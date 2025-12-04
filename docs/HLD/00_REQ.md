@@ -65,3 +65,6 @@ Session is a context initiated by developer (or agent) in which given part of ta
 ## Task
 
 Task is a set of operations, steps, subtasks etc. realizing a functionality (or subset of) as envisioned by product developer. Tasks have hierarchical structure of arbitrary depth, each node of it being managed by agent (i.e. having unique ID, description, status, attributes, parallelism), so that agent can decide which one can be executed next.
+
+## Version Control System (VCS)
+
