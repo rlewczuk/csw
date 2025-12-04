@@ -28,9 +28,11 @@
 **So that** it can break it down into manageable subtasks and guide me through the implementation
 
 **Acceptance Criteria:**
+- Agent allows developer to state intent longer and clearly, possibly from existing document
 - Agent analyzes the feature requirements
 - Agent creates a hierarchical task structure
 - Each subtask has clear description, status, and dependencies
+- Each subtask has assigned role
 - Agent suggests optimal execution order
 
 #### US-F1-002: Multi-Session Task Continuation
@@ -54,10 +56,12 @@
 - Subtasks are independently executable where possible
 - Dependencies between subtasks are clearly defined
 - Agent estimates complexity for each subtask
+- Agent assigns role to a subtask
+- When given subtask is executed, agent may decide to also split it into smaller ones
 
 #### US-F1-004: Role-Based Task Execution
-**As a** Developer  
-**I want** the agent to use appropriate roles (architect, coder, tester) for different parts of a task  
+**As a** Developer 
+**I want** the agent to use appropriate roles (architect, coder, tester) for different parts of a task 
 **So that** each phase is handled with the right expertise and tools
 
 **Acceptance Criteria:**
@@ -158,25 +162,25 @@
 
 #### US-F1-E003: Conflicting Parallel Tasks
 **As a** Developer  
-**I want** the agent to handle conflicts when parallel tasks modify the same resources  
+**I want** the agent to avoid conflicts when parallel tasks modify the same resources  
 **So that** data integrity is maintained
 
 **Acceptance Criteria:**
-- Conflicts are detected before they cause issues
-- Agent presents conflict resolution options
-- Automatic resolution is attempted where safe
-- Manual intervention is requested when needed
+- Conflicts are impossible because parallel tasks work in independent sandboxes
+- Agent uses VCS conflict resolution options
+- Automatic resolution is attempted when merging changes to upstream branch
+- Manual intervention is requested when needed durign merge
 
 #### US-F1-E004: Task Timeout Handling
 **As a** Developer  
-**I want** the agent to handle tasks that exceed time limits  
+**I want** the agent to handle tasks that exceed time or query limits  
 **So that** runaway processes don't block my workflow
 
 **Acceptance Criteria:**
-- Configurable timeout per task type
+- Configurable timeout and token limit per task type
 - Warning before timeout
+- Prompt developer to continue, terminate or modify task when limit exceeded, extending limits
 - Graceful termination with state preservation
-- Option to extend timeout
 
 #### US-F1-E005: Resource Exhaustion During Task
 **As a** Developer  
@@ -188,6 +192,8 @@
 - Warnings issued before exhaustion
 - Graceful degradation where possible
 - Clear error messages with remediation steps
+- Option to wait out (eg. for API termination)
+- Option to change model provider and/or model when limit exceeded;
 
 ---
 
