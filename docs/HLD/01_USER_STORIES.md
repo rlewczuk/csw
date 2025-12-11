@@ -18,6 +18,21 @@
 
 ---
 
+## F.0 - Basic scenarios
+
+### Common Use Cases
+
+#### US-F0-001: Generating basic Hello World program
+**As a** Developer  
+**I want to** generate a basic "Hello World" program  
+**So that** I can quickly test the agent's capabilities
+
+**Acceptance Criteria:**
+- Developer provides intent to generate "Hello World" program
+- Agent generates "Hello World" program
+- Program runs successfully
+- Output is correct
+
 ## F.1 - Task Complexity and Development Phases
 
 ### Common Use Cases
