@@ -15,20 +15,20 @@ Functional Requirements:
 * **F.2** supporting all roles in software development that AI can do: architect, developer, documenter, tester etc.
   * various roles can have not only various system prompts but also various tool sets available and various permissions (eg. writing only .md files for architect, or accessing only files in given path);
 * **F.3** enforcing specified rules when designing or developing components, features or functionalities;
-* **F.4** providing predefined custom actions that are mapped as tools and can be used by LLM or user (eg. build app, run all tests, run specific test, clean build artifacts, run app, restart app etc.)
+* **F.4** providing predefined custom actions that are mapped as tools and can be used by Model or user (eg. build app, run all tests, run specific test, clean build artifacts, run app, restart app etc.)
 * **F.5** providing predefined recipes for performing certain tasks or steps, consisting of prompts, templates and other paremeters;
   * for example SDD process should be implemented as set of recipes, not hardcoded;
 * **F.6** providing predefined blueprints -- sets of files, rules, supporting prompts etc. for quick set up of a development environment for certain software stack enforcing certain policies:
   * blueprints should be composable, eg. developer should be able to choose base software stack, design language, organizational policies etc.
 * **F.7** agent should integrate with all popular IDEs (Jetbrains, VSCode, Zed) as well as work standalone (by providing TUI or WebUI); also integration via established protocols such as ACP (Agent Client Protocol) should be supported;
   * user interface should be friendly for developer to issue more complicated tasks or decisions (better than small chat box);
-* **F.8** agent should provide a set of tools for LLM to use and decide which one should be available in certain context:
+* **F.8** agent should provide a set of tools for Model to use and decide which one should be available in certain context:
   * internal tools (managing files locally, managing tasks and overall workflow etc.);
   * tools available from IDEs with which it integrates (via ACP or MCP for Jetbrains);
   * third party tools via MCP protocol;
   * secure execution of third party tools (eg. in isolated containers);
-  * intelligent selection which tools to expose to an LLM for given subtask in given context;
-* **F.9** agent should be able to access various LLM providers, including OpenAI, Anthropic, Google, local models (Ollama, LMStudio, vllm, sglang), deepseek, qwen, minimax:
+  * intelligent selection which tools to expose to an Model for given subtask in given context;
+* **F.9** agent should be able to access various Model providers, including OpenAI, Anthropic, Google, local models (Ollama, LMStudio, vllm, sglang), deepseek, qwen, minimax:
   * various models from various providers should be used depending on role and context;
 * **F.10** agent should provide secure way for build and execution of developed application and tests:
   * agent should provide minimum surface for each task, eg. build does not need to see any files containing credentials;
@@ -44,7 +44,7 @@ Functional Requirements:
 
 ## Action
 
-Predefined command mapped as a tool (for example for building application or running tests). It relieves LLM from generating command which make it more predictable and safer.
+Predefined command mapped as a tool (for example for building application or running tests). It relieves Model from generating command which make it more predictable and safer.
 
 ## Blueprint
 
@@ -60,7 +60,7 @@ Role determines what kind of task agent will perform in a given context. It dete
 
 ## Session
 
-Session is a context initiated by developer (or agent) in which given part of task is executed. Session is associated with LLM context, consisting of system message, user and assistant messages, where new conversation is added at the end and context being periodically pruned.
+Session is a context initiated by developer (or agent) in which given part of task is executed. Session is associated with Model context, consisting of system message, user and assistant messages, where new conversation is added at the end and context being periodically pruned.
 
 ## Task
 

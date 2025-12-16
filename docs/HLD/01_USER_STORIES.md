@@ -289,7 +289,7 @@
 
 **Acceptance Criteria:**
 - Tools are assigned to roles
-- Unavailable tools are hidden from LLM
+- Unavailable tools are hidden from Model
 - Tool access attempts are logged
 - Tool permissions can be overridden per task
 
@@ -505,7 +505,7 @@
 - Custom actions can be defined in configuration
 - Actions can have parameters
 - Actions can be composed of other actions
-- Actions are available as tools to LLM
+- Actions are available as tools to Model
 
 #### US-F4-008: Action with Parameters
 **As a** Developer  
@@ -516,7 +516,7 @@
 - Parameters can be defined for actions
 - Parameters have types and validation
 - Default values are supported
-- LLM can provide parameter values
+- Model can provide parameter values
 
 ### Edge Cases
 
@@ -909,13 +909,13 @@
 
 ---
 
-## F.8 - Tool Management for LLM
+## F.8 - Tool Management for Model
 
 ### Common Use Cases
 
 #### US-F8-001: Internal File Management Tools
 **As a** Developer  
-**I want** the agent to provide file management tools to the LLM  
+**I want** the agent to provide file management tools to the Model  
 **So that** it can read, write, and manage files
 
 **Acceptance Criteria:**
@@ -927,7 +927,7 @@
 #### US-F8-002: Internal Workflow Tools
 **As a** Developer  
 **I want** the agent to provide workflow management tools  
-**So that** the LLM can manage tasks and progress
+**So that** the Model can manage tasks and progress
 
 **Acceptance Criteria:**
 - Task creation and updates work
@@ -937,7 +937,7 @@
 
 #### US-F8-003: IDE Tool Integration
 **As a** Developer  
-**I want** the agent to expose IDE tools to the LLM  
+**I want** the agent to expose IDE tools to the Model  
 **So that** it can use IDE features like refactoring
 
 **Acceptance Criteria:**
@@ -971,7 +971,7 @@
 #### US-F8-006: Context-Aware Tool Selection
 **As a** Developer  
 **I want** the agent to intelligently select which tools to expose  
-**So that** the LLM isn't overwhelmed with irrelevant tools
+**So that** the Model isn't overwhelmed with irrelevant tools
 
 **Acceptance Criteria:**
 - Tools are filtered by context
@@ -1038,7 +1038,7 @@
 
 ---
 
-## F.9 - LLM Provider Access
+## F.9 - Model Provider Access
 
 ### Common Use Cases
 
@@ -1240,7 +1240,7 @@
 #### US-F10-003: Secure Credential Handling
 **As a** DevOps Engineer  
 **I want** credentials to be handled securely  
-**So that** they're not exposed to the LLM or logs
+**So that** they're not exposed to the Model or logs
 
 **Acceptance Criteria:**
 - Credentials are stored securely
@@ -1726,7 +1726,7 @@
 
 **Acceptance Criteria:**
 - UI responses under 100ms
-- LLM responses start streaming quickly
+- Model responses start streaming quickly
 - File operations are fast
 - Search is responsive
 
@@ -1779,7 +1779,7 @@
 | F.6 - Blueprints | 7 | 3 | 10 |
 | F.7 - IDE Integration | 7 | 3 | 10 |
 | F.8 - Tool Management | 7 | 4 | 11 |
-| F.9 - LLM Providers | 11 | 4 | 15 |
+| F.9 - Model Providers | 11 | 4 | 15 |
 | F.10 - Secure Execution | 5 | 3 | 8 |
 | F.11 - Remote Execution | 4 | 3 | 7 |
 | F.12 - Navigation | 5 | 3 | 8 |

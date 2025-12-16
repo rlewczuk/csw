@@ -27,7 +27,7 @@
 * agentic library:
   * github.com/tmc/langchaingo
   * charm.land/fantasy   - library for building AI agents - Apache 2.0
-* LLM client library
+* Model client library
   * gollm
   * lexlapax/go-llms
   * langhaingo/llms
@@ -48,9 +48,9 @@ Compare charmbracelet/fantasy and langchain-go agent libraries for golang. Focus
 * testability of code using those libraries;
 * ability to run parallel sessions;
 * ability to handle more complex tasks (i.e. splitting tasks into smaller parts);
-* logging of conversation and LLM communication;
-* handling LLM communication errors, including rate limiting, failover to alternative providers etc.;
-* handling LLM cost tracking;
+* logging of conversation and Model communication;
+* handling Model communication errors, including rate limiting, failover to alternative providers etc.;
+* handling Model cost tracking;
 
 ## Agentic interface
 
@@ -59,13 +59,13 @@ I'm looking for golang library to build agentic applications. It should be able 
 * periodically prune conversation context;
 * define and use tools;
 * run parallel sessions;
-* support either local or remote LLM providers;
-* support multiple LLM providers;
+* support either local or remote Model providers;
+* support multiple Model providers;
 * provide test mocks, so that client code can be tested easily;
 
-## LLM interface
+## Model interface
 
-I'm looking for golang library to interact with LLM providers. It should be able to:
+I'm looking for golang library to interact with Model providers. It should be able to:
 * list available models;
 * query model with streaming;
 * properly handle rate limiting (eg. by pausing or letting client code provide custom handler);
@@ -74,7 +74,7 @@ I'm looking for golang library to interact with LLM providers. It should be able
 * configure model;
 * (optional)track cost;
 * support multiple providers (eg. openai, anthropic, google, local models etc.);
-* provide test mocks, so that client code can be tested without actual LLM calls;
+* provide test mocks, so that client code can be tested without actual Model calls;
 
 
 ## LSP interface

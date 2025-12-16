@@ -18,7 +18,7 @@ Contains core logic and workflow utilities, including:
 * API provider for user interfaces;
 
 
-## LLM Providers
+## Model Providers
 
 Unified interface for accessint LLMs provides following functionalities:
  
