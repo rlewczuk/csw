@@ -1,7 +1,7 @@
 Modify Ollama provider so that it contains following method:
 
 ```
-    ChatModel(mode string, options *ChatOptions) ChatModel
+    ChatModel(model string, options *ChatOptions) ChatModel
 ```
 
 This method should return an implementation of `models.ChatModel` interface.

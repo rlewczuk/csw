@@ -29,6 +29,12 @@ type OllamaChatModel struct {
 	options *models.ChatOptions
 }
 
+// OllamaEmbeddingModel is an embedding model implementation for Ollama
+type OllamaEmbeddingModel struct {
+	client *OllamaClient
+	model  string
+}
+
 // NewOllamaClient creates a new Ollama client with the given base URL and options
 func NewOllamaClient(baseURL string, options *models.ModelConnectionOptions) (*OllamaClient, error) {
 	if baseURL == "" {
@@ -77,6 +83,14 @@ func (c *OllamaClient) ChatModel(model string, options *models.ChatOptions) mode
 		client:  c,
 		model:   model,
 		options: options,
+	}
+}
+
+// EmbeddingModel returns an EmbeddingModel implementation for the given model
+func (c *OllamaClient) EmbeddingModel(model string) models.EmbeddingModel {
+	return &OllamaEmbeddingModel{
+		client: c,
+		model:  model,
 	}
 }
 
@@ -211,21 +225,21 @@ func (c *OllamaClient) Chat(ctx context.Context, messages []*models.ChatMessage,
 }
 
 // Embed generates embeddings for the given input text
-func (c *OllamaClient) Embed(ctx context.Context, input string) ([]float64, error) {
+func (m *OllamaEmbeddingModel) Embed(ctx context.Context, input string) ([]float64, error) {
 	if input == "" {
 		return nil, errors.New("input cannot be empty")
 	}
 
-	if c.model == "" {
-		return nil, errors.New("model not set, use SetModel() to set the model")
+	if m.model == "" {
+		return nil, errors.New("model not set")
 	}
 
 	embedReq := EmbedRequest{
-		Model: c.model,
+		Model: m.model,
 		Input: []string{input},
 	}
 
-	url := c.baseURL + "/api/embed"
+	url := m.client.baseURL + "/api/embed"
 
 	body, err := json.Marshal(embedReq)
 	if err != nil {
@@ -238,13 +252,13 @@ func (c *OllamaClient) Embed(ctx context.Context, input string) ([]float64, erro
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := m.client.httpClient.Do(req)
 	if err != nil {
-		return nil, c.handleHTTPError(err)
+		return nil, m.client.handleHTTPError(err)
 	}
 	defer resp.Body.Close()
 
-	if err := c.checkStatusCode(resp); err != nil {
+	if err := m.client.checkStatusCode(resp); err != nil {
 		return nil, err
 	}
 
@@ -258,6 +272,17 @@ func (c *OllamaClient) Embed(ctx context.Context, input string) ([]float64, erro
 	}
 
 	return embedResp.Embeddings[0], nil
+}
+
+// Embed generates embeddings for the given input text
+// Deprecated: Use EmbeddingModel method to get an EmbeddingModel instance and call Embed on it
+func (c *OllamaClient) Embed(ctx context.Context, input string) ([]float64, error) {
+	if c.model == "" {
+		return nil, errors.New("model not set, use SetModel() to set the model")
+	}
+
+	embedModel := c.EmbeddingModel(c.model)
+	return embedModel.Embed(ctx, input)
 }
 
 // handleHTTPError converts HTTP errors to appropriate model errors

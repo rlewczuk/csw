@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	defaultOllamaHost = "http://localhost:11434"
-	testModelName     = "devstral-small-2:latest"
-	testTimeout       = 30 * time.Second
-	connectTimeout    = 5 * time.Second
+	defaultOllamaHost  = "http://localhost:11434"
+	testModelName      = "devstral-small-2:latest"
+	testEmbedModelName = "nomic-embed-text:latest"
+	testTimeout        = 30 * time.Second
+	connectTimeout     = 5 * time.Second
 )
 
 // getOllamaHost returns the Ollama host URL from environment variable or default
@@ -317,6 +318,59 @@ func TestOllamaClient_Chat(t *testing.T) {
 	})
 }
 
+func TestOllamaClient_EmbeddingModel(t *testing.T) {
+	host := skipIfNoOllama(t)
+
+	client, err := NewOllamaClient(host, &models.ModelConnectionOptions{
+		ConnectTimeout: connectTimeout,
+		RequestTimeout: testTimeout,
+	})
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	t.Run("creates embedding model with model name", func(t *testing.T) {
+		embedModel := client.EmbeddingModel(testEmbedModelName)
+
+		assert.NotNil(t, embedModel)
+	})
+
+	t.Run("generates embeddings for text", func(t *testing.T) {
+		embedModel := client.EmbeddingModel(testEmbedModelName)
+
+		embedding, err := embedModel.Embed(ctx, "Hello, world!")
+
+		require.NoError(t, err)
+		assert.NotNil(t, embedding)
+		assert.NotEmpty(t, embedding)
+		assert.Greater(t, len(embedding), 0)
+	})
+
+	t.Run("generates embeddings for different texts", func(t *testing.T) {
+		embedModel := client.EmbeddingModel(testEmbedModelName)
+
+		embedding1, err := embedModel.Embed(ctx, "The quick brown fox")
+		require.NoError(t, err)
+		assert.NotNil(t, embedding1)
+
+		embedding2, err := embedModel.Embed(ctx, "jumps over the lazy dog")
+		require.NoError(t, err)
+		assert.NotNil(t, embedding2)
+
+		// Embeddings should have the same dimension
+		assert.Equal(t, len(embedding1), len(embedding2))
+	})
+
+	t.Run("returns error for empty input", func(t *testing.T) {
+		embedModel := client.EmbeddingModel(testEmbedModelName)
+
+		embedding, err := embedModel.Embed(ctx, "")
+
+		assert.Error(t, err)
+		assert.Nil(t, embedding)
+	})
+}
+
 func TestOllamaClient_Embed(t *testing.T) {
 	host := skipIfNoOllama(t)
 
@@ -326,17 +380,10 @@ func TestOllamaClient_Embed(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Note: devstral-small-2:latest does not support embeddings
-	// For embedding tests, you would need to use an embedding model like "nomic-embed-text"
-	// Skipping actual embedding test for now since test model doesn't support it
-
 	ctx := context.Background()
 
-	t.Run("generates embeddings for text", func(t *testing.T) {
-		t.Skip("Test model devstral-small-2:latest does not support embeddings. " +
-			"To test embeddings, use an embedding-specific model like 'nomic-embed-text'")
-
-		client.SetModel(testModelName)
+	t.Run("generates embeddings for text (deprecated)", func(t *testing.T) {
+		client.SetModel(testEmbedModelName)
 		embedding, err := client.Embed(ctx, "Hello, world!")
 
 		require.NoError(t, err)
@@ -345,8 +392,8 @@ func TestOllamaClient_Embed(t *testing.T) {
 		assert.Greater(t, len(embedding), 0)
 	})
 
-	t.Run("returns error for empty input", func(t *testing.T) {
-		client.SetModel(testModelName)
+	t.Run("returns error for empty input (deprecated)", func(t *testing.T) {
+		client.SetModel(testEmbedModelName)
 		embedding, err := client.Embed(ctx, "")
 
 		assert.Error(t, err)
