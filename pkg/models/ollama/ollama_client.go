@@ -22,6 +22,13 @@ type OllamaClient struct {
 	model      string
 }
 
+// OllamaChatModel is a chat model implementation for Ollama
+type OllamaChatModel struct {
+	client  *OllamaClient
+	model   string
+	options *models.ChatOptions
+}
+
 // NewOllamaClient creates a new Ollama client with the given base URL and options
 func NewOllamaClient(baseURL string, options *models.ModelConnectionOptions) (*OllamaClient, error) {
 	if baseURL == "" {
@@ -64,6 +71,15 @@ func (c *OllamaClient) SetModel(model string) {
 	c.model = model
 }
 
+// ChatModel returns a ChatModel implementation for the given model and options
+func (c *OllamaClient) ChatModel(model string, options *models.ChatOptions) models.ChatModel {
+	return &OllamaChatModel{
+		client:  c,
+		model:   model,
+		options: options,
+	}
+}
+
 // ListModels lists all available models
 func (c *OllamaClient) ListModels() ([]models.ModelInfo, error) {
 	url := c.baseURL + "/api/tags"
@@ -104,13 +120,19 @@ func (c *OllamaClient) ListModels() ([]models.ModelInfo, error) {
 }
 
 // Chat sends a chat request and returns the response
-func (c *OllamaClient) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) (*models.ChatMessage, error) {
+func (m *OllamaChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) (*models.ChatMessage, error) {
 	if messages == nil || len(messages) == 0 {
 		return nil, errors.New("messages cannot be nil or empty")
 	}
 
-	if c.model == "" {
-		return nil, errors.New("model not set, use SetModel() to set the model")
+	if m.model == "" {
+		return nil, errors.New("model not set")
+	}
+
+	// Use provided options or fall back to model's default options
+	effectiveOptions := options
+	if effectiveOptions == nil {
+		effectiveOptions = m.options
 	}
 
 	// Convert messages to Ollama format
@@ -126,21 +148,21 @@ func (c *OllamaClient) Chat(ctx context.Context, messages []*models.ChatMessage,
 
 	// Build request
 	chatReq := ChatRequest{
-		Model:    c.model,
+		Model:    m.model,
 		Messages: ollamaMessages,
 		Stream:   false,
 	}
 
 	// Apply options if provided
-	if options != nil {
+	if effectiveOptions != nil {
 		chatReq.Options = &ModelOptions{
-			Temperature: float64(options.Temperature),
-			TopP:        float64(options.TopP),
-			TopK:        options.TopK,
+			Temperature: float64(effectiveOptions.Temperature),
+			TopP:        float64(effectiveOptions.TopP),
+			TopK:        effectiveOptions.TopK,
 		}
 	}
 
-	url := c.baseURL + "/api/chat"
+	url := m.client.baseURL + "/api/chat"
 
 	body, err := json.Marshal(chatReq)
 	if err != nil {
@@ -153,13 +175,13 @@ func (c *OllamaClient) Chat(ctx context.Context, messages []*models.ChatMessage,
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := m.client.httpClient.Do(req)
 	if err != nil {
-		return nil, c.handleHTTPError(err)
+		return nil, m.client.handleHTTPError(err)
 	}
 	defer resp.Body.Close()
 
-	if err := c.checkStatusCode(resp); err != nil {
+	if err := m.client.checkStatusCode(resp); err != nil {
 		return nil, err
 	}
 
@@ -175,6 +197,17 @@ func (c *OllamaClient) Chat(ctx context.Context, messages []*models.ChatMessage,
 	}
 
 	return result, nil
+}
+
+// Chat sends a chat request and returns the response
+// Deprecated: Use ChatModel method to get a ChatModel instance and call Chat on it
+func (c *OllamaClient) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) (*models.ChatMessage, error) {
+	if c.model == "" {
+		return nil, errors.New("model not set, use SetModel() to set the model")
+	}
+
+	chatModel := c.ChatModel(c.model, options)
+	return chatModel.Chat(ctx, messages, options)
 }
 
 // Embed generates embeddings for the given input text

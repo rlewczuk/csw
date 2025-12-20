@@ -102,6 +102,135 @@ func TestOllamaClient_ListModels(t *testing.T) {
 	})
 }
 
+func TestOllamaClient_ChatModel(t *testing.T) {
+	host := skipIfNoOllama(t)
+
+	client, err := NewOllamaClient(host, &models.ModelConnectionOptions{
+		ConnectTimeout: connectTimeout,
+		RequestTimeout: testTimeout,
+	})
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	t.Run("creates chat model with model name and options", func(t *testing.T) {
+		options := &models.ChatOptions{
+			Temperature: 0.7,
+			TopP:        0.9,
+			TopK:        40,
+		}
+
+		chatModel := client.ChatModel(testModelName, options)
+
+		assert.NotNil(t, chatModel)
+	})
+
+	t.Run("sends chat message and gets response", func(t *testing.T) {
+		options := &models.ChatOptions{
+			Temperature: 0.7,
+			TopP:        0.9,
+			TopK:        40,
+		}
+
+		chatModel := client.ChatModel(testModelName, options)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"What is 2+2? Answer with just the number."},
+			},
+		}
+
+		response, err := chatModel.Chat(ctx, messages, nil)
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+		assert.NotEmpty(t, response.Parts)
+		assert.Greater(t, len(response.Parts[0]), 0)
+	})
+
+	t.Run("handles context with timeout", func(t *testing.T) {
+		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		chatModel := client.ChatModel(testModelName, nil)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Say hello"},
+			},
+		}
+
+		response, err := chatModel.Chat(ctxWithTimeout, messages, nil)
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+	})
+
+	t.Run("handles system and user messages", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, nil)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleSystem,
+				Parts: []string{"You are a helpful assistant that always responds in uppercase."},
+			},
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"hello"},
+			},
+		}
+
+		response, err := chatModel.Chat(ctx, messages, nil)
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+	})
+
+	t.Run("returns error for empty messages", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, nil)
+
+		response, err := chatModel.Chat(ctx, []*models.ChatMessage{}, nil)
+
+		assert.Error(t, err)
+		assert.Nil(t, response)
+	})
+
+	t.Run("returns error for nil messages", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, nil)
+
+		response, err := chatModel.Chat(ctx, nil, nil)
+
+		assert.Error(t, err)
+		assert.Nil(t, response)
+	})
+
+	t.Run("uses default options when none provided to Chat", func(t *testing.T) {
+		defaultOptions := &models.ChatOptions{
+			Temperature: 0.5,
+			TopP:        0.8,
+			TopK:        30,
+		}
+
+		chatModel := client.ChatModel(testModelName, defaultOptions)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Say hello"},
+			},
+		}
+
+		response, err := chatModel.Chat(ctx, messages, nil)
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+	})
+}
+
 func TestOllamaClient_Chat(t *testing.T) {
 	host := skipIfNoOllama(t)
 
@@ -114,7 +243,7 @@ func TestOllamaClient_Chat(t *testing.T) {
 
 	ctx := context.Background()
 
-	t.Run("sends chat message and gets response", func(t *testing.T) {
+	t.Run("sends chat message and gets response (deprecated)", func(t *testing.T) {
 		messages := []*models.ChatMessage{
 			{
 				Role:  models.ChatRoleUser,
@@ -137,7 +266,7 @@ func TestOllamaClient_Chat(t *testing.T) {
 		assert.Greater(t, len(response.Parts[0]), 0)
 	})
 
-	t.Run("handles context with timeout", func(t *testing.T) {
+	t.Run("handles context with timeout (deprecated)", func(t *testing.T) {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
@@ -154,7 +283,7 @@ func TestOllamaClient_Chat(t *testing.T) {
 		assert.NotNil(t, response)
 	})
 
-	t.Run("handles system and user messages", func(t *testing.T) {
+	t.Run("handles system and user messages (deprecated)", func(t *testing.T) {
 		messages := []*models.ChatMessage{
 			{
 				Role:  models.ChatRoleSystem,
@@ -173,14 +302,14 @@ func TestOllamaClient_Chat(t *testing.T) {
 		assert.Equal(t, models.ChatRoleAssistant, response.Role)
 	})
 
-	t.Run("returns error for empty messages", func(t *testing.T) {
+	t.Run("returns error for empty messages (deprecated)", func(t *testing.T) {
 		response, err := client.Chat(ctx, []*models.ChatMessage{}, nil)
 
 		assert.Error(t, err)
 		assert.Nil(t, response)
 	})
 
-	t.Run("returns error for nil messages", func(t *testing.T) {
+	t.Run("returns error for nil messages (deprecated)", func(t *testing.T) {
 		response, err := client.Chat(ctx, nil, nil)
 
 		assert.Error(t, err)
