@@ -232,92 +232,6 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 	})
 }
 
-func TestOllamaClient_Chat(t *testing.T) {
-	host := skipIfNoOllama(t)
-
-	client, err := NewOllamaClient(host, &models.ModelConnectionOptions{
-		ConnectTimeout: connectTimeout,
-		RequestTimeout: testTimeout,
-	})
-	require.NoError(t, err)
-	client.SetModel(testModelName)
-
-	ctx := context.Background()
-
-	t.Run("sends chat message and gets response (deprecated)", func(t *testing.T) {
-		messages := []*models.ChatMessage{
-			{
-				Role:  models.ChatRoleUser,
-				Parts: []string{"What is 2+2? Answer with just the number."},
-			},
-		}
-
-		options := &models.ChatOptions{
-			Temperature: 0.7,
-			TopP:        0.9,
-			TopK:        40,
-		}
-
-		response, err := client.Chat(ctx, messages, options)
-
-		require.NoError(t, err)
-		assert.NotNil(t, response)
-		assert.Equal(t, models.ChatRoleAssistant, response.Role)
-		assert.NotEmpty(t, response.Parts)
-		assert.Greater(t, len(response.Parts[0]), 0)
-	})
-
-	t.Run("handles context with timeout (deprecated)", func(t *testing.T) {
-		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-
-		messages := []*models.ChatMessage{
-			{
-				Role:  models.ChatRoleUser,
-				Parts: []string{"Say hello"},
-			},
-		}
-
-		response, err := client.Chat(ctxWithTimeout, messages, nil)
-
-		require.NoError(t, err)
-		assert.NotNil(t, response)
-	})
-
-	t.Run("handles system and user messages (deprecated)", func(t *testing.T) {
-		messages := []*models.ChatMessage{
-			{
-				Role:  models.ChatRoleSystem,
-				Parts: []string{"You are a helpful assistant that always responds in uppercase."},
-			},
-			{
-				Role:  models.ChatRoleUser,
-				Parts: []string{"hello"},
-			},
-		}
-
-		response, err := client.Chat(ctx, messages, nil)
-
-		require.NoError(t, err)
-		assert.NotNil(t, response)
-		assert.Equal(t, models.ChatRoleAssistant, response.Role)
-	})
-
-	t.Run("returns error for empty messages (deprecated)", func(t *testing.T) {
-		response, err := client.Chat(ctx, []*models.ChatMessage{}, nil)
-
-		assert.Error(t, err)
-		assert.Nil(t, response)
-	})
-
-	t.Run("returns error for nil messages (deprecated)", func(t *testing.T) {
-		response, err := client.Chat(ctx, nil, nil)
-
-		assert.Error(t, err)
-		assert.Nil(t, response)
-	})
-}
-
 func TestOllamaClient_EmbeddingModel(t *testing.T) {
 	host := skipIfNoOllama(t)
 
@@ -365,36 +279,6 @@ func TestOllamaClient_EmbeddingModel(t *testing.T) {
 		embedModel := client.EmbeddingModel(testEmbedModelName)
 
 		embedding, err := embedModel.Embed(ctx, "")
-
-		assert.Error(t, err)
-		assert.Nil(t, embedding)
-	})
-}
-
-func TestOllamaClient_Embed(t *testing.T) {
-	host := skipIfNoOllama(t)
-
-	client, err := NewOllamaClient(host, &models.ModelConnectionOptions{
-		ConnectTimeout: connectTimeout,
-		RequestTimeout: testTimeout,
-	})
-	require.NoError(t, err)
-
-	ctx := context.Background()
-
-	t.Run("generates embeddings for text (deprecated)", func(t *testing.T) {
-		client.SetModel(testEmbedModelName)
-		embedding, err := client.Embed(ctx, "Hello, world!")
-
-		require.NoError(t, err)
-		assert.NotNil(t, embedding)
-		assert.NotEmpty(t, embedding)
-		assert.Greater(t, len(embedding), 0)
-	})
-
-	t.Run("returns error for empty input (deprecated)", func(t *testing.T) {
-		client.SetModel(testEmbedModelName)
-		embedding, err := client.Embed(ctx, "")
 
 		assert.Error(t, err)
 		assert.Nil(t, embedding)

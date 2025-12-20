@@ -213,17 +213,6 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 	return result, nil
 }
 
-// Chat sends a chat request and returns the response
-// Deprecated: Use ChatModel method to get a ChatModel instance and call Chat on it
-func (c *OllamaClient) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) (*models.ChatMessage, error) {
-	if c.model == "" {
-		return nil, errors.New("model not set, use SetModel() to set the model")
-	}
-
-	chatModel := c.ChatModel(c.model, options)
-	return chatModel.Chat(ctx, messages, options)
-}
-
 // Embed generates embeddings for the given input text
 func (m *OllamaEmbeddingModel) Embed(ctx context.Context, input string) ([]float64, error) {
 	if input == "" {
@@ -272,17 +261,6 @@ func (m *OllamaEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 	}
 
 	return embedResp.Embeddings[0], nil
-}
-
-// Embed generates embeddings for the given input text
-// Deprecated: Use EmbeddingModel method to get an EmbeddingModel instance and call Embed on it
-func (c *OllamaClient) Embed(ctx context.Context, input string) ([]float64, error) {
-	if c.model == "" {
-		return nil, errors.New("model not set, use SetModel() to set the model")
-	}
-
-	embedModel := c.EmbeddingModel(c.model)
-	return embedModel.Embed(ctx, input)
 }
 
 // handleHTTPError converts HTTP errors to appropriate model errors
