@@ -6,5 +6,5 @@ import "github.com/codesnort/codesnort-swe/pkg/models"
 var (
 	_ models.ModelProvider  = (*OllamaClient)(nil)
 	_ models.ChatModel      = (*OllamaChatModel)(nil)
-	_ models.EmbeddingModel = (*OllamaClient)(nil)
+	_ models.EmbeddingModel = (*OllamaEmbeddingModel)(nil)
 )
