@@ -2,6 +2,7 @@ package ollama
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -229,6 +230,232 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
+	})
+}
+
+func TestOllamaClient_ChatModelStream(t *testing.T) {
+	host := skipIfNoOllama(t)
+
+	client, err := NewOllamaClient(host, &models.ModelConnectionOptions{
+		ConnectTimeout: connectTimeout,
+		RequestTimeout: testTimeout,
+	})
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	t.Run("streams chat message and gets fragments", func(t *testing.T) {
+		options := &models.ChatOptions{
+			Temperature: 0.7,
+			TopP:        0.9,
+			TopK:        40,
+		}
+
+		chatModel := client.ChatModel(testModelName, options)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Count from 1 to 5, one number per line."},
+			},
+		}
+
+		iterator, err := chatModel.ChatStream(ctx, messages, nil)
+		require.NoError(t, err)
+		require.NotNil(t, iterator)
+		defer iterator.Close()
+
+		var fragments []*models.ChatMessage
+		for {
+			fragment, err := iterator.Next()
+			if err != nil {
+				if err == models.ErrEndOfStream {
+					break
+				}
+				require.NoError(t, err)
+			}
+
+			assert.NotNil(t, fragment)
+			assert.Equal(t, models.ChatRoleAssistant, fragment.Role)
+			assert.NotEmpty(t, fragment.Parts)
+			fragments = append(fragments, fragment)
+		}
+
+		// Should have received multiple fragments
+		assert.Greater(t, len(fragments), 0, "expected to receive at least one fragment")
+	})
+
+	t.Run("handles context cancellation during streaming", func(t *testing.T) {
+		ctxWithCancel, cancel := context.WithCancel(ctx)
+
+		chatModel := client.ChatModel(testModelName, nil)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Write a long story about a cat."},
+			},
+		}
+
+		iterator, err := chatModel.ChatStream(ctxWithCancel, messages, nil)
+		require.NoError(t, err)
+		require.NotNil(t, iterator)
+		defer iterator.Close()
+
+		// Read first fragment
+		fragment, err := iterator.Next()
+		require.NoError(t, err)
+		assert.NotNil(t, fragment)
+
+		// Cancel the context
+		cancel()
+
+		// Next call should fail with context error
+		_, err = iterator.Next()
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, context.Canceled) || err == models.ErrEndOfStream,
+			"expected context.Canceled or ErrEndOfStream, got: %v", err)
+	})
+
+	t.Run("handles context with timeout during streaming", func(t *testing.T) {
+		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		chatModel := client.ChatModel(testModelName, nil)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Say hello"},
+			},
+		}
+
+		iterator, err := chatModel.ChatStream(ctxWithTimeout, messages, nil)
+		require.NoError(t, err)
+		require.NotNil(t, iterator)
+		defer iterator.Close()
+
+		var fragments []*models.ChatMessage
+		for {
+			fragment, err := iterator.Next()
+			if err != nil {
+				if err == models.ErrEndOfStream {
+					break
+				}
+				require.NoError(t, err)
+			}
+			fragments = append(fragments, fragment)
+		}
+
+		assert.Greater(t, len(fragments), 0)
+	})
+
+	t.Run("handles system and user messages in streaming", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, nil)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleSystem,
+				Parts: []string{"You are a helpful assistant that responds concisely."},
+			},
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Say 'OK'"},
+			},
+		}
+
+		iterator, err := chatModel.ChatStream(ctx, messages, nil)
+		require.NoError(t, err)
+		require.NotNil(t, iterator)
+		defer iterator.Close()
+
+		var fragments []*models.ChatMessage
+		for {
+			fragment, err := iterator.Next()
+			if err != nil {
+				if err == models.ErrEndOfStream {
+					break
+				}
+				require.NoError(t, err)
+			}
+			fragments = append(fragments, fragment)
+		}
+
+		assert.Greater(t, len(fragments), 0)
+		// All fragments should have assistant role
+		for _, fragment := range fragments {
+			assert.Equal(t, models.ChatRoleAssistant, fragment.Role)
+		}
+	})
+
+	t.Run("returns error for empty messages", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, nil)
+
+		iterator, err := chatModel.ChatStream(ctx, []*models.ChatMessage{}, nil)
+
+		assert.Error(t, err)
+		assert.Nil(t, iterator)
+	})
+
+	t.Run("returns error for nil messages", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, nil)
+
+		iterator, err := chatModel.ChatStream(ctx, nil, nil)
+
+		assert.Error(t, err)
+		assert.Nil(t, iterator)
+	})
+
+	t.Run("uses default options when none provided to ChatStream", func(t *testing.T) {
+		defaultOptions := &models.ChatOptions{
+			Temperature: 0.5,
+			TopP:        0.8,
+			TopK:        30,
+		}
+
+		chatModel := client.ChatModel(testModelName, defaultOptions)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Say hello"},
+			},
+		}
+
+		iterator, err := chatModel.ChatStream(ctx, messages, nil)
+		require.NoError(t, err)
+		require.NotNil(t, iterator)
+		defer iterator.Close()
+
+		// Should get at least one fragment
+		fragment, err := iterator.Next()
+		if err != models.ErrEndOfStream {
+			require.NoError(t, err)
+			assert.NotNil(t, fragment)
+		}
+	})
+
+	t.Run("properly closes iterator", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, nil)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Say hello"},
+			},
+		}
+
+		iterator, err := chatModel.ChatStream(ctx, messages, nil)
+		require.NoError(t, err)
+		require.NotNil(t, iterator)
+
+		// Close without reading
+		err = iterator.Close()
+		assert.NoError(t, err)
+
+		// Trying to read after close should handle gracefully
+		_, err = iterator.Next()
+		assert.Error(t, err)
 	})
 }
 
