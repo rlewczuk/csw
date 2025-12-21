@@ -1,0 +1,462 @@
+package openai
+
+import (
+	"context"
+	"errors"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+const (
+	defaultTestURL     = "http://localhost:11434/v1"
+	testModelName      = "devstral-small-2:latest"
+	testEmbedModelName = "nomic-embed-text:latest"
+	testTimeout        = 30 * time.Second
+	connectTimeout     = 5 * time.Second
+)
+
+// skipIfNoOpenAI skips the test if OPENAI_URL environment variable is not set
+func skipIfNoOpenAI(t *testing.T) string {
+	url := os.Getenv("OPENAI_URL")
+	if url == "" {
+		t.Skip("Skipping test: OPENAI_URL environment variable not set")
+	}
+	return url
+}
+
+func TestNewOpenAIClient(t *testing.T) {
+	t.Run("creates client with valid configuration", func(t *testing.T) {
+		client, err := NewOpenAIClient(defaultTestURL, &models.ModelConnectionOptions{
+			ConnectTimeout: connectTimeout,
+			RequestTimeout: testTimeout,
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, client)
+	})
+
+	t.Run("creates client with nil options", func(t *testing.T) {
+		client, err := NewOpenAIClient(defaultTestURL, nil)
+
+		require.NoError(t, err)
+		assert.NotNil(t, client)
+	})
+
+	t.Run("returns error for empty URL", func(t *testing.T) {
+		_, err := NewOpenAIClient("", nil)
+
+		assert.Error(t, err)
+	})
+}
+
+func TestOpenAIClient_ListModels(t *testing.T) {
+	url := skipIfNoOpenAI(t)
+
+	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
+		ConnectTimeout: connectTimeout,
+		RequestTimeout: testTimeout,
+	})
+	require.NoError(t, err)
+
+	t.Run("lists available models", func(t *testing.T) {
+		modelList, err := client.ListModels()
+
+		require.NoError(t, err)
+		assert.NotNil(t, modelList)
+		assert.NotEmpty(t, modelList, "expected at least one model to be available")
+
+		// Verify model info structure
+		for _, model := range modelList {
+			assert.NotEmpty(t, model.Name)
+			assert.NotEmpty(t, model.Model)
+		}
+	})
+
+	t.Run("finds test model in list", func(t *testing.T) {
+		modelList, err := client.ListModels()
+
+		require.NoError(t, err)
+
+		found := false
+		for _, model := range modelList {
+			if model.Name == testModelName {
+				found = true
+				break
+			}
+		}
+
+		assert.True(t, found, "expected test model %s to be available", testModelName)
+	})
+}
+
+func TestOpenAIClient_ChatModel(t *testing.T) {
+	url := skipIfNoOpenAI(t)
+
+	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
+		ConnectTimeout: connectTimeout,
+		RequestTimeout: testTimeout,
+	})
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	t.Run("creates chat model with model name and options", func(t *testing.T) {
+		options := &models.ChatOptions{
+			Temperature: 0.7,
+			TopP:        0.9,
+			TopK:        40,
+		}
+
+		chatModel := client.ChatModel(testModelName, options)
+
+		assert.NotNil(t, chatModel)
+	})
+
+	t.Run("sends chat message and gets response", func(t *testing.T) {
+		options := &models.ChatOptions{
+			Temperature: 0.7,
+			TopP:        0.9,
+			TopK:        40,
+		}
+
+		chatModel := client.ChatModel(testModelName, options)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"What is 2+2? Answer with just the number."},
+			},
+		}
+
+		response, err := chatModel.Chat(ctx, messages, nil)
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+		assert.NotEmpty(t, response.Parts)
+		assert.Greater(t, len(response.Parts[0]), 0)
+	})
+
+	t.Run("handles context with timeout", func(t *testing.T) {
+		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		chatModel := client.ChatModel(testModelName, nil)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Say hello"},
+			},
+		}
+
+		response, err := chatModel.Chat(ctxWithTimeout, messages, nil)
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+	})
+
+	t.Run("handles system and user messages", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, nil)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleSystem,
+				Parts: []string{"You are a helpful assistant that always responds in uppercase."},
+			},
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"hello"},
+			},
+		}
+
+		response, err := chatModel.Chat(ctx, messages, nil)
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+	})
+
+	t.Run("returns error for empty messages", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, nil)
+
+		response, err := chatModel.Chat(ctx, []*models.ChatMessage{}, nil)
+
+		assert.Error(t, err)
+		assert.Nil(t, response)
+	})
+
+	t.Run("returns error for nil messages", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, nil)
+
+		response, err := chatModel.Chat(ctx, nil, nil)
+
+		assert.Error(t, err)
+		assert.Nil(t, response)
+	})
+
+	t.Run("uses default options when none provided to Chat", func(t *testing.T) {
+		defaultOptions := &models.ChatOptions{
+			Temperature: 0.5,
+			TopP:        0.8,
+			TopK:        30,
+		}
+
+		chatModel := client.ChatModel(testModelName, defaultOptions)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Say hello"},
+			},
+		}
+
+		response, err := chatModel.Chat(ctx, messages, nil)
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+	})
+}
+
+func TestOpenAIClient_ChatModelStream(t *testing.T) {
+	url := skipIfNoOpenAI(t)
+
+	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
+		ConnectTimeout: connectTimeout,
+		RequestTimeout: testTimeout,
+	})
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	t.Run("streams chat message and gets fragments", func(t *testing.T) {
+		options := &models.ChatOptions{
+			Temperature: 0.7,
+			TopP:        0.9,
+			TopK:        40,
+		}
+
+		chatModel := client.ChatModel(testModelName, options)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Count from 1 to 5, one number per line."},
+			},
+		}
+
+		iterator, err := chatModel.ChatStream(ctx, messages, nil)
+		require.NoError(t, err)
+		require.NotNil(t, iterator)
+		defer iterator.Close()
+
+		var fragments []*models.ChatMessage
+		for {
+			fragment, err := iterator.Next()
+			if err != nil {
+				if err == models.ErrEndOfStream {
+					break
+				}
+				require.NoError(t, err)
+			}
+
+			assert.NotNil(t, fragment)
+			assert.Equal(t, models.ChatRoleAssistant, fragment.Role)
+			assert.NotEmpty(t, fragment.Parts)
+			fragments = append(fragments, fragment)
+		}
+
+		// Should have received multiple fragments
+		assert.Greater(t, len(fragments), 0, "expected to receive at least one fragment")
+	})
+
+	t.Run("handles context cancellation during streaming", func(t *testing.T) {
+		ctxWithCancel, cancel := context.WithCancel(ctx)
+
+		chatModel := client.ChatModel(testModelName, nil)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Write a long story about a cat."},
+			},
+		}
+
+		iterator, err := chatModel.ChatStream(ctxWithCancel, messages, nil)
+		require.NoError(t, err)
+		require.NotNil(t, iterator)
+		defer iterator.Close()
+
+		// Read first fragment
+		fragment, err := iterator.Next()
+		require.NoError(t, err)
+		assert.NotNil(t, fragment)
+
+		// Cancel the context
+		cancel()
+
+		// Next call should fail with context error
+		_, err = iterator.Next()
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, context.Canceled) || err == models.ErrEndOfStream,
+			"expected context.Canceled or ErrEndOfStream, got: %v", err)
+	})
+
+	t.Run("handles context with timeout during streaming", func(t *testing.T) {
+		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		chatModel := client.ChatModel(testModelName, nil)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Say hello"},
+			},
+		}
+
+		iterator, err := chatModel.ChatStream(ctxWithTimeout, messages, nil)
+		require.NoError(t, err)
+		require.NotNil(t, iterator)
+		defer iterator.Close()
+
+		var fragments []*models.ChatMessage
+		for {
+			fragment, err := iterator.Next()
+			if err != nil {
+				if err == models.ErrEndOfStream {
+					break
+				}
+				require.NoError(t, err)
+			}
+			fragments = append(fragments, fragment)
+		}
+
+		assert.Greater(t, len(fragments), 0)
+	})
+
+	t.Run("returns error for empty messages", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, nil)
+
+		iterator, err := chatModel.ChatStream(ctx, []*models.ChatMessage{}, nil)
+
+		assert.Error(t, err)
+		assert.Nil(t, iterator)
+	})
+
+	t.Run("returns error for nil messages", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, nil)
+
+		iterator, err := chatModel.ChatStream(ctx, nil, nil)
+
+		assert.Error(t, err)
+		assert.Nil(t, iterator)
+	})
+
+	t.Run("properly closes iterator", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, nil)
+
+		messages := []*models.ChatMessage{
+			{
+				Role:  models.ChatRoleUser,
+				Parts: []string{"Say hello"},
+			},
+		}
+
+		iterator, err := chatModel.ChatStream(ctx, messages, nil)
+		require.NoError(t, err)
+		require.NotNil(t, iterator)
+
+		// Close without reading
+		err = iterator.Close()
+		assert.NoError(t, err)
+
+		// Trying to read after close should handle gracefully
+		_, err = iterator.Next()
+		assert.Error(t, err)
+	})
+}
+
+func TestOpenAIClient_EmbeddingModel(t *testing.T) {
+	url := skipIfNoOpenAI(t)
+
+	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
+		ConnectTimeout: connectTimeout,
+		RequestTimeout: testTimeout,
+	})
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	t.Run("creates embedding model with model name", func(t *testing.T) {
+		embedModel := client.EmbeddingModel(testEmbedModelName)
+
+		assert.NotNil(t, embedModel)
+	})
+
+	t.Run("generates embeddings for text", func(t *testing.T) {
+		embedModel := client.EmbeddingModel(testEmbedModelName)
+
+		embedding, err := embedModel.Embed(ctx, "Hello, world!")
+
+		require.NoError(t, err)
+		assert.NotNil(t, embedding)
+		assert.NotEmpty(t, embedding)
+		assert.Greater(t, len(embedding), 0)
+	})
+
+	t.Run("generates embeddings for different texts", func(t *testing.T) {
+		embedModel := client.EmbeddingModel(testEmbedModelName)
+
+		embedding1, err := embedModel.Embed(ctx, "The quick brown fox")
+		require.NoError(t, err)
+		assert.NotNil(t, embedding1)
+
+		embedding2, err := embedModel.Embed(ctx, "jumps over the lazy dog")
+		require.NoError(t, err)
+		assert.NotNil(t, embedding2)
+
+		// Embeddings should have the same dimension
+		assert.Equal(t, len(embedding1), len(embedding2))
+	})
+
+	t.Run("returns error for empty input", func(t *testing.T) {
+		embedModel := client.EmbeddingModel(testEmbedModelName)
+
+		embedding, err := embedModel.Embed(ctx, "")
+
+		assert.Error(t, err)
+		assert.Nil(t, embedding)
+	})
+}
+
+func TestOpenAIClient_ErrorHandling(t *testing.T) {
+	t.Run("handles endpoint not found", func(t *testing.T) {
+		client, err := NewOpenAIClient("http://localhost:11434/v1/nonexistent", &models.ModelConnectionOptions{
+			ConnectTimeout: connectTimeout,
+			RequestTimeout: testTimeout,
+		})
+		require.NoError(t, err)
+
+		_, err = client.ListModels()
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, models.ErrEndpointNotFound)
+	})
+
+	t.Run("handles endpoint unavailable", func(t *testing.T) {
+		client, err := NewOpenAIClient("http://nonexistent-host:11434/v1", &models.ModelConnectionOptions{
+			ConnectTimeout: 1 * time.Second,
+			RequestTimeout: 2 * time.Second,
+		})
+		require.NoError(t, err)
+
+		_, err = client.ListModels()
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, models.ErrEndpointUnavailable)
+	})
+}
