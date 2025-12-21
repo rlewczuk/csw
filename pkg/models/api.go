@@ -84,4 +84,10 @@ type EmbeddingModel interface {
 
 type ModelProvider interface {
 	ListModels() ([]ModelInfo, error)
+
+	// ChatModel returns a ChatModel implementation for the given model and options.
+	ChatModel(model string, options *ChatOptions) ChatModel
+
+	// EmbeddingModel returns an EmbeddingModel implementation for the given model.
+	EmbeddingModel(model string) EmbeddingModel
 }
