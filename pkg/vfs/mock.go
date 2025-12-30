@@ -417,3 +417,80 @@ func (m *MockVFS) FindFiles(query string, recursive bool) ([]string, error) {
 
 	return result, nil
 }
+
+// MoveFile moves or renames a file or directory from src to dst.
+// It works for both files and directories.
+// Can be used for renaming by providing a different name in dst within the same directory.
+func (m *MockVFS) MoveFile(src, dst string) error {
+	cleanSrc, err := m.validatePath(src)
+	if err != nil {
+		return err
+	}
+
+	cleanDst, err := m.validatePath(dst)
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// Check if source exists
+	srcEntry, err := m.getEntry(cleanSrc)
+	if err != nil {
+		return err
+	}
+
+	// Check if destination already exists
+	_, err = m.getEntry(cleanDst)
+	if err == nil {
+		return ErrFileExists
+	}
+	if err != ErrFileNotFound {
+		return err
+	}
+
+	// Create parent directory of destination if it doesn't exist
+	dstDir := filepath.Dir(cleanDst)
+	if dstDir != "." && dstDir != "" {
+		if err := m.createDir(dstDir); err != nil {
+			return err
+		}
+	}
+
+	// Get the parent of source
+	srcParts := strings.Split(filepath.ToSlash(cleanSrc), "/")
+	srcName := srcParts[len(srcParts)-1]
+
+	var srcParent *fileEntry
+	if len(srcParts) > 1 {
+		srcParentPath := filepath.Join(srcParts[:len(srcParts)-1]...)
+		srcParent, err = m.getEntry(srcParentPath)
+		if err != nil {
+			return err
+		}
+	} else {
+		srcParent = m.root
+	}
+
+	// Get the parent of destination
+	dstParts := strings.Split(filepath.ToSlash(cleanDst), "/")
+	dstName := dstParts[len(dstParts)-1]
+
+	var dstParent *fileEntry
+	if len(dstParts) > 1 {
+		dstParentPath := filepath.Join(dstParts[:len(dstParts)-1]...)
+		dstParent, err = m.getEntry(dstParentPath)
+		if err != nil {
+			return err
+		}
+	} else {
+		dstParent = m.root
+	}
+
+	// Move the entry
+	dstParent.children[dstName] = srcEntry
+	delete(srcParent.children, srcName)
+
+	return nil
+}
