@@ -1,7 +1,7 @@
 package test
 
 import (
-	"github.com/codesnort/codesnort-swe/internal/core"
+	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/models/mock"
 )
 

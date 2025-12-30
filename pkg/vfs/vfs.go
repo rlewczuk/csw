@@ -1,4 +1,4 @@
-package core
+package vfs
 
 import "errors"
 
