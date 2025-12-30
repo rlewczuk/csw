@@ -31,4 +31,9 @@ type SweVFS interface {
 
 	// FindFiles searches for files and directories matching the given query.
 	FindFiles(query string, recursive bool) ([]string, error)
+
+	// MoveFile moves or renames a file or directory from src to dst.
+	// It works for both files and directories.
+	// Can be used for renaming by providing a different name in dst within the same directory.
+	MoveFile(src, dst string) error
 }

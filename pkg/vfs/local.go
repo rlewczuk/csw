@@ -315,3 +315,61 @@ func (l *LocalVFS) FindFiles(query string, recursive bool) ([]string, error) {
 
 	return result, nil
 }
+
+// MoveFile moves or renames a file or directory from src to dst.
+// It works for both files and directories.
+// Can be used for renaming by providing a different name in dst within the same directory.
+func (l *LocalVFS) MoveFile(src, dst string) error {
+	absSrc, err := l.validatePath(src)
+	if err != nil {
+		return err
+	}
+
+	absDst, err := l.validatePath(dst)
+	if err != nil {
+		return err
+	}
+
+	// Check if source exists
+	_, err = os.Stat(absSrc)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ErrFileNotFound
+		}
+		if os.IsPermission(err) {
+			return ErrPermissionDenied
+		}
+		return err
+	}
+
+	// Check if destination already exists
+	_, err = os.Stat(absDst)
+	if err == nil {
+		return ErrFileExists
+	}
+	if !os.IsNotExist(err) {
+		if os.IsPermission(err) {
+			return ErrPermissionDenied
+		}
+		return err
+	}
+
+	// Create parent directory of destination if it doesn't exist
+	dstDir := filepath.Dir(absDst)
+	if err := os.MkdirAll(dstDir, 0755); err != nil {
+		if os.IsPermission(err) {
+			return ErrPermissionDenied
+		}
+		return err
+	}
+
+	// Perform the move
+	if err := os.Rename(absSrc, absDst); err != nil {
+		if os.IsPermission(err) {
+			return ErrPermissionDenied
+		}
+		return err
+	}
+
+	return nil
+}
