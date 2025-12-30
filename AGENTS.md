@@ -19,3 +19,4 @@
 - Types: Use explicit types for constants (e.g., `type ChatRole string`)
 - Context: Pass `context.Context` as first parameter for operations that may block or need cancellation
 - Testing: Use table-driven tests with `t.Run()` for subtests
+- Use testify library for assertions, avoid using manual `if` statements
