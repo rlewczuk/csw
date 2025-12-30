@@ -2,6 +2,7 @@ package test
 
 import (
 	"github.com/codesnort/codesnort-swe/internal/core"
+	"github.com/codesnort/codesnort-swe/pkg/models/mock"
 )
 
 type TestModelRequest struct {
@@ -13,13 +14,8 @@ type TestModelResponse struct {
 	Done    bool
 }
 
-type TestModel struct {
-	Requests  []*TestModelRequest
-	Responses []*TestModelResponse
-}
-
 type TestFixtureSystem struct {
-	Model *TestModel
+	ModelProvider *mock.MockProvider
 }
 
 func (t *TestFixtureSystem) Close() error {

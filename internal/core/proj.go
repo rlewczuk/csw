@@ -5,13 +5,6 @@ import "io"
 type SweSystem interface {
 	io.Closer
 	NewProject(root string) SweProject
-
-	// TODO tool manager ?
-	// TODO runtime manager ?
-	// TODO lsp manager ?
-	// TODO vfs manager ?
-	// TODO ui manager ?
-
 }
 
 type SweProject interface {
@@ -19,6 +12,7 @@ type SweProject interface {
 }
 
 type SweTask interface {
+	Subtasks() []SweTask
 }
 
 type SweSession interface {

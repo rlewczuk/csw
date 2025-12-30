@@ -2,21 +2,26 @@ package test
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAgentCoreInitialization(t *testing.T) {
 	t.Run("basic initialization", func(t *testing.T) {
-		//system := NewTestSystem()
+		system := NewTestSystem()
+		assert.NotNil(t, system)
 
-		//project := system.NewProject("py_simple1")
-		//assert.NotNil(t, project)
+		project := system.NewProject("py_simple1")
+		assert.NotNil(t, project)
 
-		// TBD
+		session := project.NewSession()
+		assert.NotNil(t, session)
 
-		//session := project.NewSession()
-		//session.SetRole("explorer")
-		//session.Prompt("Say hello")
+		err := session.SetRole("developer")
+		assert.NoError(t, err)
 
-		//t.Skip("Agent core not implemented yet")
+		err = session.Prompt("Implement Hello World program in Python")
+		assert.NoError(t, err)
+
 	})
 }
