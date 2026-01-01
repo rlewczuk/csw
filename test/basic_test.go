@@ -20,8 +20,18 @@ func TestAgentCoreInitialization(t *testing.T) {
 		err := session.SetRole("developer")
 		assert.NoError(t, err)
 
+		err = system.ModelProvider.SetResponsesFromFile("devstral-small-2:latest", "test/data/01_sample_prog_responses.md")
+		assert.NoError(t, err)
+
 		err = session.Prompt("Implement Hello World program in Python")
 		assert.NoError(t, err)
 
+		vfs := session.Vfs()
+		bytes, err := vfs.ReadFile("hello_world.py")
+		assert.NoError(t, err)
+		assert.Contains(t, string(bytes), "print(\"Hello World\")")
+
+		err = system.Close()
+		assert.NoError(t, err)
 	})
 }
