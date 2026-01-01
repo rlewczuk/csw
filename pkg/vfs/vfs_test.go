@@ -12,7 +12,7 @@ import (
 // TestFixture provides a temporary directory for testing
 type TestFixture struct {
 	Root string
-	VFS  SweVFS
+	VFS  VFS
 }
 
 // Setup creates a temporary directory and VFS instance (either LocalVFS or MockVFS)
@@ -705,9 +705,9 @@ func TestFindFiles(t *testing.T) {
 }
 
 func TestInterfaceCompliance(t *testing.T) {
-	// This test ensures LocalVFS and MockVFS implement the SweVFS interface
-	var _ SweVFS = (*LocalVFS)(nil)
-	var _ SweVFS = (*MockVFS)(nil)
+	// This test ensures LocalVFS and MockVFS implement the VFS interface
+	var _ VFS = (*LocalVFS)(nil)
+	var _ VFS = (*MockVFS)(nil)
 }
 
 func TestMockVFSPrepopulation(t *testing.T) {

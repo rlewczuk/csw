@@ -2,6 +2,7 @@ package test
 
 import (
 	"github.com/codesnort/codesnort-swe/pkg/core"
+	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/models/mock"
 )
 
@@ -29,5 +30,7 @@ func (t *TestFixtureSystem) NewProject(root string) core.SweProject {
 }
 
 func NewTestSystem() *TestFixtureSystem {
-	return &TestFixtureSystem{}
+	return &TestFixtureSystem{
+		ModelProvider: mock.NewMockProvider([]models.ModelInfo{}),
+	}
 }

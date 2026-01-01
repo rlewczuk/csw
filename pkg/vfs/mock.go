@@ -15,7 +15,7 @@ type fileEntry struct {
 	children map[string]*fileEntry
 }
 
-// MockVFS implements SweVFS interface with an in-memory filesystem.
+// MockVFS implements VFS interface with an in-memory filesystem.
 // It behaves identically to LocalVFS but keeps all files in memory.
 type MockVFS struct {
 	root  *fileEntry

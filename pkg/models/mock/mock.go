@@ -2,6 +2,8 @@ package mock
 
 import (
 	"context"
+	"os"
+	"strings"
 	"sync"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
@@ -39,6 +41,28 @@ func (p *MockProvider) SetChatResponse(modelName string, response *ChatResponse)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.chatResponses[modelName] = response
+}
+
+// SetResponsesFromFile configures mock responses for a specific model from a file.
+func (p *MockProvider) SetResponsesFromFile(modelName string, filename string) error {
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+
+	prompts := strings.Split(string(content), "@@@@@@@")
+	fragments := make([]*models.ChatMessage, len(prompts))
+	for i, prompt := range prompts {
+		fragments[i] = &models.ChatMessage{
+			Role:  models.ChatRoleAssistant,
+			Parts: []string{strings.TrimSpace(prompt)},
+		}
+	}
+
+	p.SetChatResponse(modelName, &ChatResponse{
+		StreamFragments: fragments,
+	})
+	return nil
 }
 
 // SetEmbedResponse configures the mock embedding response for a specific model.
