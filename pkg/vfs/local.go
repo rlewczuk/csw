@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// LocalVFS implements SweVFS interface for local filesystem operations.
+// LocalVFS implements VFS interface for local filesystem operations.
 // It provides sandboxed access to files within a root directory.
 type LocalVFS struct {
 	root string

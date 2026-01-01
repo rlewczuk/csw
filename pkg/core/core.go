@@ -1,6 +1,10 @@
 package core
 
-import "io"
+import (
+	"io"
+
+	"github.com/codesnort/codesnort-swe/pkg/vfs"
+)
 
 type SweSystem interface {
 	io.Closer
@@ -18,4 +22,5 @@ type SweTask interface {
 type SweSession interface {
 	SetRole(role string) error
 	Prompt(prompt string) error
+	Vfs() vfs.VFS
 }

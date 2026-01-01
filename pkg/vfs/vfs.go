@@ -12,10 +12,10 @@ var (
 	ErrInvalidPath      = errors.New("invalid path")
 )
 
-// SweVFS represents virtual filesystem. It encapsulates access to local and remote files and directories,
+// VFS represents virtual filesystem. It encapsulates access to local and remote files and directories,
 // git worktree, in-memory files etc., may implement access control for agent etc.
 // Version control, snapshotting etc. is not part of VFS, it is implemented in another layer.
-type SweVFS interface {
+type VFS interface {
 
 	// ReadFile reads the content of the file located at the given path and returns its data as a byte slice.
 	ReadFile(path string) ([]byte, error)
