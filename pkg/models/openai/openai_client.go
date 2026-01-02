@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"net"
 	"net/http"
 	"strings"
@@ -242,70 +243,138 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 	return result, nil
 }
 
-// openaiStreamIterator implements ChatStreamIterator for OpenAI streaming responses
-type openaiStreamIterator struct {
-	ctx       context.Context
-	resp      *http.Response
-	scanner   *bufio.Scanner
-	client    *OpenAIClient
-	done      bool
-	lastError error
-}
-
-// Next returns the next fragment of the chat response
-func (it *openaiStreamIterator) Next() (*models.ChatMessage, error) {
-	if it.done {
-		return nil, models.ErrEndOfStream
-	}
-
-	if it.lastError != nil {
-		return nil, it.lastError
-	}
-
-	// Check if context is cancelled
-	select {
-	case <-it.ctx.Done():
-		it.done = true
-		it.lastError = it.ctx.Err()
-		return nil, it.lastError
-	default:
-	}
-
-	// Read lines until we get a data line or done
-	for it.scanner.Scan() {
-		line := it.scanner.Text()
-
-		// Skip empty lines
-		if line == "" {
-			continue
+// ChatStream sends a chat request and returns a standard Go iterator for streaming responses
+func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) iter.Seq[*models.ChatMessage] {
+	return func(yield func(*models.ChatMessage) bool) {
+		// Validate inputs
+		if len(messages) == 0 {
+			return
 		}
 
-		// Check for [DONE] marker
-		if strings.TrimSpace(line) == "data: [DONE]" {
-			it.done = true
-			return nil, models.ErrEndOfStream
+		if m.model == "" {
+			return
 		}
 
-		// Process SSE data line
-		if strings.HasPrefix(line, "data: ") {
-			data := strings.TrimPrefix(line, "data: ")
+		// Use provided options or fall back to model's default options
+		effectiveOptions := options
+		if effectiveOptions == nil {
+			effectiveOptions = m.options
+		}
 
-			var chatResp ChatCompletionResponse
-			if err := json.Unmarshal([]byte(data), &chatResp); err != nil {
-				// Skip invalid JSON (might be [DONE] or other markers)
+		// Convert messages to OpenAI format
+		openaiMessages := make([]ChatCompletionMessage, len(messages))
+		for i, msg := range messages {
+			// Concatenate parts into a single content string
+			content := strings.Join(msg.Parts, "")
+			openaiMessages[i] = ChatCompletionMessage{
+				Role:    string(msg.Role),
+				Content: content,
+			}
+		}
+
+		// Build request with streaming enabled
+		chatReq := ChatCompletionRequest{
+			Model:    m.model,
+			Messages: openaiMessages,
+			Stream:   true,
+		}
+
+		// Apply options if provided
+		if effectiveOptions != nil {
+			chatReq.Temperature = float64(effectiveOptions.Temperature)
+			chatReq.TopP = float64(effectiveOptions.TopP)
+			// Note: OpenAI API doesn't have TopK parameter
+		}
+
+		url := m.client.baseURL + "/chat/completions"
+
+		body, err := json.Marshal(chatReq)
+		if err != nil {
+			return
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+		if err != nil {
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
+		req.Header.Set("Accept", "text/event-stream")
+
+		resp, err := m.client.httpClient.Do(req)
+		if err != nil {
+			return
+		}
+		defer resp.Body.Close()
+
+		if err := m.client.checkStatusCode(resp); err != nil {
+			return
+		}
+
+		// Create scanner for SSE and stream responses
+		scanner := bufio.NewScanner(resp.Body)
+		for scanner.Scan() {
+			// Check if context is cancelled
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			line := scanner.Text()
+
+			// Skip empty lines
+			if line == "" {
 				continue
 			}
 
-			if len(chatResp.Choices) == 0 {
-				continue
+			// Check for [DONE] marker
+			if strings.TrimSpace(line) == "data: [DONE]" {
+				return
 			}
 
-			choice := chatResp.Choices[0]
+			// Process SSE data line
+			if strings.HasPrefix(line, "data: ") {
+				data := strings.TrimPrefix(line, "data: ")
 
-			// Check finish reason
-			if choice.FinishReason != "" {
-				it.done = true
-				// If there's content in the delta, return it before ending
+				var chatResp ChatCompletionResponse
+				if err := json.Unmarshal([]byte(data), &chatResp); err != nil {
+					// Skip invalid JSON (might be [DONE] or other markers)
+					continue
+				}
+
+				if len(chatResp.Choices) == 0 {
+					continue
+				}
+
+				choice := chatResp.Choices[0]
+
+				// Check finish reason
+				if choice.FinishReason != "" {
+					// If there's content in the delta, yield it before ending
+					if choice.Delta != nil {
+						var content string
+						switch v := choice.Delta.Content.(type) {
+						case string:
+							content = v
+						default:
+							content = fmt.Sprintf("%v", v)
+						}
+
+						if content != "" {
+							result := &models.ChatMessage{
+								Role:  models.ChatRoleAssistant,
+								Parts: []string{content},
+							}
+							if !yield(result) {
+								return
+							}
+						}
+					}
+					return
+				}
+
+				// Process delta
 				if choice.Delta != nil {
 					var content string
 					switch v := choice.Delta.Content.(type) {
@@ -320,130 +389,19 @@ func (it *openaiStreamIterator) Next() (*models.ChatMessage, error) {
 							Role:  models.ChatRoleAssistant,
 							Parts: []string{content},
 						}
-						return result, nil
+						if !yield(result) {
+							return
+						}
 					}
-				}
-				return nil, models.ErrEndOfStream
-			}
-
-			// Process delta
-			if choice.Delta != nil {
-				var content string
-				switch v := choice.Delta.Content.(type) {
-				case string:
-					content = v
-				default:
-					content = fmt.Sprintf("%v", v)
-				}
-
-				if content != "" {
-					result := &models.ChatMessage{
-						Role:  models.ChatRoleAssistant,
-						Parts: []string{content},
-					}
-					return result, nil
 				}
 			}
 		}
-	}
 
-	// Check for scanner error
-	if err := it.scanner.Err(); err != nil {
-		it.done = true
-		it.lastError = fmt.Errorf("scanner error: %w", err)
-		return nil, it.lastError
-	}
-
-	// End of stream
-	it.done = true
-	return nil, models.ErrEndOfStream
-}
-
-// Close releases resources associated with the iterator
-func (it *openaiStreamIterator) Close() error {
-	if it.resp != nil && it.resp.Body != nil {
-		return it.resp.Body.Close()
-	}
-	return nil
-}
-
-// ChatStream sends a chat request and returns an iterator for streaming responses
-func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) (models.ChatStreamIterator, error) {
-	if len(messages) == 0 {
-		return nil, errors.New("messages cannot be nil or empty")
-	}
-
-	if m.model == "" {
-		return nil, errors.New("model not set")
-	}
-
-	// Use provided options or fall back to model's default options
-	effectiveOptions := options
-	if effectiveOptions == nil {
-		effectiveOptions = m.options
-	}
-
-	// Convert messages to OpenAI format
-	openaiMessages := make([]ChatCompletionMessage, len(messages))
-	for i, msg := range messages {
-		// Concatenate parts into a single content string
-		content := strings.Join(msg.Parts, "")
-		openaiMessages[i] = ChatCompletionMessage{
-			Role:    string(msg.Role),
-			Content: content,
+		// Check for scanner error
+		if err := scanner.Err(); err != nil {
+			return
 		}
 	}
-
-	// Build request with streaming enabled
-	chatReq := ChatCompletionRequest{
-		Model:    m.model,
-		Messages: openaiMessages,
-		Stream:   true,
-	}
-
-	// Apply options if provided
-	if effectiveOptions != nil {
-		chatReq.Temperature = float64(effectiveOptions.Temperature)
-		chatReq.TopP = float64(effectiveOptions.TopP)
-		// Note: OpenAI API doesn't have TopK parameter
-	}
-
-	url := m.client.baseURL + "/chat/completions"
-
-	body, err := json.Marshal(chatReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
-	req.Header.Set("Accept", "text/event-stream")
-
-	resp, err := m.client.httpClient.Do(req)
-	if err != nil {
-		return nil, m.client.handleHTTPError(err)
-	}
-
-	if err := m.client.checkStatusCode(resp); err != nil {
-		resp.Body.Close()
-		return nil, err
-	}
-
-	// Create iterator with scanner for SSE
-	scanner := bufio.NewScanner(resp.Body)
-	iterator := &openaiStreamIterator{
-		ctx:     ctx,
-		resp:    resp,
-		scanner: scanner,
-		client:  m.client,
-		done:    false,
-	}
-
-	return iterator, nil
 }
 
 // Embed generates embeddings for the given input text

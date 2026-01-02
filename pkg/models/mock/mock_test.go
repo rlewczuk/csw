@@ -146,7 +146,7 @@ func TestMockChatModel_ChatStream(t *testing.T) {
 		name            string
 		modelName       string
 		setupResponse   *ChatResponse
-		expectError     bool
+		expectNoFrags   bool
 		expectedFrags   int
 		expectedContent []string
 	}{
@@ -171,12 +171,12 @@ func TestMockChatModel_ChatStream(t *testing.T) {
 			expectedContent: []string{"Hello", ", ", "world", "!"},
 		},
 		{
-			name:      "error on stream creation",
+			name:      "error response yields no fragments",
 			modelName: "test-model",
 			setupResponse: &ChatResponse{
 				Error: errors.New("stream error"),
 			},
-			expectError: true,
+			expectNoFrags: true,
 		},
 	}
 
@@ -193,31 +193,19 @@ func TestMockChatModel_ChatStream(t *testing.T) {
 				{Role: models.ChatRoleUser, Parts: []string{"test"}},
 			}
 
-			iter, err := chatModel.ChatStream(ctx, messages, nil)
-
-			if tc.expectError {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			defer iter.Close()
+			iter := chatModel.ChatStream(ctx, messages, nil)
 
 			// Read all fragments
 			var fragments []*models.ChatMessage
-			for {
-				msg, err := iter.Next()
-				if err == models.ErrEndOfStream {
-					break
-				}
-				if err != nil {
-					t.Fatalf("unexpected error during iteration: %v", err)
-				}
+			for msg := range iter {
 				fragments = append(fragments, msg)
+			}
+
+			if tc.expectNoFrags {
+				if len(fragments) != 0 {
+					t.Fatalf("expected no fragments, got %d", len(fragments))
+				}
+				return
 			}
 
 			if len(fragments) != tc.expectedFrags {
@@ -228,12 +216,6 @@ func TestMockChatModel_ChatStream(t *testing.T) {
 				if fragments[i].Parts[0] != content {
 					t.Errorf("fragment %d: expected '%s', got '%s'", i, content, fragments[i].Parts[0])
 				}
-			}
-
-			// Verify ErrEndOfStream after all fragments
-			_, err = iter.Next()
-			if err != models.ErrEndOfStream {
-				t.Errorf("expected ErrEndOfStream, got %v", err)
 			}
 		})
 	}
@@ -257,25 +239,22 @@ func TestMockChatModel_ChatStream_Cancellation(t *testing.T) {
 		{Role: models.ChatRoleUser, Parts: []string{"test"}},
 	}
 
-	iter, err := chatModel.ChatStream(ctx, messages, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	defer iter.Close()
+	iter := chatModel.ChatStream(ctx, messages, nil)
 
 	// Read first fragment
-	_, err = iter.Next()
-	if err != nil {
-		t.Fatalf("unexpected error on first Next(): %v", err)
+	fragmentReceived := false
+	for msg := range iter {
+		if msg != nil {
+			fragmentReceived = true
+			// Cancel context after first fragment
+			cancel()
+			// Iterator should stop gracefully
+			break
+		}
 	}
 
-	// Cancel context
-	cancel()
-
-	// Try to read next fragment - should get cancellation error
-	_, err = iter.Next()
-	if err != context.Canceled {
-		t.Fatalf("expected context.Canceled error, got %v", err)
+	if !fragmentReceived {
+		t.Fatal("expected to receive at least one fragment before cancellation")
 	}
 }
 
@@ -299,16 +278,17 @@ func TestMockChatModel_ChatStream_ContextTimeout(t *testing.T) {
 		{Role: models.ChatRoleUser, Parts: []string{"test"}},
 	}
 
-	iter, err := chatModel.ChatStream(ctx, messages, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	defer iter.Close()
+	iter := chatModel.ChatStream(ctx, messages, nil)
 
-	// Try to read - should get timeout error
-	_, err = iter.Next()
-	if err != context.DeadlineExceeded {
-		t.Fatalf("expected context.DeadlineExceeded error, got %v", err)
+	// Try to read - context should already be expired, so no fragments should be yielded
+	fragmentCount := 0
+	for range iter {
+		fragmentCount++
+	}
+
+	// With expired context, iterator should not yield any fragments
+	if fragmentCount > 0 {
+		t.Errorf("expected no fragments with expired context, got %d", fragmentCount)
 	}
 }
 
@@ -379,7 +359,6 @@ func TestMockProvider_InterfaceCompliance(t *testing.T) {
 	var _ models.ModelProvider = (*MockProvider)(nil)
 	var _ models.ChatModel = (*MockChatModel)(nil)
 	var _ models.EmbeddingModel = (*MockEmbeddingModel)(nil)
-	var _ models.ChatStreamIterator = (*MockStreamIterator)(nil)
 }
 
 func TestMockProvider_ConcurrentAccess(t *testing.T) {
@@ -421,7 +400,7 @@ func TestMockProvider_ConcurrentAccess(t *testing.T) {
 	<-done
 }
 
-func TestMockStreamIterator_Close(t *testing.T) {
+func TestMockStreamIterator_BreakEarly(t *testing.T) {
 	provider := NewMockProvider([]models.ModelInfo{})
 	chatModel := provider.ChatModel("test-model", nil)
 	ctx := context.Background()
@@ -430,14 +409,18 @@ func TestMockStreamIterator_Close(t *testing.T) {
 		{Role: models.ChatRoleUser, Parts: []string{"test"}},
 	}
 
-	iter, err := chatModel.ChatStream(ctx, messages, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	iter := chatModel.ChatStream(ctx, messages, nil)
+
+	// Breaking from range should work gracefully
+	fragmentReceived := false
+	for msg := range iter {
+		if msg != nil {
+			fragmentReceived = true
+			break
+		}
 	}
 
-	// Close should not return error
-	err = iter.Close()
-	if err != nil {
-		t.Errorf("unexpected error on Close(): %v", err)
+	if !fragmentReceived {
+		t.Error("expected to receive at least one fragment")
 	}
 }

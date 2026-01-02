@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"iter"
 	"os"
 	"strings"
 	"sync"
@@ -131,67 +132,42 @@ func (m *MockChatModel) Chat(ctx context.Context, messages []*models.ChatMessage
 	return response.Response, nil
 }
 
-// ChatStream sends a chat request and returns an iterator for streaming responses.
-func (m *MockChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) (models.ChatStreamIterator, error) {
-	m.provider.mu.RLock()
-	response := m.provider.chatResponses[m.model]
-	m.provider.mu.RUnlock()
+// ChatStream sends a chat request and returns a standard Go iterator for streaming responses.
+func (m *MockChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) iter.Seq[*models.ChatMessage] {
+	return func(yield func(*models.ChatMessage) bool) {
+		m.provider.mu.RLock()
+		response := m.provider.chatResponses[m.model]
+		m.provider.mu.RUnlock()
 
-	if response == nil {
-		// Default streaming response if none configured
-		return &MockStreamIterator{
-			ctx: ctx,
-			fragments: []*models.ChatMessage{
+		var fragments []*models.ChatMessage
+
+		if response == nil {
+			// Default streaming response if none configured
+			fragments = []*models.ChatMessage{
 				{Role: models.ChatRoleAssistant, Parts: []string{"mock"}},
 				{Role: models.ChatRoleAssistant, Parts: []string{" stream"}},
-			},
-			index: 0,
-		}, nil
+			}
+		} else if response.Error != nil {
+			// If there's an error configured, just return without yielding anything
+			return
+		} else {
+			fragments = response.StreamFragments
+		}
+
+		// Yield each fragment
+		for _, fragment := range fragments {
+			// Check for cancellation
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			if !yield(fragment) {
+				return
+			}
+		}
 	}
-
-	if response.Error != nil {
-		return nil, response.Error
-	}
-
-	return &MockStreamIterator{
-		ctx:       ctx,
-		fragments: response.StreamFragments,
-		index:     0,
-	}, nil
-}
-
-// MockStreamIterator implements models.ChatStreamIterator for testing purposes.
-type MockStreamIterator struct {
-	ctx       context.Context
-	fragments []*models.ChatMessage
-	index     int
-	mu        sync.Mutex
-}
-
-// Next returns the next fragment of the chat response.
-func (i *MockStreamIterator) Next() (*models.ChatMessage, error) {
-	i.mu.Lock()
-	defer i.mu.Unlock()
-
-	// Check for cancellation
-	select {
-	case <-i.ctx.Done():
-		return nil, i.ctx.Err()
-	default:
-	}
-
-	if i.index >= len(i.fragments) {
-		return nil, models.ErrEndOfStream
-	}
-
-	fragment := i.fragments[i.index]
-	i.index++
-	return fragment, nil
-}
-
-// Close releases any resources associated with the iterator.
-func (i *MockStreamIterator) Close() error {
-	return nil
 }
 
 // MockEmbeddingModel implements models.EmbeddingModel interface for testing purposes.
