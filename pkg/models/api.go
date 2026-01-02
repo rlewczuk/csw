@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"errors"
+	"iter"
 	"time"
 )
 
@@ -13,7 +14,6 @@ var (
 	ErrRateExceeded        = errors.New("rate exceeded")
 	ErrTooManyInputTokens  = errors.New("too many input tokens (i.e. exceeding context length)")
 	ErrToBeContinued       = errors.New("to be continued (i.e. generated tokens limit reached)")
-	ErrEndOfStream         = errors.New("end of stream")
 )
 
 type ModelConnectionOptions struct {
@@ -61,21 +61,13 @@ type ChatMessage struct {
 	Parts []string
 }
 
-// ChatStreamIterator represents an iterator for streaming chat responses.
-type ChatStreamIterator interface {
-	// Next returns the next fragment of the chat response. It returns ErrEndOfStream when the stream is complete.
-	Next() (*ChatMessage, error)
-	// Close releases any resources associated with the iterator. It should be called when done with the iterator.
-	Close() error
-}
-
 // ChatModel represents a model that can be used for chat.
 type ChatModel interface {
 	// Chat sends a chat request to the model and returns the response. This method is blocking and returns full response.
 	Chat(ctx context.Context, messages []*ChatMessage, options *ChatOptions) (*ChatMessage, error)
-	// ChatStream sends a chat request to the model and returns an iterator that yields fragments of the response as they arrive.
-	// The iterator returns ErrEndOfStream when the stream is complete. The caller must call Close() on the iterator when done.
-	ChatStream(ctx context.Context, messages []*ChatMessage, options *ChatOptions) (ChatStreamIterator, error)
+	// ChatStream sends a chat request to the model and returns a standard Go iterator that yields fragments of the response as they arrive.
+	// The iterator will stop when the stream is complete. Use with standard for-range loops.
+	ChatStream(ctx context.Context, messages []*ChatMessage, options *ChatOptions) iter.Seq[*ChatMessage]
 }
 
 type EmbeddingModel interface {

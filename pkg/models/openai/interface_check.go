@@ -12,6 +12,3 @@ var _ models.ChatModel = (*OpenAIChatModel)(nil)
 
 // Compile-time check to ensure OpenAIEmbeddingModel implements models.EmbeddingModel interface
 var _ models.EmbeddingModel = (*OpenAIEmbeddingModel)(nil)
-
-// Compile-time check to ensure openaiStreamIterator implements models.ChatStreamIterator interface
-var _ models.ChatStreamIterator = (*openaiStreamIterator)(nil)

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"net"
 	"net/http"
 	"strings"
@@ -213,153 +214,118 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 	return result, nil
 }
 
-// ollamaStreamIterator implements ChatStreamIterator for Ollama streaming responses
-type ollamaStreamIterator struct {
-	ctx       context.Context
-	resp      *http.Response
-	decoder   *json.Decoder
-	client    *OllamaClient
-	done      bool
-	lastError error
-}
-
-// Next returns the next fragment of the chat response
-func (it *ollamaStreamIterator) Next() (*models.ChatMessage, error) {
-	if it.done {
-		return nil, models.ErrEndOfStream
-	}
-
-	if it.lastError != nil {
-		return nil, it.lastError
-	}
-
-	// Check if context is cancelled
-	select {
-	case <-it.ctx.Done():
-		it.done = true
-		it.lastError = it.ctx.Err()
-		return nil, it.lastError
-	default:
-	}
-
-	var chatResp ChatResponse
-	if err := it.decoder.Decode(&chatResp); err != nil {
-		it.done = true
-		if err == io.EOF {
-			it.lastError = models.ErrEndOfStream
-			return nil, models.ErrEndOfStream
+// ChatStream sends a chat request and returns a standard Go iterator for streaming responses
+func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) iter.Seq[*models.ChatMessage] {
+	return func(yield func(*models.ChatMessage) bool) {
+		// Validate inputs
+		if messages == nil || len(messages) == 0 {
+			return
 		}
-		it.lastError = fmt.Errorf("failed to decode streaming response: %w", err)
-		return nil, it.lastError
-	}
 
-	// Check if this is the final message
-	if chatResp.Done {
-		it.done = true
-		// Return the final fragment if it has content
-		if chatResp.Message.Content != "" {
+		if m.model == "" {
+			return
+		}
+
+		// Use provided options or fall back to model's default options
+		effectiveOptions := options
+		if effectiveOptions == nil {
+			effectiveOptions = m.options
+		}
+
+		// Convert messages to Ollama format
+		ollamaMessages := make([]Message, len(messages))
+		for i, msg := range messages {
+			// Concatenate parts into a single content string
+			content := strings.Join(msg.Parts, "")
+			ollamaMessages[i] = Message{
+				Role:    string(msg.Role),
+				Content: content,
+			}
+		}
+
+		// Build request with streaming enabled
+		chatReq := ChatRequest{
+			Model:    m.model,
+			Messages: ollamaMessages,
+			Stream:   true,
+		}
+
+		// Apply options if provided
+		if effectiveOptions != nil {
+			chatReq.Options = &ModelOptions{
+				Temperature: float64(effectiveOptions.Temperature),
+				TopP:        float64(effectiveOptions.TopP),
+				TopK:        effectiveOptions.TopK,
+			}
+		}
+
+		url := m.client.baseURL + "/api/chat"
+
+		body, err := json.Marshal(chatReq)
+		if err != nil {
+			return
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+		if err != nil {
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := m.client.httpClient.Do(req)
+		if err != nil {
+			return
+		}
+		defer resp.Body.Close()
+
+		if err := m.client.checkStatusCode(resp); err != nil {
+			return
+		}
+
+		// Create decoder and stream responses
+		decoder := json.NewDecoder(resp.Body)
+		for {
+			// Check if context is cancelled
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			var chatResp ChatResponse
+			if err := decoder.Decode(&chatResp); err != nil {
+				if err == io.EOF {
+					return
+				}
+				return
+			}
+
+			// Check if this is the final message
+			if chatResp.Done {
+				// Yield the final fragment if it has content
+				if chatResp.Message.Content != "" {
+					result := &models.ChatMessage{
+						Role:  models.ChatRole(chatResp.Message.Role),
+						Parts: []string{chatResp.Message.Content},
+					}
+					if !yield(result) {
+						return
+					}
+				}
+				return
+			}
+
+			// Yield the fragment
 			result := &models.ChatMessage{
 				Role:  models.ChatRole(chatResp.Message.Role),
 				Parts: []string{chatResp.Message.Content},
 			}
-			return result, nil
-		}
-		return nil, models.ErrEndOfStream
-	}
 
-	// Return the fragment
-	result := &models.ChatMessage{
-		Role:  models.ChatRole(chatResp.Message.Role),
-		Parts: []string{chatResp.Message.Content},
-	}
-
-	return result, nil
-}
-
-// Close releases resources associated with the iterator
-func (it *ollamaStreamIterator) Close() error {
-	if it.resp != nil && it.resp.Body != nil {
-		return it.resp.Body.Close()
-	}
-	return nil
-}
-
-// ChatStream sends a chat request and returns an iterator for streaming responses
-func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) (models.ChatStreamIterator, error) {
-	if messages == nil || len(messages) == 0 {
-		return nil, errors.New("messages cannot be nil or empty")
-	}
-
-	if m.model == "" {
-		return nil, errors.New("model not set")
-	}
-
-	// Use provided options or fall back to model's default options
-	effectiveOptions := options
-	if effectiveOptions == nil {
-		effectiveOptions = m.options
-	}
-
-	// Convert messages to Ollama format
-	ollamaMessages := make([]Message, len(messages))
-	for i, msg := range messages {
-		// Concatenate parts into a single content string
-		content := strings.Join(msg.Parts, "")
-		ollamaMessages[i] = Message{
-			Role:    string(msg.Role),
-			Content: content,
+			if !yield(result) {
+				return
+			}
 		}
 	}
-
-	// Build request with streaming enabled
-	chatReq := ChatRequest{
-		Model:    m.model,
-		Messages: ollamaMessages,
-		Stream:   true,
-	}
-
-	// Apply options if provided
-	if effectiveOptions != nil {
-		chatReq.Options = &ModelOptions{
-			Temperature: float64(effectiveOptions.Temperature),
-			TopP:        float64(effectiveOptions.TopP),
-			TopK:        effectiveOptions.TopK,
-		}
-	}
-
-	url := m.client.baseURL + "/api/chat"
-
-	body, err := json.Marshal(chatReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := m.client.httpClient.Do(req)
-	if err != nil {
-		return nil, m.client.handleHTTPError(err)
-	}
-
-	if err := m.client.checkStatusCode(resp); err != nil {
-		resp.Body.Close()
-		return nil, err
-	}
-
-	// Create iterator
-	iterator := &ollamaStreamIterator{
-		ctx:     ctx,
-		resp:    resp,
-		decoder: json.NewDecoder(resp.Body),
-		client:  m.client,
-		done:    false,
-	}
-
-	return iterator, nil
 }
 
 // Embed generates embeddings for the given input text

@@ -2,7 +2,6 @@ package ollama
 
 import (
 	"context"
-	"errors"
 	"os"
 	"testing"
 	"time"
@@ -260,21 +259,11 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 			},
 		}
 
-		iterator, err := chatModel.ChatStream(ctx, messages, nil)
-		require.NoError(t, err)
+		iterator := chatModel.ChatStream(ctx, messages, nil)
 		require.NotNil(t, iterator)
-		defer iterator.Close()
 
 		var fragments []*models.ChatMessage
-		for {
-			fragment, err := iterator.Next()
-			if err != nil {
-				if err == models.ErrEndOfStream {
-					break
-				}
-				require.NoError(t, err)
-			}
-
+		for fragment := range iterator {
 			assert.NotNil(t, fragment)
 			assert.Equal(t, models.ChatRoleAssistant, fragment.Role)
 			assert.NotEmpty(t, fragment.Parts)
@@ -297,24 +286,21 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 			},
 		}
 
-		iterator, err := chatModel.ChatStream(ctxWithCancel, messages, nil)
-		require.NoError(t, err)
+		iterator := chatModel.ChatStream(ctxWithCancel, messages, nil)
 		require.NotNil(t, iterator)
-		defer iterator.Close()
 
 		// Read first fragment
-		fragment, err := iterator.Next()
-		require.NoError(t, err)
-		assert.NotNil(t, fragment)
+		fragmentReceived := false
+		for fragment := range iterator {
+			assert.NotNil(t, fragment)
+			fragmentReceived = true
+			// Cancel the context after first fragment
+			cancel()
+			// Iterator should stop gracefully
+			break
+		}
 
-		// Cancel the context
-		cancel()
-
-		// Next call should fail with context error
-		_, err = iterator.Next()
-		assert.Error(t, err)
-		assert.True(t, errors.Is(err, context.Canceled) || err == models.ErrEndOfStream,
-			"expected context.Canceled or ErrEndOfStream, got: %v", err)
+		assert.True(t, fragmentReceived, "expected to receive at least one fragment before cancellation")
 	})
 
 	t.Run("handles context with timeout during streaming", func(t *testing.T) {
@@ -330,20 +316,11 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 			},
 		}
 
-		iterator, err := chatModel.ChatStream(ctxWithTimeout, messages, nil)
-		require.NoError(t, err)
+		iterator := chatModel.ChatStream(ctxWithTimeout, messages, nil)
 		require.NotNil(t, iterator)
-		defer iterator.Close()
 
 		var fragments []*models.ChatMessage
-		for {
-			fragment, err := iterator.Next()
-			if err != nil {
-				if err == models.ErrEndOfStream {
-					break
-				}
-				require.NoError(t, err)
-			}
+		for fragment := range iterator {
 			fragments = append(fragments, fragment)
 		}
 
@@ -364,20 +341,11 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 			},
 		}
 
-		iterator, err := chatModel.ChatStream(ctx, messages, nil)
-		require.NoError(t, err)
+		iterator := chatModel.ChatStream(ctx, messages, nil)
 		require.NotNil(t, iterator)
-		defer iterator.Close()
 
 		var fragments []*models.ChatMessage
-		for {
-			fragment, err := iterator.Next()
-			if err != nil {
-				if err == models.ErrEndOfStream {
-					break
-				}
-				require.NoError(t, err)
-			}
+		for fragment := range iterator {
 			fragments = append(fragments, fragment)
 		}
 
@@ -388,22 +356,32 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		}
 	})
 
-	t.Run("returns error for empty messages", func(t *testing.T) {
+	t.Run("returns no fragments for empty messages", func(t *testing.T) {
 		chatModel := client.ChatModel(testModelName, nil)
 
-		iterator, err := chatModel.ChatStream(ctx, []*models.ChatMessage{}, nil)
+		iterator := chatModel.ChatStream(ctx, []*models.ChatMessage{}, nil)
+		require.NotNil(t, iterator)
 
-		assert.Error(t, err)
-		assert.Nil(t, iterator)
+		var fragments []*models.ChatMessage
+		for fragment := range iterator {
+			fragments = append(fragments, fragment)
+		}
+
+		assert.Empty(t, fragments)
 	})
 
-	t.Run("returns error for nil messages", func(t *testing.T) {
+	t.Run("returns no fragments for nil messages", func(t *testing.T) {
 		chatModel := client.ChatModel(testModelName, nil)
 
-		iterator, err := chatModel.ChatStream(ctx, nil, nil)
+		iterator := chatModel.ChatStream(ctx, nil, nil)
+		require.NotNil(t, iterator)
 
-		assert.Error(t, err)
-		assert.Nil(t, iterator)
+		var fragments []*models.ChatMessage
+		for fragment := range iterator {
+			fragments = append(fragments, fragment)
+		}
+
+		assert.Empty(t, fragments)
 	})
 
 	t.Run("uses default options when none provided to ChatStream", func(t *testing.T) {
@@ -422,20 +400,21 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 			},
 		}
 
-		iterator, err := chatModel.ChatStream(ctx, messages, nil)
-		require.NoError(t, err)
+		iterator := chatModel.ChatStream(ctx, messages, nil)
 		require.NotNil(t, iterator)
-		defer iterator.Close()
 
 		// Should get at least one fragment
-		fragment, err := iterator.Next()
-		if err != models.ErrEndOfStream {
-			require.NoError(t, err)
+		fragmentReceived := false
+		for fragment := range iterator {
 			assert.NotNil(t, fragment)
+			fragmentReceived = true
+			break
 		}
+
+		assert.True(t, fragmentReceived, "expected to receive at least one fragment")
 	})
 
-	t.Run("properly closes iterator", func(t *testing.T) {
+	t.Run("iterator can be stopped early", func(t *testing.T) {
 		chatModel := client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
@@ -445,17 +424,19 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 			},
 		}
 
-		iterator, err := chatModel.ChatStream(ctx, messages, nil)
-		require.NoError(t, err)
+		iterator := chatModel.ChatStream(ctx, messages, nil)
 		require.NotNil(t, iterator)
 
-		// Close without reading
-		err = iterator.Close()
-		assert.NoError(t, err)
+		// Stop reading after first fragment (if any)
+		fragmentReceived := false
+		for fragment := range iterator {
+			assert.NotNil(t, fragment)
+			fragmentReceived = true
+			break
+		}
 
-		// Trying to read after close should handle gracefully
-		_, err = iterator.Next()
-		assert.Error(t, err)
+		// Breaking from range should work gracefully
+		assert.True(t, fragmentReceived, "expected to receive at least one fragment")
 	})
 }
 
