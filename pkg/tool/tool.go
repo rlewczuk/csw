@@ -510,19 +510,100 @@ type ToolResponse struct {
 	Done bool
 }
 
+// SchemaType represents the type of a property in JSON Schema.
+// Supported types are compatible with JSON Schema used by LLM APIs (Anthropic, OpenAI, Ollama).
+type SchemaType string
+
+const (
+	SchemaTypeString  SchemaType = "string"
+	SchemaTypeNumber  SchemaType = "number"
+	SchemaTypeInteger SchemaType = "integer"
+	SchemaTypeBoolean SchemaType = "boolean"
+	SchemaTypeArray   SchemaType = "array"
+	SchemaTypeObject  SchemaType = "object"
+)
+
+// PropertySchema defines the schema for a single property in tool arguments.
+// It follows JSON Schema specification and is compatible with LLM APIs.
+type PropertySchema struct {
+	// Type is the JSON Schema type of the property.
+	Type SchemaType `json:"type"`
+
+	// Description provides context for the LLM about what this property represents.
+	Description string `json:"description"`
+
+	// Enum is an optional list of allowed values for string properties.
+	Enum []string `json:"enum,omitempty"`
+
+	// Items defines the schema for array elements (required when Type is "array").
+	Items *PropertySchema `json:"items,omitempty"`
+
+	// Properties defines nested properties (required when Type is "object").
+	Properties map[string]PropertySchema `json:"properties,omitempty"`
+
+	// Required lists the required properties (used when Type is "object").
+	Required []string `json:"required,omitempty"`
+}
+
+// ToolSchema defines the JSON Schema for tool arguments.
+// It follows the JSON Schema object type specification used by LLM APIs.
+type ToolSchema struct {
+	// Type is always "object" for tool argument schemas.
+	Type SchemaType `json:"type"`
+
+	// Description provides context for the LLM about the tool arguments structure.
+	Description string `json:"description,omitempty"`
+
+	// Properties defines the schema for each argument.
+	Properties map[string]PropertySchema `json:"properties"`
+
+	// Required lists the names of required arguments.
+	Required []string `json:"required,omitempty"`
+
+	// AdditionalProperties when false, disallows extra properties not in the schema.
+	// This is recommended for strict mode in OpenAI.
+	AdditionalProperties bool `json:"additionalProperties"`
+}
+
+// NewToolSchema creates a new ToolSchema with the object type preset.
+func NewToolSchema() ToolSchema {
+	return ToolSchema{
+		Type:                 SchemaTypeObject,
+		Properties:           make(map[string]PropertySchema),
+		AdditionalProperties: false,
+	}
+}
+
+// AddProperty adds a property to the schema.
+func (s *ToolSchema) AddProperty(name string, prop PropertySchema, required bool) {
+	if s.Properties == nil {
+		s.Properties = make(map[string]PropertySchema)
+	}
+	s.Properties[name] = prop
+	if required {
+		s.Required = append(s.Required, name)
+	}
+}
+
 // ToolInfo represents information about a tool.
 // It is used to provide LLM with information about tool purpose and arguments.
 type ToolInfo struct {
-	Name        string
-	Description string
+	// Name is the unique identifier for the tool.
+	Name string `json:"name"`
+
+	// Description explains what the tool does, helping the LLM decide when to use it.
+	Description string `json:"description"`
+
+	// Schema defines the JSON Schema for the tool's arguments.
+	Schema ToolSchema `json:"parameters"`
 }
 
 // Tool represents a tool that can be executed by the agent.
 // It is responsible for executing the tool and returning the response.
 // It can also represent a group of tools, delegating execution to other tools.
 type Tool interface {
-	// Name returns the name of the tool.
-	Name() string
+	// Info returns information about the tool including its name, description, and argument schema.
+	Info() ToolInfo
 	// Execute executes the tool with the given arguments and returns the response.
 	Execute(args ToolCall) ToolResponse
 }

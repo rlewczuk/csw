@@ -16,9 +16,19 @@ func NewVFSReadTool(v vfs.VFS) *VFSReadTool {
 	return &VFSReadTool{vfs: v}
 }
 
-// Name returns the name of the tool.
-func (t *VFSReadTool) Name() string {
-	return "vfs.read"
+// Info returns information about the tool including its name, description, and argument schema.
+func (t *VFSReadTool) Info() ToolInfo {
+	schema := NewToolSchema()
+	schema.AddProperty("path", PropertySchema{
+		Type:        SchemaTypeString,
+		Description: "The path to the file to read.",
+	}, true)
+
+	return ToolInfo{
+		Name:        "vfs.read",
+		Description: "Reads the content of a file at the specified path.",
+		Schema:      schema,
+	}
 }
 
 // Execute executes the tool with the given arguments and returns the response.
@@ -60,9 +70,23 @@ func NewVFSWriteTool(v vfs.VFS) *VFSWriteTool {
 	return &VFSWriteTool{vfs: v}
 }
 
-// Name returns the name of the tool.
-func (t *VFSWriteTool) Name() string {
-	return "vfs.write"
+// Info returns information about the tool including its name, description, and argument schema.
+func (t *VFSWriteTool) Info() ToolInfo {
+	schema := NewToolSchema()
+	schema.AddProperty("path", PropertySchema{
+		Type:        SchemaTypeString,
+		Description: "The path to the file to write.",
+	}, true)
+	schema.AddProperty("content", PropertySchema{
+		Type:        SchemaTypeString,
+		Description: "The content to write to the file.",
+	}, true)
+
+	return ToolInfo{
+		Name:        "vfs.write",
+		Description: "Writes content to a file at the specified path. Creates the file if it doesn't exist.",
+		Schema:      schema,
+	}
 }
 
 // Execute executes the tool with the given arguments and returns the response.
@@ -110,9 +134,19 @@ func NewVFSDeleteTool(v vfs.VFS) *VFSDeleteTool {
 	return &VFSDeleteTool{vfs: v}
 }
 
-// Name returns the name of the tool.
-func (t *VFSDeleteTool) Name() string {
-	return "vfs.delete"
+// Info returns information about the tool including its name, description, and argument schema.
+func (t *VFSDeleteTool) Info() ToolInfo {
+	schema := NewToolSchema()
+	schema.AddProperty("path", PropertySchema{
+		Type:        SchemaTypeString,
+		Description: "The path to the file to delete.",
+	}, true)
+
+	return ToolInfo{
+		Name:        "vfs.delete",
+		Description: "Deletes a file at the specified path.",
+		Schema:      schema,
+	}
 }
 
 // Execute executes the tool with the given arguments and returns the response.
@@ -151,9 +185,19 @@ func NewVFSListTool(v vfs.VFS) *VFSListTool {
 	return &VFSListTool{vfs: v}
 }
 
-// Name returns the name of the tool.
-func (t *VFSListTool) Name() string {
-	return "vfs.list"
+// Info returns information about the tool including its name, description, and argument schema.
+func (t *VFSListTool) Info() ToolInfo {
+	schema := NewToolSchema()
+	schema.AddProperty("path", PropertySchema{
+		Type:        SchemaTypeString,
+		Description: "The directory path to list files from.",
+	}, true)
+
+	return ToolInfo{
+		Name:        "vfs.list",
+		Description: "Lists files in the specified directory.",
+		Schema:      schema,
+	}
 }
 
 // Execute executes the tool with the given arguments and returns the response.
@@ -201,9 +245,23 @@ func NewVFSMoveTool(v vfs.VFS) *VFSMoveTool {
 	return &VFSMoveTool{vfs: v}
 }
 
-// Name returns the name of the tool.
-func (t *VFSMoveTool) Name() string {
-	return "vfs.move"
+// Info returns information about the tool including its name, description, and argument schema.
+func (t *VFSMoveTool) Info() ToolInfo {
+	schema := NewToolSchema()
+	schema.AddProperty("path", PropertySchema{
+		Type:        SchemaTypeString,
+		Description: "The source path of the file to move.",
+	}, true)
+	schema.AddProperty("destination", PropertySchema{
+		Type:        SchemaTypeString,
+		Description: "The destination path where the file should be moved to.",
+	}, true)
+
+	return ToolInfo{
+		Name:        "vfs.move",
+		Description: "Moves or renames a file from the source path to the destination path.",
+		Schema:      schema,
+	}
 }
 
 // Execute executes the tool with the given arguments and returns the response.
