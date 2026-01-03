@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/models/integ"
+	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +21,15 @@ const (
 
 // skipIfNoOpenAI skips the test if openai integration tests are disabled
 func skipIfNoOpenAI(t *testing.T) string {
-	return integ.SkipIfOpenAIDisabled(t)
+	t.Helper()
+	if !testutil.IntegTestEnabled("openai") {
+		t.Skip("Skipping test: openai integration tests not enabled (set _integ/openai.enabled or _integ/all.enabled to 'yes')")
+	}
+	url := testutil.IntegCfgReadFile("openai.url")
+	if url == "" {
+		t.Skip("Skipping test: _integ/openai.url not configured")
+	}
+	return url
 }
 
 func TestNewOpenAIClient(t *testing.T) {
@@ -51,7 +59,7 @@ func TestNewOpenAIClient(t *testing.T) {
 
 func TestOpenAIClient_ListModels(t *testing.T) {
 	url := skipIfNoOpenAI(t)
-	apiKey := integ.GetOpenAIAPIKey()
+	apiKey := testutil.IntegCfgReadFile("openai.key")
 
 	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
 		APIKey:         apiKey,
@@ -93,7 +101,7 @@ func TestOpenAIClient_ListModels(t *testing.T) {
 
 func TestOpenAIClient_ChatModel(t *testing.T) {
 	url := skipIfNoOpenAI(t)
-	apiKey := integ.GetOpenAIAPIKey()
+	apiKey := testutil.IntegCfgReadFile("openai.key")
 
 	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
 		APIKey:         apiKey,
@@ -224,7 +232,7 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 
 func TestOpenAIClient_ChatModelStream(t *testing.T) {
 	url := skipIfNoOpenAI(t)
-	apiKey := integ.GetOpenAIAPIKey()
+	apiKey := testutil.IntegCfgReadFile("openai.key")
 
 	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
 		APIKey:         apiKey,
@@ -375,7 +383,7 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 
 func TestOpenAIClient_EmbeddingModel(t *testing.T) {
 	url := skipIfNoOpenAI(t)
-	apiKey := integ.GetOpenAIAPIKey()
+	apiKey := testutil.IntegCfgReadFile("openai.key")
 
 	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
 		APIKey:         apiKey,

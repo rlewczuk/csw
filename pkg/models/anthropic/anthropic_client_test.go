@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/models/integ"
+	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +20,15 @@ const (
 
 // getAPIKey skips the test if anthropic integration tests are disabled and returns the API key
 func getAPIKey(t *testing.T) string {
-	return integ.SkipIfAnthropicDisabled(t)
+	t.Helper()
+	if !testutil.IntegTestEnabled("anthropic") {
+		t.Skip("Skipping test: anthropic integration tests not enabled (set _integ/anthropic.enabled or _integ/all.enabled to 'yes')")
+	}
+	apiKey := testutil.IntegCfgReadFile("anthropic.key")
+	if apiKey == "" {
+		t.Skip("Skipping test: _integ/anthropic.key not configured")
+	}
+	return apiKey
 }
 
 func TestNewAnthropicClient(t *testing.T) {

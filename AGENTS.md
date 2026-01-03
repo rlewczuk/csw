@@ -17,6 +17,7 @@
 - Comments: Document all exported types and functions with comments starting with the name
 - Types: Use explicit types for constants (e.g., `type ChatRole string`)
 - Context: Pass `context.Context` as first parameter for operations that may block or need cancellation
+- Try to be straighforward, avoid generating extra wrapper functions if it is not really necessary (i.e. at least three or more call sites for wrapper);
  
 Packages implemented:
 - `pkg/core`: Core agent logic
