@@ -608,7 +608,7 @@ func convertToOpenAIMessage(msg *models.ChatMessage) ChatCompletionMessage {
 				if part.ToolResponse.Call != nil {
 					openaiMsg.ToolCallID = part.ToolResponse.Call.ID
 				} else {
-					openaiMsg.ToolCallID = part.ToolResponse.ID
+					openaiMsg.ToolCallID = part.ToolResponse.Call.ID
 				}
 				if part.ToolResponse.Error != nil {
 					openaiMsg.Content = part.ToolResponse.Error.Error()

@@ -68,7 +68,7 @@ func (r *ToolRegistry) Execute(args ToolCall) ToolResponse {
 	tool, err := r.Get(args.Function)
 	if err != nil {
 		return ToolResponse{
-			ID:    args.ID,
+			Call:  &args,
 			Error: err,
 			Done:  true,
 		}

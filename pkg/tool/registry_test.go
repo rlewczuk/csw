@@ -32,7 +32,7 @@ func (m *MockTool) Execute(args ToolCall) ToolResponse {
 	var result ToolValue
 	result.Set("executed", m.name)
 	return ToolResponse{
-		ID:     args.ID,
+		Call:   &args,
 		Error:  nil,
 		Result: result,
 		Done:   true,
@@ -104,7 +104,7 @@ func TestToolRegistry_Execute(t *testing.T) {
 	}
 
 	response := registry.Execute(args)
-	assert.Equal(t, "test-id", response.ID)
+	assert.Equal(t, "test-id", response.Call.ID)
 	assert.NoError(t, response.Error)
 	assert.True(t, response.Done)
 	assert.Equal(t, "test", response.Result.Get("executed").AsString())
@@ -120,7 +120,7 @@ func TestToolRegistry_ExecuteNotFound(t *testing.T) {
 	}
 
 	response := registry.Execute(args)
-	assert.Equal(t, "test-id", response.ID)
+	assert.Equal(t, "test-id", response.Call.ID)
 	assert.Error(t, response.Error)
 	assert.True(t, response.Done)
 	assert.Equal(t, 0, response.Result.Len())
@@ -214,7 +214,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	}
 
 	writeResponse := registry.Execute(writeArgs)
-	assert.Equal(t, "write-id", writeResponse.ID)
+	assert.Equal(t, "write-id", writeResponse.Call.ID)
 	assert.NoError(t, writeResponse.Error)
 	assert.True(t, writeResponse.Done)
 
@@ -228,7 +228,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	}
 
 	readResponse := registry.Execute(readArgs)
-	assert.Equal(t, "read-id", readResponse.ID)
+	assert.Equal(t, "read-id", readResponse.Call.ID)
 	assert.NoError(t, readResponse.Error)
 	assert.True(t, readResponse.Done)
 	assert.Equal(t, "Hello, World!", readResponse.Result.Get("content").AsString())
@@ -243,7 +243,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	}
 
 	listResponse := registry.Execute(listArgs)
-	assert.Equal(t, "list-id", listResponse.ID)
+	assert.Equal(t, "list-id", listResponse.Call.ID)
 	assert.NoError(t, listResponse.Error)
 	assert.True(t, listResponse.Done)
 

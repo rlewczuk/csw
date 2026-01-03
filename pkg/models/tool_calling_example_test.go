@@ -75,7 +75,7 @@ func TestToolCallingExample(t *testing.T) {
 
 	// Simulate sending tool response back
 	toolResponse := &tool.ToolResponse{
-		ID:     "call_123",
+		Call:   toolCall,
 		Result: tool.NewToolValue("Sunny, 72°F"),
 		Done:   true,
 	}

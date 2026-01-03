@@ -542,7 +542,7 @@ func convertToAnthropicMessage(msg *models.ChatMessage) MessageParam {
 				}
 			}
 			// Prefer Call.ID if available, fall back to ID for backward compatibility
-			toolUseID := part.ToolResponse.ID
+			toolUseID := part.ToolResponse.Call.ID
 			if part.ToolResponse.Call != nil {
 				toolUseID = part.ToolResponse.Call.ID
 			}
