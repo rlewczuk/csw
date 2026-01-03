@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/models/integ"
+	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +21,7 @@ const (
 
 // getOllamaHost returns the Ollama host URL from config file or default
 func getOllamaHost() string {
-	if host := integ.GetOllamaURL(); host != "" {
+	if host := testutil.IntegCfgReadFile("ollama.url"); host != "" {
 		return host
 	}
 	return defaultOllamaHost
@@ -29,7 +29,15 @@ func getOllamaHost() string {
 
 // skipIfNoOllama skips the test if ollama integration tests are disabled
 func skipIfNoOllama(t *testing.T) string {
-	return integ.SkipIfOllamaDisabled(t)
+	t.Helper()
+	if !testutil.IntegTestEnabled("ollama") {
+		t.Skip("Skipping test: ollama integration tests not enabled (set _integ/ollama.enabled or _integ/all.enabled to 'yes')")
+	}
+	url := testutil.IntegCfgReadFile("ollama.url")
+	if url == "" {
+		t.Skip("Skipping test: _integ/ollama.url not configured")
+	}
+	return url
 }
 
 func TestNewOllamaClient(t *testing.T) {
