@@ -54,9 +54,9 @@ type Tool struct {
 
 // ToolFunction represents a function tool definition
 type ToolFunction struct {
-	Name        string            `json:"name"`        // Function name
-	Description string            `json:"description"` // Function description
-	Parameters  map[string]string `json:"parameters"`  // Function parameters (JSON schema)
+	Name        string                 `json:"name"`        // Function name
+	Description string                 `json:"description"` // Function description
+	Parameters  map[string]interface{} `json:"parameters"`  // Function parameters (JSON schema)
 }
 
 // ToolCall represents a tool call made by the model
@@ -66,8 +66,8 @@ type ToolCall struct {
 
 // ToolCallFunction represents the function details in a tool call
 type ToolCallFunction struct {
-	Name      string            `json:"name"`      // Function name
-	Arguments map[string]string `json:"arguments"` // Function arguments
+	Name      string                 `json:"name"`      // Function name
+	Arguments map[string]interface{} `json:"arguments"` // Function arguments
 }
 
 // ModelOptions represents additional model parameters

@@ -11,6 +11,7 @@ type MessagesRequest struct {
 	Stream      bool           `json:"stream,omitempty"`         // Optional: if true, returns streaming response
 	System      interface{}    `json:"system,omitempty"`         // Optional: system prompt (string or array of content blocks)
 	StopSeq     []string       `json:"stop_sequences,omitempty"` // Optional: stop sequences
+	Tools       []Tool         `json:"tools,omitempty"`          // Optional: tools available for the model to use
 }
 
 // MessageParam represents a message in the request
@@ -21,8 +22,21 @@ type MessageParam struct {
 
 // ContentBlock represents a content block in a message (for structured content)
 type ContentBlock struct {
-	Type string `json:"type"`           // Required: "text", "image", etc.
-	Text string `json:"text,omitempty"` // For text type
+	Type      string                 `json:"type"`                  // Required: "text", "image", "tool_use", "tool_result"
+	Text      string                 `json:"text,omitempty"`        // For text type
+	ID        string                 `json:"id,omitempty"`          // For tool_use and tool_result types
+	Name      string                 `json:"name,omitempty"`        // For tool_use type
+	Input     map[string]interface{} `json:"input,omitempty"`       // For tool_use type
+	Content   interface{}            `json:"content,omitempty"`     // For tool_result type (string or array of content blocks)
+	IsError   bool                   `json:"is_error,omitempty"`    // For tool_result type
+	ToolUseID string                 `json:"tool_use_id,omitempty"` // For tool_result type
+}
+
+// Tool represents a tool definition
+type Tool struct {
+	Name        string                 `json:"name"`                  // Required: tool name
+	Description string                 `json:"description,omitempty"` // Optional: tool description
+	InputSchema map[string]interface{} `json:"input_schema"`          // Required: JSON schema for tool input
 }
 
 // MessagesResponse represents the response structure for POST /v1/messages endpoint
@@ -32,15 +46,18 @@ type MessagesResponse struct {
 	Role         string            `json:"role"`                    // Required: "assistant"
 	Content      []ResponseContent `json:"content"`                 // Required: array of content blocks
 	Model        string            `json:"model"`                   // Required: model used
-	StopReason   string            `json:"stop_reason"`             // Optional: "end_turn", "max_tokens", "stop_sequence"
+	StopReason   string            `json:"stop_reason"`             // Optional: "end_turn", "max_tokens", "stop_sequence", "tool_use"
 	StopSequence string            `json:"stop_sequence,omitempty"` // Optional: which stop sequence was generated
 	Usage        UsageInfo         `json:"usage"`                   // Required: token usage
 }
 
 // ResponseContent represents a content block in the response
 type ResponseContent struct {
-	Type string `json:"type"` // Required: "text"
-	Text string `json:"text"` // Required: content text
+	Type  string                 `json:"type"`            // Required: "text" or "tool_use"
+	Text  string                 `json:"text,omitempty"`  // For text type
+	ID    string                 `json:"id,omitempty"`    // For tool_use type
+	Name  string                 `json:"name,omitempty"`  // For tool_use type
+	Input map[string]interface{} `json:"input,omitempty"` // For tool_use type
 }
 
 // UsageInfo represents token usage information
@@ -63,6 +80,7 @@ type StreamEvent struct {
 type Delta struct {
 	Type         string `json:"type,omitempty"`
 	Text         string `json:"text,omitempty"`
+	PartialJSON  string `json:"partial_json,omitempty"` // For tool_use streaming
 	StopReason   string `json:"stop_reason,omitempty"`
 	StopSequence string `json:"stop_sequence,omitempty"`
 }

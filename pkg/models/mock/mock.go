@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
 // MockProvider implements models.ModelProvider interface for testing purposes.
@@ -16,6 +17,10 @@ type MockProvider struct {
 	chatResponses  map[string]*ChatResponse
 	embedResponses map[string][]float64
 	mu             sync.RWMutex
+	// RecordedToolCalls stores tool calls received from the LLM during tests
+	RecordedToolCalls []tool.ToolCall
+	// RecordedToolResponses stores tool responses sent to the LLM during tests
+	RecordedToolResponses []tool.ToolResponse
 }
 
 // ChatResponse holds the configuration for mock chat responses.
@@ -55,8 +60,10 @@ func (p *MockProvider) SetResponsesFromFile(modelName string, filename string) e
 	fragments := make([]*models.ChatMessage, len(prompts))
 	for i, prompt := range prompts {
 		fragments[i] = &models.ChatMessage{
-			Role:  models.ChatRoleAssistant,
-			Parts: []string{strings.TrimSpace(prompt)},
+			Role: models.ChatRoleAssistant,
+			Parts: []models.ChatMessagePart{
+				{Text: strings.TrimSpace(prompt)},
+			},
 		}
 	}
 
@@ -105,13 +112,22 @@ type MockChatModel struct {
 }
 
 // Chat sends a chat request and returns the full response.
-func (m *MockChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) (*models.ChatMessage, error) {
+func (m *MockChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) (*models.ChatMessage, error) {
 	// Check for cancellation first
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	default:
 	}
+
+	// Record tool responses from incoming messages
+	m.provider.mu.Lock()
+	for _, msg := range messages {
+		for _, resp := range msg.GetToolResponses() {
+			m.provider.RecordedToolResponses = append(m.provider.RecordedToolResponses, *resp)
+		}
+	}
+	m.provider.mu.Unlock()
 
 	m.provider.mu.RLock()
 	response := m.provider.chatResponses[m.model]
@@ -120,8 +136,10 @@ func (m *MockChatModel) Chat(ctx context.Context, messages []*models.ChatMessage
 	if response == nil {
 		// Default response if none configured
 		return &models.ChatMessage{
-			Role:  models.ChatRoleAssistant,
-			Parts: []string{"mock response"},
+			Role: models.ChatRoleAssistant,
+			Parts: []models.ChatMessagePart{
+				{Text: "mock response"},
+			},
 		}, nil
 	}
 
@@ -129,12 +147,30 @@ func (m *MockChatModel) Chat(ctx context.Context, messages []*models.ChatMessage
 		return nil, response.Error
 	}
 
+	// Record tool calls from response
+	if response.Response != nil {
+		m.provider.mu.Lock()
+		for _, call := range response.Response.GetToolCalls() {
+			m.provider.RecordedToolCalls = append(m.provider.RecordedToolCalls, *call)
+		}
+		m.provider.mu.Unlock()
+	}
+
 	return response.Response, nil
 }
 
 // ChatStream sends a chat request and returns a standard Go iterator for streaming responses.
-func (m *MockChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) iter.Seq[*models.ChatMessage] {
+func (m *MockChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) iter.Seq[*models.ChatMessage] {
 	return func(yield func(*models.ChatMessage) bool) {
+		// Record tool responses from incoming messages
+		m.provider.mu.Lock()
+		for _, msg := range messages {
+			for _, resp := range msg.GetToolResponses() {
+				m.provider.RecordedToolResponses = append(m.provider.RecordedToolResponses, *resp)
+			}
+		}
+		m.provider.mu.Unlock()
+
 		m.provider.mu.RLock()
 		response := m.provider.chatResponses[m.model]
 		m.provider.mu.RUnlock()
@@ -144,8 +180,8 @@ func (m *MockChatModel) ChatStream(ctx context.Context, messages []*models.ChatM
 		if response == nil {
 			// Default streaming response if none configured
 			fragments = []*models.ChatMessage{
-				{Role: models.ChatRoleAssistant, Parts: []string{"mock"}},
-				{Role: models.ChatRoleAssistant, Parts: []string{" stream"}},
+				{Role: models.ChatRoleAssistant, Parts: []models.ChatMessagePart{{Text: "mock"}}},
+				{Role: models.ChatRoleAssistant, Parts: []models.ChatMessagePart{{Text: " stream"}}},
 			}
 		} else if response.Error != nil {
 			// If there's an error configured, just return without yielding anything
@@ -153,6 +189,15 @@ func (m *MockChatModel) ChatStream(ctx context.Context, messages []*models.ChatM
 		} else {
 			fragments = response.StreamFragments
 		}
+
+		// Record tool calls from fragments
+		m.provider.mu.Lock()
+		for _, fragment := range fragments {
+			for _, call := range fragment.GetToolCalls() {
+				m.provider.RecordedToolCalls = append(m.provider.RecordedToolCalls, *call)
+			}
+		}
+		m.provider.mu.Unlock()
 
 		// Yield each fragment
 		for _, fragment := range fragments {

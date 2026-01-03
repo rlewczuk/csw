@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
 // AnthropicClient is a client for interacting with Anthropic API
@@ -143,7 +144,7 @@ func (c *AnthropicClient) ListModels() ([]models.ModelInfo, error) {
 }
 
 // Chat sends a chat request and returns the response
-func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) (*models.ChatMessage, error) {
+func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) (*models.ChatMessage, error) {
 	if len(messages) == 0 {
 		return nil, errors.New("messages cannot be nil or empty")
 	}
@@ -164,21 +165,16 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*models.ChatMe
 	var anthropicMessages []MessageParam
 
 	for _, msg := range messages {
-		content := strings.Join(msg.Parts, "")
-
 		if msg.Role == models.ChatRoleSystem {
 			// Accumulate system messages
 			if systemPrompt != "" {
 				systemPrompt += "\n"
 			}
-			systemPrompt += content
+			systemPrompt += msg.GetText()
 		} else {
-			// Convert role
-			role := string(msg.Role)
-			anthropicMessages = append(anthropicMessages, MessageParam{
-				Role:    role,
-				Content: content,
-			})
+			// Convert message to Anthropic format
+			anthropicMsg := convertToAnthropicMessage(msg)
+			anthropicMessages = append(anthropicMessages, anthropicMsg)
 		}
 	}
 
@@ -188,6 +184,7 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*models.ChatMe
 		Messages:  anthropicMessages,
 		MaxTokens: 4096, // Default max tokens
 		Stream:    false,
+		Tools:     convertToolsToAnthropic(tools),
 	}
 
 	// Add system prompt if present
@@ -243,24 +240,13 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*models.ChatMe
 		return nil, errors.New("no content in response")
 	}
 
-	// Extract text from content blocks
-	var textParts []string
-	for _, content := range chatResp.Content {
-		if content.Type == "text" {
-			textParts = append(textParts, content.Text)
-		}
-	}
-
-	result := &models.ChatMessage{
-		Role:  models.ChatRoleAssistant,
-		Parts: textParts,
-	}
-
+	// Convert response to ChatMessage
+	result := convertFromAnthropicResponse(chatResp.Content)
 	return result, nil
 }
 
 // ChatStream sends a chat request and returns a standard Go iterator for streaming responses
-func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) iter.Seq[*models.ChatMessage] {
+func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) iter.Seq[*models.ChatMessage] {
 	return func(yield func(*models.ChatMessage) bool) {
 		// Validate inputs
 		if len(messages) == 0 {
@@ -282,19 +268,14 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*models.
 		var anthropicMessages []MessageParam
 
 		for _, msg := range messages {
-			content := strings.Join(msg.Parts, "")
-
 			if msg.Role == models.ChatRoleSystem {
 				if systemPrompt != "" {
 					systemPrompt += "\n"
 				}
-				systemPrompt += content
+				systemPrompt += msg.GetText()
 			} else {
-				role := string(msg.Role)
-				anthropicMessages = append(anthropicMessages, MessageParam{
-					Role:    role,
-					Content: content,
-				})
+				anthropicMsg := convertToAnthropicMessage(msg)
+				anthropicMessages = append(anthropicMessages, anthropicMsg)
 			}
 		}
 
@@ -304,6 +285,7 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*models.
 			Messages:  anthropicMessages,
 			MaxTokens: 4096,
 			Stream:    true,
+			Tools:     convertToolsToAnthropic(tools),
 		}
 
 		if systemPrompt != "" {
@@ -389,16 +371,40 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*models.
 
 				// Handle different event types
 				switch event.Type {
-				case "content_block_delta":
-					if event.Delta != nil && event.Delta.Text != "" {
+				case "content_block_start":
+					// Handle tool_use blocks
+					if event.ContentBlock != nil && event.ContentBlock.Type == "tool_use" {
 						result := &models.ChatMessage{
-							Role:  models.ChatRoleAssistant,
-							Parts: []string{event.Delta.Text},
+							Role: models.ChatRoleAssistant,
+							Parts: []models.ChatMessagePart{
+								{
+									ToolCall: &tool.ToolCall{
+										ID:        event.ContentBlock.ID,
+										Function:  event.ContentBlock.Name,
+										Arguments: tool.NewToolValue(event.ContentBlock.Input),
+									},
+								},
+							},
 						}
 						if !yield(result) {
 							return
 						}
 					}
+				case "content_block_delta":
+					if event.Delta != nil && event.Delta.Text != "" {
+						result := &models.ChatMessage{
+							Role: models.ChatRoleAssistant,
+							Parts: []models.ChatMessagePart{
+								{Text: event.Delta.Text},
+							},
+						}
+						if !yield(result) {
+							return
+						}
+					}
+					// Handle partial JSON for tool_use streaming
+					// Note: Anthropic may stream tool input as partial_json
+					// For now, we only return complete tool_use blocks from content_block_start
 				case "message_delta":
 					// Check for stop reason
 					if event.Delta != nil && event.Delta.StopReason != "" {
@@ -491,4 +497,111 @@ func (c *AnthropicClient) checkStatusCode(resp *http.Response) error {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
 	}
+}
+
+// convertToAnthropicMessage converts a models.ChatMessage to Anthropic MessageParam format
+func convertToAnthropicMessage(msg *models.ChatMessage) MessageParam {
+	// Check if message contains only text
+	if len(msg.Parts) > 0 && msg.Parts[0].Text != "" && msg.Parts[0].ToolCall == nil && msg.Parts[0].ToolResponse == nil {
+		// Simple text message
+		return MessageParam{
+			Role:    string(msg.Role),
+			Content: msg.GetText(),
+		}
+	}
+
+	// Message contains tool calls or tool responses - use array of content blocks
+	var contentBlocks []ContentBlock
+	for _, part := range msg.Parts {
+		if part.Text != "" {
+			contentBlocks = append(contentBlocks, ContentBlock{
+				Type: "text",
+				Text: part.Text,
+			})
+		} else if part.ToolCall != nil {
+			// Tool use block
+			contentBlocks = append(contentBlocks, ContentBlock{
+				Type:  "tool_use",
+				ID:    part.ToolCall.ID,
+				Name:  part.ToolCall.Function,
+				Input: part.ToolCall.Arguments.Raw().(map[string]interface{}),
+			})
+		} else if part.ToolResponse != nil {
+			// Tool result block
+			var content interface{}
+			if part.ToolResponse.Error != nil {
+				content = part.ToolResponse.Error.Error()
+			} else {
+				// Anthropic requires content to be a string or array of content blocks
+				// Convert result to JSON string
+				resultJSON, err := json.Marshal(part.ToolResponse.Result)
+				if err != nil {
+					content = fmt.Sprintf("Error serializing result: %v", err)
+				} else {
+					content = string(resultJSON)
+				}
+			}
+			// Prefer Call.ID if available, fall back to ID for backward compatibility
+			toolUseID := part.ToolResponse.ID
+			if part.ToolResponse.Call != nil {
+				toolUseID = part.ToolResponse.Call.ID
+			}
+			contentBlocks = append(contentBlocks, ContentBlock{
+				Type:      "tool_result",
+				ToolUseID: toolUseID,
+				Content:   content,
+				IsError:   part.ToolResponse.Error != nil,
+			})
+		}
+	}
+
+	return MessageParam{
+		Role:    string(msg.Role),
+		Content: contentBlocks,
+	}
+}
+
+// convertFromAnthropicResponse converts Anthropic response content to models.ChatMessage
+func convertFromAnthropicResponse(content []ResponseContent) *models.ChatMessage {
+	var parts []models.ChatMessagePart
+	for _, c := range content {
+		if c.Type == "text" {
+			parts = append(parts, models.ChatMessagePart{Text: c.Text})
+		} else if c.Type == "tool_use" {
+			parts = append(parts, models.ChatMessagePart{
+				ToolCall: &tool.ToolCall{
+					ID:        c.ID,
+					Function:  c.Name,
+					Arguments: tool.NewToolValue(c.Input),
+				},
+			})
+		}
+	}
+
+	return &models.ChatMessage{
+		Role:  models.ChatRoleAssistant,
+		Parts: parts,
+	}
+}
+
+// convertToolsToAnthropic converts tool.ToolInfo to Anthropic Tool format
+func convertToolsToAnthropic(tools []tool.ToolInfo) []Tool {
+	if len(tools) == 0 {
+		return nil
+	}
+
+	anthropicTools := make([]Tool, len(tools))
+	for i, t := range tools {
+		// Convert ToolSchema to map[string]interface{}
+		schemaJSON, _ := json.Marshal(t.Schema)
+		var schemaMap map[string]interface{}
+		json.Unmarshal(schemaJSON, &schemaMap)
+
+		anthropicTools[i] = Tool{
+			Name:        t.Name,
+			Description: t.Description,
+			InputSchema: schemaMap,
+		}
+	}
+	return anthropicTools
 }

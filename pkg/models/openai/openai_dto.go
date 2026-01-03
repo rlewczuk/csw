@@ -59,9 +59,10 @@ type ToolFunction struct {
 
 // ToolCall represents a tool call made by the model
 type ToolCall struct {
-	ID       string           `json:"id"`       // Required: tool call ID
-	Type     string           `json:"type"`     // Required: "function"
-	Function ToolCallFunction `json:"function"` // Required: function details
+	Index    int              `json:"index,omitempty"` // Optional: index in streaming responses
+	ID       string           `json:"id"`              // Required: tool call ID
+	Type     string           `json:"type"`            // Required: "function"
+	Function ToolCallFunction `json:"function"`        // Required: function details
 }
 
 // ToolCallFunction represents the function details in a tool call
