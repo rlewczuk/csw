@@ -19,7 +19,8 @@
 - Context: Pass `context.Context` as first parameter for operations that may block or need cancellation
 - Try to be straighforward, avoid generating extra wrapper functions if it is not really necessary (i.e. at least three or more call sites for wrapper);
 - Use standard library as long as possible, avoid adding dependencies if it is not really necessary;
- 
+- DO NOT use scripts to edit files, always edit files manually; if there are too many changes, just edit bigger chunks manually;
+
 Packages implemented:
 - `pkg/core`: Core agent logic
 - `pkg/models`: Model provider and model interfaces
