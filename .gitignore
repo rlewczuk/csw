@@ -3,3 +3,5 @@
 _*.sh
 .DS_Store
 csw
+_local/
+_integ/
