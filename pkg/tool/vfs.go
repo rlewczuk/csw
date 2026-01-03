@@ -51,7 +51,7 @@ func (t *VFSReadTool) Execute(args ToolCall) ToolResponse {
 		}
 	}
 
-	result := ToolResult{}
+	var result ToolValue
 	result.Set("content", string(content))
 	return ToolResponse{
 		ID:     args.ID,
@@ -220,13 +220,13 @@ func (t *VFSListTool) Execute(args ToolCall) ToolResponse {
 		}
 	}
 
-	// Convert files to array of any for ToolResult
+	// Convert files to array of any for ToolValue
 	filesArray := make([]any, len(files))
 	for i, f := range files {
 		filesArray[i] = f
 	}
 
-	result := ToolResult{}
+	var result ToolValue
 	result.Set("files", filesArray)
 	return ToolResponse{
 		ID:     args.ID,

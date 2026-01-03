@@ -32,43 +32,43 @@ func TestToolValue_Primitives(t *testing.T) {
 	}
 }
 
-func TestToolValue_String(t *testing.T) {
+func TestToolValue_AsString(t *testing.T) {
 	t.Run("valid string", func(t *testing.T) {
 		v := NewToolValue("hello")
-		assert.Equal(t, "hello", v.String())
-		s, ok := v.StringOK()
+		assert.Equal(t, "hello", v.AsString())
+		s, ok := v.AsStringOK()
 		assert.True(t, ok)
 		assert.Equal(t, "hello", s)
 	})
 
 	t.Run("not a string", func(t *testing.T) {
 		v := NewToolValue(42)
-		assert.Equal(t, "", v.String())
-		s, ok := v.StringOK()
+		assert.Equal(t, "", v.AsString())
+		s, ok := v.AsStringOK()
 		assert.False(t, ok)
 		assert.Equal(t, "", s)
 	})
 }
 
-func TestToolValue_Bool(t *testing.T) {
+func TestToolValue_AsBool(t *testing.T) {
 	t.Run("valid bool", func(t *testing.T) {
 		v := NewToolValue(true)
-		assert.Equal(t, true, v.Bool())
-		b, ok := v.BoolOK()
+		assert.Equal(t, true, v.AsBool())
+		b, ok := v.AsBoolOK()
 		assert.True(t, ok)
 		assert.Equal(t, true, b)
 	})
 
 	t.Run("not a bool", func(t *testing.T) {
 		v := NewToolValue("true")
-		assert.Equal(t, false, v.Bool())
-		b, ok := v.BoolOK()
+		assert.Equal(t, false, v.AsBool())
+		b, ok := v.AsBoolOK()
 		assert.False(t, ok)
 		assert.Equal(t, false, b)
 	})
 }
 
-func TestToolValue_Int(t *testing.T) {
+func TestToolValue_AsInt(t *testing.T) {
 	tests := []struct {
 		name   string
 		value  any
@@ -84,15 +84,15 @@ func TestToolValue_Int(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := NewToolValue(tt.value)
-			assert.Equal(t, tt.want, v.Int())
-			i, ok := v.IntOK()
+			assert.Equal(t, tt.want, v.AsInt())
+			i, ok := v.AsIntOK()
 			assert.Equal(t, tt.wantOK, ok)
 			assert.Equal(t, tt.want, i)
 		})
 	}
 }
 
-func TestToolValue_Float(t *testing.T) {
+func TestToolValue_AsFloat(t *testing.T) {
 	tests := []struct {
 		name   string
 		value  any
@@ -108,8 +108,8 @@ func TestToolValue_Float(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := NewToolValue(tt.value)
-			assert.Equal(t, tt.want, v.Float())
-			f, ok := v.FloatOK()
+			assert.Equal(t, tt.want, v.AsFloat())
+			f, ok := v.AsFloatOK()
 			assert.Equal(t, tt.wantOK, ok)
 			assert.Equal(t, tt.want, f)
 		})
@@ -125,9 +125,9 @@ func TestToolValue_Array(t *testing.T) {
 
 		result := v.Array()
 		require.Len(t, result, 3)
-		assert.Equal(t, "a", result[0].String())
-		assert.Equal(t, "b", result[1].String())
-		assert.Equal(t, "c", result[2].String())
+		assert.Equal(t, "a", result[0].AsString())
+		assert.Equal(t, "b", result[1].AsString())
+		assert.Equal(t, "c", result[2].AsString())
 
 		arrOK, ok := v.ArrayOK()
 		assert.True(t, ok)
@@ -145,7 +145,7 @@ func TestToolValue_Array(t *testing.T) {
 	t.Run("index access", func(t *testing.T) {
 		arr := []any{10, 20, 30}
 		v := NewToolValue(arr)
-		assert.Equal(t, int64(20), v.Index(1).Int())
+		assert.Equal(t, int64(20), v.Index(1).AsInt())
 		assert.True(t, v.Index(-1).IsNil())
 		assert.True(t, v.Index(100).IsNil())
 	})
@@ -163,8 +163,8 @@ func TestToolValue_Object(t *testing.T) {
 
 		result := v.Object()
 		require.Len(t, result, 2)
-		assert.Equal(t, "test", result["name"].String())
-		assert.Equal(t, int64(30), result["age"].Int())
+		assert.Equal(t, "test", result["name"].AsString())
+		assert.Equal(t, int64(30), result["age"].AsInt())
 
 		objOK, ok := v.ObjectOK()
 		assert.True(t, ok)
@@ -184,12 +184,12 @@ func TestToolValue_Object(t *testing.T) {
 			"key": "value",
 		}
 		v := NewToolValue(obj)
-		assert.Equal(t, "value", v.Get("key").String())
+		assert.Equal(t, "value", v.Get("key").AsString())
 		assert.True(t, v.Get("nonexistent").IsNil())
 
 		val, ok := v.GetOK("key")
 		assert.True(t, ok)
-		assert.Equal(t, "value", val.String())
+		assert.Equal(t, "value", val.AsString())
 
 		val, ok = v.GetOK("nonexistent")
 		assert.False(t, ok)
@@ -210,13 +210,13 @@ func TestToolValue_Nested(t *testing.T) {
 	// Access nested object
 	user := v.Get("user")
 	assert.Equal(t, "object", user.Type())
-	assert.Equal(t, "John", user.Get("name").String())
+	assert.Equal(t, "John", user.Get("name").AsString())
 
 	// Access nested array
 	tags := user.Get("tags")
 	assert.Equal(t, "array", tags.Type())
 	assert.Equal(t, 2, tags.Len())
-	assert.Equal(t, "admin", tags.Index(0).String())
+	assert.Equal(t, "admin", tags.Index(0).AsString())
 
 	// Non-existent path
 	assert.True(t, v.Get("user").Get("nonexistent").IsNil())
@@ -243,9 +243,9 @@ func TestToolValue_JSON(t *testing.T) {
 		err := json.Unmarshal([]byte(jsonStr), &v)
 		require.NoError(t, err)
 
-		assert.Equal(t, "test", v.Get("name").String())
-		assert.Equal(t, int64(42), v.Get("count").Int())
-		assert.Equal(t, true, v.Get("active").Bool())
+		assert.Equal(t, "test", v.Get("name").AsString())
+		assert.Equal(t, int64(42), v.Get("count").AsInt())
+		assert.Equal(t, true, v.Get("active").AsBool())
 	})
 }
 
@@ -257,8 +257,8 @@ func TestToolValue_FromToolValueSlice(t *testing.T) {
 	v := NewToolValue(slice)
 	arr := v.Array()
 	require.Len(t, arr, 2)
-	assert.Equal(t, "a", arr[0].String())
-	assert.Equal(t, "b", arr[1].String())
+	assert.Equal(t, "a", arr[0].AsString())
+	assert.Equal(t, "b", arr[1].AsString())
 }
 
 func TestToolValue_FromToolValueMap(t *testing.T) {
@@ -266,238 +266,193 @@ func TestToolValue_FromToolValueMap(t *testing.T) {
 		"key": NewToolValue("value"),
 	}
 	v := NewToolValue(m)
-	assert.Equal(t, "value", v.Get("key").String())
+	assert.Equal(t, "value", v.Get("key").AsString())
 }
 
-func TestToolArgs_Basic(t *testing.T) {
-	args := NewToolArgs(map[string]any{
-		"path":    "/tmp/test.txt",
-		"content": "hello world",
-		"lines":   100,
-		"verbose": true,
+func TestToolValue_ObjectOperations(t *testing.T) {
+	t.Run("basic operations", func(t *testing.T) {
+		v := NewToolValue(map[string]any{
+			"path":    "/tmp/test.txt",
+			"content": "hello world",
+			"lines":   100,
+			"verbose": true,
+		})
+
+		assert.Equal(t, 4, v.Len())
+		assert.True(t, v.Has("path"))
+		assert.False(t, v.Has("nonexistent"))
+
+		keys := v.Keys()
+		assert.Len(t, keys, 4)
 	})
 
-	assert.Equal(t, 4, args.Len())
-	assert.True(t, args.Has("path"))
-	assert.False(t, args.Has("nonexistent"))
+	t.Run("typed access by key", func(t *testing.T) {
+		v := NewToolValue(map[string]any{
+			"name":   "test",
+			"count":  42,
+			"rate":   3.14,
+			"active": true,
+		})
 
-	keys := args.Keys()
-	assert.Len(t, keys, 4)
-}
-
-func TestToolArgs_TypedAccess(t *testing.T) {
-	args := NewToolArgs(map[string]any{
-		"name":   "test",
-		"count":  42,
-		"rate":   3.14,
-		"active": true,
-	})
-
-	t.Run("String", func(t *testing.T) {
-		assert.Equal(t, "test", args.String("name"))
-		s, ok := args.StringOK("name")
+		// String access
+		assert.Equal(t, "test", v.String("name"))
+		s, ok := v.StringOK("name")
 		assert.True(t, ok)
 		assert.Equal(t, "test", s)
 
-		assert.Equal(t, "", args.String("nonexistent"))
-		s, ok = args.StringOK("nonexistent")
+		assert.Equal(t, "", v.String("nonexistent"))
+		s, ok = v.StringOK("nonexistent")
 		assert.False(t, ok)
 		assert.Equal(t, "", s)
-	})
 
-	t.Run("Int", func(t *testing.T) {
-		assert.Equal(t, int64(42), args.Int("count"))
-		i, ok := args.IntOK("count")
+		// Int access
+		assert.Equal(t, int64(42), v.Int("count"))
+		i, ok := v.IntOK("count")
 		assert.True(t, ok)
 		assert.Equal(t, int64(42), i)
 
-		assert.Equal(t, int64(0), args.Int("nonexistent"))
-		i, ok = args.IntOK("nonexistent")
+		assert.Equal(t, int64(0), v.Int("nonexistent"))
+		i, ok = v.IntOK("nonexistent")
 		assert.False(t, ok)
 		assert.Equal(t, int64(0), i)
-	})
 
-	t.Run("Float", func(t *testing.T) {
-		assert.Equal(t, 3.14, args.Float("rate"))
-		f, ok := args.FloatOK("rate")
+		// Float access
+		assert.Equal(t, 3.14, v.Float("rate"))
+		f, ok := v.FloatOK("rate")
 		assert.True(t, ok)
 		assert.Equal(t, 3.14, f)
-	})
 
-	t.Run("Bool", func(t *testing.T) {
-		assert.Equal(t, true, args.Bool("active"))
-		b, ok := args.BoolOK("active")
+		// Bool access
+		assert.Equal(t, true, v.Bool("active"))
+		b, ok := v.BoolOK("active")
 		assert.True(t, ok)
 		assert.Equal(t, true, b)
 	})
-}
 
-func TestToolArgs_ComplexTypes(t *testing.T) {
-	args := NewToolArgs(map[string]any{
-		"files": []any{"/a.txt", "/b.txt"},
-		"config": map[string]any{
-			"timeout": 30,
-			"retry":   true,
-		},
-	})
+	t.Run("complex types", func(t *testing.T) {
+		v := NewToolValue(map[string]any{
+			"files": []any{"/a.txt", "/b.txt"},
+			"config": map[string]any{
+				"timeout": 30,
+				"retry":   true,
+			},
+		})
 
-	t.Run("Array", func(t *testing.T) {
-		files := args.Array("files")
+		// Array access
+		files := v.Get("files").Array()
 		require.Len(t, files, 2)
-		assert.Equal(t, "/a.txt", files[0].String())
-		assert.Equal(t, "/b.txt", files[1].String())
-	})
+		assert.Equal(t, "/a.txt", files[0].AsString())
+		assert.Equal(t, "/b.txt", files[1].AsString())
 
-	t.Run("Object", func(t *testing.T) {
-		config := args.Object("config")
+		// Object access
+		config := v.Get("config").Object()
 		require.NotNil(t, config)
-		assert.Equal(t, int64(30), config["timeout"].Int())
-		assert.Equal(t, true, config["retry"].Bool())
-	})
+		assert.Equal(t, int64(30), config["timeout"].AsInt())
+		assert.Equal(t, true, config["retry"].AsBool())
 
-	t.Run("Get for nested access", func(t *testing.T) {
-		configVal := args.Get("config")
+		// Nested access via Get
+		configVal := v.Get("config")
 		assert.Equal(t, "object", configVal.Type())
-		assert.Equal(t, int64(30), configVal.Get("timeout").Int())
+		assert.Equal(t, int64(30), configVal.Get("timeout").AsInt())
 	})
 }
 
-func TestToolArgs_FromJSON(t *testing.T) {
+func TestToolValue_Set(t *testing.T) {
+	t.Run("set on empty value", func(t *testing.T) {
+		var v ToolValue
+		v.Set("content", "file contents")
+		v.Set("size", 1024)
+		v.Set("exists", true)
+
+		assert.Equal(t, 3, v.Len())
+		assert.True(t, v.Has("content"))
+		assert.False(t, v.Has("nonexistent"))
+
+		assert.Equal(t, "file contents", v.Get("content").AsString())
+		assert.Equal(t, int64(1024), v.Get("size").AsInt())
+		assert.Equal(t, true, v.Get("exists").AsBool())
+
+		keys := v.Keys()
+		assert.Len(t, keys, 3)
+	})
+
+	t.Run("set complex values", func(t *testing.T) {
+		var v ToolValue
+		v.Set("files", []any{"/a.txt", "/b.txt"})
+		v.Set("metadata", map[string]any{
+			"created": "2024-01-01",
+			"size":    100,
+		})
+
+		files := v.Get("files").Array()
+		require.Len(t, files, 2)
+		assert.Equal(t, "/a.txt", files[0].AsString())
+
+		metadata := v.Get("metadata")
+		assert.Equal(t, "2024-01-01", metadata.Get("created").AsString())
+		assert.Equal(t, int64(100), metadata.Get("size").AsInt())
+	})
+
+	t.Run("set ToolValue", func(t *testing.T) {
+		var v ToolValue
+		tv := NewToolValue(map[string]any{"nested": "value"})
+		v.Set("data", tv)
+
+		assert.Equal(t, "value", v.Get("data").Get("nested").AsString())
+	})
+}
+
+func TestToolValue_FromJSON(t *testing.T) {
 	t.Run("valid JSON", func(t *testing.T) {
 		jsonStr := `{"path": "/tmp/test.txt", "mode": 493}`
-		args, err := NewToolArgsFromJSON(jsonStr)
+		v, err := NewToolValueFromJSON(jsonStr)
 		require.NoError(t, err)
 
-		assert.Equal(t, "/tmp/test.txt", args.String("path"))
-		assert.Equal(t, int64(493), args.Int("mode"))
+		assert.Equal(t, "/tmp/test.txt", v.String("path"))
+		assert.Equal(t, int64(493), v.Int("mode"))
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
-		_, err := NewToolArgsFromJSON("not json")
+		_, err := NewToolValueFromJSON("not json")
 		assert.Error(t, err)
 	})
 
 	t.Run("not an object", func(t *testing.T) {
-		_, err := NewToolArgsFromJSON(`["array", "not", "object"]`)
+		_, err := NewToolValueFromJSON(`["array", "not", "object"]`)
 		assert.Error(t, err)
 	})
 }
 
-func TestToolArgs_JSON(t *testing.T) {
-	args := NewToolArgs(map[string]any{
+func TestToolValue_JSONRoundtrip(t *testing.T) {
+	v := NewToolValue(map[string]any{
 		"path":  "/tmp/test.txt",
 		"lines": 100,
 	})
 
-	data, err := json.Marshal(args)
+	data, err := json.Marshal(v)
 	require.NoError(t, err)
 
-	var args2 ToolArgs
-	err = json.Unmarshal(data, &args2)
+	var v2 ToolValue
+	err = json.Unmarshal(data, &v2)
 	require.NoError(t, err)
 
-	assert.Equal(t, "/tmp/test.txt", args2.String("path"))
-	assert.Equal(t, int64(100), args2.Int("lines"))
+	assert.Equal(t, "/tmp/test.txt", v2.String("path"))
+	assert.Equal(t, int64(100), v2.Int("lines"))
 }
 
-func TestToolArgs_Raw(t *testing.T) {
-	original := map[string]any{"key": "value"}
-	args := NewToolArgs(original)
-	raw := args.Raw()
-	assert.Equal(t, original, raw)
-}
-
-func TestToolArgs_NilMap(t *testing.T) {
-	args := NewToolArgs(nil)
-	assert.Equal(t, 0, args.Len())
-	assert.False(t, args.Has("any"))
-	assert.Equal(t, "", args.String("any"))
-}
-
-func TestToolResult_Basic(t *testing.T) {
-	result := NewToolResult(nil)
-	result.Set("content", "file contents")
-	result.Set("size", 1024)
-	result.Set("exists", true)
-
-	assert.Equal(t, 3, result.Len())
-	assert.True(t, result.Has("content"))
-	assert.False(t, result.Has("nonexistent"))
-
-	assert.Equal(t, "file contents", result.Get("content").String())
-	assert.Equal(t, int64(1024), result.Get("size").Int())
-	assert.Equal(t, true, result.Get("exists").Bool())
-
-	keys := result.Keys()
-	assert.Len(t, keys, 3)
-}
-
-func TestToolResult_ComplexValues(t *testing.T) {
-	result := NewToolResult(nil)
-	result.Set("files", []any{"/a.txt", "/b.txt"})
-	result.Set("metadata", map[string]any{
-		"created": "2024-01-01",
-		"size":    100,
-	})
-
-	files := result.Get("files").Array()
-	require.Len(t, files, 2)
-	assert.Equal(t, "/a.txt", files[0].String())
-
-	metadata := result.Get("metadata")
-	assert.Equal(t, "2024-01-01", metadata.Get("created").String())
-	assert.Equal(t, int64(100), metadata.Get("size").Int())
-}
-
-func TestToolResult_SetToolValue(t *testing.T) {
-	result := NewToolResult(nil)
-	tv := NewToolValue(map[string]any{"nested": "value"})
-	result.Set("data", tv)
-
-	assert.Equal(t, "value", result.Get("data").Get("nested").String())
-}
-
-func TestToolResult_GetOK(t *testing.T) {
-	result := NewToolResult(map[string]any{"key": "value"})
-
-	v, ok := result.GetOK("key")
-	assert.True(t, ok)
-	assert.Equal(t, "value", v.String())
-
-	v, ok = result.GetOK("nonexistent")
-	assert.False(t, ok)
-	assert.True(t, v.IsNil())
-}
-
-func TestToolResult_JSON(t *testing.T) {
-	result := NewToolResult(nil)
-	result.Set("content", "test")
-	result.Set("lines", []any{1, 2, 3})
-
-	data, err := json.Marshal(result)
-	require.NoError(t, err)
-
-	var result2 ToolResult
-	err = json.Unmarshal(data, &result2)
-	require.NoError(t, err)
-
-	assert.Equal(t, "test", result2.Get("content").String())
-	arr := result2.Get("lines").Array()
-	require.Len(t, arr, 3)
-	assert.Equal(t, int64(2), arr[1].Int())
-}
-
-func TestToolResult_Raw(t *testing.T) {
-	result := NewToolResult(map[string]any{"key": "value"})
-	raw := result.Raw()
-	assert.Equal(t, "value", raw["key"])
+func TestToolValue_NilObject(t *testing.T) {
+	v := NewToolValue(nil)
+	assert.Equal(t, 0, v.Len())
+	assert.False(t, v.Has("any"))
+	assert.Equal(t, "", v.String("any"))
+	assert.Nil(t, v.Keys())
 }
 
 func TestToolCall_WithComplexArgs(t *testing.T) {
 	call := ToolCall{
 		ID:       "call-123",
 		Function: "process_files",
-		Arguments: NewToolArgs(map[string]any{
+		Arguments: NewToolValue(map[string]any{
 			"files":   []any{"/a.txt", "/b.txt"},
 			"options": map[string]any{"recursive": true},
 		}),
@@ -506,16 +461,16 @@ func TestToolCall_WithComplexArgs(t *testing.T) {
 	assert.Equal(t, "call-123", call.ID)
 	assert.Equal(t, "process_files", call.Function)
 
-	files := call.Arguments.Array("files")
+	files := call.Arguments.Get("files").Array()
 	require.Len(t, files, 2)
-	assert.Equal(t, "/a.txt", files[0].String())
+	assert.Equal(t, "/a.txt", files[0].AsString())
 
-	options := call.Arguments.Object("options")
-	assert.Equal(t, true, options["recursive"].Bool())
+	options := call.Arguments.Get("options").Object()
+	assert.Equal(t, true, options["recursive"].AsBool())
 }
 
 func TestToolResponse_WithComplexResult(t *testing.T) {
-	result := ToolResult{}
+	var result ToolValue
 	result.Set("files", []any{
 		map[string]any{"name": "a.txt", "size": 100},
 		map[string]any{"name": "b.txt", "size": 200},
@@ -534,8 +489,8 @@ func TestToolResponse_WithComplexResult(t *testing.T) {
 
 	files := response.Result.Get("files").Array()
 	require.Len(t, files, 2)
-	assert.Equal(t, "a.txt", files[0].Get("name").String())
-	assert.Equal(t, int64(100), files[0].Get("size").Int())
+	assert.Equal(t, "a.txt", files[0].Get("name").AsString())
+	assert.Equal(t, int64(100), files[0].Get("size").AsInt())
 }
 
 func TestPropertySchema_BasicTypes(t *testing.T) {
@@ -818,13 +773,13 @@ func TestLLMAPICompatibility(t *testing.T) {
 	t.Run("OpenAI style arguments", func(t *testing.T) {
 		// OpenAI sends arguments as a JSON string
 		argsJSON := `{"path": "/tmp/test.txt", "options": {"line_start": 1, "line_end": 100}}`
-		args, err := NewToolArgsFromJSON(argsJSON)
+		args, err := NewToolValueFromJSON(argsJSON)
 		require.NoError(t, err)
 
 		assert.Equal(t, "/tmp/test.txt", args.String("path"))
-		options := args.Object("options")
-		assert.Equal(t, int64(1), options["line_start"].Int())
-		assert.Equal(t, int64(100), options["line_end"].Int())
+		options := args.Get("options").Object()
+		assert.Equal(t, int64(1), options["line_start"].AsInt())
+		assert.Equal(t, int64(100), options["line_end"].AsInt())
 	})
 
 	t.Run("Anthropic/Ollama style arguments", func(t *testing.T) {
@@ -837,12 +792,12 @@ func TestLLMAPICompatibility(t *testing.T) {
 			},
 			"timeout": 30000,
 		}
-		args := NewToolArgs(argsMap)
+		args := NewToolValue(argsMap)
 
 		assert.Equal(t, "ls -la", args.String("command"))
 		assert.Equal(t, int64(30000), args.Int("timeout"))
-		env := args.Object("env")
-		assert.Equal(t, "/usr/bin", env["PATH"].String())
+		env := args.Get("env").Object()
+		assert.Equal(t, "/usr/bin", env["PATH"].AsString())
 	})
 
 	t.Run("Array of complex objects", func(t *testing.T) {
@@ -852,13 +807,13 @@ func TestLLMAPICompatibility(t *testing.T) {
 				{"file": "b.go", "line": 20, "text": "another line"}
 			]
 		}`
-		args, err := NewToolArgsFromJSON(argsJSON)
+		args, err := NewToolValueFromJSON(argsJSON)
 		require.NoError(t, err)
 
-		edits := args.Array("edits")
+		edits := args.Get("edits").Array()
 		require.Len(t, edits, 2)
-		assert.Equal(t, "a.go", edits[0].Get("file").String())
-		assert.Equal(t, int64(10), edits[0].Get("line").Int())
-		assert.Equal(t, "new line", edits[0].Get("text").String())
+		assert.Equal(t, "a.go", edits[0].Get("file").AsString())
+		assert.Equal(t, int64(10), edits[0].Get("line").AsInt())
+		assert.Equal(t, "new line", edits[0].Get("text").AsString())
 	})
 }

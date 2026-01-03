@@ -21,7 +21,7 @@ func TestVFSReadTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.read",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
 		})
@@ -30,7 +30,7 @@ func TestVFSReadTool(t *testing.T) {
 		assert.Equal(t, "test-id", response.ID)
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Equal(t, "hello world", response.Result.Get("content").String())
+		assert.Equal(t, "hello world", response.Result.Get("content").AsString())
 	})
 
 	t.Run("should return error for missing path argument", func(t *testing.T) {
@@ -42,7 +42,7 @@ func TestVFSReadTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
 			Function:  "vfs.read",
-			Arguments: NewToolArgs(nil),
+			Arguments: NewToolValue(nil),
 		})
 
 		// Assert
@@ -61,7 +61,7 @@ func TestVFSReadTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.read",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"path": "non-existent.txt",
 			}),
 		})
@@ -95,7 +95,7 @@ func TestVFSWriteTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.write",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"path":    "test.txt",
 				"content": "hello world",
 			}),
@@ -121,7 +121,7 @@ func TestVFSWriteTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.write",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"content": "hello",
 			}),
 		})
@@ -142,7 +142,7 @@ func TestVFSWriteTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.write",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
 		})
@@ -181,7 +181,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.delete",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
 		})
@@ -206,7 +206,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
 			Function:  "vfs.delete",
-			Arguments: NewToolArgs(nil),
+			Arguments: NewToolValue(nil),
 		})
 
 		// Assert
@@ -225,7 +225,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.delete",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"path": "non-existent.txt",
 			}),
 		})
@@ -264,7 +264,7 @@ func TestVFSListTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.list",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"path": ".",
 			}),
 		})
@@ -278,7 +278,7 @@ func TestVFSListTool(t *testing.T) {
 		// Verify files list - now stored as array
 		filesArr := response.Result.Get("files").Array()
 		require.Len(t, filesArr, 2)
-		files := []string{filesArr[0].String(), filesArr[1].String()}
+		files := []string{filesArr[0].AsString(), filesArr[1].AsString()}
 		assert.Contains(t, files, "file1.txt")
 		assert.Contains(t, files, "file2.txt")
 	})
@@ -292,7 +292,7 @@ func TestVFSListTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.list",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"path": ".",
 			}),
 		})
@@ -317,7 +317,7 @@ func TestVFSListTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
 			Function:  "vfs.list",
-			Arguments: NewToolArgs(nil),
+			Arguments: NewToolValue(nil),
 		})
 
 		// Assert
@@ -336,7 +336,7 @@ func TestVFSListTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.list",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"path": "non-existent",
 			}),
 		})
@@ -373,7 +373,7 @@ func TestVFSMoveTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.move",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"path":        "source.txt",
 				"destination": "dest.txt",
 			}),
@@ -403,7 +403,7 @@ func TestVFSMoveTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.move",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"destination": "dest.txt",
 			}),
 		})
@@ -424,7 +424,7 @@ func TestVFSMoveTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.move",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"path": "source.txt",
 			}),
 		})
@@ -445,7 +445,7 @@ func TestVFSMoveTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.move",
-			Arguments: NewToolArgs(map[string]any{
+			Arguments: NewToolValue(map[string]any{
 				"path":        "non-existent.txt",
 				"destination": "dest.txt",
 			}),
