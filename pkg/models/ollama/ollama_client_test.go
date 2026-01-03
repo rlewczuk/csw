@@ -2,11 +2,11 @@ package ollama
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/models/integ"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,21 +19,17 @@ const (
 	connectTimeout     = 5 * time.Second
 )
 
-// getOllamaHost returns the Ollama host URL from environment variable or default
+// getOllamaHost returns the Ollama host URL from config file or default
 func getOllamaHost() string {
-	if host := os.Getenv("OLLAMA_HOST"); host != "" {
+	if host := integ.GetOllamaURL(); host != "" {
 		return host
 	}
 	return defaultOllamaHost
 }
 
-// skipIfNoOllama skips the test if OLLAMA_HOST environment variable is not set
+// skipIfNoOllama skips the test if ollama integration tests are disabled
 func skipIfNoOllama(t *testing.T) string {
-	host := os.Getenv("OLLAMA_HOST")
-	if host == "" {
-		t.Skip("Skipping test: OLLAMA_HOST environment variable not set")
-	}
-	return host
+	return integ.SkipIfOllamaDisabled(t)
 }
 
 func TestNewOllamaClient(t *testing.T) {

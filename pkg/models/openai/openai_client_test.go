@@ -2,11 +2,11 @@ package openai
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/models/integ"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,13 +19,9 @@ const (
 	connectTimeout     = 5 * time.Second
 )
 
-// skipIfNoOpenAI skips the test if OPENAI_URL environment variable is not set
+// skipIfNoOpenAI skips the test if openai integration tests are disabled
 func skipIfNoOpenAI(t *testing.T) string {
-	url := os.Getenv("OPENAI_URL")
-	if url == "" {
-		t.Skip("Skipping test: OPENAI_URL environment variable not set")
-	}
-	return url
+	return integ.SkipIfOpenAIDisabled(t)
 }
 
 func TestNewOpenAIClient(t *testing.T) {
@@ -55,8 +51,10 @@ func TestNewOpenAIClient(t *testing.T) {
 
 func TestOpenAIClient_ListModels(t *testing.T) {
 	url := skipIfNoOpenAI(t)
+	apiKey := integ.GetOpenAIAPIKey()
 
 	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
+		APIKey:         apiKey,
 		ConnectTimeout: connectTimeout,
 		RequestTimeout: testTimeout,
 	})
@@ -95,8 +93,10 @@ func TestOpenAIClient_ListModels(t *testing.T) {
 
 func TestOpenAIClient_ChatModel(t *testing.T) {
 	url := skipIfNoOpenAI(t)
+	apiKey := integ.GetOpenAIAPIKey()
 
 	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
+		APIKey:         apiKey,
 		ConnectTimeout: connectTimeout,
 		RequestTimeout: testTimeout,
 	})
@@ -224,8 +224,10 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 
 func TestOpenAIClient_ChatModelStream(t *testing.T) {
 	url := skipIfNoOpenAI(t)
+	apiKey := integ.GetOpenAIAPIKey()
 
 	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
+		APIKey:         apiKey,
 		ConnectTimeout: connectTimeout,
 		RequestTimeout: testTimeout,
 	})
@@ -373,8 +375,10 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 
 func TestOpenAIClient_EmbeddingModel(t *testing.T) {
 	url := skipIfNoOpenAI(t)
+	apiKey := integ.GetOpenAIAPIKey()
 
 	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
+		APIKey:         apiKey,
 		ConnectTimeout: connectTimeout,
 		RequestTimeout: testTimeout,
 	})

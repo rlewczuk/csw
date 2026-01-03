@@ -2,12 +2,11 @@ package anthropic
 
 import (
 	"context"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/models/integ"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,20 +16,11 @@ const (
 	testModelName  = "claude-sonnet-4-5-20250929"
 	testTimeout    = 30 * time.Second
 	connectTimeout = 5 * time.Second
-	apiKeyFile     = "../../../.anthropic_api_key"
 )
 
-// getAPIKey reads the API key from file and skips test if not found
+// getAPIKey skips the test if anthropic integration tests are disabled and returns the API key
 func getAPIKey(t *testing.T) string {
-	data, err := os.ReadFile(apiKeyFile)
-	if err != nil || len(data) == 0 {
-		t.Skipf("Skipping test: %s file not found or empty", apiKeyFile)
-	}
-	apiKey := strings.TrimSpace(string(data))
-	if apiKey == "" {
-		t.Skipf("Skipping test: API key in %s is empty", apiKeyFile)
-	}
-	return apiKey
+	return integ.SkipIfAnthropicDisabled(t)
 }
 
 func TestNewAnthropicClient(t *testing.T) {
