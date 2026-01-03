@@ -148,7 +148,7 @@ func TestOllamaClient_ListModels(t *testing.T) {
 
 	// Setup mock response if using mock
 	if tc.Mock != nil {
-		tc.Mock.AddRestResponse("/api/tags", "GET", listModelsResponseJSON(ListModelsResponse{
+		modelsResponse := listModelsResponseJSON(ListModelsResponse{
 			Models: []ModelInfo{
 				{
 					Name:       testModelName,
@@ -169,7 +169,10 @@ func TestOllamaClient_ListModels(t *testing.T) {
 					},
 				},
 			},
-		}))
+		})
+		// Add response for each subtest
+		tc.Mock.AddRestResponse("/api/tags", "GET", modelsResponse)
+		tc.Mock.AddRestResponse("/api/tags", "GET", modelsResponse)
 	}
 
 	t.Run("lists available models", func(t *testing.T) {
@@ -903,9 +906,39 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 	})
 
 	t.Run("tool responses are properly passed back to LLM", func(t *testing.T) {
-		// Skip in mock mode - MockHTTPServer doesn't support multiple sequential responses to same endpoint
+		// Setup mock responses if using mock
 		if tc.Mock != nil {
-			t.Skip("Skipping test in mock mode: requires multiple sequential non-streaming responses")
+			// First response: tool call
+			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
+				Model:     testModelName,
+				CreatedAt: "2024-01-01T00:00:00Z",
+				Message: Message{
+					Role: "assistant",
+					ToolCalls: []ToolCall{
+						{
+							Function: ToolCallFunction{
+								Name: "get_weather",
+								Arguments: map[string]interface{}{
+									"location": "Tokyo",
+								},
+							},
+						},
+					},
+				},
+				Done:       true,
+				DoneReason: "stop",
+			}))
+			// Second response: final answer after tool execution
+			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
+				Model:     testModelName,
+				CreatedAt: "2024-01-01T00:00:01Z",
+				Message: Message{
+					Role:    "assistant",
+					Content: "The weather in Tokyo is currently 18°C and cloudy.",
+				},
+				Done:       true,
+				DoneReason: "stop",
+			}))
 		}
 
 		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
@@ -957,9 +990,52 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 	})
 
 	t.Run("tool calls and responses interleaved with text chunks in streaming", func(t *testing.T) {
-		// Skip in mock mode - MockHTTPServer doesn't support multiple sequential responses to same endpoint
+		// Setup mock responses if using mock
 		if tc.Mock != nil {
-			t.Skip("Skipping test in mock mode: requires multiple sequential streaming responses")
+			// First response: streaming tool call
+			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
+				chatResponseJSON(ChatResponse{
+					Model:     testModelName,
+					CreatedAt: "2024-01-01T00:00:00Z",
+					Message: Message{
+						Role: "assistant",
+						ToolCalls: []ToolCall{
+							{
+								Function: ToolCallFunction{
+									Name: "get_weather",
+									Arguments: map[string]interface{}{
+										"location": "London",
+									},
+								},
+							},
+						},
+					},
+					Done:       true,
+					DoneReason: "stop",
+				}),
+			)
+			// Second response: streaming text response after tool execution
+			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
+				chatResponseJSON(ChatResponse{
+					Model:     testModelName,
+					CreatedAt: "2024-01-01T00:00:01Z",
+					Message:   Message{Role: "assistant", Content: "The temperature in London is "},
+					Done:      false,
+				}),
+				chatResponseJSON(ChatResponse{
+					Model:     testModelName,
+					CreatedAt: "2024-01-01T00:00:02Z",
+					Message:   Message{Role: "assistant", Content: "15°C and it's rainy."},
+					Done:      false,
+				}),
+				chatResponseJSON(ChatResponse{
+					Model:      testModelName,
+					CreatedAt:  "2024-01-01T00:00:03Z",
+					Message:    Message{Role: "assistant", Content: ""},
+					Done:       true,
+					DoneReason: "stop",
+				}),
+			)
 		}
 
 		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
@@ -1117,9 +1193,39 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 	})
 
 	t.Run("tool call with error response", func(t *testing.T) {
-		// Skip in mock mode - MockHTTPServer doesn't support multiple sequential responses to same endpoint
+		// Setup mock responses if using mock
 		if tc.Mock != nil {
-			t.Skip("Skipping test in mock mode: requires multiple sequential non-streaming responses")
+			// First response: tool call
+			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
+				Model:     testModelName,
+				CreatedAt: "2024-01-01T00:00:00Z",
+				Message: Message{
+					Role: "assistant",
+					ToolCalls: []ToolCall{
+						{
+							Function: ToolCallFunction{
+								Name: "get_weather",
+								Arguments: map[string]interface{}{
+									"location": "Berlin",
+								},
+							},
+						},
+					},
+				},
+				Done:       true,
+				DoneReason: "stop",
+			}))
+			// Second response: handling error
+			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
+				Model:     testModelName,
+				CreatedAt: "2024-01-01T00:00:01Z",
+				Message: Message{
+					Role:    "assistant",
+					Content: "I apologize, but I encountered an error: location not found.",
+				},
+				Done:       true,
+				DoneReason: "stop",
+			}))
 		}
 
 		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{

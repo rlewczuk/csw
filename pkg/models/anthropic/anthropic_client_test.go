@@ -133,7 +133,7 @@ func TestAnthropicClient_ListModels(t *testing.T) {
 
 	// Setup mock response if using mock
 	if tc.Mock != nil {
-		tc.Mock.AddRestResponse("/v1/models", "GET", listModelsResponseJSON(ModelsListResponse{
+		modelsResponse := listModelsResponseJSON(ModelsListResponse{
 			Data: []ModelInfo{
 				{
 					ID:          testModelName,
@@ -148,7 +148,10 @@ func TestAnthropicClient_ListModels(t *testing.T) {
 					Type:        "model",
 				},
 			},
-		}))
+		})
+		// Add response for each subtest
+		tc.Mock.AddRestResponse("/v1/models", "GET", modelsResponse)
+		tc.Mock.AddRestResponse("/v1/models", "GET", modelsResponse)
 	}
 
 	t.Run("lists available models", func(t *testing.T) {
@@ -640,9 +643,40 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 	})
 
 	t.Run("sends tool response back to LLM and receives final answer", func(t *testing.T) {
-		// Skip in mock mode - MockHTTPServer doesn't support multiple sequential responses to same endpoint
+		// Setup mock responses if using mock
 		if tc.Mock != nil {
-			t.Skip("Skipping test in mock mode: requires multiple sequential non-streaming responses")
+			// First response: tool call
+			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+				ID:   "msg_test131b",
+				Type: "message",
+				Role: "assistant",
+				Content: []ResponseContent{
+					{
+						Type: "tool_use",
+						ID:   "toolu_test123b",
+						Name: "get_weather",
+						Input: map[string]interface{}{
+							"location": "San Francisco, CA",
+							"unit":     "fahrenheit",
+						},
+					},
+				},
+				Model:      testModelName,
+				StopReason: "tool_use",
+				Usage:      UsageInfo{InputTokens: 20, OutputTokens: 15},
+			}))
+			// Second response: final answer after tool execution
+			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+				ID:   "msg_test131c",
+				Type: "message",
+				Role: "assistant",
+				Content: []ResponseContent{
+					{Type: "text", Text: "The weather in San Francisco is currently 72°F and sunny."},
+				},
+				Model:      testModelName,
+				StopReason: "end_turn",
+				Usage:      UsageInfo{InputTokens: 30, OutputTokens: 20},
+			}))
 		}
 
 		chatModel := tc.Client.ChatModel(testModelName, nil)
@@ -852,9 +886,35 @@ func TestAnthropicClient_ToolCallingStream(t *testing.T) {
 	})
 
 	t.Run("streams response after tool execution", func(t *testing.T) {
-		// Skip in mock mode - MockHTTPServer doesn't support multiple sequential responses to same endpoint
+		// Setup mock responses if using mock
 		if tc.Mock != nil {
-			t.Skip("Skipping test in mock mode: requires multiple sequential streaming responses")
+			// First response: tool call (non-streaming)
+			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+				ID:   "msg_test134a",
+				Type: "message",
+				Role: "assistant",
+				Content: []ResponseContent{
+					{
+						Type: "tool_use",
+						ID:   "toolu_test128",
+						Name: "get_weather",
+						Input: map[string]interface{}{
+							"location": "Portland, OR",
+						},
+					},
+				},
+				Model:      testModelName,
+				StopReason: "tool_use",
+				Usage:      UsageInfo{InputTokens: 20, OutputTokens: 15},
+			}))
+			// Second response: streaming response after tool execution
+			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
+				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test134b","type":"message","role":"assistant","content":[],"model":"`+testModelName+`","usage":{"input_tokens":30,"output_tokens":0}}}`,
+				`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
+				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"The weather in Portland is "}}`,
+				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"65°F and rainy."}}`,
+				`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
+			)
 		}
 
 		chatModel := tc.Client.ChatModel(testModelName, nil)

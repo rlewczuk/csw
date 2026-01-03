@@ -11,7 +11,11 @@ import (
 type MockHTTPServer struct {
 	Server    *httptest.Server
 	mu        sync.Mutex
-	responses map[string]map[string]*mockResponse // path -> method -> response
+	responses map[string]map[string]*responseQueue // path -> method -> response queue
+}
+
+type responseQueue struct {
+	queue []*mockResponse
 }
 
 type mockResponse struct {
@@ -25,7 +29,7 @@ type mockResponse struct {
 // NewMockHTTPServer creates a new mock HTTP server.
 func NewMockHTTPServer() *MockHTTPServer {
 	m := &MockHTTPServer{
-		responses: make(map[string]map[string]*mockResponse),
+		responses: make(map[string]map[string]*responseQueue),
 	}
 
 	m.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,18 +55,26 @@ func (m *MockHTTPServer) Close() {
 }
 
 // AddRestResponse adds a response for a specific REST endpoint.
+// Multiple calls append responses to a FIFO queue.
 func (m *MockHTTPServer) AddRestResponse(path, method, response string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.responses[path] == nil {
-		m.responses[path] = make(map[string]*mockResponse)
+		m.responses[path] = make(map[string]*responseQueue)
 	}
 
-	m.responses[path][method] = &mockResponse{
+	if m.responses[path][method] == nil {
+		m.responses[path][method] = &responseQueue{
+			queue: []*mockResponse{},
+		}
+	}
+
+	// Append new non-streaming response to queue
+	m.responses[path][method].queue = append(m.responses[path][method].queue, &mockResponse{
 		isStreaming: false,
 		body:        response,
-	}
+	})
 }
 
 // AddStreamingResponse adds a streaming response for a specific REST endpoint.
@@ -72,44 +84,43 @@ func (m *MockHTTPServer) AddStreamingResponse(path, method string, closeAfter bo
 	defer m.mu.Unlock()
 
 	if m.responses[path] == nil {
-		m.responses[path] = make(map[string]*mockResponse)
+		m.responses[path] = make(map[string]*responseQueue)
 	}
 
-	existing := m.responses[path][method]
-	if existing != nil && existing.isStreaming {
-		// Append to existing streaming response
-		existing.chunks = append(existing.chunks, responses...)
-		existing.closeAfter = closeAfter
-		// Signal that new chunks are available
-		if existing.waitCh != nil {
-			close(existing.waitCh)
-			existing.waitCh = make(chan struct{})
-		}
-	} else {
-		// Create new streaming response
-		m.responses[path][method] = &mockResponse{
-			isStreaming: true,
-			chunks:      responses,
-			closeAfter:  closeAfter,
-			waitCh:      make(chan struct{}),
+	if m.responses[path][method] == nil {
+		m.responses[path][method] = &responseQueue{
+			queue: []*mockResponse{},
 		}
 	}
+
+	// Append new streaming response to queue
+	m.responses[path][method].queue = append(m.responses[path][method].queue, &mockResponse{
+		isStreaming: true,
+		chunks:      responses,
+		closeAfter:  closeAfter,
+		waitCh:      make(chan struct{}),
+	})
 }
 
 // HandleRequest handles incoming HTTP requests by matching against configured responses.
 func (m *MockHTTPServer) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	m.mu.Lock()
 	pathResponses := m.responses[r.URL.Path]
-	var resp *mockResponse
+	var respQueue *responseQueue
 	if pathResponses != nil {
-		resp = pathResponses[r.Method]
+		respQueue = pathResponses[r.Method]
 	}
-	m.mu.Unlock()
 
-	if resp == nil {
+	if respQueue == nil || len(respQueue.queue) == 0 {
+		m.mu.Unlock()
 		http.NotFound(w, r)
 		return
 	}
+
+	// Dequeue the first response
+	resp := respQueue.queue[0]
+	respQueue.queue = respQueue.queue[1:]
+	m.mu.Unlock()
 
 	if !resp.isStreaming {
 		w.Header().Set("Content-Type", "application/json")
@@ -129,35 +140,12 @@ func (m *MockHTTPServer) HandleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chunkIndex := 0
-	for {
-		m.mu.Lock()
-		chunks := resp.chunks
-		closeAfter := resp.closeAfter
-		waitCh := resp.waitCh
-		m.mu.Unlock()
-
-		// Write any new chunks
-		for chunkIndex < len(chunks) {
-			chunk := chunks[chunkIndex]
-			chunkIndex++
-			_, err := w.Write([]byte(chunk + "\n"))
-			if err != nil {
-				return
-			}
-			flusher.Flush()
-		}
-
-		if closeAfter {
+	// Write all chunks
+	for _, chunk := range resp.chunks {
+		_, err := w.Write([]byte(chunk + "\n"))
+		if err != nil {
 			return
 		}
-
-		// Wait for new chunks or connection close
-		select {
-		case <-r.Context().Done():
-			return
-		case <-waitCh:
-			// New chunks available, continue loop
-		}
+		flusher.Flush()
 	}
 }
