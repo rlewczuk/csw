@@ -29,7 +29,7 @@ func (m *MockTool) Info() ToolInfo {
 }
 
 func (m *MockTool) Execute(args ToolCall) ToolResponse {
-	result := ToolResult{}
+	var result ToolValue
 	result.Set("executed", m.name)
 	return ToolResponse{
 		ID:     args.ID,
@@ -98,7 +98,7 @@ func TestToolRegistry_Execute(t *testing.T) {
 	args := ToolCall{
 		ID:       "test-id",
 		Function: "test",
-		Arguments: NewToolArgs(map[string]any{
+		Arguments: NewToolValue(map[string]any{
 			"arg1": "value1",
 		}),
 	}
@@ -107,7 +107,7 @@ func TestToolRegistry_Execute(t *testing.T) {
 	assert.Equal(t, "test-id", response.ID)
 	assert.NoError(t, response.Error)
 	assert.True(t, response.Done)
-	assert.Equal(t, "test", response.Result.Get("executed").String())
+	assert.Equal(t, "test", response.Result.Get("executed").AsString())
 }
 
 func TestToolRegistry_ExecuteNotFound(t *testing.T) {
@@ -116,7 +116,7 @@ func TestToolRegistry_ExecuteNotFound(t *testing.T) {
 	args := ToolCall{
 		ID:        "test-id",
 		Function:  "nonexistent",
-		Arguments: NewToolArgs(nil),
+		Arguments: NewToolValue(nil),
 	}
 
 	response := registry.Execute(args)
@@ -207,7 +207,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	writeArgs := ToolCall{
 		ID:       "write-id",
 		Function: "vfs.write",
-		Arguments: NewToolArgs(map[string]any{
+		Arguments: NewToolValue(map[string]any{
 			"path":    "test.txt",
 			"content": "Hello, World!",
 		}),
@@ -222,7 +222,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	readArgs := ToolCall{
 		ID:       "read-id",
 		Function: "vfs.read",
-		Arguments: NewToolArgs(map[string]any{
+		Arguments: NewToolValue(map[string]any{
 			"path": "test.txt",
 		}),
 	}
@@ -231,13 +231,13 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	assert.Equal(t, "read-id", readResponse.ID)
 	assert.NoError(t, readResponse.Error)
 	assert.True(t, readResponse.Done)
-	assert.Equal(t, "Hello, World!", readResponse.Result.Get("content").String())
+	assert.Equal(t, "Hello, World!", readResponse.Result.Get("content").AsString())
 
 	// Test listing files
 	listArgs := ToolCall{
 		ID:       "list-id",
 		Function: "vfs.list",
-		Arguments: NewToolArgs(map[string]any{
+		Arguments: NewToolValue(map[string]any{
 			"path": ".",
 		}),
 	}
@@ -249,5 +249,5 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 
 	filesArr := listResponse.Result.Get("files").Array()
 	require.Len(t, filesArr, 1)
-	assert.Equal(t, "test.txt", filesArr[0].String())
+	assert.Equal(t, "test.txt", filesArr[0].AsString())
 }

@@ -45,37 +45,37 @@ func (v ToolValue) IsNil() bool {
 	return v.value == nil
 }
 
-// String returns the value as a string. Returns empty string if not a string.
-func (v ToolValue) String() string {
+// AsString returns the value as a string. Returns empty string if not a string.
+func (v ToolValue) AsString() string {
 	if s, ok := v.value.(string); ok {
 		return s
 	}
 	return ""
 }
 
-// StringOK returns the value as a string and a boolean indicating success.
-func (v ToolValue) StringOK() (string, bool) {
+// AsStringOK returns the value as a string and a boolean indicating success.
+func (v ToolValue) AsStringOK() (string, bool) {
 	s, ok := v.value.(string)
 	return s, ok
 }
 
-// Bool returns the value as a bool. Returns false if not a bool.
-func (v ToolValue) Bool() bool {
+// AsBool returns the value as a bool. Returns false if not a bool.
+func (v ToolValue) AsBool() bool {
 	if b, ok := v.value.(bool); ok {
 		return b
 	}
 	return false
 }
 
-// BoolOK returns the value as a bool and a boolean indicating success.
-func (v ToolValue) BoolOK() (bool, bool) {
+// AsBoolOK returns the value as a bool and a boolean indicating success.
+func (v ToolValue) AsBoolOK() (bool, bool) {
 	b, ok := v.value.(bool)
 	return b, ok
 }
 
-// Int returns the value as an int64. Returns 0 if not a number.
+// AsInt returns the value as an int64. Returns 0 if not a number.
 // Handles both int and float64 (JSON numbers are typically float64).
-func (v ToolValue) Int() int64 {
+func (v ToolValue) AsInt() int64 {
 	switch n := v.value.(type) {
 	case int:
 		return int64(n)
@@ -88,8 +88,8 @@ func (v ToolValue) Int() int64 {
 	}
 }
 
-// IntOK returns the value as an int64 and a boolean indicating success.
-func (v ToolValue) IntOK() (int64, bool) {
+// AsIntOK returns the value as an int64 and a boolean indicating success.
+func (v ToolValue) AsIntOK() (int64, bool) {
 	switch n := v.value.(type) {
 	case int:
 		return int64(n), true
@@ -102,8 +102,8 @@ func (v ToolValue) IntOK() (int64, bool) {
 	}
 }
 
-// Float returns the value as a float64. Returns 0 if not a number.
-func (v ToolValue) Float() float64 {
+// AsFloat returns the value as a float64. Returns 0 if not a number.
+func (v ToolValue) AsFloat() float64 {
 	switch n := v.value.(type) {
 	case float64:
 		return n
@@ -116,8 +116,8 @@ func (v ToolValue) Float() float64 {
 	}
 }
 
-// FloatOK returns the value as a float64 and a boolean indicating success.
-func (v ToolValue) FloatOK() (float64, bool) {
+// AsFloatOK returns the value as a float64 and a boolean indicating success.
+func (v ToolValue) AsFloatOK() (float64, bool) {
 	switch n := v.value.(type) {
 	case float64:
 		return n, true
@@ -182,6 +182,16 @@ func (v ToolValue) ObjectOK() (map[string]ToolValue, bool) {
 	return result, true
 }
 
+// Has returns true if the key exists in an object. Returns false for non-objects.
+func (v ToolValue) Has(key string) bool {
+	obj, ok := v.value.(map[string]any)
+	if !ok {
+		return false
+	}
+	_, exists := obj[key]
+	return exists
+}
+
 // Get retrieves a nested value by key. Returns a nil ToolValue if not an object or key doesn't exist.
 func (v ToolValue) Get(key string) ToolValue {
 	obj, ok := v.value.(map[string]any)
@@ -229,6 +239,37 @@ func (v ToolValue) Len() int {
 	}
 }
 
+// Keys returns all keys if the value is an object. Returns nil for non-objects.
+func (v ToolValue) Keys() []string {
+	obj, ok := v.value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	keys := make([]string, 0, len(obj))
+	for k := range obj {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// Set sets a key-value pair if the value is an object. Initializes the object if nil.
+// Returns the ToolValue for method chaining.
+func (v *ToolValue) Set(key string, val any) *ToolValue {
+	obj, ok := v.value.(map[string]any)
+	if !ok {
+		// Initialize as object if nil or not an object
+		obj = make(map[string]any)
+		v.value = obj
+	}
+	// Convert ToolValue to raw value
+	if tv, ok := val.(ToolValue); ok {
+		obj[key] = tv.Raw()
+	} else {
+		obj[key] = val
+	}
+	return v
+}
+
 // Type returns a string describing the type of the value.
 func (v ToolValue) Type() string {
 	switch v.value.(type) {
@@ -259,226 +300,74 @@ func (v *ToolValue) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &v.value)
 }
 
-// ToolArgs represents the arguments passed to a tool.
-// It provides convenient access to named arguments with type conversion.
-type ToolArgs struct {
-	values map[string]any
-}
-
-// NewToolArgs creates a new ToolArgs from a map.
-func NewToolArgs(m map[string]any) ToolArgs {
-	if m == nil {
-		m = make(map[string]any)
-	}
-	return ToolArgs{values: m}
-}
-
-// NewToolArgsFromJSON creates a new ToolArgs from a JSON string.
-func NewToolArgsFromJSON(jsonStr string) (ToolArgs, error) {
+// NewToolValueFromJSON creates a new ToolValue from a JSON string.
+// The JSON must represent an object (map).
+func NewToolValueFromJSON(jsonStr string) (ToolValue, error) {
 	var m map[string]any
 	if err := json.Unmarshal([]byte(jsonStr), &m); err != nil {
-		return ToolArgs{}, fmt.Errorf("failed to parse JSON arguments: %w", err)
+		return ToolValue{}, fmt.Errorf("failed to parse JSON: %w", err)
 	}
-	return NewToolArgs(m), nil
+	return NewToolValue(m), nil
 }
 
-// Get retrieves an argument by name as a ToolValue.
-func (a ToolArgs) Get(name string) ToolValue {
-	val, exists := a.values[name]
-	if !exists {
-		return ToolValue{}
-	}
-	return NewToolValue(val)
+// String retrieves a nested string value by key. Returns empty string if not found or not a string.
+// This is a convenience method for v.Get(key).AsString().
+func (v ToolValue) String(key string) string {
+	return v.Get(key).AsString()
 }
 
-// GetOK retrieves an argument by name and returns a boolean indicating if it exists.
-func (a ToolArgs) GetOK(name string) (ToolValue, bool) {
-	val, exists := a.values[name]
-	if !exists {
-		return ToolValue{}, false
-	}
-	return NewToolValue(val), true
-}
-
-// Has returns true if the argument exists.
-func (a ToolArgs) Has(name string) bool {
-	_, exists := a.values[name]
-	return exists
-}
-
-// String retrieves an argument as a string. Returns empty string if not found or not a string.
-func (a ToolArgs) String(name string) string {
-	return a.Get(name).String()
-}
-
-// StringOK retrieves an argument as a string and returns a boolean indicating success.
-func (a ToolArgs) StringOK(name string) (string, bool) {
-	v, exists := a.GetOK(name)
+// StringOK retrieves a nested string value by key and returns a boolean indicating success.
+func (v ToolValue) StringOK(key string) (string, bool) {
+	val, exists := v.GetOK(key)
 	if !exists {
 		return "", false
 	}
-	return v.StringOK()
+	return val.AsStringOK()
 }
 
-// Bool retrieves an argument as a bool. Returns false if not found or not a bool.
-func (a ToolArgs) Bool(name string) bool {
-	return a.Get(name).Bool()
+// Bool retrieves a nested bool value by key. Returns false if not found or not a bool.
+// This is a convenience method for v.Get(key).AsBool().
+func (v ToolValue) Bool(key string) bool {
+	return v.Get(key).AsBool()
 }
 
-// BoolOK retrieves an argument as a bool and returns a boolean indicating success.
-func (a ToolArgs) BoolOK(name string) (bool, bool) {
-	v, exists := a.GetOK(name)
+// BoolOK retrieves a nested bool value by key and returns a boolean indicating success.
+func (v ToolValue) BoolOK(key string) (bool, bool) {
+	val, exists := v.GetOK(key)
 	if !exists {
 		return false, false
 	}
-	return v.BoolOK()
+	return val.AsBoolOK()
 }
 
-// Int retrieves an argument as an int64. Returns 0 if not found or not a number.
-func (a ToolArgs) Int(name string) int64 {
-	return a.Get(name).Int()
+// Int retrieves a nested int value by key. Returns 0 if not found or not a number.
+// This is a convenience method for v.Get(key).AsInt().
+func (v ToolValue) Int(key string) int64 {
+	return v.Get(key).AsInt()
 }
 
-// IntOK retrieves an argument as an int64 and returns a boolean indicating success.
-func (a ToolArgs) IntOK(name string) (int64, bool) {
-	v, exists := a.GetOK(name)
+// IntOK retrieves a nested int value by key and returns a boolean indicating success.
+func (v ToolValue) IntOK(key string) (int64, bool) {
+	val, exists := v.GetOK(key)
 	if !exists {
 		return 0, false
 	}
-	return v.IntOK()
+	return val.AsIntOK()
 }
 
-// Float retrieves an argument as a float64. Returns 0 if not found or not a number.
-func (a ToolArgs) Float(name string) float64 {
-	return a.Get(name).Float()
+// Float retrieves a nested float value by key. Returns 0 if not found or not a number.
+// This is a convenience method for v.Get(key).AsFloat().
+func (v ToolValue) Float(key string) float64 {
+	return v.Get(key).AsFloat()
 }
 
-// FloatOK retrieves an argument as a float64 and returns a boolean indicating success.
-func (a ToolArgs) FloatOK(name string) (float64, bool) {
-	v, exists := a.GetOK(name)
+// FloatOK retrieves a nested float value by key and returns a boolean indicating success.
+func (v ToolValue) FloatOK(key string) (float64, bool) {
+	val, exists := v.GetOK(key)
 	if !exists {
 		return 0, false
 	}
-	return v.FloatOK()
-}
-
-// Array retrieves an argument as a slice of ToolValue. Returns nil if not found or not an array.
-func (a ToolArgs) Array(name string) []ToolValue {
-	return a.Get(name).Array()
-}
-
-// Object retrieves an argument as a map of string to ToolValue. Returns nil if not found or not an object.
-func (a ToolArgs) Object(name string) map[string]ToolValue {
-	return a.Get(name).Object()
-}
-
-// Keys returns all argument names.
-func (a ToolArgs) Keys() []string {
-	keys := make([]string, 0, len(a.values))
-	for k := range a.values {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-// Len returns the number of arguments.
-func (a ToolArgs) Len() int {
-	return len(a.values)
-}
-
-// Raw returns the underlying map.
-func (a ToolArgs) Raw() map[string]any {
-	return a.values
-}
-
-// MarshalJSON implements json.Marshaler.
-func (a ToolArgs) MarshalJSON() ([]byte, error) {
-	return json.Marshal(a.values)
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (a *ToolArgs) UnmarshalJSON(data []byte) error {
-	return json.Unmarshal(data, &a.values)
-}
-
-// ToolResult represents the result of a tool execution.
-// It can hold any JSON-compatible value.
-type ToolResult struct {
-	values map[string]any
-}
-
-// NewToolResult creates a new ToolResult from a map.
-func NewToolResult(m map[string]any) ToolResult {
-	if m == nil {
-		m = make(map[string]any)
-	}
-	return ToolResult{values: m}
-}
-
-// Set sets a key-value pair in the result.
-func (r *ToolResult) Set(key string, value any) {
-	if r.values == nil {
-		r.values = make(map[string]any)
-	}
-	// Convert ToolValue to raw value
-	if tv, ok := value.(ToolValue); ok {
-		r.values[key] = tv.Raw()
-	} else {
-		r.values[key] = value
-	}
-}
-
-// Get retrieves a value by key as a ToolValue.
-func (r ToolResult) Get(key string) ToolValue {
-	val, exists := r.values[key]
-	if !exists {
-		return ToolValue{}
-	}
-	return NewToolValue(val)
-}
-
-// GetOK retrieves a value by key and returns a boolean indicating if it exists.
-func (r ToolResult) GetOK(key string) (ToolValue, bool) {
-	val, exists := r.values[key]
-	if !exists {
-		return ToolValue{}, false
-	}
-	return NewToolValue(val), true
-}
-
-// Has returns true if the key exists.
-func (r ToolResult) Has(key string) bool {
-	_, exists := r.values[key]
-	return exists
-}
-
-// Keys returns all result keys.
-func (r ToolResult) Keys() []string {
-	keys := make([]string, 0, len(r.values))
-	for k := range r.values {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-// Len returns the number of key-value pairs.
-func (r ToolResult) Len() int {
-	return len(r.values)
-}
-
-// Raw returns the underlying map.
-func (r ToolResult) Raw() map[string]any {
-	return r.values
-}
-
-// MarshalJSON implements json.Marshaler.
-func (r ToolResult) MarshalJSON() ([]byte, error) {
-	return json.Marshal(r.values)
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (r *ToolResult) UnmarshalJSON(data []byte) error {
-	return json.Unmarshal(data, &r.values)
+	return val.AsFloatOK()
 }
 
 // ToolCall represents a call to a tool with specific arguments.
@@ -490,8 +379,8 @@ type ToolCall struct {
 	Function string
 
 	// Arguments contains the arguments to be passed to the tool.
-	// Supports primitive types (string, int, float, bool), arrays, and nested objects.
-	Arguments ToolArgs
+	// Must be an object (map[string]any). Supports nested objects and arrays.
+	Arguments ToolValue
 }
 
 // ToolResponse represents the response from a tool execution.
@@ -504,7 +393,7 @@ type ToolResponse struct {
 
 	// Result is the result of the tool execution.
 	// Supports primitive types (string, int, float, bool), arrays, and nested objects.
-	Result ToolResult
+	Result ToolValue
 
 	// Done indicates whether the tool execution is complete.
 	Done bool
