@@ -9,7 +9,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
-// MockTool implements SweTool interface for testing.
+// MockTool implements Tool interface for testing.
 type MockTool struct {
 	name string
 }
@@ -19,10 +19,12 @@ func (m *MockTool) Name() string {
 }
 
 func (m *MockTool) Execute(args ToolCall) ToolResponse {
+	result := ToolResult{}
+	result.Set("executed", m.name)
 	return ToolResponse{
 		ID:     args.ID,
 		Error:  nil,
-		Result: map[string]string{"executed": m.name},
+		Result: result,
 		Done:   true,
 	}
 }
@@ -86,16 +88,16 @@ func TestToolRegistry_Execute(t *testing.T) {
 	args := ToolCall{
 		ID:       "test-id",
 		Function: "test",
-		Arguments: map[string]string{
+		Arguments: NewToolArgs(map[string]any{
 			"arg1": "value1",
-		},
+		}),
 	}
 
 	response := registry.Execute(args)
 	assert.Equal(t, "test-id", response.ID)
 	assert.NoError(t, response.Error)
 	assert.True(t, response.Done)
-	assert.Equal(t, "test", response.Result["executed"])
+	assert.Equal(t, "test", response.Result.Get("executed").String())
 }
 
 func TestToolRegistry_ExecuteNotFound(t *testing.T) {
@@ -104,14 +106,14 @@ func TestToolRegistry_ExecuteNotFound(t *testing.T) {
 	args := ToolCall{
 		ID:        "test-id",
 		Function:  "nonexistent",
-		Arguments: map[string]string{},
+		Arguments: NewToolArgs(nil),
 	}
 
 	response := registry.Execute(args)
 	assert.Equal(t, "test-id", response.ID)
 	assert.Error(t, response.Error)
 	assert.True(t, response.Done)
-	assert.Nil(t, response.Result)
+	assert.Equal(t, 0, response.Result.Len())
 	assert.Contains(t, response.Error.Error(), "tool not found: nonexistent")
 }
 
@@ -167,10 +169,10 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	writeArgs := ToolCall{
 		ID:       "write-id",
 		Function: "vfs.write",
-		Arguments: map[string]string{
+		Arguments: NewToolArgs(map[string]any{
 			"path":    "test.txt",
 			"content": "Hello, World!",
-		},
+		}),
 	}
 
 	writeResponse := registry.Execute(writeArgs)
@@ -182,29 +184,32 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	readArgs := ToolCall{
 		ID:       "read-id",
 		Function: "vfs.read",
-		Arguments: map[string]string{
+		Arguments: NewToolArgs(map[string]any{
 			"path": "test.txt",
-		},
+		}),
 	}
 
 	readResponse := registry.Execute(readArgs)
 	assert.Equal(t, "read-id", readResponse.ID)
 	assert.NoError(t, readResponse.Error)
 	assert.True(t, readResponse.Done)
-	assert.Equal(t, "Hello, World!", readResponse.Result["content"])
+	assert.Equal(t, "Hello, World!", readResponse.Result.Get("content").String())
 
 	// Test listing files
 	listArgs := ToolCall{
 		ID:       "list-id",
 		Function: "vfs.list",
-		Arguments: map[string]string{
+		Arguments: NewToolArgs(map[string]any{
 			"path": ".",
-		},
+		}),
 	}
 
 	listResponse := registry.Execute(listArgs)
 	assert.Equal(t, "list-id", listResponse.ID)
 	assert.NoError(t, listResponse.Error)
 	assert.True(t, listResponse.Done)
-	assert.Contains(t, listResponse.Result["files"], "test.txt")
+
+	filesArr := listResponse.Result.Get("files").Array()
+	require.Len(t, filesArr, 1)
+	assert.Equal(t, "test.txt", filesArr[0].String())
 }
