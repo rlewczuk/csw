@@ -2,11 +2,14 @@ package ollama
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
+	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -142,17 +145,17 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 		messages := []*models.ChatMessage{
 			{
 				Role:  models.ChatRoleUser,
-				Parts: []string{"What is 2+2? Answer with just the number."},
+				Parts: []models.ChatMessagePart{{Text: "What is 2+2? Answer with just the number."}},
 			},
 		}
 
-		response, err := chatModel.Chat(ctx, messages, nil)
+		response, err := chatModel.Chat(ctx, messages, nil, nil)
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
 		assert.Equal(t, models.ChatRoleAssistant, response.Role)
 		assert.NotEmpty(t, response.Parts)
-		assert.Greater(t, len(response.Parts[0]), 0)
+		assert.Greater(t, len(response.GetText()), 0)
 	})
 
 	t.Run("handles context with timeout", func(t *testing.T) {
@@ -164,11 +167,11 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 		messages := []*models.ChatMessage{
 			{
 				Role:  models.ChatRoleUser,
-				Parts: []string{"Say hello"},
+				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
-		response, err := chatModel.Chat(ctxWithTimeout, messages, nil)
+		response, err := chatModel.Chat(ctxWithTimeout, messages, nil, nil)
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
@@ -180,15 +183,15 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 		messages := []*models.ChatMessage{
 			{
 				Role:  models.ChatRoleSystem,
-				Parts: []string{"You are a helpful assistant that always responds in uppercase."},
+				Parts: []models.ChatMessagePart{{Text: "You are a helpful assistant that always responds in uppercase."}},
 			},
 			{
 				Role:  models.ChatRoleUser,
-				Parts: []string{"hello"},
+				Parts: []models.ChatMessagePart{{Text: "hello"}},
 			},
 		}
 
-		response, err := chatModel.Chat(ctx, messages, nil)
+		response, err := chatModel.Chat(ctx, messages, nil, nil)
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
@@ -198,7 +201,7 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 	t.Run("returns error for empty messages", func(t *testing.T) {
 		chatModel := client.ChatModel(testModelName, nil)
 
-		response, err := chatModel.Chat(ctx, []*models.ChatMessage{}, nil)
+		response, err := chatModel.Chat(ctx, []*models.ChatMessage{}, nil, nil)
 
 		assert.Error(t, err)
 		assert.Nil(t, response)
@@ -207,7 +210,7 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 	t.Run("returns error for nil messages", func(t *testing.T) {
 		chatModel := client.ChatModel(testModelName, nil)
 
-		response, err := chatModel.Chat(ctx, nil, nil)
+		response, err := chatModel.Chat(ctx, nil, nil, nil)
 
 		assert.Error(t, err)
 		assert.Nil(t, response)
@@ -225,11 +228,11 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 		messages := []*models.ChatMessage{
 			{
 				Role:  models.ChatRoleUser,
-				Parts: []string{"Say hello"},
+				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
-		response, err := chatModel.Chat(ctx, messages, nil)
+		response, err := chatModel.Chat(ctx, messages, nil, nil)
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
@@ -259,11 +262,11 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		messages := []*models.ChatMessage{
 			{
 				Role:  models.ChatRoleUser,
-				Parts: []string{"Count from 1 to 5, one number per line."},
+				Parts: []models.ChatMessagePart{{Text: "Count from 1 to 5, one number per line."}},
 			},
 		}
 
-		iterator := chatModel.ChatStream(ctx, messages, nil)
+		iterator := chatModel.ChatStream(ctx, messages, nil, nil)
 		require.NotNil(t, iterator)
 
 		var fragments []*models.ChatMessage
@@ -286,11 +289,11 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		messages := []*models.ChatMessage{
 			{
 				Role:  models.ChatRoleUser,
-				Parts: []string{"Write a long story about a cat."},
+				Parts: []models.ChatMessagePart{{Text: "Write a long story about a cat."}},
 			},
 		}
 
-		iterator := chatModel.ChatStream(ctxWithCancel, messages, nil)
+		iterator := chatModel.ChatStream(ctxWithCancel, messages, nil, nil)
 		require.NotNil(t, iterator)
 
 		// Read first fragment
@@ -316,11 +319,11 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		messages := []*models.ChatMessage{
 			{
 				Role:  models.ChatRoleUser,
-				Parts: []string{"Say hello"},
+				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
-		iterator := chatModel.ChatStream(ctxWithTimeout, messages, nil)
+		iterator := chatModel.ChatStream(ctxWithTimeout, messages, nil, nil)
 		require.NotNil(t, iterator)
 
 		var fragments []*models.ChatMessage
@@ -337,15 +340,15 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		messages := []*models.ChatMessage{
 			{
 				Role:  models.ChatRoleSystem,
-				Parts: []string{"You are a helpful assistant that responds concisely."},
+				Parts: []models.ChatMessagePart{{Text: "You are a helpful assistant that responds concisely."}},
 			},
 			{
 				Role:  models.ChatRoleUser,
-				Parts: []string{"Say 'OK'"},
+				Parts: []models.ChatMessagePart{{Text: "Say 'OK'"}},
 			},
 		}
 
-		iterator := chatModel.ChatStream(ctx, messages, nil)
+		iterator := chatModel.ChatStream(ctx, messages, nil, nil)
 		require.NotNil(t, iterator)
 
 		var fragments []*models.ChatMessage
@@ -363,7 +366,7 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 	t.Run("returns no fragments for empty messages", func(t *testing.T) {
 		chatModel := client.ChatModel(testModelName, nil)
 
-		iterator := chatModel.ChatStream(ctx, []*models.ChatMessage{}, nil)
+		iterator := chatModel.ChatStream(ctx, []*models.ChatMessage{}, nil, nil)
 		require.NotNil(t, iterator)
 
 		var fragments []*models.ChatMessage
@@ -377,7 +380,7 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 	t.Run("returns no fragments for nil messages", func(t *testing.T) {
 		chatModel := client.ChatModel(testModelName, nil)
 
-		iterator := chatModel.ChatStream(ctx, nil, nil)
+		iterator := chatModel.ChatStream(ctx, nil, nil, nil)
 		require.NotNil(t, iterator)
 
 		var fragments []*models.ChatMessage
@@ -400,11 +403,11 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		messages := []*models.ChatMessage{
 			{
 				Role:  models.ChatRoleUser,
-				Parts: []string{"Say hello"},
+				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
-		iterator := chatModel.ChatStream(ctx, messages, nil)
+		iterator := chatModel.ChatStream(ctx, messages, nil, nil)
 		require.NotNil(t, iterator)
 
 		// Should get at least one fragment
@@ -424,11 +427,11 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		messages := []*models.ChatMessage{
 			{
 				Role:  models.ChatRoleUser,
-				Parts: []string{"Say hello"},
+				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
-		iterator := chatModel.ChatStream(ctx, messages, nil)
+		iterator := chatModel.ChatStream(ctx, messages, nil, nil)
 		require.NotNil(t, iterator)
 
 		// Stop reading after first fragment (if any)
@@ -520,5 +523,285 @@ func TestOllamaClient_ErrorHandling(t *testing.T) {
 		_, err = client.ListModels()
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, models.ErrEndpointUnavailable)
+	})
+}
+
+func TestOllamaClient_ToolCalling(t *testing.T) {
+	host := skipIfNoOllama(t)
+
+	client, err := NewOllamaClient(host, &models.ModelConnectionOptions{
+		ConnectTimeout: connectTimeout,
+		RequestTimeout: testTimeout,
+	})
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Define a weather tool for testing
+	weatherTool := tool.ToolInfo{
+		Name:        "get_weather",
+		Description: "Get the current weather in a given location",
+		Schema: tool.ToolSchema{
+			Type: tool.SchemaTypeObject,
+			Properties: map[string]tool.PropertySchema{
+				"location": {
+					Type:        tool.SchemaTypeString,
+					Description: "The city and state, e.g. San Francisco, CA",
+				},
+				"unit": {
+					Type:        tool.SchemaTypeString,
+					Description: "Temperature unit",
+					Enum:        []string{"celsius", "fahrenheit"},
+				},
+			},
+			Required:             []string{"location"},
+			AdditionalProperties: false,
+		},
+	}
+
+	t.Run("tool calls are properly passed to LLM", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, &models.ChatOptions{
+			Temperature: 0.1,
+		})
+
+		messages := []*models.ChatMessage{
+			models.NewTextMessage(models.ChatRoleUser, "What's the weather like in Paris, France?"),
+		}
+
+		response, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool})
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+
+		// The LLM should return a tool call
+		toolCalls := response.GetToolCalls()
+		assert.NotEmpty(t, toolCalls, "expected LLM to return at least one tool call")
+
+		if len(toolCalls) > 0 {
+			call := toolCalls[0]
+			assert.NotEmpty(t, call.ID, "tool call ID should not be empty")
+			assert.Equal(t, "get_weather", call.Function, "expected tool call to get_weather")
+			assert.NotNil(t, call.Arguments, "tool call arguments should not be nil")
+
+			// Verify the location argument is present
+			location, ok := call.Arguments.StringOK("location")
+			assert.True(t, ok, "expected location argument to be present")
+			assert.NotEmpty(t, location, "location should not be empty")
+		}
+	})
+
+	t.Run("tool responses are properly passed back to LLM", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, &models.ChatOptions{
+			Temperature: 0.1,
+		})
+
+		messages := []*models.ChatMessage{
+			models.NewTextMessage(models.ChatRoleUser, "What's the weather like in Tokyo?"),
+		}
+
+		// First call - get tool call from LLM
+		response, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool})
+		require.NoError(t, err)
+		require.NotNil(t, response)
+
+		toolCalls := response.GetToolCalls()
+		require.NotEmpty(t, toolCalls, "expected LLM to return a tool call")
+
+		// Add the assistant's tool call to conversation
+		messages = append(messages, response)
+
+		// Simulate tool execution
+		toolResponse := &tool.ToolResponse{
+			Call:   toolCalls[0],
+			Result: tool.NewToolValue(map[string]interface{}{"temperature": 18, "condition": "cloudy", "unit": "celsius"}),
+			Done:   true,
+		}
+
+		// Add tool response to conversation
+		messages = append(messages, models.NewToolResponseMessage(toolResponse))
+
+		// Second call - LLM should process tool response
+		finalResponse, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool})
+
+		require.NoError(t, err)
+		assert.NotNil(t, finalResponse)
+		assert.Equal(t, models.ChatRoleAssistant, finalResponse.Role)
+
+		// The response should contain text (not tool calls) about weather
+		responseText := finalResponse.GetText()
+		assert.NotEmpty(t, responseText, "expected LLM to return text response after tool execution")
+		// The LLM should reference the weather data we provided - check for any weather-related terms
+		containsWeatherInfo := strings.Contains(strings.ToLower(responseText), "18") ||
+			strings.Contains(strings.ToLower(responseText), "cloudy") ||
+			strings.Contains(strings.ToLower(responseText), "celsius") ||
+			strings.Contains(strings.ToLower(responseText), "tokyo") ||
+			strings.Contains(strings.ToLower(responseText), "weather")
+		assert.True(t, containsWeatherInfo, "expected response to reference weather information, got: %s", responseText)
+	})
+
+	t.Run("tool calls and responses interleaved with text chunks in streaming", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, &models.ChatOptions{
+			Temperature: 0.1,
+		})
+
+		messages := []*models.ChatMessage{
+			models.NewTextMessage(models.ChatRoleUser, "What's the weather in London? Please tell me the temperature."),
+		}
+
+		// First streaming call - get tool call from LLM
+		iterator := chatModel.ChatStream(ctx, messages, nil, []tool.ToolInfo{weatherTool})
+		require.NotNil(t, iterator)
+
+		var fragments []*models.ChatMessage
+		var collectedToolCalls []*tool.ToolCall
+
+		for fragment := range iterator {
+			assert.NotNil(t, fragment)
+			fragments = append(fragments, fragment)
+
+			// Collect tool calls as they arrive
+			toolCalls := fragment.GetToolCalls()
+			collectedToolCalls = append(collectedToolCalls, toolCalls...)
+		}
+
+		assert.Greater(t, len(fragments), 0, "expected to receive fragments")
+
+		// Tool calls might be split across fragments or come in one fragment
+		// We need to check if we received any tool calls
+		assert.NotEmpty(t, collectedToolCalls, "expected to receive tool calls in streaming response")
+
+		if len(collectedToolCalls) > 0 {
+			// Reconstruct the complete response
+			completeResponse := &models.ChatMessage{
+				Role:  models.ChatRoleAssistant,
+				Parts: []models.ChatMessagePart{},
+			}
+
+			// Merge all fragments
+			for _, fragment := range fragments {
+				completeResponse.Parts = append(completeResponse.Parts, fragment.Parts...)
+			}
+
+			// Add to conversation
+			messages = append(messages, completeResponse)
+
+			// Simulate tool execution
+			toolResponse := &tool.ToolResponse{
+				Call:   collectedToolCalls[0],
+				Result: tool.NewToolValue(map[string]interface{}{"temperature": 15, "condition": "rainy", "unit": "celsius"}),
+				Done:   true,
+			}
+
+			messages = append(messages, models.NewToolResponseMessage(toolResponse))
+
+			// Second streaming call - LLM processes tool response
+			iterator2 := chatModel.ChatStream(ctx, messages, nil, []tool.ToolInfo{weatherTool})
+			require.NotNil(t, iterator2)
+
+			var textFragments []string
+			for fragment := range iterator2 {
+				assert.NotNil(t, fragment)
+				text := fragment.GetText()
+				if text != "" {
+					textFragments = append(textFragments, text)
+				}
+			}
+
+			// Should have received text fragments
+			assert.NotEmpty(t, textFragments, "expected to receive text fragments after tool response")
+
+			// Combine all text
+			fullText := ""
+			for _, txt := range textFragments {
+				fullText += txt
+			}
+
+			assert.NotEmpty(t, fullText, "expected non-empty final response")
+		}
+	})
+
+	t.Run("multiple tool calls in single response", func(t *testing.T) {
+		// Define another tool
+		timeTool := tool.ToolInfo{
+			Name:        "get_time",
+			Description: "Get the current time in a given location",
+			Schema: tool.ToolSchema{
+				Type: tool.SchemaTypeObject,
+				Properties: map[string]tool.PropertySchema{
+					"location": {
+						Type:        tool.SchemaTypeString,
+						Description: "The city and state",
+					},
+				},
+				Required:             []string{"location"},
+				AdditionalProperties: false,
+			},
+		}
+
+		chatModel := client.ChatModel(testModelName, &models.ChatOptions{
+			Temperature: 0.1,
+		})
+
+		messages := []*models.ChatMessage{
+			models.NewTextMessage(models.ChatRoleUser, "What's the weather and current time in New York?"),
+		}
+
+		response, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool, timeTool})
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+
+		// The LLM might return one or two tool calls
+		toolCalls := response.GetToolCalls()
+		assert.NotEmpty(t, toolCalls, "expected at least one tool call")
+
+		// Verify each tool call has proper structure
+		for _, call := range toolCalls {
+			assert.NotEmpty(t, call.ID, "tool call ID should not be empty")
+			assert.Contains(t, []string{"get_weather", "get_time"}, call.Function, "unexpected tool function")
+			assert.NotNil(t, call.Arguments, "tool call arguments should not be nil")
+		}
+	})
+
+	t.Run("tool call with error response", func(t *testing.T) {
+		chatModel := client.ChatModel(testModelName, &models.ChatOptions{
+			Temperature: 0.1,
+		})
+
+		messages := []*models.ChatMessage{
+			models.NewTextMessage(models.ChatRoleUser, "Use the get_weather tool to check the weather in Berlin."),
+		}
+
+		// First call - get tool call
+		response, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool})
+		require.NoError(t, err)
+		require.NotNil(t, response)
+
+		toolCalls := response.GetToolCalls()
+		if len(toolCalls) == 0 {
+			t.Skip("LLM did not return a tool call, skipping error response test")
+		}
+
+		messages = append(messages, response)
+
+		// Simulate tool execution error
+		toolResponse := &tool.ToolResponse{
+			Call:  toolCalls[0],
+			Error: errors.New("location not found"),
+			Done:  true,
+		}
+
+		messages = append(messages, models.NewToolResponseMessage(toolResponse))
+
+		// Second call - LLM should handle the error
+		finalResponse, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool})
+
+		require.NoError(t, err)
+		assert.NotNil(t, finalResponse)
+
+		// The response should contain text explaining the error
+		responseText := finalResponse.GetText()
+		assert.NotEmpty(t, responseText, "expected LLM to return text response after tool error")
 	})
 }

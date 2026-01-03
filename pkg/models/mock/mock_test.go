@@ -55,23 +55,26 @@ func TestMockChatModel_Chat(t *testing.T) {
 		modelName     string
 		setupResponse *ChatResponse
 		expectError   bool
-		expectedParts []string
+		expectedText  string
 	}{
 		{
-			name:          "default response",
-			modelName:     "test-model",
-			expectedParts: []string{"mock response"},
+			name:         "default response",
+			modelName:    "test-model",
+			expectedText: "mock response",
 		},
 		{
 			name:      "custom response",
 			modelName: "test-model",
 			setupResponse: &ChatResponse{
 				Response: &models.ChatMessage{
-					Role:  models.ChatRoleAssistant,
-					Parts: []string{"Hello, ", "world!"},
+					Role: models.ChatRoleAssistant,
+					Parts: []models.ChatMessagePart{
+						{Text: "Hello, "},
+						{Text: "world!"},
+					},
 				},
 			},
-			expectedParts: []string{"Hello, ", "world!"},
+			expectedText: "Hello, world!",
 		},
 		{
 			name:      "error response",
@@ -93,10 +96,10 @@ func TestMockChatModel_Chat(t *testing.T) {
 			ctx := context.Background()
 
 			messages := []*models.ChatMessage{
-				{Role: models.ChatRoleUser, Parts: []string{"test"}},
+				models.NewTextMessage(models.ChatRoleUser, "test"),
 			}
 
-			response, err := chatModel.Chat(ctx, messages, nil)
+			response, err := chatModel.Chat(ctx, messages, nil, nil)
 
 			if tc.expectError {
 				if err == nil {
@@ -109,14 +112,9 @@ func TestMockChatModel_Chat(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if len(response.Parts) != len(tc.expectedParts) {
-				t.Fatalf("expected %d parts, got %d", len(tc.expectedParts), len(response.Parts))
-			}
-
-			for i, part := range tc.expectedParts {
-				if response.Parts[i] != part {
-					t.Errorf("part %d: expected '%s', got '%s'", i, part, response.Parts[i])
-				}
+			responseText := response.GetText()
+			if responseText != tc.expectedText {
+				t.Errorf("expected text '%s', got '%s'", tc.expectedText, responseText)
 			}
 		})
 	}
@@ -130,10 +128,10 @@ func TestMockChatModel_Chat_Cancellation(t *testing.T) {
 	cancel() // Cancel immediately
 
 	messages := []*models.ChatMessage{
-		{Role: models.ChatRoleUser, Parts: []string{"test"}},
+		models.NewTextMessage(models.ChatRoleUser, "test"),
 	}
 
-	_, err := chatModel.Chat(ctx, messages, nil)
+	_, err := chatModel.Chat(ctx, messages, nil, nil)
 	if err != context.Canceled {
 		t.Fatalf("expected context.Canceled error, got %v", err)
 	}
@@ -161,10 +159,10 @@ func TestMockChatModel_ChatStream(t *testing.T) {
 			modelName: "test-model",
 			setupResponse: &ChatResponse{
 				StreamFragments: []*models.ChatMessage{
-					{Role: models.ChatRoleAssistant, Parts: []string{"Hello"}},
-					{Role: models.ChatRoleAssistant, Parts: []string{", "}},
-					{Role: models.ChatRoleAssistant, Parts: []string{"world"}},
-					{Role: models.ChatRoleAssistant, Parts: []string{"!"}},
+					models.NewTextMessage(models.ChatRoleAssistant, "Hello"),
+					models.NewTextMessage(models.ChatRoleAssistant, ", "),
+					models.NewTextMessage(models.ChatRoleAssistant, "world"),
+					models.NewTextMessage(models.ChatRoleAssistant, "!"),
 				},
 			},
 			expectedFrags:   4,
@@ -190,10 +188,10 @@ func TestMockChatModel_ChatStream(t *testing.T) {
 			ctx := context.Background()
 
 			messages := []*models.ChatMessage{
-				{Role: models.ChatRoleUser, Parts: []string{"test"}},
+				models.NewTextMessage(models.ChatRoleUser, "test"),
 			}
 
-			iter := chatModel.ChatStream(ctx, messages, nil)
+			iter := chatModel.ChatStream(ctx, messages, nil, nil)
 
 			// Read all fragments
 			var fragments []*models.ChatMessage
@@ -213,8 +211,8 @@ func TestMockChatModel_ChatStream(t *testing.T) {
 			}
 
 			for i, content := range tc.expectedContent {
-				if fragments[i].Parts[0] != content {
-					t.Errorf("fragment %d: expected '%s', got '%s'", i, content, fragments[i].Parts[0])
+				if fragments[i].GetText() != content {
+					t.Errorf("fragment %d: expected '%s', got '%s'", i, content, fragments[i].GetText())
 				}
 			}
 		})
@@ -225,9 +223,9 @@ func TestMockChatModel_ChatStream_Cancellation(t *testing.T) {
 	provider := NewMockProvider([]models.ModelInfo{})
 	provider.SetChatResponse("test-model", &ChatResponse{
 		StreamFragments: []*models.ChatMessage{
-			{Role: models.ChatRoleAssistant, Parts: []string{"fragment 1"}},
-			{Role: models.ChatRoleAssistant, Parts: []string{"fragment 2"}},
-			{Role: models.ChatRoleAssistant, Parts: []string{"fragment 3"}},
+			models.NewTextMessage(models.ChatRoleAssistant, "fragment 1"),
+			models.NewTextMessage(models.ChatRoleAssistant, "fragment 2"),
+			models.NewTextMessage(models.ChatRoleAssistant, "fragment 3"),
 		},
 	})
 
@@ -236,10 +234,10 @@ func TestMockChatModel_ChatStream_Cancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	messages := []*models.ChatMessage{
-		{Role: models.ChatRoleUser, Parts: []string{"test"}},
+		models.NewTextMessage(models.ChatRoleUser, "test"),
 	}
 
-	iter := chatModel.ChatStream(ctx, messages, nil)
+	iter := chatModel.ChatStream(ctx, messages, nil, nil)
 
 	// Read first fragment
 	fragmentReceived := false
@@ -262,7 +260,7 @@ func TestMockChatModel_ChatStream_ContextTimeout(t *testing.T) {
 	provider := NewMockProvider([]models.ModelInfo{})
 	provider.SetChatResponse("test-model", &ChatResponse{
 		StreamFragments: []*models.ChatMessage{
-			{Role: models.ChatRoleAssistant, Parts: []string{"fragment 1"}},
+			models.NewTextMessage(models.ChatRoleAssistant, "fragment 1"),
 		},
 	})
 
@@ -275,10 +273,10 @@ func TestMockChatModel_ChatStream_ContextTimeout(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	messages := []*models.ChatMessage{
-		{Role: models.ChatRoleUser, Parts: []string{"test"}},
+		models.NewTextMessage(models.ChatRoleUser, "test"),
 	}
 
-	iter := chatModel.ChatStream(ctx, messages, nil)
+	iter := chatModel.ChatStream(ctx, messages, nil, nil)
 
 	// Try to read - context should already be expired, so no fragments should be yielded
 	fragmentCount := 0
@@ -373,10 +371,7 @@ func TestMockProvider_ConcurrentAccess(t *testing.T) {
 	go func() {
 		for i := 0; i < 100; i++ {
 			provider.SetChatResponse("test-model", &ChatResponse{
-				Response: &models.ChatMessage{
-					Role:  models.ChatRoleAssistant,
-					Parts: []string{"response"},
-				},
+				Response: models.NewTextMessage(models.ChatRoleAssistant, "response"),
 			})
 		}
 		done <- true
@@ -388,9 +383,9 @@ func TestMockProvider_ConcurrentAccess(t *testing.T) {
 			chatModel := provider.ChatModel("test-model", nil)
 			ctx := context.Background()
 			messages := []*models.ChatMessage{
-				{Role: models.ChatRoleUser, Parts: []string{"test"}},
+				models.NewTextMessage(models.ChatRoleUser, "test"),
 			}
-			_, _ = chatModel.Chat(ctx, messages, nil)
+			_, _ = chatModel.Chat(ctx, messages, nil, nil)
 		}
 		done <- true
 	}()
@@ -406,10 +401,10 @@ func TestMockStreamIterator_BreakEarly(t *testing.T) {
 	ctx := context.Background()
 
 	messages := []*models.ChatMessage{
-		{Role: models.ChatRoleUser, Parts: []string{"test"}},
+		models.NewTextMessage(models.ChatRoleUser, "test"),
 	}
 
-	iter := chatModel.ChatStream(ctx, messages, nil)
+	iter := chatModel.ChatStream(ctx, messages, nil, nil)
 
 	// Breaking from range should work gracefully
 	fragmentReceived := false

@@ -3,6 +3,8 @@ package ollama
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +16,7 @@ import (
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
 // OllamaClient is a client for interacting with Ollama API
@@ -135,7 +138,7 @@ func (c *OllamaClient) ListModels() ([]models.ModelInfo, error) {
 }
 
 // Chat sends a chat request and returns the response
-func (m *OllamaChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) (*models.ChatMessage, error) {
+func (m *OllamaChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) (*models.ChatMessage, error) {
 	if messages == nil || len(messages) == 0 {
 		return nil, errors.New("messages cannot be nil or empty")
 	}
@@ -153,12 +156,7 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 	// Convert messages to Ollama format
 	ollamaMessages := make([]Message, len(messages))
 	for i, msg := range messages {
-		// Concatenate parts into a single content string
-		content := strings.Join(msg.Parts, "")
-		ollamaMessages[i] = Message{
-			Role:    string(msg.Role),
-			Content: content,
-		}
+		ollamaMessages[i] = convertToOllamaMessage(msg)
 	}
 
 	// Build request
@@ -166,6 +164,7 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 		Model:    m.model,
 		Messages: ollamaMessages,
 		Stream:   false,
+		Tools:    convertToolsToOllama(tools),
 	}
 
 	// Apply options if provided
@@ -200,22 +199,43 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 		return nil, err
 	}
 
-	var chatResp ChatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	// Ollama sends multiple JSON objects even with stream=false
+	// We need to read all of them and merge the results
+	decoder := json.NewDecoder(resp.Body)
+	var mergedMessage Message
+	mergedMessage.Role = "assistant"
+
+	for {
+		var chatResp ChatResponse
+		if err := decoder.Decode(&chatResp); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, fmt.Errorf("failed to decode response: %w", err)
+		}
+
+		// Merge content
+		if chatResp.Message.Content != "" {
+			mergedMessage.Content += chatResp.Message.Content
+		}
+
+		// Merge tool calls
+		if len(chatResp.Message.ToolCalls) > 0 {
+			mergedMessage.ToolCalls = append(mergedMessage.ToolCalls, chatResp.Message.ToolCalls...)
+		}
+
+		if chatResp.Done {
+			break
+		}
 	}
 
 	// Convert response to models.ChatMessage
-	result := &models.ChatMessage{
-		Role:  models.ChatRole(chatResp.Message.Role),
-		Parts: []string{chatResp.Message.Content},
-	}
-
+	result := convertFromOllamaMessage(mergedMessage)
 	return result, nil
 }
 
 // ChatStream sends a chat request and returns a standard Go iterator for streaming responses
-func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) iter.Seq[*models.ChatMessage] {
+func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) iter.Seq[*models.ChatMessage] {
 	return func(yield func(*models.ChatMessage) bool) {
 		// Validate inputs
 		if messages == nil || len(messages) == 0 {
@@ -235,12 +255,7 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 		// Convert messages to Ollama format
 		ollamaMessages := make([]Message, len(messages))
 		for i, msg := range messages {
-			// Concatenate parts into a single content string
-			content := strings.Join(msg.Parts, "")
-			ollamaMessages[i] = Message{
-				Role:    string(msg.Role),
-				Content: content,
-			}
+			ollamaMessages[i] = convertToOllamaMessage(msg)
 		}
 
 		// Build request with streaming enabled
@@ -248,6 +263,7 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 			Model:    m.model,
 			Messages: ollamaMessages,
 			Stream:   true,
+			Tools:    convertToolsToOllama(tools),
 		}
 
 		// Apply options if provided
@@ -300,14 +316,13 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 				return
 			}
 
+			// Convert the streamed message to ChatMessage
+			result := convertFromOllamaMessage(chatResp.Message)
+
 			// Check if this is the final message
 			if chatResp.Done {
-				// Yield the final fragment if it has content
-				if chatResp.Message.Content != "" {
-					result := &models.ChatMessage{
-						Role:  models.ChatRole(chatResp.Message.Role),
-						Parts: []string{chatResp.Message.Content},
-					}
+				// Yield the final fragment if it has content or tool calls
+				if len(result.Parts) > 0 && (result.GetText() != "" || len(result.GetToolCalls()) > 0) {
 					if !yield(result) {
 						return
 					}
@@ -315,14 +330,11 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 				return
 			}
 
-			// Yield the fragment
-			result := &models.ChatMessage{
-				Role:  models.ChatRole(chatResp.Message.Role),
-				Parts: []string{chatResp.Message.Content},
-			}
-
-			if !yield(result) {
-				return
+			// Yield the fragment if it has content or tool calls
+			if len(result.Parts) > 0 && (result.GetText() != "" || len(result.GetToolCalls()) > 0) {
+				if !yield(result) {
+					return
+				}
 			}
 		}
 	}
@@ -433,4 +445,118 @@ func (c *OllamaClient) checkStatusCode(resp *http.Response) error {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
 	}
+}
+
+// convertToOllamaMessage converts a models.ChatMessage to Ollama Message format
+func convertToOllamaMessage(msg *models.ChatMessage) Message {
+	ollamaMsg := Message{
+		Role: string(msg.Role),
+	}
+
+	// Check if message contains tool calls or responses
+	toolCalls := msg.GetToolCalls()
+	toolResponses := msg.GetToolResponses()
+
+	if len(toolCalls) > 0 {
+		// Message contains tool calls from assistant
+		ollamaMsg.Content = msg.GetText()
+		for _, tc := range toolCalls {
+			// Safely convert arguments to map
+			var args map[string]interface{}
+			if tc.Arguments.Raw() != nil {
+				if m, ok := tc.Arguments.Raw().(map[string]interface{}); ok {
+					args = m
+				}
+			}
+			if args == nil {
+				args = make(map[string]interface{})
+			}
+			ollamaMsg.ToolCalls = append(ollamaMsg.ToolCalls, ToolCall{
+				Function: ToolCallFunction{
+					Name:      tc.Function,
+					Arguments: args,
+				},
+			})
+		}
+	} else if len(toolResponses) > 0 {
+		// Message contains tool responses
+		// In Ollama, tool responses should use role "tool" and include tool_name
+		ollamaMsg.Role = "tool"
+		for _, tr := range toolResponses {
+			if tr.Error != nil {
+				ollamaMsg.Content = "Error: " + tr.Error.Error()
+			} else {
+				resultJSON, _ := json.Marshal(tr.Result.Raw())
+				ollamaMsg.Content = string(resultJSON)
+			}
+			// Set tool_name from the original tool call if available
+			if tr.Call != nil {
+				ollamaMsg.ToolName = tr.Call.Function
+			}
+			break // Handle only first response for now
+		}
+	} else {
+		// Simple text message
+		ollamaMsg.Content = msg.GetText()
+	}
+
+	return ollamaMsg
+}
+
+// generateToolCallID generates a unique ID for tool calls since Ollama doesn't provide them.
+func generateToolCallID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return "call_" + hex.EncodeToString(b)
+}
+
+// convertFromOllamaMessage converts Ollama Message to models.ChatMessage
+func convertFromOllamaMessage(msg Message) *models.ChatMessage {
+	var parts []models.ChatMessagePart
+
+	// Add text content if present
+	if msg.Content != "" {
+		parts = append(parts, models.ChatMessagePart{Text: msg.Content})
+	}
+
+	// Add tool calls if present
+	for _, tc := range msg.ToolCalls {
+		parts = append(parts, models.ChatMessagePart{
+			ToolCall: &tool.ToolCall{
+				ID:        generateToolCallID(),
+				Function:  tc.Function.Name,
+				Arguments: tool.NewToolValue(tc.Function.Arguments),
+			},
+		})
+	}
+
+	return &models.ChatMessage{
+		Role:  models.ChatRole(msg.Role),
+		Parts: parts,
+	}
+}
+
+// convertToolsToOllama converts tool.ToolInfo to Ollama Tool format
+func convertToolsToOllama(tools []tool.ToolInfo) []Tool {
+	if len(tools) == 0 {
+		return nil
+	}
+
+	ollamaTools := make([]Tool, len(tools))
+	for i, t := range tools {
+		// Convert ToolSchema to map[string]interface{}
+		schemaJSON, _ := json.Marshal(t.Schema)
+		var schemaMap map[string]interface{}
+		json.Unmarshal(schemaJSON, &schemaMap)
+
+		ollamaTools[i] = Tool{
+			Type: "function",
+			Function: ToolFunction{
+				Name:        t.Name,
+				Description: t.Description,
+				Parameters:  schemaMap,
+			},
+		}
+	}
+	return ollamaTools
 }

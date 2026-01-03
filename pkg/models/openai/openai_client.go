@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
 // OpenAIClient is a client for interacting with OpenAI-compatible API
@@ -138,7 +139,7 @@ func (c *OpenAIClient) ListModels() ([]models.ModelInfo, error) {
 }
 
 // Chat sends a chat request and returns the response
-func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) (*models.ChatMessage, error) {
+func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) (*models.ChatMessage, error) {
 	if len(messages) == 0 {
 		return nil, errors.New("messages cannot be nil or empty")
 	}
@@ -156,12 +157,7 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 	// Convert messages to OpenAI format
 	openaiMessages := make([]ChatCompletionMessage, len(messages))
 	for i, msg := range messages {
-		// Concatenate parts into a single content string
-		content := strings.Join(msg.Parts, "")
-		openaiMessages[i] = ChatCompletionMessage{
-			Role:    string(msg.Role),
-			Content: content,
-		}
+		openaiMessages[i] = convertToOpenAIMessage(msg)
 	}
 
 	// Build request
@@ -169,6 +165,7 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 		Model:    m.model,
 		Messages: openaiMessages,
 		Stream:   false,
+		Tools:    convertToolsToOpenAI(tools),
 	}
 
 	// Apply options if provided
@@ -218,33 +215,12 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 	}
 
 	// Convert response to models.ChatMessage
-	var content string
-	switch v := choice.Message.Content.(type) {
-	case string:
-		content = v
-	case []interface{}:
-		// Handle array of content parts
-		for _, part := range v {
-			if partMap, ok := part.(map[string]interface{}); ok {
-				if text, ok := partMap["text"].(string); ok {
-					content += text
-				}
-			}
-		}
-	default:
-		content = fmt.Sprintf("%v", v)
-	}
-
-	result := &models.ChatMessage{
-		Role:  models.ChatRole(choice.Message.Role),
-		Parts: []string{content},
-	}
-
+	result := convertFromOpenAIMessage(choice.Message)
 	return result, nil
 }
 
 // ChatStream sends a chat request and returns a standard Go iterator for streaming responses
-func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions) iter.Seq[*models.ChatMessage] {
+func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) iter.Seq[*models.ChatMessage] {
 	return func(yield func(*models.ChatMessage) bool) {
 		// Validate inputs
 		if len(messages) == 0 {
@@ -264,12 +240,7 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 		// Convert messages to OpenAI format
 		openaiMessages := make([]ChatCompletionMessage, len(messages))
 		for i, msg := range messages {
-			// Concatenate parts into a single content string
-			content := strings.Join(msg.Parts, "")
-			openaiMessages[i] = ChatCompletionMessage{
-				Role:    string(msg.Role),
-				Content: content,
-			}
+			openaiMessages[i] = convertToOpenAIMessage(msg)
 		}
 
 		// Build request with streaming enabled
@@ -277,6 +248,7 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 			Model:    m.model,
 			Messages: openaiMessages,
 			Stream:   true,
+			Tools:    convertToolsToOpenAI(tools),
 		}
 
 		// Apply options if provided
@@ -313,6 +285,10 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 
 		// Create scanner for SSE and stream responses
 		scanner := bufio.NewScanner(resp.Body)
+
+		// Track accumulated tool calls across chunks
+		toolCallsInProgress := make(map[int]*ToolCall)
+
 		for scanner.Scan() {
 			// Check if context is cancelled
 			select {
@@ -351,20 +327,47 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 
 				// Check finish reason
 				if choice.FinishReason != "" {
-					// If there's content in the delta, yield it before ending
+					// If there's content or tool calls in the delta, yield it before ending
 					if choice.Delta != nil {
+						// Yield any remaining content
 						var content string
 						switch v := choice.Delta.Content.(type) {
 						case string:
 							content = v
 						default:
-							content = fmt.Sprintf("%v", v)
+							if v != nil {
+								content = fmt.Sprintf("%v", v)
+							}
 						}
 
 						if content != "" {
 							result := &models.ChatMessage{
+								Role: models.ChatRoleAssistant,
+								Parts: []models.ChatMessagePart{
+									{Text: content},
+								},
+							}
+							if !yield(result) {
+								return
+							}
+						}
+
+						// Yield any tool calls accumulated so far
+						if len(toolCallsInProgress) > 0 {
+							result := &models.ChatMessage{
 								Role:  models.ChatRoleAssistant,
-								Parts: []string{content},
+								Parts: []models.ChatMessagePart{},
+							}
+							for _, tc := range toolCallsInProgress {
+								var args map[string]interface{}
+								json.Unmarshal([]byte(tc.Function.Arguments), &args)
+								result.Parts = append(result.Parts, models.ChatMessagePart{
+									ToolCall: &tool.ToolCall{
+										ID:        tc.ID,
+										Function:  tc.Function.Name,
+										Arguments: tool.NewToolValue(args),
+									},
+								})
 							}
 							if !yield(result) {
 								return
@@ -376,21 +379,61 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 
 				// Process delta
 				if choice.Delta != nil {
+					// Handle text content
 					var content string
 					switch v := choice.Delta.Content.(type) {
 					case string:
 						content = v
 					default:
-						content = fmt.Sprintf("%v", v)
+						if v != nil {
+							content = fmt.Sprintf("%v", v)
+						}
 					}
 
 					if content != "" {
 						result := &models.ChatMessage{
-							Role:  models.ChatRoleAssistant,
-							Parts: []string{content},
+							Role: models.ChatRoleAssistant,
+							Parts: []models.ChatMessagePart{
+								{Text: content},
+							},
 						}
 						if !yield(result) {
 							return
+						}
+					}
+
+					// Handle tool calls in delta
+					// Tool calls are streamed incrementally
+					if len(choice.Delta.ToolCalls) > 0 {
+						for _, tcDelta := range choice.Delta.ToolCalls {
+							// Get or create the tool call in progress
+							tc, exists := toolCallsInProgress[tcDelta.Index]
+							if !exists {
+								tc = &ToolCall{
+									ID:   tcDelta.ID,
+									Type: tcDelta.Type,
+									Function: ToolCallFunction{
+										Name:      tcDelta.Function.Name,
+										Arguments: tcDelta.Function.Arguments,
+									},
+								}
+								toolCallsInProgress[tcDelta.Index] = tc
+							} else {
+								// Accumulate the arguments
+								if tcDelta.Function.Arguments != "" {
+									tc.Function.Arguments += tcDelta.Function.Arguments
+								}
+								// Update fields if they were sent
+								if tcDelta.ID != "" {
+									tc.ID = tcDelta.ID
+								}
+								if tcDelta.Type != "" {
+									tc.Type = tcDelta.Type
+								}
+								if tcDelta.Function.Name != "" {
+									tc.Function.Name = tcDelta.Function.Name
+								}
+							}
 						}
 					}
 				}
@@ -523,4 +566,112 @@ func (c *OpenAIClient) checkStatusCode(resp *http.Response) error {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
 	}
+}
+
+// convertToOpenAIMessage converts a models.ChatMessage to OpenAI ChatCompletionMessage format
+func convertToOpenAIMessage(msg *models.ChatMessage) ChatCompletionMessage {
+	openaiMsg := ChatCompletionMessage{
+		Role: string(msg.Role),
+	}
+
+	// Check if message contains only text
+	hasOnlyText := true
+	for _, part := range msg.Parts {
+		if part.ToolCall != nil || part.ToolResponse != nil {
+			hasOnlyText = false
+			break
+		}
+	}
+
+	if hasOnlyText {
+		// Simple text message
+		openaiMsg.Content = msg.GetText()
+	} else {
+		// Message contains tool calls or tool responses
+		for _, part := range msg.Parts {
+			if part.Text != "" {
+				openaiMsg.Content = part.Text
+			} else if part.ToolCall != nil {
+				// Add tool call
+				argsJSON, _ := json.Marshal(part.ToolCall.Arguments.Raw())
+				openaiMsg.ToolCalls = append(openaiMsg.ToolCalls, ToolCall{
+					ID:   part.ToolCall.ID,
+					Type: "function",
+					Function: ToolCallFunction{
+						Name:      part.ToolCall.Function,
+						Arguments: string(argsJSON),
+					},
+				})
+			} else if part.ToolResponse != nil {
+				// Tool response - set tool_call_id and content
+				// Prefer Call.ID if available, fall back to ID for backward compatibility
+				if part.ToolResponse.Call != nil {
+					openaiMsg.ToolCallID = part.ToolResponse.Call.ID
+				} else {
+					openaiMsg.ToolCallID = part.ToolResponse.ID
+				}
+				if part.ToolResponse.Error != nil {
+					openaiMsg.Content = part.ToolResponse.Error.Error()
+				} else {
+					resultJSON, _ := json.Marshal(part.ToolResponse.Result.Raw())
+					openaiMsg.Content = string(resultJSON)
+				}
+			}
+		}
+	}
+
+	return openaiMsg
+}
+
+// convertFromOpenAIMessage converts OpenAI ChatCompletionMessage to models.ChatMessage
+func convertFromOpenAIMessage(msg *ChatCompletionMessage) *models.ChatMessage {
+	var parts []models.ChatMessagePart
+
+	// Add text content if present
+	if contentStr, ok := msg.Content.(string); ok && contentStr != "" {
+		parts = append(parts, models.ChatMessagePart{Text: contentStr})
+	}
+
+	// Add tool calls if present
+	for _, tc := range msg.ToolCalls {
+		var args map[string]interface{}
+		json.Unmarshal([]byte(tc.Function.Arguments), &args)
+		parts = append(parts, models.ChatMessagePart{
+			ToolCall: &tool.ToolCall{
+				ID:        tc.ID,
+				Function:  tc.Function.Name,
+				Arguments: tool.NewToolValue(args),
+			},
+		})
+	}
+
+	return &models.ChatMessage{
+		Role:  models.ChatRole(msg.Role),
+		Parts: parts,
+	}
+}
+
+// convertToolsToOpenAI converts tool.ToolInfo to OpenAI Tool format
+func convertToolsToOpenAI(tools []tool.ToolInfo) []Tool {
+	if len(tools) == 0 {
+		return nil
+	}
+
+	openaiTools := make([]Tool, len(tools))
+	for i, t := range tools {
+		// Convert ToolSchema to map[string]interface{}
+		schemaJSON, _ := json.Marshal(t.Schema)
+		var schemaMap map[string]interface{}
+		json.Unmarshal(schemaJSON, &schemaMap)
+
+		openaiTools[i] = Tool{
+			Type: "function",
+			Function: ToolFunction{
+				Name:        t.Name,
+				Description: t.Description,
+				Parameters:  schemaMap,
+			},
+		}
+	}
+	return openaiTools
 }
