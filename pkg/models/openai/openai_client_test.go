@@ -2,6 +2,7 @@ package openai
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -22,17 +23,65 @@ const (
 	connectTimeout     = 5 * time.Second
 )
 
-// skipIfNoOpenAI skips the test if openai integration tests are disabled
-func skipIfNoOpenAI(t *testing.T) string {
+// chatResponseJSON converts a ChatCompletionResponse to JSON string.
+func chatResponseJSON(response ChatCompletionResponse) string {
+	data, _ := json.Marshal(response)
+	return string(data)
+}
+
+// embedResponseJSON converts an EmbeddingResponse to JSON string.
+func embedResponseJSON(response EmbeddingResponse) string {
+	data, _ := json.Marshal(response)
+	return string(data)
+}
+
+// listModelsResponseJSON converts a ModelList to JSON string.
+func listModelsResponseJSON(response ModelList) string {
+	data, _ := json.Marshal(response)
+	return string(data)
+}
+
+// testClient holds either a real or mock client and provides cleanup
+type testClient struct {
+	Client *OpenAIClient
+	Mock   *testutil.MockHTTPServer
+}
+
+// Close cleans up the test client resources
+func (tc *testClient) Close() {
+	if tc.Mock != nil {
+		tc.Mock.Close()
+	}
+}
+
+// getTestClient returns a client for testing - either real or mock based on integration mode
+// For mock mode, it also returns the mock server for adding responses
+func getTestClient(t *testing.T) *testClient {
 	t.Helper()
-	if !testutil.IntegTestEnabled("openai") {
-		t.Skip("Skipping test: openai integration tests not enabled (set _integ/openai.enabled or _integ/all.enabled to 'yes')")
+
+	if testutil.IntegTestEnabled("openai") {
+		url := testutil.IntegCfgReadFile("openai.url")
+		if url == "" {
+			t.Skip("Skipping test: _integ/openai.url not configured")
+		}
+		apiKey := testutil.IntegCfgReadFile("openai.key")
+
+		client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
+			APIKey:         apiKey,
+			ConnectTimeout: connectTimeout,
+			RequestTimeout: testTimeout,
+		})
+		require.NoError(t, err)
+
+		return &testClient{Client: client}
 	}
-	url := testutil.IntegCfgReadFile("openai.url")
-	if url == "" {
-		t.Skip("Skipping test: _integ/openai.url not configured")
-	}
-	return url
+
+	// Create mock server
+	mock := testutil.NewMockHTTPServer()
+	client, err := NewOpenAIClientWithHTTPClient(mock.URL(), mock.Client())
+	require.NoError(t, err)
+
+	return &testClient{Client: client, Mock: mock}
 }
 
 func TestNewOpenAIClient(t *testing.T) {
@@ -61,18 +110,34 @@ func TestNewOpenAIClient(t *testing.T) {
 }
 
 func TestOpenAIClient_ListModels(t *testing.T) {
-	url := skipIfNoOpenAI(t)
-	apiKey := testutil.IntegCfgReadFile("openai.key")
+	tc := getTestClient(t)
+	defer tc.Close()
 
-	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
-		APIKey:         apiKey,
-		ConnectTimeout: connectTimeout,
-		RequestTimeout: testTimeout,
-	})
-	require.NoError(t, err)
+	// Setup mock response if using mock
+	if tc.Mock != nil {
+		modelsResponse := listModelsResponseJSON(ModelList{
+			Data: []ModelData{
+				{
+					ID:      testModelName,
+					Object:  "model",
+					Created: 1640000000,
+					OwnedBy: "openai",
+				},
+				{
+					ID:      testEmbedModelName,
+					Object:  "model",
+					Created: 1640000000,
+					OwnedBy: "openai",
+				},
+			},
+		})
+		// Add response for each subtest
+		tc.Mock.AddRestResponse("/models", "GET", modelsResponse)
+		tc.Mock.AddRestResponse("/models", "GET", modelsResponse)
+	}
 
 	t.Run("lists available models", func(t *testing.T) {
-		modelList, err := client.ListModels()
+		modelList, err := tc.Client.ListModels()
 
 		require.NoError(t, err)
 		assert.NotNil(t, modelList)
@@ -86,7 +151,7 @@ func TestOpenAIClient_ListModels(t *testing.T) {
 	})
 
 	t.Run("finds test model in list", func(t *testing.T) {
-		modelList, err := client.ListModels()
+		modelList, err := tc.Client.ListModels()
 
 		require.NoError(t, err)
 
@@ -103,15 +168,8 @@ func TestOpenAIClient_ListModels(t *testing.T) {
 }
 
 func TestOpenAIClient_ChatModel(t *testing.T) {
-	url := skipIfNoOpenAI(t)
-	apiKey := testutil.IntegCfgReadFile("openai.key")
-
-	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
-		APIKey:         apiKey,
-		ConnectTimeout: connectTimeout,
-		RequestTimeout: testTimeout,
-	})
-	require.NoError(t, err)
+	tc := getTestClient(t)
+	defer tc.Close()
 
 	ctx := context.Background()
 
@@ -122,19 +180,39 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 			TopK:        40,
 		}
 
-		chatModel := client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testModelName, options)
 
 		assert.NotNil(t, chatModel)
 	})
 
 	t.Run("sends chat message and gets response", func(t *testing.T) {
+		// Setup mock response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+				ID:      "chatcmpl-123",
+				Object:  "chat.completion",
+				Created: 1640000000,
+				Model:   testModelName,
+				Choices: []ChatCompletionChoice{
+					{
+						Index: 0,
+						Message: &ChatCompletionMessage{
+							Role:    "assistant",
+							Content: "4",
+						},
+						FinishReason: "stop",
+					},
+				},
+			}))
+		}
+
 		options := &models.ChatOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 		}
 
-		chatModel := client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testModelName, options)
 
 		messages := []*models.ChatMessage{
 			{
@@ -153,10 +231,30 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	})
 
 	t.Run("handles context with timeout", func(t *testing.T) {
+		// Setup mock response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+				ID:      "chatcmpl-124",
+				Object:  "chat.completion",
+				Created: 1640000000,
+				Model:   testModelName,
+				Choices: []ChatCompletionChoice{
+					{
+						Index: 0,
+						Message: &ChatCompletionMessage{
+							Role:    "assistant",
+							Content: "Hello!",
+						},
+						FinishReason: "stop",
+					},
+				},
+			}))
+		}
+
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
 			{
@@ -172,7 +270,27 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	})
 
 	t.Run("handles system and user messages", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		// Setup mock response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+				ID:      "chatcmpl-125",
+				Object:  "chat.completion",
+				Created: 1640000000,
+				Model:   testModelName,
+				Choices: []ChatCompletionChoice{
+					{
+						Index: 0,
+						Message: &ChatCompletionMessage{
+							Role:    "assistant",
+							Content: "HELLO",
+						},
+						FinishReason: "stop",
+					},
+				},
+			}))
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
 			{
@@ -193,7 +311,7 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	})
 
 	t.Run("returns error for empty messages", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		response, err := chatModel.Chat(ctx, []*models.ChatMessage{}, nil, nil)
 
@@ -202,7 +320,7 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	})
 
 	t.Run("returns error for nil messages", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		response, err := chatModel.Chat(ctx, nil, nil, nil)
 
@@ -211,13 +329,33 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	})
 
 	t.Run("uses default options when none provided to Chat", func(t *testing.T) {
+		// Setup mock response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+				ID:      "chatcmpl-126",
+				Object:  "chat.completion",
+				Created: 1640000000,
+				Model:   testModelName,
+				Choices: []ChatCompletionChoice{
+					{
+						Index: 0,
+						Message: &ChatCompletionMessage{
+							Role:    "assistant",
+							Content: "Hello!",
+						},
+						FinishReason: "stop",
+					},
+				},
+			}))
+		}
+
 		defaultOptions := &models.ChatOptions{
 			Temperature: 0.5,
 			TopP:        0.8,
 			TopK:        30,
 		}
 
-		chatModel := client.ChatModel(testModelName, defaultOptions)
+		chatModel := tc.Client.ChatModel(testModelName, defaultOptions)
 
 		messages := []*models.ChatMessage{
 			{
@@ -234,26 +372,68 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 }
 
 func TestOpenAIClient_ChatModelStream(t *testing.T) {
-	url := skipIfNoOpenAI(t)
-	apiKey := testutil.IntegCfgReadFile("openai.key")
-
-	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
-		APIKey:         apiKey,
-		ConnectTimeout: connectTimeout,
-		RequestTimeout: testTimeout,
-	})
-	require.NoError(t, err)
+	tc := getTestClient(t)
+	defer tc.Close()
 
 	ctx := context.Background()
 
 	t.Run("streams chat message and gets fragments", func(t *testing.T) {
+		// Setup mock streaming response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
+				"data: "+chatResponseJSON(ChatCompletionResponse{
+					ID:      "chatcmpl-stream-1",
+					Object:  "chat.completion.chunk",
+					Created: 1640000000,
+					Model:   testModelName,
+					Choices: []ChatCompletionChoice{
+						{
+							Index: 0,
+							Delta: &ChatCompletionMessage{
+								Role:    "assistant",
+								Content: "1",
+							},
+						},
+					},
+				}),
+				"data: "+chatResponseJSON(ChatCompletionResponse{
+					ID:      "chatcmpl-stream-1",
+					Object:  "chat.completion.chunk",
+					Created: 1640000001,
+					Model:   testModelName,
+					Choices: []ChatCompletionChoice{
+						{
+							Index: 0,
+							Delta: &ChatCompletionMessage{
+								Content: "\n2\n3",
+							},
+						},
+					},
+				}),
+				"data: "+chatResponseJSON(ChatCompletionResponse{
+					ID:      "chatcmpl-stream-1",
+					Object:  "chat.completion.chunk",
+					Created: 1640000002,
+					Model:   testModelName,
+					Choices: []ChatCompletionChoice{
+						{
+							Index:        0,
+							Delta:        &ChatCompletionMessage{},
+							FinishReason: "stop",
+						},
+					},
+				}),
+				"data: [DONE]",
+			)
+		}
+
 		options := &models.ChatOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 		}
 
-		chatModel := client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testModelName, options)
 
 		messages := []*models.ChatMessage{
 			{
@@ -278,9 +458,31 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("handles context cancellation during streaming", func(t *testing.T) {
+		// Setup mock streaming response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
+				"data: "+chatResponseJSON(ChatCompletionResponse{
+					ID:      "chatcmpl-stream-2",
+					Object:  "chat.completion.chunk",
+					Created: 1640000000,
+					Model:   testModelName,
+					Choices: []ChatCompletionChoice{
+						{
+							Index: 0,
+							Delta: &ChatCompletionMessage{
+								Role:    "assistant",
+								Content: "Once upon a time",
+							},
+						},
+					},
+				}),
+				"data: [DONE]",
+			)
+		}
+
 		ctxWithCancel, cancel := context.WithCancel(ctx)
 
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
 			{
@@ -307,10 +509,45 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("handles context with timeout during streaming", func(t *testing.T) {
+		// Setup mock streaming response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
+				"data: "+chatResponseJSON(ChatCompletionResponse{
+					ID:      "chatcmpl-stream-3",
+					Object:  "chat.completion.chunk",
+					Created: 1640000000,
+					Model:   testModelName,
+					Choices: []ChatCompletionChoice{
+						{
+							Index: 0,
+							Delta: &ChatCompletionMessage{
+								Role:    "assistant",
+								Content: "Hello!",
+							},
+						},
+					},
+				}),
+				"data: "+chatResponseJSON(ChatCompletionResponse{
+					ID:      "chatcmpl-stream-3",
+					Object:  "chat.completion.chunk",
+					Created: 1640000001,
+					Model:   testModelName,
+					Choices: []ChatCompletionChoice{
+						{
+							Index:        0,
+							Delta:        &ChatCompletionMessage{},
+							FinishReason: "stop",
+						},
+					},
+				}),
+				"data: [DONE]",
+			)
+		}
+
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
 			{
@@ -331,7 +568,7 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("returns no fragments for empty messages", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		iterator := chatModel.ChatStream(ctx, []*models.ChatMessage{}, nil, nil)
 		require.NotNil(t, iterator)
@@ -345,7 +582,7 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("returns no fragments for nil messages", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		iterator := chatModel.ChatStream(ctx, nil, nil, nil)
 		require.NotNil(t, iterator)
@@ -359,7 +596,29 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("iterator can be stopped early", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		// Setup mock streaming response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
+				"data: "+chatResponseJSON(ChatCompletionResponse{
+					ID:      "chatcmpl-stream-4",
+					Object:  "chat.completion.chunk",
+					Created: 1640000000,
+					Model:   testModelName,
+					Choices: []ChatCompletionChoice{
+						{
+							Index: 0,
+							Delta: &ChatCompletionMessage{
+								Role:    "assistant",
+								Content: "Hello!",
+							},
+						},
+					},
+				}),
+				"data: [DONE]",
+			)
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
 			{
@@ -385,26 +644,34 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 }
 
 func TestOpenAIClient_EmbeddingModel(t *testing.T) {
-	url := skipIfNoOpenAI(t)
-	apiKey := testutil.IntegCfgReadFile("openai.key")
-
-	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
-		APIKey:         apiKey,
-		ConnectTimeout: connectTimeout,
-		RequestTimeout: testTimeout,
-	})
-	require.NoError(t, err)
+	tc := getTestClient(t)
+	defer tc.Close()
 
 	ctx := context.Background()
 
 	t.Run("creates embedding model with model name", func(t *testing.T) {
-		embedModel := client.EmbeddingModel(testEmbedModelName)
+		embedModel := tc.Client.EmbeddingModel(testEmbedModelName)
 
 		assert.NotNil(t, embedModel)
 	})
 
 	t.Run("generates embeddings for text", func(t *testing.T) {
-		embedModel := client.EmbeddingModel(testEmbedModelName)
+		// Setup mock response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/embeddings", "POST", embedResponseJSON(EmbeddingResponse{
+				Object: "list",
+				Data: []EmbeddingData{
+					{
+						Object:    "embedding",
+						Embedding: []float64{0.1, 0.2, 0.3, 0.4, 0.5},
+						Index:     0,
+					},
+				},
+				Model: testEmbedModelName,
+			}))
+		}
+
+		embedModel := tc.Client.EmbeddingModel(testEmbedModelName)
 
 		embedding, err := embedModel.Embed(ctx, "Hello, world!")
 
@@ -415,7 +682,33 @@ func TestOpenAIClient_EmbeddingModel(t *testing.T) {
 	})
 
 	t.Run("generates embeddings for different texts", func(t *testing.T) {
-		embedModel := client.EmbeddingModel(testEmbedModelName)
+		// Setup mock responses if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/embeddings", "POST", embedResponseJSON(EmbeddingResponse{
+				Object: "list",
+				Data: []EmbeddingData{
+					{
+						Object:    "embedding",
+						Embedding: []float64{0.1, 0.2, 0.3, 0.4, 0.5},
+						Index:     0,
+					},
+				},
+				Model: testEmbedModelName,
+			}))
+			tc.Mock.AddRestResponse("/embeddings", "POST", embedResponseJSON(EmbeddingResponse{
+				Object: "list",
+				Data: []EmbeddingData{
+					{
+						Object:    "embedding",
+						Embedding: []float64{0.2, 0.3, 0.4, 0.5, 0.6},
+						Index:     0,
+					},
+				},
+				Model: testEmbedModelName,
+			}))
+		}
+
+		embedModel := tc.Client.EmbeddingModel(testEmbedModelName)
 
 		embedding1, err := embedModel.Embed(ctx, "The quick brown fox")
 		require.NoError(t, err)
@@ -430,7 +723,7 @@ func TestOpenAIClient_EmbeddingModel(t *testing.T) {
 	})
 
 	t.Run("returns error for empty input", func(t *testing.T) {
-		embedModel := client.EmbeddingModel(testEmbedModelName)
+		embedModel := tc.Client.EmbeddingModel(testEmbedModelName)
 
 		embedding, err := embedModel.Embed(ctx, "")
 
@@ -440,15 +733,8 @@ func TestOpenAIClient_EmbeddingModel(t *testing.T) {
 }
 
 func TestOpenAIClient_ToolCalling(t *testing.T) {
-	url := skipIfNoOpenAI(t)
-	apiKey := testutil.IntegCfgReadFile("openai.key")
-
-	client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
-		APIKey:         apiKey,
-		ConnectTimeout: connectTimeout,
-		RequestTimeout: testTimeout,
-	})
-	require.NoError(t, err)
+	tc := getTestClient(t)
+	defer tc.Close()
 
 	ctx := context.Background()
 
@@ -475,7 +761,37 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 	}
 
 	t.Run("tool calls are properly passed to LLM", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, &models.ChatOptions{
+		// Setup mock response with tool call if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+				ID:      "chatcmpl-tool-1",
+				Object:  "chat.completion",
+				Created: 1640000000,
+				Model:   testModelName,
+				Choices: []ChatCompletionChoice{
+					{
+						Index: 0,
+						Message: &ChatCompletionMessage{
+							Role:    "assistant",
+							Content: "",
+							ToolCalls: []ToolCall{
+								{
+									ID:   "call_abc123",
+									Type: "function",
+									Function: ToolCallFunction{
+										Name:      "get_weather",
+										Arguments: `{"location":"Paris, France","unit":"celsius"}`,
+									},
+								},
+							},
+						},
+						FinishReason: "tool_calls",
+					},
+				},
+			}))
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
 			Temperature: 0.0,
 		})
 
@@ -508,7 +824,54 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 	})
 
 	t.Run("tool responses are properly passed back to LLM", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, &models.ChatOptions{
+		// Setup mock responses if using mock
+		if tc.Mock != nil {
+			// First response: tool call
+			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+				ID:      "chatcmpl-tool-2",
+				Object:  "chat.completion",
+				Created: 1640000000,
+				Model:   testModelName,
+				Choices: []ChatCompletionChoice{
+					{
+						Index: 0,
+						Message: &ChatCompletionMessage{
+							Role: "assistant",
+							ToolCalls: []ToolCall{
+								{
+									ID:   "call_def456",
+									Type: "function",
+									Function: ToolCallFunction{
+										Name:      "get_weather",
+										Arguments: `{"location":"Tokyo"}`,
+									},
+								},
+							},
+						},
+						FinishReason: "tool_calls",
+					},
+				},
+			}))
+			// Second response: final answer after tool execution
+			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+				ID:      "chatcmpl-tool-2b",
+				Object:  "chat.completion",
+				Created: 1640000001,
+				Model:   testModelName,
+				Choices: []ChatCompletionChoice{
+					{
+						Index: 0,
+						Message: &ChatCompletionMessage{
+							Role:    "assistant",
+							Content: "The weather in Tokyo is currently 18°C and cloudy.",
+						},
+						FinishReason: "stop",
+					},
+				},
+			}))
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
 			Temperature: 0.0,
 		})
 
@@ -556,7 +919,85 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 	})
 
 	t.Run("tool calls and responses interleaved with text chunks in streaming", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, &models.ChatOptions{
+		// Setup mock responses if using mock
+		if tc.Mock != nil {
+			// First response: streaming tool call
+			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
+				"data: "+chatResponseJSON(ChatCompletionResponse{
+					ID:      "chatcmpl-tool-stream-1",
+					Object:  "chat.completion.chunk",
+					Created: 1640000000,
+					Model:   testModelName,
+					Choices: []ChatCompletionChoice{
+						{
+							Index: 0,
+							Delta: &ChatCompletionMessage{
+								Role: "assistant",
+								ToolCalls: []ToolCall{
+									{
+										Index: 0,
+										ID:    "call_ghi789",
+										Type:  "function",
+										Function: ToolCallFunction{
+											Name:      "get_weather",
+											Arguments: `{"location":"London"}`,
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+				"data: "+chatResponseJSON(ChatCompletionResponse{
+					ID:      "chatcmpl-tool-stream-1",
+					Object:  "chat.completion.chunk",
+					Created: 1640000001,
+					Model:   testModelName,
+					Choices: []ChatCompletionChoice{
+						{
+							Index:        0,
+							Delta:        &ChatCompletionMessage{},
+							FinishReason: "tool_calls",
+						},
+					},
+				}),
+				"data: [DONE]",
+			)
+			// Second response: streaming text response after tool execution
+			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
+				"data: "+chatResponseJSON(ChatCompletionResponse{
+					ID:      "chatcmpl-tool-stream-1b",
+					Object:  "chat.completion.chunk",
+					Created: 1640000002,
+					Model:   testModelName,
+					Choices: []ChatCompletionChoice{
+						{
+							Index: 0,
+							Delta: &ChatCompletionMessage{
+								Role:    "assistant",
+								Content: "The temperature in London is 15°C and it's rainy.",
+							},
+						},
+					},
+				}),
+				"data: "+chatResponseJSON(ChatCompletionResponse{
+					ID:      "chatcmpl-tool-stream-1b",
+					Object:  "chat.completion.chunk",
+					Created: 1640000003,
+					Model:   testModelName,
+					Choices: []ChatCompletionChoice{
+						{
+							Index:        0,
+							Delta:        &ChatCompletionMessage{},
+							FinishReason: "stop",
+						},
+					},
+				}),
+				"data: [DONE]",
+			)
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
 			Temperature: 0.0,
 		})
 
@@ -655,7 +1096,44 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 			},
 		}
 
-		chatModel := client.ChatModel(testModelName, &models.ChatOptions{
+		// Setup mock response with multiple tool calls if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+				ID:      "chatcmpl-tool-3",
+				Object:  "chat.completion",
+				Created: 1640000000,
+				Model:   testModelName,
+				Choices: []ChatCompletionChoice{
+					{
+						Index: 0,
+						Message: &ChatCompletionMessage{
+							Role: "assistant",
+							ToolCalls: []ToolCall{
+								{
+									ID:   "call_jkl012",
+									Type: "function",
+									Function: ToolCallFunction{
+										Name:      "get_weather",
+										Arguments: `{"location":"New York"}`,
+									},
+								},
+								{
+									ID:   "call_mno345",
+									Type: "function",
+									Function: ToolCallFunction{
+										Name:      "get_time",
+										Arguments: `{"location":"New York"}`,
+									},
+								},
+							},
+						},
+						FinishReason: "tool_calls",
+					},
+				},
+			}))
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
 			Temperature: 0.0,
 		})
 
@@ -684,7 +1162,54 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 	})
 
 	t.Run("tool call with error response", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, &models.ChatOptions{
+		// Setup mock responses if using mock
+		if tc.Mock != nil {
+			// First response: tool call
+			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+				ID:      "chatcmpl-tool-4",
+				Object:  "chat.completion",
+				Created: 1640000000,
+				Model:   testModelName,
+				Choices: []ChatCompletionChoice{
+					{
+						Index: 0,
+						Message: &ChatCompletionMessage{
+							Role: "assistant",
+							ToolCalls: []ToolCall{
+								{
+									ID:   "call_pqr678",
+									Type: "function",
+									Function: ToolCallFunction{
+										Name:      "get_weather",
+										Arguments: `{"location":"Berlin"}`,
+									},
+								},
+							},
+						},
+						FinishReason: "tool_calls",
+					},
+				},
+			}))
+			// Second response: handling error
+			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+				ID:      "chatcmpl-tool-4b",
+				Object:  "chat.completion",
+				Created: 1640000001,
+				Model:   testModelName,
+				Choices: []ChatCompletionChoice{
+					{
+						Index: 0,
+						Message: &ChatCompletionMessage{
+							Role:    "assistant",
+							Content: "I apologize, but I encountered an error: location not found.",
+						},
+						FinishReason: "stop",
+					},
+				},
+			}))
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
 			Temperature: 0.0,
 		})
 

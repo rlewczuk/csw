@@ -80,6 +80,24 @@ func NewOpenAIClient(baseURL string, options *models.ModelConnectionOptions) (*O
 	}, nil
 }
 
+// NewOpenAIClientWithHTTPClient creates a new OpenAI-compatible client with a custom HTTP client.
+// This is useful for testing with mock HTTP servers.
+func NewOpenAIClientWithHTTPClient(baseURL string, httpClient *http.Client) (*OpenAIClient, error) {
+	if baseURL == "" {
+		return nil, errors.New("baseURL cannot be empty")
+	}
+
+	if httpClient == nil {
+		return nil, errors.New("httpClient cannot be nil")
+	}
+
+	return &OpenAIClient{
+		baseURL:    strings.TrimSuffix(baseURL, "/"),
+		httpClient: httpClient,
+		apiKey:     "test", // Default API key for testing
+	}, nil
+}
+
 // ChatModel returns a ChatModel implementation for the given model and options
 func (c *OpenAIClient) ChatModel(model string, options *models.ChatOptions) models.ChatModel {
 	return &OpenAIChatModel{
