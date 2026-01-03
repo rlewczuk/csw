@@ -6,7 +6,6 @@
 - Test single package: `go test ./test -v`
 - Test single function: `go test ./test -v -run TestAgentCoreInitialization`
 - Run main: `go run ./cmd/csw`
-- When running all tests, set following environment variables: `OLLAMA_HOST=http://beha:11434` and `OPENAI_URL=http://beha:11434/v1`
 
 ## Code Style
 - Module: `github.com/codesnort/codesnort-swe`
