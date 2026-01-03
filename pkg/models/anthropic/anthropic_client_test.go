@@ -2,6 +2,7 @@ package anthropic
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -19,17 +20,58 @@ const (
 	connectTimeout = 5 * time.Second
 )
 
-// getAPIKey skips the test if anthropic integration tests are disabled and returns the API key
-func getAPIKey(t *testing.T) string {
+// messagesResponseJSON converts a MessagesResponse to JSON string.
+func messagesResponseJSON(response MessagesResponse) string {
+	data, _ := json.Marshal(response)
+	return string(data)
+}
+
+// listModelsResponseJSON converts a ModelsListResponse to JSON string.
+func listModelsResponseJSON(response ModelsListResponse) string {
+	data, _ := json.Marshal(response)
+	return string(data)
+}
+
+// testClient holds either a real or mock client and provides cleanup
+type testClient struct {
+	Client *AnthropicClient
+	Mock   *testutil.MockHTTPServer
+}
+
+// Close cleans up the test client resources
+func (tc *testClient) Close() {
+	if tc.Mock != nil {
+		tc.Mock.Close()
+	}
+}
+
+// getTestClient returns a client for testing - either real or mock based on integration mode
+// For mock mode, it also returns the mock server for adding responses
+func getTestClient(t *testing.T) *testClient {
 	t.Helper()
-	if !testutil.IntegTestEnabled("anthropic") {
-		t.Skip("Skipping test: anthropic integration tests not enabled (set _integ/anthropic.enabled or _integ/all.enabled to 'yes')")
+
+	if testutil.IntegTestEnabled("anthropic") {
+		apiKey := testutil.IntegCfgReadFile("anthropic.key")
+		if apiKey == "" {
+			t.Skip("Skipping test: _integ/anthropic.key not configured")
+		}
+
+		client, err := NewAnthropicClient(defaultTestURL, &models.ModelConnectionOptions{
+			APIKey:         apiKey,
+			ConnectTimeout: connectTimeout,
+			RequestTimeout: testTimeout,
+		})
+		require.NoError(t, err)
+
+		return &testClient{Client: client}
 	}
-	apiKey := testutil.IntegCfgReadFile("anthropic.key")
-	if apiKey == "" {
-		t.Skip("Skipping test: _integ/anthropic.key not configured")
-	}
-	return apiKey
+
+	// Create mock server
+	mock := testutil.NewMockHTTPServer()
+	client, err := NewAnthropicClientWithHTTPClient(mock.URL(), mock.Client())
+	require.NoError(t, err)
+
+	return &testClient{Client: client, Mock: mock}
 }
 
 func TestNewAnthropicClient(t *testing.T) {
@@ -58,18 +100,59 @@ func TestNewAnthropicClient(t *testing.T) {
 	})
 }
 
-func TestAnthropicClient_ListModels(t *testing.T) {
-	apiKey := getAPIKey(t)
+func TestNewAnthropicClientWithHTTPClient(t *testing.T) {
+	t.Run("creates client with custom HTTP client", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
 
-	client, err := NewAnthropicClient(defaultTestURL, &models.ModelConnectionOptions{
-		APIKey:         apiKey,
-		ConnectTimeout: connectTimeout,
-		RequestTimeout: testTimeout,
+		client, err := NewAnthropicClientWithHTTPClient(mock.URL(), mock.Client())
+
+		require.NoError(t, err)
+		assert.NotNil(t, client)
 	})
-	require.NoError(t, err)
+
+	t.Run("returns error for empty URL", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		_, err := NewAnthropicClientWithHTTPClient("", mock.Client())
+
+		assert.Error(t, err)
+	})
+
+	t.Run("returns error for nil HTTP client", func(t *testing.T) {
+		_, err := NewAnthropicClientWithHTTPClient(defaultTestURL, nil)
+
+		assert.Error(t, err)
+	})
+}
+
+func TestAnthropicClient_ListModels(t *testing.T) {
+	tc := getTestClient(t)
+	defer tc.Close()
+
+	// Setup mock response if using mock
+	if tc.Mock != nil {
+		tc.Mock.AddRestResponse("/v1/models", "GET", listModelsResponseJSON(ModelsListResponse{
+			Data: []ModelInfo{
+				{
+					ID:          testModelName,
+					CreatedAt:   "2024-01-01T00:00:00Z",
+					DisplayName: "Claude Sonnet 4.5",
+					Type:        "model",
+				},
+				{
+					ID:          "claude-3-5-sonnet-20241022",
+					CreatedAt:   "2024-01-01T00:00:00Z",
+					DisplayName: "Claude 3.5 Sonnet",
+					Type:        "model",
+				},
+			},
+		}))
+	}
 
 	t.Run("lists available models", func(t *testing.T) {
-		modelList, err := client.ListModels()
+		modelList, err := tc.Client.ListModels()
 
 		require.NoError(t, err)
 		assert.NotNil(t, modelList)
@@ -83,7 +166,7 @@ func TestAnthropicClient_ListModels(t *testing.T) {
 	})
 
 	t.Run("finds test model in list", func(t *testing.T) {
-		modelList, err := client.ListModels()
+		modelList, err := tc.Client.ListModels()
 
 		require.NoError(t, err)
 
@@ -100,14 +183,8 @@ func TestAnthropicClient_ListModels(t *testing.T) {
 }
 
 func TestAnthropicClient_ChatModel(t *testing.T) {
-	apiKey := getAPIKey(t)
-
-	client, err := NewAnthropicClient(defaultTestURL, &models.ModelConnectionOptions{
-		APIKey:         apiKey,
-		ConnectTimeout: connectTimeout,
-		RequestTimeout: testTimeout,
-	})
-	require.NoError(t, err)
+	tc := getTestClient(t)
+	defer tc.Close()
 
 	ctx := context.Background()
 
@@ -118,19 +195,34 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 			TopK:        40,
 		}
 
-		chatModel := client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testModelName, options)
 
 		assert.NotNil(t, chatModel)
 	})
 
 	t.Run("sends chat message and gets response", func(t *testing.T) {
+		// Setup mock response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+				ID:   "msg_test123",
+				Type: "message",
+				Role: "assistant",
+				Content: []ResponseContent{
+					{Type: "text", Text: "4"},
+				},
+				Model:      testModelName,
+				StopReason: "end_turn",
+				Usage:      UsageInfo{InputTokens: 10, OutputTokens: 5},
+			}))
+		}
+
 		options := &models.ChatOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 		}
 
-		chatModel := client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testModelName, options)
 
 		messages := []*models.ChatMessage{
 			{
@@ -149,10 +241,25 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	})
 
 	t.Run("handles context with timeout", func(t *testing.T) {
+		// Setup mock response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+				ID:   "msg_test124",
+				Type: "message",
+				Role: "assistant",
+				Content: []ResponseContent{
+					{Type: "text", Text: "Hello!"},
+				},
+				Model:      testModelName,
+				StopReason: "end_turn",
+				Usage:      UsageInfo{InputTokens: 10, OutputTokens: 5},
+			}))
+		}
+
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
 			{
@@ -168,7 +275,22 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	})
 
 	t.Run("handles system and user messages", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		// Setup mock response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+				ID:   "msg_test125",
+				Type: "message",
+				Role: "assistant",
+				Content: []ResponseContent{
+					{Type: "text", Text: "HELLO"},
+				},
+				Model:      testModelName,
+				StopReason: "end_turn",
+				Usage:      UsageInfo{InputTokens: 15, OutputTokens: 3},
+			}))
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
 			{
@@ -189,7 +311,7 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	})
 
 	t.Run("returns error for empty messages", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		response, err := chatModel.Chat(ctx, []*models.ChatMessage{}, nil, nil)
 
@@ -198,7 +320,7 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	})
 
 	t.Run("returns error for nil messages", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		response, err := chatModel.Chat(ctx, nil, nil, nil)
 
@@ -207,13 +329,28 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	})
 
 	t.Run("uses default options when none provided to Chat", func(t *testing.T) {
+		// Setup mock response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+				ID:   "msg_test126",
+				Type: "message",
+				Role: "assistant",
+				Content: []ResponseContent{
+					{Type: "text", Text: "Hello!"},
+				},
+				Model:      testModelName,
+				StopReason: "end_turn",
+				Usage:      UsageInfo{InputTokens: 10, OutputTokens: 5},
+			}))
+		}
+
 		defaultOptions := &models.ChatOptions{
 			Temperature: 0.5,
 			TopP:        0.8,
 			TopK:        30,
 		}
 
-		chatModel := client.ChatModel(testModelName, defaultOptions)
+		chatModel := tc.Client.ChatModel(testModelName, defaultOptions)
 
 		messages := []*models.ChatMessage{
 			{
@@ -230,25 +367,31 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 }
 
 func TestAnthropicClient_ChatModelStream(t *testing.T) {
-	apiKey := getAPIKey(t)
-
-	client, err := NewAnthropicClient(defaultTestURL, &models.ModelConnectionOptions{
-		APIKey:         apiKey,
-		ConnectTimeout: connectTimeout,
-		RequestTimeout: testTimeout,
-	})
-	require.NoError(t, err)
+	tc := getTestClient(t)
+	defer tc.Close()
 
 	ctx := context.Background()
 
 	t.Run("streams chat message and gets fragments", func(t *testing.T) {
+		// Setup mock streaming response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
+				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test127","type":"message","role":"assistant","content":[],"model":"`+testModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
+				`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
+				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"1"}}`,
+				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n2"}}`,
+				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n3"}}`,
+				`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
+			)
+		}
+
 		options := &models.ChatOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 		}
 
-		chatModel := client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testModelName, options)
 
 		messages := []*models.ChatMessage{
 			{
@@ -273,9 +416,19 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("handles context cancellation during streaming", func(t *testing.T) {
+		// Setup mock streaming response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
+				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test128","type":"message","role":"assistant","content":[],"model":"`+testModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
+				`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
+				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Once upon a time"}}`,
+				`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
+			)
+		}
+
 		ctxWithCancel, cancel := context.WithCancel(ctx)
 
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
 			{
@@ -302,10 +455,20 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("handles context with timeout during streaming", func(t *testing.T) {
+		// Setup mock streaming response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
+				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test129","type":"message","role":"assistant","content":[],"model":"`+testModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
+				`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
+				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello!"}}`,
+				`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
+			)
+		}
+
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
 			{
@@ -326,7 +489,7 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("returns no fragments for empty messages", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		iterator := chatModel.ChatStream(ctx, []*models.ChatMessage{}, nil, nil)
 		require.NotNil(t, iterator)
@@ -340,7 +503,7 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("returns no fragments for nil messages", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		iterator := chatModel.ChatStream(ctx, nil, nil, nil)
 		require.NotNil(t, iterator)
@@ -354,7 +517,17 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("iterator can be stopped early", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		// Setup mock streaming response if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
+				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test130","type":"message","role":"assistant","content":[],"model":"`+testModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
+				`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
+				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello!"}}`,
+				`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
+			)
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
 			{
@@ -380,19 +553,13 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 }
 
 func TestAnthropicClient_EmbeddingModel(t *testing.T) {
-	apiKey := getAPIKey(t)
-
-	client, err := NewAnthropicClient(defaultTestURL, &models.ModelConnectionOptions{
-		APIKey:         apiKey,
-		ConnectTimeout: connectTimeout,
-		RequestTimeout: testTimeout,
-	})
-	require.NoError(t, err)
+	tc := getTestClient(t)
+	defer tc.Close()
 
 	ctx := context.Background()
 
 	t.Run("returns error for embedding model", func(t *testing.T) {
-		embedModel := client.EmbeddingModel("any-model")
+		embedModel := tc.Client.EmbeddingModel("any-model")
 
 		assert.NotNil(t, embedModel)
 
@@ -405,14 +572,8 @@ func TestAnthropicClient_EmbeddingModel(t *testing.T) {
 }
 
 func TestAnthropicClient_ToolCalling(t *testing.T) {
-	apiKey := getAPIKey(t)
-
-	client, err := NewAnthropicClient(defaultTestURL, &models.ModelConnectionOptions{
-		APIKey:         apiKey,
-		ConnectTimeout: connectTimeout,
-		RequestTimeout: testTimeout,
-	})
-	require.NoError(t, err)
+	tc := getTestClient(t)
+	defer tc.Close()
 
 	ctx := context.Background()
 
@@ -420,7 +581,30 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 	weatherTool := createWeatherToolInfo()
 
 	t.Run("sends tool definitions to LLM and receives tool call", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		// Setup mock response with tool call if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+				ID:   "msg_test131",
+				Type: "message",
+				Role: "assistant",
+				Content: []ResponseContent{
+					{
+						Type: "tool_use",
+						ID:   "toolu_test123",
+						Name: "get_weather",
+						Input: map[string]interface{}{
+							"location": "San Francisco, CA",
+							"unit":     "fahrenheit",
+						},
+					},
+				},
+				Model:      testModelName,
+				StopReason: "tool_use",
+				Usage:      UsageInfo{InputTokens: 20, OutputTokens: 15},
+			}))
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
 			{
@@ -456,7 +640,12 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 	})
 
 	t.Run("sends tool response back to LLM and receives final answer", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		// Skip in mock mode - MockHTTPServer doesn't support multiple sequential responses to same endpoint
+		if tc.Mock != nil {
+			t.Skip("Skipping test in mock mode: requires multiple sequential non-streaming responses")
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		// First message: user asks about weather
 		messages := []*models.ChatMessage{
@@ -504,7 +693,37 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 	})
 
 	t.Run("handles multiple tool calls in conversation", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		// Setup mock response with multiple tool calls if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+				ID:   "msg_test132",
+				Type: "message",
+				Role: "assistant",
+				Content: []ResponseContent{
+					{
+						Type: "tool_use",
+						ID:   "toolu_test124",
+						Name: "get_weather",
+						Input: map[string]interface{}{
+							"location": "San Francisco, CA",
+						},
+					},
+					{
+						Type: "tool_use",
+						ID:   "toolu_test125",
+						Name: "get_time",
+						Input: map[string]interface{}{
+							"location": "San Francisco, CA",
+						},
+					},
+				},
+				Model:      testModelName,
+				StopReason: "tool_use",
+				Usage:      UsageInfo{InputTokens: 25, OutputTokens: 20},
+			}))
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		// Define multiple tools
 		weatherTool := createWeatherToolInfo()
@@ -535,7 +754,29 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 	})
 
 	t.Run("handles interleaved text and tool calls", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		// Setup mock response with tool call if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+				ID:   "msg_test133",
+				Type: "message",
+				Role: "assistant",
+				Content: []ResponseContent{
+					{
+						Type: "tool_use",
+						ID:   "toolu_test126",
+						Name: "get_weather",
+						Input: map[string]interface{}{
+							"location": "Boston, MA",
+						},
+					},
+				},
+				Model:      testModelName,
+				StopReason: "tool_use",
+				Usage:      UsageInfo{InputTokens: 25, OutputTokens: 15},
+			}))
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
 			{
@@ -566,21 +807,24 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 }
 
 func TestAnthropicClient_ToolCallingStream(t *testing.T) {
-	apiKey := getAPIKey(t)
-
-	client, err := NewAnthropicClient(defaultTestURL, &models.ModelConnectionOptions{
-		APIKey:         apiKey,
-		ConnectTimeout: connectTimeout,
-		RequestTimeout: testTimeout,
-	})
-	require.NoError(t, err)
+	tc := getTestClient(t)
+	defer tc.Close()
 
 	ctx := context.Background()
 
 	weatherTool := createWeatherToolInfo()
 
 	t.Run("streams tool calls properly reassembled from chunks", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		// Setup mock streaming response with tool call if using mock
+		if tc.Mock != nil {
+			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
+				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test134","type":"message","role":"assistant","content":[],"model":"`+testModelName+`","usage":{"input_tokens":20,"output_tokens":0}}}`,
+				`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_test127","name":"get_weather","input":{"location":"Seattle, WA"}}}`,
+				`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
+			)
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		messages := []*models.ChatMessage{
 			{
@@ -608,7 +852,12 @@ func TestAnthropicClient_ToolCallingStream(t *testing.T) {
 	})
 
 	t.Run("streams response after tool execution", func(t *testing.T) {
-		chatModel := client.ChatModel(testModelName, nil)
+		// Skip in mock mode - MockHTTPServer doesn't support multiple sequential responses to same endpoint
+		if tc.Mock != nil {
+			t.Skip("Skipping test in mock mode: requires multiple sequential streaming responses")
+		}
+
+		chatModel := tc.Client.ChatModel(testModelName, nil)
 
 		// First get a tool call (non-streaming for simplicity)
 		messages := []*models.ChatMessage{

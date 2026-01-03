@@ -83,6 +83,26 @@ func NewAnthropicClient(baseURL string, options *models.ModelConnectionOptions) 
 	}, nil
 }
 
+// NewAnthropicClientWithHTTPClient creates a new Anthropic client with the given base URL and custom HTTP client
+func NewAnthropicClientWithHTTPClient(baseURL string, httpClient *http.Client) (*AnthropicClient, error) {
+	if baseURL == "" {
+		return nil, errors.New("baseURL cannot be empty")
+	}
+
+	if httpClient == nil {
+		return nil, errors.New("httpClient cannot be nil")
+	}
+
+	apiVersion := "2023-06-01" // Default Anthropic API version
+
+	return &AnthropicClient{
+		baseURL:    strings.TrimSuffix(baseURL, "/"),
+		httpClient: httpClient,
+		apiKey:     "", // API key not required for mock server
+		apiVersion: apiVersion,
+	}, nil
+}
+
 // ChatModel returns a ChatModel implementation for the given model and options
 func (c *AnthropicClient) ChatModel(model string, options *models.ChatOptions) models.ChatModel {
 	return &AnthropicChatModel{
