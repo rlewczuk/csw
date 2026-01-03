@@ -7,15 +7,15 @@ import (
 )
 
 // ToolRegistry implements a registry for tools that can be registered and retrieved by name.
-// It implements the SweTool interface and delegates execution to the appropriate tool.
+// It implements the Tool interface and delegates execution to the appropriate tool.
 type ToolRegistry struct {
-	tools map[string]SweTool
+	tools map[string]Tool
 }
 
 // NewToolRegistry creates a new ToolRegistry instance.
 func NewToolRegistry() *ToolRegistry {
 	return &ToolRegistry{
-		tools: make(map[string]SweTool),
+		tools: make(map[string]Tool),
 	}
 }
 
@@ -26,13 +26,13 @@ func (r *ToolRegistry) Name() string {
 
 // Register registers a tool under the given name(s).
 // A tool can be registered under multiple names.
-func (r *ToolRegistry) Register(name string, tool SweTool) {
+func (r *ToolRegistry) Register(name string, tool Tool) {
 	r.tools[name] = tool
 }
 
 // Get retrieves a tool by name.
 // Returns an error if the tool is not found.
-func (r *ToolRegistry) Get(name string) (SweTool, error) {
+func (r *ToolRegistry) Get(name string) (Tool, error) {
 	tool, exists := r.tools[name]
 	if !exists {
 		return nil, fmt.Errorf("tool not found: %s", name)
@@ -55,10 +55,9 @@ func (r *ToolRegistry) Execute(args ToolCall) ToolResponse {
 	tool, err := r.Get(args.Function)
 	if err != nil {
 		return ToolResponse{
-			ID:     args.ID,
-			Error:  err,
-			Result: nil,
-			Done:   true,
+			ID:    args.ID,
+			Error: err,
+			Done:  true,
 		}
 	}
 

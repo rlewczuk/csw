@@ -1,7 +1,6 @@
 package tool
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
@@ -22,16 +21,16 @@ func TestVFSReadTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.read",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"path": "test.txt",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Equal(t, "hello world", response.Result["content"])
+		assert.Equal(t, "hello world", response.Result.Get("content").String())
 	})
 
 	t.Run("should return error for missing path argument", func(t *testing.T) {
@@ -43,14 +42,14 @@ func TestVFSReadTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
 			Function:  "vfs.read",
-			Arguments: map[string]string{},
+			Arguments: NewToolArgs(nil),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Nil(t, response.Result)
+		assert.Equal(t, 0, response.Result.Len())
 	})
 
 	t.Run("should return error for non-existent file", func(t *testing.T) {
@@ -62,16 +61,16 @@ func TestVFSReadTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.read",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"path": "non-existent.txt",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Nil(t, response.Result)
+		assert.Equal(t, 0, response.Result.Len())
 	})
 
 	t.Run("should have correct tool name", func(t *testing.T) {
@@ -91,17 +90,16 @@ func TestVFSWriteTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.write",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"path":    "test.txt",
 				"content": "hello world",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
-		assert.NotNil(t, response.Result)
 
 		// Verify file was written
 		content, err := mockVFS.ReadFile("test.txt")
@@ -118,16 +116,16 @@ func TestVFSWriteTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.write",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"content": "hello",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Nil(t, response.Result)
+		assert.Equal(t, 0, response.Result.Len())
 	})
 
 	t.Run("should return error for missing content argument", func(t *testing.T) {
@@ -139,16 +137,16 @@ func TestVFSWriteTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.write",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"path": "test.txt",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Nil(t, response.Result)
+		assert.Equal(t, 0, response.Result.Len())
 	})
 
 	t.Run("should have correct tool name", func(t *testing.T) {
@@ -171,16 +169,15 @@ func TestVFSDeleteTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.delete",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"path": "test.txt",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
-		assert.NotNil(t, response.Result)
 
 		// Verify file was deleted
 		_, err = mockVFS.ReadFile("test.txt")
@@ -197,14 +194,14 @@ func TestVFSDeleteTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
 			Function:  "vfs.delete",
-			Arguments: map[string]string{},
+			Arguments: NewToolArgs(nil),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Nil(t, response.Result)
+		assert.Equal(t, 0, response.Result.Len())
 	})
 
 	t.Run("should return error for non-existent file", func(t *testing.T) {
@@ -216,16 +213,16 @@ func TestVFSDeleteTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.delete",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"path": "non-existent.txt",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Nil(t, response.Result)
+		assert.Equal(t, 0, response.Result.Len())
 	})
 
 	t.Run("should have correct tool name", func(t *testing.T) {
@@ -250,22 +247,21 @@ func TestVFSListTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.list",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"path": ".",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
-		assert.NotNil(t, response.Result)
+		assert.True(t, response.Result.Has("files"))
 
-		// Verify files list
-		var files []string
-		err = json.Unmarshal([]byte(response.Result["files"]), &files)
-		require.NoError(t, err)
-		assert.Len(t, files, 2)
+		// Verify files list - now stored as array
+		filesArr := response.Result.Get("files").Array()
+		require.Len(t, filesArr, 2)
+		files := []string{filesArr[0].String(), filesArr[1].String()}
 		assert.Contains(t, files, "file1.txt")
 		assert.Contains(t, files, "file2.txt")
 	})
@@ -279,22 +275,20 @@ func TestVFSListTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.list",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"path": ".",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
-		assert.NotNil(t, response.Result)
+		assert.True(t, response.Result.Has("files"))
 
 		// Verify empty files list
-		var files []string
-		err := json.Unmarshal([]byte(response.Result["files"]), &files)
-		require.NoError(t, err)
-		assert.Len(t, files, 0)
+		filesArr := response.Result.Get("files").Array()
+		assert.Len(t, filesArr, 0)
 	})
 
 	t.Run("should return error for missing path argument", func(t *testing.T) {
@@ -306,14 +300,14 @@ func TestVFSListTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
 			Function:  "vfs.list",
-			Arguments: map[string]string{},
+			Arguments: NewToolArgs(nil),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Nil(t, response.Result)
+		assert.Equal(t, 0, response.Result.Len())
 	})
 
 	t.Run("should return error for non-existent directory", func(t *testing.T) {
@@ -325,16 +319,16 @@ func TestVFSListTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.list",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"path": "non-existent",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Nil(t, response.Result)
+		assert.Equal(t, 0, response.Result.Len())
 	})
 
 	t.Run("should have correct tool name", func(t *testing.T) {
@@ -357,17 +351,16 @@ func TestVFSMoveTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.move",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"path":        "source.txt",
 				"destination": "dest.txt",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
-		assert.NotNil(t, response.Result)
 
 		// Verify file was moved
 		_, err = mockVFS.ReadFile("source.txt")
@@ -388,16 +381,16 @@ func TestVFSMoveTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.move",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"destination": "dest.txt",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Nil(t, response.Result)
+		assert.Equal(t, 0, response.Result.Len())
 	})
 
 	t.Run("should return error for missing destination argument", func(t *testing.T) {
@@ -409,16 +402,16 @@ func TestVFSMoveTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.move",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"path": "source.txt",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Nil(t, response.Result)
+		assert.Equal(t, 0, response.Result.Len())
 	})
 
 	t.Run("should return error for non-existent source file", func(t *testing.T) {
@@ -430,17 +423,17 @@ func TestVFSMoveTool(t *testing.T) {
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.move",
-			Arguments: map[string]string{
+			Arguments: NewToolArgs(map[string]any{
 				"path":        "non-existent.txt",
 				"destination": "dest.txt",
-			},
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Nil(t, response.Result)
+		assert.Equal(t, 0, response.Result.Len())
 	})
 
 	t.Run("should have correct tool name", func(t *testing.T) {
