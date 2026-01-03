@@ -76,6 +76,23 @@ func NewOllamaClient(baseURL string, options *models.ModelConnectionOptions) (*O
 	}, nil
 }
 
+// NewOllamaClientWithHTTPClient creates a new Ollama client with a custom HTTP client.
+// This is useful for testing with mock HTTP servers.
+func NewOllamaClientWithHTTPClient(baseURL string, httpClient *http.Client) (*OllamaClient, error) {
+	if baseURL == "" {
+		return nil, errors.New("baseURL cannot be empty")
+	}
+
+	if httpClient == nil {
+		return nil, errors.New("httpClient cannot be nil")
+	}
+
+	return &OllamaClient{
+		baseURL:    strings.TrimSuffix(baseURL, "/"),
+		httpClient: httpClient,
+	}, nil
+}
+
 // SetModel sets the model to use for chat and embedding operations
 func (c *OllamaClient) SetModel(model string) {
 	c.model = model
