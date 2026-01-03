@@ -477,13 +477,13 @@ func TestToolResponse_WithComplexResult(t *testing.T) {
 	})
 
 	response := ToolResponse{
-		ID:     "call-123",
+		Call:   &ToolCall{ID: "call-123", Function: "list_files"},
 		Error:  nil,
 		Result: result,
 		Done:   true,
 	}
 
-	assert.Equal(t, "call-123", response.ID)
+	assert.Equal(t, "call-123", response.Call.ID)
 	assert.NoError(t, response.Error)
 	assert.True(t, response.Done)
 

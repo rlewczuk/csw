@@ -385,10 +385,6 @@ type ToolCall struct {
 
 // ToolResponse represents the response from a tool execution.
 type ToolResponse struct {
-	// ID is the unique identifier for the tool call (typically UUIDv7 represented as string).
-	// Deprecated: Use Call.ID instead. This field is kept for backward compatibility.
-	ID string
-
 	// Call is a reference to the original tool call that this response is for.
 	// This provides access to the tool call ID, function name, and arguments.
 	Call *ToolCall

@@ -36,7 +36,7 @@ func (t *VFSReadTool) Execute(args ToolCall) ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
 	if !ok {
 		return ToolResponse{
-			ID:    args.ID,
+			Call:  &args,
 			Error: fmt.Errorf("missing required argument: path"),
 			Done:  true,
 		}
@@ -45,7 +45,7 @@ func (t *VFSReadTool) Execute(args ToolCall) ToolResponse {
 	content, err := t.vfs.ReadFile(path)
 	if err != nil {
 		return ToolResponse{
-			ID:    args.ID,
+			Call:  &args,
 			Error: err,
 			Done:  true,
 		}
@@ -54,7 +54,7 @@ func (t *VFSReadTool) Execute(args ToolCall) ToolResponse {
 	var result ToolValue
 	result.Set("content", string(content))
 	return ToolResponse{
-		ID:     args.ID,
+		Call:   &args,
 		Result: result,
 		Done:   true,
 	}
@@ -94,7 +94,7 @@ func (t *VFSWriteTool) Execute(args ToolCall) ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
 	if !ok {
 		return ToolResponse{
-			ID:    args.ID,
+			Call:  &args,
 			Error: fmt.Errorf("missing required argument: path"),
 			Done:  true,
 		}
@@ -103,7 +103,7 @@ func (t *VFSWriteTool) Execute(args ToolCall) ToolResponse {
 	content, ok := args.Arguments.StringOK("content")
 	if !ok {
 		return ToolResponse{
-			ID:    args.ID,
+			Call:  &args,
 			Error: fmt.Errorf("missing required argument: content"),
 			Done:  true,
 		}
@@ -112,14 +112,14 @@ func (t *VFSWriteTool) Execute(args ToolCall) ToolResponse {
 	err := t.vfs.WriteFile(path, []byte(content))
 	if err != nil {
 		return ToolResponse{
-			ID:    args.ID,
+			Call:  &args,
 			Error: err,
 			Done:  true,
 		}
 	}
 
 	return ToolResponse{
-		ID:   args.ID,
+		Call: &args,
 		Done: true,
 	}
 }
@@ -154,7 +154,7 @@ func (t *VFSDeleteTool) Execute(args ToolCall) ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
 	if !ok {
 		return ToolResponse{
-			ID:    args.ID,
+			Call:  &args,
 			Error: fmt.Errorf("missing required argument: path"),
 			Done:  true,
 		}
@@ -163,14 +163,14 @@ func (t *VFSDeleteTool) Execute(args ToolCall) ToolResponse {
 	err := t.vfs.DeleteFile(path, false, false)
 	if err != nil {
 		return ToolResponse{
-			ID:    args.ID,
+			Call:  &args,
 			Error: err,
 			Done:  true,
 		}
 	}
 
 	return ToolResponse{
-		ID:   args.ID,
+		Call: &args,
 		Done: true,
 	}
 }
@@ -205,7 +205,7 @@ func (t *VFSListTool) Execute(args ToolCall) ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
 	if !ok {
 		return ToolResponse{
-			ID:    args.ID,
+			Call:  &args,
 			Error: fmt.Errorf("missing required argument: path"),
 			Done:  true,
 		}
@@ -214,7 +214,7 @@ func (t *VFSListTool) Execute(args ToolCall) ToolResponse {
 	files, err := t.vfs.ListFiles(path, false)
 	if err != nil {
 		return ToolResponse{
-			ID:    args.ID,
+			Call:  &args,
 			Error: err,
 			Done:  true,
 		}
@@ -229,7 +229,7 @@ func (t *VFSListTool) Execute(args ToolCall) ToolResponse {
 	var result ToolValue
 	result.Set("files", filesArray)
 	return ToolResponse{
-		ID:     args.ID,
+		Call:   &args,
 		Result: result,
 		Done:   true,
 	}
@@ -269,7 +269,7 @@ func (t *VFSMoveTool) Execute(args ToolCall) ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
 	if !ok {
 		return ToolResponse{
-			ID:    args.ID,
+			Call:  &args,
 			Error: fmt.Errorf("missing required argument: path"),
 			Done:  true,
 		}
@@ -278,7 +278,7 @@ func (t *VFSMoveTool) Execute(args ToolCall) ToolResponse {
 	destination, ok := args.Arguments.StringOK("destination")
 	if !ok {
 		return ToolResponse{
-			ID:    args.ID,
+			Call:  &args,
 			Error: fmt.Errorf("missing required argument: destination"),
 			Done:  true,
 		}
@@ -287,14 +287,14 @@ func (t *VFSMoveTool) Execute(args ToolCall) ToolResponse {
 	err := t.vfs.MoveFile(path, destination)
 	if err != nil {
 		return ToolResponse{
-			ID:    args.ID,
+			Call:  &args,
 			Error: err,
 			Done:  true,
 		}
 	}
 
 	return ToolResponse{
-		ID:   args.ID,
+		Call: &args,
 		Done: true,
 	}
 }

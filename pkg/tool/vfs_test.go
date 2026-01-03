@@ -27,7 +27,7 @@ func TestVFSReadTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, "hello world", response.Result.Get("content").AsString())
@@ -46,7 +46,7 @@ func TestVFSReadTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
@@ -67,7 +67,7 @@ func TestVFSReadTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
@@ -102,7 +102,7 @@ func TestVFSWriteTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
 
@@ -127,7 +127,7 @@ func TestVFSWriteTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
@@ -148,7 +148,7 @@ func TestVFSWriteTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
@@ -187,7 +187,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
 
@@ -210,7 +210,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
@@ -231,7 +231,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
@@ -270,7 +270,7 @@ func TestVFSListTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
 		assert.True(t, response.Result.Has("files"))
@@ -298,7 +298,7 @@ func TestVFSListTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
 		assert.True(t, response.Result.Has("files"))
@@ -321,7 +321,7 @@ func TestVFSListTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
@@ -342,7 +342,7 @@ func TestVFSListTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
@@ -380,7 +380,7 @@ func TestVFSMoveTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
 
@@ -409,7 +409,7 @@ func TestVFSMoveTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
@@ -430,7 +430,7 @@ func TestVFSMoveTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
@@ -452,7 +452,7 @@ func TestVFSMoveTool(t *testing.T) {
 		})
 
 		// Assert
-		assert.Equal(t, "test-id", response.ID)
+		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
