@@ -14,8 +14,18 @@ type MockTool struct {
 	name string
 }
 
-func (m *MockTool) Name() string {
-	return m.name
+func (m *MockTool) Info() ToolInfo {
+	schema := NewToolSchema()
+	schema.AddProperty("arg1", PropertySchema{
+		Type:        SchemaTypeString,
+		Description: "A test argument.",
+	}, false)
+
+	return ToolInfo{
+		Name:        m.name,
+		Description: "A mock tool for testing.",
+		Schema:      schema,
+	}
 }
 
 func (m *MockTool) Execute(args ToolCall) ToolResponse {
@@ -117,9 +127,37 @@ func TestToolRegistry_ExecuteNotFound(t *testing.T) {
 	assert.Contains(t, response.Error.Error(), "tool not found: nonexistent")
 }
 
-func TestToolRegistry_Name(t *testing.T) {
+func TestToolRegistry_Info(t *testing.T) {
 	registry := NewToolRegistry()
-	assert.Equal(t, "registry", registry.Name())
+	info := registry.Info()
+	assert.Equal(t, "registry", info.Name)
+	assert.NotEmpty(t, info.Description)
+}
+
+func TestToolRegistry_ListInfo(t *testing.T) {
+	registry := NewToolRegistry()
+	tool1 := &MockTool{name: "tool1"}
+	tool2 := &MockTool{name: "tool2"}
+
+	registry.Register("tool1", tool1)
+	registry.Register("tool2", tool2)
+
+	infos := registry.ListInfo()
+	assert.Len(t, infos, 2)
+
+	// Collect names from infos
+	names := make([]string, len(infos))
+	for i, info := range infos {
+		names[i] = info.Name
+	}
+	assert.Contains(t, names, "tool1")
+	assert.Contains(t, names, "tool2")
+
+	// Verify each info has a schema
+	for _, info := range infos {
+		assert.Equal(t, SchemaTypeObject, info.Schema.Type)
+		assert.NotEmpty(t, info.Description)
+	}
 }
 
 func TestRegisterVFSTools(t *testing.T) {
@@ -140,23 +178,23 @@ func TestRegisterVFSTools(t *testing.T) {
 	// Test that the tools have the correct names
 	readTool, err := registry.Get("vfs.read")
 	require.NoError(t, err)
-	assert.Equal(t, "vfs.read", readTool.Name())
+	assert.Equal(t, "vfs.read", readTool.Info().Name)
 
 	writeTool, err := registry.Get("vfs.write")
 	require.NoError(t, err)
-	assert.Equal(t, "vfs.write", writeTool.Name())
+	assert.Equal(t, "vfs.write", writeTool.Info().Name)
 
 	deleteTool, err := registry.Get("vfs.delete")
 	require.NoError(t, err)
-	assert.Equal(t, "vfs.delete", deleteTool.Name())
+	assert.Equal(t, "vfs.delete", deleteTool.Info().Name)
 
 	listTool, err := registry.Get("vfs.list")
 	require.NoError(t, err)
-	assert.Equal(t, "vfs.list", listTool.Name())
+	assert.Equal(t, "vfs.list", listTool.Info().Name)
 
 	moveTool, err := registry.Get("vfs.move")
 	require.NoError(t, err)
-	assert.Equal(t, "vfs.move", moveTool.Name())
+	assert.Equal(t, "vfs.move", moveTool.Info().Name)
 }
 
 func TestToolRegistry_VFSIntegration(t *testing.T) {
