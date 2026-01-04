@@ -29,17 +29,6 @@ type ModelProviderConfig struct {
 	ContextLengthLimit int
 }
 
-// ProviderFactory is a function that creates a ModelProvider from connection options.
-type ProviderFactory func(baseURL string, options *ModelConnectionOptions) (ModelProvider, error)
-
-// providerRegistry holds registered provider factories.
-var providerRegistry = make(map[string]ProviderFactory)
-
-// RegisterProvider registers a provider factory for a given type.
-func RegisterProvider(providerType string, factory ProviderFactory) {
-	providerRegistry[providerType] = factory
-}
-
 // FromConfig creates a new ModelProvider instance from the configuration.
 // It automatically selects the right implementation based on the Type field.
 func FromConfig(config *ModelProviderConfig) (ModelProvider, error) {
@@ -66,11 +55,15 @@ func FromConfig(config *ModelProviderConfig) (ModelProvider, error) {
 		connOpts.RequestTimeout = 60 * time.Second
 	}
 
-	// Look up factory
-	factory, ok := providerRegistry[config.Type]
-	if !ok {
+	// Call factory function directly based on provider type
+	switch config.Type {
+	case "ollama":
+		return NewOllamaClient(config.URL, connOpts)
+	case "openai":
+		return NewOpenAIClient(config.URL, connOpts)
+	case "anthropic":
+		return NewAnthropicClient(config.URL, connOpts)
+	default:
 		return nil, errors.New("unsupported provider type: " + config.Type)
 	}
-
-	return factory(config.URL, connOpts)
 }

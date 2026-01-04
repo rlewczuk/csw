@@ -12,16 +12,6 @@ import (
 )
 
 func TestFromConfig(t *testing.T) {
-	// Setup: Register mock providers for testing
-	RegisterProvider("ollama", func(baseURL string, options *ModelConnectionOptions) (ModelProvider, error) {
-		return &mockProviderForTest{}, nil
-	})
-	RegisterProvider("openai", func(baseURL string, options *ModelConnectionOptions) (ModelProvider, error) {
-		return &mockProviderForTest{}, nil
-	})
-	RegisterProvider("anthropic", func(baseURL string, options *ModelConnectionOptions) (ModelProvider, error) {
-		return &mockProviderForTest{}, nil
-	})
 	tests := []struct {
 		name        string
 		config      *ModelProviderConfig
@@ -133,40 +123,6 @@ func TestFromConfig(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestRegisterProvider(t *testing.T) {
-	t.Run("registers custom provider factory", func(t *testing.T) {
-		// Save original registry
-		originalRegistry := make(map[string]ProviderFactory)
-		for k, v := range providerRegistry {
-			originalRegistry[k] = v
-		}
-		defer func() {
-			// Restore original registry
-			providerRegistry = originalRegistry
-		}()
-
-		// Register a custom provider
-		customProviderCalled := false
-		RegisterProvider("custom", func(baseURL string, options *ModelConnectionOptions) (ModelProvider, error) {
-			customProviderCalled = true
-			// Return a mock provider for testing
-			return &mockProviderForTest{}, nil
-		})
-
-		// Create provider from config
-		config := &ModelProviderConfig{
-			Type: "custom",
-			Name: "custom-provider",
-			URL:  "http://localhost:8080",
-		}
-
-		provider, err := FromConfig(config)
-		require.NoError(t, err)
-		require.NotNil(t, provider)
-		assert.True(t, customProviderCalled)
-	})
 }
 
 // mockProviderForTest is a minimal mock provider for testing registration

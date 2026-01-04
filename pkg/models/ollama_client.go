@@ -18,12 +18,6 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
-func init() {
-	RegisterProvider("ollama", func(baseURL string, options *ModelConnectionOptions) (ModelProvider, error) {
-		return NewOllamaClient(baseURL, options)
-	})
-}
-
 // OllamaClient is a client for interacting with Ollama API
 type OllamaClient struct {
 	baseURL    string
