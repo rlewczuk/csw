@@ -20,46 +20,6 @@ func chatResponseJSON(response ollama.ChatResponse) string {
 	return string(data)
 }
 
-// testMockOutputHandler is a test implementation of SessionOutputHandler for integration tests
-type testMockOutputHandler struct {
-	MarkdownChunks  []string
-	ToolCallStarts  []*tool.ToolCall
-	ToolCallDetails []*tool.ToolCall
-	ToolCallResults []*tool.ToolResponse
-}
-
-func (h *testMockOutputHandler) AddMarkdownChunk(markdown string) {
-	h.MarkdownChunks = append(h.MarkdownChunks, markdown)
-}
-
-func (h *testMockOutputHandler) AddToolCallStart(call *tool.ToolCall) {
-	h.ToolCallStarts = append(h.ToolCallStarts, call)
-}
-
-func (h *testMockOutputHandler) AddToolCallDetails(call *tool.ToolCall) {
-	h.ToolCallDetails = append(h.ToolCallDetails, call)
-}
-
-func (h *testMockOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
-	h.ToolCallResults = append(h.ToolCallResults, result)
-}
-
-// testMockUiFactory is a test implementation of SweUiFactory
-type testMockUiFactory struct {
-	handlers []*testMockOutputHandler
-}
-
-func (f *testMockUiFactory) NewSessionOutputHandler() ui.SessionOutputHandler {
-	handler := &testMockOutputHandler{
-		MarkdownChunks:  make([]string, 0),
-		ToolCallStarts:  make([]*tool.ToolCall, 0),
-		ToolCallDetails: make([]*tool.ToolCall, 0),
-		ToolCallResults: make([]*tool.ToolResponse, 0),
-	}
-	f.handlers = append(f.handlers, handler)
-	return handler
-}
-
 func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 	mockServer := testutil.NewMockHTTPServer()
 	defer mockServer.Close()
@@ -149,9 +109,7 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 	})
 
 	t.Run("UI output handler integration", func(t *testing.T) {
-		uiFactory := &testMockUiFactory{
-			handlers: make([]*testMockOutputHandler, 0),
-		}
+		uiFactory := ui.NewMockUiFactory()
 
 		system := &SweSystem{
 			ModelProviders: map[string]models.ModelProvider{"ollama": client},
@@ -166,8 +124,8 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 		assert.NotNil(t, session)
 
 		// Verify that UI factory created a handler
-		require.Len(t, uiFactory.handlers, 1)
-		handler := uiFactory.handlers[0]
+		require.Len(t, uiFactory.Handlers, 1)
+		handler := uiFactory.Handlers[0]
 
 		// Populate mock server with LLM responses
 		// First response: assistant makes a tool call to write the file
