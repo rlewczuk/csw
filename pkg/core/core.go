@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
@@ -23,6 +24,9 @@ type SweSystem struct {
 
 	// Virtual filesystem
 	VFS vfs.VFS
+
+	// Roles
+	Roles map[string]AgentRole
 }
 
 func (s *SweSystem) NewSession(model string) (*SweSession, error) {
@@ -50,6 +54,9 @@ func (s *SweSystem) NewSession(model string) (*SweSession, error) {
 		provider: provider,
 		model:    modelName,
 		messages: []*models.ChatMessage{},
+		role:     nil,
+		VFS:      s.VFS,
+		Tools:    s.Tools,
 	}
 
 	// Add system prompt if provided
@@ -65,6 +72,9 @@ type SweSession struct {
 	provider models.ModelProvider
 	model    string
 	messages []*models.ChatMessage
+	role     *AgentRole
+	VFS      vfs.VFS
+	Tools    *tool.ToolRegistry
 }
 
 // Prompt adds user prompt to the conversation and starts processing if processing is not already in progress.
@@ -123,4 +133,70 @@ func (s *SweSession) Run(ctx context.Context) error {
 
 func (s *SweSession) ChatMessages() []*models.ChatMessage {
 	return s.messages
+}
+
+// Role returns the current agent role for this session.
+func (s *SweSession) Role() *AgentRole {
+	return s.role
+}
+
+// SetRole changes the agent role for this session.
+// It updates the VFS and Tools with access controls based on the new role,
+// and adds or updates the system prompt at the beginning of the conversation.
+func (s *SweSession) SetRole(roleName string) error {
+	role, ok := s.system.Roles[roleName]
+	if !ok {
+		return fmt.Errorf("role not found: %s", roleName)
+	}
+
+	// Store the new role
+	s.role = &role
+
+	// Wrap VFS with access control based on role privileges
+	if role.VFSPrivileges != nil {
+		s.VFS = vfs.NewAccessControlVFS(s.system.VFS, role.VFSPrivileges)
+	} else {
+		s.VFS = s.system.VFS
+	}
+
+	// Create a new tool registry with access-controlled tools
+	if role.ToolsAccess != nil {
+		s.Tools = wrapToolsWithAccessControl(s.system.Tools, role.ToolsAccess)
+	} else {
+		s.Tools = s.system.Tools
+	}
+
+	// Update system prompt
+	if role.SystemPrompt != "" {
+		// Check if there's already a system message
+		if len(s.messages) > 0 && s.messages[0].Role == models.ChatRoleSystem {
+			// Replace the existing system message
+			s.messages[0] = models.NewTextMessage(models.ChatRoleSystem, role.SystemPrompt)
+		} else {
+			// Insert system message at the beginning
+			s.messages = append([]*models.ChatMessage{models.NewTextMessage(models.ChatRoleSystem, role.SystemPrompt)}, s.messages...)
+		}
+	}
+
+	return nil
+}
+
+// wrapToolsWithAccessControl creates a new tool registry with all tools wrapped in access control.
+func wrapToolsWithAccessControl(registry *tool.ToolRegistry, privileges map[string]shared.AccessFlag) *tool.ToolRegistry {
+	newRegistry := tool.NewToolRegistry()
+
+	// Get all tool names from the original registry
+	for _, name := range registry.List() {
+		t, err := registry.Get(name)
+		if err != nil {
+			// This shouldn't happen since we just got the name from List()
+			continue
+		}
+
+		// Wrap the tool with access control
+		wrappedTool := tool.NewAccessControlTool(t, privileges)
+		newRegistry.Register(name, wrappedTool)
+	}
+
+	return newRegistry
 }
