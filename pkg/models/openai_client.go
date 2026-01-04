@@ -37,10 +37,14 @@ type OpenAIEmbeddingModel struct {
 	model  string
 }
 
-// NewOpenAIClient creates a new OpenAI-compatible client with the given base URL and config
-func NewOpenAIClient(baseURL string, config *ModelProviderConfig) (*OpenAIClient, error) {
-	if baseURL == "" {
-		return nil, errors.New("baseURL cannot be empty")
+// NewOpenAIClient creates a new OpenAI-compatible client with the given config
+func NewOpenAIClient(config *ModelProviderConfig) (*OpenAIClient, error) {
+	if config == nil {
+		return nil, errors.New("config cannot be nil")
+	}
+
+	if config.URL == "" {
+		return nil, errors.New("URL cannot be empty")
 	}
 
 	// Default options
@@ -48,16 +52,14 @@ func NewOpenAIClient(baseURL string, config *ModelProviderConfig) (*OpenAIClient
 	requestTimeout := 60 * time.Second
 	apiKey := "ollama" // Default API key for Ollama
 
-	if config != nil {
-		if config.ConnectTimeout > 0 {
-			connectTimeout = config.ConnectTimeout
-		}
-		if config.RequestTimeout > 0 {
-			requestTimeout = config.RequestTimeout
-		}
-		if config.APIKey != "" {
-			apiKey = config.APIKey
-		}
+	if config.ConnectTimeout > 0 {
+		connectTimeout = config.ConnectTimeout
+	}
+	if config.RequestTimeout > 0 {
+		requestTimeout = config.RequestTimeout
+	}
+	if config.APIKey != "" {
+		apiKey = config.APIKey
 	}
 
 	// Create HTTP client with custom transport for connection timeout
@@ -73,7 +75,7 @@ func NewOpenAIClient(baseURL string, config *ModelProviderConfig) (*OpenAIClient
 	}
 
 	return &OpenAIClient{
-		baseURL:    strings.TrimSuffix(baseURL, "/"),
+		baseURL:    strings.TrimSuffix(config.URL, "/"),
 		httpClient: httpClient,
 		apiKey:     apiKey,
 	}, nil

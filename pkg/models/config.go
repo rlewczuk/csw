@@ -51,11 +51,11 @@ func FromConfig(config *ModelProviderConfig) (ModelProvider, error) {
 	// Call factory function directly based on provider type
 	switch config.Type {
 	case "ollama":
-		return NewOllamaClient(config.URL, config)
+		return NewOllamaClient(config)
 	case "openai":
-		return NewOpenAIClient(config.URL, config)
+		return NewOpenAIClient(config)
 	case "anthropic":
-		return NewAnthropicClient(config.URL, config)
+		return NewAnthropicClient(config)
 	default:
 		return nil, errors.New("unsupported provider type: " + config.Type)
 	}

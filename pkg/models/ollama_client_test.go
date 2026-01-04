@@ -72,7 +72,8 @@ func getOllamaTestClient(t *testing.T) *ollamaTestClient {
 			t.Skip("Skipping test: _integ/ollama.url not configured")
 		}
 
-		client, err := NewOllamaClient(url, &ModelProviderConfig{
+		client, err := NewOllamaClient(&ModelProviderConfig{
+			URL:            url,
 			ConnectTimeout: connectOllamaTimeout,
 			RequestTimeout: testOllamaTimeout,
 		})
@@ -91,7 +92,8 @@ func getOllamaTestClient(t *testing.T) *ollamaTestClient {
 
 func TestNewOllamaClient(t *testing.T) {
 	t.Run("creates client with valid configuration", func(t *testing.T) {
-		client, err := NewOllamaClient(getOllamaHost(), &ModelProviderConfig{
+		client, err := NewOllamaClient(&ModelProviderConfig{
+			URL:            getOllamaHost(),
 			ConnectTimeout: connectOllamaTimeout,
 			RequestTimeout: testOllamaTimeout,
 		})
@@ -100,15 +102,16 @@ func TestNewOllamaClient(t *testing.T) {
 		assert.NotNil(t, client)
 	})
 
-	t.Run("creates client with nil options", func(t *testing.T) {
-		client, err := NewOllamaClient(getOllamaHost(), nil)
+	t.Run("returns error for nil config", func(t *testing.T) {
+		_, err := NewOllamaClient(nil)
 
-		require.NoError(t, err)
-		assert.NotNil(t, client)
+		assert.Error(t, err)
 	})
 
-	t.Run("returns error for empty host", func(t *testing.T) {
-		_, err := NewOllamaClient("", nil)
+	t.Run("returns error for empty URL", func(t *testing.T) {
+		_, err := NewOllamaClient(&ModelProviderConfig{
+			URL: "",
+		})
 
 		assert.Error(t, err)
 	})
@@ -796,7 +799,8 @@ func TestOllamaClient_EmbeddingModel(t *testing.T) {
 
 func TestOllamaClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint not found", func(t *testing.T) {
-		client, err := NewOllamaClient("http://beha:11434/nonexistent", &ModelProviderConfig{
+		client, err := NewOllamaClient(&ModelProviderConfig{
+			URL:            "http://beha:11434/nonexistent",
 			ConnectTimeout: connectOllamaTimeout,
 			RequestTimeout: testOllamaTimeout,
 		})
@@ -808,7 +812,8 @@ func TestOllamaClient_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		client, err := NewOllamaClient("http://nonexistent-host:11434", &ModelProviderConfig{
+		client, err := NewOllamaClient(&ModelProviderConfig{
+			URL:            "http://nonexistent-host:11434",
 			ConnectTimeout: 1 * time.Second,
 			RequestTimeout: 2 * time.Second,
 		})

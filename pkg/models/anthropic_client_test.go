@@ -57,7 +57,8 @@ func getAnthropicTestClient(t *testing.T) *anthropicTestClient {
 			t.Skip("Skipping test: _integ/anthropic.key not configured")
 		}
 
-		client, err := NewAnthropicClient(defaultAnthropicTestURL, &ModelProviderConfig{
+		client, err := NewAnthropicClient(&ModelProviderConfig{
+			URL:            defaultAnthropicTestURL,
 			APIKey:         apiKey,
 			ConnectTimeout: connectAnthropicTimeout,
 			RequestTimeout: testAnthropicTimeout,
@@ -77,7 +78,8 @@ func getAnthropicTestClient(t *testing.T) *anthropicTestClient {
 
 func TestNewAnthropicClient(t *testing.T) {
 	t.Run("creates client with valid configuration", func(t *testing.T) {
-		client, err := NewAnthropicClient(defaultAnthropicTestURL, &ModelProviderConfig{
+		client, err := NewAnthropicClient(&ModelProviderConfig{
+			URL:            defaultAnthropicTestURL,
 			APIKey:         "test-api-key",
 			ConnectTimeout: connectAnthropicTimeout,
 			RequestTimeout: testAnthropicTimeout,
@@ -87,15 +89,16 @@ func TestNewAnthropicClient(t *testing.T) {
 		assert.NotNil(t, client)
 	})
 
-	t.Run("creates client with nil options", func(t *testing.T) {
-		client, err := NewAnthropicClient(defaultAnthropicTestURL, nil)
+	t.Run("returns error for nil config", func(t *testing.T) {
+		_, err := NewAnthropicClient(nil)
 
-		require.NoError(t, err)
-		assert.NotNil(t, client)
+		assert.Error(t, err)
 	})
 
 	t.Run("returns error for empty URL", func(t *testing.T) {
-		_, err := NewAnthropicClient("", nil)
+		_, err := NewAnthropicClient(&ModelProviderConfig{
+			URL: "",
+		})
 
 		assert.Error(t, err)
 	})
@@ -965,7 +968,8 @@ func TestAnthropicClient_ToolCallingStream(t *testing.T) {
 
 func TestAnthropicClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		client, err := NewAnthropicClient("http://nonexistent-host:11434", &ModelProviderConfig{
+		client, err := NewAnthropicClient(&ModelProviderConfig{
+			URL:            "http://nonexistent-host:11434",
 			APIKey:         "test-key",
 			ConnectTimeout: 1 * time.Second,
 			RequestTimeout: 2 * time.Second,

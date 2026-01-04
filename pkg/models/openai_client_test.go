@@ -65,7 +65,8 @@ func getOpenAITestClient(t *testing.T) *openaiTestClient {
 		}
 		apiKey := testutil.IntegCfgReadFile("openai.key")
 
-		client, err := NewOpenAIClient(url, &ModelProviderConfig{
+		client, err := NewOpenAIClient(&ModelProviderConfig{
+			URL:            url,
 			APIKey:         apiKey,
 			ConnectTimeout: connectOpenAITimeout,
 			RequestTimeout: testOpenAITimeout,
@@ -85,7 +86,8 @@ func getOpenAITestClient(t *testing.T) *openaiTestClient {
 
 func TestNewOpenAIClient(t *testing.T) {
 	t.Run("creates client with valid configuration", func(t *testing.T) {
-		client, err := NewOpenAIClient(defaultOpenAITestURL, &ModelProviderConfig{
+		client, err := NewOpenAIClient(&ModelProviderConfig{
+			URL:            defaultOpenAITestURL,
 			ConnectTimeout: connectOpenAITimeout,
 			RequestTimeout: testOpenAITimeout,
 		})
@@ -94,15 +96,16 @@ func TestNewOpenAIClient(t *testing.T) {
 		assert.NotNil(t, client)
 	})
 
-	t.Run("creates client with nil options", func(t *testing.T) {
-		client, err := NewOpenAIClient(defaultOpenAITestURL, nil)
+	t.Run("returns error for nil config", func(t *testing.T) {
+		_, err := NewOpenAIClient(nil)
 
-		require.NoError(t, err)
-		assert.NotNil(t, client)
+		assert.Error(t, err)
 	})
 
 	t.Run("returns error for empty URL", func(t *testing.T) {
-		_, err := NewOpenAIClient("", nil)
+		_, err := NewOpenAIClient(&ModelProviderConfig{
+			URL: "",
+		})
 
 		assert.Error(t, err)
 	})
@@ -1252,7 +1255,8 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 
 func TestOpenAIClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint not found", func(t *testing.T) {
-		client, err := NewOpenAIClient("http://localhost:11434/v1/nonexistent", &ModelProviderConfig{
+		client, err := NewOpenAIClient(&ModelProviderConfig{
+			URL:            "http://localhost:11434/v1/nonexistent",
 			ConnectTimeout: connectOpenAITimeout,
 			RequestTimeout: testOpenAITimeout,
 		})
@@ -1264,7 +1268,8 @@ func TestOpenAIClient_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		client, err := NewOpenAIClient("http://nonexistent-host:11434/v1", &ModelProviderConfig{
+		client, err := NewOpenAIClient(&ModelProviderConfig{
+			URL:            "http://nonexistent-host:11434/v1",
 			ConnectTimeout: 1 * time.Second,
 			RequestTimeout: 2 * time.Second,
 		})
