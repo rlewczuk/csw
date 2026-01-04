@@ -1,4 +1,4 @@
-package anthropic
+package models
 
 import (
 	"bufio"
@@ -14,12 +14,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
 func init() {
-	models.RegisterProvider("anthropic", func(baseURL string, options *models.ModelConnectionOptions) (models.ModelProvider, error) {
+	RegisterProvider("anthropic", func(baseURL string, options *ModelConnectionOptions) (ModelProvider, error) {
 		return NewAnthropicClient(baseURL, options)
 	})
 }
@@ -36,7 +35,7 @@ type AnthropicClient struct {
 type AnthropicChatModel struct {
 	client  *AnthropicClient
 	model   string
-	options *models.ChatOptions
+	options *ChatOptions
 }
 
 // AnthropicEmbeddingModel is a placeholder embedding model (not supported by Anthropic)
@@ -46,7 +45,7 @@ type AnthropicEmbeddingModel struct {
 }
 
 // NewAnthropicClient creates a new Anthropic client with the given base URL and options
-func NewAnthropicClient(baseURL string, options *models.ModelConnectionOptions) (*AnthropicClient, error) {
+func NewAnthropicClient(baseURL string, options *ModelConnectionOptions) (*AnthropicClient, error) {
 	if baseURL == "" {
 		return nil, errors.New("baseURL cannot be empty")
 	}
@@ -110,7 +109,7 @@ func NewAnthropicClientWithHTTPClient(baseURL string, httpClient *http.Client) (
 }
 
 // ChatModel returns a ChatModel implementation for the given model and options
-func (c *AnthropicClient) ChatModel(model string, options *models.ChatOptions) models.ChatModel {
+func (c *AnthropicClient) ChatModel(model string, options *ChatOptions) ChatModel {
 	return &AnthropicChatModel{
 		client:  c,
 		model:   model,
@@ -120,7 +119,7 @@ func (c *AnthropicClient) ChatModel(model string, options *models.ChatOptions) m
 
 // EmbeddingModel returns an EmbeddingModel implementation for the given model
 // Note: Anthropic doesn't support embeddings, so this will return an error when used
-func (c *AnthropicClient) EmbeddingModel(model string) models.EmbeddingModel {
+func (c *AnthropicClient) EmbeddingModel(model string) EmbeddingModel {
 	return &AnthropicEmbeddingModel{
 		client: c,
 		model:  model,
@@ -128,7 +127,7 @@ func (c *AnthropicClient) EmbeddingModel(model string) models.EmbeddingModel {
 }
 
 // ListModels lists all available models
-func (c *AnthropicClient) ListModels() ([]models.ModelInfo, error) {
+func (c *AnthropicClient) ListModels() ([]ModelInfo, error) {
 	url := c.baseURL + "/v1/models"
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -149,15 +148,15 @@ func (c *AnthropicClient) ListModels() ([]models.ModelInfo, error) {
 		return nil, err
 	}
 
-	var response ModelsListResponse
+	var response AnthropicModelsListResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	// Convert from Anthropic ModelInfo to models.ModelInfo
-	result := make([]models.ModelInfo, len(response.Data))
+	// Convert from Anthropic AnthropicModelInfo to models.AnthropicModelInfo
+	result := make([]ModelInfo, len(response.Data))
 	for i, model := range response.Data {
-		result[i] = models.ModelInfo{
+		result[i] = ModelInfo{
 			Name:       model.ID,
 			Model:      model.ID,
 			ModifiedAt: model.CreatedAt,
@@ -170,7 +169,7 @@ func (c *AnthropicClient) ListModels() ([]models.ModelInfo, error) {
 }
 
 // Chat sends a chat request and returns the response
-func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) (*models.ChatMessage, error) {
+func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) (*ChatMessage, error) {
 	if len(messages) == 0 {
 		return nil, errors.New("messages cannot be nil or empty")
 	}
@@ -188,10 +187,10 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*models.ChatMe
 	// Convert messages to Anthropic format
 	// Anthropic API requires system messages to be separate
 	var systemPrompt string
-	var anthropicMessages []MessageParam
+	var anthropicMessages []AnthropicMessageParam
 
 	for _, msg := range messages {
-		if msg.Role == models.ChatRoleSystem {
+		if msg.Role == ChatRoleSystem {
 			// Accumulate system messages
 			if systemPrompt != "" {
 				systemPrompt += "\n"
@@ -205,7 +204,7 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*models.ChatMe
 	}
 
 	// Build request
-	chatReq := MessagesRequest{
+	chatReq := AnthropicMessagesRequest{
 		Model:     m.model,
 		Messages:  anthropicMessages,
 		MaxTokens: 4096, // Default max tokens
@@ -257,7 +256,7 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*models.ChatMe
 		return nil, err
 	}
 
-	var chatResp MessagesResponse
+	var chatResp AnthropicMessagesResponse
 	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
@@ -272,8 +271,8 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*models.ChatMe
 }
 
 // ChatStream sends a chat request and returns a standard Go iterator for streaming responses
-func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) iter.Seq[*models.ChatMessage] {
-	return func(yield func(*models.ChatMessage) bool) {
+func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) iter.Seq[*ChatMessage] {
+	return func(yield func(*ChatMessage) bool) {
 		// Validate inputs
 		if len(messages) == 0 {
 			return
@@ -291,10 +290,10 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*models.
 
 		// Convert messages to Anthropic format
 		var systemPrompt string
-		var anthropicMessages []MessageParam
+		var anthropicMessages []AnthropicMessageParam
 
 		for _, msg := range messages {
-			if msg.Role == models.ChatRoleSystem {
+			if msg.Role == ChatRoleSystem {
 				if systemPrompt != "" {
 					systemPrompt += "\n"
 				}
@@ -306,7 +305,7 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*models.
 		}
 
 		// Build request with streaming enabled
-		chatReq := MessagesRequest{
+		chatReq := AnthropicMessagesRequest{
 			Model:     m.model,
 			Messages:  anthropicMessages,
 			MaxTokens: 4096,
@@ -389,7 +388,7 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*models.
 					return
 				}
 
-				var event StreamEvent
+				var event AnthropicStreamEvent
 				if err := json.Unmarshal([]byte(data), &event); err != nil {
 					// Skip invalid JSON
 					continue
@@ -400,9 +399,9 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*models.
 				case "content_block_start":
 					// Handle tool_use blocks
 					if event.ContentBlock != nil && event.ContentBlock.Type == "tool_use" {
-						result := &models.ChatMessage{
-							Role: models.ChatRoleAssistant,
-							Parts: []models.ChatMessagePart{
+						result := &ChatMessage{
+							Role: ChatRoleAssistant,
+							Parts: []ChatMessagePart{
 								{
 									ToolCall: &tool.ToolCall{
 										ID:        event.ContentBlock.ID,
@@ -418,9 +417,9 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*models.
 					}
 				case "content_block_delta":
 					if event.Delta != nil && event.Delta.Text != "" {
-						result := &models.ChatMessage{
-							Role: models.ChatRoleAssistant,
-							Parts: []models.ChatMessagePart{
+						result := &ChatMessage{
+							Role: ChatRoleAssistant,
+							Parts: []ChatMessagePart{
 								{Text: event.Delta.Text},
 							},
 						}
@@ -465,18 +464,18 @@ func (c *AnthropicClient) handleHTTPError(err error) error {
 	var netErr net.Error
 	if errors.As(err, &netErr) {
 		if netErr.Timeout() {
-			return fmt.Errorf("%w: %v", models.ErrEndpointUnavailable, err)
+			return fmt.Errorf("%w: %v", ErrEndpointUnavailable, err)
 		}
-		return fmt.Errorf("%w: %v", models.ErrEndpointUnavailable, err)
+		return fmt.Errorf("%w: %v", ErrEndpointUnavailable, err)
 	}
 
 	// Check for DNS errors
 	var dnsErr *net.DNSError
 	if errors.As(err, &dnsErr) {
-		return fmt.Errorf("%w: %v", models.ErrEndpointNotFound, err)
+		return fmt.Errorf("%w: %v", ErrEndpointNotFound, err)
 	}
 
-	return fmt.Errorf("%w: %v", models.ErrEndpointUnavailable, err)
+	return fmt.Errorf("%w: %v", ErrEndpointUnavailable, err)
 }
 
 // checkStatusCode checks the HTTP status code and returns appropriate errors
@@ -486,25 +485,25 @@ func (c *AnthropicClient) checkStatusCode(resp *http.Response) error {
 		return nil
 	case http.StatusNotFound:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", models.ErrEndpointNotFound, string(body))
+		return fmt.Errorf("%w: %s", ErrEndpointNotFound, string(body))
 	case http.StatusUnauthorized, http.StatusForbidden:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", models.ErrPermissionDenied, string(body))
+		return fmt.Errorf("%w: %s", ErrPermissionDenied, string(body))
 	case http.StatusTooManyRequests:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", models.ErrRateExceeded, string(body))
+		return fmt.Errorf("%w: %s", ErrRateExceeded, string(body))
 	case http.StatusBadRequest:
 		body, _ := io.ReadAll(resp.Body)
 		bodyStr := string(body)
 
 		// Try to parse error response
-		var errResp ErrorResponse
+		var errResp AnthropicErrorResponse
 		if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error != nil {
 			// Check for context length errors
 			if strings.Contains(strings.ToLower(errResp.Error.Message), "context length") ||
 				strings.Contains(strings.ToLower(errResp.Error.Message), "too many tokens") ||
 				strings.Contains(strings.ToLower(errResp.Error.Message), "maximum context length") {
-				return fmt.Errorf("%w: %s", models.ErrTooManyInputTokens, errResp.Error.Message)
+				return fmt.Errorf("%w: %s", ErrTooManyInputTokens, errResp.Error.Message)
 			}
 			return fmt.Errorf("bad request: %s", errResp.Error.Message)
 		}
@@ -512,48 +511,48 @@ func (c *AnthropicClient) checkStatusCode(resp *http.Response) error {
 		// Fallback to raw body
 		if strings.Contains(strings.ToLower(bodyStr), "context length") ||
 			strings.Contains(strings.ToLower(bodyStr), "too many tokens") {
-			return fmt.Errorf("%w: %s", models.ErrTooManyInputTokens, bodyStr)
+			return fmt.Errorf("%w: %s", ErrTooManyInputTokens, bodyStr)
 		}
 		return fmt.Errorf("bad request: %s", bodyStr)
 	case http.StatusInternalServerError, http.StatusBadGateway,
 		http.StatusServiceUnavailable, http.StatusGatewayTimeout:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", models.ErrEndpointUnavailable, string(body))
+		return fmt.Errorf("%w: %s", ErrEndpointUnavailable, string(body))
 	default:
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
 	}
 }
 
-// convertToAnthropicMessage converts a models.ChatMessage to Anthropic MessageParam format
-func convertToAnthropicMessage(msg *models.ChatMessage) MessageParam {
+// convertToAnthropicMessage converts a models.ChatMessage to Anthropic AnthropicMessageParam format
+func convertToAnthropicMessage(msg *ChatMessage) AnthropicMessageParam {
 	// Check if message contains only text
 	if len(msg.Parts) > 0 && msg.Parts[0].Text != "" && msg.Parts[0].ToolCall == nil && msg.Parts[0].ToolResponse == nil {
 		// Simple text message
-		return MessageParam{
+		return AnthropicMessageParam{
 			Role:    string(msg.Role),
 			Content: msg.GetText(),
 		}
 	}
 
 	// Message contains tool calls or tool responses - use array of content blocks
-	var contentBlocks []ContentBlock
+	var contentBlocks []AnthropicContentBlock
 	for _, part := range msg.Parts {
 		if part.Text != "" {
-			contentBlocks = append(contentBlocks, ContentBlock{
+			contentBlocks = append(contentBlocks, AnthropicContentBlock{
 				Type: "text",
 				Text: part.Text,
 			})
 		} else if part.ToolCall != nil {
-			// Tool use block
-			contentBlocks = append(contentBlocks, ContentBlock{
+			// AnthropicTool use block
+			contentBlocks = append(contentBlocks, AnthropicContentBlock{
 				Type:  "tool_use",
 				ID:    part.ToolCall.ID,
 				Name:  part.ToolCall.Function,
 				Input: part.ToolCall.Arguments.Raw().(map[string]interface{}),
 			})
 		} else if part.ToolResponse != nil {
-			// Tool result block
+			// AnthropicTool result block
 			var content interface{}
 			if part.ToolResponse.Error != nil {
 				content = part.ToolResponse.Error.Error()
@@ -572,7 +571,7 @@ func convertToAnthropicMessage(msg *models.ChatMessage) MessageParam {
 			if part.ToolResponse.Call != nil {
 				toolUseID = part.ToolResponse.Call.ID
 			}
-			contentBlocks = append(contentBlocks, ContentBlock{
+			contentBlocks = append(contentBlocks, AnthropicContentBlock{
 				Type:      "tool_result",
 				ToolUseID: toolUseID,
 				Content:   content,
@@ -581,20 +580,20 @@ func convertToAnthropicMessage(msg *models.ChatMessage) MessageParam {
 		}
 	}
 
-	return MessageParam{
+	return AnthropicMessageParam{
 		Role:    string(msg.Role),
 		Content: contentBlocks,
 	}
 }
 
 // convertFromAnthropicResponse converts Anthropic response content to models.ChatMessage
-func convertFromAnthropicResponse(content []ResponseContent) *models.ChatMessage {
-	var parts []models.ChatMessagePart
+func convertFromAnthropicResponse(content []AnthropicResponseContent) *ChatMessage {
+	var parts []ChatMessagePart
 	for _, c := range content {
 		if c.Type == "text" {
-			parts = append(parts, models.ChatMessagePart{Text: c.Text})
+			parts = append(parts, ChatMessagePart{Text: c.Text})
 		} else if c.Type == "tool_use" {
-			parts = append(parts, models.ChatMessagePart{
+			parts = append(parts, ChatMessagePart{
 				ToolCall: &tool.ToolCall{
 					ID:        c.ID,
 					Function:  c.Name,
@@ -604,26 +603,26 @@ func convertFromAnthropicResponse(content []ResponseContent) *models.ChatMessage
 		}
 	}
 
-	return &models.ChatMessage{
-		Role:  models.ChatRoleAssistant,
+	return &ChatMessage{
+		Role:  ChatRoleAssistant,
 		Parts: parts,
 	}
 }
 
-// convertToolsToAnthropic converts tool.ToolInfo to Anthropic Tool format
-func convertToolsToAnthropic(tools []tool.ToolInfo) []Tool {
+// convertToolsToAnthropic converts tool.ToolInfo to Anthropic AnthropicTool format
+func convertToolsToAnthropic(tools []tool.ToolInfo) []AnthropicTool {
 	if len(tools) == 0 {
 		return nil
 	}
 
-	anthropicTools := make([]Tool, len(tools))
+	anthropicTools := make([]AnthropicTool, len(tools))
 	for i, t := range tools {
 		// Convert ToolSchema to map[string]interface{}
 		schemaJSON, _ := json.Marshal(t.Schema)
 		var schemaMap map[string]interface{}
 		json.Unmarshal(schemaJSON, &schemaMap)
 
-		anthropicTools[i] = Tool{
+		anthropicTools[i] = AnthropicTool{
 			Name:        t.Name,
 			Description: t.Description,
 			InputSchema: schemaMap,

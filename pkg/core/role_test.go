@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/models/mock"
 	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
@@ -100,7 +99,7 @@ func TestAgentRoleRegistry(t *testing.T) {
 
 func TestAgentRoleIntegration(t *testing.T) {
 	// Create mock components
-	mockProvider := mock.NewMockProvider([]models.ModelInfo{
+	mockProvider := models.NewMockProvider([]models.ModelInfo{
 		{Name: "test-model", Model: "test-model"},
 	})
 	mockVFS := vfs.NewMockVFS()
@@ -348,7 +347,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 }
 
 func TestSweSessionGetState(t *testing.T) {
-	mockProvider := mock.NewMockProvider([]models.ModelInfo{
+	mockProvider := models.NewMockProvider([]models.ModelInfo{
 		{Name: "test-model", Model: "test-model"},
 	})
 	mockVFS := vfs.NewMockVFS()

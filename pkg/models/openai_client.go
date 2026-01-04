@@ -1,4 +1,4 @@
-package openai
+package models
 
 import (
 	"bufio"
@@ -14,12 +14,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
 func init() {
-	models.RegisterProvider("openai", func(baseURL string, options *models.ModelConnectionOptions) (models.ModelProvider, error) {
+	RegisterProvider("openai", func(baseURL string, options *ModelConnectionOptions) (ModelProvider, error) {
 		return NewOpenAIClient(baseURL, options)
 	})
 }
@@ -35,7 +34,7 @@ type OpenAIClient struct {
 type OpenAIChatModel struct {
 	client  *OpenAIClient
 	model   string
-	options *models.ChatOptions
+	options *ChatOptions
 }
 
 // OpenAIEmbeddingModel is an embedding model implementation for OpenAI
@@ -45,7 +44,7 @@ type OpenAIEmbeddingModel struct {
 }
 
 // NewOpenAIClient creates a new OpenAI-compatible client with the given base URL and options
-func NewOpenAIClient(baseURL string, options *models.ModelConnectionOptions) (*OpenAIClient, error) {
+func NewOpenAIClient(baseURL string, options *ModelConnectionOptions) (*OpenAIClient, error) {
 	if baseURL == "" {
 		return nil, errors.New("baseURL cannot be empty")
 	}
@@ -105,7 +104,7 @@ func NewOpenAIClientWithHTTPClient(baseURL string, httpClient *http.Client) (*Op
 }
 
 // ChatModel returns a ChatModel implementation for the given model and options
-func (c *OpenAIClient) ChatModel(model string, options *models.ChatOptions) models.ChatModel {
+func (c *OpenAIClient) ChatModel(model string, options *ChatOptions) ChatModel {
 	return &OpenAIChatModel{
 		client:  c,
 		model:   model,
@@ -114,7 +113,7 @@ func (c *OpenAIClient) ChatModel(model string, options *models.ChatOptions) mode
 }
 
 // EmbeddingModel returns an EmbeddingModel implementation for the given model
-func (c *OpenAIClient) EmbeddingModel(model string) models.EmbeddingModel {
+func (c *OpenAIClient) EmbeddingModel(model string) EmbeddingModel {
 	return &OpenAIEmbeddingModel{
 		client: c,
 		model:  model,
@@ -122,7 +121,7 @@ func (c *OpenAIClient) EmbeddingModel(model string) models.EmbeddingModel {
 }
 
 // ListModels lists all available models
-func (c *OpenAIClient) ListModels() ([]models.ModelInfo, error) {
+func (c *OpenAIClient) ListModels() ([]ModelInfo, error) {
 	url := c.baseURL + "/models"
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -142,15 +141,15 @@ func (c *OpenAIClient) ListModels() ([]models.ModelInfo, error) {
 		return nil, err
 	}
 
-	var response ModelList
+	var response OpenaiModelList
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	// Convert from OpenAI ModelData to models.ModelInfo
-	result := make([]models.ModelInfo, len(response.Data))
+	// Convert from OpenAI OpenaiModelData to models.ModelInfo
+	result := make([]ModelInfo, len(response.Data))
 	for i, model := range response.Data {
-		result[i] = models.ModelInfo{
+		result[i] = ModelInfo{
 			Name:       model.ID,
 			Model:      model.ID,
 			ModifiedAt: time.Unix(model.Created, 0).Format(time.RFC3339),
@@ -163,7 +162,7 @@ func (c *OpenAIClient) ListModels() ([]models.ModelInfo, error) {
 }
 
 // Chat sends a chat request and returns the response
-func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) (*models.ChatMessage, error) {
+func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) (*ChatMessage, error) {
 	if len(messages) == 0 {
 		return nil, errors.New("messages cannot be nil or empty")
 	}
@@ -179,13 +178,13 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 	}
 
 	// Convert messages to OpenAI format
-	openaiMessages := make([]ChatCompletionMessage, len(messages))
+	openaiMessages := make([]OpenaiChatCompletionMessage, len(messages))
 	for i, msg := range messages {
 		openaiMessages[i] = convertToOpenAIMessage(msg)
 	}
 
 	// Build request
-	chatReq := ChatCompletionRequest{
+	chatReq := OpenaiChatCompletionRequest{
 		Model:    m.model,
 		Messages: openaiMessages,
 		Stream:   false,
@@ -223,7 +222,7 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 		return nil, err
 	}
 
-	var chatResp ChatCompletionResponse
+	var chatResp OpenaiChatCompletionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
@@ -244,8 +243,8 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 }
 
 // ChatStream sends a chat request and returns a standard Go iterator for streaming responses
-func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) iter.Seq[*models.ChatMessage] {
-	return func(yield func(*models.ChatMessage) bool) {
+func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) iter.Seq[*ChatMessage] {
+	return func(yield func(*ChatMessage) bool) {
 		// Validate inputs
 		if len(messages) == 0 {
 			return
@@ -262,13 +261,13 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 		}
 
 		// Convert messages to OpenAI format
-		openaiMessages := make([]ChatCompletionMessage, len(messages))
+		openaiMessages := make([]OpenaiChatCompletionMessage, len(messages))
 		for i, msg := range messages {
 			openaiMessages[i] = convertToOpenAIMessage(msg)
 		}
 
 		// Build request with streaming enabled
-		chatReq := ChatCompletionRequest{
+		chatReq := OpenaiChatCompletionRequest{
 			Model:    m.model,
 			Messages: openaiMessages,
 			Stream:   true,
@@ -311,7 +310,7 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 		scanner := bufio.NewScanner(resp.Body)
 
 		// Track accumulated tool calls across chunks
-		toolCallsInProgress := make(map[int]*ToolCall)
+		toolCallsInProgress := make(map[int]*OpenaiToolCall)
 
 		for scanner.Scan() {
 			// Check if context is cancelled
@@ -337,7 +336,7 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 			if strings.HasPrefix(line, "data: ") {
 				data := strings.TrimPrefix(line, "data: ")
 
-				var chatResp ChatCompletionResponse
+				var chatResp OpenaiChatCompletionResponse
 				if err := json.Unmarshal([]byte(data), &chatResp); err != nil {
 					// Skip invalid JSON (might be [DONE] or other markers)
 					continue
@@ -365,9 +364,9 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 						}
 
 						if content != "" {
-							result := &models.ChatMessage{
-								Role: models.ChatRoleAssistant,
-								Parts: []models.ChatMessagePart{
+							result := &ChatMessage{
+								Role: ChatRoleAssistant,
+								Parts: []ChatMessagePart{
 									{Text: content},
 								},
 							}
@@ -378,14 +377,14 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 
 						// Yield any tool calls accumulated so far
 						if len(toolCallsInProgress) > 0 {
-							result := &models.ChatMessage{
-								Role:  models.ChatRoleAssistant,
-								Parts: []models.ChatMessagePart{},
+							result := &ChatMessage{
+								Role:  ChatRoleAssistant,
+								Parts: []ChatMessagePart{},
 							}
 							for _, tc := range toolCallsInProgress {
 								var args map[string]interface{}
 								json.Unmarshal([]byte(tc.Function.Arguments), &args)
-								result.Parts = append(result.Parts, models.ChatMessagePart{
+								result.Parts = append(result.Parts, ChatMessagePart{
 									ToolCall: &tool.ToolCall{
 										ID:        tc.ID,
 										Function:  tc.Function.Name,
@@ -415,9 +414,9 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 					}
 
 					if content != "" {
-						result := &models.ChatMessage{
-							Role: models.ChatRoleAssistant,
-							Parts: []models.ChatMessagePart{
+						result := &ChatMessage{
+							Role: ChatRoleAssistant,
+							Parts: []ChatMessagePart{
 								{Text: content},
 							},
 						}
@@ -427,16 +426,16 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 					}
 
 					// Handle tool calls in delta
-					// Tool calls are streamed incrementally
+					// OpenaiTool calls are streamed incrementally
 					if len(choice.Delta.ToolCalls) > 0 {
 						for _, tcDelta := range choice.Delta.ToolCalls {
 							// Get or create the tool call in progress
 							tc, exists := toolCallsInProgress[tcDelta.Index]
 							if !exists {
-								tc = &ToolCall{
+								tc = &OpenaiToolCall{
 									ID:   tcDelta.ID,
 									Type: tcDelta.Type,
-									Function: ToolCallFunction{
+									Function: OpenaiToolCallFunction{
 										Name:      tcDelta.Function.Name,
 										Arguments: tcDelta.Function.Arguments,
 									},
@@ -481,7 +480,7 @@ func (m *OpenAIEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 		return nil, errors.New("model not set")
 	}
 
-	embedReq := EmbeddingRequest{
+	embedReq := OpenaiEmbeddingRequest{
 		Model: m.model,
 		Input: input,
 	}
@@ -510,7 +509,7 @@ func (m *OpenAIEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 		return nil, err
 	}
 
-	var embedResp EmbeddingResponse
+	var embedResp OpenaiEmbeddingResponse
 	if err := json.NewDecoder(resp.Body).Decode(&embedResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
@@ -532,18 +531,18 @@ func (c *OpenAIClient) handleHTTPError(err error) error {
 	var netErr net.Error
 	if errors.As(err, &netErr) {
 		if netErr.Timeout() {
-			return fmt.Errorf("%w: %v", models.ErrEndpointUnavailable, err)
+			return fmt.Errorf("%w: %v", ErrEndpointUnavailable, err)
 		}
-		return fmt.Errorf("%w: %v", models.ErrEndpointUnavailable, err)
+		return fmt.Errorf("%w: %v", ErrEndpointUnavailable, err)
 	}
 
 	// Check for DNS errors
 	var dnsErr *net.DNSError
 	if errors.As(err, &dnsErr) {
-		return fmt.Errorf("%w: %v", models.ErrEndpointNotFound, err)
+		return fmt.Errorf("%w: %v", ErrEndpointNotFound, err)
 	}
 
-	return fmt.Errorf("%w: %v", models.ErrEndpointUnavailable, err)
+	return fmt.Errorf("%w: %v", ErrEndpointUnavailable, err)
 }
 
 // checkStatusCode checks the HTTP status code and returns appropriate errors
@@ -553,25 +552,25 @@ func (c *OpenAIClient) checkStatusCode(resp *http.Response) error {
 		return nil
 	case http.StatusNotFound:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", models.ErrEndpointNotFound, string(body))
+		return fmt.Errorf("%w: %s", ErrEndpointNotFound, string(body))
 	case http.StatusUnauthorized, http.StatusForbidden:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", models.ErrPermissionDenied, string(body))
+		return fmt.Errorf("%w: %s", ErrPermissionDenied, string(body))
 	case http.StatusTooManyRequests:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", models.ErrRateExceeded, string(body))
+		return fmt.Errorf("%w: %s", ErrRateExceeded, string(body))
 	case http.StatusBadRequest:
 		body, _ := io.ReadAll(resp.Body)
 		bodyStr := string(body)
 
 		// Try to parse error response
-		var errResp ErrorResponse
+		var errResp OpenaiErrorResponse
 		if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error != nil {
 			// Check for context length errors
 			if strings.Contains(strings.ToLower(errResp.Error.Message), "context length") ||
 				strings.Contains(strings.ToLower(errResp.Error.Message), "too many tokens") ||
 				strings.Contains(strings.ToLower(errResp.Error.Message), "maximum context length") {
-				return fmt.Errorf("%w: %s", models.ErrTooManyInputTokens, errResp.Error.Message)
+				return fmt.Errorf("%w: %s", ErrTooManyInputTokens, errResp.Error.Message)
 			}
 			return fmt.Errorf("bad request: %s", errResp.Error.Message)
 		}
@@ -579,22 +578,22 @@ func (c *OpenAIClient) checkStatusCode(resp *http.Response) error {
 		// Fallback to raw body
 		if strings.Contains(strings.ToLower(bodyStr), "context length") ||
 			strings.Contains(strings.ToLower(bodyStr), "too many tokens") {
-			return fmt.Errorf("%w: %s", models.ErrTooManyInputTokens, bodyStr)
+			return fmt.Errorf("%w: %s", ErrTooManyInputTokens, bodyStr)
 		}
 		return fmt.Errorf("bad request: %s", bodyStr)
 	case http.StatusInternalServerError, http.StatusBadGateway,
 		http.StatusServiceUnavailable, http.StatusGatewayTimeout:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", models.ErrEndpointUnavailable, string(body))
+		return fmt.Errorf("%w: %s", ErrEndpointUnavailable, string(body))
 	default:
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
 	}
 }
 
-// convertToOpenAIMessage converts a models.ChatMessage to OpenAI ChatCompletionMessage format
-func convertToOpenAIMessage(msg *models.ChatMessage) ChatCompletionMessage {
-	openaiMsg := ChatCompletionMessage{
+// convertToOpenAIMessage converts a models.ChatMessage to OpenAI OpenaiChatCompletionMessage format
+func convertToOpenAIMessage(msg *ChatMessage) OpenaiChatCompletionMessage {
+	openaiMsg := OpenaiChatCompletionMessage{
 		Role: string(msg.Role),
 	}
 
@@ -618,16 +617,16 @@ func convertToOpenAIMessage(msg *models.ChatMessage) ChatCompletionMessage {
 			} else if part.ToolCall != nil {
 				// Add tool call
 				argsJSON, _ := json.Marshal(part.ToolCall.Arguments.Raw())
-				openaiMsg.ToolCalls = append(openaiMsg.ToolCalls, ToolCall{
+				openaiMsg.ToolCalls = append(openaiMsg.ToolCalls, OpenaiToolCall{
 					ID:   part.ToolCall.ID,
 					Type: "function",
-					Function: ToolCallFunction{
+					Function: OpenaiToolCallFunction{
 						Name:      part.ToolCall.Function,
 						Arguments: string(argsJSON),
 					},
 				})
 			} else if part.ToolResponse != nil {
-				// Tool response - set tool_call_id and content
+				// OpenaiTool response - set tool_call_id and content
 				// Prefer Call.ID if available, fall back to ID for backward compatibility
 				if part.ToolResponse.Call != nil {
 					openaiMsg.ToolCallID = part.ToolResponse.Call.ID
@@ -647,20 +646,20 @@ func convertToOpenAIMessage(msg *models.ChatMessage) ChatCompletionMessage {
 	return openaiMsg
 }
 
-// convertFromOpenAIMessage converts OpenAI ChatCompletionMessage to models.ChatMessage
-func convertFromOpenAIMessage(msg *ChatCompletionMessage) *models.ChatMessage {
-	var parts []models.ChatMessagePart
+// convertFromOpenAIMessage converts OpenAI OpenaiChatCompletionMessage to models.ChatMessage
+func convertFromOpenAIMessage(msg *OpenaiChatCompletionMessage) *ChatMessage {
+	var parts []ChatMessagePart
 
 	// Add text content if present
 	if contentStr, ok := msg.Content.(string); ok && contentStr != "" {
-		parts = append(parts, models.ChatMessagePart{Text: contentStr})
+		parts = append(parts, ChatMessagePart{Text: contentStr})
 	}
 
 	// Add tool calls if present
 	for _, tc := range msg.ToolCalls {
 		var args map[string]interface{}
 		json.Unmarshal([]byte(tc.Function.Arguments), &args)
-		parts = append(parts, models.ChatMessagePart{
+		parts = append(parts, ChatMessagePart{
 			ToolCall: &tool.ToolCall{
 				ID:        tc.ID,
 				Function:  tc.Function.Name,
@@ -669,28 +668,28 @@ func convertFromOpenAIMessage(msg *ChatCompletionMessage) *models.ChatMessage {
 		})
 	}
 
-	return &models.ChatMessage{
-		Role:  models.ChatRole(msg.Role),
+	return &ChatMessage{
+		Role:  ChatRole(msg.Role),
 		Parts: parts,
 	}
 }
 
-// convertToolsToOpenAI converts tool.ToolInfo to OpenAI Tool format
-func convertToolsToOpenAI(tools []tool.ToolInfo) []Tool {
+// convertToolsToOpenAI converts tool.ToolInfo to OpenAI OpenaiTool format
+func convertToolsToOpenAI(tools []tool.ToolInfo) []OpenaiTool {
 	if len(tools) == 0 {
 		return nil
 	}
 
-	openaiTools := make([]Tool, len(tools))
+	openaiTools := make([]OpenaiTool, len(tools))
 	for i, t := range tools {
 		// Convert ToolSchema to map[string]interface{}
 		schemaJSON, _ := json.Marshal(t.Schema)
 		var schemaMap map[string]interface{}
 		json.Unmarshal(schemaJSON, &schemaMap)
 
-		openaiTools[i] = Tool{
+		openaiTools[i] = OpenaiTool{
 			Type: "function",
-			Function: ToolFunction{
+			Function: OpenaiToolFunction{
 				Name:        t.Name,
 				Description: t.Description,
 				Parameters:  schemaMap,

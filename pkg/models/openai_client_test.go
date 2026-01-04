@@ -1,4 +1,4 @@
-package openai
+package models
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/stretchr/testify/assert"
@@ -16,47 +15,47 @@ import (
 )
 
 const (
-	defaultTestURL     = "http://localhost:11434/v1"
-	testModelName      = "devstral-small-2:latest"
-	testEmbedModelName = "nomic-embed-text:latest"
-	testTimeout        = 30 * time.Second
-	connectTimeout     = 5 * time.Second
+	defaultOpenAITestURL     = "http://localhost:11434/v1"
+	testOpenAIModelName      = "devstral-small-2:latest"
+	testOpenAIEmbedModelName = "nomic-embed-text:latest"
+	testOpenAITimeout        = 30 * time.Second
+	connectOpenAITimeout     = 5 * time.Second
 )
 
-// chatResponseJSON converts a ChatCompletionResponse to JSON string.
-func chatResponseJSON(response ChatCompletionResponse) string {
+// openaiChatResponseJSON converts a OpenaiChatCompletionResponse to JSON string.
+func openaiChatResponseJSON(response OpenaiChatCompletionResponse) string {
 	data, _ := json.Marshal(response)
 	return string(data)
 }
 
-// embedResponseJSON converts an EmbeddingResponse to JSON string.
-func embedResponseJSON(response EmbeddingResponse) string {
+// openaiEmbedResponseJSON converts an OpenaiEmbeddingResponse to JSON string.
+func openaiEmbedResponseJSON(response OpenaiEmbeddingResponse) string {
 	data, _ := json.Marshal(response)
 	return string(data)
 }
 
-// listModelsResponseJSON converts a ModelList to JSON string.
-func listModelsResponseJSON(response ModelList) string {
+// openaiListModelsResponseJSON converts a OpenaiModelList to JSON string.
+func openaiListModelsResponseJSON(response OpenaiModelList) string {
 	data, _ := json.Marshal(response)
 	return string(data)
 }
 
-// testClient holds either a real or mock client and provides cleanup
-type testClient struct {
+// openaiTestClient holds either a real or mock client and provides cleanup
+type openaiTestClient struct {
 	Client *OpenAIClient
 	Mock   *testutil.MockHTTPServer
 }
 
 // Close cleans up the test client resources
-func (tc *testClient) Close() {
+func (tc *openaiTestClient) Close() {
 	if tc.Mock != nil {
 		tc.Mock.Close()
 	}
 }
 
-// getTestClient returns a client for testing - either real or mock based on integration mode
+// getOpenAITestClient returns a client for testing - either real or mock based on integration mode
 // For mock mode, it also returns the mock server for adding responses
-func getTestClient(t *testing.T) *testClient {
+func getOpenAITestClient(t *testing.T) *openaiTestClient {
 	t.Helper()
 
 	if testutil.IntegTestEnabled("openai") {
@@ -66,14 +65,14 @@ func getTestClient(t *testing.T) *testClient {
 		}
 		apiKey := testutil.IntegCfgReadFile("openai.key")
 
-		client, err := NewOpenAIClient(url, &models.ModelConnectionOptions{
+		client, err := NewOpenAIClient(url, &ModelConnectionOptions{
 			APIKey:         apiKey,
-			ConnectTimeout: connectTimeout,
-			RequestTimeout: testTimeout,
+			ConnectTimeout: connectOpenAITimeout,
+			RequestTimeout: testOpenAITimeout,
 		})
 		require.NoError(t, err)
 
-		return &testClient{Client: client}
+		return &openaiTestClient{Client: client}
 	}
 
 	// Create mock server
@@ -81,14 +80,14 @@ func getTestClient(t *testing.T) *testClient {
 	client, err := NewOpenAIClientWithHTTPClient(mock.URL(), mock.Client())
 	require.NoError(t, err)
 
-	return &testClient{Client: client, Mock: mock}
+	return &openaiTestClient{Client: client, Mock: mock}
 }
 
 func TestNewOpenAIClient(t *testing.T) {
 	t.Run("creates client with valid configuration", func(t *testing.T) {
-		client, err := NewOpenAIClient(defaultTestURL, &models.ModelConnectionOptions{
-			ConnectTimeout: connectTimeout,
-			RequestTimeout: testTimeout,
+		client, err := NewOpenAIClient(defaultOpenAITestURL, &ModelConnectionOptions{
+			ConnectTimeout: connectOpenAITimeout,
+			RequestTimeout: testOpenAITimeout,
 		})
 
 		require.NoError(t, err)
@@ -96,7 +95,7 @@ func TestNewOpenAIClient(t *testing.T) {
 	})
 
 	t.Run("creates client with nil options", func(t *testing.T) {
-		client, err := NewOpenAIClient(defaultTestURL, nil)
+		client, err := NewOpenAIClient(defaultOpenAITestURL, nil)
 
 		require.NoError(t, err)
 		assert.NotNil(t, client)
@@ -110,21 +109,21 @@ func TestNewOpenAIClient(t *testing.T) {
 }
 
 func TestOpenAIClient_ListModels(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getOpenAITestClient(t)
 	defer tc.Close()
 
 	// Setup mock response if using mock
 	if tc.Mock != nil {
-		modelsResponse := listModelsResponseJSON(ModelList{
-			Data: []ModelData{
+		modelsResponse := openaiListModelsResponseJSON(OpenaiModelList{
+			Data: []OpenaiModelData{
 				{
-					ID:      testModelName,
+					ID:      testOpenAIModelName,
 					Object:  "model",
 					Created: 1640000000,
 					OwnedBy: "openai",
 				},
 				{
-					ID:      testEmbedModelName,
+					ID:      testOpenAIEmbedModelName,
 					Object:  "model",
 					Created: 1640000000,
 					OwnedBy: "openai",
@@ -157,30 +156,30 @@ func TestOpenAIClient_ListModels(t *testing.T) {
 
 		found := false
 		for _, model := range modelList {
-			if model.Name == testModelName {
+			if model.Name == testOpenAIModelName {
 				found = true
 				break
 			}
 		}
 
-		assert.True(t, found, "expected test model %s to be available", testModelName)
+		assert.True(t, found, "expected test model %s to be available", testOpenAIModelName)
 	})
 }
 
 func TestOpenAIClient_ChatModel(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getOpenAITestClient(t)
 	defer tc.Close()
 
 	ctx := context.Background()
 
 	t.Run("creates chat model with model name and options", func(t *testing.T) {
-		options := &models.ChatOptions{
+		options := &ChatOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, options)
 
 		assert.NotNil(t, chatModel)
 	})
@@ -188,15 +187,15 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	t.Run("sends chat message and gets response", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
 				ID:      "chatcmpl-123",
 				Object:  "chat.completion",
 				Created: 1640000000,
-				Model:   testModelName,
-				Choices: []ChatCompletionChoice{
+				Model:   testOpenAIModelName,
+				Choices: []OpenaiChatCompletionChoice{
 					{
 						Index: 0,
-						Message: &ChatCompletionMessage{
+						Message: &OpenaiChatCompletionMessage{
 							Role:    "assistant",
 							Content: "4",
 						},
@@ -206,18 +205,18 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 			}))
 		}
 
-		options := &models.ChatOptions{
+		options := &ChatOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, options)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "What is 2+2? Answer with just the number."}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "What is 2+2? Answer with just the number."}},
 			},
 		}
 
@@ -225,7 +224,7 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
-		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+		assert.Equal(t, ChatRoleAssistant, response.Role)
 		assert.NotEmpty(t, response.Parts)
 		assert.Greater(t, len(response.GetText()), 0)
 	})
@@ -233,15 +232,15 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	t.Run("handles context with timeout", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
 				ID:      "chatcmpl-124",
 				Object:  "chat.completion",
 				Created: 1640000000,
-				Model:   testModelName,
-				Choices: []ChatCompletionChoice{
+				Model:   testOpenAIModelName,
+				Choices: []OpenaiChatCompletionChoice{
 					{
 						Index: 0,
-						Message: &ChatCompletionMessage{
+						Message: &OpenaiChatCompletionMessage{
 							Role:    "assistant",
 							Content: "Hello!",
 						},
@@ -254,12 +253,12 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
@@ -272,15 +271,15 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	t.Run("handles system and user messages", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
 				ID:      "chatcmpl-125",
 				Object:  "chat.completion",
 				Created: 1640000000,
-				Model:   testModelName,
-				Choices: []ChatCompletionChoice{
+				Model:   testOpenAIModelName,
+				Choices: []OpenaiChatCompletionChoice{
 					{
 						Index: 0,
-						Message: &ChatCompletionMessage{
+						Message: &OpenaiChatCompletionMessage{
 							Role:    "assistant",
 							Content: "HELLO",
 						},
@@ -290,16 +289,16 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleSystem,
-				Parts: []models.ChatMessagePart{{Text: "You are a helpful assistant that always responds in uppercase."}},
+				Role:  ChatRoleSystem,
+				Parts: []ChatMessagePart{{Text: "You are a helpful assistant that always responds in uppercase."}},
 			},
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "hello"}},
 			},
 		}
 
@@ -307,20 +306,20 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
-		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+		assert.Equal(t, ChatRoleAssistant, response.Role)
 	})
 
 	t.Run("returns error for empty messages", func(t *testing.T) {
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, nil)
 
-		response, err := chatModel.Chat(ctx, []*models.ChatMessage{}, nil, nil)
+		response, err := chatModel.Chat(ctx, []*ChatMessage{}, nil, nil)
 
 		assert.Error(t, err)
 		assert.Nil(t, response)
 	})
 
 	t.Run("returns error for nil messages", func(t *testing.T) {
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, nil)
 
 		response, err := chatModel.Chat(ctx, nil, nil, nil)
 
@@ -331,15 +330,15 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	t.Run("uses default options when none provided to Chat", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
 				ID:      "chatcmpl-126",
 				Object:  "chat.completion",
 				Created: 1640000000,
-				Model:   testModelName,
-				Choices: []ChatCompletionChoice{
+				Model:   testOpenAIModelName,
+				Choices: []OpenaiChatCompletionChoice{
 					{
 						Index: 0,
-						Message: &ChatCompletionMessage{
+						Message: &OpenaiChatCompletionMessage{
 							Role:    "assistant",
 							Content: "Hello!",
 						},
@@ -349,18 +348,18 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 			}))
 		}
 
-		defaultOptions := &models.ChatOptions{
+		defaultOptions := &ChatOptions{
 			Temperature: 0.5,
 			TopP:        0.8,
 			TopK:        30,
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, defaultOptions)
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, defaultOptions)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
@@ -372,7 +371,7 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 }
 
 func TestOpenAIClient_ChatModelStream(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getOpenAITestClient(t)
 	defer tc.Close()
 
 	ctx := context.Background()
@@ -381,44 +380,44 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
-				"data: "+chatResponseJSON(ChatCompletionResponse{
+				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
 					ID:      "chatcmpl-stream-1",
 					Object:  "chat.completion.chunk",
 					Created: 1640000000,
-					Model:   testModelName,
-					Choices: []ChatCompletionChoice{
+					Model:   testOpenAIModelName,
+					Choices: []OpenaiChatCompletionChoice{
 						{
 							Index: 0,
-							Delta: &ChatCompletionMessage{
+							Delta: &OpenaiChatCompletionMessage{
 								Role:    "assistant",
 								Content: "1",
 							},
 						},
 					},
 				}),
-				"data: "+chatResponseJSON(ChatCompletionResponse{
+				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
 					ID:      "chatcmpl-stream-1",
 					Object:  "chat.completion.chunk",
 					Created: 1640000001,
-					Model:   testModelName,
-					Choices: []ChatCompletionChoice{
+					Model:   testOpenAIModelName,
+					Choices: []OpenaiChatCompletionChoice{
 						{
 							Index: 0,
-							Delta: &ChatCompletionMessage{
+							Delta: &OpenaiChatCompletionMessage{
 								Content: "\n2\n3",
 							},
 						},
 					},
 				}),
-				"data: "+chatResponseJSON(ChatCompletionResponse{
+				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
 					ID:      "chatcmpl-stream-1",
 					Object:  "chat.completion.chunk",
 					Created: 1640000002,
-					Model:   testModelName,
-					Choices: []ChatCompletionChoice{
+					Model:   testOpenAIModelName,
+					Choices: []OpenaiChatCompletionChoice{
 						{
 							Index:        0,
-							Delta:        &ChatCompletionMessage{},
+							Delta:        &OpenaiChatCompletionMessage{},
 							FinishReason: "stop",
 						},
 					},
@@ -427,28 +426,28 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 			)
 		}
 
-		options := &models.ChatOptions{
+		options := &ChatOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, options)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Count from 1 to 5, one number per line."}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Count from 1 to 5, one number per line."}},
 			},
 		}
 
 		iterator := chatModel.ChatStream(ctx, messages, nil, nil)
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			assert.NotNil(t, fragment)
-			assert.Equal(t, models.ChatRoleAssistant, fragment.Role)
+			assert.Equal(t, ChatRoleAssistant, fragment.Role)
 			assert.NotEmpty(t, fragment.Parts)
 			fragments = append(fragments, fragment)
 		}
@@ -461,15 +460,15 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
-				"data: "+chatResponseJSON(ChatCompletionResponse{
+				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
 					ID:      "chatcmpl-stream-2",
 					Object:  "chat.completion.chunk",
 					Created: 1640000000,
-					Model:   testModelName,
-					Choices: []ChatCompletionChoice{
+					Model:   testOpenAIModelName,
+					Choices: []OpenaiChatCompletionChoice{
 						{
 							Index: 0,
-							Delta: &ChatCompletionMessage{
+							Delta: &OpenaiChatCompletionMessage{
 								Role:    "assistant",
 								Content: "Once upon a time",
 							},
@@ -482,12 +481,12 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 
 		ctxWithCancel, cancel := context.WithCancel(ctx)
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Write a long story about a cat."}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Write a long story about a cat."}},
 			},
 		}
 
@@ -512,30 +511,30 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
-				"data: "+chatResponseJSON(ChatCompletionResponse{
+				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
 					ID:      "chatcmpl-stream-3",
 					Object:  "chat.completion.chunk",
 					Created: 1640000000,
-					Model:   testModelName,
-					Choices: []ChatCompletionChoice{
+					Model:   testOpenAIModelName,
+					Choices: []OpenaiChatCompletionChoice{
 						{
 							Index: 0,
-							Delta: &ChatCompletionMessage{
+							Delta: &OpenaiChatCompletionMessage{
 								Role:    "assistant",
 								Content: "Hello!",
 							},
 						},
 					},
 				}),
-				"data: "+chatResponseJSON(ChatCompletionResponse{
+				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
 					ID:      "chatcmpl-stream-3",
 					Object:  "chat.completion.chunk",
 					Created: 1640000001,
-					Model:   testModelName,
-					Choices: []ChatCompletionChoice{
+					Model:   testOpenAIModelName,
+					Choices: []OpenaiChatCompletionChoice{
 						{
 							Index:        0,
-							Delta:        &ChatCompletionMessage{},
+							Delta:        &OpenaiChatCompletionMessage{},
 							FinishReason: "stop",
 						},
 					},
@@ -547,19 +546,19 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
 		iterator := chatModel.ChatStream(ctxWithTimeout, messages, nil, nil)
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			fragments = append(fragments, fragment)
 		}
@@ -568,12 +567,12 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("returns no fragments for empty messages", func(t *testing.T) {
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, nil)
 
-		iterator := chatModel.ChatStream(ctx, []*models.ChatMessage{}, nil, nil)
+		iterator := chatModel.ChatStream(ctx, []*ChatMessage{}, nil, nil)
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			fragments = append(fragments, fragment)
 		}
@@ -582,12 +581,12 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("returns no fragments for nil messages", func(t *testing.T) {
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, nil)
 
 		iterator := chatModel.ChatStream(ctx, nil, nil, nil)
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			fragments = append(fragments, fragment)
 		}
@@ -599,15 +598,15 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
-				"data: "+chatResponseJSON(ChatCompletionResponse{
+				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
 					ID:      "chatcmpl-stream-4",
 					Object:  "chat.completion.chunk",
 					Created: 1640000000,
-					Model:   testModelName,
-					Choices: []ChatCompletionChoice{
+					Model:   testOpenAIModelName,
+					Choices: []OpenaiChatCompletionChoice{
 						{
 							Index: 0,
-							Delta: &ChatCompletionMessage{
+							Delta: &OpenaiChatCompletionMessage{
 								Role:    "assistant",
 								Content: "Hello!",
 							},
@@ -618,12 +617,12 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 			)
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
@@ -644,13 +643,13 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 }
 
 func TestOpenAIClient_EmbeddingModel(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getOpenAITestClient(t)
 	defer tc.Close()
 
 	ctx := context.Background()
 
 	t.Run("creates embedding model with model name", func(t *testing.T) {
-		embedModel := tc.Client.EmbeddingModel(testEmbedModelName)
+		embedModel := tc.Client.EmbeddingModel(testOpenAIEmbedModelName)
 
 		assert.NotNil(t, embedModel)
 	})
@@ -658,20 +657,20 @@ func TestOpenAIClient_EmbeddingModel(t *testing.T) {
 	t.Run("generates embeddings for text", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/embeddings", "POST", embedResponseJSON(EmbeddingResponse{
+			tc.Mock.AddRestResponse("/embeddings", "POST", openaiEmbedResponseJSON(OpenaiEmbeddingResponse{
 				Object: "list",
-				Data: []EmbeddingData{
+				Data: []OpenaiEmbeddingData{
 					{
 						Object:    "embedding",
 						Embedding: []float64{0.1, 0.2, 0.3, 0.4, 0.5},
 						Index:     0,
 					},
 				},
-				Model: testEmbedModelName,
+				Model: testOpenAIEmbedModelName,
 			}))
 		}
 
-		embedModel := tc.Client.EmbeddingModel(testEmbedModelName)
+		embedModel := tc.Client.EmbeddingModel(testOpenAIEmbedModelName)
 
 		embedding, err := embedModel.Embed(ctx, "Hello, world!")
 
@@ -684,31 +683,31 @@ func TestOpenAIClient_EmbeddingModel(t *testing.T) {
 	t.Run("generates embeddings for different texts", func(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/embeddings", "POST", embedResponseJSON(EmbeddingResponse{
+			tc.Mock.AddRestResponse("/embeddings", "POST", openaiEmbedResponseJSON(OpenaiEmbeddingResponse{
 				Object: "list",
-				Data: []EmbeddingData{
+				Data: []OpenaiEmbeddingData{
 					{
 						Object:    "embedding",
 						Embedding: []float64{0.1, 0.2, 0.3, 0.4, 0.5},
 						Index:     0,
 					},
 				},
-				Model: testEmbedModelName,
+				Model: testOpenAIEmbedModelName,
 			}))
-			tc.Mock.AddRestResponse("/embeddings", "POST", embedResponseJSON(EmbeddingResponse{
+			tc.Mock.AddRestResponse("/embeddings", "POST", openaiEmbedResponseJSON(OpenaiEmbeddingResponse{
 				Object: "list",
-				Data: []EmbeddingData{
+				Data: []OpenaiEmbeddingData{
 					{
 						Object:    "embedding",
 						Embedding: []float64{0.2, 0.3, 0.4, 0.5, 0.6},
 						Index:     0,
 					},
 				},
-				Model: testEmbedModelName,
+				Model: testOpenAIEmbedModelName,
 			}))
 		}
 
-		embedModel := tc.Client.EmbeddingModel(testEmbedModelName)
+		embedModel := tc.Client.EmbeddingModel(testOpenAIEmbedModelName)
 
 		embedding1, err := embedModel.Embed(ctx, "The quick brown fox")
 		require.NoError(t, err)
@@ -723,7 +722,7 @@ func TestOpenAIClient_EmbeddingModel(t *testing.T) {
 	})
 
 	t.Run("returns error for empty input", func(t *testing.T) {
-		embedModel := tc.Client.EmbeddingModel(testEmbedModelName)
+		embedModel := tc.Client.EmbeddingModel(testOpenAIEmbedModelName)
 
 		embedding, err := embedModel.Embed(ctx, "")
 
@@ -733,7 +732,7 @@ func TestOpenAIClient_EmbeddingModel(t *testing.T) {
 }
 
 func TestOpenAIClient_ToolCalling(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getOpenAITestClient(t)
 	defer tc.Close()
 
 	ctx := context.Background()
@@ -763,22 +762,22 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 	t.Run("tool calls are properly passed to LLM", func(t *testing.T) {
 		// Setup mock response with tool call if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
 				ID:      "chatcmpl-tool-1",
 				Object:  "chat.completion",
 				Created: 1640000000,
-				Model:   testModelName,
-				Choices: []ChatCompletionChoice{
+				Model:   testOpenAIModelName,
+				Choices: []OpenaiChatCompletionChoice{
 					{
 						Index: 0,
-						Message: &ChatCompletionMessage{
+						Message: &OpenaiChatCompletionMessage{
 							Role:    "assistant",
 							Content: "",
-							ToolCalls: []ToolCall{
+							ToolCalls: []OpenaiToolCall{
 								{
 									ID:   "call_abc123",
 									Type: "function",
-									Function: ToolCallFunction{
+									Function: OpenaiToolCallFunction{
 										Name:      "get_weather",
 										Arguments: `{"location":"Paris, France","unit":"celsius"}`,
 									},
@@ -791,20 +790,20 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, &ChatOptions{
 			Temperature: 0.0,
 		})
 
-		messages := []*models.ChatMessage{
-			models.NewTextMessage(models.ChatRoleSystem, "You are a helpful assistant. When asked about weather, you MUST use the get_weather tool. Do not answer weather questions without using the tool."),
-			models.NewTextMessage(models.ChatRoleUser, "Use the get_weather tool to check the weather in Paris, France."),
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleSystem, "You are a helpful assistant. When asked about weather, you MUST use the get_weather tool. Do not answer weather questions without using the tool."),
+			NewTextMessage(ChatRoleUser, "Use the get_weather tool to check the weather in Paris, France."),
 		}
 
 		response, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool})
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
-		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+		assert.Equal(t, ChatRoleAssistant, response.Role)
 
 		// The LLM should return a tool call
 		toolCalls := response.GetToolCalls()
@@ -827,21 +826,21 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
 			// First response: tool call
-			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
 				ID:      "chatcmpl-tool-2",
 				Object:  "chat.completion",
 				Created: 1640000000,
-				Model:   testModelName,
-				Choices: []ChatCompletionChoice{
+				Model:   testOpenAIModelName,
+				Choices: []OpenaiChatCompletionChoice{
 					{
 						Index: 0,
-						Message: &ChatCompletionMessage{
+						Message: &OpenaiChatCompletionMessage{
 							Role: "assistant",
-							ToolCalls: []ToolCall{
+							ToolCalls: []OpenaiToolCall{
 								{
 									ID:   "call_def456",
 									Type: "function",
-									Function: ToolCallFunction{
+									Function: OpenaiToolCallFunction{
 										Name:      "get_weather",
 										Arguments: `{"location":"Tokyo"}`,
 									},
@@ -853,15 +852,15 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 				},
 			}))
 			// Second response: final answer after tool execution
-			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
 				ID:      "chatcmpl-tool-2b",
 				Object:  "chat.completion",
 				Created: 1640000001,
-				Model:   testModelName,
-				Choices: []ChatCompletionChoice{
+				Model:   testOpenAIModelName,
+				Choices: []OpenaiChatCompletionChoice{
 					{
 						Index: 0,
-						Message: &ChatCompletionMessage{
+						Message: &OpenaiChatCompletionMessage{
 							Role:    "assistant",
 							Content: "The weather in Tokyo is currently 18°C and cloudy.",
 						},
@@ -871,13 +870,13 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, &ChatOptions{
 			Temperature: 0.0,
 		})
 
-		messages := []*models.ChatMessage{
-			models.NewTextMessage(models.ChatRoleSystem, "You are a helpful assistant. When asked about weather, you MUST use the get_weather tool. Do not answer weather questions without using the tool."),
-			models.NewTextMessage(models.ChatRoleUser, "Use the get_weather tool to check the weather in Tokyo."),
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleSystem, "You are a helpful assistant. When asked about weather, you MUST use the get_weather tool. Do not answer weather questions without using the tool."),
+			NewTextMessage(ChatRoleUser, "Use the get_weather tool to check the weather in Tokyo."),
 		}
 
 		// First call - get tool call from LLM
@@ -901,14 +900,14 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 		}
 
 		// Add tool response to conversation
-		messages = append(messages, models.NewToolResponseMessage(toolResponse))
+		messages = append(messages, NewToolResponseMessage(toolResponse))
 
 		// Second call - LLM should process tool response
 		finalResponse, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool})
 
 		require.NoError(t, err)
 		assert.NotNil(t, finalResponse)
-		assert.Equal(t, models.ChatRoleAssistant, finalResponse.Role)
+		assert.Equal(t, ChatRoleAssistant, finalResponse.Role)
 
 		// The response should contain text (not tool calls)
 		responseText := finalResponse.GetText()
@@ -923,22 +922,22 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 		if tc.Mock != nil {
 			// First response: streaming tool call
 			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
-				"data: "+chatResponseJSON(ChatCompletionResponse{
+				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
 					ID:      "chatcmpl-tool-stream-1",
 					Object:  "chat.completion.chunk",
 					Created: 1640000000,
-					Model:   testModelName,
-					Choices: []ChatCompletionChoice{
+					Model:   testOpenAIModelName,
+					Choices: []OpenaiChatCompletionChoice{
 						{
 							Index: 0,
-							Delta: &ChatCompletionMessage{
+							Delta: &OpenaiChatCompletionMessage{
 								Role: "assistant",
-								ToolCalls: []ToolCall{
+								ToolCalls: []OpenaiToolCall{
 									{
 										Index: 0,
 										ID:    "call_ghi789",
 										Type:  "function",
-										Function: ToolCallFunction{
+										Function: OpenaiToolCallFunction{
 											Name:      "get_weather",
 											Arguments: `{"location":"London"}`,
 										},
@@ -948,15 +947,15 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 						},
 					},
 				}),
-				"data: "+chatResponseJSON(ChatCompletionResponse{
+				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
 					ID:      "chatcmpl-tool-stream-1",
 					Object:  "chat.completion.chunk",
 					Created: 1640000001,
-					Model:   testModelName,
-					Choices: []ChatCompletionChoice{
+					Model:   testOpenAIModelName,
+					Choices: []OpenaiChatCompletionChoice{
 						{
 							Index:        0,
-							Delta:        &ChatCompletionMessage{},
+							Delta:        &OpenaiChatCompletionMessage{},
 							FinishReason: "tool_calls",
 						},
 					},
@@ -965,30 +964,30 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 			)
 			// Second response: streaming text response after tool execution
 			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
-				"data: "+chatResponseJSON(ChatCompletionResponse{
+				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
 					ID:      "chatcmpl-tool-stream-1b",
 					Object:  "chat.completion.chunk",
 					Created: 1640000002,
-					Model:   testModelName,
-					Choices: []ChatCompletionChoice{
+					Model:   testOpenAIModelName,
+					Choices: []OpenaiChatCompletionChoice{
 						{
 							Index: 0,
-							Delta: &ChatCompletionMessage{
+							Delta: &OpenaiChatCompletionMessage{
 								Role:    "assistant",
 								Content: "The temperature in London is 15°C and it's rainy.",
 							},
 						},
 					},
 				}),
-				"data: "+chatResponseJSON(ChatCompletionResponse{
+				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
 					ID:      "chatcmpl-tool-stream-1b",
 					Object:  "chat.completion.chunk",
 					Created: 1640000003,
-					Model:   testModelName,
-					Choices: []ChatCompletionChoice{
+					Model:   testOpenAIModelName,
+					Choices: []OpenaiChatCompletionChoice{
 						{
 							Index:        0,
-							Delta:        &ChatCompletionMessage{},
+							Delta:        &OpenaiChatCompletionMessage{},
 							FinishReason: "stop",
 						},
 					},
@@ -997,20 +996,20 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 			)
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, &ChatOptions{
 			Temperature: 0.0,
 		})
 
-		messages := []*models.ChatMessage{
-			models.NewTextMessage(models.ChatRoleSystem, "You are a helpful assistant. When asked about weather, you MUST use the get_weather tool. Do not answer weather questions without using the tool."),
-			models.NewTextMessage(models.ChatRoleUser, "Use the get_weather tool to check the weather in London."),
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleSystem, "You are a helpful assistant. When asked about weather, you MUST use the get_weather tool. Do not answer weather questions without using the tool."),
+			NewTextMessage(ChatRoleUser, "Use the get_weather tool to check the weather in London."),
 		}
 
 		// First streaming call - get tool call from LLM
 		iterator := chatModel.ChatStream(ctx, messages, nil, []tool.ToolInfo{weatherTool})
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		var collectedToolCalls []*tool.ToolCall
 
 		for fragment := range iterator {
@@ -1024,16 +1023,16 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 
 		assert.Greater(t, len(fragments), 0, "expected to receive fragments")
 
-		// Tool calls might be split across fragments or come in one fragment
+		// OpenaiTool calls might be split across fragments or come in one fragment
 		// Skip if no tool calls were returned (model non-determinism)
 		if len(collectedToolCalls) == 0 {
 			t.Skip("LLM did not return a tool call in streaming response - this can happen due to model non-determinism")
 		}
 
 		// Reconstruct the complete response
-		completeResponse := &models.ChatMessage{
-			Role:  models.ChatRoleAssistant,
-			Parts: []models.ChatMessagePart{},
+		completeResponse := &ChatMessage{
+			Role:  ChatRoleAssistant,
+			Parts: []ChatMessagePart{},
 		}
 
 		// Merge all fragments
@@ -1051,7 +1050,7 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 			Done:   true,
 		}
 
-		messages = append(messages, models.NewToolResponseMessage(toolResponse))
+		messages = append(messages, NewToolResponseMessage(toolResponse))
 
 		// Second streaming call - LLM processes tool response
 		iterator2 := chatModel.ChatStream(ctx, messages, nil, []tool.ToolInfo{weatherTool})
@@ -1098,21 +1097,21 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 
 		// Setup mock response with multiple tool calls if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
 				ID:      "chatcmpl-tool-3",
 				Object:  "chat.completion",
 				Created: 1640000000,
-				Model:   testModelName,
-				Choices: []ChatCompletionChoice{
+				Model:   testOpenAIModelName,
+				Choices: []OpenaiChatCompletionChoice{
 					{
 						Index: 0,
-						Message: &ChatCompletionMessage{
+						Message: &OpenaiChatCompletionMessage{
 							Role: "assistant",
-							ToolCalls: []ToolCall{
+							ToolCalls: []OpenaiToolCall{
 								{
 									ID:   "call_jkl012",
 									Type: "function",
-									Function: ToolCallFunction{
+									Function: OpenaiToolCallFunction{
 										Name:      "get_weather",
 										Arguments: `{"location":"New York"}`,
 									},
@@ -1120,7 +1119,7 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 								{
 									ID:   "call_mno345",
 									Type: "function",
-									Function: ToolCallFunction{
+									Function: OpenaiToolCallFunction{
 										Name:      "get_time",
 										Arguments: `{"location":"New York"}`,
 									},
@@ -1133,13 +1132,13 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, &ChatOptions{
 			Temperature: 0.0,
 		})
 
-		messages := []*models.ChatMessage{
-			models.NewTextMessage(models.ChatRoleSystem, "You are a helpful assistant. When asked about weather, you MUST use the get_weather tool. When asked about time, you MUST use the get_time tool. Do not answer these questions without using the tools."),
-			models.NewTextMessage(models.ChatRoleUser, "Use the get_weather and get_time tools to check the weather and current time in New York."),
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleSystem, "You are a helpful assistant. When asked about weather, you MUST use the get_weather tool. When asked about time, you MUST use the get_time tool. Do not answer these questions without using the tools."),
+			NewTextMessage(ChatRoleUser, "Use the get_weather and get_time tools to check the weather and current time in New York."),
 		}
 
 		response, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool, timeTool})
@@ -1165,21 +1164,21 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
 			// First response: tool call
-			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
 				ID:      "chatcmpl-tool-4",
 				Object:  "chat.completion",
 				Created: 1640000000,
-				Model:   testModelName,
-				Choices: []ChatCompletionChoice{
+				Model:   testOpenAIModelName,
+				Choices: []OpenaiChatCompletionChoice{
 					{
 						Index: 0,
-						Message: &ChatCompletionMessage{
+						Message: &OpenaiChatCompletionMessage{
 							Role: "assistant",
-							ToolCalls: []ToolCall{
+							ToolCalls: []OpenaiToolCall{
 								{
 									ID:   "call_pqr678",
 									Type: "function",
-									Function: ToolCallFunction{
+									Function: OpenaiToolCallFunction{
 										Name:      "get_weather",
 										Arguments: `{"location":"Berlin"}`,
 									},
@@ -1191,15 +1190,15 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 				},
 			}))
 			// Second response: handling error
-			tc.Mock.AddRestResponse("/chat/completions", "POST", chatResponseJSON(ChatCompletionResponse{
+			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
 				ID:      "chatcmpl-tool-4b",
 				Object:  "chat.completion",
 				Created: 1640000001,
-				Model:   testModelName,
-				Choices: []ChatCompletionChoice{
+				Model:   testOpenAIModelName,
+				Choices: []OpenaiChatCompletionChoice{
 					{
 						Index: 0,
-						Message: &ChatCompletionMessage{
+						Message: &OpenaiChatCompletionMessage{
 							Role:    "assistant",
 							Content: "I apologize, but I encountered an error: location not found.",
 						},
@@ -1209,13 +1208,13 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, &ChatOptions{
 			Temperature: 0.0,
 		})
 
-		messages := []*models.ChatMessage{
-			models.NewTextMessage(models.ChatRoleSystem, "You are a helpful assistant. When asked about weather, you MUST use the get_weather tool. Do not answer weather questions without using the tool."),
-			models.NewTextMessage(models.ChatRoleUser, "Use the get_weather tool to check the weather in Berlin."),
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleSystem, "You are a helpful assistant. When asked about weather, you MUST use the get_weather tool. Do not answer weather questions without using the tool."),
+			NewTextMessage(ChatRoleUser, "Use the get_weather tool to check the weather in Berlin."),
 		}
 
 		// First call - get tool call
@@ -1237,7 +1236,7 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 			Done:  true,
 		}
 
-		messages = append(messages, models.NewToolResponseMessage(toolResponse))
+		messages = append(messages, NewToolResponseMessage(toolResponse))
 
 		// Second call - LLM should handle the error
 		finalResponse, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool})
@@ -1253,19 +1252,19 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 
 func TestOpenAIClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint not found", func(t *testing.T) {
-		client, err := NewOpenAIClient("http://localhost:11434/v1/nonexistent", &models.ModelConnectionOptions{
-			ConnectTimeout: connectTimeout,
-			RequestTimeout: testTimeout,
+		client, err := NewOpenAIClient("http://localhost:11434/v1/nonexistent", &ModelConnectionOptions{
+			ConnectTimeout: connectOpenAITimeout,
+			RequestTimeout: testOpenAITimeout,
 		})
 		require.NoError(t, err)
 
 		_, err = client.ListModels()
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, models.ErrEndpointNotFound)
+		assert.ErrorIs(t, err, ErrEndpointNotFound)
 	})
 
 	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		client, err := NewOpenAIClient("http://nonexistent-host:11434/v1", &models.ModelConnectionOptions{
+		client, err := NewOpenAIClient("http://nonexistent-host:11434/v1", &ModelConnectionOptions{
 			ConnectTimeout: 1 * time.Second,
 			RequestTimeout: 2 * time.Second,
 		})
@@ -1273,6 +1272,6 @@ func TestOpenAIClient_ErrorHandling(t *testing.T) {
 
 		_, err = client.ListModels()
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, models.ErrEndpointUnavailable)
+		assert.ErrorIs(t, err, ErrEndpointUnavailable)
 	})
 }
