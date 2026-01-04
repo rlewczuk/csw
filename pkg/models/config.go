@@ -8,25 +8,27 @@ import (
 // ModelProviderConfig represents common configuration for model providers.
 type ModelProviderConfig struct {
 	// Type specifies the provider type (e.g., "ollama", "openai", "anthropic")
-	Type string
-	// Name is a user-friendly name for the provider instance
-	Name string
+	Type string `json:"type"`
+	// Name is a short computer-friendly name for the provider instance (eg. `ollama-local`)
+	Name string `json:"name"`
+	// Description is a user-friendly description for the provider instance
+	Description string `json:"description,omitempty"`
 	// URL is the base URL for the provider's API
-	URL string
+	URL string `json:"url"`
 	// APIKey is the API key for authentication (if required)
-	APIKey string
+	APIKey string `json:"api_key,omitempty"`
 	// ConnectTimeout is the timeout for establishing connections
-	ConnectTimeout time.Duration
+	ConnectTimeout time.Duration `json:"connect_timeout,omitempty"`
 	// RequestTimeout is the timeout for complete requests
-	RequestTimeout time.Duration
+	RequestTimeout time.Duration `json:"request_timeout,omitempty"`
 	// DefaultTemperature is the default temperature for chat completions
-	DefaultTemperature float32
+	DefaultTemperature float32 `json:"default_temperature,omitempty"`
 	// DefaultTopP is the default top_p for chat completions
-	DefaultTopP float32
+	DefaultTopP float32 `json:"default_top_p,omitempty"`
 	// DefaultTopK is the default top_k for chat completions
-	DefaultTopK int
+	DefaultTopK int `json:"default_top_k,omitempty"`
 	// ContextLengthLimit is the maximum context length in tokens
-	ContextLengthLimit int
+	ContextLengthLimit int `json:"context_length_limit,omitempty"`
 }
 
 // FromConfig creates a new ModelProvider instance from the configuration.

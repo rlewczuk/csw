@@ -1,0 +1,6 @@
+{
+  "type": "ollama",
+  "name": "ollama",
+  "description": "Local Ollama instance",
+  "url": "http://localhost:11434"
+}

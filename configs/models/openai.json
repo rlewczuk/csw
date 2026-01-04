@@ -1,0 +1,6 @@
+{
+  "type": "openai",
+  "description": "OpenAI API",
+  "url": "https://api.openai.com/v1",
+  "api_key": "test-api-key"
+}
