@@ -9,3 +9,6 @@ Implement mock UI output handler for SweSession in `pkg/ui/ui.go`:
 * write tests for it in `pkg/ui/ui_test.go`, use `testify` library for assertions;
 
 ---
+
+Integration tests in `pkg/core/simple_test.go` should be modified to use mock UI output from `pkg/ui/mock.go` instead of custom handler to capture and verify output of agent operation.
+Modify tests, also you can modify mock ui implementation if needed by tests. Try preserving logic of modified tests.
