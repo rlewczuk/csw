@@ -38,10 +38,14 @@ type AnthropicEmbeddingModel struct {
 	model  string
 }
 
-// NewAnthropicClient creates a new Anthropic client with the given base URL and config
-func NewAnthropicClient(baseURL string, config *ModelProviderConfig) (*AnthropicClient, error) {
-	if baseURL == "" {
-		return nil, errors.New("baseURL cannot be empty")
+// NewAnthropicClient creates a new Anthropic client with the given config
+func NewAnthropicClient(config *ModelProviderConfig) (*AnthropicClient, error) {
+	if config == nil {
+		return nil, errors.New("config cannot be nil")
+	}
+
+	if config.URL == "" {
+		return nil, errors.New("URL cannot be empty")
 	}
 
 	// Default options
@@ -50,16 +54,14 @@ func NewAnthropicClient(baseURL string, config *ModelProviderConfig) (*Anthropic
 	apiKey := ""
 	apiVersion := "2023-06-01" // Default Anthropic API version
 
-	if config != nil {
-		if config.ConnectTimeout > 0 {
-			connectTimeout = config.ConnectTimeout
-		}
-		if config.RequestTimeout > 0 {
-			requestTimeout = config.RequestTimeout
-		}
-		if config.APIKey != "" {
-			apiKey = config.APIKey
-		}
+	if config.ConnectTimeout > 0 {
+		connectTimeout = config.ConnectTimeout
+	}
+	if config.RequestTimeout > 0 {
+		requestTimeout = config.RequestTimeout
+	}
+	if config.APIKey != "" {
+		apiKey = config.APIKey
 	}
 
 	// Create HTTP client with custom transport for connection timeout
@@ -75,7 +77,7 @@ func NewAnthropicClient(baseURL string, config *ModelProviderConfig) (*Anthropic
 	}
 
 	return &AnthropicClient{
-		baseURL:    strings.TrimSuffix(baseURL, "/"),
+		baseURL:    strings.TrimSuffix(config.URL, "/"),
 		httpClient: httpClient,
 		apiKey:     apiKey,
 		apiVersion: apiVersion,

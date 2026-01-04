@@ -38,23 +38,25 @@ type OllamaEmbeddingModel struct {
 	model  string
 }
 
-// NewOllamaClient creates a new Ollama client with the given base URL and config
-func NewOllamaClient(baseURL string, config *ModelProviderConfig) (*OllamaClient, error) {
-	if baseURL == "" {
-		return nil, errors.New("baseURL cannot be empty")
+// NewOllamaClient creates a new Ollama client with the given config
+func NewOllamaClient(config *ModelProviderConfig) (*OllamaClient, error) {
+	if config == nil {
+		return nil, errors.New("config cannot be nil")
+	}
+
+	if config.URL == "" {
+		return nil, errors.New("URL cannot be empty")
 	}
 
 	// Default options
 	connectTimeout := 10 * time.Second
 	requestTimeout := 60 * time.Second
 
-	if config != nil {
-		if config.ConnectTimeout > 0 {
-			connectTimeout = config.ConnectTimeout
-		}
-		if config.RequestTimeout > 0 {
-			requestTimeout = config.RequestTimeout
-		}
+	if config.ConnectTimeout > 0 {
+		connectTimeout = config.ConnectTimeout
+	}
+	if config.RequestTimeout > 0 {
+		requestTimeout = config.RequestTimeout
 	}
 
 	// Create HTTP client with custom transport for connection timeout
@@ -70,7 +72,7 @@ func NewOllamaClient(baseURL string, config *ModelProviderConfig) (*OllamaClient
 	}
 
 	return &OllamaClient{
-		baseURL:    strings.TrimSuffix(baseURL, "/"),
+		baseURL:    strings.TrimSuffix(config.URL, "/"),
 		httpClient: httpClient,
 	}, nil
 }
