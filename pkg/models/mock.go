@@ -1,4 +1,4 @@
-package mock
+package models
 
 import (
 	"context"
@@ -7,14 +7,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
-// MockProvider implements models.ModelProvider interface for testing purposes.
-type MockProvider struct {
-	models         []models.ModelInfo
-	chatResponses  map[string]*ChatResponse
+// MockClient implements models.ModelProvider interface for testing purposes.
+type MockClient struct {
+	models         []ModelInfo
+	chatResponses  map[string]*MockChatResponse
 	embedResponses map[string][]float64
 	mu             sync.RWMutex
 	// RecordedToolCalls stores tool calls received from the LLM during tests
@@ -23,72 +22,72 @@ type MockProvider struct {
 	RecordedToolResponses []tool.ToolResponse
 }
 
-// ChatResponse holds the configuration for mock chat responses.
-type ChatResponse struct {
+// MockChatResponse holds the configuration for mock chat responses.
+type MockChatResponse struct {
 	// Response is the full response message for non-streaming calls
-	Response *models.ChatMessage
+	Response *ChatMessage
 	// StreamFragments are the message fragments for streaming calls
-	StreamFragments []*models.ChatMessage
+	StreamFragments []*ChatMessage
 	// Error to return (if any)
 	Error error
 }
 
 // NewMockProvider creates a new mock provider with the given model list.
-func NewMockProvider(models []models.ModelInfo) *MockProvider {
-	return &MockProvider{
+func NewMockProvider(models []ModelInfo) *MockClient {
+	return &MockClient{
 		models:         models,
-		chatResponses:  make(map[string]*ChatResponse),
+		chatResponses:  make(map[string]*MockChatResponse),
 		embedResponses: make(map[string][]float64),
 	}
 }
 
 // SetChatResponse configures the mock response for a specific model.
-func (p *MockProvider) SetChatResponse(modelName string, response *ChatResponse) {
+func (p *MockClient) SetChatResponse(modelName string, response *MockChatResponse) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.chatResponses[modelName] = response
 }
 
 // SetResponsesFromFile configures mock responses for a specific model from a file.
-func (p *MockProvider) SetResponsesFromFile(modelName string, filename string) error {
+func (p *MockClient) SetResponsesFromFile(modelName string, filename string) error {
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
 
 	prompts := strings.Split(string(content), "@@@@@@@")
-	fragments := make([]*models.ChatMessage, len(prompts))
+	fragments := make([]*ChatMessage, len(prompts))
 	for i, prompt := range prompts {
-		fragments[i] = &models.ChatMessage{
-			Role: models.ChatRoleAssistant,
-			Parts: []models.ChatMessagePart{
+		fragments[i] = &ChatMessage{
+			Role: ChatRoleAssistant,
+			Parts: []ChatMessagePart{
 				{Text: strings.TrimSpace(prompt)},
 			},
 		}
 	}
 
-	p.SetChatResponse(modelName, &ChatResponse{
+	p.SetChatResponse(modelName, &MockChatResponse{
 		StreamFragments: fragments,
 	})
 	return nil
 }
 
 // SetEmbedResponse configures the mock embedding response for a specific model.
-func (p *MockProvider) SetEmbedResponse(modelName string, embedding []float64) {
+func (p *MockClient) SetEmbedResponse(modelName string, embedding []float64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.embedResponses[modelName] = embedding
 }
 
 // ListModels returns the predefined list of models.
-func (p *MockProvider) ListModels() ([]models.ModelInfo, error) {
+func (p *MockClient) ListModels() ([]ModelInfo, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.models, nil
 }
 
 // ChatModel returns a MockChatModel implementation for the given model and options.
-func (p *MockProvider) ChatModel(model string, options *models.ChatOptions) models.ChatModel {
+func (p *MockClient) ChatModel(model string, options *ChatOptions) ChatModel {
 	return &MockChatModel{
 		provider: p,
 		model:    model,
@@ -97,7 +96,7 @@ func (p *MockProvider) ChatModel(model string, options *models.ChatOptions) mode
 }
 
 // EmbeddingModel returns a MockEmbeddingModel implementation for the given model.
-func (p *MockProvider) EmbeddingModel(model string) models.EmbeddingModel {
+func (p *MockClient) EmbeddingModel(model string) EmbeddingModel {
 	return &MockEmbeddingModel{
 		provider: p,
 		model:    model,
@@ -106,13 +105,13 @@ func (p *MockProvider) EmbeddingModel(model string) models.EmbeddingModel {
 
 // MockChatModel implements models.ChatModel interface for testing purposes.
 type MockChatModel struct {
-	provider *MockProvider
+	provider *MockClient
 	model    string
-	options  *models.ChatOptions
+	options  *ChatOptions
 }
 
 // Chat sends a chat request and returns the full response.
-func (m *MockChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) (*models.ChatMessage, error) {
+func (m *MockChatModel) Chat(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) (*ChatMessage, error) {
 	// Check for cancellation first
 	select {
 	case <-ctx.Done():
@@ -135,9 +134,9 @@ func (m *MockChatModel) Chat(ctx context.Context, messages []*models.ChatMessage
 
 	if response == nil {
 		// Default response if none configured
-		return &models.ChatMessage{
-			Role: models.ChatRoleAssistant,
-			Parts: []models.ChatMessagePart{
+		return &ChatMessage{
+			Role: ChatRoleAssistant,
+			Parts: []ChatMessagePart{
 				{Text: "mock response"},
 			},
 		}, nil
@@ -160,8 +159,8 @@ func (m *MockChatModel) Chat(ctx context.Context, messages []*models.ChatMessage
 }
 
 // ChatStream sends a chat request and returns a standard Go iterator for streaming responses.
-func (m *MockChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) iter.Seq[*models.ChatMessage] {
-	return func(yield func(*models.ChatMessage) bool) {
+func (m *MockChatModel) ChatStream(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) iter.Seq[*ChatMessage] {
+	return func(yield func(*ChatMessage) bool) {
 		// Record tool responses from incoming messages
 		m.provider.mu.Lock()
 		for _, msg := range messages {
@@ -175,13 +174,13 @@ func (m *MockChatModel) ChatStream(ctx context.Context, messages []*models.ChatM
 		response := m.provider.chatResponses[m.model]
 		m.provider.mu.RUnlock()
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 
 		if response == nil {
 			// Default streaming response if none configured
-			fragments = []*models.ChatMessage{
-				{Role: models.ChatRoleAssistant, Parts: []models.ChatMessagePart{{Text: "mock"}}},
-				{Role: models.ChatRoleAssistant, Parts: []models.ChatMessagePart{{Text: " stream"}}},
+			fragments = []*ChatMessage{
+				{Role: ChatRoleAssistant, Parts: []ChatMessagePart{{Text: "mock"}}},
+				{Role: ChatRoleAssistant, Parts: []ChatMessagePart{{Text: " stream"}}},
 			}
 		} else if response.Error != nil {
 			// If there's an error configured, just return without yielding anything
@@ -217,7 +216,7 @@ func (m *MockChatModel) ChatStream(ctx context.Context, messages []*models.ChatM
 
 // MockEmbeddingModel implements models.EmbeddingModel interface for testing purposes.
 type MockEmbeddingModel struct {
-	provider *MockProvider
+	provider *MockClient
 	model    string
 }
 

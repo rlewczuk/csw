@@ -1,4 +1,4 @@
-package ollama
+package models
 
 import (
 	"bytes"
@@ -15,12 +15,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
 func init() {
-	models.RegisterProvider("ollama", func(baseURL string, options *models.ModelConnectionOptions) (models.ModelProvider, error) {
+	RegisterProvider("ollama", func(baseURL string, options *ModelConnectionOptions) (ModelProvider, error) {
 		return NewOllamaClient(baseURL, options)
 	})
 }
@@ -36,7 +35,7 @@ type OllamaClient struct {
 type OllamaChatModel struct {
 	client  *OllamaClient
 	model   string
-	options *models.ChatOptions
+	options *ChatOptions
 }
 
 // OllamaEmbeddingModel is an embedding model implementation for Ollama
@@ -46,7 +45,7 @@ type OllamaEmbeddingModel struct {
 }
 
 // NewOllamaClient creates a new Ollama client with the given base URL and options
-func NewOllamaClient(baseURL string, options *models.ModelConnectionOptions) (*OllamaClient, error) {
+func NewOllamaClient(baseURL string, options *ModelConnectionOptions) (*OllamaClient, error) {
 	if baseURL == "" {
 		return nil, errors.New("baseURL cannot be empty")
 	}
@@ -105,7 +104,7 @@ func (c *OllamaClient) SetModel(model string) {
 }
 
 // ChatModel returns a ChatModel implementation for the given model and options
-func (c *OllamaClient) ChatModel(model string, options *models.ChatOptions) models.ChatModel {
+func (c *OllamaClient) ChatModel(model string, options *ChatOptions) ChatModel {
 	return &OllamaChatModel{
 		client:  c,
 		model:   model,
@@ -114,7 +113,7 @@ func (c *OllamaClient) ChatModel(model string, options *models.ChatOptions) mode
 }
 
 // EmbeddingModel returns an EmbeddingModel implementation for the given model
-func (c *OllamaClient) EmbeddingModel(model string) models.EmbeddingModel {
+func (c *OllamaClient) EmbeddingModel(model string) EmbeddingModel {
 	return &OllamaEmbeddingModel{
 		client: c,
 		model:  model,
@@ -122,7 +121,7 @@ func (c *OllamaClient) EmbeddingModel(model string) models.EmbeddingModel {
 }
 
 // ListModels lists all available models
-func (c *OllamaClient) ListModels() ([]models.ModelInfo, error) {
+func (c *OllamaClient) ListModels() ([]ModelInfo, error) {
 	url := c.baseURL + "/api/tags"
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -140,15 +139,15 @@ func (c *OllamaClient) ListModels() ([]models.ModelInfo, error) {
 		return nil, err
 	}
 
-	var response ListModelsResponse
+	var response OllamaListModelsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	// Convert from Ollama ModelInfo to models.ModelInfo
-	result := make([]models.ModelInfo, len(response.Models))
+	// Convert from Ollama OllamaModelInfo to models.OllamaModelInfo
+	result := make([]ModelInfo, len(response.Models))
 	for i, model := range response.Models {
-		result[i] = models.ModelInfo{
+		result[i] = ModelInfo{
 			Name:       model.Name,
 			Model:      model.Model,
 			ModifiedAt: model.ModifiedAt,
@@ -161,7 +160,7 @@ func (c *OllamaClient) ListModels() ([]models.ModelInfo, error) {
 }
 
 // Chat sends a chat request and returns the response
-func (m *OllamaChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) (*models.ChatMessage, error) {
+func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) (*ChatMessage, error) {
 	if messages == nil || len(messages) == 0 {
 		return nil, errors.New("messages cannot be nil or empty")
 	}
@@ -177,13 +176,13 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 	}
 
 	// Convert messages to Ollama format
-	ollamaMessages := make([]Message, len(messages))
+	ollamaMessages := make([]OllamaMessage, len(messages))
 	for i, msg := range messages {
 		ollamaMessages[i] = convertToOllamaMessage(msg)
 	}
 
 	// Build request
-	chatReq := ChatRequest{
+	chatReq := OllamaChatRequest{
 		Model:    m.model,
 		Messages: ollamaMessages,
 		Stream:   false,
@@ -192,7 +191,7 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 
 	// Apply options if provided
 	if effectiveOptions != nil {
-		chatReq.Options = &ModelOptions{
+		chatReq.Options = &OllamaModelOptions{
 			Temperature: float64(effectiveOptions.Temperature),
 			TopP:        float64(effectiveOptions.TopP),
 			TopK:        effectiveOptions.TopK,
@@ -225,11 +224,11 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 	// Ollama sends multiple JSON objects even with stream=false
 	// We need to read all of them and merge the results
 	decoder := json.NewDecoder(resp.Body)
-	var mergedMessage Message
+	var mergedMessage OllamaMessage
 	mergedMessage.Role = "assistant"
 
 	for {
-		var chatResp ChatResponse
+		var chatResp OllamaChatResponse
 		if err := decoder.Decode(&chatResp); err != nil {
 			if err == io.EOF {
 				break
@@ -258,8 +257,8 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*models.ChatMessa
 }
 
 // ChatStream sends a chat request and returns a standard Go iterator for streaming responses
-func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) iter.Seq[*models.ChatMessage] {
-	return func(yield func(*models.ChatMessage) bool) {
+func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) iter.Seq[*ChatMessage] {
+	return func(yield func(*ChatMessage) bool) {
 		// Validate inputs
 		if messages == nil || len(messages) == 0 {
 			return
@@ -276,13 +275,13 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 		}
 
 		// Convert messages to Ollama format
-		ollamaMessages := make([]Message, len(messages))
+		ollamaMessages := make([]OllamaMessage, len(messages))
 		for i, msg := range messages {
 			ollamaMessages[i] = convertToOllamaMessage(msg)
 		}
 
 		// Build request with streaming enabled
-		chatReq := ChatRequest{
+		chatReq := OllamaChatRequest{
 			Model:    m.model,
 			Messages: ollamaMessages,
 			Stream:   true,
@@ -291,7 +290,7 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 
 		// Apply options if provided
 		if effectiveOptions != nil {
-			chatReq.Options = &ModelOptions{
+			chatReq.Options = &OllamaModelOptions{
 				Temperature: float64(effectiveOptions.Temperature),
 				TopP:        float64(effectiveOptions.TopP),
 				TopK:        effectiveOptions.TopK,
@@ -331,7 +330,7 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*models.Cha
 			default:
 			}
 
-			var chatResp ChatResponse
+			var chatResp OllamaChatResponse
 			if err := decoder.Decode(&chatResp); err != nil {
 				if err == io.EOF {
 					return
@@ -373,7 +372,7 @@ func (m *OllamaEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 		return nil, errors.New("model not set")
 	}
 
-	embedReq := EmbedRequest{
+	embedReq := OllamaEmbedRequest{
 		Model: m.model,
 		Input: []string{input},
 	}
@@ -401,7 +400,7 @@ func (m *OllamaEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 		return nil, err
 	}
 
-	var embedResp EmbedResponse
+	var embedResp OllamaEmbedResponse
 	if err := json.NewDecoder(resp.Body).Decode(&embedResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
@@ -423,18 +422,18 @@ func (c *OllamaClient) handleHTTPError(err error) error {
 	var netErr net.Error
 	if errors.As(err, &netErr) {
 		if netErr.Timeout() {
-			return fmt.Errorf("%w: %v", models.ErrEndpointUnavailable, err)
+			return fmt.Errorf("%w: %v", ErrEndpointUnavailable, err)
 		}
-		return fmt.Errorf("%w: %v", models.ErrEndpointUnavailable, err)
+		return fmt.Errorf("%w: %v", ErrEndpointUnavailable, err)
 	}
 
 	// Check for DNS errors
 	var dnsErr *net.DNSError
 	if errors.As(err, &dnsErr) {
-		return fmt.Errorf("%w: %v", models.ErrEndpointNotFound, err)
+		return fmt.Errorf("%w: %v", ErrEndpointNotFound, err)
 	}
 
-	return fmt.Errorf("%w: %v", models.ErrEndpointUnavailable, err)
+	return fmt.Errorf("%w: %v", ErrEndpointUnavailable, err)
 }
 
 // checkStatusCode checks the HTTP status code and returns appropriate errors
@@ -444,35 +443,35 @@ func (c *OllamaClient) checkStatusCode(resp *http.Response) error {
 		return nil
 	case http.StatusNotFound:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", models.ErrEndpointNotFound, string(body))
+		return fmt.Errorf("%w: %s", ErrEndpointNotFound, string(body))
 	case http.StatusUnauthorized, http.StatusForbidden:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", models.ErrPermissionDenied, string(body))
+		return fmt.Errorf("%w: %s", ErrPermissionDenied, string(body))
 	case http.StatusTooManyRequests:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", models.ErrRateExceeded, string(body))
+		return fmt.Errorf("%w: %s", ErrRateExceeded, string(body))
 	case http.StatusBadRequest:
 		body, _ := io.ReadAll(resp.Body)
 		bodyStr := string(body)
 		// Check for context length errors
 		if strings.Contains(strings.ToLower(bodyStr), "context length") ||
 			strings.Contains(strings.ToLower(bodyStr), "too many tokens") {
-			return fmt.Errorf("%w: %s", models.ErrTooManyInputTokens, bodyStr)
+			return fmt.Errorf("%w: %s", ErrTooManyInputTokens, bodyStr)
 		}
 		return fmt.Errorf("bad request: %s", bodyStr)
 	case http.StatusInternalServerError, http.StatusBadGateway,
 		http.StatusServiceUnavailable, http.StatusGatewayTimeout:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", models.ErrEndpointUnavailable, string(body))
+		return fmt.Errorf("%w: %s", ErrEndpointUnavailable, string(body))
 	default:
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
 	}
 }
 
-// convertToOllamaMessage converts a models.ChatMessage to Ollama Message format
-func convertToOllamaMessage(msg *models.ChatMessage) Message {
-	ollamaMsg := Message{
+// convertToOllamaMessage converts a models.ChatMessage to Ollama OllamaMessage format
+func convertToOllamaMessage(msg *ChatMessage) OllamaMessage {
+	ollamaMsg := OllamaMessage{
 		Role: string(msg.Role),
 	}
 
@@ -481,7 +480,7 @@ func convertToOllamaMessage(msg *models.ChatMessage) Message {
 	toolResponses := msg.GetToolResponses()
 
 	if len(toolCalls) > 0 {
-		// Message contains tool calls from assistant
+		// OllamaMessage contains tool calls from assistant
 		ollamaMsg.Content = msg.GetText()
 		for _, tc := range toolCalls {
 			// Safely convert arguments to map
@@ -494,15 +493,15 @@ func convertToOllamaMessage(msg *models.ChatMessage) Message {
 			if args == nil {
 				args = make(map[string]interface{})
 			}
-			ollamaMsg.ToolCalls = append(ollamaMsg.ToolCalls, ToolCall{
-				Function: ToolCallFunction{
+			ollamaMsg.ToolCalls = append(ollamaMsg.ToolCalls, OllamaToolCall{
+				Function: OllamaToolCallFunction{
 					Name:      tc.Function,
 					Arguments: args,
 				},
 			})
 		}
 	} else if len(toolResponses) > 0 {
-		// Message contains tool responses
+		// OllamaMessage contains tool responses
 		// In Ollama, tool responses should use role "tool" and include tool_name
 		ollamaMsg.Role = "tool"
 		for _, tr := range toolResponses {
@@ -526,55 +525,55 @@ func convertToOllamaMessage(msg *models.ChatMessage) Message {
 	return ollamaMsg
 }
 
-// generateToolCallID generates a unique ID for tool calls since Ollama doesn't provide them.
-func generateToolCallID() string {
+// generateOllamaToolCallID generates a unique ID for tool calls since Ollama doesn't provide them.
+func generateOllamaToolCallID() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
 	return "call_" + hex.EncodeToString(b)
 }
 
-// convertFromOllamaMessage converts Ollama Message to models.ChatMessage
-func convertFromOllamaMessage(msg Message) *models.ChatMessage {
-	var parts []models.ChatMessagePart
+// convertFromOllamaMessage converts Ollama OllamaMessage to models.ChatMessage
+func convertFromOllamaMessage(msg OllamaMessage) *ChatMessage {
+	var parts []ChatMessagePart
 
 	// Add text content if present
 	if msg.Content != "" {
-		parts = append(parts, models.ChatMessagePart{Text: msg.Content})
+		parts = append(parts, ChatMessagePart{Text: msg.Content})
 	}
 
 	// Add tool calls if present
 	for _, tc := range msg.ToolCalls {
-		parts = append(parts, models.ChatMessagePart{
+		parts = append(parts, ChatMessagePart{
 			ToolCall: &tool.ToolCall{
-				ID:        generateToolCallID(),
+				ID:        generateOllamaToolCallID(),
 				Function:  tc.Function.Name,
 				Arguments: tool.NewToolValue(tc.Function.Arguments),
 			},
 		})
 	}
 
-	return &models.ChatMessage{
-		Role:  models.ChatRole(msg.Role),
+	return &ChatMessage{
+		Role:  ChatRole(msg.Role),
 		Parts: parts,
 	}
 }
 
-// convertToolsToOllama converts tool.ToolInfo to Ollama Tool format
-func convertToolsToOllama(tools []tool.ToolInfo) []Tool {
+// convertToolsToOllama converts tool.ToolInfo to Ollama OllamaTool format
+func convertToolsToOllama(tools []tool.ToolInfo) []OllamaTool {
 	if len(tools) == 0 {
 		return nil
 	}
 
-	ollamaTools := make([]Tool, len(tools))
+	ollamaTools := make([]OllamaTool, len(tools))
 	for i, t := range tools {
 		// Convert ToolSchema to map[string]interface{}
 		schemaJSON, _ := json.Marshal(t.Schema)
 		var schemaMap map[string]interface{}
 		json.Unmarshal(schemaJSON, &schemaMap)
 
-		ollamaTools[i] = Tool{
+		ollamaTools[i] = OllamaTool{
 			Type: "function",
-			Function: ToolFunction{
+			Function: OllamaToolFunction{
 				Name:        t.Name,
 				Description: t.Description,
 				Parameters:  schemaMap,

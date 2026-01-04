@@ -1,4 +1,4 @@
-package anthropic
+package models
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/stretchr/testify/assert"
@@ -14,40 +13,42 @@ import (
 )
 
 const (
-	defaultTestURL = "https://api.anthropic.com"
-	testModelName  = "claude-sonnet-4-5-20250929"
-	testTimeout    = 30 * time.Second
-	connectTimeout = 5 * time.Second
+	defaultAnthropicTestURL = "https://api.anthropic.com"
+	testAnthropicModelName  = "claude-sonnet-4-5-20250929"
+	testAnthropicTimeout    = 30 * time.Second
+	connectAnthropicTimeout = 5 * time.Second
 )
 
-// messagesResponseJSON converts a MessagesResponse to JSON string.
-func messagesResponseJSON(response MessagesResponse) string {
+// anthropicMessagesResponseJSON converts a AnthropicMessagesResponse to JSON string.
+// TODO remove this function
+func anthropicMessagesResponseJSON(response AnthropicMessagesResponse) string {
 	data, _ := json.Marshal(response)
 	return string(data)
 }
 
-// listModelsResponseJSON converts a ModelsListResponse to JSON string.
-func listModelsResponseJSON(response ModelsListResponse) string {
+// anthropicListModelsResponseJSON converts a AnthropicModelsListResponse to JSON string.
+// TODO remove this function
+func anthropicListModelsResponseJSON(response AnthropicModelsListResponse) string {
 	data, _ := json.Marshal(response)
 	return string(data)
 }
 
-// testClient holds either a real or mock client and provides cleanup
-type testClient struct {
+// anthropicTestClient holds either a real or mock client and provides cleanup
+type anthropicTestClient struct {
 	Client *AnthropicClient
 	Mock   *testutil.MockHTTPServer
 }
 
 // Close cleans up the test client resources
-func (tc *testClient) Close() {
+func (tc *anthropicTestClient) Close() {
 	if tc.Mock != nil {
 		tc.Mock.Close()
 	}
 }
 
-// getTestClient returns a client for testing - either real or mock based on integration mode
+// getAnthropicTestClient returns a client for testing - either real or mock based on integration mode
 // For mock mode, it also returns the mock server for adding responses
-func getTestClient(t *testing.T) *testClient {
+func getAnthropicTestClient(t *testing.T) *anthropicTestClient {
 	t.Helper()
 
 	if testutil.IntegTestEnabled("anthropic") {
@@ -56,14 +57,14 @@ func getTestClient(t *testing.T) *testClient {
 			t.Skip("Skipping test: _integ/anthropic.key not configured")
 		}
 
-		client, err := NewAnthropicClient(defaultTestURL, &models.ModelConnectionOptions{
+		client, err := NewAnthropicClient(defaultAnthropicTestURL, &ModelConnectionOptions{
 			APIKey:         apiKey,
-			ConnectTimeout: connectTimeout,
-			RequestTimeout: testTimeout,
+			ConnectTimeout: connectAnthropicTimeout,
+			RequestTimeout: testAnthropicTimeout,
 		})
 		require.NoError(t, err)
 
-		return &testClient{Client: client}
+		return &anthropicTestClient{Client: client}
 	}
 
 	// Create mock server
@@ -71,15 +72,15 @@ func getTestClient(t *testing.T) *testClient {
 	client, err := NewAnthropicClientWithHTTPClient(mock.URL(), mock.Client())
 	require.NoError(t, err)
 
-	return &testClient{Client: client, Mock: mock}
+	return &anthropicTestClient{Client: client, Mock: mock}
 }
 
 func TestNewAnthropicClient(t *testing.T) {
 	t.Run("creates client with valid configuration", func(t *testing.T) {
-		client, err := NewAnthropicClient(defaultTestURL, &models.ModelConnectionOptions{
+		client, err := NewAnthropicClient(defaultAnthropicTestURL, &ModelConnectionOptions{
 			APIKey:         "test-api-key",
-			ConnectTimeout: connectTimeout,
-			RequestTimeout: testTimeout,
+			ConnectTimeout: connectAnthropicTimeout,
+			RequestTimeout: testAnthropicTimeout,
 		})
 
 		require.NoError(t, err)
@@ -87,7 +88,7 @@ func TestNewAnthropicClient(t *testing.T) {
 	})
 
 	t.Run("creates client with nil options", func(t *testing.T) {
-		client, err := NewAnthropicClient(defaultTestURL, nil)
+		client, err := NewAnthropicClient(defaultAnthropicTestURL, nil)
 
 		require.NoError(t, err)
 		assert.NotNil(t, client)
@@ -121,22 +122,22 @@ func TestNewAnthropicClientWithHTTPClient(t *testing.T) {
 	})
 
 	t.Run("returns error for nil HTTP client", func(t *testing.T) {
-		_, err := NewAnthropicClientWithHTTPClient(defaultTestURL, nil)
+		_, err := NewAnthropicClientWithHTTPClient(defaultAnthropicTestURL, nil)
 
 		assert.Error(t, err)
 	})
 }
 
 func TestAnthropicClient_ListModels(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getAnthropicTestClient(t)
 	defer tc.Close()
 
 	// Setup mock response if using mock
 	if tc.Mock != nil {
-		modelsResponse := listModelsResponseJSON(ModelsListResponse{
-			Data: []ModelInfo{
+		modelsResponse := anthropicListModelsResponseJSON(AnthropicModelsListResponse{
+			Data: []AnthropicModelInfo{
 				{
-					ID:          testModelName,
+					ID:          testAnthropicModelName,
 					CreatedAt:   "2024-01-01T00:00:00Z",
 					DisplayName: "Claude Sonnet 4.5",
 					Type:        "model",
@@ -175,30 +176,30 @@ func TestAnthropicClient_ListModels(t *testing.T) {
 
 		found := false
 		for _, model := range modelList {
-			if model.Name == testModelName {
+			if model.Name == testAnthropicModelName {
 				found = true
 				break
 			}
 		}
 
-		assert.True(t, found, "expected test model %s to be available", testModelName)
+		assert.True(t, found, "expected test model %s to be available", testAnthropicModelName)
 	})
 }
 
 func TestAnthropicClient_ChatModel(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getAnthropicTestClient(t)
 	defer tc.Close()
 
 	ctx := context.Background()
 
 	t.Run("creates chat model with model name and options", func(t *testing.T) {
-		options := &models.ChatOptions{
+		options := &ChatOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, options)
 
 		assert.NotNil(t, chatModel)
 	})
@@ -206,31 +207,31 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	t.Run("sends chat message and gets response", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
 				ID:   "msg_test123",
 				Type: "message",
 				Role: "assistant",
-				Content: []ResponseContent{
+				Content: []AnthropicResponseContent{
 					{Type: "text", Text: "4"},
 				},
-				Model:      testModelName,
+				Model:      testAnthropicModelName,
 				StopReason: "end_turn",
-				Usage:      UsageInfo{InputTokens: 10, OutputTokens: 5},
+				Usage:      AnthropicUsageInfo{InputTokens: 10, OutputTokens: 5},
 			}))
 		}
 
-		options := &models.ChatOptions{
+		options := &ChatOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, options)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "What is 2+2? Answer with just the number."}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "What is 2+2? Answer with just the number."}},
 			},
 		}
 
@@ -238,7 +239,7 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
-		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+		assert.Equal(t, ChatRoleAssistant, response.Role)
 		assert.NotEmpty(t, response.Parts)
 		assert.Greater(t, len(response.GetText()), 0)
 	})
@@ -246,28 +247,28 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	t.Run("handles context with timeout", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
 				ID:   "msg_test124",
 				Type: "message",
 				Role: "assistant",
-				Content: []ResponseContent{
+				Content: []AnthropicResponseContent{
 					{Type: "text", Text: "Hello!"},
 				},
-				Model:      testModelName,
+				Model:      testAnthropicModelName,
 				StopReason: "end_turn",
-				Usage:      UsageInfo{InputTokens: 10, OutputTokens: 5},
+				Usage:      AnthropicUsageInfo{InputTokens: 10, OutputTokens: 5},
 			}))
 		}
 
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
@@ -280,29 +281,29 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	t.Run("handles system and user messages", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
 				ID:   "msg_test125",
 				Type: "message",
 				Role: "assistant",
-				Content: []ResponseContent{
+				Content: []AnthropicResponseContent{
 					{Type: "text", Text: "HELLO"},
 				},
-				Model:      testModelName,
+				Model:      testAnthropicModelName,
 				StopReason: "end_turn",
-				Usage:      UsageInfo{InputTokens: 15, OutputTokens: 3},
+				Usage:      AnthropicUsageInfo{InputTokens: 15, OutputTokens: 3},
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleSystem,
-				Parts: []models.ChatMessagePart{{Text: "You are a helpful assistant that always responds in uppercase."}},
+				Role:  ChatRoleSystem,
+				Parts: []ChatMessagePart{{Text: "You are a helpful assistant that always responds in uppercase."}},
 			},
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "hello"}},
 			},
 		}
 
@@ -310,20 +311,20 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
-		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+		assert.Equal(t, ChatRoleAssistant, response.Role)
 	})
 
 	t.Run("returns error for empty messages", func(t *testing.T) {
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
-		response, err := chatModel.Chat(ctx, []*models.ChatMessage{}, nil, nil)
+		response, err := chatModel.Chat(ctx, []*ChatMessage{}, nil, nil)
 
 		assert.Error(t, err)
 		assert.Nil(t, response)
 	})
 
 	t.Run("returns error for nil messages", func(t *testing.T) {
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
 		response, err := chatModel.Chat(ctx, nil, nil, nil)
 
@@ -334,31 +335,31 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	t.Run("uses default options when none provided to Chat", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
 				ID:   "msg_test126",
 				Type: "message",
 				Role: "assistant",
-				Content: []ResponseContent{
+				Content: []AnthropicResponseContent{
 					{Type: "text", Text: "Hello!"},
 				},
-				Model:      testModelName,
+				Model:      testAnthropicModelName,
 				StopReason: "end_turn",
-				Usage:      UsageInfo{InputTokens: 10, OutputTokens: 5},
+				Usage:      AnthropicUsageInfo{InputTokens: 10, OutputTokens: 5},
 			}))
 		}
 
-		defaultOptions := &models.ChatOptions{
+		defaultOptions := &ChatOptions{
 			Temperature: 0.5,
 			TopP:        0.8,
 			TopK:        30,
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, defaultOptions)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, defaultOptions)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
@@ -370,7 +371,7 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 }
 
 func TestAnthropicClient_ChatModelStream(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getAnthropicTestClient(t)
 	defer tc.Close()
 
 	ctx := context.Background()
@@ -379,7 +380,7 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
-				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test127","type":"message","role":"assistant","content":[],"model":"`+testModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
+				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test127","type":"message","role":"assistant","content":[],"model":"`+testAnthropicModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
 				`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
 				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"1"}}`,
 				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n2"}}`,
@@ -388,28 +389,28 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 			)
 		}
 
-		options := &models.ChatOptions{
+		options := &ChatOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, options)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Count from 1 to 5, one number per line."}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Count from 1 to 5, one number per line."}},
 			},
 		}
 
 		iterator := chatModel.ChatStream(ctx, messages, nil, nil)
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			assert.NotNil(t, fragment)
-			assert.Equal(t, models.ChatRoleAssistant, fragment.Role)
+			assert.Equal(t, ChatRoleAssistant, fragment.Role)
 			assert.NotEmpty(t, fragment.Parts)
 			fragments = append(fragments, fragment)
 		}
@@ -422,7 +423,7 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
-				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test128","type":"message","role":"assistant","content":[],"model":"`+testModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
+				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test128","type":"message","role":"assistant","content":[],"model":"`+testAnthropicModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
 				`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
 				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Once upon a time"}}`,
 				`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
@@ -431,12 +432,12 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 
 		ctxWithCancel, cancel := context.WithCancel(ctx)
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Write a long story about a cat."}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Write a long story about a cat."}},
 			},
 		}
 
@@ -461,7 +462,7 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
-				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test129","type":"message","role":"assistant","content":[],"model":"`+testModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
+				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test129","type":"message","role":"assistant","content":[],"model":"`+testAnthropicModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
 				`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
 				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello!"}}`,
 				`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
@@ -471,19 +472,19 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
 		iterator := chatModel.ChatStream(ctxWithTimeout, messages, nil, nil)
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			fragments = append(fragments, fragment)
 		}
@@ -492,12 +493,12 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("returns no fragments for empty messages", func(t *testing.T) {
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
-		iterator := chatModel.ChatStream(ctx, []*models.ChatMessage{}, nil, nil)
+		iterator := chatModel.ChatStream(ctx, []*ChatMessage{}, nil, nil)
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			fragments = append(fragments, fragment)
 		}
@@ -506,12 +507,12 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("returns no fragments for nil messages", func(t *testing.T) {
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
 		iterator := chatModel.ChatStream(ctx, nil, nil, nil)
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			fragments = append(fragments, fragment)
 		}
@@ -523,19 +524,19 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
-				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test130","type":"message","role":"assistant","content":[],"model":"`+testModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
+				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test130","type":"message","role":"assistant","content":[],"model":"`+testAnthropicModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
 				`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
 				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello!"}}`,
 				`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
 			)
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
@@ -556,7 +557,7 @@ func TestAnthropicClient_ChatModelStream(t *testing.T) {
 }
 
 func TestAnthropicClient_EmbeddingModel(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getAnthropicTestClient(t)
 	defer tc.Close()
 
 	ctx := context.Background()
@@ -575,22 +576,22 @@ func TestAnthropicClient_EmbeddingModel(t *testing.T) {
 }
 
 func TestAnthropicClient_ToolCalling(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getAnthropicTestClient(t)
 	defer tc.Close()
 
 	ctx := context.Background()
 
 	// Define a simple weather tool for testing
-	weatherTool := createWeatherToolInfo()
+	weatherTool := createAnthropicWeatherToolInfo()
 
 	t.Run("sends tool definitions to LLM and receives tool call", func(t *testing.T) {
 		// Setup mock response with tool call if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
 				ID:   "msg_test131",
 				Type: "message",
 				Role: "assistant",
-				Content: []ResponseContent{
+				Content: []AnthropicResponseContent{
 					{
 						Type: "tool_use",
 						ID:   "toolu_test123",
@@ -601,18 +602,18 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 						},
 					},
 				},
-				Model:      testModelName,
+				Model:      testAnthropicModelName,
 				StopReason: "tool_use",
-				Usage:      UsageInfo{InputTokens: 20, OutputTokens: 15},
+				Usage:      AnthropicUsageInfo{InputTokens: 20, OutputTokens: 15},
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "What is the weather in San Francisco?"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "What is the weather in San Francisco?"}},
 			},
 		}
 
@@ -620,7 +621,7 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
-		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+		assert.Equal(t, ChatRoleAssistant, response.Role)
 
 		// The LLM should return a tool call
 		toolCalls := response.GetToolCalls()
@@ -646,11 +647,11 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
 			// First response: tool call
-			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
 				ID:   "msg_test131b",
 				Type: "message",
 				Role: "assistant",
-				Content: []ResponseContent{
+				Content: []AnthropicResponseContent{
 					{
 						Type: "tool_use",
 						ID:   "toolu_test123b",
@@ -661,31 +662,31 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 						},
 					},
 				},
-				Model:      testModelName,
+				Model:      testAnthropicModelName,
 				StopReason: "tool_use",
-				Usage:      UsageInfo{InputTokens: 20, OutputTokens: 15},
+				Usage:      AnthropicUsageInfo{InputTokens: 20, OutputTokens: 15},
 			}))
 			// Second response: final answer after tool execution
-			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
 				ID:   "msg_test131c",
 				Type: "message",
 				Role: "assistant",
-				Content: []ResponseContent{
+				Content: []AnthropicResponseContent{
 					{Type: "text", Text: "The weather in San Francisco is currently 72°F and sunny."},
 				},
-				Model:      testModelName,
+				Model:      testAnthropicModelName,
 				StopReason: "end_turn",
-				Usage:      UsageInfo{InputTokens: 30, OutputTokens: 20},
+				Usage:      AnthropicUsageInfo{InputTokens: 30, OutputTokens: 20},
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
 		// First message: user asks about weather
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "What is the weather in San Francisco?"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "What is the weather in San Francisco?"}},
 			},
 		}
 
@@ -708,14 +709,14 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 		}
 
 		// Add tool response to conversation
-		messages = append(messages, models.NewToolResponseMessage(toolResponse))
+		messages = append(messages, NewToolResponseMessage(toolResponse))
 
 		// Send tool response back to LLM
 		response2, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool})
 
 		require.NoError(t, err)
 		assert.NotNil(t, response2)
-		assert.Equal(t, models.ChatRoleAssistant, response2.Role)
+		assert.Equal(t, ChatRoleAssistant, response2.Role)
 
 		// The final response should contain text (not tool calls)
 		text := response2.GetText()
@@ -729,11 +730,11 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 	t.Run("handles multiple tool calls in conversation", func(t *testing.T) {
 		// Setup mock response with multiple tool calls if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
 				ID:   "msg_test132",
 				Type: "message",
 				Role: "assistant",
-				Content: []ResponseContent{
+				Content: []AnthropicResponseContent{
 					{
 						Type: "tool_use",
 						ID:   "toolu_test124",
@@ -751,22 +752,22 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 						},
 					},
 				},
-				Model:      testModelName,
+				Model:      testAnthropicModelName,
 				StopReason: "tool_use",
-				Usage:      UsageInfo{InputTokens: 25, OutputTokens: 20},
+				Usage:      AnthropicUsageInfo{InputTokens: 25, OutputTokens: 20},
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
 		// Define multiple tools
-		weatherTool := createWeatherToolInfo()
-		timeTool := createTimeToolInfo()
+		weatherTool := createAnthropicWeatherToolInfo()
+		timeTool := createAnthropicTimeToolInfo()
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "What is the weather and current time in San Francisco?"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "What is the weather and current time in San Francisco?"}},
 			},
 		}
 
@@ -790,11 +791,11 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 	t.Run("handles interleaved text and tool calls", func(t *testing.T) {
 		// Setup mock response with tool call if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
 				ID:   "msg_test133",
 				Type: "message",
 				Role: "assistant",
-				Content: []ResponseContent{
+				Content: []AnthropicResponseContent{
 					{
 						Type: "tool_use",
 						ID:   "toolu_test126",
@@ -804,18 +805,18 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 						},
 					},
 				},
-				Model:      testModelName,
+				Model:      testAnthropicModelName,
 				StopReason: "tool_use",
-				Usage:      UsageInfo{InputTokens: 25, OutputTokens: 15},
+				Usage:      AnthropicUsageInfo{InputTokens: 25, OutputTokens: 15},
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Check the weather in Boston and tell me if I should bring an umbrella."}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Check the weather in Boston and tell me if I should bring an umbrella."}},
 			},
 		}
 
@@ -841,39 +842,39 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 }
 
 func TestAnthropicClient_ToolCallingStream(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getAnthropicTestClient(t)
 	defer tc.Close()
 
 	ctx := context.Background()
 
-	weatherTool := createWeatherToolInfo()
+	weatherTool := createAnthropicWeatherToolInfo()
 
 	t.Run("streams tool calls properly reassembled from chunks", func(t *testing.T) {
 		// Setup mock streaming response with tool call if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
-				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test134","type":"message","role":"assistant","content":[],"model":"`+testModelName+`","usage":{"input_tokens":20,"output_tokens":0}}}`,
+				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test134","type":"message","role":"assistant","content":[],"model":"`+testAnthropicModelName+`","usage":{"input_tokens":20,"output_tokens":0}}}`,
 				`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_test127","name":"get_weather","input":{"location":"Seattle, WA"}}}`,
 				`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
 			)
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "What is the weather in Seattle?"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "What is the weather in Seattle?"}},
 			},
 		}
 
 		iterator := chatModel.ChatStream(ctx, messages, nil, []tool.ToolInfo{weatherTool})
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			assert.NotNil(t, fragment)
-			assert.Equal(t, models.ChatRoleAssistant, fragment.Role)
+			assert.Equal(t, ChatRoleAssistant, fragment.Role)
 			fragments = append(fragments, fragment)
 		}
 
@@ -889,11 +890,11 @@ func TestAnthropicClient_ToolCallingStream(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
 			// First response: tool call (non-streaming)
-			tc.Mock.AddRestResponse("/v1/messages", "POST", messagesResponseJSON(MessagesResponse{
+			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
 				ID:   "msg_test134a",
 				Type: "message",
 				Role: "assistant",
-				Content: []ResponseContent{
+				Content: []AnthropicResponseContent{
 					{
 						Type: "tool_use",
 						ID:   "toolu_test128",
@@ -903,13 +904,13 @@ func TestAnthropicClient_ToolCallingStream(t *testing.T) {
 						},
 					},
 				},
-				Model:      testModelName,
+				Model:      testAnthropicModelName,
 				StopReason: "tool_use",
-				Usage:      UsageInfo{InputTokens: 20, OutputTokens: 15},
+				Usage:      AnthropicUsageInfo{InputTokens: 20, OutputTokens: 15},
 			}))
 			// Second response: streaming response after tool execution
 			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
-				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test134b","type":"message","role":"assistant","content":[],"model":"`+testModelName+`","usage":{"input_tokens":30,"output_tokens":0}}}`,
+				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test134b","type":"message","role":"assistant","content":[],"model":"`+testAnthropicModelName+`","usage":{"input_tokens":30,"output_tokens":0}}}`,
 				`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
 				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"The weather in Portland is "}}`,
 				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"65°F and rainy."}}`,
@@ -917,13 +918,13 @@ func TestAnthropicClient_ToolCallingStream(t *testing.T) {
 			)
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
 
 		// First get a tool call (non-streaming for simplicity)
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "What is the weather in Portland?"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "What is the weather in Portland?"}},
 			},
 		}
 
@@ -942,13 +943,13 @@ func TestAnthropicClient_ToolCallingStream(t *testing.T) {
 			Result: tool.NewToolValue(map[string]interface{}{"temperature": 65, "condition": "rainy"}),
 			Done:   true,
 		}
-		messages = append(messages, models.NewToolResponseMessage(toolResponse))
+		messages = append(messages, NewToolResponseMessage(toolResponse))
 
 		// Stream the final response
 		iterator := chatModel.ChatStream(ctx, messages, nil, []tool.ToolInfo{weatherTool})
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		var fullText string
 		for fragment := range iterator {
 			assert.NotNil(t, fragment)
@@ -964,7 +965,7 @@ func TestAnthropicClient_ToolCallingStream(t *testing.T) {
 
 func TestAnthropicClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		client, err := NewAnthropicClient("http://nonexistent-host:11434", &models.ModelConnectionOptions{
+		client, err := NewAnthropicClient("http://nonexistent-host:11434", &ModelConnectionOptions{
 			APIKey:         "test-key",
 			ConnectTimeout: 1 * time.Second,
 			RequestTimeout: 2 * time.Second,
@@ -973,13 +974,13 @@ func TestAnthropicClient_ErrorHandling(t *testing.T) {
 
 		_, err = client.ListModels()
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, models.ErrEndpointUnavailable)
+		assert.ErrorIs(t, err, ErrEndpointUnavailable)
 	})
 }
 
 // Helper functions for creating test tools
 
-func createWeatherToolInfo() tool.ToolInfo {
+func createAnthropicWeatherToolInfo() tool.ToolInfo {
 	schema := tool.NewToolSchema()
 	schema.AddProperty("location", tool.PropertySchema{
 		Type:        tool.SchemaTypeString,
@@ -998,7 +999,7 @@ func createWeatherToolInfo() tool.ToolInfo {
 	}
 }
 
-func createTimeToolInfo() tool.ToolInfo {
+func createAnthropicTimeToolInfo() tool.ToolInfo {
 	schema := tool.NewToolSchema()
 	schema.AddProperty("location", tool.PropertySchema{
 		Type:        tool.SchemaTypeString,

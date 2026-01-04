@@ -1,4 +1,4 @@
-package ollama
+package models
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/stretchr/testify/assert"
@@ -16,27 +15,27 @@ import (
 )
 
 const (
-	defaultOllamaHost  = "http://localhost:11434"
-	testModelName      = "devstral-small-2:latest"
-	testEmbedModelName = "nomic-embed-text:latest"
-	testTimeout        = 30 * time.Second
-	connectTimeout     = 5 * time.Second
+	defaultOllamaHost        = "http://localhost:11434"
+	testOllamaModelName      = "devstral-small-2:latest"
+	testOllamaEmbedModelName = "nomic-embed-text:latest"
+	testOllamaTimeout        = 30 * time.Second
+	connectOllamaTimeout     = 5 * time.Second
 )
 
-// chatResponseJSON converts a ChatResponse to JSON string.
-func chatResponseJSON(response ChatResponse) string {
+// ollamaChatResponseJSON converts a OllamaChatResponse to JSON string.
+func ollamaChatResponseJSON(response OllamaChatResponse) string {
 	data, _ := json.Marshal(response)
 	return string(data)
 }
 
-// embedResponseJSON converts an EmbedResponse to JSON string.
-func embedResponseJSON(response EmbedResponse) string {
+// ollamaEmbedResponseJSON converts an OllamaEmbedResponse to JSON string.
+func ollamaEmbedResponseJSON(response OllamaEmbedResponse) string {
 	data, _ := json.Marshal(response)
 	return string(data)
 }
 
-// listModelsResponseJSON converts a ListModelsResponse to JSON string.
-func listModelsResponseJSON(response ListModelsResponse) string {
+// ollamaListModelsResponseJSON converts a OllamaListModelsResponse to JSON string.
+func ollamaListModelsResponseJSON(response OllamaListModelsResponse) string {
 	data, _ := json.Marshal(response)
 	return string(data)
 }
@@ -49,22 +48,22 @@ func getOllamaHost() string {
 	return defaultOllamaHost
 }
 
-// testClient holds either a real or mock client and provides cleanup
-type testClient struct {
+// ollamaTestClient holds either a real or mock client and provides cleanup
+type ollamaTestClient struct {
 	Client *OllamaClient
 	Mock   *testutil.MockHTTPServer
 }
 
 // Close cleans up the test client resources
-func (tc *testClient) Close() {
+func (tc *ollamaTestClient) Close() {
 	if tc.Mock != nil {
 		tc.Mock.Close()
 	}
 }
 
-// getTestClient returns a client for testing - either real or mock based on integration mode
+// getOllamaTestClient returns a client for testing - either real or mock based on integration mode
 // For mock mode, it also returns the mock server for adding responses
-func getTestClient(t *testing.T) *testClient {
+func getOllamaTestClient(t *testing.T) *ollamaTestClient {
 	t.Helper()
 
 	if testutil.IntegTestEnabled("ollama") {
@@ -73,13 +72,13 @@ func getTestClient(t *testing.T) *testClient {
 			t.Skip("Skipping test: _integ/ollama.url not configured")
 		}
 
-		client, err := NewOllamaClient(url, &models.ModelConnectionOptions{
-			ConnectTimeout: connectTimeout,
-			RequestTimeout: testTimeout,
+		client, err := NewOllamaClient(url, &ModelConnectionOptions{
+			ConnectTimeout: connectOllamaTimeout,
+			RequestTimeout: testOllamaTimeout,
 		})
 		require.NoError(t, err)
 
-		return &testClient{Client: client}
+		return &ollamaTestClient{Client: client}
 	}
 
 	// Create mock server
@@ -87,14 +86,14 @@ func getTestClient(t *testing.T) *testClient {
 	client, err := NewOllamaClientWithHTTPClient(mock.URL(), mock.Client())
 	require.NoError(t, err)
 
-	return &testClient{Client: client, Mock: mock}
+	return &ollamaTestClient{Client: client, Mock: mock}
 }
 
 func TestNewOllamaClient(t *testing.T) {
 	t.Run("creates client with valid configuration", func(t *testing.T) {
-		client, err := NewOllamaClient(getOllamaHost(), &models.ModelConnectionOptions{
-			ConnectTimeout: connectTimeout,
-			RequestTimeout: testTimeout,
+		client, err := NewOllamaClient(getOllamaHost(), &ModelConnectionOptions{
+			ConnectTimeout: connectOllamaTimeout,
+			RequestTimeout: testOllamaTimeout,
 		})
 
 		require.NoError(t, err)
@@ -143,28 +142,28 @@ func TestNewOllamaClientWithHTTPClient(t *testing.T) {
 }
 
 func TestOllamaClient_ListModels(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getOllamaTestClient(t)
 	defer tc.Close()
 
 	// Setup mock response if using mock
 	if tc.Mock != nil {
-		modelsResponse := listModelsResponseJSON(ListModelsResponse{
-			Models: []ModelInfo{
+		modelsResponse := ollamaListModelsResponseJSON(OllamaListModelsResponse{
+			Models: []OllamaModelInfo{
 				{
-					Name:       testModelName,
-					Model:      testModelName,
+					Name:       testOllamaModelName,
+					Model:      testOllamaModelName,
 					ModifiedAt: "2024-01-01T00:00:00Z",
 					Size:       1000000000,
-					Details: ModelDetails{
+					Details: OllamaModelDetails{
 						Family: "llama",
 					},
 				},
 				{
-					Name:       testEmbedModelName,
-					Model:      testEmbedModelName,
+					Name:       testOllamaEmbedModelName,
+					Model:      testOllamaEmbedModelName,
 					ModifiedAt: "2024-01-01T00:00:00Z",
 					Size:       500000000,
-					Details: ModelDetails{
+					Details: OllamaModelDetails{
 						Family: "nomic",
 					},
 				},
@@ -197,31 +196,31 @@ func TestOllamaClient_ListModels(t *testing.T) {
 
 		found := false
 		for _, model := range modelList {
-			if model.Name == testModelName {
+			if model.Name == testOllamaModelName {
 				found = true
 				assert.NotEmpty(t, model.Family)
 				break
 			}
 		}
 
-		assert.True(t, found, "expected test model %s to be available", testModelName)
+		assert.True(t, found, "expected test model %s to be available", testOllamaModelName)
 	})
 }
 
 func TestOllamaClient_ChatModel(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getOllamaTestClient(t)
 	defer tc.Close()
 
 	ctx := context.Background()
 
 	t.Run("creates chat model with model name and options", func(t *testing.T) {
-		options := &models.ChatOptions{
+		options := &ChatOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, options)
 
 		assert.NotNil(t, chatModel)
 	})
@@ -229,10 +228,10 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 	t.Run("sends chat message and gets response", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
-				Model:     testModelName,
+			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
+				Model:     testOllamaModelName,
 				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: Message{
+				Message: OllamaMessage{
 					Role:    "assistant",
 					Content: "4",
 				},
@@ -241,18 +240,18 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 			}))
 		}
 
-		options := &models.ChatOptions{
+		options := &ChatOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, options)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "What is 2+2? Answer with just the number."}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "What is 2+2? Answer with just the number."}},
 			},
 		}
 
@@ -260,7 +259,7 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
-		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+		assert.Equal(t, ChatRoleAssistant, response.Role)
 		assert.NotEmpty(t, response.Parts)
 		assert.Greater(t, len(response.GetText()), 0)
 	})
@@ -268,10 +267,10 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 	t.Run("handles context with timeout", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
-				Model:     testModelName,
+			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
+				Model:     testOllamaModelName,
 				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: Message{
+				Message: OllamaMessage{
 					Role:    "assistant",
 					Content: "Hello!",
 				},
@@ -283,12 +282,12 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
@@ -301,10 +300,10 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 	t.Run("handles system and user messages", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
-				Model:     testModelName,
+			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
+				Model:     testOllamaModelName,
 				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: Message{
+				Message: OllamaMessage{
 					Role:    "assistant",
 					Content: "HELLO!",
 				},
@@ -313,16 +312,16 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleSystem,
-				Parts: []models.ChatMessagePart{{Text: "You are a helpful assistant that always responds in uppercase."}},
+				Role:  ChatRoleSystem,
+				Parts: []ChatMessagePart{{Text: "You are a helpful assistant that always responds in uppercase."}},
 			},
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "hello"}},
 			},
 		}
 
@@ -330,20 +329,20 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
-		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+		assert.Equal(t, ChatRoleAssistant, response.Role)
 	})
 
 	t.Run("returns error for empty messages", func(t *testing.T) {
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, nil)
 
-		response, err := chatModel.Chat(ctx, []*models.ChatMessage{}, nil, nil)
+		response, err := chatModel.Chat(ctx, []*ChatMessage{}, nil, nil)
 
 		assert.Error(t, err)
 		assert.Nil(t, response)
 	})
 
 	t.Run("returns error for nil messages", func(t *testing.T) {
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, nil)
 
 		response, err := chatModel.Chat(ctx, nil, nil, nil)
 
@@ -354,10 +353,10 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 	t.Run("uses default options when none provided to Chat", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
-				Model:     testModelName,
+			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
+				Model:     testOllamaModelName,
 				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: Message{
+				Message: OllamaMessage{
 					Role:    "assistant",
 					Content: "Hello!",
 				},
@@ -366,18 +365,18 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 			}))
 		}
 
-		defaultOptions := &models.ChatOptions{
+		defaultOptions := &ChatOptions{
 			Temperature: 0.5,
 			TopP:        0.8,
 			TopK:        30,
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, defaultOptions)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, defaultOptions)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
@@ -389,7 +388,7 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 }
 
 func TestOllamaClient_ChatModelStream(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getOllamaTestClient(t)
 	defer tc.Close()
 
 	ctx := context.Background()
@@ -398,56 +397,56 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				chatResponseJSON(ChatResponse{
-					Model:     testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:     testOllamaModelName,
 					CreatedAt: "2024-01-01T00:00:00Z",
-					Message:   Message{Role: "assistant", Content: "1"},
+					Message:   OllamaMessage{Role: "assistant", Content: "1"},
 					Done:      false,
 				}),
-				chatResponseJSON(ChatResponse{
-					Model:     testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:     testOllamaModelName,
 					CreatedAt: "2024-01-01T00:00:01Z",
-					Message:   Message{Role: "assistant", Content: "\n2"},
+					Message:   OllamaMessage{Role: "assistant", Content: "\n2"},
 					Done:      false,
 				}),
-				chatResponseJSON(ChatResponse{
-					Model:     testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:     testOllamaModelName,
 					CreatedAt: "2024-01-01T00:00:02Z",
-					Message:   Message{Role: "assistant", Content: "\n3"},
+					Message:   OllamaMessage{Role: "assistant", Content: "\n3"},
 					Done:      false,
 				}),
-				chatResponseJSON(ChatResponse{
-					Model:      testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:      testOllamaModelName,
 					CreatedAt:  "2024-01-01T00:00:03Z",
-					Message:    Message{Role: "assistant", Content: ""},
+					Message:    OllamaMessage{Role: "assistant", Content: ""},
 					Done:       true,
 					DoneReason: "stop",
 				}),
 			)
 		}
 
-		options := &models.ChatOptions{
+		options := &ChatOptions{
 			Temperature: 0.7,
 			TopP:        0.9,
 			TopK:        40,
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, options)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, options)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Count from 1 to 5, one number per line."}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Count from 1 to 5, one number per line."}},
 			},
 		}
 
 		iterator := chatModel.ChatStream(ctx, messages, nil, nil)
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			assert.NotNil(t, fragment)
-			assert.Equal(t, models.ChatRoleAssistant, fragment.Role)
+			assert.Equal(t, ChatRoleAssistant, fragment.Role)
 			assert.NotEmpty(t, fragment.Parts)
 			fragments = append(fragments, fragment)
 		}
@@ -460,22 +459,22 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock (longer response for cancellation test)
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				chatResponseJSON(ChatResponse{
-					Model:     testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:     testOllamaModelName,
 					CreatedAt: "2024-01-01T00:00:00Z",
-					Message:   Message{Role: "assistant", Content: "Once upon a time"},
+					Message:   OllamaMessage{Role: "assistant", Content: "Once upon a time"},
 					Done:      false,
 				}),
-				chatResponseJSON(ChatResponse{
-					Model:     testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:     testOllamaModelName,
 					CreatedAt: "2024-01-01T00:00:01Z",
-					Message:   Message{Role: "assistant", Content: " there was a cat"},
+					Message:   OllamaMessage{Role: "assistant", Content: " there was a cat"},
 					Done:      false,
 				}),
-				chatResponseJSON(ChatResponse{
-					Model:      testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:      testOllamaModelName,
 					CreatedAt:  "2024-01-01T00:00:02Z",
-					Message:    Message{Role: "assistant", Content: ""},
+					Message:    OllamaMessage{Role: "assistant", Content: ""},
 					Done:       true,
 					DoneReason: "stop",
 				}),
@@ -484,12 +483,12 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 
 		ctxWithCancel, cancel := context.WithCancel(ctx)
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Write a long story about a cat."}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Write a long story about a cat."}},
 			},
 		}
 
@@ -514,16 +513,16 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				chatResponseJSON(ChatResponse{
-					Model:     testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:     testOllamaModelName,
 					CreatedAt: "2024-01-01T00:00:00Z",
-					Message:   Message{Role: "assistant", Content: "Hello!"},
+					Message:   OllamaMessage{Role: "assistant", Content: "Hello!"},
 					Done:      false,
 				}),
-				chatResponseJSON(ChatResponse{
-					Model:      testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:      testOllamaModelName,
 					CreatedAt:  "2024-01-01T00:00:01Z",
-					Message:    Message{Role: "assistant", Content: ""},
+					Message:    OllamaMessage{Role: "assistant", Content: ""},
 					Done:       true,
 					DoneReason: "stop",
 				}),
@@ -533,19 +532,19 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
 		iterator := chatModel.ChatStream(ctxWithTimeout, messages, nil, nil)
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			fragments = append(fragments, fragment)
 		}
@@ -557,39 +556,39 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				chatResponseJSON(ChatResponse{
-					Model:     testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:     testOllamaModelName,
 					CreatedAt: "2024-01-01T00:00:00Z",
-					Message:   Message{Role: "assistant", Content: "OK"},
+					Message:   OllamaMessage{Role: "assistant", Content: "OK"},
 					Done:      false,
 				}),
-				chatResponseJSON(ChatResponse{
-					Model:      testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:      testOllamaModelName,
 					CreatedAt:  "2024-01-01T00:00:01Z",
-					Message:    Message{Role: "assistant", Content: ""},
+					Message:    OllamaMessage{Role: "assistant", Content: ""},
 					Done:       true,
 					DoneReason: "stop",
 				}),
 			)
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleSystem,
-				Parts: []models.ChatMessagePart{{Text: "You are a helpful assistant that responds concisely."}},
+				Role:  ChatRoleSystem,
+				Parts: []ChatMessagePart{{Text: "You are a helpful assistant that responds concisely."}},
 			},
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say 'OK'"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say 'OK'"}},
 			},
 		}
 
 		iterator := chatModel.ChatStream(ctx, messages, nil, nil)
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			fragments = append(fragments, fragment)
 		}
@@ -597,17 +596,17 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		assert.Greater(t, len(fragments), 0)
 		// All fragments should have assistant role
 		for _, fragment := range fragments {
-			assert.Equal(t, models.ChatRoleAssistant, fragment.Role)
+			assert.Equal(t, ChatRoleAssistant, fragment.Role)
 		}
 	})
 
 	t.Run("returns no fragments for empty messages", func(t *testing.T) {
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, nil)
 
-		iterator := chatModel.ChatStream(ctx, []*models.ChatMessage{}, nil, nil)
+		iterator := chatModel.ChatStream(ctx, []*ChatMessage{}, nil, nil)
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			fragments = append(fragments, fragment)
 		}
@@ -616,12 +615,12 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 	})
 
 	t.Run("returns no fragments for nil messages", func(t *testing.T) {
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, nil)
 
 		iterator := chatModel.ChatStream(ctx, nil, nil, nil)
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		for fragment := range iterator {
 			fragments = append(fragments, fragment)
 		}
@@ -633,34 +632,34 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				chatResponseJSON(ChatResponse{
-					Model:     testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:     testOllamaModelName,
 					CreatedAt: "2024-01-01T00:00:00Z",
-					Message:   Message{Role: "assistant", Content: "Hello!"},
+					Message:   OllamaMessage{Role: "assistant", Content: "Hello!"},
 					Done:      false,
 				}),
-				chatResponseJSON(ChatResponse{
-					Model:      testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:      testOllamaModelName,
 					CreatedAt:  "2024-01-01T00:00:01Z",
-					Message:    Message{Role: "assistant", Content: ""},
+					Message:    OllamaMessage{Role: "assistant", Content: ""},
 					Done:       true,
 					DoneReason: "stop",
 				}),
 			)
 		}
 
-		defaultOptions := &models.ChatOptions{
+		defaultOptions := &ChatOptions{
 			Temperature: 0.5,
 			TopP:        0.8,
 			TopK:        30,
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, defaultOptions)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, defaultOptions)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
@@ -682,28 +681,28 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				chatResponseJSON(ChatResponse{
-					Model:     testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:     testOllamaModelName,
 					CreatedAt: "2024-01-01T00:00:00Z",
-					Message:   Message{Role: "assistant", Content: "Hello!"},
+					Message:   OllamaMessage{Role: "assistant", Content: "Hello!"},
 					Done:      false,
 				}),
-				chatResponseJSON(ChatResponse{
-					Model:      testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:      testOllamaModelName,
 					CreatedAt:  "2024-01-01T00:00:01Z",
-					Message:    Message{Role: "assistant", Content: ""},
+					Message:    OllamaMessage{Role: "assistant", Content: ""},
 					Done:       true,
 					DoneReason: "stop",
 				}),
 			)
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, nil)
+		chatModel := tc.Client.ChatModel(testOllamaModelName, nil)
 
-		messages := []*models.ChatMessage{
+		messages := []*ChatMessage{
 			{
-				Role:  models.ChatRoleUser,
-				Parts: []models.ChatMessagePart{{Text: "Say hello"}},
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Say hello"}},
 			},
 		}
 
@@ -724,13 +723,13 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 }
 
 func TestOllamaClient_EmbeddingModel(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getOllamaTestClient(t)
 	defer tc.Close()
 
 	ctx := context.Background()
 
 	t.Run("creates embedding model with model name", func(t *testing.T) {
-		embedModel := tc.Client.EmbeddingModel(testEmbedModelName)
+		embedModel := tc.Client.EmbeddingModel(testOllamaEmbedModelName)
 
 		assert.NotNil(t, embedModel)
 	})
@@ -738,13 +737,13 @@ func TestOllamaClient_EmbeddingModel(t *testing.T) {
 	t.Run("generates embeddings for text", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/embed", "POST", embedResponseJSON(EmbedResponse{
-				Model:      testEmbedModelName,
+			tc.Mock.AddRestResponse("/api/embed", "POST", ollamaEmbedResponseJSON(OllamaEmbedResponse{
+				Model:      testOllamaEmbedModelName,
 				Embeddings: [][]float64{{0.1, 0.2, 0.3, 0.4, 0.5}},
 			}))
 		}
 
-		embedModel := tc.Client.EmbeddingModel(testEmbedModelName)
+		embedModel := tc.Client.EmbeddingModel(testOllamaEmbedModelName)
 
 		embedding, err := embedModel.Embed(ctx, "Hello, world!")
 
@@ -757,13 +756,13 @@ func TestOllamaClient_EmbeddingModel(t *testing.T) {
 	t.Run("generates embeddings for different texts", func(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/embed", "POST", embedResponseJSON(EmbedResponse{
-				Model:      testEmbedModelName,
+			tc.Mock.AddRestResponse("/api/embed", "POST", ollamaEmbedResponseJSON(OllamaEmbedResponse{
+				Model:      testOllamaEmbedModelName,
 				Embeddings: [][]float64{{0.1, 0.2, 0.3, 0.4, 0.5}},
 			}))
 		}
 
-		embedModel := tc.Client.EmbeddingModel(testEmbedModelName)
+		embedModel := tc.Client.EmbeddingModel(testOllamaEmbedModelName)
 
 		embedding1, err := embedModel.Embed(ctx, "The quick brown fox")
 		require.NoError(t, err)
@@ -771,8 +770,8 @@ func TestOllamaClient_EmbeddingModel(t *testing.T) {
 
 		// For mock mode, we need to add another response
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/embed", "POST", embedResponseJSON(EmbedResponse{
-				Model:      testEmbedModelName,
+			tc.Mock.AddRestResponse("/api/embed", "POST", ollamaEmbedResponseJSON(OllamaEmbedResponse{
+				Model:      testOllamaEmbedModelName,
 				Embeddings: [][]float64{{0.2, 0.3, 0.4, 0.5, 0.6}},
 			}))
 		}
@@ -786,7 +785,7 @@ func TestOllamaClient_EmbeddingModel(t *testing.T) {
 	})
 
 	t.Run("returns error for empty input", func(t *testing.T) {
-		embedModel := tc.Client.EmbeddingModel(testEmbedModelName)
+		embedModel := tc.Client.EmbeddingModel(testOllamaEmbedModelName)
 
 		embedding, err := embedModel.Embed(ctx, "")
 
@@ -797,19 +796,19 @@ func TestOllamaClient_EmbeddingModel(t *testing.T) {
 
 func TestOllamaClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint not found", func(t *testing.T) {
-		client, err := NewOllamaClient("http://beha:11434/nonexistent", &models.ModelConnectionOptions{
-			ConnectTimeout: connectTimeout,
-			RequestTimeout: testTimeout,
+		client, err := NewOllamaClient("http://beha:11434/nonexistent", &ModelConnectionOptions{
+			ConnectTimeout: connectOllamaTimeout,
+			RequestTimeout: testOllamaTimeout,
 		})
 		require.NoError(t, err)
 
 		_, err = client.ListModels()
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, models.ErrEndpointNotFound)
+		assert.ErrorIs(t, err, ErrEndpointNotFound)
 	})
 
 	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		client, err := NewOllamaClient("http://nonexistent-host:11434", &models.ModelConnectionOptions{
+		client, err := NewOllamaClient("http://nonexistent-host:11434", &ModelConnectionOptions{
 			ConnectTimeout: 1 * time.Second,
 			RequestTimeout: 2 * time.Second,
 		})
@@ -817,12 +816,12 @@ func TestOllamaClient_ErrorHandling(t *testing.T) {
 
 		_, err = client.ListModels()
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, models.ErrEndpointUnavailable)
+		assert.ErrorIs(t, err, ErrEndpointUnavailable)
 	})
 }
 
 func TestOllamaClient_ToolCalling(t *testing.T) {
-	tc := getTestClient(t)
+	tc := getOllamaTestClient(t)
 	defer tc.Close()
 
 	ctx := context.Background()
@@ -852,14 +851,14 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 	t.Run("tool calls are properly passed to LLM", func(t *testing.T) {
 		// Setup mock response with tool call if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
-				Model:     testModelName,
+			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
+				Model:     testOllamaModelName,
 				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: Message{
+				Message: OllamaMessage{
 					Role: "assistant",
-					ToolCalls: []ToolCall{
+					ToolCalls: []OllamaToolCall{
 						{
-							Function: ToolCallFunction{
+							Function: OllamaToolCallFunction{
 								Name: "get_weather",
 								Arguments: map[string]interface{}{
 									"location": "Paris, France",
@@ -874,19 +873,19 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
+		chatModel := tc.Client.ChatModel(testOllamaModelName, &ChatOptions{
 			Temperature: 0.1,
 		})
 
-		messages := []*models.ChatMessage{
-			models.NewTextMessage(models.ChatRoleUser, "What's the weather like in Paris, France?"),
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "What's the weather like in Paris, France?"),
 		}
 
 		response, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool})
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
-		assert.Equal(t, models.ChatRoleAssistant, response.Role)
+		assert.Equal(t, ChatRoleAssistant, response.Role)
 
 		// The LLM should return a tool call
 		toolCalls := response.GetToolCalls()
@@ -909,14 +908,14 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
 			// First response: tool call
-			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
-				Model:     testModelName,
+			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
+				Model:     testOllamaModelName,
 				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: Message{
+				Message: OllamaMessage{
 					Role: "assistant",
-					ToolCalls: []ToolCall{
+					ToolCalls: []OllamaToolCall{
 						{
-							Function: ToolCallFunction{
+							Function: OllamaToolCallFunction{
 								Name: "get_weather",
 								Arguments: map[string]interface{}{
 									"location": "Tokyo",
@@ -929,10 +928,10 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 				DoneReason: "stop",
 			}))
 			// Second response: final answer after tool execution
-			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
-				Model:     testModelName,
+			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
+				Model:     testOllamaModelName,
 				CreatedAt: "2024-01-01T00:00:01Z",
-				Message: Message{
+				Message: OllamaMessage{
 					Role:    "assistant",
 					Content: "The weather in Tokyo is currently 18°C and cloudy.",
 				},
@@ -941,12 +940,12 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
+		chatModel := tc.Client.ChatModel(testOllamaModelName, &ChatOptions{
 			Temperature: 0.1,
 		})
 
-		messages := []*models.ChatMessage{
-			models.NewTextMessage(models.ChatRoleUser, "What's the weather like in Tokyo?"),
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "What's the weather like in Tokyo?"),
 		}
 
 		// First call - get tool call from LLM
@@ -968,14 +967,14 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 		}
 
 		// Add tool response to conversation
-		messages = append(messages, models.NewToolResponseMessage(toolResponse))
+		messages = append(messages, NewToolResponseMessage(toolResponse))
 
 		// Second call - LLM should process tool response
 		finalResponse, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool})
 
 		require.NoError(t, err)
 		assert.NotNil(t, finalResponse)
-		assert.Equal(t, models.ChatRoleAssistant, finalResponse.Role)
+		assert.Equal(t, ChatRoleAssistant, finalResponse.Role)
 
 		// The response should contain text (not tool calls) about weather
 		responseText := finalResponse.GetText()
@@ -994,14 +993,14 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 		if tc.Mock != nil {
 			// First response: streaming tool call
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				chatResponseJSON(ChatResponse{
-					Model:     testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:     testOllamaModelName,
 					CreatedAt: "2024-01-01T00:00:00Z",
-					Message: Message{
+					Message: OllamaMessage{
 						Role: "assistant",
-						ToolCalls: []ToolCall{
+						ToolCalls: []OllamaToolCall{
 							{
-								Function: ToolCallFunction{
+								Function: OllamaToolCallFunction{
 									Name: "get_weather",
 									Arguments: map[string]interface{}{
 										"location": "London",
@@ -1016,41 +1015,41 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 			)
 			// Second response: streaming text response after tool execution
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				chatResponseJSON(ChatResponse{
-					Model:     testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:     testOllamaModelName,
 					CreatedAt: "2024-01-01T00:00:01Z",
-					Message:   Message{Role: "assistant", Content: "The temperature in London is "},
+					Message:   OllamaMessage{Role: "assistant", Content: "The temperature in London is "},
 					Done:      false,
 				}),
-				chatResponseJSON(ChatResponse{
-					Model:     testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:     testOllamaModelName,
 					CreatedAt: "2024-01-01T00:00:02Z",
-					Message:   Message{Role: "assistant", Content: "15°C and it's rainy."},
+					Message:   OllamaMessage{Role: "assistant", Content: "15°C and it's rainy."},
 					Done:      false,
 				}),
-				chatResponseJSON(ChatResponse{
-					Model:      testModelName,
+				ollamaChatResponseJSON(OllamaChatResponse{
+					Model:      testOllamaModelName,
 					CreatedAt:  "2024-01-01T00:00:03Z",
-					Message:    Message{Role: "assistant", Content: ""},
+					Message:    OllamaMessage{Role: "assistant", Content: ""},
 					Done:       true,
 					DoneReason: "stop",
 				}),
 			)
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
+		chatModel := tc.Client.ChatModel(testOllamaModelName, &ChatOptions{
 			Temperature: 0.1,
 		})
 
-		messages := []*models.ChatMessage{
-			models.NewTextMessage(models.ChatRoleUser, "What's the weather in London? Please tell me the temperature."),
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "What's the weather in London? Please tell me the temperature."),
 		}
 
 		// First streaming call - get tool call from LLM
 		iterator := chatModel.ChatStream(ctx, messages, nil, []tool.ToolInfo{weatherTool})
 		require.NotNil(t, iterator)
 
-		var fragments []*models.ChatMessage
+		var fragments []*ChatMessage
 		var collectedToolCalls []*tool.ToolCall
 
 		for fragment := range iterator {
@@ -1064,15 +1063,15 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 
 		assert.Greater(t, len(fragments), 0, "expected to receive fragments")
 
-		// Tool calls might be split across fragments or come in one fragment
+		// OllamaTool calls might be split across fragments or come in one fragment
 		// We need to check if we received any tool calls
 		assert.NotEmpty(t, collectedToolCalls, "expected to receive tool calls in streaming response")
 
 		if len(collectedToolCalls) > 0 {
 			// Reconstruct the complete response
-			completeResponse := &models.ChatMessage{
-				Role:  models.ChatRoleAssistant,
-				Parts: []models.ChatMessagePart{},
+			completeResponse := &ChatMessage{
+				Role:  ChatRoleAssistant,
+				Parts: []ChatMessagePart{},
 			}
 
 			// Merge all fragments
@@ -1090,7 +1089,7 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 				Done:   true,
 			}
 
-			messages = append(messages, models.NewToolResponseMessage(toolResponse))
+			messages = append(messages, NewToolResponseMessage(toolResponse))
 
 			// Second streaming call - LLM processes tool response
 			iterator2 := chatModel.ChatStream(ctx, messages, nil, []tool.ToolInfo{weatherTool})
@@ -1138,14 +1137,14 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 
 		// Setup mock response with multiple tool calls if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
-				Model:     testModelName,
+			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
+				Model:     testOllamaModelName,
 				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: Message{
+				Message: OllamaMessage{
 					Role: "assistant",
-					ToolCalls: []ToolCall{
+					ToolCalls: []OllamaToolCall{
 						{
-							Function: ToolCallFunction{
+							Function: OllamaToolCallFunction{
 								Name: "get_weather",
 								Arguments: map[string]interface{}{
 									"location": "New York",
@@ -1153,7 +1152,7 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 							},
 						},
 						{
-							Function: ToolCallFunction{
+							Function: OllamaToolCallFunction{
 								Name: "get_time",
 								Arguments: map[string]interface{}{
 									"location": "New York",
@@ -1167,12 +1166,12 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
+		chatModel := tc.Client.ChatModel(testOllamaModelName, &ChatOptions{
 			Temperature: 0.1,
 		})
 
-		messages := []*models.ChatMessage{
-			models.NewTextMessage(models.ChatRoleUser, "What's the weather and current time in New York?"),
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "What's the weather and current time in New York?"),
 		}
 
 		response, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool, timeTool})
@@ -1196,14 +1195,14 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
 			// First response: tool call
-			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
-				Model:     testModelName,
+			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
+				Model:     testOllamaModelName,
 				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: Message{
+				Message: OllamaMessage{
 					Role: "assistant",
-					ToolCalls: []ToolCall{
+					ToolCalls: []OllamaToolCall{
 						{
-							Function: ToolCallFunction{
+							Function: OllamaToolCallFunction{
 								Name: "get_weather",
 								Arguments: map[string]interface{}{
 									"location": "Berlin",
@@ -1216,10 +1215,10 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 				DoneReason: "stop",
 			}))
 			// Second response: handling error
-			tc.Mock.AddRestResponse("/api/chat", "POST", chatResponseJSON(ChatResponse{
-				Model:     testModelName,
+			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
+				Model:     testOllamaModelName,
 				CreatedAt: "2024-01-01T00:00:01Z",
-				Message: Message{
+				Message: OllamaMessage{
 					Role:    "assistant",
 					Content: "I apologize, but I encountered an error: location not found.",
 				},
@@ -1228,12 +1227,12 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 			}))
 		}
 
-		chatModel := tc.Client.ChatModel(testModelName, &models.ChatOptions{
+		chatModel := tc.Client.ChatModel(testOllamaModelName, &ChatOptions{
 			Temperature: 0.1,
 		})
 
-		messages := []*models.ChatMessage{
-			models.NewTextMessage(models.ChatRoleUser, "Use the get_weather tool to check the weather in Berlin."),
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "Use the get_weather tool to check the weather in Berlin."),
 		}
 
 		// First call - get tool call
@@ -1255,7 +1254,7 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 			Done:  true,
 		}
 
-		messages = append(messages, models.NewToolResponseMessage(toolResponse))
+		messages = append(messages, NewToolResponseMessage(toolResponse))
 
 		// Second call - LLM should handle the error
 		finalResponse, err := chatModel.Chat(ctx, messages, nil, []tool.ToolInfo{weatherTool})

@@ -5,14 +5,13 @@ import (
 	"testing"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/models/mock"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
 // TestToolCallingExample demonstrates how tool calling works with the new API
 func TestToolCallingExample(t *testing.T) {
 	// Create a mock provider
-	provider := mock.NewMockProvider(nil)
+	provider := models.NewMockProvider(nil)
 
 	// Define a tool
 	toolInfo := tool.ToolInfo{
@@ -40,7 +39,7 @@ func TestToolCallingExample(t *testing.T) {
 		}),
 	}
 
-	provider.SetChatResponse("test-model", &mock.ChatResponse{
+	provider.SetChatResponse("test-model", &models.MockChatResponse{
 		Response: models.NewToolCallMessage(toolCall),
 	})
 
@@ -80,7 +79,7 @@ func TestToolCallingExample(t *testing.T) {
 		Done:   true,
 	}
 
-	provider.SetChatResponse("test-model", &mock.ChatResponse{
+	provider.SetChatResponse("test-model", &models.MockChatResponse{
 		Response: models.NewTextMessage(models.ChatRoleAssistant, "The weather in San Francisco is sunny and 72°F."),
 	})
 
