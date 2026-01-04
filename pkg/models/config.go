@@ -40,29 +40,22 @@ func FromConfig(config *ModelProviderConfig) (ModelProvider, error) {
 		return nil, errors.New("URL cannot be empty")
 	}
 
-	// Create connection options
-	connOpts := &ModelConnectionOptions{
-		APIKey:         config.APIKey,
-		ConnectTimeout: config.ConnectTimeout,
-		RequestTimeout: config.RequestTimeout,
-	}
-
 	// Set defaults if not specified
-	if connOpts.ConnectTimeout == 0 {
-		connOpts.ConnectTimeout = 10 * time.Second
+	if config.ConnectTimeout == 0 {
+		config.ConnectTimeout = 10 * time.Second
 	}
-	if connOpts.RequestTimeout == 0 {
-		connOpts.RequestTimeout = 60 * time.Second
+	if config.RequestTimeout == 0 {
+		config.RequestTimeout = 60 * time.Second
 	}
 
 	// Call factory function directly based on provider type
 	switch config.Type {
 	case "ollama":
-		return NewOllamaClient(config.URL, connOpts)
+		return NewOllamaClient(config.URL, config)
 	case "openai":
-		return NewOpenAIClient(config.URL, connOpts)
+		return NewOpenAIClient(config.URL, config)
 	case "anthropic":
-		return NewAnthropicClient(config.URL, connOpts)
+		return NewAnthropicClient(config.URL, config)
 	default:
 		return nil, errors.New("unsupported provider type: " + config.Type)
 	}

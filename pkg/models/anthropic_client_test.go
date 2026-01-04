@@ -57,7 +57,7 @@ func getAnthropicTestClient(t *testing.T) *anthropicTestClient {
 			t.Skip("Skipping test: _integ/anthropic.key not configured")
 		}
 
-		client, err := NewAnthropicClient(defaultAnthropicTestURL, &ModelConnectionOptions{
+		client, err := NewAnthropicClient(defaultAnthropicTestURL, &ModelProviderConfig{
 			APIKey:         apiKey,
 			ConnectTimeout: connectAnthropicTimeout,
 			RequestTimeout: testAnthropicTimeout,
@@ -77,7 +77,7 @@ func getAnthropicTestClient(t *testing.T) *anthropicTestClient {
 
 func TestNewAnthropicClient(t *testing.T) {
 	t.Run("creates client with valid configuration", func(t *testing.T) {
-		client, err := NewAnthropicClient(defaultAnthropicTestURL, &ModelConnectionOptions{
+		client, err := NewAnthropicClient(defaultAnthropicTestURL, &ModelProviderConfig{
 			APIKey:         "test-api-key",
 			ConnectTimeout: connectAnthropicTimeout,
 			RequestTimeout: testAnthropicTimeout,
@@ -965,7 +965,7 @@ func TestAnthropicClient_ToolCallingStream(t *testing.T) {
 
 func TestAnthropicClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		client, err := NewAnthropicClient("http://nonexistent-host:11434", &ModelConnectionOptions{
+		client, err := NewAnthropicClient("http://nonexistent-host:11434", &ModelProviderConfig{
 			APIKey:         "test-key",
 			ConnectTimeout: 1 * time.Second,
 			RequestTimeout: 2 * time.Second,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"iter"
-	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
@@ -17,12 +16,6 @@ var (
 	ErrTooManyInputTokens  = errors.New("too many input tokens (i.e. exceeding context length)")
 	ErrToBeContinued       = errors.New("to be continued (i.e. generated tokens limit reached)")
 )
-
-type ModelConnectionOptions struct {
-	APIKey         string
-	ConnectTimeout time.Duration
-	RequestTimeout time.Duration
-}
 
 type ModelType string
 
