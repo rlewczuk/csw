@@ -7,3 +7,5 @@ Implement mock UI output handler for SweSession in `pkg/ui/ui.go`:
 * integrate it into `SweSystem` do that it can be used to create sessions with UI created by factory;
 * all parts related to mock UI should be implemeted in `pkg/ui/mock.go`;
 * write tests for it in `pkg/ui/ui_test.go`, use `testify` library for assertions;
+
+---

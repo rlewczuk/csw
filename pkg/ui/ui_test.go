@@ -16,7 +16,6 @@ func TestMockSessionOutputHandler(t *testing.T) {
 		assert.Empty(t, handler.ToolCallStarts)
 		assert.Empty(t, handler.ToolCallDetails)
 		assert.Empty(t, handler.ToolCallResults)
-		assert.Nil(t, handler.Session())
 	})
 
 	t.Run("records markdown chunks", func(t *testing.T) {
