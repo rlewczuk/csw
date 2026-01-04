@@ -18,6 +18,12 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
+func init() {
+	models.RegisterProvider("anthropic", func(baseURL string, options *models.ModelConnectionOptions) (models.ModelProvider, error) {
+		return NewAnthropicClient(baseURL, options)
+	})
+}
+
 // AnthropicClient is a client for interacting with Anthropic API
 type AnthropicClient struct {
 	baseURL    string
