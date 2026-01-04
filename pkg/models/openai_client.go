@@ -17,12 +17,6 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
-func init() {
-	RegisterProvider("openai", func(baseURL string, options *ModelConnectionOptions) (ModelProvider, error) {
-		return NewOpenAIClient(baseURL, options)
-	})
-}
-
 // OpenAIClient is a client for interacting with OpenAI-compatible API
 type OpenAIClient struct {
 	baseURL    string
