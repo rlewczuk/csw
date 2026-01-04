@@ -1,0 +1,16 @@
+{
+  "description": "A software developer role with full VFS access",
+  "vfs-privileges": {
+    "**": {
+      "read": "allow",
+      "write": "allow",
+      "delete": "allow",
+      "list": "allow",
+      "find": "allow",
+      "move": "allow"
+    }
+  },
+  "tools-access": {
+    "**": "allow"
+  }
+}
