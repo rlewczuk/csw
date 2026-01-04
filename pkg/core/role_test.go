@@ -1,6 +1,7 @@
 package core
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
@@ -11,6 +12,91 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAgentRoleRegistry(t *testing.T) {
+	t.Run("Register and Get", func(t *testing.T) {
+		registry := NewAgentRoleRegistry()
+
+		role := AgentRole{
+			Name:        "test-role",
+			Description: "A test role",
+		}
+
+		registry.Register(role)
+
+		retrieved, ok := registry.Get("test-role")
+		assert.True(t, ok)
+		assert.Equal(t, "test-role", retrieved.Name)
+		assert.Equal(t, "A test role", retrieved.Description)
+
+		_, ok = registry.Get("nonexistent")
+		assert.False(t, ok)
+	})
+
+	t.Run("List returns all role names", func(t *testing.T) {
+		registry := NewAgentRoleRegistry()
+
+		role1 := AgentRole{Name: "role1", Description: "Role 1"}
+		role2 := AgentRole{Name: "role2", Description: "Role 2"}
+
+		registry.Register(role1)
+		registry.Register(role2)
+
+		names := registry.List()
+		assert.Len(t, names, 2)
+		assert.Contains(t, names, "role1")
+		assert.Contains(t, names, "role2")
+	})
+
+	t.Run("LoadFromDirectory loads roles from config files", func(t *testing.T) {
+		registry := NewAgentRoleRegistry()
+
+		// Get the absolute path to the configs/roles directory
+		configsDir := filepath.Join("..", "..", "configs", "roles")
+
+		err := registry.LoadFromDirectory(configsDir)
+		require.NoError(t, err)
+
+		// Check that developer role was loaded
+		developer, ok := registry.Get("developer")
+		assert.True(t, ok)
+		assert.Equal(t, "developer", developer.Name)
+		assert.Equal(t, "A software developer role with full VFS access", developer.Description)
+		assert.NotEmpty(t, developer.SystemPrompt)
+		assert.Contains(t, developer.SystemPrompt, "{{.Info.WorkDir}}")
+
+		// Check that explorer role was loaded
+		explorer, ok := registry.Get("explorer")
+		assert.True(t, ok)
+		assert.Equal(t, "explorer", explorer.Name)
+		assert.Equal(t, "A role for exploring the codebase", explorer.Description)
+
+		// Check VFS privileges
+		assert.NotNil(t, developer.VFSPrivileges)
+		assert.NotNil(t, explorer.VFSPrivileges)
+
+		// Check tools access
+		assert.NotNil(t, developer.ToolsAccess)
+		assert.NotNil(t, explorer.ToolsAccess)
+	})
+
+	t.Run("RenderSystemPrompt renders template with state", func(t *testing.T) {
+		role := AgentRole{
+			Name:         "test",
+			SystemPrompt: "Working directory is {{.Info.WorkDir}}.",
+		}
+
+		state := AgentState{
+			Info: AgentStateCommonInfo{
+				WorkDir: "/home/user/project",
+			},
+		}
+
+		rendered, err := role.RenderSystemPrompt(state)
+		require.NoError(t, err)
+		assert.Equal(t, "Working directory is /home/user/project.", rendered)
+	})
+}
 
 func TestAgentRoleIntegration(t *testing.T) {
 	// Create mock components
@@ -63,14 +149,15 @@ func TestAgentRoleIntegration(t *testing.T) {
 	}
 
 	t.Run("SetRole updates role field", func(t *testing.T) {
+		registry := NewAgentRoleRegistry()
+		registry.Register(developerRole)
+		registry.Register(readOnlyRole)
+
 		system := &SweSystem{
 			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
 			Tools:          tools,
 			VFS:            mockVFS,
-			Roles: map[string]AgentRole{
-				"developer": developerRole,
-				"readonly":  readOnlyRole,
-			},
+			Roles:          registry,
 		}
 
 		session, err := system.NewSession("mock/test-model")
@@ -84,14 +171,15 @@ func TestAgentRoleIntegration(t *testing.T) {
 	})
 
 	t.Run("SetRole updates system prompt", func(t *testing.T) {
+		registry := NewAgentRoleRegistry()
+		registry.Register(developerRole)
+
 		system := &SweSystem{
 			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
 			SystemPrompt:   "Initial system prompt",
 			Tools:          tools,
 			VFS:            mockVFS,
-			Roles: map[string]AgentRole{
-				"developer": developerRole,
-			},
+			Roles:          registry,
 		}
 
 		session, err := system.NewSession("mock/test-model")
@@ -114,13 +202,14 @@ func TestAgentRoleIntegration(t *testing.T) {
 	})
 
 	t.Run("SetRole wraps VFS with access control", func(t *testing.T) {
+		registry := NewAgentRoleRegistry()
+		registry.Register(readOnlyRole)
+
 		system := &SweSystem{
 			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
 			Tools:          tools,
 			VFS:            mockVFS,
-			Roles: map[string]AgentRole{
-				"readonly": readOnlyRole,
-			},
+			Roles:          registry,
 		}
 
 		session, err := system.NewSession("mock/test-model")
@@ -150,13 +239,14 @@ func TestAgentRoleIntegration(t *testing.T) {
 	})
 
 	t.Run("SetRole wraps tools with access control", func(t *testing.T) {
+		registry := NewAgentRoleRegistry()
+		registry.Register(readOnlyRole)
+
 		system := &SweSystem{
 			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
 			Tools:          tools,
 			VFS:            mockVFS,
-			Roles: map[string]AgentRole{
-				"readonly": readOnlyRole,
-			},
+			Roles:          registry,
 		}
 
 		session, err := system.NewSession("mock/test-model")
@@ -191,11 +281,13 @@ func TestAgentRoleIntegration(t *testing.T) {
 	})
 
 	t.Run("SetRole returns error for unknown role", func(t *testing.T) {
+		registry := NewAgentRoleRegistry()
+
 		system := &SweSystem{
 			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
 			Tools:          tools,
 			VFS:            mockVFS,
-			Roles:          map[string]AgentRole{},
+			Roles:          registry,
 		}
 
 		session, err := system.NewSession("mock/test-model")
@@ -207,14 +299,15 @@ func TestAgentRoleIntegration(t *testing.T) {
 	})
 
 	t.Run("SetRole can switch between roles", func(t *testing.T) {
+		registry := NewAgentRoleRegistry()
+		registry.Register(developerRole)
+		registry.Register(readOnlyRole)
+
 		system := &SweSystem{
 			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
 			Tools:          tools,
 			VFS:            mockVFS,
-			Roles: map[string]AgentRole{
-				"developer": developerRole,
-				"readonly":  readOnlyRole,
-			},
+			Roles:          registry,
 		}
 
 		session, err := system.NewSession("mock/test-model")
@@ -251,5 +344,76 @@ func TestAgentRoleIntegration(t *testing.T) {
 			Arguments: writeArgs2,
 		})
 		assert.Error(t, writeResponse.Error)
+	})
+}
+
+func TestSweSessionGetState(t *testing.T) {
+	mockProvider := mock.NewMockProvider([]models.ModelInfo{
+		{Name: "test-model", Model: "test-model"},
+	})
+	mockVFS := vfs.NewMockVFS()
+	tools := tool.NewToolRegistry()
+	registry := NewAgentRoleRegistry()
+
+	t.Run("GetState returns current work directory", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
+			Tools:          tools,
+			VFS:            mockVFS,
+			Roles:          registry,
+		}
+
+		session, err := system.NewSession("mock/test-model")
+		require.NoError(t, err)
+
+		state := session.GetState()
+		assert.Equal(t, ".", state.Info.WorkDir)
+	})
+
+	t.Run("SetWorkDir updates work directory in state", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
+			Tools:          tools,
+			VFS:            mockVFS,
+			Roles:          registry,
+		}
+
+		session, err := system.NewSession("mock/test-model")
+		require.NoError(t, err)
+
+		session.SetWorkDir("/home/user/project")
+
+		state := session.GetState()
+		assert.Equal(t, "/home/user/project", state.Info.WorkDir)
+	})
+
+	t.Run("SetRole renders system prompt with current state", func(t *testing.T) {
+		role := AgentRole{
+			Name:         "dev",
+			Description:  "Developer role",
+			SystemPrompt: "You are a developer. Work dir: {{.Info.WorkDir}}",
+		}
+
+		registry := NewAgentRoleRegistry()
+		registry.Register(role)
+
+		system := &SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
+			Tools:          tools,
+			VFS:            mockVFS,
+			Roles:          registry,
+		}
+
+		session, err := system.NewSession("mock/test-model")
+		require.NoError(t, err)
+
+		session.SetWorkDir("/test/path")
+		err = session.SetRole("dev")
+		require.NoError(t, err)
+
+		messages := session.ChatMessages()
+		require.Len(t, messages, 1)
+		assert.Equal(t, models.ChatRoleSystem, messages[0].Role)
+		assert.Equal(t, "You are a developer. Work dir: /test/path", messages[0].Parts[0].Text)
 	})
 }

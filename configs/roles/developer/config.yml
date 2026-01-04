@@ -1,5 +1,0 @@
-privileges:
-  - vfs.read
-  - vfs.write
-model: devstral-small-2:latest
-system-prompt: @system.md

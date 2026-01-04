@@ -27,7 +27,7 @@ type SweSystem struct {
 	VFS vfs.VFS
 
 	// Roles
-	Roles map[string]AgentRole
+	Roles *AgentRoleRegistry
 
 	// UI factory for creating session output handlers
 	UiFactory ui.SweUiFactory
@@ -61,6 +61,7 @@ func (s *SweSystem) NewSession(model string) (*SweSession, error) {
 		role:     nil,
 		VFS:      s.VFS,
 		Tools:    s.Tools,
+		workDir:  ".",
 	}
 
 	// Create and attach UI output handler if factory is available
@@ -85,6 +86,7 @@ type SweSession struct {
 	VFS           vfs.VFS
 	Tools         *tool.ToolRegistry
 	outputHandler ui.SessionOutputHandler
+	workDir       string
 }
 
 // Prompt adds user prompt to the conversation and starts processing if processing is not already in progress.
@@ -169,6 +171,20 @@ func (s *SweSession) ChatMessages() []*models.ChatMessage {
 	return s.messages
 }
 
+// GetState returns the current agent state for this session.
+func (s *SweSession) GetState() AgentState {
+	return AgentState{
+		Info: AgentStateCommonInfo{
+			WorkDir: s.workDir,
+		},
+	}
+}
+
+// SetWorkDir sets the working directory for this session.
+func (s *SweSession) SetWorkDir(dir string) {
+	s.workDir = dir
+}
+
 // Role returns the current agent role for this session.
 func (s *SweSession) Role() *AgentRole {
 	return s.role
@@ -178,7 +194,7 @@ func (s *SweSession) Role() *AgentRole {
 // It updates the VFS and Tools with access controls based on the new role,
 // and adds or updates the system prompt at the beginning of the conversation.
 func (s *SweSession) SetRole(roleName string) error {
-	role, ok := s.system.Roles[roleName]
+	role, ok := s.system.Roles.Get(roleName)
 	if !ok {
 		return fmt.Errorf("role not found: %s", roleName)
 	}
@@ -200,15 +216,21 @@ func (s *SweSession) SetRole(roleName string) error {
 		s.Tools = s.system.Tools
 	}
 
-	// Update system prompt
+	// Update system prompt by rendering the template with current state
 	if role.SystemPrompt != "" {
+		state := s.GetState()
+		renderedPrompt, err := role.RenderSystemPrompt(state)
+		if err != nil {
+			return fmt.Errorf("failed to render system prompt: %w", err)
+		}
+
 		// Check if there's already a system message
 		if len(s.messages) > 0 && s.messages[0].Role == models.ChatRoleSystem {
 			// Replace the existing system message
-			s.messages[0] = models.NewTextMessage(models.ChatRoleSystem, role.SystemPrompt)
+			s.messages[0] = models.NewTextMessage(models.ChatRoleSystem, renderedPrompt)
 		} else {
 			// Insert system message at the beginning
-			s.messages = append([]*models.ChatMessage{models.NewTextMessage(models.ChatRoleSystem, role.SystemPrompt)}, s.messages...)
+			s.messages = append([]*models.ChatMessage{models.NewTextMessage(models.ChatRoleSystem, renderedPrompt)}, s.messages...)
 		}
 	}
 

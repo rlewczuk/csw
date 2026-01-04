@@ -1,0 +1,16 @@
+{
+  "description": "A role for exploring the codebase",
+  "vfs-privileges": {
+    "**": {
+      "read": "allow",
+      "write": "deny",
+      "delete": "deny",
+      "list": "allow",
+      "find": "allow",
+      "move": "deny"
+    }
+  },
+  "tools-access": {
+    "**": "allow"
+  }
+}
