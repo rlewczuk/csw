@@ -9,6 +9,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/models/ollama"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/codesnort/codesnort-swe/pkg/ui"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,15 +22,10 @@ func chatResponseJSON(response ollama.ChatResponse) string {
 
 // testMockOutputHandler is a test implementation of SessionOutputHandler for integration tests
 type testMockOutputHandler struct {
-	session         *SweSession
 	MarkdownChunks  []string
 	ToolCallStarts  []*tool.ToolCall
 	ToolCallDetails []*tool.ToolCall
 	ToolCallResults []*tool.ToolResponse
-}
-
-func (h *testMockOutputHandler) AttachToSession(session *SweSession) {
-	h.session = session
 }
 
 func (h *testMockOutputHandler) AddMarkdownChunk(markdown string) {
@@ -53,7 +49,7 @@ type testMockUiFactory struct {
 	handlers []*testMockOutputHandler
 }
 
-func (f *testMockUiFactory) NewSessionOutputHandler() SessionOutputHandler {
+func (f *testMockUiFactory) NewSessionOutputHandler() ui.SessionOutputHandler {
 	handler := &testMockOutputHandler{
 		MarkdownChunks:  make([]string, 0),
 		ToolCallStarts:  make([]*tool.ToolCall, 0),
@@ -172,7 +168,6 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 		// Verify that UI factory created a handler
 		require.Len(t, uiFactory.handlers, 1)
 		handler := uiFactory.handlers[0]
-		assert.NotNil(t, handler.session)
 
 		// Populate mock server with LLM responses
 		// First response: assistant makes a tool call to write the file

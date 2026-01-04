@@ -1,15 +1,12 @@
 package ui
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
 // MockSessionOutputHandler is a mock implementation of SessionOutputHandler that keeps all output in memory.
 // It is used for testing and capturing output from agent operations.
 type MockSessionOutputHandler struct {
-	session *core.SweSession
-
 	// MarkdownChunks stores all markdown chunks received via AddMarkdownChunk.
 	MarkdownChunks []string
 
@@ -34,11 +31,6 @@ func NewMockSessionOutputHandler() *MockSessionOutputHandler {
 	}
 }
 
-// AttachToSession associates this output handler with a session.
-func (h *MockSessionOutputHandler) AttachToSession(session *core.SweSession) {
-	h.session = session
-}
-
 // AddMarkdownChunk records a markdown chunk.
 func (h *MockSessionOutputHandler) AddMarkdownChunk(markdown string) {
 	h.MarkdownChunks = append(h.MarkdownChunks, markdown)
@@ -57,11 +49,6 @@ func (h *MockSessionOutputHandler) AddToolCallDetails(call *tool.ToolCall) {
 // AddToolCallResult records a tool call result.
 func (h *MockSessionOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
 	h.ToolCallResults = append(h.ToolCallResults, result)
-}
-
-// Session returns the session this handler is attached to.
-func (h *MockSessionOutputHandler) Session() *core.SweSession {
-	return h.session
 }
 
 // Reset clears all recorded output data.
@@ -87,7 +74,7 @@ func NewMockUiFactory() *MockUiFactory {
 }
 
 // NewSessionOutputHandler creates a new MockSessionOutputHandler and stores it for later inspection.
-func (f *MockUiFactory) NewSessionOutputHandler() core.SessionOutputHandler {
+func (f *MockUiFactory) NewSessionOutputHandler() SessionOutputHandler {
 	handler := NewMockSessionOutputHandler()
 	f.Handlers = append(f.Handlers, handler)
 	return handler
