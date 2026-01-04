@@ -72,7 +72,7 @@ func getOllamaTestClient(t *testing.T) *ollamaTestClient {
 			t.Skip("Skipping test: _integ/ollama.url not configured")
 		}
 
-		client, err := NewOllamaClient(url, &ModelConnectionOptions{
+		client, err := NewOllamaClient(url, &ModelProviderConfig{
 			ConnectTimeout: connectOllamaTimeout,
 			RequestTimeout: testOllamaTimeout,
 		})
@@ -91,7 +91,7 @@ func getOllamaTestClient(t *testing.T) *ollamaTestClient {
 
 func TestNewOllamaClient(t *testing.T) {
 	t.Run("creates client with valid configuration", func(t *testing.T) {
-		client, err := NewOllamaClient(getOllamaHost(), &ModelConnectionOptions{
+		client, err := NewOllamaClient(getOllamaHost(), &ModelProviderConfig{
 			ConnectTimeout: connectOllamaTimeout,
 			RequestTimeout: testOllamaTimeout,
 		})
@@ -796,7 +796,7 @@ func TestOllamaClient_EmbeddingModel(t *testing.T) {
 
 func TestOllamaClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint not found", func(t *testing.T) {
-		client, err := NewOllamaClient("http://beha:11434/nonexistent", &ModelConnectionOptions{
+		client, err := NewOllamaClient("http://beha:11434/nonexistent", &ModelProviderConfig{
 			ConnectTimeout: connectOllamaTimeout,
 			RequestTimeout: testOllamaTimeout,
 		})
@@ -808,7 +808,7 @@ func TestOllamaClient_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		client, err := NewOllamaClient("http://nonexistent-host:11434", &ModelConnectionOptions{
+		client, err := NewOllamaClient("http://nonexistent-host:11434", &ModelProviderConfig{
 			ConnectTimeout: 1 * time.Second,
 			RequestTimeout: 2 * time.Second,
 		})

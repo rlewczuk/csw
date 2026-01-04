@@ -37,8 +37,8 @@ type OpenAIEmbeddingModel struct {
 	model  string
 }
 
-// NewOpenAIClient creates a new OpenAI-compatible client with the given base URL and options
-func NewOpenAIClient(baseURL string, options *ModelConnectionOptions) (*OpenAIClient, error) {
+// NewOpenAIClient creates a new OpenAI-compatible client with the given base URL and config
+func NewOpenAIClient(baseURL string, config *ModelProviderConfig) (*OpenAIClient, error) {
 	if baseURL == "" {
 		return nil, errors.New("baseURL cannot be empty")
 	}
@@ -48,15 +48,15 @@ func NewOpenAIClient(baseURL string, options *ModelConnectionOptions) (*OpenAICl
 	requestTimeout := 60 * time.Second
 	apiKey := "ollama" // Default API key for Ollama
 
-	if options != nil {
-		if options.ConnectTimeout > 0 {
-			connectTimeout = options.ConnectTimeout
+	if config != nil {
+		if config.ConnectTimeout > 0 {
+			connectTimeout = config.ConnectTimeout
 		}
-		if options.RequestTimeout > 0 {
-			requestTimeout = options.RequestTimeout
+		if config.RequestTimeout > 0 {
+			requestTimeout = config.RequestTimeout
 		}
-		if options.APIKey != "" {
-			apiKey = options.APIKey
+		if config.APIKey != "" {
+			apiKey = config.APIKey
 		}
 	}
 

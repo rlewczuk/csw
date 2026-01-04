@@ -65,7 +65,7 @@ func getOpenAITestClient(t *testing.T) *openaiTestClient {
 		}
 		apiKey := testutil.IntegCfgReadFile("openai.key")
 
-		client, err := NewOpenAIClient(url, &ModelConnectionOptions{
+		client, err := NewOpenAIClient(url, &ModelProviderConfig{
 			APIKey:         apiKey,
 			ConnectTimeout: connectOpenAITimeout,
 			RequestTimeout: testOpenAITimeout,
@@ -85,7 +85,7 @@ func getOpenAITestClient(t *testing.T) *openaiTestClient {
 
 func TestNewOpenAIClient(t *testing.T) {
 	t.Run("creates client with valid configuration", func(t *testing.T) {
-		client, err := NewOpenAIClient(defaultOpenAITestURL, &ModelConnectionOptions{
+		client, err := NewOpenAIClient(defaultOpenAITestURL, &ModelProviderConfig{
 			ConnectTimeout: connectOpenAITimeout,
 			RequestTimeout: testOpenAITimeout,
 		})
@@ -1252,7 +1252,7 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 
 func TestOpenAIClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint not found", func(t *testing.T) {
-		client, err := NewOpenAIClient("http://localhost:11434/v1/nonexistent", &ModelConnectionOptions{
+		client, err := NewOpenAIClient("http://localhost:11434/v1/nonexistent", &ModelProviderConfig{
 			ConnectTimeout: connectOpenAITimeout,
 			RequestTimeout: testOpenAITimeout,
 		})
@@ -1264,7 +1264,7 @@ func TestOpenAIClient_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		client, err := NewOpenAIClient("http://nonexistent-host:11434/v1", &ModelConnectionOptions{
+		client, err := NewOpenAIClient("http://nonexistent-host:11434/v1", &ModelProviderConfig{
 			ConnectTimeout: 1 * time.Second,
 			RequestTimeout: 2 * time.Second,
 		})
