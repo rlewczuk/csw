@@ -58,29 +58,3 @@ func (h *MockSessionOutputHandler) Reset() {
 	h.ToolCallDetails = make([]*tool.ToolCall, 0)
 	h.ToolCallResults = make([]*tool.ToolResponse, 0)
 }
-
-// MockUiFactory is a mock implementation of SweUiFactory.
-// It creates MockSessionOutputHandler instances for sessions.
-type MockUiFactory struct {
-	// Handlers stores all created handlers for inspection in tests.
-	Handlers []*MockSessionOutputHandler
-}
-
-// NewMockUiFactory creates a new MockUiFactory.
-func NewMockUiFactory() *MockUiFactory {
-	return &MockUiFactory{
-		Handlers: make([]*MockSessionOutputHandler, 0),
-	}
-}
-
-// NewSessionOutputHandler creates a new MockSessionOutputHandler and stores it for later inspection.
-func (f *MockUiFactory) NewSessionOutputHandler() SessionOutputHandler {
-	handler := NewMockSessionOutputHandler()
-	f.Handlers = append(f.Handlers, handler)
-	return handler
-}
-
-// Reset clears the list of created handlers.
-func (f *MockUiFactory) Reset() {
-	f.Handlers = make([]*MockSessionOutputHandler, 0)
-}
