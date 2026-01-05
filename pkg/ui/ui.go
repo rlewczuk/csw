@@ -42,9 +42,3 @@ type SessionOutputHandler interface {
 	// for checking error status and displaying either result or error.
 	AddToolCallResult(result *tool.ToolResponse)
 }
-
-// SweUiFactory is an interface for creating UI handlers for the session.
-type SweUiFactory interface {
-	// NewSessionOutputHandler creates a new output handler for the session.
-	NewSessionOutputHandler() SessionOutputHandler
-}
