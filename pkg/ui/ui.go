@@ -41,4 +41,9 @@ type SessionOutputHandler interface {
 	// This also includes errors if tool call failed, UI is responsible
 	// for checking error status and displaying either result or error.
 	AddToolCallResult(result *tool.ToolResponse)
+
+	// RunFinished is called when the session Run() loop is finished.
+	// This is called either when the session completes successfully (err == nil)
+	// or when it encounters an error (err != nil).
+	RunFinished(err error)
 }
