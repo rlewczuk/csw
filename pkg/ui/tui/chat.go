@@ -125,7 +125,7 @@ func (w *ChatWidget) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "esc":
 			return w, tea.Quit
 
-		case "ctrl+enter":
+		case "alt+enter":
 			// Send message
 			input := w.textarea.Value()
 			if input != "" {

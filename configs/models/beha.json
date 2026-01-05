@@ -1,6 +1,6 @@
 {
   "type": "ollama",
-  "name": "ollama-beha",
+  "name": "beha",
   "description": "Local server running ollama",
   "url": "http://beha:11434"
 }

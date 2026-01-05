@@ -80,6 +80,19 @@ func (c *SessionController) Interrupt() error {
 	return nil
 }
 
+// SetOutputHandler sets the output handler for the controller.
+// This method is thread-safe and can be called before or after StartSession.
+// If called after StartSession, it will update the output handler for the existing session.
+func (c *SessionController) SetOutputHandler(handler ui.SessionOutputHandler) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.outputHandler = handler
+	if c.session != nil {
+		c.session.outputHandler = handler
+	}
+}
+
 // StartSession initializes a new session with the given model.
 // This method is non-blocking and thread-safe.
 func (c *SessionController) StartSession(model string) error {
