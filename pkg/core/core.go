@@ -28,12 +28,9 @@ type SweSystem struct {
 
 	// Roles
 	Roles *AgentRoleRegistry
-
-	// UI factory for creating session output handlers
-	UiFactory ui.SweUiFactory
 }
 
-func (s *SweSystem) NewSession(model string) (*SweSession, error) {
+func (s *SweSystem) NewSession(model string, outputHandler ui.SessionOutputHandler) (*SweSession, error) {
 	// Parse provider/model format (e.g., "ollama/devstral-small-2:latest")
 	var providerName, modelName string
 	for i, c := range model {
@@ -54,19 +51,15 @@ func (s *SweSystem) NewSession(model string) (*SweSession, error) {
 	}
 
 	session := &SweSession{
-		system:   s,
-		provider: provider,
-		model:    modelName,
-		messages: []*models.ChatMessage{},
-		role:     nil,
-		VFS:      s.VFS,
-		Tools:    s.Tools,
-		workDir:  ".",
-	}
-
-	// Create and attach UI output handler if factory is available
-	if s.UiFactory != nil {
-		session.outputHandler = s.UiFactory.NewSessionOutputHandler()
+		system:        s,
+		provider:      provider,
+		model:         modelName,
+		messages:      []*models.ChatMessage{},
+		role:          nil,
+		VFS:           s.VFS,
+		Tools:         s.Tools,
+		outputHandler: outputHandler,
+		workDir:       ".",
 	}
 
 	// Add system prompt if provided

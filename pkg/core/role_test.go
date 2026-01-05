@@ -159,7 +159,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			Roles:          registry,
 		}
 
-		session, err := system.NewSession("mock/test-model")
+		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 		assert.Nil(t, session.Role())
 
@@ -181,7 +181,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			Roles:          registry,
 		}
 
-		session, err := system.NewSession("mock/test-model")
+		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
 		// Check initial system prompt
@@ -211,7 +211,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			Roles:          registry,
 		}
 
-		session, err := system.NewSession("mock/test-model")
+		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
 		// Initially, VFS should be unwrapped
@@ -248,7 +248,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			Roles:          registry,
 		}
 
-		session, err := system.NewSession("mock/test-model")
+		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
 		// Set role to readonly
@@ -289,7 +289,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			Roles:          registry,
 		}
 
-		session, err := system.NewSession("mock/test-model")
+		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
 		err = session.SetRole("unknown")
@@ -309,7 +309,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			Roles:          registry,
 		}
 
-		session, err := system.NewSession("mock/test-model")
+		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
 		// Set to developer role
@@ -362,7 +362,7 @@ func TestSweSessionGetState(t *testing.T) {
 			Roles:          registry,
 		}
 
-		session, err := system.NewSession("mock/test-model")
+		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
 		state := session.GetState()
@@ -377,7 +377,7 @@ func TestSweSessionGetState(t *testing.T) {
 			Roles:          registry,
 		}
 
-		session, err := system.NewSession("mock/test-model")
+		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
 		session.SetWorkDir("/home/user/project")
@@ -403,7 +403,7 @@ func TestSweSessionGetState(t *testing.T) {
 			Roles:          registry,
 		}
 
-		session, err := system.NewSession("mock/test-model")
+		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
 		session.SetWorkDir("/test/path")

@@ -6,6 +6,22 @@ import "github.com/codesnort/codesnort-swe/pkg/tool"
 // The core interfaces (SessionOutputHandler, SweUiFactory) are defined in pkg/core
 // to avoid circular dependencies.
 
+// SessionInputHandler is an interface for handling input to the session.
+// In single-process (eg. TUI) environment it will be called directly from user interface code.
+// In multi-process (server) environment it will be called via REST API or remote procedure call.
+// It is called by UI input events and can be used to inject user input into the session.
+// Note: all methods are non-blocking, input handler implementation is responsible for
+// maintaining thread, context and cancellation safety.
+type SessionInputHandler interface {
+	// UserPrompt is called when user input via prompt box is received.
+	// If there was running task in progress in session, it is interrupted and
+	// user prompt is added to the conversation, then processing is resumed.
+	UserPrompt(input string) error
+
+	// Interrupt is called when user interrupts the current task.
+	Interrupt() error
+}
+
 // SessionOutputHandler is an interface for handling output from the session.
 // Defined here to avoid circular dependency with pkg/ui.
 type SessionOutputHandler interface {
