@@ -37,7 +37,8 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 			VFS:            vfs,
 		}
 
-		session, err := system.NewSession("ollama/devstral-small-2:latest")
+		mockHandler := ui.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
 		require.NoError(t, err)
 		assert.NotNil(t, session)
 
@@ -108,23 +109,18 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 	})
 
 	t.Run("UI output handler integration", func(t *testing.T) {
-		uiFactory := ui.NewMockUiFactory()
+		mockHandler := ui.NewMockSessionOutputHandler()
 
 		system := &SweSystem{
 			ModelProviders: map[string]models.ModelProvider{"ollama": client},
 			SystemPrompt:   "You are skilled software developer.",
 			Tools:          tools,
 			VFS:            vfs,
-			UiFactory:      uiFactory,
 		}
 
-		session, err := system.NewSession("ollama/devstral-small-2:latest")
+		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
 		require.NoError(t, err)
 		assert.NotNil(t, session)
-
-		// Verify that UI factory created a handler
-		require.Len(t, uiFactory.Handlers, 1)
-		handler := uiFactory.Handlers[0]
 
 		// Populate mock server with LLM responses
 		// First response: assistant makes a tool call to write the file
@@ -189,14 +185,14 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 
 		// Verify UI handler captured the events
 		// Should have at least one tool call start
-		assert.NotEmpty(t, handler.ToolCallStarts, "should have captured tool call start")
+		assert.NotEmpty(t, mockHandler.ToolCallStarts, "should have captured tool call start")
 		// Should have tool call details
-		assert.NotEmpty(t, handler.ToolCallDetails, "should have captured tool call details")
+		assert.NotEmpty(t, mockHandler.ToolCallDetails, "should have captured tool call details")
 		// Should have tool call result
-		assert.NotEmpty(t, handler.ToolCallResults, "should have captured tool call result")
-		assert.Equal(t, "vfs.write", handler.ToolCallResults[0].Call.Function)
+		assert.NotEmpty(t, mockHandler.ToolCallResults, "should have captured tool call result")
+		assert.Equal(t, "vfs.write", mockHandler.ToolCallResults[0].Call.Function)
 		// Should have markdown chunks from the final response
-		assert.NotEmpty(t, handler.MarkdownChunks, "should have captured markdown chunks")
-		assert.Contains(t, handler.MarkdownChunks, "File created successfully.")
+		assert.NotEmpty(t, mockHandler.MarkdownChunks, "should have captured markdown chunks")
+		assert.Contains(t, mockHandler.MarkdownChunks, "File created successfully.")
 	})
 }
