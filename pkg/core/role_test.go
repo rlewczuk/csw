@@ -62,7 +62,7 @@ func TestAgentRoleRegistry(t *testing.T) {
 		assert.Equal(t, "developer", developer.Name)
 		assert.Equal(t, "A software developer role with full VFS access", developer.Description)
 		assert.NotEmpty(t, developer.SystemPrompt)
-		assert.Contains(t, developer.SystemPrompt, "{{.Info.WorkDir}}")
+		assert.Contains(t, developer.SystemPrompt, "the best coding agent on the planet")
 
 		// Check that explorer role was loaded
 		explorer, ok := registry.Get("explorer")
