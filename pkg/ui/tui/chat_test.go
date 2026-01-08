@@ -35,7 +35,6 @@ func TestChatWidget(t *testing.T) {
 			tea.WithOutput(term),
 			tea.WithoutSignalHandler(),
 		)
-		widget.SetProgram(p)
 
 		// Run program in background
 		go func() {
@@ -76,7 +75,6 @@ func TestChatWidget(t *testing.T) {
 			tea.WithOutput(term),
 			tea.WithoutSignalHandler(),
 		)
-		widget.SetProgram(p)
 
 		// Run program in background
 		go func() {
@@ -126,7 +124,6 @@ func TestChatWidget(t *testing.T) {
 			tea.WithOutput(term),
 			tea.WithoutSignalHandler(),
 		)
-		widget.SetProgram(p)
 
 		// Run program in background
 		go func() {
@@ -141,6 +138,9 @@ func TestChatWidget(t *testing.T) {
 		widget.AddMarkdownChunk("This is ")
 		widget.AddMarkdownChunk("a test ")
 		widget.AddMarkdownChunk("response.")
+
+		// Trigger re-render by sending contentUpdateMsg
+		p.Send(contentUpdateMsg{})
 
 		// Wait for content to appear in terminal output
 		found := term.WaitForText("This is a test response.", 2*time.Second)
@@ -173,7 +173,6 @@ func TestChatWidget(t *testing.T) {
 			tea.WithOutput(term),
 			tea.WithoutSignalHandler(),
 		)
-		widget.SetProgram(p)
 
 		// Run program in background
 		go func() {
@@ -192,6 +191,9 @@ func TestChatWidget(t *testing.T) {
 
 		widget.AddToolCallStart(toolCall)
 		widget.AddToolCallDetails(toolCall)
+
+		// Trigger re-render by sending contentUpdateMsg
+		p.Send(contentUpdateMsg{})
 
 		// Wait for tool call to appear in terminal output
 		found := term.WaitForText("test_tool", 2*time.Second)
@@ -224,7 +226,6 @@ func TestChatWidget(t *testing.T) {
 			tea.WithOutput(term),
 			tea.WithoutSignalHandler(),
 		)
-		widget.SetProgram(p)
 
 		// Run program in background
 		go func() {
@@ -251,6 +252,9 @@ func TestChatWidget(t *testing.T) {
 		result.Result.Set("output", "success")
 
 		widget.AddToolCallResult(result)
+
+		// Trigger re-render by sending contentUpdateMsg
+		p.Send(contentUpdateMsg{})
 
 		// Wait for tool call to appear in terminal output
 		found := term.WaitForText("test_tool_with_result", 2*time.Second)
@@ -283,7 +287,6 @@ func TestChatWidget(t *testing.T) {
 			tea.WithOutput(term),
 			tea.WithoutSignalHandler(),
 		)
-		widget.SetProgram(p)
 
 		// Run program and capture when it exits
 		done := make(chan struct{})
@@ -329,7 +332,6 @@ func TestChatWidget(t *testing.T) {
 			tea.WithOutput(term),
 			tea.WithoutSignalHandler(),
 		)
-		widget.SetProgram(p)
 
 		// Run program in background
 		go func() {
@@ -347,6 +349,9 @@ func TestChatWidget(t *testing.T) {
 
 		// Finalize the message
 		widget.RunFinished(nil)
+
+		// Trigger re-render by sending contentUpdateMsg
+		p.Send(contentUpdateMsg{})
 
 		// Wait for complete message to appear in terminal output
 		fullMessage := "Hello world! This is streaming."
