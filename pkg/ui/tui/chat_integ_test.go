@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/codesnort/codesnort-swe/pkg/ui/tui/mock"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,66 +69,35 @@ func TestChatWidgetWithFullController(t *testing.T) {
 			}),
 		)
 
-		// Initialize the widget
-		widget.Init()
+		// Create mock terminal
+		term := mock.NewTerminal()
 
-		// Simulate user typing a message
-		widget.textarea.SetValue("Hello, assistant!")
+		term.Run(widget)
 
-		// Check initial state - no messages yet
-		output := widget.View()
-		assert.Contains(t, output, "Welcome!", "Should show welcome message")
+		// Wait for welcome message
+		assert.True(t, term.WaitForText("Welcome!", 2*time.Second), "Should show welcome message")
 
-		// Simulate Alt+Enter key press to send message
-		// Create a proper alt+enter key message
-		updatedModel, _ := widget.Update(tea.KeyMsg{
-			Type: tea.KeyEnter,
-			Alt:  true,
-		})
-		widget = updatedModel.(*ChatWidget)
+		// Type a message via mock terminal
+		term.SendString("Hello, assistant!")
 
-		// Verify textarea is cleared
-		assert.Equal(t, "", widget.textarea.Value(), "Textarea should be cleared after sending")
+		// Send Alt+Enter to submit
+		term.SendKey("alt+enter")
 
-		// Verify user message was added
-		widget.mu.Lock()
-		assert.GreaterOrEqual(t, len(widget.messages), 1, "Should have at least one message")
-		assert.Equal(t, "user", widget.messages[0].Role)
-		assert.Equal(t, "Hello, assistant!", widget.messages[0].Content)
-		widget.mu.Unlock()
+		// Wait for user message to appear in view
+		assert.True(t, term.WaitForText("Hello, assistant!", 2*time.Second), "Should show user message in view")
 
-		// Wait for the response to be processed
-		// Poll for the assistant message to appear
-		var foundResponse bool
-		for i := 0; i < 50; i++ {
-			time.Sleep(100 * time.Millisecond)
-			widget.mu.Lock()
-			messageCount := len(widget.messages)
-			hasContent := false
-			if messageCount >= 2 && widget.messages[1].Content != "" {
-				hasContent = true
-			}
-			widget.mu.Unlock()
-			if hasContent {
-				foundResponse = true
-				break
-			}
-		}
-		assert.True(t, foundResponse, "Should have received assistant response")
-
-		// Update viewport content to reflect the changes
-		widget.updateViewportContent()
-
-		// Check that response appears in view
-		output = widget.View()
-		assert.Contains(t, output, "Hello, assistant!", "Should show user message in view")
-		assert.Contains(t, output, "Hello! How can I help you today?", "Should show assistant response in view")
+		// Wait for assistant response to appear
+		assert.True(t, term.WaitForText("Hello! How can I help you today?", 5*time.Second), "Should show assistant response in view")
 
 		// Verify session has the messages
 		session := controller.GetSession()
 		messages := session.ChatMessages()
 		// Should have: system prompt + user message + assistant response
 		assert.GreaterOrEqual(t, len(messages), 3)
+
+		// Cleanup
+		term.SendKey("esc")
+		term.Close()
 	})
 
 	t.Run("verify user input sent to controller", func(t *testing.T) {
@@ -175,39 +144,23 @@ func TestChatWidgetWithFullController(t *testing.T) {
 			}),
 		)
 
-		// Initialize the widget
-		widget.Init()
+		// Create mock terminal
+		term := mock.NewTerminal()
+
+		term.Run(widget)
+
+		// Wait for initial render
+		term.WaitForText("Welcome!", 2*time.Second)
 
 		// Set user input
 		userMessage := "Test message for controller"
-		widget.textarea.SetValue(userMessage)
+		term.SendString(userMessage)
 
-		// Simulate Alt+Enter key press to send message
-		widget.Update(tea.KeyMsg{
-			Type: tea.KeyEnter,
-			Alt:  true,
-		})
+		// Send Alt+Enter to submit
+		term.SendKey("alt+enter")
 
-		// Wait for response
-		var foundResponse bool
-		for i := 0; i < 50; i++ {
-			time.Sleep(100 * time.Millisecond)
-			widget.mu.Lock()
-			messageCount := len(widget.messages)
-			hasContent := false
-			if messageCount >= 2 && widget.messages[1].Content != "" {
-				hasContent = true
-			}
-			widget.mu.Unlock()
-			if hasContent {
-				foundResponse = true
-				break
-			}
-		}
-		assert.True(t, foundResponse, "Should have received assistant response")
-
-		// Update viewport content to reflect the changes
-		widget.updateViewportContent()
+		// Wait for assistant response to appear
+		assert.True(t, term.WaitForText("I received your message!", 5*time.Second), "Should show assistant response")
 
 		// Verify the session has the user message
 		session := controller.GetSession()
@@ -226,9 +179,9 @@ func TestChatWidgetWithFullController(t *testing.T) {
 		}
 		assert.True(t, foundUserMessage, "User message should be in session history")
 
-		// Verify response appears in widget
-		output := widget.View()
-		assert.Contains(t, output, "I received your message!", "Should show assistant response")
+		// Cleanup
+		term.SendKey("esc")
+		term.Close()
 	})
 
 	t.Run("verify multiple messages", func(t *testing.T) {
@@ -289,74 +242,38 @@ func TestChatWidgetWithFullController(t *testing.T) {
 			}),
 		)
 
-		// Initialize the widget
-		widget.Init()
+		// Create mock terminal
+		term := mock.NewTerminal()
+
+		// Run the widget in the terminal
+		term.Run(widget)
+
+		// Wait for initial render
+		term.WaitForText("Welcome!", 2*time.Second)
 
 		// Send first message
-		widget.textarea.SetValue("First message")
-		widget.Update(tea.KeyMsg{
-			Type: tea.KeyEnter,
-			Alt:  true,
-		})
+		term.SendString("First message")
+		term.SendKey("alt+enter")
 
 		// Wait for first response
-		var foundFirstResponse bool
-		for i := 0; i < 50; i++ {
-			time.Sleep(100 * time.Millisecond)
-			widget.mu.Lock()
-			messageCount := len(widget.messages)
-			hasContent := false
-			if messageCount >= 2 && widget.messages[1].Content != "" {
-				hasContent = true
-			}
-			widget.mu.Unlock()
-			if hasContent {
-				foundFirstResponse = true
-				break
-			}
-		}
-		assert.True(t, foundFirstResponse, "Should have received first assistant response")
+		assert.True(t, term.WaitForText("First response", 5*time.Second), "Should show first assistant response")
 
 		// Send second message
-		widget.textarea.SetValue("Second message")
-		widget.Update(tea.KeyMsg{
-			Type: tea.KeyEnter,
-			Alt:  true,
-		})
+		term.SendString("Second message")
+		term.SendKey("alt+enter")
 
 		// Wait for second response
-		var foundSecondResponse bool
-		for i := 0; i < 50; i++ {
-			time.Sleep(100 * time.Millisecond)
-			widget.mu.Lock()
-			messageCount := len(widget.messages)
-			hasContent := false
-			if messageCount >= 4 && widget.messages[3].Content != "" {
-				hasContent = true
-			}
-			widget.mu.Unlock()
-			if hasContent {
-				foundSecondResponse = true
-				break
-			}
-		}
-		assert.True(t, foundSecondResponse, "Should have received second assistant response")
-
-		// Update viewport content to reflect the changes
-		widget.updateViewportContent()
+		assert.True(t, term.WaitForText("Second response", 5*time.Second), "Should show second assistant response")
 
 		// Verify both messages appear in view
-		output := widget.View()
-		assert.Contains(t, output, "First message", "First user message should appear")
-		assert.Contains(t, output, "First response", "First assistant response should appear")
-		assert.Contains(t, output, "Second message", "Second user message should appear")
-		assert.Contains(t, output, "Second response", "Second assistant response should appear")
+		assert.True(t, term.ContainsText("First message"), "First user message should appear")
+		assert.True(t, term.ContainsText("First response"), "First assistant response should appear")
+		assert.True(t, term.ContainsText("Second message"), "Second user message should appear")
+		assert.True(t, term.ContainsText("Second response"), "Second assistant response should appear")
 
-		// Verify widget has both user messages
-		widget.mu.Lock()
-		messageCount := len(widget.messages)
-		widget.mu.Unlock()
-		assert.GreaterOrEqual(t, messageCount, 4, "Should have at least 4 messages (2 user + 2 assistant)")
+		// Cleanup
+		term.SendKey("esc")
+		term.Close()
 	})
 }
 

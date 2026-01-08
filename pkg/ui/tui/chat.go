@@ -52,9 +52,6 @@ type ChatWidget struct {
 	mu sync.Mutex
 }
 
-// contentUpdateMsg is a message sent when content is updated from SessionOutputHandler
-type contentUpdateMsg struct{}
-
 // NewChatWidget creates a new chat widget with the given session controller.
 func NewChatWidget(controller *core.SessionController) (*ChatWidget, error) {
 	// Create markdown renderer
@@ -108,12 +105,6 @@ func (w *ChatWidget) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case contentUpdateMsg:
-		// Content was updated from SessionOutputHandler, re-render viewport
-		w.updateViewportContent()
-		w.viewport.GotoBottom()
-		return w, nil
-
 	case tea.WindowSizeMsg:
 		w.width = msg.Width
 		w.height = msg.Height

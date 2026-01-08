@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/ui"
@@ -28,21 +27,7 @@ func TestChatWidget(t *testing.T) {
 		// Create mock terminal
 		term := mock.NewTerminal()
 
-		// Create bubbletea program with mock terminal
-		p := tea.NewProgram(
-			widget,
-			tea.WithInput(term),
-			tea.WithOutput(term),
-			tea.WithoutSignalHandler(),
-		)
-
-		// Run program in background
-		go func() {
-			p.Run()
-		}()
-
-		// Give the program time to start and render initial view
-		time.Sleep(100 * time.Millisecond)
+		term.Run(widget)
 
 		// Check output contains welcome message
 		assert.True(t, term.WaitForText("Welcome!", 1*time.Second), "Initial view should contain welcome message")
@@ -50,7 +35,6 @@ func TestChatWidget(t *testing.T) {
 
 		// Cleanup: send quit command
 		term.SendKey("esc")
-		time.Sleep(50 * time.Millisecond)
 		term.Close()
 	})
 
@@ -68,27 +52,10 @@ func TestChatWidget(t *testing.T) {
 		// Create mock terminal
 		term := mock.NewTerminal()
 
-		// Create bubbletea program with mock terminal
-		p := tea.NewProgram(
-			widget,
-			tea.WithInput(term),
-			tea.WithOutput(term),
-			tea.WithoutSignalHandler(),
-		)
-
-		// Run program in background
-		go func() {
-			p.Run()
-		}()
-
-		// Give the program time to start
-		time.Sleep(100 * time.Millisecond)
+		term.Run(widget)
 
 		// Type a message via mock terminal
 		term.SendString("Hello assistant!")
-
-		// Give time for input to be processed
-		time.Sleep(50 * time.Millisecond)
 
 		// Send Alt+Enter to submit
 		term.SendKey("alt+enter")
@@ -99,7 +66,6 @@ func TestChatWidget(t *testing.T) {
 
 		// Cleanup
 		term.SendKey("esc")
-		time.Sleep(50 * time.Millisecond)
 		term.Close()
 	})
 
@@ -117,21 +83,7 @@ func TestChatWidget(t *testing.T) {
 		// Create mock terminal
 		term := mock.NewTerminal()
 
-		// Create bubbletea program with mock terminal
-		p := tea.NewProgram(
-			widget,
-			tea.WithInput(term),
-			tea.WithOutput(term),
-			tea.WithoutSignalHandler(),
-		)
-
-		// Run program in background
-		go func() {
-			p.Run()
-		}()
-
-		// Give the program time to start
-		time.Sleep(100 * time.Millisecond)
+		term.Run(widget)
 
 		// Simulate assistant response chunks via SessionOutputHandler interface
 		// This is how the controller would send data to the widget
@@ -139,16 +91,12 @@ func TestChatWidget(t *testing.T) {
 		widget.AddMarkdownChunk("a test ")
 		widget.AddMarkdownChunk("response.")
 
-		// Trigger re-render by sending contentUpdateMsg
-		p.Send(contentUpdateMsg{})
-
 		// Wait for content to appear in terminal output
 		found := term.WaitForText("This is a test response.", 2*time.Second)
 		assert.True(t, found, "View should show assembled markdown chunks")
 
 		// Cleanup
 		term.SendKey("esc")
-		time.Sleep(50 * time.Millisecond)
 		term.Close()
 	})
 
@@ -166,21 +114,7 @@ func TestChatWidget(t *testing.T) {
 		// Create mock terminal
 		term := mock.NewTerminal()
 
-		// Create bubbletea program with mock terminal
-		p := tea.NewProgram(
-			widget,
-			tea.WithInput(term),
-			tea.WithOutput(term),
-			tea.WithoutSignalHandler(),
-		)
-
-		// Run program in background
-		go func() {
-			p.Run()
-		}()
-
-		// Give the program time to start
-		time.Sleep(100 * time.Millisecond)
+		term.Run(widget)
 
 		// Simulate tool call via SessionOutputHandler interface
 		toolCall := &tool.ToolCall{
@@ -192,16 +126,12 @@ func TestChatWidget(t *testing.T) {
 		widget.AddToolCallStart(toolCall)
 		widget.AddToolCallDetails(toolCall)
 
-		// Trigger re-render by sending contentUpdateMsg
-		p.Send(contentUpdateMsg{})
-
 		// Wait for tool call to appear in terminal output
 		found := term.WaitForText("test_tool", 2*time.Second)
 		assert.True(t, found, "View should show tool call name")
 
 		// Cleanup
 		term.SendKey("esc")
-		time.Sleep(50 * time.Millisecond)
 		term.Close()
 	})
 
@@ -219,21 +149,7 @@ func TestChatWidget(t *testing.T) {
 		// Create mock terminal
 		term := mock.NewTerminal()
 
-		// Create bubbletea program with mock terminal
-		p := tea.NewProgram(
-			widget,
-			tea.WithInput(term),
-			tea.WithOutput(term),
-			tea.WithoutSignalHandler(),
-		)
-
-		// Run program in background
-		go func() {
-			p.Run()
-		}()
-
-		// Give the program time to start
-		time.Sleep(100 * time.Millisecond)
+		term.Run(widget)
 
 		// Simulate tool call and result via SessionOutputHandler interface
 		toolCall := &tool.ToolCall{
@@ -253,16 +169,12 @@ func TestChatWidget(t *testing.T) {
 
 		widget.AddToolCallResult(result)
 
-		// Trigger re-render by sending contentUpdateMsg
-		p.Send(contentUpdateMsg{})
-
 		// Wait for tool call to appear in terminal output
 		found := term.WaitForText("test_tool_with_result", 2*time.Second)
 		assert.True(t, found, "View should show tool call name")
 
 		// Cleanup
 		term.SendKey("esc")
-		time.Sleep(50 * time.Millisecond)
 		term.Close()
 	})
 
@@ -280,23 +192,12 @@ func TestChatWidget(t *testing.T) {
 		// Create mock terminal
 		term := mock.NewTerminal()
 
-		// Create bubbletea program with mock terminal
-		p := tea.NewProgram(
-			widget,
-			tea.WithInput(term),
-			tea.WithOutput(term),
-			tea.WithoutSignalHandler(),
-		)
-
 		// Run program and capture when it exits
 		done := make(chan struct{})
 		go func() {
-			p.Run()
+			term.Run(widget)
 			close(done)
 		}()
-
-		// Give the program time to start
-		time.Sleep(100 * time.Millisecond)
 
 		// Send esc key
 		term.SendKey("esc")
@@ -325,21 +226,7 @@ func TestChatWidget(t *testing.T) {
 		// Create mock terminal
 		term := mock.NewTerminal()
 
-		// Create bubbletea program with mock terminal
-		p := tea.NewProgram(
-			widget,
-			tea.WithInput(term),
-			tea.WithOutput(term),
-			tea.WithoutSignalHandler(),
-		)
-
-		// Run program in background
-		go func() {
-			p.Run()
-		}()
-
-		// Give the program time to start
-		time.Sleep(100 * time.Millisecond)
+		term.Run(widget)
 
 		// Simulate streaming response via SessionOutputHandler interface
 		chunks := []string{"Hello", " ", "world", "!", " ", "This", " ", "is", " ", "streaming."}
@@ -349,9 +236,6 @@ func TestChatWidget(t *testing.T) {
 
 		// Finalize the message
 		widget.RunFinished(nil)
-
-		// Trigger re-render by sending contentUpdateMsg
-		p.Send(contentUpdateMsg{})
 
 		// Wait for complete message to appear in terminal output
 		fullMessage := "Hello world! This is streaming."

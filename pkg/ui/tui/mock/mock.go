@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // Terminal is a mock terminal that implements io.Reader and io.Writer
@@ -26,6 +28,8 @@ type Terminal struct {
 
 	// inputCond is a condition variable for waiting on input
 	inputCond *sync.Cond
+
+	program *tea.Program
 }
 
 // NewTerminal creates a new mock terminal.
@@ -36,6 +40,28 @@ func NewTerminal() *Terminal {
 	}
 	t.inputCond = sync.NewCond(&t.mu)
 	return t
+}
+
+func (t *Terminal) Run(model tea.Model) *tea.Program {
+	t.program = tea.NewProgram(
+		model,
+		tea.WithInput(t),
+		tea.WithOutput(t),
+		tea.WithoutSignalHandler(),
+	)
+
+	go func() {
+		t.program.Run()
+	}()
+
+	return t.program
+}
+
+// Send sends a message to the bubbletea program.
+func (t *Terminal) Send(msg tea.Msg) {
+	if t.program != nil {
+		t.program.Send(msg)
+	}
 }
 
 // Read implements io.Reader. It reads from the input buffer.
@@ -167,7 +193,7 @@ func (t *Terminal) WaitForText(text string, timeout time.Duration) bool {
 		}
 
 		// Sleep a bit before checking again
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(1 * time.Millisecond)
 	}
 }
 
