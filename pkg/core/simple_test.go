@@ -8,7 +8,6 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
-	"github.com/codesnort/codesnort-swe/pkg/ui"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,7 +36,7 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 			VFS:            vfs,
 		}
 
-		mockHandler := ui.NewMockSessionOutputHandler()
+		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
 		require.NoError(t, err)
 		assert.NotNil(t, session)
@@ -109,7 +108,7 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 	})
 
 	t.Run("UI output handler integration", func(t *testing.T) {
-		mockHandler := ui.NewMockSessionOutputHandler()
+		mockHandler := testutil.NewMockSessionOutputHandler()
 
 		system := &SweSystem{
 			ModelProviders: map[string]models.ModelProvider{"ollama": client},
