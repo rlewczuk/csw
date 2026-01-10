@@ -5,9 +5,8 @@ import (
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/core"
+	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
-	"github.com/codesnort/codesnort-swe/pkg/ui"
-	"github.com/codesnort/codesnort-swe/pkg/ui/tui/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +14,7 @@ import (
 func TestChatWidget(t *testing.T) {
 	t.Run("initial state and view", func(t *testing.T) {
 		// Create mock output handler for capturing session events
-		outputHandler := ui.NewMockSessionOutputHandler()
+		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller (we won't start a real session)
 		controller := core.NewSessionController(nil, outputHandler)
@@ -25,7 +24,7 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := mock.NewTerminal()
+		term := NewTerminal()
 
 		term.Run(widget)
 
@@ -40,7 +39,7 @@ func TestChatWidget(t *testing.T) {
 
 	t.Run("user message is added to widget", func(t *testing.T) {
 		// Create mock output handler
-		outputHandler := ui.NewMockSessionOutputHandler()
+		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller
 		controller := core.NewSessionController(nil, outputHandler)
@@ -50,7 +49,7 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := mock.NewTerminal()
+		term := NewTerminal()
 
 		term.Run(widget)
 
@@ -71,7 +70,7 @@ func TestChatWidget(t *testing.T) {
 
 	t.Run("markdown chunks are displayed", func(t *testing.T) {
 		// Create mock output handler for capturing session events
-		outputHandler := ui.NewMockSessionOutputHandler()
+		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller
 		controller := core.NewSessionController(nil, outputHandler)
@@ -81,11 +80,11 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := mock.NewTerminal()
+		term := NewTerminal()
 
 		term.Run(widget)
 
-		// Simulate assistant response chunks via SessionOutputHandler interface
+		// Simulate assistant response chunks via SessionThreadOutput interface
 		// This is how the controller would send data to the widget
 		widget.AddMarkdownChunk("This is ")
 		widget.AddMarkdownChunk("a test ")
@@ -102,7 +101,7 @@ func TestChatWidget(t *testing.T) {
 
 	t.Run("tool calls are displayed", func(t *testing.T) {
 		// Create mock output handler
-		outputHandler := ui.NewMockSessionOutputHandler()
+		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller
 		controller := core.NewSessionController(nil, outputHandler)
@@ -112,11 +111,11 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := mock.NewTerminal()
+		term := NewTerminal()
 
 		term.Run(widget)
 
-		// Simulate tool call via SessionOutputHandler interface
+		// Simulate tool call via SessionThreadOutput interface
 		toolCall := &tool.ToolCall{
 			ID:       "call_123",
 			Function: "test_tool",
@@ -137,7 +136,7 @@ func TestChatWidget(t *testing.T) {
 
 	t.Run("tool call results are displayed", func(t *testing.T) {
 		// Create mock output handler
-		outputHandler := ui.NewMockSessionOutputHandler()
+		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller
 		controller := core.NewSessionController(nil, outputHandler)
@@ -147,11 +146,11 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := mock.NewTerminal()
+		term := NewTerminal()
 
 		term.Run(widget)
 
-		// Simulate tool call and result via SessionOutputHandler interface
+		// Simulate tool call and result via SessionThreadOutput interface
 		toolCall := &tool.ToolCall{
 			ID:       "call_456",
 			Function: "test_tool_with_result",
@@ -180,7 +179,7 @@ func TestChatWidget(t *testing.T) {
 
 	t.Run("esc key quits program", func(t *testing.T) {
 		// Create mock output handler
-		outputHandler := ui.NewMockSessionOutputHandler()
+		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller
 		controller := core.NewSessionController(nil, outputHandler)
@@ -190,7 +189,7 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := mock.NewTerminal()
+		term := NewTerminal()
 
 		// Run program and capture when it exits
 		done := make(chan struct{})
@@ -214,7 +213,7 @@ func TestChatWidget(t *testing.T) {
 
 	t.Run("multiple markdown chunks build up message", func(t *testing.T) {
 		// Create mock output handler
-		outputHandler := ui.NewMockSessionOutputHandler()
+		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller
 		controller := core.NewSessionController(nil, outputHandler)
@@ -224,11 +223,11 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := mock.NewTerminal()
+		term := NewTerminal()
 
 		term.Run(widget)
 
-		// Simulate streaming response via SessionOutputHandler interface
+		// Simulate streaming response via SessionThreadOutput interface
 		chunks := []string{"Hello", " ", "world", "!", " ", "This", " ", "is", " ", "streaming."}
 		for _, chunk := range chunks {
 			widget.AddMarkdownChunk(chunk)

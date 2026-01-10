@@ -149,7 +149,7 @@ func run(cmd *cobra.Command, args []string) error {
 	controller := core.NewSessionController(sweSystem, nil)
 
 	// Create chat widget with the controller
-	// ChatWidget implements ui.SessionOutputHandler interface
+	// ChatWidget implements ui.SessionThreadOutput interface
 	chatWidget, err := tui.NewChatWidget(controller)
 	if err != nil {
 		return fmt.Errorf("failed to create chat widget: %w", err)

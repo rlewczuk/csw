@@ -10,7 +10,6 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
-	"github.com/codesnort/codesnort-swe/pkg/ui/tui/mock"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -70,7 +69,7 @@ func TestChatWidgetWithFullController(t *testing.T) {
 		)
 
 		// Create mock terminal
-		term := mock.NewTerminal()
+		term := NewTerminal()
 
 		term.Run(widget)
 
@@ -145,7 +144,7 @@ func TestChatWidgetWithFullController(t *testing.T) {
 		)
 
 		// Create mock terminal
-		term := mock.NewTerminal()
+		term := NewTerminal()
 
 		term.Run(widget)
 
@@ -243,7 +242,7 @@ func TestChatWidgetWithFullController(t *testing.T) {
 		)
 
 		// Create mock terminal
-		term := mock.NewTerminal()
+		term := NewTerminal()
 
 		// Run the widget in the terminal
 		term.Run(widget)
