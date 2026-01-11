@@ -19,6 +19,7 @@ const (
 )
 
 type tuiChatMessage struct {
+	id        string
 	role      string
 	content   string
 	toolCalls []*tuiToolCallWidget
@@ -249,9 +250,14 @@ func (v *TuiChatView) UpdateMessage(msg *ui.ChatMessageUI) error {
 	v.model.mu.Lock()
 	defer v.model.mu.Unlock()
 
+	// Find message by ID or by role if ID is empty (backwards compatibility)
 	for _, m := range v.model.messages {
-		if m.role == string(msg.Role) && len(m.content) == 0 {
+		if (msg.Id != "" && m.id == msg.Id) || (msg.Id == "" && m.role == string(msg.Role) && len(m.content) == 0) {
+			// Update content (replace, not append - presenter sends accumulated text)
 			m.content = msg.Text
+
+			// Update tool calls
+			m.toolCalls = make([]*tuiToolCallWidget, 0, len(msg.Tools))
 			for _, tool := range msg.Tools {
 				m.toolCalls = append(m.toolCalls, newTuiToolCallWidget(tool))
 			}
@@ -290,6 +296,7 @@ func (m *tuiChatViewModel) addUserMessage(content string) {
 	defer m.mu.Unlock()
 
 	msg := &tuiChatMessage{
+		id:        "", // User messages from UI don't have IDs yet
 		role:      string(ui.ChatRoleUser),
 		content:   content,
 		toolCalls: make([]*tuiToolCallWidget, 0),
@@ -299,6 +306,7 @@ func (m *tuiChatViewModel) addUserMessage(content string) {
 
 func (m *tuiChatViewModel) addMessageUnsafe(msg *ui.ChatMessageUI) {
 	chatMsg := &tuiChatMessage{
+		id:        msg.Id,
 		role:      string(msg.Role),
 		content:   msg.Text,
 		toolCalls: make([]*tuiToolCallWidget, 0),
