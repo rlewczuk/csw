@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
@@ -12,11 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func chatResponseJSON(response models.OllamaChatResponse) string {
-	data, _ := json.Marshal(response)
-	return string(data)
-}
 
 func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 	mockServer := testutil.NewMockHTTPServer()
@@ -44,56 +38,14 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 		// Populate mock server with LLM responses
 		// First response: assistant makes a tool call to write the file
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: models.OllamaMessage{
-					Role: "assistant",
-					ToolCalls: []models.OllamaToolCall{
-						{
-							Function: models.OllamaToolCallFunction{
-								Name: "vfs.write",
-								Arguments: map[string]interface{}{
-									"path":    "hello_world.py",
-									"content": "print(\"Hello World\")\n",
-								},
-							},
-						},
-					},
-				},
-				Done: false,
-			}),
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:01Z",
-				Message: models.OllamaMessage{
-					Role: "assistant",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfs.write","arguments":{"path":"hello_world.py","content":"print(\"Hello World\")\n"}}}]},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 		)
 
 		// Second response: after tool execution, assistant confirms completion
 		mockServer.AddStreamingResponse("/api/chat", "POST", true,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:02Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "I've created the Hello World program in Python.",
-				},
-				Done: false,
-			}),
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:03Z",
-				Message: models.OllamaMessage{
-					Role: "assistant",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"I've created the Hello World program in Python."},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 		)
 
 		err = session.UserPrompt("Implement Hello World program in Python")
@@ -124,56 +76,14 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 		// Populate mock server with LLM responses
 		// First response: assistant makes a tool call to write the file
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: models.OllamaMessage{
-					Role: "assistant",
-					ToolCalls: []models.OllamaToolCall{
-						{
-							Function: models.OllamaToolCallFunction{
-								Name: "vfs.write",
-								Arguments: map[string]interface{}{
-									"path":    "test.txt",
-									"content": "test content",
-								},
-							},
-						},
-					},
-				},
-				Done: false,
-			}),
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:01Z",
-				Message: models.OllamaMessage{
-					Role: "assistant",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfs.write","arguments":{"path":"test.txt","content":"test content"}}}]},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 		)
 
 		// Second response: after tool execution, assistant confirms completion
 		mockServer.AddStreamingResponse("/api/chat", "POST", true,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:02Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "File created successfully.",
-				},
-				Done: false,
-			}),
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:03Z",
-				Message: models.OllamaMessage{
-					Role: "assistant",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"File created successfully."},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 		)
 
 		err = session.UserPrompt("Create a test file")

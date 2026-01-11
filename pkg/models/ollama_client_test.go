@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -21,24 +20,6 @@ const (
 	testOllamaTimeout        = 30 * time.Second
 	connectOllamaTimeout     = 5 * time.Second
 )
-
-// ollamaChatResponseJSON converts a OllamaChatResponse to JSON string.
-func ollamaChatResponseJSON(response OllamaChatResponse) string {
-	data, _ := json.Marshal(response)
-	return string(data)
-}
-
-// ollamaEmbedResponseJSON converts an OllamaEmbedResponse to JSON string.
-func ollamaEmbedResponseJSON(response OllamaEmbedResponse) string {
-	data, _ := json.Marshal(response)
-	return string(data)
-}
-
-// ollamaListModelsResponseJSON converts a OllamaListModelsResponse to JSON string.
-func ollamaListModelsResponseJSON(response OllamaListModelsResponse) string {
-	data, _ := json.Marshal(response)
-	return string(data)
-}
 
 // getOllamaHost returns the Ollama host URL from config file or default
 func getOllamaHost() string {
@@ -150,28 +131,7 @@ func TestOllamaClient_ListModels(t *testing.T) {
 
 	// Setup mock response if using mock
 	if tc.Mock != nil {
-		modelsResponse := ollamaListModelsResponseJSON(OllamaListModelsResponse{
-			Models: []OllamaModelInfo{
-				{
-					Name:       testOllamaModelName,
-					Model:      testOllamaModelName,
-					ModifiedAt: "2024-01-01T00:00:00Z",
-					Size:       1000000000,
-					Details: OllamaModelDetails{
-						Family: "llama",
-					},
-				},
-				{
-					Name:       testOllamaEmbedModelName,
-					Model:      testOllamaEmbedModelName,
-					ModifiedAt: "2024-01-01T00:00:00Z",
-					Size:       500000000,
-					Details: OllamaModelDetails{
-						Family: "nomic",
-					},
-				},
-			},
-		})
+		modelsResponse := `{"models":[{"name":"devstral-small-2:latest","model":"devstral-small-2:latest","modified_at":"2024-01-01T00:00:00Z","size":1000000000,"details":{"family":"llama"}},{"name":"nomic-embed-text:latest","model":"nomic-embed-text:latest","modified_at":"2024-01-01T00:00:00Z","size":500000000,"details":{"family":"nomic"}}]}`
 		// Add response for each subtest
 		tc.Mock.AddRestResponse("/api/tags", "GET", modelsResponse)
 		tc.Mock.AddRestResponse("/api/tags", "GET", modelsResponse)
@@ -231,16 +191,7 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 	t.Run("sends chat message and gets response", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
-				Model:     testOllamaModelName,
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: OllamaMessage{
-					Role:    "assistant",
-					Content: "4",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}))
+			tc.Mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"4"},"done":true,"done_reason":"stop"}`)
 		}
 
 		options := &ChatOptions{
@@ -270,16 +221,7 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 	t.Run("handles context with timeout", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
-				Model:     testOllamaModelName,
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: OllamaMessage{
-					Role:    "assistant",
-					Content: "Hello!",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}))
+			tc.Mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello!"},"done":true,"done_reason":"stop"}`)
 		}
 
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -303,16 +245,7 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 	t.Run("handles system and user messages", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
-				Model:     testOllamaModelName,
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: OllamaMessage{
-					Role:    "assistant",
-					Content: "HELLO!",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}))
+			tc.Mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"HELLO!"},"done":true,"done_reason":"stop"}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testOllamaModelName, nil)
@@ -356,16 +289,7 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 	t.Run("uses default options when none provided to Chat", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
-				Model:     testOllamaModelName,
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: OllamaMessage{
-					Role:    "assistant",
-					Content: "Hello!",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}))
+			tc.Mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello!"},"done":true,"done_reason":"stop"}`)
 		}
 
 		defaultOptions := &ChatOptions{
@@ -400,31 +324,10 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:     testOllamaModelName,
-					CreatedAt: "2024-01-01T00:00:00Z",
-					Message:   OllamaMessage{Role: "assistant", Content: "1"},
-					Done:      false,
-				}),
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:     testOllamaModelName,
-					CreatedAt: "2024-01-01T00:00:01Z",
-					Message:   OllamaMessage{Role: "assistant", Content: "\n2"},
-					Done:      false,
-				}),
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:     testOllamaModelName,
-					CreatedAt: "2024-01-01T00:00:02Z",
-					Message:   OllamaMessage{Role: "assistant", Content: "\n3"},
-					Done:      false,
-				}),
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:      testOllamaModelName,
-					CreatedAt:  "2024-01-01T00:00:03Z",
-					Message:    OllamaMessage{Role: "assistant", Content: ""},
-					Done:       true,
-					DoneReason: "stop",
-				}),
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"1"},"done":false}`,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":"\n2"},"done":false}`,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"\n3"},"done":false}`,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}`,
 			)
 		}
 
@@ -462,25 +365,9 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock (longer response for cancellation test)
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:     testOllamaModelName,
-					CreatedAt: "2024-01-01T00:00:00Z",
-					Message:   OllamaMessage{Role: "assistant", Content: "Once upon a time"},
-					Done:      false,
-				}),
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:     testOllamaModelName,
-					CreatedAt: "2024-01-01T00:00:01Z",
-					Message:   OllamaMessage{Role: "assistant", Content: " there was a cat"},
-					Done:      false,
-				}),
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:      testOllamaModelName,
-					CreatedAt:  "2024-01-01T00:00:02Z",
-					Message:    OllamaMessage{Role: "assistant", Content: ""},
-					Done:       true,
-					DoneReason: "stop",
-				}),
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Once upon a time"},"done":false}`,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":" there was a cat"},"done":false}`,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}`,
 			)
 		}
 
@@ -516,19 +403,8 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:     testOllamaModelName,
-					CreatedAt: "2024-01-01T00:00:00Z",
-					Message:   OllamaMessage{Role: "assistant", Content: "Hello!"},
-					Done:      false,
-				}),
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:      testOllamaModelName,
-					CreatedAt:  "2024-01-01T00:00:01Z",
-					Message:    OllamaMessage{Role: "assistant", Content: ""},
-					Done:       true,
-					DoneReason: "stop",
-				}),
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello!"},"done":false}`,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}`,
 			)
 		}
 
@@ -559,19 +435,8 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:     testOllamaModelName,
-					CreatedAt: "2024-01-01T00:00:00Z",
-					Message:   OllamaMessage{Role: "assistant", Content: "OK"},
-					Done:      false,
-				}),
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:      testOllamaModelName,
-					CreatedAt:  "2024-01-01T00:00:01Z",
-					Message:    OllamaMessage{Role: "assistant", Content: ""},
-					Done:       true,
-					DoneReason: "stop",
-				}),
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"OK"},"done":false}`,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}`,
 			)
 		}
 
@@ -635,19 +500,8 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:     testOllamaModelName,
-					CreatedAt: "2024-01-01T00:00:00Z",
-					Message:   OllamaMessage{Role: "assistant", Content: "Hello!"},
-					Done:      false,
-				}),
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:      testOllamaModelName,
-					CreatedAt:  "2024-01-01T00:00:01Z",
-					Message:    OllamaMessage{Role: "assistant", Content: ""},
-					Done:       true,
-					DoneReason: "stop",
-				}),
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello!"},"done":false}`,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}`,
 			)
 		}
 
@@ -684,19 +538,8 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:     testOllamaModelName,
-					CreatedAt: "2024-01-01T00:00:00Z",
-					Message:   OllamaMessage{Role: "assistant", Content: "Hello!"},
-					Done:      false,
-				}),
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:      testOllamaModelName,
-					CreatedAt:  "2024-01-01T00:00:01Z",
-					Message:    OllamaMessage{Role: "assistant", Content: ""},
-					Done:       true,
-					DoneReason: "stop",
-				}),
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello!"},"done":false}`,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}`,
 			)
 		}
 
@@ -740,10 +583,7 @@ func TestOllamaClient_EmbeddingModel(t *testing.T) {
 	t.Run("generates embeddings for text", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/embed", "POST", ollamaEmbedResponseJSON(OllamaEmbedResponse{
-				Model:      testOllamaEmbedModelName,
-				Embeddings: [][]float64{{0.1, 0.2, 0.3, 0.4, 0.5}},
-			}))
+			tc.Mock.AddRestResponse("/api/embed", "POST", `{"model":"nomic-embed-text:latest","embeddings":[[0.1,0.2,0.3,0.4,0.5]]}`)
 		}
 
 		embedModel := tc.Client.EmbeddingModel(testOllamaEmbedModelName)
@@ -759,10 +599,7 @@ func TestOllamaClient_EmbeddingModel(t *testing.T) {
 	t.Run("generates embeddings for different texts", func(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/embed", "POST", ollamaEmbedResponseJSON(OllamaEmbedResponse{
-				Model:      testOllamaEmbedModelName,
-				Embeddings: [][]float64{{0.1, 0.2, 0.3, 0.4, 0.5}},
-			}))
+			tc.Mock.AddRestResponse("/api/embed", "POST", `{"model":"nomic-embed-text:latest","embeddings":[[0.1,0.2,0.3,0.4,0.5]]}`)
 		}
 
 		embedModel := tc.Client.EmbeddingModel(testOllamaEmbedModelName)
@@ -773,10 +610,7 @@ func TestOllamaClient_EmbeddingModel(t *testing.T) {
 
 		// For mock mode, we need to add another response
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/embed", "POST", ollamaEmbedResponseJSON(OllamaEmbedResponse{
-				Model:      testOllamaEmbedModelName,
-				Embeddings: [][]float64{{0.2, 0.3, 0.4, 0.5, 0.6}},
-			}))
+			tc.Mock.AddRestResponse("/api/embed", "POST", `{"model":"nomic-embed-text:latest","embeddings":[[0.2,0.3,0.4,0.5,0.6]]}`)
 		}
 
 		embedding2, err := embedModel.Embed(ctx, "jumps over the lazy dog")
@@ -856,26 +690,7 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 	t.Run("tool calls are properly passed to LLM", func(t *testing.T) {
 		// Setup mock response with tool call if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
-				Model:     testOllamaModelName,
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: OllamaMessage{
-					Role: "assistant",
-					ToolCalls: []OllamaToolCall{
-						{
-							Function: OllamaToolCallFunction{
-								Name: "get_weather",
-								Arguments: map[string]interface{}{
-									"location": "Paris, France",
-									"unit":     "celsius",
-								},
-							},
-						},
-					},
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}))
+			tc.Mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"get_weather","arguments":{"location":"Paris, France","unit":"celsius"}}}]},"done":true,"done_reason":"stop"}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testOllamaModelName, &ChatOptions{
@@ -913,36 +728,9 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
 			// First response: tool call
-			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
-				Model:     testOllamaModelName,
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: OllamaMessage{
-					Role: "assistant",
-					ToolCalls: []OllamaToolCall{
-						{
-							Function: OllamaToolCallFunction{
-								Name: "get_weather",
-								Arguments: map[string]interface{}{
-									"location": "Tokyo",
-								},
-							},
-						},
-					},
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}))
+			tc.Mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"get_weather","arguments":{"location":"Tokyo"}}}]},"done":true,"done_reason":"stop"}`)
 			// Second response: final answer after tool execution
-			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
-				Model:     testOllamaModelName,
-				CreatedAt: "2024-01-01T00:00:01Z",
-				Message: OllamaMessage{
-					Role:    "assistant",
-					Content: "The weather in Tokyo is currently 18°C and cloudy.",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}))
+			tc.Mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":"The weather in Tokyo is currently 18°C and cloudy."},"done":true,"done_reason":"stop"}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testOllamaModelName, &ChatOptions{
@@ -998,47 +786,13 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 		if tc.Mock != nil {
 			// First response: streaming tool call
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:     testOllamaModelName,
-					CreatedAt: "2024-01-01T00:00:00Z",
-					Message: OllamaMessage{
-						Role: "assistant",
-						ToolCalls: []OllamaToolCall{
-							{
-								Function: OllamaToolCallFunction{
-									Name: "get_weather",
-									Arguments: map[string]interface{}{
-										"location": "London",
-									},
-								},
-							},
-						},
-					},
-					Done:       true,
-					DoneReason: "stop",
-				}),
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"get_weather","arguments":{"location":"London"}}}]},"done":true,"done_reason":"stop"}`,
 			)
 			// Second response: streaming text response after tool execution
 			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:     testOllamaModelName,
-					CreatedAt: "2024-01-01T00:00:01Z",
-					Message:   OllamaMessage{Role: "assistant", Content: "The temperature in London is "},
-					Done:      false,
-				}),
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:     testOllamaModelName,
-					CreatedAt: "2024-01-01T00:00:02Z",
-					Message:   OllamaMessage{Role: "assistant", Content: "15°C and it's rainy."},
-					Done:      false,
-				}),
-				ollamaChatResponseJSON(OllamaChatResponse{
-					Model:      testOllamaModelName,
-					CreatedAt:  "2024-01-01T00:00:03Z",
-					Message:    OllamaMessage{Role: "assistant", Content: ""},
-					Done:       true,
-					DoneReason: "stop",
-				}),
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":"The temperature in London is "},"done":false}`,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"15°C and it's rainy."},"done":false}`,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}`,
 			)
 		}
 
@@ -1142,33 +896,7 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 
 		// Setup mock response with multiple tool calls if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
-				Model:     testOllamaModelName,
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: OllamaMessage{
-					Role: "assistant",
-					ToolCalls: []OllamaToolCall{
-						{
-							Function: OllamaToolCallFunction{
-								Name: "get_weather",
-								Arguments: map[string]interface{}{
-									"location": "New York",
-								},
-							},
-						},
-						{
-							Function: OllamaToolCallFunction{
-								Name: "get_time",
-								Arguments: map[string]interface{}{
-									"location": "New York",
-								},
-							},
-						},
-					},
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}))
+			tc.Mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"get_weather","arguments":{"location":"New York"}}},{"function":{"name":"get_time","arguments":{"location":"New York"}}}]},"done":true,"done_reason":"stop"}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testOllamaModelName, &ChatOptions{
@@ -1200,36 +928,9 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
 			// First response: tool call
-			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
-				Model:     testOllamaModelName,
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: OllamaMessage{
-					Role: "assistant",
-					ToolCalls: []OllamaToolCall{
-						{
-							Function: OllamaToolCallFunction{
-								Name: "get_weather",
-								Arguments: map[string]interface{}{
-									"location": "Berlin",
-								},
-							},
-						},
-					},
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}))
+			tc.Mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"get_weather","arguments":{"location":"Berlin"}}}]},"done":true,"done_reason":"stop"}`)
 			// Second response: handling error
-			tc.Mock.AddRestResponse("/api/chat", "POST", ollamaChatResponseJSON(OllamaChatResponse{
-				Model:     testOllamaModelName,
-				CreatedAt: "2024-01-01T00:00:01Z",
-				Message: OllamaMessage{
-					Role:    "assistant",
-					Content: "I apologize, but I encountered an error: location not found.",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}))
+			tc.Mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":"I apologize, but I encountered an error: location not found."},"done":true,"done_reason":"stop"}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testOllamaModelName, &ChatOptions{

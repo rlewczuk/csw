@@ -1,7 +1,6 @@
 package presenter
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -15,11 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func chatResponseJSON(response models.OllamaChatResponse) string {
-	data, _ := json.Marshal(response)
-	return string(data)
-}
 
 func setupTestSystem(t *testing.T) (*core.SweSystem, *testutil.MockHTTPServer, vfs.VFS) {
 	mockServer := testutil.NewMockHTTPServer()
@@ -97,21 +91,8 @@ func TestChatPresenter_SendUserMessage(t *testing.T) {
 
 		// Setup LLM response
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "Hello! How can I help you?",
-				},
-				Done: false,
-			}),
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:      "devstral-small-2:latest",
-				CreatedAt:  "2024-01-01T00:00:01Z",
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello! How can I help you?"},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","done":true,"done_reason":"stop"}`,
 		)
 
 		// Send user message
@@ -208,21 +189,8 @@ func TestChatPresenter_PauseResume(t *testing.T) {
 
 		// Setup LLM response
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "Hello! How can I help you?",
-				},
-				Done: false,
-			}),
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:      "devstral-small-2:latest",
-				CreatedAt:  "2024-01-01T00:00:01Z",
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello! How can I help you?"},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","done":true,"done_reason":"stop"}`,
 		)
 
 		// Verify not running initially
@@ -265,50 +233,14 @@ func TestChatPresenter_ToolCallHandling(t *testing.T) {
 
 		// Setup LLM responses with tool call
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: models.OllamaMessage{
-					Role: "assistant",
-					ToolCalls: []models.OllamaToolCall{
-						{
-							Function: models.OllamaToolCallFunction{
-								Name: "vfs.write",
-								Arguments: map[string]interface{}{
-									"path":    "test.txt",
-									"content": "Hello World",
-								},
-							},
-						},
-					},
-				},
-				Done: false,
-			}),
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:      "devstral-small-2:latest",
-				CreatedAt:  "2024-01-01T00:00:01Z",
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfs.write","arguments":{"path":"test.txt","content":"Hello World"}}}]},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","done":true,"done_reason":"stop"}`,
 		)
 
 		// Second response after tool execution
 		mockServer.AddStreamingResponse("/api/chat", "POST", true,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:02Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "File created.",
-				},
-				Done: false,
-			}),
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:      "devstral-small-2:latest",
-				CreatedAt:  "2024-01-01T00:00:03Z",
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"File created."},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:03Z","done":true,"done_reason":"stop"}`,
 		)
 
 		// Send user message
@@ -351,21 +283,8 @@ func TestChatPresenter_SessionPersistence(t *testing.T) {
 
 		// Setup LLM response
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "First response",
-				},
-				Done: false,
-			}),
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:      "devstral-small-2:latest",
-				CreatedAt:  "2024-01-01T00:00:01Z",
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"First response"},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","done":true,"done_reason":"stop"}`,
 		)
 
 		// Send message via first presenter
@@ -434,21 +353,8 @@ func TestChatPresenter_MoveToBottom(t *testing.T) {
 
 		// Setup LLM response
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "Response",
-				},
-				Done: false,
-			}),
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:      "devstral-small-2:latest",
-				CreatedAt:  "2024-01-01T00:00:01Z",
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello! How can I help you?"},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","done":true,"done_reason":"stop"}`,
 		)
 
 		// Send message

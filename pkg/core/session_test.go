@@ -66,56 +66,14 @@ func TestSessionThread(t *testing.T) {
 		// Populate mock server with LLM responses
 		// First response: assistant makes a tool call to write the file
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: models.OllamaMessage{
-					Role: "assistant",
-					ToolCalls: []models.OllamaToolCall{
-						{
-							Function: models.OllamaToolCallFunction{
-								Name: "vfs.write",
-								Arguments: map[string]interface{}{
-									"path":    "hello_world.py",
-									"content": "print(\"Hello World\")\n",
-								},
-							},
-						},
-					},
-				},
-				Done: false,
-			}),
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:01Z",
-				Message: models.OllamaMessage{
-					Role: "assistant",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfs.write","arguments":{"path":"hello_world.py","content":"print(\"Hello World\")\n"}}}]},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 		)
 
 		// Second response: after tool execution, assistant confirms completion
 		mockServer.AddStreamingResponse("/api/chat", "POST", true,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:02Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "I've created the Hello World program in Python.",
-				},
-				Done: false,
-			}),
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:03Z",
-				Message: models.OllamaMessage{
-					Role: "assistant",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"I've created the Hello World program in Python."},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 		)
 
 		// Send user prompt (non-blocking)
@@ -151,30 +109,12 @@ func TestSessionThread(t *testing.T) {
 
 		// Setup responses for first prompt
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "First response",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"First response"},"done":true,"done_reason":"stop"}`,
 		)
 
 		// Setup responses for second prompt
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "devstral-small-2:latest",
-				CreatedAt: "2024-01-01T00:00:01Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "Second response",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":"Second response"},"done":true,"done_reason":"stop"}`,
 		)
 
 		// Send two prompts quickly
@@ -272,16 +212,7 @@ func TestSessionThreadSafety(t *testing.T) {
 		// Setup multiple responses
 		for i := 0; i < 5; i++ {
 			mockServer.AddStreamingResponse("/api/chat", "POST", false,
-				chatResponseJSON(models.OllamaChatResponse{
-					Model:     "devstral-small-2:latest",
-					CreatedAt: "2024-01-01T00:00:00Z",
-					Message: models.OllamaMessage{
-						Role:    "assistant",
-						Content: "Response",
-					},
-					Done:       true,
-					DoneReason: "stop",
-				}),
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Response"},"done":true,"done_reason":"stop"}`,
 			)
 		}
 
