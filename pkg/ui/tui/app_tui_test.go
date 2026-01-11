@@ -95,7 +95,7 @@ func TestTuiAppView(t *testing.T) {
 		assert.NoError(t, err)
 
 		viewStr := view.View()
-		assert.Contains(t, viewStr, "Ctrl+P: Menu")
+		assert.Contains(t, viewStr, "Ctrl+P/Esc: Menu")
 		assert.Contains(t, viewStr, appName)
 		assert.Contains(t, viewStr, appVersion)
 	})
@@ -111,7 +111,7 @@ func TestTuiAppView(t *testing.T) {
 		viewStr := view.View()
 		assert.NotEmpty(t, viewStr)
 		// Status bar should still be present
-		assert.Contains(t, viewStr, "Ctrl+P: Menu")
+		assert.Contains(t, viewStr, "Ctrl+P/Esc: Menu")
 	})
 }
 
@@ -292,7 +292,7 @@ func TestTuiAppViewIntegration(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 
 		// Verify initial state shows status bar
-		assert.True(t, term.WaitForText("Ctrl+P: Menu", 1*time.Second))
+		assert.True(t, term.WaitForText("Ctrl+P/Esc: Menu", 1*time.Second))
 
 		// Open menu
 		term.SendKey("ctrl+p")
@@ -348,7 +348,7 @@ func TestTuiAppViewStatusBar(t *testing.T) {
 
 		statusBar := view.renderStatusBar()
 		assert.NotEmpty(t, statusBar)
-		assert.Contains(t, statusBar, "Ctrl+P: Menu")
+		assert.Contains(t, statusBar, "Ctrl+P/Esc: Menu")
 		assert.Contains(t, statusBar, appName)
 	})
 

@@ -351,6 +351,6 @@ func TestTuiChatViewBubbletea(t *testing.T) {
 		assert.NotNil(t, cmd)
 
 		_, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
-		assert.NotNil(t, cmd)
+		assert.Nil(t, cmd)
 	})
 }
