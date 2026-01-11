@@ -6,12 +6,12 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/ui"
 )
 
-// MockAppView implements ui.AppView interface for testing purposes.
+// MockAppView implements ui.IAppView interface for testing purposes.
 type MockAppView struct {
 	mu sync.RWMutex
 
 	// Recorded calls
-	ShowChatCalls     []ui.ChatView
+	ShowChatCalls     []ui.IChatView
 	ShowSettingsCalls int
 }
 
@@ -21,7 +21,7 @@ func NewMockAppView() *MockAppView {
 }
 
 // ShowChat shows the chat view.
-func (m *MockAppView) ShowChat(view ui.ChatView) {
+func (m *MockAppView) ShowChat(view ui.IChatView) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -45,7 +45,7 @@ func (m *MockAppView) Reset() {
 	m.ShowSettingsCalls = 0
 }
 
-// MockAppPresenter implements ui.AppPresenter interface for testing purposes.
+// MockAppPresenter implements ui.IAppPresenter interface for testing purposes.
 type MockAppPresenter struct {
 	mu sync.RWMutex
 

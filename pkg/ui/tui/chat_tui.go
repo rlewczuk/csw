@@ -92,7 +92,7 @@ type TuiChatView struct {
 }
 
 type tuiChatViewModel struct {
-	presenter ui.ChatPresenter
+	presenter ui.IChatPresenter
 	viewport  viewport.Model
 	textarea  textarea.Model
 	messages  []*tuiChatMessage
@@ -105,7 +105,7 @@ type tuiChatViewModel struct {
 	mu sync.Mutex
 }
 
-func NewTuiChatView(presenter ui.ChatPresenter) (*TuiChatView, error) {
+func NewTuiChatView(presenter ui.IChatPresenter) (*TuiChatView, error) {
 	renderer, err := glamour.NewTermRenderer(
 		glamour.WithAutoStyle(),
 		glamour.WithWordWrap(defaultWidth-4),
@@ -359,5 +359,5 @@ func (m *tuiChatViewModel) updateViewportContentUnsafe() {
 	m.viewport.SetContent(content.String())
 }
 
-var _ ui.ChatView = (*TuiChatView)(nil)
+var _ ui.IChatView = (*TuiChatView)(nil)
 var _ tea.Model = (*tuiChatViewModel)(nil)

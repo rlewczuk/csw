@@ -9,12 +9,12 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/ui"
 )
 
-// ChatPresenter implements ui.ChatPresenter and core.SessionThreadOutput.
-// It acts as a bridge between the SessionThread and the ChatView,
+// ChatPresenter implements ui.IChatPresenter and core.SessionThreadOutput.
+// It acts as a bridge between the SessionThread and the IChatView,
 // translating session events into UI updates.
 type ChatPresenter struct {
 	mu     sync.Mutex
-	view   ui.ChatView
+	view   ui.IChatView
 	thread *core.SessionThread
 	system *core.SweSystem
 
@@ -37,7 +37,7 @@ func NewChatPresenter(system *core.SweSystem, thread *core.SessionThread) *ChatP
 
 // SetView sets the view to render the chat conversation.
 // It initializes the view with the current session state.
-func (p *ChatPresenter) SetView(view ui.ChatView) error {
+func (p *ChatPresenter) SetView(view ui.IChatView) error {
 	p.mu.Lock()
 	p.view = view
 	session := p.thread.GetSession()

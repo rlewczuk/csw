@@ -6,7 +6,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/ui"
 )
 
-// MockChatView implements ui.ChatView interface for testing purposes.
+// MockChatView implements ui.IChatView interface for testing purposes.
 type MockChatView struct {
 	mu sync.RWMutex
 
@@ -93,7 +93,7 @@ func (m *MockChatView) Reset() {
 	m.MoveToBottomCalls = 0
 }
 
-// MockChatPresenter implements ui.ChatPresenter interface for testing purposes.
+// MockChatPresenter implements ui.IChatPresenter interface for testing purposes.
 type MockChatPresenter struct {
 	mu sync.RWMutex
 
@@ -105,7 +105,7 @@ type MockChatPresenter struct {
 	ResumeErr          error
 
 	// Recorded calls
-	SetViewCalls         []ui.ChatView
+	SetViewCalls         []ui.IChatView
 	SendUserMessageCalls []*ui.ChatMessageUI
 	SaveUserMessageCalls []*ui.ChatMessageUI
 	PauseCalls           int
@@ -118,7 +118,7 @@ func NewMockChatPresenter() *MockChatPresenter {
 }
 
 // SetView sets the view to render the chat conversation.
-func (m *MockChatPresenter) SetView(view ui.ChatView) error {
+func (m *MockChatPresenter) SetView(view ui.IChatView) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
