@@ -11,21 +11,27 @@ type MockAppView struct {
 	mu sync.RWMutex
 
 	// Recorded calls
-	ShowChatCalls     []ui.IChatView
+	ShowChatCalls     []ui.IChatPresenter
 	ShowSettingsCalls int
+
+	// MockChatView to return from ShowChat
+	chatView *MockChatView
 }
 
 // NewMockAppView creates a new MockAppView instance.
 func NewMockAppView() *MockAppView {
-	return &MockAppView{}
+	return &MockAppView{
+		chatView: NewMockChatView(),
+	}
 }
 
 // ShowChat shows the chat view.
-func (m *MockAppView) ShowChat(view ui.IChatView) {
+func (m *MockAppView) ShowChat(presenter ui.IChatPresenter) ui.IChatView {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.ShowChatCalls = append(m.ShowChatCalls, view)
+	m.ShowChatCalls = append(m.ShowChatCalls, presenter)
+	return m.chatView
 }
 
 // ShowSettings shows the settings view.
@@ -43,6 +49,7 @@ func (m *MockAppView) Reset() {
 
 	m.ShowChatCalls = nil
 	m.ShowSettingsCalls = 0
+	m.chatView.Reset()
 }
 
 // MockAppPresenter implements ui.IAppPresenter interface for testing purposes.

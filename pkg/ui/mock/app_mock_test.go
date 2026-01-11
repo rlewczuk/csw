@@ -10,15 +10,18 @@ import (
 // TestMockAppView_ShowChat tests that ShowChat records calls correctly.
 func TestMockAppView_ShowChat(t *testing.T) {
 	view := NewMockAppView()
-	chatView1 := NewMockChatView()
-	chatView2 := NewMockChatView()
+	chatPresenter1 := NewMockChatPresenter()
+	chatPresenter2 := NewMockChatPresenter()
 
-	view.ShowChat(chatView1)
-	view.ShowChat(chatView2)
+	chatView1 := view.ShowChat(chatPresenter1)
+	chatView2 := view.ShowChat(chatPresenter2)
 
 	assert.Len(t, view.ShowChatCalls, 2, "expected 2 ShowChat calls")
-	assert.Equal(t, chatView1, view.ShowChatCalls[0], "first call should record chatView1")
-	assert.Equal(t, chatView2, view.ShowChatCalls[1], "second call should record chatView2")
+	assert.Equal(t, chatPresenter1, view.ShowChatCalls[0], "first call should record chatPresenter1")
+	assert.Equal(t, chatPresenter2, view.ShowChatCalls[1], "second call should record chatPresenter2")
+	assert.NotNil(t, chatView1, "ShowChat should return a chat view")
+	assert.NotNil(t, chatView2, "ShowChat should return a chat view")
+	assert.Equal(t, chatView1, chatView2, "ShowChat should return the same view instance")
 }
 
 // TestMockAppView_ShowSettings tests that ShowSettings counts calls correctly.
@@ -35,9 +38,9 @@ func TestMockAppView_ShowSettings(t *testing.T) {
 // TestMockAppView_Reset tests that Reset clears all recorded data.
 func TestMockAppView_Reset(t *testing.T) {
 	view := NewMockAppView()
-	chatView := NewMockChatView()
+	chatPresenter := NewMockChatPresenter()
 
-	view.ShowChat(chatView)
+	view.ShowChat(chatPresenter)
 	view.ShowSettings()
 
 	assert.Len(t, view.ShowChatCalls, 1, "should have 1 ShowChat call before reset")
