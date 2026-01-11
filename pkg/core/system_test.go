@@ -1,0 +1,292 @@
+package core
+
+import (
+	"context"
+	"testing"
+
+	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/testutil"
+	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/codesnort/codesnort-swe/pkg/vfs"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+	require.NoError(t, err)
+	vfs := vfs.NewMockVFS()
+
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfs)
+
+	t.Run("basic initialization", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"ollama": client},
+			SystemPrompt:   "You are skilled software developer.",
+			Tools:          tools,
+			VFS:            vfs,
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
+		require.NoError(t, err)
+		assert.NotNil(t, session)
+
+		// Populate mock server with LLM responses
+		// First response: assistant makes a tool call to write the file
+		mockServer.AddStreamingResponse("/api/chat", "POST", false,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfs.write","arguments":{"path":"hello_world.py","content":"print(\"Hello World\")\n"}}}]},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+		)
+
+		// Second response: after tool execution, assistant confirms completion
+		mockServer.AddStreamingResponse("/api/chat", "POST", true,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"I've created the Hello World program in Python."},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+		)
+
+		err = session.UserPrompt("Implement Hello World program in Python")
+		assert.NoError(t, err)
+
+		err = session.Run(context.Background())
+		assert.NoError(t, err)
+
+		bytes, err := vfs.ReadFile("hello_world.py")
+		assert.NoError(t, err)
+		assert.Contains(t, string(bytes), "print(\"Hello World\")")
+	})
+
+	t.Run("UI output handler integration", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+
+		system := &SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"ollama": client},
+			SystemPrompt:   "You are skilled software developer.",
+			Tools:          tools,
+			VFS:            vfs,
+		}
+
+		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
+		require.NoError(t, err)
+		assert.NotNil(t, session)
+
+		// Populate mock server with LLM responses
+		// First response: assistant makes a tool call to write the file
+		mockServer.AddStreamingResponse("/api/chat", "POST", false,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfs.write","arguments":{"path":"test.txt","content":"test content"}}}]},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+		)
+
+		// Second response: after tool execution, assistant confirms completion
+		mockServer.AddStreamingResponse("/api/chat", "POST", true,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"File created successfully."},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+		)
+
+		err = session.UserPrompt("Create a test file")
+		assert.NoError(t, err)
+
+		err = session.Run(context.Background())
+		assert.NoError(t, err)
+
+		// Verify UI handler captured the events
+		// Should have at least one tool call start
+		assert.NotEmpty(t, mockHandler.ToolCallStarts, "should have captured tool call start")
+		// Should have tool call details
+		assert.NotEmpty(t, mockHandler.ToolCallDetails, "should have captured tool call details")
+		// Should have tool call result
+		assert.NotEmpty(t, mockHandler.ToolCallResults, "should have captured tool call result")
+		assert.Equal(t, "vfs.write", mockHandler.ToolCallResults[0].Call.Function)
+		// Should have markdown chunks from the final response
+		assert.NotEmpty(t, mockHandler.MarkdownChunks, "should have captured markdown chunks")
+		assert.Contains(t, mockHandler.MarkdownChunks, "File created successfully.")
+	})
+}
+
+func TestSweSystemSessionManagement(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+	require.NoError(t, err)
+	vfs := vfs.NewMockVFS()
+
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfs)
+
+	system := &SweSystem{
+		ModelProviders: map[string]models.ModelProvider{"ollama": client},
+		SystemPrompt:   "You are a test assistant.",
+		Tools:          tools,
+		VFS:            vfs,
+	}
+
+	mockHandler := testutil.NewMockSessionOutputHandler()
+
+	t.Run("NewSession creates and stores session", func(t *testing.T) {
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		assert.NotNil(t, session)
+		assert.NotEmpty(t, session.ID())
+
+		// Verify session is stored
+		storedSession, err := system.GetSession(session.ID())
+		require.NoError(t, err)
+		assert.Equal(t, session, storedSession)
+	})
+
+	t.Run("GetSession returns error for non-existent session", func(t *testing.T) {
+		_, err := system.GetSession("non-existent-id")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "session not found")
+	})
+
+	t.Run("ListSessions returns all sessions", func(t *testing.T) {
+		// Create multiple sessions
+		session1, err := system.NewSession("ollama/model1:latest", mockHandler)
+		require.NoError(t, err)
+		session2, err := system.NewSession("ollama/model2:latest", mockHandler)
+		require.NoError(t, err)
+
+		sessions := system.ListSessions()
+		assert.GreaterOrEqual(t, len(sessions), 2)
+
+		// Check that our sessions are in the list
+		sessionIDs := make(map[string]bool)
+		for _, s := range sessions {
+			sessionIDs[s.ID()] = true
+		}
+		assert.True(t, sessionIDs[session1.ID()])
+		assert.True(t, sessionIDs[session2.ID()])
+	})
+
+	t.Run("DeleteSession removes session", func(t *testing.T) {
+		// Create a session
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		sessionID := session.ID()
+
+		// Verify it exists
+		_, err = system.GetSession(sessionID)
+		require.NoError(t, err)
+
+		// Delete it
+		err = system.DeleteSession(sessionID)
+		require.NoError(t, err)
+
+		// Verify it's gone
+		_, err = system.GetSession(sessionID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "session not found")
+	})
+
+	t.Run("DeleteSession returns error for non-existent session", func(t *testing.T) {
+		err := system.DeleteSession("non-existent-id")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "session not found")
+	})
+
+	t.Run("Session IDs are UUIDs", func(t *testing.T) {
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+
+		id := session.ID()
+		// UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 chars)
+		assert.Len(t, id, 36)
+		assert.Equal(t, "-", string(id[8]))
+		assert.Equal(t, "-", string(id[13]))
+		assert.Equal(t, "-", string(id[18]))
+		assert.Equal(t, "-", string(id[23]))
+		// Version should be 7
+		assert.Equal(t, "7", string(id[14]))
+	})
+
+	t.Run("Multiple sessions have unique IDs", func(t *testing.T) {
+		session1, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		session2, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+
+		assert.NotEqual(t, session1.ID(), session2.ID())
+	})
+}
+
+func TestSweSystemGetSessionThread(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+	require.NoError(t, err)
+	vfs := vfs.NewMockVFS()
+
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfs)
+
+	system := &SweSystem{
+		ModelProviders: map[string]models.ModelProvider{"ollama": client},
+		SystemPrompt:   "You are a test assistant.",
+		Tools:          tools,
+		VFS:            vfs,
+	}
+
+	mockHandler := testutil.NewMockSessionOutputHandler()
+
+	t.Run("GetSessionThread returns thread for existing session", func(t *testing.T) {
+		// Create a session
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		sessionID := session.ID()
+
+		// Get thread for this session
+		thread, err := system.GetSessionThread(sessionID)
+		require.NoError(t, err)
+		assert.NotNil(t, thread)
+
+		// Verify the thread has the correct session
+		assert.Equal(t, session, thread.GetSession())
+	})
+
+	t.Run("GetSessionThread returns error for non-existent session", func(t *testing.T) {
+		_, err := system.GetSessionThread("non-existent-id")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "session not found")
+	})
+
+	t.Run("GetSessionThread returns same thread on multiple calls", func(t *testing.T) {
+		// Create a session
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		sessionID := session.ID()
+
+		// Get thread twice
+		thread1, err := system.GetSessionThread(sessionID)
+		require.NoError(t, err)
+		thread2, err := system.GetSessionThread(sessionID)
+		require.NoError(t, err)
+
+		// Should be the same thread instance
+		assert.Equal(t, thread1, thread2)
+	})
+
+	t.Run("GetSessionThread creates different threads for different sessions", func(t *testing.T) {
+		// Create two sessions
+		session1, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		session2, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+
+		// Get threads for both sessions
+		thread1, err := system.GetSessionThread(session1.ID())
+		require.NoError(t, err)
+		thread2, err := system.GetSessionThread(session2.ID())
+		require.NoError(t, err)
+
+		// Threads should be different
+		assert.NotEqual(t, thread1, thread2)
+
+		// Each thread should have the correct session
+		assert.Equal(t, session1, thread1.GetSession())
+		assert.Equal(t, session2, thread2.GetSession())
+	})
+}
