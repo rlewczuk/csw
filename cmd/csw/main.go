@@ -146,40 +146,27 @@ func run(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
-	// Create session thread without output handler initially
-	thread := core.NewSessionThread(sweSystem, nil)
+	// Create AppPresenter with the system and default model
+	appPresenter := presenter.NewAppPresenter(sweSystem, modelName)
 
-	// Start a new session
-	if err := thread.StartSession(modelName); err != nil {
-		return fmt.Errorf("failed to start session: %w", err)
-	}
-
-	// Get the session and set the role
-	session := thread.GetSession()
-	if session == nil {
-		return fmt.Errorf("session was not created")
-	}
-
-	if err := session.SetRole(roleName); err != nil {
-		return fmt.Errorf("failed to set role: %w", err)
-	}
-
-	// Create presenter (sets itself as output handler for the thread)
-	chatPresenter := presenter.NewChatPresenter(sweSystem, thread)
-
-	// Create TUI chat view
-	tuiView, err := tui.NewTuiChatView(chatPresenter)
+	// Create TuiAppView with the presenter
+	tuiAppView, err := tui.NewTuiAppView(appPresenter)
 	if err != nil {
-		return fmt.Errorf("failed to create chat view: %w", err)
+		return fmt.Errorf("failed to create app view: %w", err)
 	}
 
-	// Connect presenter to view
-	if err := chatPresenter.SetView(tuiView); err != nil {
-		return fmt.Errorf("failed to set view: %w", err)
+	// Set the view on the presenter
+	if err := appPresenter.SetView(tuiAppView); err != nil {
+		return fmt.Errorf("failed to set app view: %w", err)
 	}
 
-	// Create the bubbletea program with the view's model
-	p := tea.NewProgram(tuiView.Model(), tea.WithAltScreen())
+	// Create a new session to start with
+	if err := appPresenter.NewSession(); err != nil {
+		return fmt.Errorf("failed to create initial session: %w", err)
+	}
+
+	// Create the bubbletea program with the app view's model
+	p := tea.NewProgram(tuiAppView.Model(), tea.WithAltScreen())
 
 	// Run the program in a goroutine
 	done := make(chan error, 1)
