@@ -247,4 +247,78 @@ func TestTuiChatViewWithPresenter(t *testing.T) {
 		term.SendKey("esc")
 		term.Close()
 	})
+
+	t.Run("multi-chunk streaming response renders completely", func(t *testing.T) {
+		// Setup mock LLM server
+		mockServer := testutil.NewMockHTTPServer()
+		defer mockServer.Close()
+
+		client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+		require.NoError(t, err)
+
+		vfsInstance := vfs.NewMockVFS()
+		tools := tool.NewToolRegistry()
+		tool.RegisterVFSTools(tools, vfsInstance)
+
+		system := &core.SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"ollama": client},
+			SystemPrompt:   "You are a helpful assistant.",
+			Tools:          tools,
+			VFS:            vfsInstance,
+		}
+
+		// Create session thread
+		thread := core.NewSessionThread(system, nil)
+		err = thread.StartSession("ollama/test-model:latest")
+		require.NoError(t, err)
+
+		// Create presenter
+		chatPresenter := presenter.NewChatPresenter(system, thread)
+
+		// Create TUI chat view
+		tuiView, err := NewTuiChatView(chatPresenter)
+		require.NoError(t, err)
+
+		// Connect presenter to view
+		err = chatPresenter.SetView(tuiView)
+		require.NoError(t, err)
+
+		// Setup LLM response with multiple chunks
+		mockServer.AddStreamingResponse("/api/chat", "POST", true,
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"This is "},"done":false}`,
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"chunk two "},"done":false}`,
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"and chunk three."},"done":false}`,
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+		)
+
+		// Create mock terminal
+		term := NewTerminalMock()
+
+		term.Run(tuiView.Model())
+
+		// Wait for welcome message
+		assert.True(t, term.WaitForText("Welcome!", 2*time.Second), "Should show welcome message")
+
+		// Type a message via mock terminal
+		term.SendString("Tell me a story")
+
+		// Send Alt+Enter to submit
+		term.SendKey("alt+enter")
+
+		// Wait for user message to appear in view
+		assert.True(t, term.WaitForText("Tell me a story", 2*time.Second), "Should show user message in view")
+
+		// Wait for complete assistant response to appear
+		// The complete response should be: "This is chunk two and chunk three."
+		assert.True(t, term.WaitForText("This is chunk two and chunk three.", 5*time.Second), "Should show complete assistant response with all chunks")
+
+		// Also verify each individual chunk text is present
+		assert.True(t, term.ContainsText("This is "), "Should contain first chunk")
+		assert.True(t, term.ContainsText("chunk two "), "Should contain second chunk")
+		assert.True(t, term.ContainsText("chunk three"), "Should contain third chunk")
+
+		// Cleanup
+		term.SendKey("esc")
+		term.Close()
+	})
 }
