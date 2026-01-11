@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/presenter"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/ui/tui"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
@@ -145,26 +146,16 @@ func run(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
-	// Create session controller without output handler initially
-	controller := core.NewSessionThread(sweSystem, nil)
+	// Create session thread without output handler initially
+	thread := core.NewSessionThread(sweSystem, nil)
 
-	// Create chat widget with the controller
-	// ChatWidget implements ui.SessionThreadOutput interface
-	chatWidget, err := tui.NewChatWidget(controller)
-	if err != nil {
-		return fmt.Errorf("failed to create chat widget: %w", err)
-	}
-
-	// Set the chat widget as the output handler
-	controller.SetOutputHandler(chatWidget)
-
-	// Create a new session
-	if err := controller.StartSession(modelName); err != nil {
+	// Start a new session
+	if err := thread.StartSession(modelName); err != nil {
 		return fmt.Errorf("failed to start session: %w", err)
 	}
 
 	// Get the session and set the role
-	session := controller.GetSession()
+	session := thread.GetSession()
 	if session == nil {
 		return fmt.Errorf("session was not created")
 	}
@@ -173,8 +164,22 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to set role: %w", err)
 	}
 
-	// Create the bubbletea program
-	p := tea.NewProgram(chatWidget, tea.WithAltScreen())
+	// Create presenter (sets itself as output handler for the thread)
+	chatPresenter := presenter.NewChatPresenter(sweSystem, thread)
+
+	// Create TUI chat view
+	tuiView, err := tui.NewTuiChatView(chatPresenter)
+	if err != nil {
+		return fmt.Errorf("failed to create chat view: %w", err)
+	}
+
+	// Connect presenter to view
+	if err := chatPresenter.SetView(tuiView); err != nil {
+		return fmt.Errorf("failed to set view: %w", err)
+	}
+
+	// Create the bubbletea program with the view's model
+	p := tea.NewProgram(tuiView.Model(), tea.WithAltScreen())
 
 	// Run the program in a goroutine
 	done := make(chan error, 1)
