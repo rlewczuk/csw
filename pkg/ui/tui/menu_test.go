@@ -48,7 +48,7 @@ func TestMenuWidget(t *testing.T) {
 		menu := NewMenuWidget("Test Menu", items, DefaultMenuColors())
 		menu.Show()
 
-		term := NewTerminal()
+		term := NewTerminalMock()
 		term.Run(menu)
 
 		// Wait for menu to render
@@ -73,7 +73,7 @@ func TestMenuWidget(t *testing.T) {
 		menu := NewMenuWidget("Test Menu", items, DefaultMenuColors())
 		menu.Show()
 
-		term := NewTerminal()
+		term := NewTerminalMock()
 		term.Run(menu)
 
 		// Wait for initial render
@@ -105,7 +105,7 @@ func TestMenuWidget(t *testing.T) {
 		menu := NewMenuWidget("Test Menu", items, DefaultMenuColors())
 		menu.Show()
 
-		term := NewTerminal()
+		term := NewTerminalMock()
 		term.Run(menu)
 
 		// Wait for initial render
@@ -141,7 +141,7 @@ func TestMenuWidget(t *testing.T) {
 		menu := NewMenuWidget("Test Menu", items, DefaultMenuColors())
 		menu.Show()
 
-		term := NewTerminal()
+		term := NewTerminalMock()
 		term.Run(menu)
 
 		// Wait for initial render
@@ -173,7 +173,7 @@ func TestMenuWidget(t *testing.T) {
 		menu := NewMenuWidget("Test Menu", items, DefaultMenuColors())
 		menu.Show()
 
-		term := NewTerminal()
+		term := NewTerminalMock()
 		term.Run(menu)
 
 		// Wait for initial render
@@ -206,7 +206,7 @@ func TestMenuWidget(t *testing.T) {
 		menu := NewMenuWidget("Test Menu", items, DefaultMenuColors())
 		menu.Show()
 
-		term := NewTerminal()
+		term := NewTerminalMock()
 		term.Run(menu)
 
 		// Wait for initial render
@@ -246,7 +246,7 @@ func TestMenuWidget(t *testing.T) {
 		menu := NewMenuWidget("Test Menu", items, customColors)
 		menu.Show()
 
-		term := NewTerminal()
+		term := NewTerminalMock()
 		term.Run(menu)
 
 		// Wait for render
@@ -266,7 +266,7 @@ func TestMenuWidget(t *testing.T) {
 		menu := NewMenuWidget("Empty Menu", items, DefaultMenuColors())
 		menu.Show()
 
-		term := NewTerminal()
+		term := NewTerminalMock()
 		term.Run(menu)
 
 		// Wait for render
@@ -297,7 +297,7 @@ func TestMenuWidget(t *testing.T) {
 		menu := NewMenuWidget("", items, DefaultMenuColors())
 		menu.Show()
 
-		term := NewTerminal()
+		term := NewTerminalMock()
 		term.Run(menu)
 
 		// Wait for render (should show items even without title)
@@ -348,7 +348,7 @@ func TestMenuWidget(t *testing.T) {
 		menu := NewMenuWidget("Test Menu", items, DefaultMenuColors())
 		menu.Show()
 
-		term := NewTerminal()
+		term := NewTerminalMock()
 		term.Run(menu)
 
 		// Wait for initial render
@@ -402,7 +402,7 @@ func TestMenuWidget(t *testing.T) {
 		menu := NewMenuWidget("Test Menu", items, DefaultMenuColors())
 		// Don't show the menu (keep it hidden)
 
-		term := NewTerminal()
+		term := NewTerminalMock()
 		term.Run(menu)
 
 		// Try to interact with hidden menu
