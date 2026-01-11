@@ -68,8 +68,8 @@ type SessionThread struct {
 	interruptPending bool
 }
 
-// NewSessionController creates a new SessionThread with the given system and output handler.
-func NewSessionController(system *SweSystem, outputHandler SessionThreadOutput) *SessionThread {
+// NewSessionThread creates a new SessionThread with the given system and output handler.
+func NewSessionThread(system *SweSystem, outputHandler SessionThreadOutput) *SessionThread {
 	return &SessionThread{
 		system:        system,
 		outputHandler: outputHandler,
