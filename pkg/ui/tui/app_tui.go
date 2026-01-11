@@ -16,12 +16,13 @@ const (
 
 // TuiAppView implements ui.IAppView for a terminal user interface.
 type TuiAppView struct {
-	presenter  ui.IAppPresenter
-	chatView   *TuiChatView
-	menu       *MenuWidget
-	width      int
-	height     int
+	presenter   ui.IAppPresenter
+	chatView    *TuiChatView
+	menu        *MenuWidget
+	width       int
+	height      int
 	showingMenu bool
+	refreshCh   chan struct{}
 }
 
 // NewTuiAppView creates a new TUI app view with the given presenter.
@@ -31,7 +32,35 @@ func NewTuiAppView(presenter ui.IAppPresenter) (*TuiAppView, error) {
 		width:       defaultWidth,
 		height:      defaultHeight,
 		showingMenu: false,
+		refreshCh:   make(chan struct{}, 1),
 	}, nil
+}
+
+// refreshMsg is a message sent to trigger a refresh.
+type refreshMsg struct{}
+
+// Notify implements ui.CompositeWidget.
+func (v *TuiAppView) Notify(msg ui.CompositeNotification) {
+	if msg == ui.CompositeNotificationRefresh {
+		select {
+		case v.refreshCh <- struct{}{}:
+		default:
+			// Channel full, refresh already pending
+		}
+	}
+}
+
+// SetParent implements ui.CompositeWidget.
+func (v *TuiAppView) SetParent(parent ui.CompositeWidget) {
+	// AppView is the root widget, so this is a no-op
+}
+
+// waitForRefresh waits for a refresh signal.
+func (v *TuiAppView) waitForRefresh() tea.Cmd {
+	return func() tea.Msg {
+		<-v.refreshCh
+		return refreshMsg{}
+	}
 }
 
 // ShowChat switches to the chat view with the given presenter.
@@ -43,6 +72,7 @@ func (v *TuiAppView) ShowChat(presenter ui.IChatPresenter) ui.IChatView {
 			// In case of error, return nil (this should be handled better in production)
 			return nil
 		}
+		chatView.SetParent(v)
 		v.chatView = chatView
 	}
 	return v.chatView
@@ -60,10 +90,15 @@ func (v *TuiAppView) Model() tea.Model {
 
 // Init initializes the app view.
 func (v *TuiAppView) Init() tea.Cmd {
+	var cmds []tea.Cmd
+
 	if v.chatView != nil {
-		return v.chatView.model.Init()
+		cmds = append(cmds, v.chatView.model.Init())
 	}
-	return nil
+
+	cmds = append(cmds, v.waitForRefresh())
+
+	return tea.Batch(cmds...)
 }
 
 // Update handles updates to the app view.
@@ -71,6 +106,10 @@ func (v *TuiAppView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case refreshMsg:
+		// Just re-render and listen again
+		cmds = append(cmds, v.waitForRefresh())
+
 	case tea.WindowSizeMsg:
 		v.width = msg.Width
 		v.height = msg.Height

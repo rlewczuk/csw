@@ -457,35 +457,13 @@ func TestAppViewRefreshBug(t *testing.T) {
 		term.SendString("Test")
 		term.SendKey("alt+enter")
 
-		// Wait a short time for LLM response to be processed (but NOT waiting for text)
-		time.Sleep(500 * time.Millisecond)
+		// Wait for assistant response to appear in terminal output without user interaction
+		// We use a short timeout (1 second) to ensure it appears promptly and not just
+		// because of a cursor blink (which usually happens every 500ms) or other timeout.
+		// The refresh should be triggered immediately by the presenter update.
+		responseInOutput := term.WaitForText("BUG_TEST_RESPONSE", 1*time.Second)
 
-		// Check if the internal chat view model has the response
-		tuiChatView, ok := chatView.(*TuiChatView)
-		require.True(t, ok, "chatView should be *TuiChatView")
-
-		// Access the internal model to check if data is there
-		tuiChatView.model.mu.Lock()
-		messageCount := len(tuiChatView.model.messages)
-		var foundResponse bool
-		for _, msg := range tuiChatView.model.messages {
-			if strings.Contains(msg.content, "BUG_TEST_RESPONSE") {
-				foundResponse = true
-				break
-			}
-		}
-		tuiChatView.model.mu.Unlock()
-
-		// The internal model should have the response
-		assert.True(t, foundResponse, "Internal model should have the response (messages: %d)", messageCount)
-
-		// But check if it appears in the terminal output WITHOUT any user interaction
-		// This is the bug - the response might be in the model but not rendered to screen
-		responseInOutput := term.ContainsText("BUG_TEST_RESPONSE")
-
-		// This assertion exposes the bug: if the fix is not applied,
-		// the response will be in the model but not in the output
-		assert.True(t, responseInOutput, "Response should appear in terminal output without user interaction")
+		assert.True(t, responseInOutput, "Response should appear in terminal output prompt without user interaction")
 
 		// Cleanup
 		term.SendKey("esc")

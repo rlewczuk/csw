@@ -89,7 +89,19 @@ func (w *tuiToolCallWidget) View() string {
 }
 
 type TuiChatView struct {
-	model *tuiChatViewModel
+	model  *tuiChatViewModel
+	parent ui.CompositeWidget
+}
+
+// Notify implements ui.CompositeWidget.
+func (v *TuiChatView) Notify(msg ui.CompositeNotification) {
+	// Pass through to parent if needed, or handle self-refresh
+	// For now, TuiChatView is a leaf, but it could have children tool widgets
+}
+
+// SetParent implements ui.CompositeWidget.
+func (v *TuiChatView) SetParent(parent ui.CompositeWidget) {
+	v.parent = parent
 }
 
 type tuiChatViewModel struct {
@@ -230,6 +242,10 @@ func (v *TuiChatView) Init(session *ui.ChatSessionUI) error {
 
 	v.model.updateViewportContentUnsafe()
 	v.model.viewport.GotoBottom()
+
+	if v.parent != nil {
+		v.parent.Notify(ui.CompositeNotificationRefresh)
+	}
 	return nil
 }
 
@@ -240,6 +256,10 @@ func (v *TuiChatView) AddMessage(msg *ui.ChatMessageUI) error {
 	v.model.addMessageUnsafe(msg)
 	v.model.updateViewportContentUnsafe()
 	v.model.viewport.GotoBottom()
+
+	if v.parent != nil {
+		v.parent.Notify(ui.CompositeNotificationRefresh)
+	}
 	return nil
 }
 
@@ -264,6 +284,10 @@ func (v *TuiChatView) UpdateMessage(msg *ui.ChatMessageUI) error {
 
 	v.model.updateViewportContentUnsafe()
 	v.model.viewport.GotoBottom()
+
+	if v.parent != nil {
+		v.parent.Notify(ui.CompositeNotificationRefresh)
+	}
 	return nil
 }
 
@@ -280,6 +304,10 @@ func (v *TuiChatView) UpdateTool(tool *ui.ToolUI) error {
 	}
 
 	v.model.updateViewportContentUnsafe()
+
+	if v.parent != nil {
+		v.parent.Notify(ui.CompositeNotificationRefresh)
+	}
 	return nil
 }
 

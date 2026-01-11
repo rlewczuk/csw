@@ -67,7 +67,7 @@ func TestTuiAppView(t *testing.T) {
 		assert.NotNil(t, model)
 
 		cmd := model.Init()
-		assert.Nil(t, cmd) // Should be nil when no chat view is set
+		assert.NotNil(t, cmd) // Should NOT be nil as we are listening for refresh events
 	})
 
 	t.Run("Model handles WindowSizeMsg", func(t *testing.T) {
