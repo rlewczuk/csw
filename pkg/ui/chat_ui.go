@@ -1,30 +1,30 @@
 package ui
 
-type ToolStatus string
+type ToolStatusUI string
 
-// ToolStatus represents the status of a tool call.
+// ToolStatusUI represents the status of a tool call.
 const (
-	ToolStatusStarted   ToolStatus = "started"
-	ToolStatusExecuting ToolStatus = "executing"
-	ToolStatusSucceeded ToolStatus = "succeeded"
-	ToolStatusFailed    ToolStatus = "failed"
+	ToolStatusStarted   ToolStatusUI = "started"
+	ToolStatusExecuting ToolStatusUI = "executing"
+	ToolStatusSucceeded ToolStatusUI = "succeeded"
+	ToolStatusFailed    ToolStatusUI = "failed"
 )
 
-// ChatRole represents who sent a message in chat.
-type ChatRole string
+// ChatRoleUI represents who sent a message in chat.
+type ChatRoleUI string
 
 const (
-	ChatRoleAssistant ChatRole = "assistant"
-	ChatRoleUser      ChatRole = "user"
+	ChatRoleAssistant ChatRoleUI = "assistant"
+	ChatRoleUser      ChatRoleUI = "user"
 )
 
-// ToolState represents the state of a tool call as seen by the user in UI.
-type ToolState struct {
+// ToolUI represents the state of a tool call as seen by the user in UI.
+type ToolUI struct {
 	// Unique tool call ID
 	Id string `json:"id"`
 
 	// Status of the tool call
-	Status ToolStatus `json:"status"`
+	Status ToolStatusUI `json:"status"`
 
 	// Tool name
 	Name string `json:"name"`
@@ -36,24 +36,24 @@ type ToolState struct {
 	Props [][]string `json:"props"`
 }
 
-// ChatMessage represents a chat message as seen by the user in UI.
-type ChatMessage struct {
+// ChatMessageUI represents a chat message as seen by the user in UI.
+type ChatMessageUI struct {
 	// Unique message ID
 	Id string
 
 	// Role of the message (assistant or user)
-	Role ChatRole
+	Role ChatRoleUI
 
 	// Text content of the message
 	Text string
 
 	// List of tools in the message
-	Tools []*ToolState
+	Tools []*ToolUI
 }
 
-// ChatSession represents a chat session as seen by the user in UI.
+// ChatSessionUI represents a chat session as seen by the user in UI.
 // It is a subset of information from SweSession suitable for rendering on all platforms.
-type ChatSession struct {
+type ChatSessionUI struct {
 
 	// Unique session ID
 	Id string
@@ -68,22 +68,22 @@ type ChatSession struct {
 	WorkDir string
 
 	// List of messages in the chat
-	Messages []*ChatMessage
+	Messages []*ChatMessageUI
 }
 
 // ChatView is an interface for rendering chat conversation.
 type ChatView interface {
 	// Init initializes the view with all messages from the session.
-	Init(session *ChatSession) error
+	Init(session *ChatSessionUI) error
 
 	// AddMessage adds a new message to the view.
-	AddMessage(msg *ChatMessage) error
+	AddMessage(msg *ChatMessageUI) error
 
 	// UpdateMessage updates an existing message in the view.
-	UpdateMessage(msg *ChatMessage) error
+	UpdateMessage(msg *ChatMessageUI) error
 
 	// UpdateTool updates an existing tool in the view.
-	UpdateTool(tool *ToolState) error
+	UpdateTool(tool *ToolUI) error
 
 	// MoveToBottom scrolls the view to the bottom.
 	MoveToBottom() error
@@ -95,10 +95,10 @@ type ChatPresenter interface {
 	SetView(view ChatView) error
 
 	// SendUserMessage sends a user message to the chat session and starts processing.
-	SendUserMessage(message *ChatMessage) error
+	SendUserMessage(message *ChatMessageUI) error
 
 	// SaveUserMessage saves a user message to the chat session but doesn't start processing.
-	SaveUserMessage(message *ChatMessage) error
+	SaveUserMessage(message *ChatMessageUI) error
 
 	// Pause pauses the chat session (i.e. stops processing).
 	Pause() error

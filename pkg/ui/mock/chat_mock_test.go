@@ -10,12 +10,12 @@ import (
 func TestMockChatView_Init(t *testing.T) {
 	view := NewMockChatView()
 
-	session := &ui.ChatSession{
+	session := &ui.ChatSessionUI{
 		Id:      "session-123",
 		Model:   "gpt-4",
 		Role:    "assistant",
 		WorkDir: "/tmp",
-		Messages: []*ui.ChatMessage{
+		Messages: []*ui.ChatMessageUI{
 			{Id: "msg-1", Role: ui.ChatRoleUser, Text: "Hello"},
 		},
 	}
@@ -38,7 +38,7 @@ func TestMockChatView_Init_WithError(t *testing.T) {
 	expectedErr := errors.New("init error")
 	view.InitErr = expectedErr
 
-	err := view.Init(&ui.ChatSession{})
+	err := view.Init(&ui.ChatSessionUI{})
 	if err != expectedErr {
 		t.Errorf("Init() expected error %v, got %v", expectedErr, err)
 	}
@@ -47,8 +47,8 @@ func TestMockChatView_Init_WithError(t *testing.T) {
 func TestMockChatView_AddMessage(t *testing.T) {
 	view := NewMockChatView()
 
-	msg1 := &ui.ChatMessage{Id: "msg-1", Role: ui.ChatRoleUser, Text: "Hello"}
-	msg2 := &ui.ChatMessage{Id: "msg-2", Role: ui.ChatRoleAssistant, Text: "Hi there"}
+	msg1 := &ui.ChatMessageUI{Id: "msg-1", Role: ui.ChatRoleUser, Text: "Hello"}
+	msg2 := &ui.ChatMessageUI{Id: "msg-2", Role: ui.ChatRoleAssistant, Text: "Hi there"}
 
 	if err := view.AddMessage(msg1); err != nil {
 		t.Errorf("AddMessage() returned unexpected error: %v", err)
@@ -73,7 +73,7 @@ func TestMockChatView_AddMessage_WithError(t *testing.T) {
 	expectedErr := errors.New("add message error")
 	view.AddMessageErr = expectedErr
 
-	err := view.AddMessage(&ui.ChatMessage{})
+	err := view.AddMessage(&ui.ChatMessageUI{})
 	if err != expectedErr {
 		t.Errorf("AddMessage() expected error %v, got %v", expectedErr, err)
 	}
@@ -82,7 +82,7 @@ func TestMockChatView_AddMessage_WithError(t *testing.T) {
 func TestMockChatView_UpdateMessage(t *testing.T) {
 	view := NewMockChatView()
 
-	msg := &ui.ChatMessage{Id: "msg-1", Role: ui.ChatRoleAssistant, Text: "Updated text"}
+	msg := &ui.ChatMessageUI{Id: "msg-1", Role: ui.ChatRoleAssistant, Text: "Updated text"}
 
 	if err := view.UpdateMessage(msg); err != nil {
 		t.Errorf("UpdateMessage() returned unexpected error: %v", err)
@@ -104,7 +104,7 @@ func TestMockChatView_UpdateMessage_WithError(t *testing.T) {
 	expectedErr := errors.New("update message error")
 	view.UpdateMessageErr = expectedErr
 
-	err := view.UpdateMessage(&ui.ChatMessage{})
+	err := view.UpdateMessage(&ui.ChatMessageUI{})
 	if err != expectedErr {
 		t.Errorf("UpdateMessage() expected error %v, got %v", expectedErr, err)
 	}
@@ -113,7 +113,7 @@ func TestMockChatView_UpdateMessage_WithError(t *testing.T) {
 func TestMockChatView_UpdateTool(t *testing.T) {
 	view := NewMockChatView()
 
-	tool := &ui.ToolState{
+	tool := &ui.ToolUI{
 		Id:      "tool-1",
 		Status:  ui.ToolStatusExecuting,
 		Name:    "bash",
@@ -144,7 +144,7 @@ func TestMockChatView_UpdateTool_WithError(t *testing.T) {
 	expectedErr := errors.New("update tool error")
 	view.UpdateToolErr = expectedErr
 
-	err := view.UpdateTool(&ui.ToolState{})
+	err := view.UpdateTool(&ui.ToolUI{})
 	if err != expectedErr {
 		t.Errorf("UpdateTool() expected error %v, got %v", expectedErr, err)
 	}
@@ -180,10 +180,10 @@ func TestMockChatView_Reset(t *testing.T) {
 
 	// Set up some state
 	view.InitErr = errors.New("some error")
-	view.Init(&ui.ChatSession{Id: "session-1"})
-	view.AddMessage(&ui.ChatMessage{Id: "msg-1"})
-	view.UpdateMessage(&ui.ChatMessage{Id: "msg-2"})
-	view.UpdateTool(&ui.ToolState{Id: "tool-1"})
+	view.Init(&ui.ChatSessionUI{Id: "session-1"})
+	view.AddMessage(&ui.ChatMessageUI{Id: "msg-1"})
+	view.UpdateMessage(&ui.ChatMessageUI{Id: "msg-2"})
+	view.UpdateTool(&ui.ToolUI{Id: "tool-1"})
 	view.MoveToBottom()
 
 	// Reset
@@ -240,7 +240,7 @@ func TestMockChatPresenter_SetView_WithError(t *testing.T) {
 func TestMockChatPresenter_SendUserMessage(t *testing.T) {
 	presenter := NewMockChatPresenter()
 
-	msg := &ui.ChatMessage{
+	msg := &ui.ChatMessageUI{
 		Id:   "msg-1",
 		Role: ui.ChatRoleUser,
 		Text: "Hello, assistant!",
@@ -266,7 +266,7 @@ func TestMockChatPresenter_SendUserMessage_WithError(t *testing.T) {
 	expectedErr := errors.New("send user message error")
 	presenter.SendUserMessageErr = expectedErr
 
-	err := presenter.SendUserMessage(&ui.ChatMessage{})
+	err := presenter.SendUserMessage(&ui.ChatMessageUI{})
 	if err != expectedErr {
 		t.Errorf("SendUserMessage() expected error %v, got %v", expectedErr, err)
 	}
@@ -275,7 +275,7 @@ func TestMockChatPresenter_SendUserMessage_WithError(t *testing.T) {
 func TestMockChatPresenter_SaveUserMessage(t *testing.T) {
 	presenter := NewMockChatPresenter()
 
-	msg := &ui.ChatMessage{
+	msg := &ui.ChatMessageUI{
 		Id:   "msg-1",
 		Role: ui.ChatRoleUser,
 		Text: "Draft message",
@@ -301,7 +301,7 @@ func TestMockChatPresenter_SaveUserMessage_WithError(t *testing.T) {
 	expectedErr := errors.New("save user message error")
 	presenter.SaveUserMessageErr = expectedErr
 
-	err := presenter.SaveUserMessage(&ui.ChatMessage{})
+	err := presenter.SaveUserMessage(&ui.ChatMessageUI{})
 	if err != expectedErr {
 		t.Errorf("SaveUserMessage() expected error %v, got %v", expectedErr, err)
 	}
@@ -363,8 +363,8 @@ func TestMockChatPresenter_Reset(t *testing.T) {
 	// Set up some state
 	presenter.SetViewErr = errors.New("some error")
 	presenter.SetView(NewMockChatView())
-	presenter.SendUserMessage(&ui.ChatMessage{Id: "msg-1"})
-	presenter.SaveUserMessage(&ui.ChatMessage{Id: "msg-2"})
+	presenter.SendUserMessage(&ui.ChatMessageUI{Id: "msg-1"})
+	presenter.SaveUserMessage(&ui.ChatMessageUI{Id: "msg-2"})
 	presenter.Pause()
 	presenter.Resume()
 

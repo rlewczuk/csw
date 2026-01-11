@@ -19,7 +19,7 @@ type ChatPresenter struct {
 	system *core.SweSystem
 
 	// Tracking state for streaming
-	currentAssistantMessage *ui.ChatMessage
+	currentAssistantMessage *ui.ChatMessageUI
 	messageCounter          int
 	toolCallCounter         int
 }
@@ -48,13 +48,13 @@ func (p *ChatPresenter) SetView(view ui.ChatView) error {
 		return nil
 	}
 
-	// Build ChatSession from SweSession
+	// Build ChatSessionUI from SweSession
 	chatSession := p.buildChatSession(session)
 	return view.Init(chatSession)
 }
 
 // SendUserMessage sends a user message to the chat session and starts processing.
-func (p *ChatPresenter) SendUserMessage(message *ui.ChatMessage) error {
+func (p *ChatPresenter) SendUserMessage(message *ui.ChatMessageUI) error {
 	p.mu.Lock()
 	view := p.view
 	p.mu.Unlock()
@@ -71,7 +71,7 @@ func (p *ChatPresenter) SendUserMessage(message *ui.ChatMessage) error {
 }
 
 // SaveUserMessage saves a user message to the chat session but doesn't start processing.
-func (p *ChatPresenter) SaveUserMessage(message *ui.ChatMessage) error {
+func (p *ChatPresenter) SaveUserMessage(message *ui.ChatMessageUI) error {
 	p.mu.Lock()
 	view := p.view
 	p.mu.Unlock()
@@ -106,11 +106,11 @@ func (p *ChatPresenter) AddMarkdownChunk(markdown string) {
 	// Create or update current assistant message
 	if p.currentAssistantMessage == nil {
 		p.messageCounter++
-		p.currentAssistantMessage = &ui.ChatMessage{
+		p.currentAssistantMessage = &ui.ChatMessageUI{
 			Id:    generateMessageID(p.messageCounter),
 			Role:  ui.ChatRoleAssistant,
 			Text:  markdown,
-			Tools: []*ui.ToolState{},
+			Tools: []*ui.ToolUI{},
 		}
 		p.mu.Unlock()
 
@@ -141,11 +141,11 @@ func (p *ChatPresenter) AddToolCallStart(call *tool.ToolCall) {
 	// Ensure we have a current assistant message
 	if p.currentAssistantMessage == nil {
 		p.messageCounter++
-		p.currentAssistantMessage = &ui.ChatMessage{
+		p.currentAssistantMessage = &ui.ChatMessageUI{
 			Id:    generateMessageID(p.messageCounter),
 			Role:  ui.ChatRoleAssistant,
 			Text:  "",
-			Tools: []*ui.ToolState{},
+			Tools: []*ui.ToolUI{},
 		}
 		p.mu.Unlock()
 
@@ -157,7 +157,7 @@ func (p *ChatPresenter) AddToolCallStart(call *tool.ToolCall) {
 
 	// Create tool state
 	p.toolCallCounter++
-	toolState := &ui.ToolState{
+	toolState := &ui.ToolUI{
 		Id:     call.ID,
 		Status: ui.ToolStatusStarted,
 		Name:   call.Function,
@@ -197,7 +197,7 @@ func (p *ChatPresenter) AddToolCallDetails(call *tool.ToolCall) {
 	if view != nil {
 		// Find the tool state to update
 		p.mu.Lock()
-		var toolState *ui.ToolState
+		var toolState *ui.ToolUI
 		if p.currentAssistantMessage != nil {
 			for _, t := range p.currentAssistantMessage.Tools {
 				if t.Id == call.ID {
@@ -222,7 +222,7 @@ func (p *ChatPresenter) AddToolCallResult(result *tool.ToolResponse) {
 	view := p.view
 
 	// Find and update the tool in current message
-	var toolState *ui.ToolState
+	var toolState *ui.ToolUI
 	if p.currentAssistantMessage != nil {
 		for _, t := range p.currentAssistantMessage.Tools {
 			if t.Id == result.Call.ID {
@@ -254,13 +254,13 @@ func (p *ChatPresenter) RunFinished(err error) {
 	p.mu.Unlock()
 }
 
-// buildChatSession converts a SweSession to a ui.ChatSession.
-func (p *ChatPresenter) buildChatSession(session *core.SweSession) *ui.ChatSession {
-	chatSession := &ui.ChatSession{
+// buildChatSession converts a SweSession to a ui.ChatSessionUI.
+func (p *ChatPresenter) buildChatSession(session *core.SweSession) *ui.ChatSessionUI {
+	chatSession := &ui.ChatSessionUI{
 		Id:       session.ID(),
 		Model:    session.Model(),
 		WorkDir:  session.GetState().Info.WorkDir,
-		Messages: []*ui.ChatMessage{},
+		Messages: []*ui.ChatMessageUI{},
 	}
 
 	// Set role name if available
@@ -279,18 +279,18 @@ func (p *ChatPresenter) buildChatSession(session *core.SweSession) *ui.ChatSessi
 	return chatSession
 }
 
-// convertMessage converts a models.ChatMessage to a ui.ChatMessage.
-func (p *ChatPresenter) convertMessage(msg *models.ChatMessage) *ui.ChatMessage {
+// convertMessage converts a models.ChatMessage to a ui.ChatMessageUI.
+func (p *ChatPresenter) convertMessage(msg *models.ChatMessage) *ui.ChatMessageUI {
 	// Skip system messages
 	if msg.Role == models.ChatRoleSystem {
 		return nil
 	}
 
 	p.messageCounter++
-	chatMsg := &ui.ChatMessage{
+	chatMsg := &ui.ChatMessageUI{
 		Id:    generateMessageID(p.messageCounter),
 		Text:  msg.GetText(),
-		Tools: []*ui.ToolState{},
+		Tools: []*ui.ToolUI{},
 	}
 
 	// Set role
@@ -306,7 +306,7 @@ func (p *ChatPresenter) convertMessage(msg *models.ChatMessage) *ui.ChatMessage 
 	// Convert tool calls
 	for _, tc := range msg.GetToolCalls() {
 		p.toolCallCounter++
-		toolState := &ui.ToolState{
+		toolState := &ui.ToolUI{
 			Id:      tc.ID,
 			Status:  ui.ToolStatusSucceeded, // Historical tool calls are completed
 			Name:    tc.Function,

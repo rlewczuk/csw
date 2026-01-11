@@ -25,10 +25,10 @@ type tuiChatMessage struct {
 }
 
 type tuiToolCallWidget struct {
-	tool *ui.ToolState
+	tool *ui.ToolUI
 }
 
-func newTuiToolCallWidget(tool *ui.ToolState) *tuiToolCallWidget {
+func newTuiToolCallWidget(tool *ui.ToolUI) *tuiToolCallWidget {
 	return &tuiToolCallWidget{
 		tool: tool,
 	}
@@ -179,7 +179,7 @@ func (m *tuiChatViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.updateViewportContent()
 				m.viewport.GotoBottom()
 
-				message := &ui.ChatMessage{
+				message := &ui.ChatMessageUI{
 					Id:   "",
 					Role: ui.ChatRoleUser,
 					Text: input,
@@ -221,7 +221,7 @@ func (m *tuiChatViewModel) View() string {
 	return view.String()
 }
 
-func (v *TuiChatView) Init(session *ui.ChatSession) error {
+func (v *TuiChatView) Init(session *ui.ChatSessionUI) error {
 	v.model.mu.Lock()
 	defer v.model.mu.Unlock()
 
@@ -235,7 +235,7 @@ func (v *TuiChatView) Init(session *ui.ChatSession) error {
 	return nil
 }
 
-func (v *TuiChatView) AddMessage(msg *ui.ChatMessage) error {
+func (v *TuiChatView) AddMessage(msg *ui.ChatMessageUI) error {
 	v.model.mu.Lock()
 	defer v.model.mu.Unlock()
 
@@ -245,7 +245,7 @@ func (v *TuiChatView) AddMessage(msg *ui.ChatMessage) error {
 	return nil
 }
 
-func (v *TuiChatView) UpdateMessage(msg *ui.ChatMessage) error {
+func (v *TuiChatView) UpdateMessage(msg *ui.ChatMessageUI) error {
 	v.model.mu.Lock()
 	defer v.model.mu.Unlock()
 
@@ -264,7 +264,7 @@ func (v *TuiChatView) UpdateMessage(msg *ui.ChatMessage) error {
 	return nil
 }
 
-func (v *TuiChatView) UpdateTool(tool *ui.ToolState) error {
+func (v *TuiChatView) UpdateTool(tool *ui.ToolUI) error {
 	v.model.mu.Lock()
 	defer v.model.mu.Unlock()
 
@@ -297,7 +297,7 @@ func (m *tuiChatViewModel) addUserMessage(content string) {
 	m.messages = append(m.messages, msg)
 }
 
-func (m *tuiChatViewModel) addMessageUnsafe(msg *ui.ChatMessage) {
+func (m *tuiChatViewModel) addMessageUnsafe(msg *ui.ChatMessageUI) {
 	chatMsg := &tuiChatMessage{
 		role:      string(msg.Role),
 		content:   msg.Text,
