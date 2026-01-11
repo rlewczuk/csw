@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -48,24 +47,8 @@ func TestChatWidgetWithFullController(t *testing.T) {
 
 		// Setup LLM response
 		mockServer.AddStreamingResponse("/api/chat", "POST", true,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "test-model:latest",
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "Hello! How can I help you today?",
-				},
-				Done: false,
-			}),
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "test-model:latest",
-				CreatedAt: "2024-01-01T00:00:01Z",
-				Message: models.OllamaMessage{
-					Role: "assistant",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello! How can I help you today?"},"done":false}`,
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 		)
 
 		// Create mock terminal
@@ -131,16 +114,7 @@ func TestChatWidgetWithFullController(t *testing.T) {
 
 		// Setup LLM response
 		mockServer.AddStreamingResponse("/api/chat", "POST", true,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "test-model:latest",
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "I received your message!",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"I received your message!"},"done":true,"done_reason":"stop"}`,
 		)
 
 		// Create mock terminal
@@ -215,30 +189,12 @@ func TestChatWidgetWithFullController(t *testing.T) {
 
 		// Setup first LLM response
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "test-model:latest",
-				CreatedAt: "2024-01-01T00:00:00Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "First response",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"First response"},"done":true,"done_reason":"stop"}`,
 		)
 
 		// Setup second LLM response
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			chatResponseJSON(models.OllamaChatResponse{
-				Model:     "test-model:latest",
-				CreatedAt: "2024-01-01T00:00:01Z",
-				Message: models.OllamaMessage{
-					Role:    "assistant",
-					Content: "Second response",
-				},
-				Done:       true,
-				DoneReason: "stop",
-			}),
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":"Second response"},"done":true,"done_reason":"stop"}`,
 		)
 
 		// Create mock terminal
@@ -274,10 +230,4 @@ func TestChatWidgetWithFullController(t *testing.T) {
 		term.SendKey("esc")
 		term.Close()
 	})
-}
-
-// chatResponseJSON converts a chat response to JSON string.
-func chatResponseJSON(resp models.OllamaChatResponse) string {
-	data, _ := json.Marshal(resp)
-	return string(data)
 }

@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -21,24 +20,6 @@ const (
 	testOpenAITimeout        = 30 * time.Second
 	connectOpenAITimeout     = 5 * time.Second
 )
-
-// openaiChatResponseJSON converts a OpenaiChatCompletionResponse to JSON string.
-func openaiChatResponseJSON(response OpenaiChatCompletionResponse) string {
-	data, _ := json.Marshal(response)
-	return string(data)
-}
-
-// openaiEmbedResponseJSON converts an OpenaiEmbeddingResponse to JSON string.
-func openaiEmbedResponseJSON(response OpenaiEmbeddingResponse) string {
-	data, _ := json.Marshal(response)
-	return string(data)
-}
-
-// openaiListModelsResponseJSON converts a OpenaiModelList to JSON string.
-func openaiListModelsResponseJSON(response OpenaiModelList) string {
-	data, _ := json.Marshal(response)
-	return string(data)
-}
 
 // openaiTestClient holds either a real or mock client and provides cleanup
 type openaiTestClient struct {
@@ -117,22 +98,7 @@ func TestOpenAIClient_ListModels(t *testing.T) {
 
 	// Setup mock response if using mock
 	if tc.Mock != nil {
-		modelsResponse := openaiListModelsResponseJSON(OpenaiModelList{
-			Data: []OpenaiModelData{
-				{
-					ID:      testOpenAIModelName,
-					Object:  "model",
-					Created: 1640000000,
-					OwnedBy: "openai",
-				},
-				{
-					ID:      testOpenAIEmbedModelName,
-					Object:  "model",
-					Created: 1640000000,
-					OwnedBy: "openai",
-				},
-			},
-		})
+		modelsResponse := `{"data":[{"id":"devstral-small-2:latest","object":"model","created":1640000000,"owned_by":"openai"},{"id":"nomic-embed-text:latest","object":"model","created":1640000000,"owned_by":"openai"}]}`
 		// Add response for each subtest
 		tc.Mock.AddRestResponse("/models", "GET", modelsResponse)
 		tc.Mock.AddRestResponse("/models", "GET", modelsResponse)
@@ -190,22 +156,7 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	t.Run("sends chat message and gets response", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
-				ID:      "chatcmpl-123",
-				Object:  "chat.completion",
-				Created: 1640000000,
-				Model:   testOpenAIModelName,
-				Choices: []OpenaiChatCompletionChoice{
-					{
-						Index: 0,
-						Message: &OpenaiChatCompletionMessage{
-							Role:    "assistant",
-							Content: "4",
-						},
-						FinishReason: "stop",
-					},
-				},
-			}))
+			tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-123","object":"chat.completion","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","content":"4"},"finish_reason":"stop"}]}`)
 		}
 
 		options := &ChatOptions{
@@ -235,22 +186,7 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	t.Run("handles context with timeout", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
-				ID:      "chatcmpl-124",
-				Object:  "chat.completion",
-				Created: 1640000000,
-				Model:   testOpenAIModelName,
-				Choices: []OpenaiChatCompletionChoice{
-					{
-						Index: 0,
-						Message: &OpenaiChatCompletionMessage{
-							Role:    "assistant",
-							Content: "Hello!",
-						},
-						FinishReason: "stop",
-					},
-				},
-			}))
+			tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-124","object":"chat.completion","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","content":"Hello!"},"finish_reason":"stop"}]}`)
 		}
 
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -274,22 +210,7 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	t.Run("handles system and user messages", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
-				ID:      "chatcmpl-125",
-				Object:  "chat.completion",
-				Created: 1640000000,
-				Model:   testOpenAIModelName,
-				Choices: []OpenaiChatCompletionChoice{
-					{
-						Index: 0,
-						Message: &OpenaiChatCompletionMessage{
-							Role:    "assistant",
-							Content: "HELLO",
-						},
-						FinishReason: "stop",
-					},
-				},
-			}))
+			tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-125","object":"chat.completion","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","content":"HELLO"},"finish_reason":"stop"}]}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testOpenAIModelName, nil)
@@ -333,22 +254,7 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	t.Run("uses default options when none provided to Chat", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
-				ID:      "chatcmpl-126",
-				Object:  "chat.completion",
-				Created: 1640000000,
-				Model:   testOpenAIModelName,
-				Choices: []OpenaiChatCompletionChoice{
-					{
-						Index: 0,
-						Message: &OpenaiChatCompletionMessage{
-							Role:    "assistant",
-							Content: "Hello!",
-						},
-						FinishReason: "stop",
-					},
-				},
-			}))
+			tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-126","object":"chat.completion","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","content":"Hello!"},"finish_reason":"stop"}]}`)
 		}
 
 		defaultOptions := &ChatOptions{
@@ -383,48 +289,9 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
-				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
-					ID:      "chatcmpl-stream-1",
-					Object:  "chat.completion.chunk",
-					Created: 1640000000,
-					Model:   testOpenAIModelName,
-					Choices: []OpenaiChatCompletionChoice{
-						{
-							Index: 0,
-							Delta: &OpenaiChatCompletionMessage{
-								Role:    "assistant",
-								Content: "1",
-							},
-						},
-					},
-				}),
-				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
-					ID:      "chatcmpl-stream-1",
-					Object:  "chat.completion.chunk",
-					Created: 1640000001,
-					Model:   testOpenAIModelName,
-					Choices: []OpenaiChatCompletionChoice{
-						{
-							Index: 0,
-							Delta: &OpenaiChatCompletionMessage{
-								Content: "\n2\n3",
-							},
-						},
-					},
-				}),
-				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
-					ID:      "chatcmpl-stream-1",
-					Object:  "chat.completion.chunk",
-					Created: 1640000002,
-					Model:   testOpenAIModelName,
-					Choices: []OpenaiChatCompletionChoice{
-						{
-							Index:        0,
-							Delta:        &OpenaiChatCompletionMessage{},
-							FinishReason: "stop",
-						},
-					},
-				}),
+				`data: {"id":"chatcmpl-stream-1","object":"chat.completion.chunk","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"delta":{"role":"assistant","content":"1"}}]}`,
+				`data: {"id":"chatcmpl-stream-1","object":"chat.completion.chunk","created":1640000001,"model":"devstral-small-2:latest","choices":[{"index":0,"delta":{"content":"\n2\n3"}}]}`,
+				`data: {"id":"chatcmpl-stream-1","object":"chat.completion.chunk","created":1640000002,"model":"devstral-small-2:latest","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
 				"data: [DONE]",
 			)
 		}
@@ -463,21 +330,7 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
-				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
-					ID:      "chatcmpl-stream-2",
-					Object:  "chat.completion.chunk",
-					Created: 1640000000,
-					Model:   testOpenAIModelName,
-					Choices: []OpenaiChatCompletionChoice{
-						{
-							Index: 0,
-							Delta: &OpenaiChatCompletionMessage{
-								Role:    "assistant",
-								Content: "Once upon a time",
-							},
-						},
-					},
-				}),
+				`data: {"id":"chatcmpl-stream-2","object":"chat.completion.chunk","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"delta":{"role":"assistant","content":"Once upon a time"}}]}`,
 				"data: [DONE]",
 			)
 		}
@@ -514,34 +367,8 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
-				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
-					ID:      "chatcmpl-stream-3",
-					Object:  "chat.completion.chunk",
-					Created: 1640000000,
-					Model:   testOpenAIModelName,
-					Choices: []OpenaiChatCompletionChoice{
-						{
-							Index: 0,
-							Delta: &OpenaiChatCompletionMessage{
-								Role:    "assistant",
-								Content: "Hello!",
-							},
-						},
-					},
-				}),
-				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
-					ID:      "chatcmpl-stream-3",
-					Object:  "chat.completion.chunk",
-					Created: 1640000001,
-					Model:   testOpenAIModelName,
-					Choices: []OpenaiChatCompletionChoice{
-						{
-							Index:        0,
-							Delta:        &OpenaiChatCompletionMessage{},
-							FinishReason: "stop",
-						},
-					},
-				}),
+				`data: {"id":"chatcmpl-stream-3","object":"chat.completion.chunk","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello!"}}]}`,
+				`data: {"id":"chatcmpl-stream-3","object":"chat.completion.chunk","created":1640000001,"model":"devstral-small-2:latest","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
 				"data: [DONE]",
 			)
 		}
@@ -601,21 +428,7 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 		// Setup mock streaming response if using mock
 		if tc.Mock != nil {
 			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
-				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
-					ID:      "chatcmpl-stream-4",
-					Object:  "chat.completion.chunk",
-					Created: 1640000000,
-					Model:   testOpenAIModelName,
-					Choices: []OpenaiChatCompletionChoice{
-						{
-							Index: 0,
-							Delta: &OpenaiChatCompletionMessage{
-								Role:    "assistant",
-								Content: "Hello!",
-							},
-						},
-					},
-				}),
+				`data: {"id":"chatcmpl-stream-4","object":"chat.completion.chunk","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello!"}}]}`,
 				"data: [DONE]",
 			)
 		}
@@ -660,17 +473,7 @@ func TestOpenAIClient_EmbeddingModel(t *testing.T) {
 	t.Run("generates embeddings for text", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/embeddings", "POST", openaiEmbedResponseJSON(OpenaiEmbeddingResponse{
-				Object: "list",
-				Data: []OpenaiEmbeddingData{
-					{
-						Object:    "embedding",
-						Embedding: []float64{0.1, 0.2, 0.3, 0.4, 0.5},
-						Index:     0,
-					},
-				},
-				Model: testOpenAIEmbedModelName,
-			}))
+			tc.Mock.AddRestResponse("/embeddings", "POST", `{"object":"list","data":[{"object":"embedding","embedding":[0.1,0.2,0.3,0.4,0.5],"index":0}],"model":"nomic-embed-text:latest"}`)
 		}
 
 		embedModel := tc.Client.EmbeddingModel(testOpenAIEmbedModelName)
@@ -686,28 +489,8 @@ func TestOpenAIClient_EmbeddingModel(t *testing.T) {
 	t.Run("generates embeddings for different texts", func(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/embeddings", "POST", openaiEmbedResponseJSON(OpenaiEmbeddingResponse{
-				Object: "list",
-				Data: []OpenaiEmbeddingData{
-					{
-						Object:    "embedding",
-						Embedding: []float64{0.1, 0.2, 0.3, 0.4, 0.5},
-						Index:     0,
-					},
-				},
-				Model: testOpenAIEmbedModelName,
-			}))
-			tc.Mock.AddRestResponse("/embeddings", "POST", openaiEmbedResponseJSON(OpenaiEmbeddingResponse{
-				Object: "list",
-				Data: []OpenaiEmbeddingData{
-					{
-						Object:    "embedding",
-						Embedding: []float64{0.2, 0.3, 0.4, 0.5, 0.6},
-						Index:     0,
-					},
-				},
-				Model: testOpenAIEmbedModelName,
-			}))
+			tc.Mock.AddRestResponse("/embeddings", "POST", `{"object":"list","data":[{"object":"embedding","embedding":[0.1,0.2,0.3,0.4,0.5],"index":0}],"model":"nomic-embed-text:latest"}`)
+			tc.Mock.AddRestResponse("/embeddings", "POST", `{"object":"list","data":[{"object":"embedding","embedding":[0.2,0.3,0.4,0.5,0.6],"index":0}],"model":"nomic-embed-text:latest"}`)
 		}
 
 		embedModel := tc.Client.EmbeddingModel(testOpenAIEmbedModelName)
@@ -765,32 +548,7 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 	t.Run("tool calls are properly passed to LLM", func(t *testing.T) {
 		// Setup mock response with tool call if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
-				ID:      "chatcmpl-tool-1",
-				Object:  "chat.completion",
-				Created: 1640000000,
-				Model:   testOpenAIModelName,
-				Choices: []OpenaiChatCompletionChoice{
-					{
-						Index: 0,
-						Message: &OpenaiChatCompletionMessage{
-							Role:    "assistant",
-							Content: "",
-							ToolCalls: []OpenaiToolCall{
-								{
-									ID:   "call_abc123",
-									Type: "function",
-									Function: OpenaiToolCallFunction{
-										Name:      "get_weather",
-										Arguments: `{"location":"Paris, France","unit":"celsius"}`,
-									},
-								},
-							},
-						},
-						FinishReason: "tool_calls",
-					},
-				},
-			}))
+			tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-tool-1","object":"chat.completion","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","content":"","tool_calls":[{"id":"call_abc123","type":"function","function":{"name":"get_weather","arguments":"{\"location\":\"Paris, France\",\"unit\":\"celsius\"}"}}]},"finish_reason":"tool_calls"}]}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testOpenAIModelName, &ChatOptions{
@@ -829,48 +587,9 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
 			// First response: tool call
-			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
-				ID:      "chatcmpl-tool-2",
-				Object:  "chat.completion",
-				Created: 1640000000,
-				Model:   testOpenAIModelName,
-				Choices: []OpenaiChatCompletionChoice{
-					{
-						Index: 0,
-						Message: &OpenaiChatCompletionMessage{
-							Role: "assistant",
-							ToolCalls: []OpenaiToolCall{
-								{
-									ID:   "call_def456",
-									Type: "function",
-									Function: OpenaiToolCallFunction{
-										Name:      "get_weather",
-										Arguments: `{"location":"Tokyo"}`,
-									},
-								},
-							},
-						},
-						FinishReason: "tool_calls",
-					},
-				},
-			}))
+			tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-tool-2","object":"chat.completion","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","tool_calls":[{"id":"call_def456","type":"function","function":{"name":"get_weather","arguments":"{\"location\":\"Tokyo\"}"}}]},"finish_reason":"tool_calls"}]}`)
 			// Second response: final answer after tool execution
-			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
-				ID:      "chatcmpl-tool-2b",
-				Object:  "chat.completion",
-				Created: 1640000001,
-				Model:   testOpenAIModelName,
-				Choices: []OpenaiChatCompletionChoice{
-					{
-						Index: 0,
-						Message: &OpenaiChatCompletionMessage{
-							Role:    "assistant",
-							Content: "The weather in Tokyo is currently 18°C and cloudy.",
-						},
-						FinishReason: "stop",
-					},
-				},
-			}))
+			tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-tool-2b","object":"chat.completion","created":1640000001,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","content":"The weather in Tokyo is currently 18°C and cloudy."},"finish_reason":"stop"}]}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testOpenAIModelName, &ChatOptions{
@@ -925,76 +644,14 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 		if tc.Mock != nil {
 			// First response: streaming tool call
 			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
-				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
-					ID:      "chatcmpl-tool-stream-1",
-					Object:  "chat.completion.chunk",
-					Created: 1640000000,
-					Model:   testOpenAIModelName,
-					Choices: []OpenaiChatCompletionChoice{
-						{
-							Index: 0,
-							Delta: &OpenaiChatCompletionMessage{
-								Role: "assistant",
-								ToolCalls: []OpenaiToolCall{
-									{
-										Index: 0,
-										ID:    "call_ghi789",
-										Type:  "function",
-										Function: OpenaiToolCallFunction{
-											Name:      "get_weather",
-											Arguments: `{"location":"London"}`,
-										},
-									},
-								},
-							},
-						},
-					},
-				}),
-				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
-					ID:      "chatcmpl-tool-stream-1",
-					Object:  "chat.completion.chunk",
-					Created: 1640000001,
-					Model:   testOpenAIModelName,
-					Choices: []OpenaiChatCompletionChoice{
-						{
-							Index:        0,
-							Delta:        &OpenaiChatCompletionMessage{},
-							FinishReason: "tool_calls",
-						},
-					},
-				}),
+				`data: {"id":"chatcmpl-tool-stream-1","object":"chat.completion.chunk","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":"call_ghi789","type":"function","function":{"name":"get_weather","arguments":"{\"location\":\"London\"}"}}]}}]}`,
+				`data: {"id":"chatcmpl-tool-stream-1","object":"chat.completion.chunk","created":1640000001,"model":"devstral-small-2:latest","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}`,
 				"data: [DONE]",
 			)
 			// Second response: streaming text response after tool execution
 			tc.Mock.AddStreamingResponse("/chat/completions", "POST", true,
-				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
-					ID:      "chatcmpl-tool-stream-1b",
-					Object:  "chat.completion.chunk",
-					Created: 1640000002,
-					Model:   testOpenAIModelName,
-					Choices: []OpenaiChatCompletionChoice{
-						{
-							Index: 0,
-							Delta: &OpenaiChatCompletionMessage{
-								Role:    "assistant",
-								Content: "The temperature in London is 15°C and it's rainy.",
-							},
-						},
-					},
-				}),
-				"data: "+openaiChatResponseJSON(OpenaiChatCompletionResponse{
-					ID:      "chatcmpl-tool-stream-1b",
-					Object:  "chat.completion.chunk",
-					Created: 1640000003,
-					Model:   testOpenAIModelName,
-					Choices: []OpenaiChatCompletionChoice{
-						{
-							Index:        0,
-							Delta:        &OpenaiChatCompletionMessage{},
-							FinishReason: "stop",
-						},
-					},
-				}),
+				`data: {"id":"chatcmpl-tool-stream-1b","object":"chat.completion.chunk","created":1640000002,"model":"devstral-small-2:latest","choices":[{"index":0,"delta":{"role":"assistant","content":"The temperature in London is 15°C and it's rainy."}}]}`,
+				`data: {"id":"chatcmpl-tool-stream-1b","object":"chat.completion.chunk","created":1640000003,"model":"devstral-small-2:latest","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
 				"data: [DONE]",
 			)
 		}
@@ -1100,39 +757,7 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 
 		// Setup mock response with multiple tool calls if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
-				ID:      "chatcmpl-tool-3",
-				Object:  "chat.completion",
-				Created: 1640000000,
-				Model:   testOpenAIModelName,
-				Choices: []OpenaiChatCompletionChoice{
-					{
-						Index: 0,
-						Message: &OpenaiChatCompletionMessage{
-							Role: "assistant",
-							ToolCalls: []OpenaiToolCall{
-								{
-									ID:   "call_jkl012",
-									Type: "function",
-									Function: OpenaiToolCallFunction{
-										Name:      "get_weather",
-										Arguments: `{"location":"New York"}`,
-									},
-								},
-								{
-									ID:   "call_mno345",
-									Type: "function",
-									Function: OpenaiToolCallFunction{
-										Name:      "get_time",
-										Arguments: `{"location":"New York"}`,
-									},
-								},
-							},
-						},
-						FinishReason: "tool_calls",
-					},
-				},
-			}))
+			tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-tool-3","object":"chat.completion","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","tool_calls":[{"id":"call_jkl012","type":"function","function":{"name":"get_weather","arguments":"{\"location\":\"New York\"}"}},{"id":"call_mno345","type":"function","function":{"name":"get_time","arguments":"{\"location\":\"New York\"}"}}]},"finish_reason":"tool_calls"}]}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testOpenAIModelName, &ChatOptions{
@@ -1167,48 +792,9 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
 			// First response: tool call
-			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
-				ID:      "chatcmpl-tool-4",
-				Object:  "chat.completion",
-				Created: 1640000000,
-				Model:   testOpenAIModelName,
-				Choices: []OpenaiChatCompletionChoice{
-					{
-						Index: 0,
-						Message: &OpenaiChatCompletionMessage{
-							Role: "assistant",
-							ToolCalls: []OpenaiToolCall{
-								{
-									ID:   "call_pqr678",
-									Type: "function",
-									Function: OpenaiToolCallFunction{
-										Name:      "get_weather",
-										Arguments: `{"location":"Berlin"}`,
-									},
-								},
-							},
-						},
-						FinishReason: "tool_calls",
-					},
-				},
-			}))
+			tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-tool-4","object":"chat.completion","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","tool_calls":[{"id":"call_pqr678","type":"function","function":{"name":"get_weather","arguments":"{\"location\":\"Berlin\"}"}}]},"finish_reason":"tool_calls"}]}`)
 			// Second response: handling error
-			tc.Mock.AddRestResponse("/chat/completions", "POST", openaiChatResponseJSON(OpenaiChatCompletionResponse{
-				ID:      "chatcmpl-tool-4b",
-				Object:  "chat.completion",
-				Created: 1640000001,
-				Model:   testOpenAIModelName,
-				Choices: []OpenaiChatCompletionChoice{
-					{
-						Index: 0,
-						Message: &OpenaiChatCompletionMessage{
-							Role:    "assistant",
-							Content: "I apologize, but I encountered an error: location not found.",
-						},
-						FinishReason: "stop",
-					},
-				},
-			}))
+			tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-tool-4b","object":"chat.completion","created":1640000001,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","content":"I apologize, but I encountered an error: location not found."},"finish_reason":"stop"}]}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testOpenAIModelName, &ChatOptions{

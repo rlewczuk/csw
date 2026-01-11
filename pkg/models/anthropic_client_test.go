@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -18,20 +17,6 @@ const (
 	testAnthropicTimeout    = 30 * time.Second
 	connectAnthropicTimeout = 5 * time.Second
 )
-
-// anthropicMessagesResponseJSON converts a AnthropicMessagesResponse to JSON string.
-// TODO remove this function
-func anthropicMessagesResponseJSON(response AnthropicMessagesResponse) string {
-	data, _ := json.Marshal(response)
-	return string(data)
-}
-
-// anthropicListModelsResponseJSON converts a AnthropicModelsListResponse to JSON string.
-// TODO remove this function
-func anthropicListModelsResponseJSON(response AnthropicModelsListResponse) string {
-	data, _ := json.Marshal(response)
-	return string(data)
-}
 
 // anthropicTestClient holds either a real or mock client and provides cleanup
 type anthropicTestClient struct {
@@ -137,22 +122,7 @@ func TestAnthropicClient_ListModels(t *testing.T) {
 
 	// Setup mock response if using mock
 	if tc.Mock != nil {
-		modelsResponse := anthropicListModelsResponseJSON(AnthropicModelsListResponse{
-			Data: []AnthropicModelInfo{
-				{
-					ID:          testAnthropicModelName,
-					CreatedAt:   "2024-01-01T00:00:00Z",
-					DisplayName: "Claude Sonnet 4.5",
-					Type:        "model",
-				},
-				{
-					ID:          "claude-3-5-sonnet-20241022",
-					CreatedAt:   "2024-01-01T00:00:00Z",
-					DisplayName: "Claude 3.5 Sonnet",
-					Type:        "model",
-				},
-			},
-		})
+		modelsResponse := `{"data":[{"id":"claude-sonnet-4-5-20250929","created_at":"2024-01-01T00:00:00Z","display_name":"Claude Sonnet 4.5","type":"model"},{"id":"claude-3-5-sonnet-20241022","created_at":"2024-01-01T00:00:00Z","display_name":"Claude 3.5 Sonnet","type":"model"}]}`
 		// Add response for each subtest
 		tc.Mock.AddRestResponse("/v1/models", "GET", modelsResponse)
 		tc.Mock.AddRestResponse("/v1/models", "GET", modelsResponse)
@@ -210,17 +180,7 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	t.Run("sends chat message and gets response", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
-				ID:   "msg_test123",
-				Type: "message",
-				Role: "assistant",
-				Content: []AnthropicResponseContent{
-					{Type: "text", Text: "4"},
-				},
-				Model:      testAnthropicModelName,
-				StopReason: "end_turn",
-				Usage:      AnthropicUsageInfo{InputTokens: 10, OutputTokens: 5},
-			}))
+			tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_test123","type":"message","role":"assistant","content":[{"type":"text","text":"4"}],"model":"claude-sonnet-4-5-20250929","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`)
 		}
 
 		options := &ChatOptions{
@@ -250,17 +210,7 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	t.Run("handles context with timeout", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
-				ID:   "msg_test124",
-				Type: "message",
-				Role: "assistant",
-				Content: []AnthropicResponseContent{
-					{Type: "text", Text: "Hello!"},
-				},
-				Model:      testAnthropicModelName,
-				StopReason: "end_turn",
-				Usage:      AnthropicUsageInfo{InputTokens: 10, OutputTokens: 5},
-			}))
+			tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_test124","type":"message","role":"assistant","content":[{"type":"text","text":"Hello!"}],"model":"claude-sonnet-4-5-20250929","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`)
 		}
 
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -284,17 +234,7 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	t.Run("handles system and user messages", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
-				ID:   "msg_test125",
-				Type: "message",
-				Role: "assistant",
-				Content: []AnthropicResponseContent{
-					{Type: "text", Text: "HELLO"},
-				},
-				Model:      testAnthropicModelName,
-				StopReason: "end_turn",
-				Usage:      AnthropicUsageInfo{InputTokens: 15, OutputTokens: 3},
-			}))
+			tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_test125","type":"message","role":"assistant","content":[{"type":"text","text":"HELLO"}],"model":"claude-sonnet-4-5-20250929","stop_reason":"end_turn","usage":{"input_tokens":15,"output_tokens":3}}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
@@ -338,17 +278,7 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	t.Run("uses default options when none provided to Chat", func(t *testing.T) {
 		// Setup mock response if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
-				ID:   "msg_test126",
-				Type: "message",
-				Role: "assistant",
-				Content: []AnthropicResponseContent{
-					{Type: "text", Text: "Hello!"},
-				},
-				Model:      testAnthropicModelName,
-				StopReason: "end_turn",
-				Usage:      AnthropicUsageInfo{InputTokens: 10, OutputTokens: 5},
-			}))
+			tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_test126","type":"message","role":"assistant","content":[{"type":"text","text":"Hello!"}],"model":"claude-sonnet-4-5-20250929","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`)
 		}
 
 		defaultOptions := &ChatOptions{
@@ -590,25 +520,7 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 	t.Run("sends tool definitions to LLM and receives tool call", func(t *testing.T) {
 		// Setup mock response with tool call if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
-				ID:   "msg_test131",
-				Type: "message",
-				Role: "assistant",
-				Content: []AnthropicResponseContent{
-					{
-						Type: "tool_use",
-						ID:   "toolu_test123",
-						Name: "get_weather",
-						Input: map[string]interface{}{
-							"location": "San Francisco, CA",
-							"unit":     "fahrenheit",
-						},
-					},
-				},
-				Model:      testAnthropicModelName,
-				StopReason: "tool_use",
-				Usage:      AnthropicUsageInfo{InputTokens: 20, OutputTokens: 15},
-			}))
+			tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_test131","type":"message","role":"assistant","content":[{"type":"tool_use","id":"toolu_test123","name":"get_weather","input":{"location":"San Francisco, CA","unit":"fahrenheit"}}],"model":"claude-sonnet-4-5-20250929","stop_reason":"tool_use","usage":{"input_tokens":20,"output_tokens":15}}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
@@ -650,37 +562,9 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
 			// First response: tool call
-			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
-				ID:   "msg_test131b",
-				Type: "message",
-				Role: "assistant",
-				Content: []AnthropicResponseContent{
-					{
-						Type: "tool_use",
-						ID:   "toolu_test123b",
-						Name: "get_weather",
-						Input: map[string]interface{}{
-							"location": "San Francisco, CA",
-							"unit":     "fahrenheit",
-						},
-					},
-				},
-				Model:      testAnthropicModelName,
-				StopReason: "tool_use",
-				Usage:      AnthropicUsageInfo{InputTokens: 20, OutputTokens: 15},
-			}))
+			tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_test131b","type":"message","role":"assistant","content":[{"type":"tool_use","id":"toolu_test123b","name":"get_weather","input":{"location":"San Francisco, CA","unit":"fahrenheit"}}],"model":"claude-sonnet-4-5-20250929","stop_reason":"tool_use","usage":{"input_tokens":20,"output_tokens":15}}`)
 			// Second response: final answer after tool execution
-			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
-				ID:   "msg_test131c",
-				Type: "message",
-				Role: "assistant",
-				Content: []AnthropicResponseContent{
-					{Type: "text", Text: "The weather in San Francisco is currently 72°F and sunny."},
-				},
-				Model:      testAnthropicModelName,
-				StopReason: "end_turn",
-				Usage:      AnthropicUsageInfo{InputTokens: 30, OutputTokens: 20},
-			}))
+			tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_test131c","type":"message","role":"assistant","content":[{"type":"text","text":"The weather in San Francisco is currently 72°F and sunny."}],"model":"claude-sonnet-4-5-20250929","stop_reason":"end_turn","usage":{"input_tokens":30,"output_tokens":20}}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
@@ -733,32 +617,7 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 	t.Run("handles multiple tool calls in conversation", func(t *testing.T) {
 		// Setup mock response with multiple tool calls if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
-				ID:   "msg_test132",
-				Type: "message",
-				Role: "assistant",
-				Content: []AnthropicResponseContent{
-					{
-						Type: "tool_use",
-						ID:   "toolu_test124",
-						Name: "get_weather",
-						Input: map[string]interface{}{
-							"location": "San Francisco, CA",
-						},
-					},
-					{
-						Type: "tool_use",
-						ID:   "toolu_test125",
-						Name: "get_time",
-						Input: map[string]interface{}{
-							"location": "San Francisco, CA",
-						},
-					},
-				},
-				Model:      testAnthropicModelName,
-				StopReason: "tool_use",
-				Usage:      AnthropicUsageInfo{InputTokens: 25, OutputTokens: 20},
-			}))
+			tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_test132","type":"message","role":"assistant","content":[{"type":"tool_use","id":"toolu_test124","name":"get_weather","input":{"location":"San Francisco, CA"}},{"type":"tool_use","id":"toolu_test125","name":"get_time","input":{"location":"San Francisco, CA"}}],"model":"claude-sonnet-4-5-20250929","stop_reason":"tool_use","usage":{"input_tokens":25,"output_tokens":20}}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
@@ -794,24 +653,7 @@ func TestAnthropicClient_ToolCalling(t *testing.T) {
 	t.Run("handles interleaved text and tool calls", func(t *testing.T) {
 		// Setup mock response with tool call if using mock
 		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
-				ID:   "msg_test133",
-				Type: "message",
-				Role: "assistant",
-				Content: []AnthropicResponseContent{
-					{
-						Type: "tool_use",
-						ID:   "toolu_test126",
-						Name: "get_weather",
-						Input: map[string]interface{}{
-							"location": "Boston, MA",
-						},
-					},
-				},
-				Model:      testAnthropicModelName,
-				StopReason: "tool_use",
-				Usage:      AnthropicUsageInfo{InputTokens: 25, OutputTokens: 15},
-			}))
+			tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_test133","type":"message","role":"assistant","content":[{"type":"tool_use","id":"toolu_test126","name":"get_weather","input":{"location":"Boston, MA"}}],"model":"claude-sonnet-4-5-20250929","stop_reason":"tool_use","usage":{"input_tokens":25,"output_tokens":15}}`)
 		}
 
 		chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
@@ -893,24 +735,7 @@ func TestAnthropicClient_ToolCallingStream(t *testing.T) {
 		// Setup mock responses if using mock
 		if tc.Mock != nil {
 			// First response: tool call (non-streaming)
-			tc.Mock.AddRestResponse("/v1/messages", "POST", anthropicMessagesResponseJSON(AnthropicMessagesResponse{
-				ID:   "msg_test134a",
-				Type: "message",
-				Role: "assistant",
-				Content: []AnthropicResponseContent{
-					{
-						Type: "tool_use",
-						ID:   "toolu_test128",
-						Name: "get_weather",
-						Input: map[string]interface{}{
-							"location": "Portland, OR",
-						},
-					},
-				},
-				Model:      testAnthropicModelName,
-				StopReason: "tool_use",
-				Usage:      AnthropicUsageInfo{InputTokens: 20, OutputTokens: 15},
-			}))
+			tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_test134a","type":"message","role":"assistant","content":[{"type":"tool_use","id":"toolu_test128","name":"get_weather","input":{"location":"Portland, OR"}}],"model":"claude-sonnet-4-5-20250929","stop_reason":"tool_use","usage":{"input_tokens":20,"output_tokens":15}}`)
 			// Second response: streaming response after tool execution
 			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
 				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test134b","type":"message","role":"assistant","content":[],"model":"`+testAnthropicModelName+`","usage":{"input_tokens":30,"output_tokens":0}}}`,
