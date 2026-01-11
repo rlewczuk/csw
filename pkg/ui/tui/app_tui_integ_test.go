@@ -397,6 +397,72 @@ func TestTuiAppViewWithChatIntegration(t *testing.T) {
 	})
 }
 
+// TestEscKeyOpensMenu verifies that Esc key opens the main menu like Ctrl+P does.
+func TestEscKeyOpensMenu(t *testing.T) {
+	t.Run("Esc key should open menu like Ctrl+P", func(t *testing.T) {
+		// Setup mock LLM server
+		mockServer := testutil.NewMockHTTPServer()
+		defer mockServer.Close()
+
+		client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+		require.NoError(t, err)
+
+		vfsInstance := vfs.NewMockVFS()
+		tools := tool.NewToolRegistry()
+		tool.RegisterVFSTools(tools, vfsInstance)
+
+		system := &core.SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"ollama": client},
+			SystemPrompt:   "You are a helpful assistant.",
+			Tools:          tools,
+			VFS:            vfsInstance,
+		}
+
+		// Create session thread
+		thread := core.NewSessionThread(system, nil)
+		err = thread.StartSession("ollama/test-model:latest")
+		require.NoError(t, err)
+
+		// Create presenters
+		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest")
+		chatPresenter := presenter.NewChatPresenter(system, thread)
+
+		// Create TUI app view
+		appView, err := NewTuiAppView(appPresenter)
+		require.NoError(t, err)
+
+		// Show chat view through app view
+		chatView := appView.ShowChat(chatPresenter)
+		require.NotNil(t, chatView)
+
+		// Connect chat presenter to view
+		err = chatPresenter.SetView(chatView)
+		require.NoError(t, err)
+
+		// Create mock terminal and run app view
+		term := NewTerminalMock()
+		term.Run(appView.Model())
+
+		// Wait for initial render
+		assert.True(t, term.WaitForText("Welcome!", 2*time.Second), "Should show welcome message")
+
+		// Test that Esc key opens the menu (should not quit the application)
+		term.SendKey("esc")
+		assert.True(t, term.WaitForText("Main Menu", 1*time.Second), "Esc should open main menu")
+
+		// Close the menu
+		term.SendKey("esc")
+
+		// Test that Ctrl+P also opens the menu
+		term.SendKey("ctrl+p")
+		assert.True(t, term.WaitForText("Main Menu", 1*time.Second), "Ctrl+P should also open main menu")
+
+		// Cleanup
+		term.SendKey("esc")
+		term.Close()
+	})
+}
+
 // TestAppViewRefreshBug is a specific test to demonstrate the refresh bug.
 // When chat view is embedded in app view, updates from presenter don't trigger re-render.
 func TestAppViewRefreshBug(t *testing.T) {

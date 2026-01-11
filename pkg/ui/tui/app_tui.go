@@ -141,7 +141,7 @@ func (v *TuiAppView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle global hotkeys
 		keyStr := msg.String()
 		switch keyStr {
-		case "ctrl+p", "\x10": // \x10 is the byte representation of Ctrl+P
+		case "ctrl+p", "\x10", "esc": // \x10 is the byte representation of Ctrl+P
 			v.showMenu()
 			return v, nil
 		}
@@ -208,7 +208,7 @@ func (v *TuiAppView) renderStatusBar() string {
 		Padding(0, 1).
 		Align(lipgloss.Right)
 
-	leftText := leftStyle.Render("Ctrl+P: Menu")
+	leftText := leftStyle.Render("Ctrl+P/Esc: Menu")
 	rightText := rightStyle.Render(fmt.Sprintf("%s v%s", appName, appVersion))
 
 	// Calculate spacing to fill the width
