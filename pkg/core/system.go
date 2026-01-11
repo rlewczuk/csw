@@ -156,3 +156,22 @@ func (s *SweSystem) DeleteSession(id string) error {
 	delete(s.sessions, id)
 	return nil
 }
+
+// Shutdown interrupts all running sessions and deletes all sessions and threads.
+// This method is thread-safe and will attempt to interrupt all threads even if some fail.
+func (s *SweSystem) Shutdown() {
+	s.sessionsMu.Lock()
+	defer s.sessionsMu.Unlock()
+
+	// Interrupt all running threads
+	for _, thread := range s.threads {
+		// Ignore errors since thread might not be running
+		_ = thread.Interrupt()
+	}
+
+	// Clear all threads
+	s.threads = make(map[string]*SessionThread)
+
+	// Clear all sessions
+	s.sessions = make(map[string]*SweSession)
+}

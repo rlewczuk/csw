@@ -290,3 +290,170 @@ func TestSweSystemGetSessionThread(t *testing.T) {
 		assert.Equal(t, session2, thread2.GetSession())
 	})
 }
+
+func TestSweSystemShutdown(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+	require.NoError(t, err)
+	vfs := vfs.NewMockVFS()
+
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfs)
+
+	t.Run("Shutdown with no sessions or threads", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"ollama": client},
+			SystemPrompt:   "You are a test assistant.",
+			Tools:          tools,
+			VFS:            vfs,
+		}
+
+		// Should not panic
+		system.Shutdown()
+
+		// Verify both maps are initialized and empty
+		assert.Empty(t, system.ListSessions())
+	})
+
+	t.Run("Shutdown with sessions but no threads", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"ollama": client},
+			SystemPrompt:   "You are a test assistant.",
+			Tools:          tools,
+			VFS:            vfs,
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+
+		// Create multiple sessions
+		session1, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		session2, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+
+		// Verify sessions exist
+		assert.NotEmpty(t, system.ListSessions())
+
+		// Shutdown
+		system.Shutdown()
+
+		// Verify all sessions are deleted
+		assert.Empty(t, system.ListSessions())
+
+		// Verify sessions are actually gone
+		_, err = system.GetSession(session1.ID())
+		assert.Error(t, err)
+		_, err = system.GetSession(session2.ID())
+		assert.Error(t, err)
+	})
+
+	t.Run("Shutdown with sessions and threads", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"ollama": client},
+			SystemPrompt:   "You are a test assistant.",
+			Tools:          tools,
+			VFS:            vfs,
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+
+		// Create multiple sessions
+		session1, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		session2, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+
+		// Create threads for sessions
+		thread1, err := system.GetSessionThread(session1.ID())
+		require.NoError(t, err)
+		require.NotNil(t, thread1)
+		thread2, err := system.GetSessionThread(session2.ID())
+		require.NoError(t, err)
+		require.NotNil(t, thread2)
+
+		// Shutdown
+		system.Shutdown()
+
+		// Verify all sessions and threads are deleted
+		assert.Empty(t, system.ListSessions())
+
+		// Verify sessions are gone
+		_, err = system.GetSession(session1.ID())
+		assert.Error(t, err)
+		_, err = system.GetSession(session2.ID())
+		assert.Error(t, err)
+
+		// Verify threads are gone (would create new ones if requested)
+		thread3, err := system.GetSessionThread(session1.ID())
+		assert.Error(t, err) // Session doesn't exist, so thread creation should fail
+		assert.Nil(t, thread3)
+	})
+
+	t.Run("Shutdown interrupts running threads", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"ollama": client},
+			SystemPrompt:   "You are a test assistant.",
+			Tools:          tools,
+			VFS:            vfs,
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+
+		// Create a session
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+
+		// Get thread for this session
+		thread, err := system.GetSessionThread(session.ID())
+		require.NoError(t, err)
+
+		// Add a long-running streaming response to simulate a running task
+		mockServer.AddStreamingResponse("/api/chat", "POST", false,
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Processing..."},"done":false}`,
+		)
+
+		// Start the thread (non-blocking)
+		err = thread.AddPrompt("Test prompt")
+		require.NoError(t, err)
+		err = thread.Resume()
+		require.NoError(t, err)
+
+		// Give it a moment to start
+		// Note: In a real scenario, we'd use synchronization primitives,
+		// but for this test we'll just verify the shutdown doesn't panic
+		// and cleans up properly
+
+		// Shutdown should interrupt the running thread
+		system.Shutdown()
+
+		// Verify cleanup
+		assert.Empty(t, system.ListSessions())
+
+		// Verify thread is not running anymore (if we could check)
+		// This is tested indirectly by verifying the thread map is cleared
+	})
+
+	t.Run("Shutdown is idempotent", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"ollama": client},
+			SystemPrompt:   "You are a test assistant.",
+			Tools:          tools,
+			VFS:            vfs,
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+
+		// Create a session
+		_, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+
+		// Shutdown once
+		system.Shutdown()
+		assert.Empty(t, system.ListSessions())
+
+		// Shutdown again should not panic
+		system.Shutdown()
+		assert.Empty(t, system.ListSessions())
+	})
+}

@@ -1,20 +1,21 @@
 package ui
 
-// AppView is an interface for rendering the main app window.
-type AppView interface {
-	// ShowChat shows the chat view.
-	ShowChat(view ChatView)
+// IAppView is an interface for rendering the main app window.
+type IAppView interface {
+	// ShowChat switches to the chat view with the given presenter.
+	// Chat view can be created or reused but this is internal to implementation.
+	ShowChat(presenter IChatPresenter) IChatView
 
 	// ShowSettings shows the settings view.
 	ShowSettings()
 }
 
-// AppPresenter is an interface for propagating user input from UI to the app.
-type AppPresenter interface {
-	// NewSession creates a new chat session.
+// IAppPresenter is an interface for propagating user input from UI to the app.
+type IAppPresenter interface {
+	// NewSession creates a new chat session
 	NewSession() error
 
-	// OpenSession opens an existing chat session.
+	// OpenSession reopens an existing chat session
 	OpenSession(id string) error
 
 	// Exit exits the app.

@@ -71,8 +71,8 @@ type ChatSessionUI struct {
 	Messages []*ChatMessageUI
 }
 
-// ChatView is an interface for rendering chat conversation.
-type ChatView interface {
+// IChatView is an interface for rendering chat conversation.
+type IChatView interface {
 	// Init initializes the view with all messages from the session.
 	Init(session *ChatSessionUI) error
 
@@ -89,10 +89,10 @@ type ChatView interface {
 	MoveToBottom() error
 }
 
-// ChatPresenter is an interface for propagating user input from UI to the chat session.
-type ChatPresenter interface {
+// IChatPresenter is an interface for propagating user input from UI to the chat session.
+type IChatPresenter interface {
 	// SetView sets the view to render the chat conversation.
-	SetView(view ChatView) error
+	SetView(view IChatView) error
 
 	// SendUserMessage sends a user message to the chat session and starts processing.
 	SendUserMessage(message *ChatMessageUI) error

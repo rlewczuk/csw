@@ -393,9 +393,9 @@ func TestMockChatPresenter_Reset(t *testing.T) {
 }
 
 func TestMockChatView_ImplementsChatViewInterface(t *testing.T) {
-	var _ ui.ChatView = (*MockChatView)(nil)
+	var _ ui.IChatView = (*MockChatView)(nil)
 }
 
 func TestMockChatPresenter_ImplementsChatPresenterInterface(t *testing.T) {
-	var _ ui.ChatPresenter = (*MockChatPresenter)(nil)
+	var _ ui.IChatPresenter = (*MockChatPresenter)(nil)
 }
