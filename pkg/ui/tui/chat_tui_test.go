@@ -23,12 +23,12 @@ func TestTuiChatView(t *testing.T) {
 		view, err := NewTuiChatView(presenter)
 		assert.NoError(t, err)
 
-		session := &ui.ChatSession{
+		session := &ui.ChatSessionUI{
 			Id:      "test-session",
 			Model:   "test-model",
 			Role:    "assistant",
 			WorkDir: "/test/dir",
-			Messages: []*ui.ChatMessage{
+			Messages: []*ui.ChatMessageUI{
 				{
 					Id:   "msg-1",
 					Role: ui.ChatRoleUser,
@@ -52,7 +52,7 @@ func TestTuiChatView(t *testing.T) {
 		view, err := NewTuiChatView(presenter)
 		assert.NoError(t, err)
 
-		msg := &ui.ChatMessage{
+		msg := &ui.ChatMessageUI{
 			Id:   "msg-1",
 			Role: ui.ChatRoleUser,
 			Text: "First",
@@ -60,8 +60,8 @@ func TestTuiChatView(t *testing.T) {
 		err = view.AddMessage(msg)
 		assert.NoError(t, err)
 
-		session := &ui.ChatSession{
-			Messages: []*ui.ChatMessage{
+		session := &ui.ChatSessionUI{
+			Messages: []*ui.ChatMessageUI{
 				{
 					Id:   "msg-2",
 					Role: ui.ChatRoleUser,
@@ -81,7 +81,7 @@ func TestTuiChatView(t *testing.T) {
 		view, err := NewTuiChatView(presenter)
 		assert.NoError(t, err)
 
-		msg := &ui.ChatMessage{
+		msg := &ui.ChatMessageUI{
 			Id:   "msg-1",
 			Role: ui.ChatRoleUser,
 			Text: "Test message",
@@ -99,11 +99,11 @@ func TestTuiChatView(t *testing.T) {
 		view, err := NewTuiChatView(presenter)
 		assert.NoError(t, err)
 
-		msg := &ui.ChatMessage{
+		msg := &ui.ChatMessageUI{
 			Id:   "msg-1",
 			Role: ui.ChatRoleAssistant,
 			Text: "Assistant response",
-			Tools: []*ui.ToolState{
+			Tools: []*ui.ToolUI{
 				{
 					Id:     "tool-1",
 					Status: ui.ToolStatusStarted,
@@ -124,7 +124,7 @@ func TestTuiChatView(t *testing.T) {
 		view, err := NewTuiChatView(presenter)
 		assert.NoError(t, err)
 
-		messages := []*ui.ChatMessage{
+		messages := []*ui.ChatMessageUI{
 			{Id: "1", Role: ui.ChatRoleUser, Text: "First"},
 			{Id: "2", Role: ui.ChatRoleAssistant, Text: "Second"},
 			{Id: "3", Role: ui.ChatRoleUser, Text: "Third"},
@@ -143,7 +143,7 @@ func TestTuiChatView(t *testing.T) {
 		view, err := NewTuiChatView(presenter)
 		assert.NoError(t, err)
 
-		partialMsg := &ui.ChatMessage{
+		partialMsg := &ui.ChatMessageUI{
 			Id:   "msg-1",
 			Role: ui.ChatRoleAssistant,
 			Text: "",
@@ -152,11 +152,11 @@ func TestTuiChatView(t *testing.T) {
 		err = view.AddMessage(partialMsg)
 		assert.NoError(t, err)
 
-		updatedMsg := &ui.ChatMessage{
+		updatedMsg := &ui.ChatMessageUI{
 			Id:   "msg-1",
 			Role: ui.ChatRoleAssistant,
 			Text: "Updated content",
-			Tools: []*ui.ToolState{
+			Tools: []*ui.ToolUI{
 				{
 					Id:     "tool-1",
 					Status: ui.ToolStatusStarted,
@@ -177,7 +177,7 @@ func TestTuiChatView(t *testing.T) {
 		view, err := NewTuiChatView(presenter)
 		assert.NoError(t, err)
 
-		msg1 := &ui.ChatMessage{
+		msg1 := &ui.ChatMessageUI{
 			Id:   "msg-1",
 			Role: ui.ChatRoleAssistant,
 			Text: "First assistant",
@@ -186,7 +186,7 @@ func TestTuiChatView(t *testing.T) {
 		err = view.AddMessage(msg1)
 		assert.NoError(t, err)
 
-		partialMsg := &ui.ChatMessage{
+		partialMsg := &ui.ChatMessageUI{
 			Id:   "msg-2",
 			Role: ui.ChatRoleAssistant,
 			Text: "",
@@ -195,7 +195,7 @@ func TestTuiChatView(t *testing.T) {
 		err = view.AddMessage(partialMsg)
 		assert.NoError(t, err)
 
-		updatedMsg := &ui.ChatMessage{
+		updatedMsg := &ui.ChatMessageUI{
 			Id:   "msg-2",
 			Role: ui.ChatRoleAssistant,
 			Text: "Updated second message",
@@ -212,11 +212,11 @@ func TestTuiChatView(t *testing.T) {
 		view, err := NewTuiChatView(presenter)
 		assert.NoError(t, err)
 
-		msg := &ui.ChatMessage{
+		msg := &ui.ChatMessageUI{
 			Id:   "msg-1",
 			Role: ui.ChatRoleAssistant,
 			Text: "Message with tool",
-			Tools: []*ui.ToolState{
+			Tools: []*ui.ToolUI{
 				{
 					Id:     "tool-1",
 					Status: ui.ToolStatusStarted,
@@ -228,7 +228,7 @@ func TestTuiChatView(t *testing.T) {
 		err = view.AddMessage(msg)
 		assert.NoError(t, err)
 
-		updatedTool := &ui.ToolState{
+		updatedTool := &ui.ToolUI{
 			Id:     "tool-1",
 			Status: ui.ToolStatusSucceeded,
 			Name:   "test_tool",
@@ -244,7 +244,7 @@ func TestTuiChatView(t *testing.T) {
 		view, err := NewTuiChatView(presenter)
 		assert.NoError(t, err)
 
-		msg := &ui.ChatMessage{
+		msg := &ui.ChatMessageUI{
 			Id:   "msg-1",
 			Role: ui.ChatRoleAssistant,
 			Text: "Message",
@@ -253,7 +253,7 @@ func TestTuiChatView(t *testing.T) {
 		err = view.AddMessage(msg)
 		assert.NoError(t, err)
 
-		updatedTool := &ui.ToolState{
+		updatedTool := &ui.ToolUI{
 			Id:     "non-existent",
 			Status: ui.ToolStatusSucceeded,
 			Name:   "test_tool",
@@ -268,11 +268,11 @@ func TestTuiChatView(t *testing.T) {
 		view, err := NewTuiChatView(presenter)
 		assert.NoError(t, err)
 
-		msg := &ui.ChatMessage{
+		msg := &ui.ChatMessageUI{
 			Id:   "msg-1",
 			Role: ui.ChatRoleAssistant,
 			Text: "Message with tools",
-			Tools: []*ui.ToolState{
+			Tools: []*ui.ToolUI{
 				{
 					Id:     "tool-1",
 					Status: ui.ToolStatusStarted,
@@ -289,7 +289,7 @@ func TestTuiChatView(t *testing.T) {
 		err = view.AddMessage(msg)
 		assert.NoError(t, err)
 
-		updatedTool := &ui.ToolState{
+		updatedTool := &ui.ToolUI{
 			Id:     "tool-2",
 			Status: ui.ToolStatusSucceeded,
 			Name:   "tool_two",

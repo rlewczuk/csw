@@ -96,7 +96,7 @@ func TestChatPresenter_SendUserMessage(t *testing.T) {
 		)
 
 		// Send user message
-		userMsg := &ui.ChatMessage{
+		userMsg := &ui.ChatMessageUI{
 			Id:   "user-1",
 			Role: ui.ChatRoleUser,
 			Text: "Hello",
@@ -142,7 +142,7 @@ func TestChatPresenter_SaveUserMessage(t *testing.T) {
 		require.NoError(t, err)
 
 		// Save user message (should not start processing)
-		userMsg := &ui.ChatMessage{
+		userMsg := &ui.ChatMessageUI{
 			Id:   "user-1",
 			Role: ui.ChatRoleUser,
 			Text: "Hello",
@@ -179,7 +179,7 @@ func TestChatPresenter_PauseResume(t *testing.T) {
 		require.NoError(t, err)
 
 		// Save message without processing
-		userMsg := &ui.ChatMessage{
+		userMsg := &ui.ChatMessageUI{
 			Id:   "user-1",
 			Role: ui.ChatRoleUser,
 			Text: "Hello",
@@ -244,7 +244,7 @@ func TestChatPresenter_ToolCallHandling(t *testing.T) {
 		)
 
 		// Send user message
-		userMsg := &ui.ChatMessage{
+		userMsg := &ui.ChatMessageUI{
 			Id:   "user-1",
 			Role: ui.ChatRoleUser,
 			Text: "Create a test file",
@@ -288,7 +288,7 @@ func TestChatPresenter_SessionPersistence(t *testing.T) {
 		)
 
 		// Send message via first presenter
-		userMsg := &ui.ChatMessage{
+		userMsg := &ui.ChatMessageUI{
 			Id:   "user-1",
 			Role: ui.ChatRoleUser,
 			Text: "Hello",
@@ -358,7 +358,7 @@ func TestChatPresenter_MoveToBottom(t *testing.T) {
 		)
 
 		// Send message
-		userMsg := &ui.ChatMessage{
+		userMsg := &ui.ChatMessageUI{
 			Id:   "user-1",
 			Role: ui.ChatRoleUser,
 			Text: "Hello",

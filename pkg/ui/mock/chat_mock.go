@@ -18,10 +18,10 @@ type MockChatView struct {
 	MoveToBottomErr  error
 
 	// Recorded calls
-	InitCalls          []*ui.ChatSession
-	AddMessageCalls    []*ui.ChatMessage
-	UpdateMessageCalls []*ui.ChatMessage
-	UpdateToolCalls    []*ui.ToolState
+	InitCalls          []*ui.ChatSessionUI
+	AddMessageCalls    []*ui.ChatMessageUI
+	UpdateMessageCalls []*ui.ChatMessageUI
+	UpdateToolCalls    []*ui.ToolUI
 	MoveToBottomCalls  int
 }
 
@@ -31,7 +31,7 @@ func NewMockChatView() *MockChatView {
 }
 
 // Init initializes the view with all messages from the session.
-func (m *MockChatView) Init(session *ui.ChatSession) error {
+func (m *MockChatView) Init(session *ui.ChatSessionUI) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -40,7 +40,7 @@ func (m *MockChatView) Init(session *ui.ChatSession) error {
 }
 
 // AddMessage adds a new message to the view.
-func (m *MockChatView) AddMessage(msg *ui.ChatMessage) error {
+func (m *MockChatView) AddMessage(msg *ui.ChatMessageUI) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -49,7 +49,7 @@ func (m *MockChatView) AddMessage(msg *ui.ChatMessage) error {
 }
 
 // UpdateMessage updates an existing message in the view.
-func (m *MockChatView) UpdateMessage(msg *ui.ChatMessage) error {
+func (m *MockChatView) UpdateMessage(msg *ui.ChatMessageUI) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -58,7 +58,7 @@ func (m *MockChatView) UpdateMessage(msg *ui.ChatMessage) error {
 }
 
 // UpdateTool updates an existing tool in the view.
-func (m *MockChatView) UpdateTool(tool *ui.ToolState) error {
+func (m *MockChatView) UpdateTool(tool *ui.ToolUI) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -106,8 +106,8 @@ type MockChatPresenter struct {
 
 	// Recorded calls
 	SetViewCalls         []ui.ChatView
-	SendUserMessageCalls []*ui.ChatMessage
-	SaveUserMessageCalls []*ui.ChatMessage
+	SendUserMessageCalls []*ui.ChatMessageUI
+	SaveUserMessageCalls []*ui.ChatMessageUI
 	PauseCalls           int
 	ResumeCalls          int
 }
@@ -127,7 +127,7 @@ func (m *MockChatPresenter) SetView(view ui.ChatView) error {
 }
 
 // SendUserMessage sends a user message to the chat session and starts processing.
-func (m *MockChatPresenter) SendUserMessage(message *ui.ChatMessage) error {
+func (m *MockChatPresenter) SendUserMessage(message *ui.ChatMessageUI) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -136,7 +136,7 @@ func (m *MockChatPresenter) SendUserMessage(message *ui.ChatMessage) error {
 }
 
 // SaveUserMessage saves a user message to the chat session but doesn't start processing.
-func (m *MockChatPresenter) SaveUserMessage(message *ui.ChatMessage) error {
+func (m *MockChatPresenter) SaveUserMessage(message *ui.ChatMessageUI) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
