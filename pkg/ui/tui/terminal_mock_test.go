@@ -11,9 +11,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Terminal is a mock terminal that implements io.Reader and io.Writer
+// TerminalMock is a mock terminal that implements io.Reader and io.Writer
 // for testing TUI applications with bubbletea.
-type Terminal struct {
+type TerminalMock struct {
 	// inputBuffer holds the input data to be read
 	inputBuffer *bytes.Buffer
 
@@ -32,9 +32,9 @@ type Terminal struct {
 	program *tea.Program
 }
 
-// NewTerminal creates a new mock terminal.
-func NewTerminal() *Terminal {
-	t := &Terminal{
+// NewTerminalMock creates a new mock terminal.
+func NewTerminalMock() *TerminalMock {
+	t := &TerminalMock{
 		inputBuffer:  &bytes.Buffer{},
 		outputChunks: make([][]byte, 0),
 	}
@@ -42,7 +42,7 @@ func NewTerminal() *Terminal {
 	return t
 }
 
-func (t *Terminal) Run(model tea.Model) *tea.Program {
+func (t *TerminalMock) Run(model tea.Model) *tea.Program {
 	t.program = tea.NewProgram(
 		model,
 		tea.WithInput(t),
@@ -58,14 +58,14 @@ func (t *Terminal) Run(model tea.Model) *tea.Program {
 }
 
 // Send sends a message to the bubbletea program.
-func (t *Terminal) Send(msg tea.Msg) {
+func (t *TerminalMock) Send(msg tea.Msg) {
 	if t.program != nil {
 		t.program.Send(msg)
 	}
 }
 
 // Read implements io.Reader. It reads from the input buffer.
-func (t *Terminal) Read(p []byte) (n int, err error) {
+func (t *TerminalMock) Read(p []byte) (n int, err error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -83,7 +83,7 @@ func (t *Terminal) Read(p []byte) (n int, err error) {
 }
 
 // Write implements io.Writer. It records output in chunks.
-func (t *Terminal) Write(p []byte) (n int, err error) {
+func (t *TerminalMock) Write(p []byte) (n int, err error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -96,7 +96,7 @@ func (t *Terminal) Write(p []byte) (n int, err error) {
 }
 
 // SendInput sends input data to the terminal.
-func (t *Terminal) SendInput(data []byte) {
+func (t *TerminalMock) SendInput(data []byte) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -105,13 +105,13 @@ func (t *Terminal) SendInput(data []byte) {
 }
 
 // SendString sends a string input to the terminal.
-func (t *Terminal) SendString(s string) {
+func (t *TerminalMock) SendString(s string) {
 	t.SendInput([]byte(s))
 }
 
 // SendKey sends a special key to the terminal.
 // Supported keys: "enter", "ctrl+c", "alt+enter", "esc", etc.
-func (t *Terminal) SendKey(key string) {
+func (t *TerminalMock) SendKey(key string) {
 	var seq []byte
 
 	switch key {
@@ -147,7 +147,7 @@ func (t *Terminal) SendKey(key string) {
 }
 
 // GetOutput returns all output as a single string.
-func (t *Terminal) GetOutput() string {
+func (t *TerminalMock) GetOutput() string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -159,7 +159,7 @@ func (t *Terminal) GetOutput() string {
 }
 
 // GetOutputChunks returns all output chunks.
-func (t *Terminal) GetOutputChunks() [][]byte {
+func (t *TerminalMock) GetOutputChunks() [][]byte {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -173,14 +173,14 @@ func (t *Terminal) GetOutputChunks() [][]byte {
 }
 
 // ContainsText searches for specific text in the recorded output.
-func (t *Terminal) ContainsText(text string) bool {
+func (t *TerminalMock) ContainsText(text string) bool {
 	output := t.GetOutput()
 	return strings.Contains(output, text)
 }
 
 // WaitForText waits for specific text to appear in the output with a timeout.
 // Returns true if the text was found, false if the timeout was reached.
-func (t *Terminal) WaitForText(text string, timeout time.Duration) bool {
+func (t *TerminalMock) WaitForText(text string, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 
 	for {
@@ -199,7 +199,7 @@ func (t *Terminal) WaitForText(text string, timeout time.Duration) bool {
 
 // WaitForTextWithRetry waits for specific text to appear in the output with a timeout,
 // checking every checkInterval.
-func (t *Terminal) WaitForTextWithRetry(text string, timeout, checkInterval time.Duration) bool {
+func (t *TerminalMock) WaitForTextWithRetry(text string, timeout, checkInterval time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 
 	for {
@@ -217,14 +217,14 @@ func (t *Terminal) WaitForTextWithRetry(text string, timeout, checkInterval time
 
 // GetOutputSince returns output written since the given time.
 // This is useful for checking output generated after a specific action.
-func (t *Terminal) GetOutputSince(since time.Time) string {
+func (t *TerminalMock) GetOutputSince(since time.Time) string {
 	// For simplicity, this implementation returns all output
 	// A more sophisticated implementation could track timestamps per chunk
 	return t.GetOutput()
 }
 
 // Clear clears all recorded output.
-func (t *Terminal) Clear() {
+func (t *TerminalMock) Clear() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -232,7 +232,7 @@ func (t *Terminal) Clear() {
 }
 
 // ClearInput clears the input buffer.
-func (t *Terminal) ClearInput() {
+func (t *TerminalMock) ClearInput() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -240,14 +240,14 @@ func (t *Terminal) ClearInput() {
 }
 
 // Reset clears both input and output.
-func (t *Terminal) Reset() {
+func (t *TerminalMock) Reset() {
 	t.Clear()
 	t.ClearInput()
 }
 
 // Close closes the terminal, causing Read() to return EOF.
 // This is useful for cleanly shutting down bubbletea programs.
-func (t *Terminal) Close() {
+func (t *TerminalMock) Close() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -256,14 +256,14 @@ func (t *Terminal) Close() {
 }
 
 // String returns a string representation of the terminal state (for debugging).
-func (t *Terminal) String() string {
+func (t *TerminalMock) String() string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	return fmt.Sprintf("Terminal{input: %d bytes, output: %d chunks}",
+	return fmt.Sprintf("TerminalMock{input: %d bytes, output: %d chunks}",
 		t.inputBuffer.Len(), len(t.outputChunks))
 }
 
-// Ensure Terminal implements io.Reader and io.Writer
-var _ io.Reader = (*Terminal)(nil)
-var _ io.Writer = (*Terminal)(nil)
+// Ensure TerminalMock implements io.Reader and io.Writer
+var _ io.Reader = (*TerminalMock)(nil)
+var _ io.Writer = (*TerminalMock)(nil)

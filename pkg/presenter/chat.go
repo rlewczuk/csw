@@ -320,8 +320,9 @@ func (p *ChatPresenter) convertMessage(msg *models.ChatMessage) *ui.ChatMessage 
 }
 
 // generateMessageID generates a unique message ID.
+// TODO use uuid instead
 func generateMessageID(counter int) string {
-	return string(rune('0' + counter%10)) + "-msg-" + string(rune('a'+counter/10%26))
+	return string(rune('0'+counter%10)) + "-msg-" + string(rune('a'+counter/10%26))
 }
 
 // formatToolArguments formats tool arguments for display.

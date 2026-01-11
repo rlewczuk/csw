@@ -24,7 +24,7 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := NewTerminal()
+		term := NewTerminalMock()
 
 		term.Run(widget)
 
@@ -49,7 +49,7 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := NewTerminal()
+		term := NewTerminalMock()
 
 		term.Run(widget)
 
@@ -80,7 +80,7 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := NewTerminal()
+		term := NewTerminalMock()
 
 		term.Run(widget)
 
@@ -111,7 +111,7 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := NewTerminal()
+		term := NewTerminalMock()
 
 		term.Run(widget)
 
@@ -146,7 +146,7 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := NewTerminal()
+		term := NewTerminalMock()
 
 		term.Run(widget)
 
@@ -189,7 +189,7 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := NewTerminal()
+		term := NewTerminalMock()
 
 		// Run program and capture when it exits
 		done := make(chan struct{})
@@ -223,7 +223,7 @@ func TestChatWidget(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create mock terminal
-		term := NewTerminal()
+		term := NewTerminalMock()
 
 		term.Run(widget)
 

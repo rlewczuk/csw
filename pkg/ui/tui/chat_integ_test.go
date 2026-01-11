@@ -52,7 +52,7 @@ func TestChatWidgetWithFullController(t *testing.T) {
 		)
 
 		// Create mock terminal
-		term := NewTerminal()
+		term := NewTerminalMock()
 
 		term.Run(widget)
 
@@ -118,7 +118,7 @@ func TestChatWidgetWithFullController(t *testing.T) {
 		)
 
 		// Create mock terminal
-		term := NewTerminal()
+		term := NewTerminalMock()
 
 		term.Run(widget)
 
@@ -198,7 +198,7 @@ func TestChatWidgetWithFullController(t *testing.T) {
 		)
 
 		// Create mock terminal
-		term := NewTerminal()
+		term := NewTerminalMock()
 
 		// Run the widget in the terminal
 		term.Run(widget)
