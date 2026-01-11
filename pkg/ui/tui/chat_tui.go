@@ -175,10 +175,7 @@ func (m *tuiChatViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "alt+enter":
 			input := m.textarea.Value()
 			if input != "" {
-				m.addUserMessage(input)
 				m.textarea.Reset()
-				m.updateViewportContent()
-				m.viewport.GotoBottom()
 
 				message := &ui.ChatMessageUI{
 					Id:   "",

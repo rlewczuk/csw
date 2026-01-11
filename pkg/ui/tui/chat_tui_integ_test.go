@@ -321,4 +321,80 @@ func TestTuiChatViewWithPresenter(t *testing.T) {
 		term.SendKey("esc")
 		term.Close()
 	})
+
+	t.Run("user message should not be duplicated", func(t *testing.T) {
+		// Setup mock LLM server
+		mockServer := testutil.NewMockHTTPServer()
+		defer mockServer.Close()
+
+		client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+		require.NoError(t, err)
+
+		vfsInstance := vfs.NewMockVFS()
+		tools := tool.NewToolRegistry()
+		tool.RegisterVFSTools(tools, vfsInstance)
+
+		system := &core.SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"ollama": client},
+			SystemPrompt:   "You are a helpful assistant.",
+			Tools:          tools,
+			VFS:            vfsInstance,
+		}
+
+		// Create session thread
+		thread := core.NewSessionThread(system, nil)
+		err = thread.StartSession("ollama/test-model:latest")
+		require.NoError(t, err)
+
+		// Create presenter
+		chatPresenter := presenter.NewChatPresenter(system, thread)
+
+		// Create TUI chat view
+		tuiView, err := NewTuiChatView(chatPresenter)
+		require.NoError(t, err)
+
+		// Connect presenter to view
+		err = chatPresenter.SetView(tuiView)
+		require.NoError(t, err)
+
+		// Setup LLM response
+		mockServer.AddStreamingResponse("/api/chat", "POST", true,
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Response received"},"done":true,"done_reason":"stop"}`,
+		)
+
+		// Create mock terminal
+		term := NewTerminalMock()
+
+		term.Run(tuiView.Model())
+
+		// Wait for welcome message
+		assert.True(t, term.WaitForText("Welcome!", 2*time.Second), "Should show welcome message")
+
+		// Type a unique message via mock terminal
+		uniqueUserMessage := "This is my unique test message"
+		term.SendString(uniqueUserMessage)
+
+		// Send Alt+Enter to submit
+		term.SendKey("alt+enter")
+
+		// Wait for user message to appear in view
+		assert.True(t, term.WaitForText(uniqueUserMessage, 2*time.Second), "Should show user message in view")
+
+		// Wait for assistant response to appear (ensures processing is complete)
+		assert.True(t, term.WaitForText("Response received", 5*time.Second), "Should show assistant response")
+
+		// Give it a moment to ensure all rendering is complete
+		time.Sleep(100 * time.Millisecond)
+
+		// Get the output and count occurrences of the user message
+		output := term.GetOutput()
+		count := strings.Count(output, uniqueUserMessage)
+
+		// The message should appear exactly once in the view
+		assert.Equal(t, 1, count, "User message should appear exactly once, but appeared %d times", count)
+
+		// Cleanup
+		term.SendKey("esc")
+		term.Close()
+	})
 }
