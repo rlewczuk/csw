@@ -66,12 +66,26 @@ type SessionThread struct {
 	cancelFunc       context.CancelFunc
 	inputQueue       []string
 	interruptPending bool
+	paused           bool
 }
 
 // NewSessionThread creates a new SessionThread with the given system and output handler.
 func NewSessionThread(system *SweSystem, outputHandler SessionThreadOutput) *SessionThread {
 	return &SessionThread{
 		system:        system,
+		outputHandler: outputHandler,
+		inputQueue:    make([]string, 0),
+	}
+}
+
+// NewSessionThreadWithSession creates a new SessionThread with an existing session.
+// This allows creating a new thread/presenter while preserving session state and messages.
+func NewSessionThreadWithSession(system *SweSystem, session *SweSession, outputHandler SessionThreadOutput) *SessionThread {
+	// Update the session's output handler to the new one
+	session.outputHandler = outputHandler
+	return &SessionThread{
+		system:        system,
+		session:       session,
 		outputHandler: outputHandler,
 		inputQueue:    make([]string, 0),
 	}
@@ -122,6 +136,73 @@ func (c *SessionThread) Interrupt() error {
 	}
 
 	return nil
+}
+
+// AddPrompt adds a user prompt to the session without starting processing.
+// This method is non-blocking and thread-safe.
+// Use Resume() to start processing the queued prompts.
+func (c *SessionThread) AddPrompt(input string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.session == nil {
+		return fmt.Errorf("session not initialized, call StartSession first")
+	}
+
+	// Add to input queue
+	c.inputQueue = append(c.inputQueue, input)
+
+	return nil
+}
+
+// Pause stops the current session processing without signaling an error.
+// The queue is preserved and can be resumed with Resume().
+// This method is non-blocking and thread-safe.
+func (c *SessionThread) Pause() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.paused = true
+
+	if c.sessionRunning && c.cancelFunc != nil {
+		c.cancelFunc()
+	}
+
+	return nil
+}
+
+// Resume starts processing the queued prompts if not already running.
+// This method is non-blocking and thread-safe.
+func (c *SessionThread) Resume() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.session == nil {
+		return fmt.Errorf("session not initialized, call StartSession first")
+	}
+
+	c.paused = false
+
+	// Start processing if not already running and there are items in the queue
+	if !c.sessionRunning && len(c.inputQueue) > 0 {
+		c.startSessionLocked()
+	}
+
+	return nil
+}
+
+// IsPaused returns true if the session is paused.
+func (c *SessionThread) IsPaused() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.paused
+}
+
+// IsRunning returns true if the session loop is currently running.
+func (c *SessionThread) IsRunning() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.sessionRunning
 }
 
 // SetOutputHandler sets the output handler for the controller.
@@ -191,6 +272,13 @@ func (c *SessionThread) runSessionLoop() {
 			return
 		}
 
+		// Check if paused
+		if c.paused {
+			c.mu.Unlock()
+			c.outputHandler.RunFinished(nil)
+			return
+		}
+
 		input := c.inputQueue[0]
 		c.inputQueue = c.inputQueue[1:]
 		c.interruptPending = false
@@ -206,10 +294,17 @@ func (c *SessionThread) runSessionLoop() {
 		// Run the session
 		err = c.session.Run(ctx)
 
-		// Check if we were interrupted
+		// Check if we were interrupted or paused
 		c.mu.Lock()
 		wasInterrupted := c.interruptPending
+		wasPaused := c.paused
 		c.mu.Unlock()
+
+		if wasPaused {
+			// Paused cleanly, no error
+			c.outputHandler.RunFinished(nil)
+			return
+		}
 
 		if wasInterrupted {
 			c.outputHandler.RunFinished(fmt.Errorf("interrupted"))
@@ -224,6 +319,7 @@ func (c *SessionThread) runSessionLoop() {
 }
 
 type SweSession struct {
+	id            string
 	system        *SweSystem
 	provider      models.ModelProvider
 	model         string
@@ -315,6 +411,16 @@ func (s *SweSession) Run(ctx context.Context) error {
 
 func (s *SweSession) ChatMessages() []*models.ChatMessage {
 	return s.messages
+}
+
+// ID returns the unique identifier for this session.
+func (s *SweSession) ID() string {
+	return s.id
+}
+
+// Model returns the model name (without provider prefix) used for this session.
+func (s *SweSession) Model() string {
+	return s.model
 }
 
 // GetState returns the current agent state for this session.

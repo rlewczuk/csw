@@ -1,12 +1,21 @@
 package core
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
+
+// generateSessionID generates a unique session ID.
+func generateSessionID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
 
 // SweSystem represents the core system for managing conversations, tools, and models.
 type SweSystem struct {
@@ -48,6 +57,7 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 	}
 
 	session := &SweSession{
+		id:            generateSessionID(),
 		system:        s,
 		provider:      provider,
 		model:         modelName,
