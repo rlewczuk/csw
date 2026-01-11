@@ -36,7 +36,7 @@ func TestChatWidgetWithFullController(t *testing.T) {
 		}
 
 		// Create chat widget
-		controller := core.NewSessionController(system, nil)
+		controller := core.NewSessionThread(system, nil)
 		err = controller.StartSession("ollama/test-model:latest")
 		require.NoError(t, err)
 
@@ -119,7 +119,7 @@ func TestChatWidgetWithFullController(t *testing.T) {
 		}
 
 		// Create chat widget
-		controller := core.NewSessionController(system, nil)
+		controller := core.NewSessionThread(system, nil)
 		err = controller.StartSession("ollama/test-model:latest")
 		require.NoError(t, err)
 
@@ -203,7 +203,7 @@ func TestChatWidgetWithFullController(t *testing.T) {
 		}
 
 		// Create chat widget
-		controller := core.NewSessionController(system, nil)
+		controller := core.NewSessionThread(system, nil)
 		err = controller.StartSession("ollama/test-model:latest")
 		require.NoError(t, err)
 

@@ -146,7 +146,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}()
 
 	// Create session controller without output handler initially
-	controller := core.NewSessionController(sweSystem, nil)
+	controller := core.NewSessionThread(sweSystem, nil)
 
 	// Create chat widget with the controller
 	// ChatWidget implements ui.SessionThreadOutput interface

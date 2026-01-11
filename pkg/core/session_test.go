@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSessionController(t *testing.T) {
+func TestSessionThread(t *testing.T) {
 	mockServer := testutil.NewMockHTTPServer()
 	defer mockServer.Close()
 	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
@@ -30,7 +30,7 @@ func TestSessionController(t *testing.T) {
 
 	t.Run("basic initialization and session management", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
-		controller := NewSessionController(system, mockHandler)
+		controller := NewSessionThread(system, mockHandler)
 
 		// Initially no session
 		assert.Nil(t, controller.GetSession())
@@ -45,7 +45,7 @@ func TestSessionController(t *testing.T) {
 
 	t.Run("cannot start session twice", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
-		controller := NewSessionController(system, mockHandler)
+		controller := NewSessionThread(system, mockHandler)
 
 		err := controller.StartSession("ollama/devstral-small-2:latest")
 		require.NoError(t, err)
@@ -58,7 +58,7 @@ func TestSessionController(t *testing.T) {
 
 	t.Run("full conversation with tool calls", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
-		controller := NewSessionController(system, mockHandler)
+		controller := NewSessionThread(system, mockHandler)
 
 		err := controller.StartSession("ollama/devstral-small-2:latest")
 		require.NoError(t, err)
@@ -144,7 +144,7 @@ func TestSessionController(t *testing.T) {
 
 	t.Run("multiple prompts in queue", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
-		controller := NewSessionController(system, mockHandler)
+		controller := NewSessionThread(system, mockHandler)
 
 		err := controller.StartSession("ollama/devstral-small-2:latest")
 		require.NoError(t, err)
@@ -203,7 +203,7 @@ func TestSessionController(t *testing.T) {
 
 	t.Run("error when prompting without session", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
-		controller := NewSessionController(system, mockHandler)
+		controller := NewSessionThread(system, mockHandler)
 
 		// Try to send prompt without starting session
 		err := controller.UserPrompt("Test prompt")
@@ -213,7 +213,7 @@ func TestSessionController(t *testing.T) {
 
 	t.Run("error when interrupting without running session", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
-		controller := NewSessionController(system, mockHandler)
+		controller := NewSessionThread(system, mockHandler)
 
 		// Try to interrupt without a running session
 		err := controller.Interrupt()
@@ -222,7 +222,7 @@ func TestSessionController(t *testing.T) {
 	})
 }
 
-func TestSessionControllerThreadSafety(t *testing.T) {
+func TestSessionThreadSafety(t *testing.T) {
 	mockServer := testutil.NewMockHTTPServer()
 	defer mockServer.Close()
 	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
@@ -241,7 +241,7 @@ func TestSessionControllerThreadSafety(t *testing.T) {
 
 	t.Run("concurrent GetSession calls", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
-		controller := NewSessionController(system, mockHandler)
+		controller := NewSessionThread(system, mockHandler)
 
 		err := controller.StartSession("ollama/devstral-small-2:latest")
 		require.NoError(t, err)
@@ -264,7 +264,7 @@ func TestSessionControllerThreadSafety(t *testing.T) {
 
 	t.Run("concurrent UserPrompt calls with single session", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
-		controller := NewSessionController(system, mockHandler)
+		controller := NewSessionThread(system, mockHandler)
 
 		err := controller.StartSession("ollama/devstral-small-2:latest")
 		require.NoError(t, err)

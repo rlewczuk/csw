@@ -17,7 +17,7 @@ func TestChatWidget(t *testing.T) {
 		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller (we won't start a real session)
-		controller := core.NewSessionController(nil, outputHandler)
+		controller := core.NewSessionThread(nil, outputHandler)
 
 		// Create chat widget
 		widget, err := NewChatWidget(controller)
@@ -42,7 +42,7 @@ func TestChatWidget(t *testing.T) {
 		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller
-		controller := core.NewSessionController(nil, outputHandler)
+		controller := core.NewSessionThread(nil, outputHandler)
 
 		// Create chat widget
 		widget, err := NewChatWidget(controller)
@@ -73,7 +73,7 @@ func TestChatWidget(t *testing.T) {
 		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller
-		controller := core.NewSessionController(nil, outputHandler)
+		controller := core.NewSessionThread(nil, outputHandler)
 
 		// Create chat widget
 		widget, err := NewChatWidget(controller)
@@ -104,7 +104,7 @@ func TestChatWidget(t *testing.T) {
 		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller
-		controller := core.NewSessionController(nil, outputHandler)
+		controller := core.NewSessionThread(nil, outputHandler)
 
 		// Create chat widget
 		widget, err := NewChatWidget(controller)
@@ -139,7 +139,7 @@ func TestChatWidget(t *testing.T) {
 		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller
-		controller := core.NewSessionController(nil, outputHandler)
+		controller := core.NewSessionThread(nil, outputHandler)
 
 		// Create chat widget
 		widget, err := NewChatWidget(controller)
@@ -182,7 +182,7 @@ func TestChatWidget(t *testing.T) {
 		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller
-		controller := core.NewSessionController(nil, outputHandler)
+		controller := core.NewSessionThread(nil, outputHandler)
 
 		// Create chat widget
 		widget, err := NewChatWidget(controller)
@@ -216,7 +216,7 @@ func TestChatWidget(t *testing.T) {
 		outputHandler := testutil.NewMockSessionOutputHandler()
 
 		// Create a minimal controller
-		controller := core.NewSessionController(nil, outputHandler)
+		controller := core.NewSessionThread(nil, outputHandler)
 
 		// Create chat widget
 		widget, err := NewChatWidget(controller)
