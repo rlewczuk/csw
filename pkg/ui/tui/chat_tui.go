@@ -13,6 +13,11 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/ui"
 )
 
+const (
+	defaultWidth  = 80
+	defaultHeight = 24
+)
+
 type tuiChatMessage struct {
 	role      string
 	content   string
