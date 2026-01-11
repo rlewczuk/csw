@@ -110,26 +110,86 @@ func (t *TerminalMock) SendString(s string) {
 }
 
 // SendKey sends a special key to the terminal.
-// Supported keys: "enter", "ctrl+c", "alt+enter", "esc", etc.
+// Supports all keys recognized by bubbletea, including control keys,
+// arrow keys with modifiers, navigation keys, and function keys.
+// Examples: "enter", "ctrl+c", "alt+enter", "esc", "shift+tab", "f1", etc.
 func (t *TerminalMock) SendKey(key string) {
 	var seq []byte
 
 	switch key {
-	case "enter":
-		seq = []byte{'\r'}
+	// Control keys
+	case "ctrl+@":
+		seq = []byte{0x00}
+	case "ctrl+a":
+		seq = []byte{0x01}
+	case "ctrl+b":
+		seq = []byte{0x02}
 	case "ctrl+c":
-		seq = []byte{0x03} // ETX
+		seq = []byte{0x03}
 	case "ctrl+d":
-		seq = []byte{0x04} // EOT
-	case "esc":
+		seq = []byte{0x04}
+	case "ctrl+e":
+		seq = []byte{0x05}
+	case "ctrl+f":
+		seq = []byte{0x06}
+	case "ctrl+g":
+		seq = []byte{0x07}
+	case "ctrl+h":
+		seq = []byte{0x08}
+	case "ctrl+i", "tab":
+		seq = []byte{0x09}
+	case "ctrl+j":
+		seq = []byte{0x0a}
+	case "ctrl+k":
+		seq = []byte{0x0b}
+	case "ctrl+l":
+		seq = []byte{0x0c}
+	case "ctrl+m", "enter":
+		seq = []byte{0x0d}
+	case "ctrl+n":
+		seq = []byte{0x0e}
+	case "ctrl+o":
+		seq = []byte{0x0f}
+	case "ctrl+p":
+		seq = []byte{0x10}
+	case "ctrl+q":
+		seq = []byte{0x11}
+	case "ctrl+r":
+		seq = []byte{0x12}
+	case "ctrl+s":
+		seq = []byte{0x13}
+	case "ctrl+t":
+		seq = []byte{0x14}
+	case "ctrl+u":
+		seq = []byte{0x15}
+	case "ctrl+v":
+		seq = []byte{0x16}
+	case "ctrl+w":
+		seq = []byte{0x17}
+	case "ctrl+x":
+		seq = []byte{0x18}
+	case "ctrl+y":
+		seq = []byte{0x19}
+	case "ctrl+z":
+		seq = []byte{0x1a}
+	case "ctrl+[", "esc":
 		seq = []byte{0x1b}
-	case "alt+enter":
-		// Alt+Enter is typically ESC followed by Enter
-		seq = []byte{0x1b, '\r'}
-	case "backspace":
+	case "ctrl+\\":
+		seq = []byte{0x1c}
+	case "ctrl+]":
+		seq = []byte{0x1d}
+	case "ctrl+^":
+		seq = []byte{0x1e}
+	case "ctrl+_":
+		seq = []byte{0x1f}
+	case "ctrl+?", "backspace":
 		seq = []byte{0x7f}
-	case "tab":
-		seq = []byte{'\t'}
+
+	// Special keys
+	case " ":
+		seq = []byte{' '}
+
+	// Arrow keys
 	case "up":
 		seq = []byte{0x1b, '[', 'A'}
 	case "down":
@@ -138,9 +198,194 @@ func (t *TerminalMock) SendKey(key string) {
 		seq = []byte{0x1b, '[', 'C'}
 	case "left":
 		seq = []byte{0x1b, '[', 'D'}
+
+	// Shift + Arrow keys
+	case "shift+up":
+		seq = []byte{0x1b, '[', '1', ';', '2', 'A'}
+	case "shift+down":
+		seq = []byte{0x1b, '[', '1', ';', '2', 'B'}
+	case "shift+right":
+		seq = []byte{0x1b, '[', '1', ';', '2', 'C'}
+	case "shift+left":
+		seq = []byte{0x1b, '[', '1', ';', '2', 'D'}
+
+	// Ctrl + Arrow keys
+	case "ctrl+up":
+		seq = []byte{0x1b, '[', '1', ';', '5', 'A'}
+	case "ctrl+down":
+		seq = []byte{0x1b, '[', '1', ';', '5', 'B'}
+	case "ctrl+right":
+		seq = []byte{0x1b, '[', '1', ';', '5', 'C'}
+	case "ctrl+left":
+		seq = []byte{0x1b, '[', '1', ';', '5', 'D'}
+
+	// Ctrl + Shift + Arrow keys
+	case "ctrl+shift+up":
+		seq = []byte{0x1b, '[', '1', ';', '6', 'A'}
+	case "ctrl+shift+down":
+		seq = []byte{0x1b, '[', '1', ';', '6', 'B'}
+	case "ctrl+shift+right":
+		seq = []byte{0x1b, '[', '1', ';', '6', 'C'}
+	case "ctrl+shift+left":
+		seq = []byte{0x1b, '[', '1', ';', '6', 'D'}
+
+	// Alt + Arrow keys
+	case "alt+up":
+		seq = []byte{0x1b, '[', '1', ';', '3', 'A'}
+	case "alt+down":
+		seq = []byte{0x1b, '[', '1', ';', '3', 'B'}
+	case "alt+right":
+		seq = []byte{0x1b, '[', '1', ';', '3', 'C'}
+	case "alt+left":
+		seq = []byte{0x1b, '[', '1', ';', '3', 'D'}
+
+	// Navigation keys
+	case "home":
+		seq = []byte{0x1b, '[', 'H'}
+	case "end":
+		seq = []byte{0x1b, '[', 'F'}
+	case "pgup":
+		seq = []byte{0x1b, '[', '5', '~'}
+	case "pgdown":
+		seq = []byte{0x1b, '[', '6', '~'}
+	case "insert":
+		seq = []byte{0x1b, '[', '2', '~'}
+	case "delete":
+		seq = []byte{0x1b, '[', '3', '~'}
+
+	// Ctrl + Navigation keys
+	case "ctrl+home":
+		seq = []byte{0x1b, '[', '1', ';', '5', 'H'}
+	case "ctrl+end":
+		seq = []byte{0x1b, '[', '1', ';', '5', 'F'}
+	case "ctrl+pgup":
+		seq = []byte{0x1b, '[', '5', ';', '5', '~'}
+	case "ctrl+pgdown":
+		seq = []byte{0x1b, '[', '6', ';', '5', '~'}
+
+	// Shift + Navigation keys
+	case "shift+home":
+		seq = []byte{0x1b, '[', '1', ';', '2', 'H'}
+	case "shift+end":
+		seq = []byte{0x1b, '[', '1', ';', '2', 'F'}
+	case "shift+tab":
+		seq = []byte{0x1b, '[', 'Z'}
+
+	// Ctrl + Shift + Navigation keys
+	case "ctrl+shift+home":
+		seq = []byte{0x1b, '[', '1', ';', '6', 'H'}
+	case "ctrl+shift+end":
+		seq = []byte{0x1b, '[', '1', ';', '6', 'F'}
+
+	// Alt + Navigation keys
+	case "alt+home":
+		seq = []byte{0x1b, '[', '1', ';', '3', 'H'}
+	case "alt+end":
+		seq = []byte{0x1b, '[', '1', ';', '3', 'F'}
+	case "alt+pgup":
+		seq = []byte{0x1b, '[', '5', ';', '3', '~'}
+	case "alt+pgdown":
+		seq = []byte{0x1b, '[', '6', ';', '3', '~'}
+	case "alt+delete":
+		seq = []byte{0x1b, '[', '3', ';', '3', '~'}
+	case "alt+insert":
+		seq = []byte{0x1b, '[', '3', ';', '2', '~'}
+
+	// Function keys F1-F4 (vt100/xterm)
+	case "f1":
+		seq = []byte{0x1b, 'O', 'P'}
+	case "f2":
+		seq = []byte{0x1b, 'O', 'Q'}
+	case "f3":
+		seq = []byte{0x1b, 'O', 'R'}
+	case "f4":
+		seq = []byte{0x1b, 'O', 'S'}
+
+	// Function keys F5-F12
+	case "f5":
+		seq = []byte{0x1b, '[', '1', '5', '~'}
+	case "f6":
+		seq = []byte{0x1b, '[', '1', '7', '~'}
+	case "f7":
+		seq = []byte{0x1b, '[', '1', '8', '~'}
+	case "f8":
+		seq = []byte{0x1b, '[', '1', '9', '~'}
+	case "f9":
+		seq = []byte{0x1b, '[', '2', '0', '~'}
+	case "f10":
+		seq = []byte{0x1b, '[', '2', '1', '~'}
+	case "f11":
+		seq = []byte{0x1b, '[', '2', '3', '~'}
+	case "f12":
+		seq = []byte{0x1b, '[', '2', '4', '~'}
+
+	// Function keys F13-F20
+	case "f13":
+		seq = []byte{0x1b, '[', '1', ';', '2', 'P'}
+	case "f14":
+		seq = []byte{0x1b, '[', '1', ';', '2', 'Q'}
+	case "f15":
+		seq = []byte{0x1b, '[', '1', ';', '2', 'R'}
+	case "f16":
+		seq = []byte{0x1b, '[', '1', ';', '2', 'S'}
+	case "f17":
+		seq = []byte{0x1b, '[', '1', '5', ';', '2', '~'}
+	case "f18":
+		seq = []byte{0x1b, '[', '1', '7', ';', '2', '~'}
+	case "f19":
+		seq = []byte{0x1b, '[', '1', '8', ';', '2', '~'}
+	case "f20":
+		seq = []byte{0x1b, '[', '1', '9', ';', '2', '~'}
+
+	// Alt + Function keys F1-F4
+	case "alt+f1":
+		seq = []byte{0x1b, '[', '1', ';', '3', 'P'}
+	case "alt+f2":
+		seq = []byte{0x1b, '[', '1', ';', '3', 'Q'}
+	case "alt+f3":
+		seq = []byte{0x1b, '[', '1', ';', '3', 'R'}
+	case "alt+f4":
+		seq = []byte{0x1b, '[', '1', ';', '3', 'S'}
+
+	// Alt + Function keys F5-F16
+	case "alt+f5":
+		seq = []byte{0x1b, '[', '1', '5', ';', '3', '~'}
+	case "alt+f6":
+		seq = []byte{0x1b, '[', '1', '7', ';', '3', '~'}
+	case "alt+f7":
+		seq = []byte{0x1b, '[', '1', '8', ';', '3', '~'}
+	case "alt+f8":
+		seq = []byte{0x1b, '[', '1', '9', ';', '3', '~'}
+	case "alt+f9":
+		seq = []byte{0x1b, '[', '2', '0', ';', '3', '~'}
+	case "alt+f10":
+		seq = []byte{0x1b, '[', '2', '1', ';', '3', '~'}
+	case "alt+f11":
+		seq = []byte{0x1b, '[', '2', '3', ';', '3', '~'}
+	case "alt+f12":
+		seq = []byte{0x1b, '[', '2', '4', ';', '3', '~'}
+	case "alt+f13":
+		seq = []byte{0x1b, '[', '2', '5', ';', '3', '~'}
+	case "alt+f14":
+		seq = []byte{0x1b, '[', '2', '6', ';', '3', '~'}
+	case "alt+f15":
+		seq = []byte{0x1b, '[', '2', '8', ';', '3', '~'}
+	case "alt+f16":
+		seq = []byte{0x1b, '[', '2', '9', ';', '3', '~'}
+
+	// Alt + Enter (commonly used)
+	case "alt+enter":
+		seq = []byte{0x1b, '\r'}
+
 	default:
-		// Unknown key, just send the string
-		seq = []byte(key)
+		// For alt+<char> patterns, send ESC followed by the character
+		if strings.HasPrefix(key, "alt+") && len(key) == 5 {
+			char := key[4]
+			seq = []byte{0x1b, char}
+		} else {
+			// Unknown key, just send the string as-is
+			seq = []byte(key)
+		}
 	}
 
 	t.SendInput(seq)
