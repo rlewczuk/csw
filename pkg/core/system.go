@@ -1,21 +1,14 @@
 package core
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
+	"sync"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
-
-// generateSessionID generates a unique session ID.
-func generateSessionID() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return hex.EncodeToString(b)
-}
 
 // SweSystem represents the core system for managing conversations, tools, and models.
 type SweSystem struct {
@@ -34,6 +27,15 @@ type SweSystem struct {
 
 	// Roles
 	Roles *AgentRoleRegistry
+
+	// Map of sessions by ID
+	sessions map[string]*SweSession
+
+	// Map of session threads by session ID
+	threads map[string]*SessionThread
+
+	// Mutex for thread-safe session access
+	sessionsMu sync.RWMutex
 }
 
 func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) (*SweSession, error) {
@@ -57,7 +59,7 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 	}
 
 	session := &SweSession{
-		id:            generateSessionID(),
+		id:            shared.GenerateUUIDv7(),
 		system:        s,
 		provider:      provider,
 		model:         modelName,
@@ -74,5 +76,83 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		session.messages = append(session.messages, models.NewTextMessage(models.ChatRoleSystem, s.SystemPrompt))
 	}
 
+	// Store session
+	s.sessionsMu.Lock()
+	if s.sessions == nil {
+		s.sessions = make(map[string]*SweSession)
+	}
+	s.sessions[session.id] = session
+	s.sessionsMu.Unlock()
+
 	return session, nil
+}
+
+// GetSession returns the session with the given ID.
+// Returns an error if the session is not found.
+func (s *SweSystem) GetSession(id string) (*SweSession, error) {
+	s.sessionsMu.RLock()
+	defer s.sessionsMu.RUnlock()
+
+	session, ok := s.sessions[id]
+	if !ok {
+		return nil, fmt.Errorf("session not found: %s", id)
+	}
+
+	return session, nil
+}
+
+// GetSessionThread returns the SessionThread for the given session ID.
+// If the thread doesn't exist yet, it creates a new one with the session.
+// Returns an error if the session is not found.
+func (s *SweSystem) GetSessionThread(id string) (*SessionThread, error) {
+	s.sessionsMu.Lock()
+	defer s.sessionsMu.Unlock()
+
+	// Check if session exists
+	session, ok := s.sessions[id]
+	if !ok {
+		return nil, fmt.Errorf("session not found: %s", id)
+	}
+
+	// Check if thread already exists
+	if s.threads == nil {
+		s.threads = make(map[string]*SessionThread)
+	}
+
+	thread, ok := s.threads[id]
+	if !ok {
+		// Create a new thread with the existing session
+		// Use the session's existing output handler
+		thread = NewSessionThreadWithSession(s, session, session.outputHandler)
+		s.threads[id] = thread
+	}
+
+	return thread, nil
+}
+
+// ListSessions returns a list of all active sessions.
+func (s *SweSystem) ListSessions() []*SweSession {
+	s.sessionsMu.RLock()
+	defer s.sessionsMu.RUnlock()
+
+	sessions := make([]*SweSession, 0, len(s.sessions))
+	for _, session := range s.sessions {
+		sessions = append(sessions, session)
+	}
+
+	return sessions
+}
+
+// DeleteSession deletes the session with the given ID.
+// Returns an error if the session is not found.
+func (s *SweSystem) DeleteSession(id string) error {
+	s.sessionsMu.Lock()
+	defer s.sessionsMu.Unlock()
+
+	if _, ok := s.sessions[id]; !ok {
+		return fmt.Errorf("session not found: %s", id)
+	}
+
+	delete(s.sessions, id)
+	return nil
 }
