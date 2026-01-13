@@ -11,18 +11,20 @@ type MockChatView struct {
 	mu sync.RWMutex
 
 	// Configurable errors for each method
-	InitErr          error
-	AddMessageErr    error
-	UpdateMessageErr error
-	UpdateToolErr    error
-	MoveToBottomErr  error
+	InitErr            error
+	AddMessageErr      error
+	UpdateMessageErr   error
+	UpdateToolErr      error
+	MoveToBottomErr    error
+	QueryPermissionErr error
 
 	// Recorded calls
-	InitCalls          []*ui.ChatSessionUI
-	AddMessageCalls    []*ui.ChatMessageUI
-	UpdateMessageCalls []*ui.ChatMessageUI
-	UpdateToolCalls    []*ui.ToolUI
-	MoveToBottomCalls  int
+	InitCalls            []*ui.ChatSessionUI
+	AddMessageCalls      []*ui.ChatMessageUI
+	UpdateMessageCalls   []*ui.ChatMessageUI
+	UpdateToolCalls      []*ui.ToolUI
+	MoveToBottomCalls    int
+	QueryPermissionCalls []*ui.PermissionQueryUI
 }
 
 // NewMockChatView creates a new MockChatView instance.
@@ -75,6 +77,15 @@ func (m *MockChatView) MoveToBottom() error {
 	return m.MoveToBottomErr
 }
 
+// QueryPermission queries user for permission to use a tool.
+func (m *MockChatView) QueryPermission(query *ui.PermissionQueryUI) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.QueryPermissionCalls = append(m.QueryPermissionCalls, query)
+	return m.QueryPermissionErr
+}
+
 // Reset clears all recorded calls and errors.
 func (m *MockChatView) Reset() {
 	m.mu.Lock()
@@ -85,12 +96,14 @@ func (m *MockChatView) Reset() {
 	m.UpdateMessageErr = nil
 	m.UpdateToolErr = nil
 	m.MoveToBottomErr = nil
+	m.QueryPermissionErr = nil
 
 	m.InitCalls = nil
 	m.AddMessageCalls = nil
 	m.UpdateMessageCalls = nil
 	m.UpdateToolCalls = nil
 	m.MoveToBottomCalls = 0
+	m.QueryPermissionCalls = nil
 }
 
 // MockChatPresenter implements ui.IChatPresenter interface for testing purposes.
@@ -98,18 +111,20 @@ type MockChatPresenter struct {
 	mu sync.RWMutex
 
 	// Configurable errors for each method
-	SetViewErr         error
-	SendUserMessageErr error
-	SaveUserMessageErr error
-	PauseErr           error
-	ResumeErr          error
+	SetViewErr            error
+	SendUserMessageErr    error
+	SaveUserMessageErr    error
+	PauseErr              error
+	ResumeErr             error
+	PermissionResponseErr error
 
 	// Recorded calls
-	SetViewCalls         []ui.IChatView
-	SendUserMessageCalls []*ui.ChatMessageUI
-	SaveUserMessageCalls []*ui.ChatMessageUI
-	PauseCalls           int
-	ResumeCalls          int
+	SetViewCalls            []ui.IChatView
+	SendUserMessageCalls    []*ui.ChatMessageUI
+	SaveUserMessageCalls    []*ui.ChatMessageUI
+	PauseCalls              int
+	ResumeCalls             int
+	PermissionResponseCalls []string
 }
 
 // NewMockChatPresenter creates a new MockChatPresenter instance.
@@ -162,6 +177,15 @@ func (m *MockChatPresenter) Resume() error {
 	return m.ResumeErr
 }
 
+// PermissionResponse sends user response to permission query.
+func (m *MockChatPresenter) PermissionResponse(response string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.PermissionResponseCalls = append(m.PermissionResponseCalls, response)
+	return m.PermissionResponseErr
+}
+
 // Reset clears all recorded calls and errors.
 func (m *MockChatPresenter) Reset() {
 	m.mu.Lock()
@@ -172,10 +196,12 @@ func (m *MockChatPresenter) Reset() {
 	m.SaveUserMessageErr = nil
 	m.PauseErr = nil
 	m.ResumeErr = nil
+	m.PermissionResponseErr = nil
 
 	m.SetViewCalls = nil
 	m.SendUserMessageCalls = nil
 	m.SaveUserMessageCalls = nil
 	m.PauseCalls = 0
 	m.ResumeCalls = 0
+	m.PermissionResponseCalls = nil
 }

@@ -105,13 +105,15 @@ func (v *TuiChatView) SetParent(parent ui.CompositeWidget) {
 }
 
 type tuiChatViewModel struct {
-	presenter ui.IChatPresenter
-	viewport  viewport.Model
-	textarea  textarea.Model
-	messages  []*tuiChatMessage
-	width     int
-	height    int
-	err       error
+	presenter         ui.IChatPresenter
+	viewport          viewport.Model
+	textarea          textarea.Model
+	messages          []*tuiChatMessage
+	width             int
+	height            int
+	err               error
+	permissionWidget  *PermissionQueryWidget
+	showingPermission bool
 
 	renderer *glamour.TermRenderer
 
@@ -166,6 +168,14 @@ func (m *tuiChatViewModel) Init() tea.Cmd {
 func (m *tuiChatViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
+	// If permission widget is showing, route messages to it first
+	if m.showingPermission && m.permissionWidget != nil {
+		var cmd tea.Cmd
+		_, cmd = m.permissionWidget.Update(msg)
+		cmds = append(cmds, cmd)
+		return m, tea.Batch(cmds...)
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -216,6 +226,15 @@ func (m *tuiChatViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *tuiChatViewModel) View() string {
+	// If showing permission widget, display it instead of the textarea
+	if m.showingPermission && m.permissionWidget != nil {
+		var view strings.Builder
+		view.WriteString(m.viewport.View())
+		view.WriteString("\n\n")
+		view.WriteString(m.permissionWidget.View())
+		return view.String()
+	}
+
 	var view strings.Builder
 
 	view.WriteString(m.viewport.View())
@@ -313,6 +332,35 @@ func (v *TuiChatView) UpdateTool(tool *ui.ToolUI) error {
 
 func (v *TuiChatView) MoveToBottom() error {
 	v.model.viewport.GotoBottom()
+	return nil
+}
+
+func (v *TuiChatView) QueryPermission(query *ui.PermissionQueryUI) error {
+	v.model.mu.Lock()
+	defer v.model.mu.Unlock()
+
+	// Create callback that will be invoked when user responds
+	callback := func(response string) {
+		if response != "" && v.model.presenter != nil {
+			v.model.presenter.PermissionResponse(response)
+		}
+		v.model.showingPermission = false
+		v.model.permissionWidget = nil
+		v.model.textarea.Focus()
+		if v.parent != nil {
+			v.parent.Notify(ui.CompositeNotificationRefresh)
+		}
+	}
+
+	// Create and show the permission widget
+	v.model.permissionWidget = NewPermissionQueryWidget(query, callback)
+	v.model.permissionWidget.Show()
+	v.model.showingPermission = true
+	v.model.textarea.Blur()
+
+	if v.parent != nil {
+		v.parent.Notify(ui.CompositeNotificationRefresh)
+	}
 	return nil
 }
 
