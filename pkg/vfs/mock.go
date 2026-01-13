@@ -1,6 +1,8 @@
 package vfs
 
 import (
+	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -43,13 +45,13 @@ func NewMockVFSFromDir(dir string) (*MockVFS, error) {
 	info, err := os.Stat(absDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, ErrFileNotFound
+			return nil, fmt.Errorf("NewMockVFSFromDir() [mock.go]: %w", ErrFileNotFound)
 		}
 		return nil, err
 	}
 
 	if !info.IsDir() {
-		return nil, ErrNotADir
+		return nil, fmt.Errorf("NewMockVFSFromDir() [mock.go]: %w", ErrNotADir)
 	}
 
 	mock := NewMockVFS()
@@ -99,7 +101,7 @@ func NewMockVFSFromDir(dir string) (*MockVFS, error) {
 // It returns the cleaned path if valid.
 func (m *MockVFS) validatePath(path string) (string, error) {
 	if path == "" {
-		return "", ErrInvalidPath
+		return "", fmt.Errorf("MockVFS.validatePath() [mock.go]: %w", ErrInvalidPath)
 	}
 
 	// Clean the path to remove any .. or . components
@@ -107,12 +109,12 @@ func (m *MockVFS) validatePath(path string) (string, error) {
 
 	// Prevent absolute paths or paths that try to escape
 	if filepath.IsAbs(cleanPath) {
-		return "", ErrInvalidPath
+		return "", fmt.Errorf("MockVFS.validatePath() [mock.go]: %w", ErrInvalidPath)
 	}
 
 	// Check for path traversal attempts
 	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, string(filepath.Separator)+"..") {
-		return "", ErrPermissionDenied
+		return "", fmt.Errorf("MockVFS.validatePath() [mock.go]: %w", ErrPermissionDenied)
 	}
 
 	return cleanPath, nil
@@ -134,12 +136,12 @@ func (m *MockVFS) getEntry(path string) (*fileEntry, error) {
 		}
 
 		if !current.isDir {
-			return nil, ErrNotADir
+			return nil, fmt.Errorf("MockVFS.getEntry() [mock.go]: %w", ErrNotADir)
 		}
 
 		next, exists := current.children[part]
 		if !exists {
-			return nil, ErrFileNotFound
+			return nil, fmt.Errorf("MockVFS.getEntry() [mock.go]: %w", ErrFileNotFound)
 		}
 
 		current = next
@@ -163,7 +165,7 @@ func (m *MockVFS) createDir(path string) error {
 		}
 
 		if !current.isDir {
-			return ErrNotADir
+			return fmt.Errorf("MockVFS.createDir() [mock.go]: %w", ErrNotADir)
 		}
 
 		next, exists := current.children[part]
@@ -174,7 +176,7 @@ func (m *MockVFS) createDir(path string) error {
 			}
 			current.children[part] = next
 		} else if !next.isDir {
-			return ErrNotADir
+			return fmt.Errorf("MockVFS.createDir() [mock.go]: %w", ErrNotADir)
 		}
 
 		current = next
@@ -199,7 +201,7 @@ func (m *MockVFS) ReadFile(path string) ([]byte, error) {
 	}
 
 	if entry.isDir {
-		return nil, ErrNotAFile
+		return nil, fmt.Errorf("MockVFS.ReadFile() [mock.go]: %w", ErrNotAFile)
 	}
 
 	// Return a copy to prevent external modification
@@ -243,7 +245,7 @@ func (m *MockVFS) WriteFile(path string, content []byte) error {
 	}
 
 	if !parent.isDir {
-		return ErrNotADir
+		return fmt.Errorf("MockVFS.WriteFile() [mock.go]: %w", ErrNotADir)
 	}
 
 	// Create or update the file
@@ -278,7 +280,7 @@ func (m *MockVFS) DeleteFile(path string, recursive bool, force bool) error {
 
 	// If it's a directory and recursive is false, return error
 	if entry.isDir && !recursive {
-		return ErrNotAFile
+		return fmt.Errorf("MockVFS.DeleteFile() [mock.go]: %w", ErrNotAFile)
 	}
 
 	// Navigate to parent and remove the entry
@@ -318,7 +320,7 @@ func (m *MockVFS) ListFiles(path string, recursive bool) ([]string, error) {
 	}
 
 	if !entry.isDir {
-		return nil, ErrNotADir
+		return nil, fmt.Errorf("MockVFS.ListFiles() [mock.go]: %w", ErrNotADir)
 	}
 
 	var result []string
@@ -362,7 +364,7 @@ func (m *MockVFS) ListFiles(path string, recursive bool) ([]string, error) {
 // Returns paths relative to the VFS root.
 func (m *MockVFS) FindFiles(query string, recursive bool) ([]string, error) {
 	if query == "" {
-		return nil, ErrInvalidPath
+		return nil, fmt.Errorf("MockVFS.FindFiles() [mock.go]: %w", ErrInvalidPath)
 	}
 
 	m.mutex.RLock()
@@ -444,9 +446,11 @@ func (m *MockVFS) MoveFile(src, dst string) error {
 	// Check if destination already exists
 	_, err = m.getEntry(cleanDst)
 	if err == nil {
-		return ErrFileExists
+		return fmt.Errorf("MockVFS.MoveFile() [mock.go]: %w", ErrFileExists)
 	}
-	if err != ErrFileNotFound {
+	// Check if error is something other than file not found (which we expect when the destination doesn't exist yet)
+	// We use errors.Is since we wrapped the error with %w
+	if !errors.Is(err, ErrFileNotFound) {
 		return err
 	}
 

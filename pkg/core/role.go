@@ -70,7 +70,7 @@ func (r *AgentRoleRegistry) List() []string {
 func (r *AgentRoleRegistry) LoadFromDirectory(dir string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("failed to read roles directory: %w", err)
+		return fmt.Errorf("AgentRoleRegistry.LoadFromDirectory() [role.go]: failed to read roles directory: %w", err)
 	}
 
 	for _, entry := range entries {
@@ -83,7 +83,7 @@ func (r *AgentRoleRegistry) LoadFromDirectory(dir string) error {
 
 		role, err := loadRole(roleName, rolePath)
 		if err != nil {
-			return fmt.Errorf("failed to load role %s: %w", roleName, err)
+			return fmt.Errorf("AgentRoleRegistry.LoadFromDirectory() [role.go]: failed to load role %s: %w", roleName, err)
 		}
 
 		r.Register(role)
@@ -102,18 +102,18 @@ func loadRole(name, dir string) (AgentRole, error) {
 	configPath := filepath.Join(dir, "config.json")
 	configData, err := os.ReadFile(configPath)
 	if err != nil {
-		return role, fmt.Errorf("failed to read config.json: %w", err)
+		return role, fmt.Errorf("loadRole() [role.go]: failed to read config.json: %w", err)
 	}
 
 	if err := json.Unmarshal(configData, &role); err != nil {
-		return role, fmt.Errorf("failed to parse config.json: %w", err)
+		return role, fmt.Errorf("loadRole() [role.go]: failed to parse config.json: %w", err)
 	}
 
 	// Load system.md
 	systemPath := filepath.Join(dir, "system.md")
 	systemData, err := os.ReadFile(systemPath)
 	if err != nil {
-		return role, fmt.Errorf("failed to read system.md: %w", err)
+		return role, fmt.Errorf("loadRole() [role.go]: failed to read system.md: %w", err)
 	}
 
 	role.SystemPrompt = string(systemData)
@@ -125,12 +125,12 @@ func loadRole(name, dir string) (AgentRole, error) {
 func (r *AgentRole) RenderSystemPrompt(state AgentState) (string, error) {
 	tmpl, err := template.New("system").Parse(r.SystemPrompt)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse system prompt template: %w", err)
+		return "", fmt.Errorf("AgentRole.RenderSystemPrompt() [role.go]: failed to parse system prompt template: %w", err)
 	}
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, state); err != nil {
-		return "", fmt.Errorf("failed to execute system prompt template: %w", err)
+		return "", fmt.Errorf("AgentRole.RenderSystemPrompt() [role.go]: failed to execute system prompt template: %w", err)
 	}
 
 	return buf.String(), nil

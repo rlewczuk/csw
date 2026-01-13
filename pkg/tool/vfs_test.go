@@ -195,7 +195,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		// Verify file was deleted
 		_, err = mockVFS.ReadFile("test.txt")
 		assert.Error(t, err)
-		assert.Equal(t, vfs.ErrFileNotFound, err)
+		assert.ErrorIs(t, err, vfs.ErrFileNotFound)
 	})
 
 	t.Run("should return error for missing path argument", func(t *testing.T) {
@@ -388,7 +388,7 @@ func TestVFSMoveTool(t *testing.T) {
 		// Verify file was moved
 		_, err = mockVFS.ReadFile("source.txt")
 		assert.Error(t, err)
-		assert.Equal(t, vfs.ErrFileNotFound, err)
+		assert.ErrorIs(t, err, vfs.ErrFileNotFound)
 
 		content, err := mockVFS.ReadFile("dest.txt")
 		require.NoError(t, err)

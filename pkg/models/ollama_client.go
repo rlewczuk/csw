@@ -41,11 +41,11 @@ type OllamaEmbeddingModel struct {
 // NewOllamaClient creates a new Ollama client with the given config
 func NewOllamaClient(config *ModelProviderConfig) (*OllamaClient, error) {
 	if config == nil {
-		return nil, errors.New("config cannot be nil")
+		return nil, fmt.Errorf("NewOllamaClient() [ollama_client.go]: config cannot be nil")
 	}
 
 	if config.URL == "" {
-		return nil, errors.New("URL cannot be empty")
+		return nil, fmt.Errorf("NewOllamaClient() [ollama_client.go]: URL cannot be empty")
 	}
 
 	// Default options
@@ -81,11 +81,11 @@ func NewOllamaClient(config *ModelProviderConfig) (*OllamaClient, error) {
 // This is useful for testing with mock HTTP servers.
 func NewOllamaClientWithHTTPClient(baseURL string, httpClient *http.Client) (*OllamaClient, error) {
 	if baseURL == "" {
-		return nil, errors.New("baseURL cannot be empty")
+		return nil, fmt.Errorf("NewOllamaClientWithHTTPClient() [ollama_client.go]: baseURL cannot be empty")
 	}
 
 	if httpClient == nil {
-		return nil, errors.New("httpClient cannot be nil")
+		return nil, fmt.Errorf("NewOllamaClientWithHTTPClient() [ollama_client.go]: httpClient cannot be nil")
 	}
 
 	return &OllamaClient{
@@ -158,11 +158,11 @@ func (c *OllamaClient) ListModels() ([]ModelInfo, error) {
 // Chat sends a chat request and returns the response
 func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) (*ChatMessage, error) {
 	if messages == nil || len(messages) == 0 {
-		return nil, errors.New("messages cannot be nil or empty")
+		return nil, fmt.Errorf("OllamaChatModel.Chat() [ollama_client.go]: messages cannot be nil or empty")
 	}
 
 	if m.model == "" {
-		return nil, errors.New("model not set")
+		return nil, fmt.Errorf("OllamaChatModel.Chat() [ollama_client.go]: model not set")
 	}
 
 	// Use provided options or fall back to model's default options
@@ -361,11 +361,11 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 // Embed generates embeddings for the given input text
 func (m *OllamaEmbeddingModel) Embed(ctx context.Context, input string) ([]float64, error) {
 	if input == "" {
-		return nil, errors.New("input cannot be empty")
+		return nil, fmt.Errorf("OllamaEmbeddingModel.Embed() [ollama_client.go]: input cannot be empty")
 	}
 
 	if m.model == "" {
-		return nil, errors.New("model not set")
+		return nil, fmt.Errorf("OllamaEmbeddingModel.Embed() [ollama_client.go]: model not set")
 	}
 
 	embedReq := OllamaEmbedRequest{
@@ -402,7 +402,7 @@ func (m *OllamaEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 	}
 
 	if len(embedResp.Embeddings) == 0 {
-		return nil, errors.New("no embeddings returned")
+		return nil, fmt.Errorf("OllamaEmbeddingModel.Embed() [ollama_client.go]: no embeddings returned")
 	}
 
 	return embedResp.Embeddings[0], nil

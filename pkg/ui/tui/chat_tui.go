@@ -126,7 +126,7 @@ func NewTuiChatView(presenter ui.IChatPresenter) (*TuiChatView, error) {
 		glamour.WithWordWrap(defaultWidth-4),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create markdown renderer: %w", err)
+		return nil, fmt.Errorf("NewTuiChatView() [chat_tui.go]: failed to create markdown renderer: %w", err)
 	}
 
 	vp := viewport.New(defaultWidth, defaultHeight-5)

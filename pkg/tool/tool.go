@@ -305,7 +305,7 @@ func (v *ToolValue) UnmarshalJSON(data []byte) error {
 func NewToolValueFromJSON(jsonStr string) (ToolValue, error) {
 	var m map[string]any
 	if err := json.Unmarshal([]byte(jsonStr), &m); err != nil {
-		return ToolValue{}, fmt.Errorf("failed to parse JSON: %w", err)
+		return ToolValue{}, fmt.Errorf("NewToolValueFromJSON() [tool.go]: failed to parse JSON: %w", err)
 	}
 	return NewToolValue(m), nil
 }
