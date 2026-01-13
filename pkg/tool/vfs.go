@@ -39,7 +39,7 @@ func (t *VFSReadTool) Execute(args ToolCall) ToolResponse {
 	if !ok {
 		return ToolResponse{
 			Call:  &args,
-			Error: fmt.Errorf("missing required argument: path"),
+			Error: fmt.Errorf("VFSReadTool.Execute() [vfs.go]: missing required argument: path"),
 			Done:  true,
 		}
 	}
@@ -129,7 +129,7 @@ func (t *VFSWriteTool) Execute(args ToolCall) ToolResponse {
 	if !ok {
 		return ToolResponse{
 			Call:  &args,
-			Error: fmt.Errorf("missing required argument: path"),
+			Error: fmt.Errorf("VFSWriteTool.Execute() [vfs.go]: missing required argument: path"),
 			Done:  true,
 		}
 	}
@@ -138,7 +138,7 @@ func (t *VFSWriteTool) Execute(args ToolCall) ToolResponse {
 	if !ok {
 		return ToolResponse{
 			Call:  &args,
-			Error: fmt.Errorf("missing required argument: content"),
+			Error: fmt.Errorf("VFSWriteTool.Execute() [vfs.go]: missing required argument: content"),
 			Done:  true,
 		}
 	}
@@ -195,7 +195,7 @@ func (t *VFSDeleteTool) Execute(args ToolCall) ToolResponse {
 	if !ok {
 		return ToolResponse{
 			Call:  &args,
-			Error: fmt.Errorf("missing required argument: path"),
+			Error: fmt.Errorf("VFSDeleteTool.Execute() [vfs.go]: missing required argument: path"),
 			Done:  true,
 		}
 	}
@@ -252,7 +252,7 @@ func (t *VFSListTool) Execute(args ToolCall) ToolResponse {
 	if !ok {
 		return ToolResponse{
 			Call:  &args,
-			Error: fmt.Errorf("missing required argument: path"),
+			Error: fmt.Errorf("VFSListTool.Execute() [vfs.go]: missing required argument: path"),
 			Done:  true,
 		}
 	}
@@ -323,7 +323,7 @@ func (t *VFSMoveTool) Execute(args ToolCall) ToolResponse {
 	if !ok {
 		return ToolResponse{
 			Call:  &args,
-			Error: fmt.Errorf("missing required argument: path"),
+			Error: fmt.Errorf("VFSMoveTool.Execute() [vfs.go]: missing required argument: path"),
 			Done:  true,
 		}
 	}
@@ -332,7 +332,7 @@ func (t *VFSMoveTool) Execute(args ToolCall) ToolResponse {
 	if !ok {
 		return ToolResponse{
 			Call:  &args,
-			Error: fmt.Errorf("missing required argument: destination"),
+			Error: fmt.Errorf("VFSMoveTool.Execute() [vfs.go]: missing required argument: destination"),
 			Done:  true,
 		}
 	}

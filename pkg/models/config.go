@@ -1,7 +1,7 @@
 package models
 
 import (
-	"errors"
+	"fmt"
 	"time"
 )
 
@@ -35,11 +35,11 @@ type ModelProviderConfig struct {
 // It automatically selects the right implementation based on the Type field.
 func FromConfig(config *ModelProviderConfig) (ModelProvider, error) {
 	if config == nil {
-		return nil, errors.New("config cannot be nil")
+		return nil, fmt.Errorf("FromConfig() [config.go]: config cannot be nil")
 	}
 
 	if config.URL == "" {
-		return nil, errors.New("URL cannot be empty")
+		return nil, fmt.Errorf("FromConfig() [config.go]: URL cannot be empty")
 	}
 
 	// Set defaults if not specified
@@ -59,6 +59,6 @@ func FromConfig(config *ModelProviderConfig) (ModelProvider, error) {
 	case "anthropic":
 		return NewAnthropicClient(config)
 	default:
-		return nil, errors.New("unsupported provider type: " + config.Type)
+		return nil, fmt.Errorf("FromConfig() [config.go]: unsupported provider type: %s", config.Type)
 	}
 }

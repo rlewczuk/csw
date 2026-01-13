@@ -41,11 +41,11 @@ type AnthropicEmbeddingModel struct {
 // NewAnthropicClient creates a new Anthropic client with the given config
 func NewAnthropicClient(config *ModelProviderConfig) (*AnthropicClient, error) {
 	if config == nil {
-		return nil, errors.New("config cannot be nil")
+		return nil, fmt.Errorf("NewAnthropicClient() [anthropic_client.go]: config cannot be nil")
 	}
 
 	if config.URL == "" {
-		return nil, errors.New("URL cannot be empty")
+		return nil, fmt.Errorf("NewAnthropicClient() [anthropic_client.go]: URL cannot be empty")
 	}
 
 	// Default options
@@ -87,11 +87,11 @@ func NewAnthropicClient(config *ModelProviderConfig) (*AnthropicClient, error) {
 // NewAnthropicClientWithHTTPClient creates a new Anthropic client with the given base URL and custom HTTP client
 func NewAnthropicClientWithHTTPClient(baseURL string, httpClient *http.Client) (*AnthropicClient, error) {
 	if baseURL == "" {
-		return nil, errors.New("baseURL cannot be empty")
+		return nil, fmt.Errorf("NewAnthropicClientWithHTTPClient() [anthropic_client.go]: baseURL cannot be empty")
 	}
 
 	if httpClient == nil {
-		return nil, errors.New("httpClient cannot be nil")
+		return nil, fmt.Errorf("NewAnthropicClientWithHTTPClient() [anthropic_client.go]: httpClient cannot be nil")
 	}
 
 	apiVersion := "2023-06-01" // Default Anthropic API version
@@ -167,11 +167,11 @@ func (c *AnthropicClient) ListModels() ([]ModelInfo, error) {
 // Chat sends a chat request and returns the response
 func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) (*ChatMessage, error) {
 	if len(messages) == 0 {
-		return nil, errors.New("messages cannot be nil or empty")
+		return nil, fmt.Errorf("AnthropicChatModel.Chat() [anthropic_client.go]: messages cannot be nil or empty")
 	}
 
 	if m.model == "" {
-		return nil, errors.New("model not set")
+		return nil, fmt.Errorf("AnthropicChatModel.Chat() [anthropic_client.go]: model not set")
 	}
 
 	// Use provided options or fall back to model's default options
@@ -258,7 +258,7 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	}
 
 	if len(chatResp.Content) == 0 {
-		return nil, errors.New("no content in response")
+		return nil, fmt.Errorf("AnthropicChatModel.Chat() [anthropic_client.go]: no content in response")
 	}
 
 	// Convert response to ChatMessage
@@ -447,7 +447,7 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 // Embed generates embeddings for the given input text
 // Note: Anthropic doesn't support embeddings, so this always returns an error
 func (m *AnthropicEmbeddingModel) Embed(ctx context.Context, input string) ([]float64, error) {
-	return nil, errors.New("not implemented")
+	return nil, fmt.Errorf("AnthropicEmbeddingModel.Embed() [anthropic_client.go]: not implemented")
 }
 
 // handleHTTPError converts HTTP errors to appropriate model errors

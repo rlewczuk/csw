@@ -50,12 +50,12 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 	}
 
 	if providerName == "" || modelName == "" {
-		return nil, fmt.Errorf("invalid model format, expected 'provider/model', got '%s'", model)
+		return nil, fmt.Errorf("SweSystem.NewSession() [system.go]: invalid model format, expected 'provider/model', got '%s'", model)
 	}
 
 	provider, ok := s.ModelProviders[providerName]
 	if !ok {
-		return nil, fmt.Errorf("provider not found: %s", providerName)
+		return nil, fmt.Errorf("SweSystem.NewSession() [system.go]: provider not found: %s", providerName)
 	}
 
 	session := &SweSession{
@@ -95,7 +95,7 @@ func (s *SweSystem) GetSession(id string) (*SweSession, error) {
 
 	session, ok := s.sessions[id]
 	if !ok {
-		return nil, fmt.Errorf("session not found: %s", id)
+		return nil, fmt.Errorf("SweSystem.GetSession() [system.go]: session not found: %s", id)
 	}
 
 	return session, nil
@@ -111,7 +111,7 @@ func (s *SweSystem) GetSessionThread(id string) (*SessionThread, error) {
 	// Check if session exists
 	session, ok := s.sessions[id]
 	if !ok {
-		return nil, fmt.Errorf("session not found: %s", id)
+		return nil, fmt.Errorf("SweSystem.GetSessionThread() [system.go]: session not found: %s", id)
 	}
 
 	// Check if thread already exists
@@ -150,7 +150,7 @@ func (s *SweSystem) DeleteSession(id string) error {
 	defer s.sessionsMu.Unlock()
 
 	if _, ok := s.sessions[id]; !ok {
-		return fmt.Errorf("session not found: %s", id)
+		return fmt.Errorf("SweSystem.DeleteSession() [system.go]: session not found: %s", id)
 	}
 
 	delete(s.sessions, id)

@@ -112,7 +112,7 @@ func (c *SessionThread) UserPrompt(input string) error {
 
 	// Initialize session if not already created
 	if c.session == nil {
-		return fmt.Errorf("session not initialized, call StartSession first")
+		return fmt.Errorf("SessionThread.UserPrompt() [session.go]: session not initialized, call StartSession first")
 	}
 
 	// Add to input queue
@@ -133,7 +133,7 @@ func (c *SessionThread) Interrupt() error {
 	defer c.mu.Unlock()
 
 	if !c.sessionRunning {
-		return fmt.Errorf("no session running to interrupt")
+		return fmt.Errorf("SessionThread.Interrupt() [session.go]: no session running to interrupt")
 	}
 
 	c.interruptPending = true
@@ -152,7 +152,7 @@ func (c *SessionThread) AddPrompt(input string) error {
 	defer c.mu.Unlock()
 
 	if c.session == nil {
-		return fmt.Errorf("session not initialized, call StartSession first")
+		return fmt.Errorf("SessionThread.AddPrompt() [session.go]: session not initialized, call StartSession first")
 	}
 
 	// Add to input queue
@@ -184,7 +184,7 @@ func (c *SessionThread) Resume() error {
 	defer c.mu.Unlock()
 
 	if c.session == nil {
-		return fmt.Errorf("session not initialized, call StartSession first")
+		return fmt.Errorf("SessionThread.Resume() [session.go]: session not initialized, call StartSession first")
 	}
 
 	c.paused = false
@@ -230,7 +230,7 @@ func (c *SessionThread) PermissionResponse(response string) error {
 	defer c.mu.Unlock()
 
 	if c.pendingPermissionQuery == nil {
-		return fmt.Errorf("no pending permission query")
+		return fmt.Errorf("SessionThread.PermissionResponse() [session.go]: no pending permission query")
 	}
 
 	query := c.pendingPermissionQuery
@@ -258,7 +258,7 @@ func (c *SessionThread) StartSession(model string) error {
 	defer c.mu.Unlock()
 
 	if c.session != nil {
-		return fmt.Errorf("session already exists")
+		return fmt.Errorf("SessionThread.StartSession() [session.go]: session already exists")
 	}
 
 	session, err := c.system.NewSession(model, c.outputHandler)
@@ -332,7 +332,7 @@ func (c *SessionThread) runSessionLoop() {
 					return
 				}
 				if wasInterrupted {
-					c.outputHandler.RunFinished(fmt.Errorf("interrupted"))
+					c.outputHandler.RunFinished(fmt.Errorf("SessionThread.runSessionLoop() [session.go]: interrupted"))
 					return
 				}
 
@@ -392,7 +392,7 @@ func (c *SessionThread) runSessionLoop() {
 		}
 
 		if wasInterrupted {
-			c.outputHandler.RunFinished(fmt.Errorf("interrupted"))
+			c.outputHandler.RunFinished(fmt.Errorf("SessionThread.runSessionLoop() [session.go]: interrupted"))
 			return
 		}
 
@@ -562,7 +562,7 @@ func (s *SweSession) Role() *AgentRole {
 func (s *SweSession) SetRole(roleName string) error {
 	role, ok := s.system.Roles.Get(roleName)
 	if !ok {
-		return fmt.Errorf("role not found: %s", roleName)
+		return fmt.Errorf("SweSession.SetRole() [session.go]: role not found: %s", roleName)
 	}
 
 	// Store the new role

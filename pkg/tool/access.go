@@ -71,7 +71,7 @@ func (a *AccessControlTool) Execute(call ToolCall) ToolResponse {
 	case shared.AccessDeny:
 		return ToolResponse{
 			Call:  &call,
-			Error: fmt.Errorf("access denied for tool: %s", toolName),
+			Error: fmt.Errorf("AccessControlTool.Execute() [access.go]: access denied for tool: %s", toolName),
 			Done:  true,
 		}
 	case shared.AccessAsk:
@@ -90,7 +90,7 @@ func (a *AccessControlTool) Execute(call ToolCall) ToolResponse {
 	default:
 		return ToolResponse{
 			Call:  &call,
-			Error: fmt.Errorf("unknown access flag for tool: %s", toolName),
+			Error: fmt.Errorf("AccessControlTool.Execute() [access.go]: unknown access flag for tool: %s", toolName),
 			Done:  true,
 		}
 	}

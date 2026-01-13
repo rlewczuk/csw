@@ -40,11 +40,11 @@ type OpenAIEmbeddingModel struct {
 // NewOpenAIClient creates a new OpenAI-compatible client with the given config
 func NewOpenAIClient(config *ModelProviderConfig) (*OpenAIClient, error) {
 	if config == nil {
-		return nil, errors.New("config cannot be nil")
+		return nil, fmt.Errorf("NewOpenAIClient() [openai_client.go]: config cannot be nil")
 	}
 
 	if config.URL == "" {
-		return nil, errors.New("URL cannot be empty")
+		return nil, fmt.Errorf("NewOpenAIClient() [openai_client.go]: URL cannot be empty")
 	}
 
 	// Default options
@@ -85,11 +85,11 @@ func NewOpenAIClient(config *ModelProviderConfig) (*OpenAIClient, error) {
 // This is useful for testing with mock HTTP servers.
 func NewOpenAIClientWithHTTPClient(baseURL string, httpClient *http.Client) (*OpenAIClient, error) {
 	if baseURL == "" {
-		return nil, errors.New("baseURL cannot be empty")
+		return nil, fmt.Errorf("NewOpenAIClientWithHTTPClient() [openai_client.go]: baseURL cannot be empty")
 	}
 
 	if httpClient == nil {
-		return nil, errors.New("httpClient cannot be nil")
+		return nil, fmt.Errorf("NewOpenAIClientWithHTTPClient() [openai_client.go]: httpClient cannot be nil")
 	}
 
 	return &OpenAIClient{
@@ -160,11 +160,11 @@ func (c *OpenAIClient) ListModels() ([]ModelInfo, error) {
 // Chat sends a chat request and returns the response
 func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) (*ChatMessage, error) {
 	if len(messages) == 0 {
-		return nil, errors.New("messages cannot be nil or empty")
+		return nil, fmt.Errorf("OpenAIChatModel.Chat() [openai_client.go]: messages cannot be nil or empty")
 	}
 
 	if m.model == "" {
-		return nil, errors.New("model not set")
+		return nil, fmt.Errorf("OpenAIChatModel.Chat() [openai_client.go]: model not set")
 	}
 
 	// Use provided options or fall back to model's default options
@@ -224,13 +224,13 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	}
 
 	if len(chatResp.Choices) == 0 {
-		return nil, errors.New("no choices in response")
+		return nil, fmt.Errorf("OpenAIChatModel.Chat() [openai_client.go]: no choices in response")
 	}
 
 	// Get the first choice
 	choice := chatResp.Choices[0]
 	if choice.Message == nil {
-		return nil, errors.New("no message in choice")
+		return nil, fmt.Errorf("OpenAIChatModel.Chat() [openai_client.go]: no message in choice")
 	}
 
 	// Convert response to models.ChatMessage
@@ -469,11 +469,11 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 // Embed generates embeddings for the given input text
 func (m *OpenAIEmbeddingModel) Embed(ctx context.Context, input string) ([]float64, error) {
 	if input == "" {
-		return nil, errors.New("input cannot be empty")
+		return nil, fmt.Errorf("OpenAIEmbeddingModel.Embed() [openai_client.go]: input cannot be empty")
 	}
 
 	if m.model == "" {
-		return nil, errors.New("model not set")
+		return nil, fmt.Errorf("OpenAIEmbeddingModel.Embed() [openai_client.go]: model not set")
 	}
 
 	embedReq := OpenaiEmbeddingRequest{
@@ -511,7 +511,7 @@ func (m *OpenAIEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 	}
 
 	if len(embedResp.Data) == 0 {
-		return nil, errors.New("no embeddings returned")
+		return nil, fmt.Errorf("OpenAIEmbeddingModel.Embed() [openai_client.go]: no embeddings returned")
 	}
 
 	return embedResp.Data[0].Embedding, nil

@@ -33,17 +33,17 @@ func NewProviderRegistry() *ProviderRegistry {
 // It returns an error if a provider with the same name already exists.
 func (r *ProviderRegistry) Register(name string, provider ModelProvider) error {
 	if name == "" {
-		return errors.New("provider name cannot be empty")
+		return fmt.Errorf("ProviderRegistry.Register() [registry.go]: provider name cannot be empty")
 	}
 	if provider == nil {
-		return errors.New("provider cannot be nil")
+		return fmt.Errorf("ProviderRegistry.Register() [registry.go]: provider cannot be nil")
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if _, exists := r.providers[name]; exists {
-		return ErrProviderAlreadyExists
+		return fmt.Errorf("ProviderRegistry.Register() [registry.go]: %w", ErrProviderAlreadyExists)
 	}
 
 	r.providers[name] = provider
@@ -58,7 +58,7 @@ func (r *ProviderRegistry) Get(name string) (ModelProvider, error) {
 
 	provider, exists := r.providers[name]
 	if !exists {
-		return nil, ErrProviderNotFound
+		return nil, fmt.Errorf("ProviderRegistry.Get() [registry.go]: %w", ErrProviderNotFound)
 	}
 
 	return provider, nil
