@@ -43,7 +43,7 @@ func TestTuiAppViewWithChatIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create presenters
-		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest")
+		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest", "")
 		chatPresenter := presenter.NewChatPresenter(system, thread)
 
 		// Create TUI app view
@@ -112,7 +112,7 @@ func TestTuiAppViewWithChatIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create presenters
-		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest")
+		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest", "")
 		chatPresenter := presenter.NewChatPresenter(system, thread)
 
 		// Create TUI app view
@@ -179,7 +179,7 @@ func TestTuiAppViewWithChatIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create presenters
-		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest")
+		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest", "")
 		chatPresenter := presenter.NewChatPresenter(system, thread)
 
 		// Create TUI app view
@@ -261,7 +261,7 @@ func TestTuiAppViewWithChatIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create presenters
-		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest")
+		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest", "")
 		chatPresenter := presenter.NewChatPresenter(system, thread)
 
 		// Create TUI app view
@@ -341,7 +341,7 @@ func TestTuiAppViewWithChatIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create presenters
-		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest")
+		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest", "")
 		chatPresenter := presenter.NewChatPresenter(system, thread)
 
 		// Create TUI app view
@@ -424,7 +424,7 @@ func TestEscKeyOpensMenu(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create presenters
-		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest")
+		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest", "")
 		chatPresenter := presenter.NewChatPresenter(system, thread)
 
 		// Create TUI app view
@@ -491,7 +491,7 @@ func TestAppViewRefreshBug(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create presenters
-		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest")
+		appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest", "")
 		chatPresenter := presenter.NewChatPresenter(system, thread)
 
 		// Create TUI app view

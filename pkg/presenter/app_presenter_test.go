@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/ui"
 	"github.com/codesnort/codesnort-swe/pkg/ui/mock"
@@ -13,7 +14,7 @@ import (
 
 func TestAppPresenter_SetView(t *testing.T) {
 	system, _, _ := setupTestSystem(t)
-	presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest")
+	presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
 
 	mockView := mock.NewMockAppView()
 	err := presenter.SetView(mockView)
@@ -29,7 +30,7 @@ func TestAppPresenter_NewSession(t *testing.T) {
 	system, _, _ := setupTestSystem(t)
 
 	t.Run("creates new session without view", func(t *testing.T) {
-		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest")
+		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
 
 		err := presenter.NewSession()
 		assert.NoError(t, err)
@@ -40,7 +41,7 @@ func TestAppPresenter_NewSession(t *testing.T) {
 	})
 
 	t.Run("creates new session and shows chat view", func(t *testing.T) {
-		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest")
+		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
 		mockView := mock.NewMockAppView()
 		err := presenter.SetView(mockView)
 		require.NoError(t, err)
@@ -59,7 +60,7 @@ func TestAppPresenter_NewSession(t *testing.T) {
 	})
 
 	t.Run("creates session with correct model", func(t *testing.T) {
-		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest")
+		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
 
 		err := presenter.NewSession()
 		require.NoError(t, err)
@@ -79,10 +80,55 @@ func TestAppPresenter_NewSession(t *testing.T) {
 	})
 
 	t.Run("returns error for invalid model", func(t *testing.T) {
-		presenter := NewAppPresenter(system, "invalid/model:latest")
+		presenter := NewAppPresenter(system, "invalid/model:latest", "")
 
 		err := presenter.NewSession()
 		assert.Error(t, err)
+	})
+
+	t.Run("creates session with default role", func(t *testing.T) {
+		// Create a fresh system for this test
+		roleSystem, _, _ := setupTestSystem(t)
+
+		// Setup role in system
+		roleName := "test_role"
+		testRole := core.AgentRole{
+			Name:         roleName,
+			SystemPrompt: "You are a test assistant.",
+		}
+		roleSystem.Roles = core.NewAgentRoleRegistry()
+		roleSystem.Roles.Register(testRole)
+
+		presenter := NewAppPresenter(roleSystem, "ollama/devstral-small-2:latest", roleName)
+
+		err := presenter.NewSession()
+		require.NoError(t, err)
+
+		// Verify session was created with the role
+		sessions := roleSystem.ListSessions()
+		require.NotEmpty(t, sessions)
+
+		// The session should have the role set
+		foundSession := sessions[0]
+		require.NotNil(t, foundSession, "should have created session")
+
+		// Verify role was set
+		require.NotNil(t, foundSession.Role(), "session role should not be nil")
+		assert.Equal(t, roleName, foundSession.Role().Name)
+	})
+
+	t.Run("creates session without role when empty string", func(t *testing.T) {
+		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
+
+		err := presenter.NewSession()
+		require.NoError(t, err)
+
+		sessions := system.ListSessions()
+		require.NotEmpty(t, sessions)
+
+		// The last session should have no role set
+		lastSession := sessions[len(sessions)-1]
+		assert.Nil(t, lastSession.Role())
 	})
 }
 
@@ -97,7 +143,7 @@ func TestAppPresenter_OpenSession(t *testing.T) {
 		sessionID := session.ID()
 
 		// Create presenter and open the session
-		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest")
+		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
 		mockView := mock.NewMockAppView()
 		err = presenter.SetView(mockView)
 		require.NoError(t, err)
@@ -112,7 +158,7 @@ func TestAppPresenter_OpenSession(t *testing.T) {
 	})
 
 	t.Run("returns error for non-existent session", func(t *testing.T) {
-		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest")
+		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
 
 		err := presenter.OpenSession("non-existent-session-id")
 		assert.Error(t, err)
@@ -127,7 +173,7 @@ func TestAppPresenter_OpenSession(t *testing.T) {
 		sessionID := session.ID()
 
 		// Create presenter without setting view
-		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest")
+		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
 
 		err = presenter.OpenSession(sessionID)
 		assert.NoError(t, err)
@@ -150,7 +196,7 @@ func TestAppPresenter_Exit(t *testing.T) {
 		assert.GreaterOrEqual(t, len(sessions), 2)
 
 		// Exit
-		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest")
+		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
 		err = presenter.Exit()
 		assert.NoError(t, err)
 
@@ -164,7 +210,7 @@ func TestAppPresenter_Integration(t *testing.T) {
 	system, mockServer, vfsInstance := setupTestSystem(t)
 
 	t.Run("create session and send message", func(t *testing.T) {
-		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest")
+		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
 		mockView := mock.NewMockAppView()
 		err := presenter.SetView(mockView)
 		require.NoError(t, err)
@@ -203,7 +249,7 @@ func TestAppPresenter_Integration(t *testing.T) {
 	})
 
 	t.Run("create session with tool call", func(t *testing.T) {
-		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest")
+		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
 		mockView := mock.NewMockAppView()
 		err := presenter.SetView(mockView)
 		require.NoError(t, err)
@@ -247,7 +293,7 @@ func TestAppPresenter_Integration(t *testing.T) {
 	})
 
 	t.Run("reopen session and continue conversation", func(t *testing.T) {
-		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest")
+		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
 		mockView := mock.NewMockAppView()
 		err := presenter.SetView(mockView)
 		require.NoError(t, err)
