@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/codesnort/codesnort-swe/pkg/shared"
+	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
 // AccessControlTool is a wrapper that controls access to tools based on access flags.
@@ -45,7 +46,28 @@ func (a *AccessControlTool) Execute(call ToolCall) ToolResponse {
 
 	switch flag {
 	case shared.AccessAllow:
-		return a.tool.Execute(call)
+		resp := a.tool.Execute(call)
+		if resp.Error != nil {
+			if perr, ok := resp.Error.(*vfs.PermissionError); ok {
+				return ToolResponse{
+					Call: &call,
+					Error: &ToolPermissionsQuery{
+						Id:      call.ID,
+						Tool:    &call,
+						Title:   "Permission Required",
+						Details: fmt.Sprintf("Access to file %s required for %s", perr.Path, perr.Operation),
+						Options: []string{"Allow", "Deny"},
+						Meta: map[string]string{
+							"type":      "vfs",
+							"path":      perr.Path,
+							"operation": perr.Operation,
+						},
+					},
+					Done: true,
+				}
+			}
+		}
+		return resp
 	case shared.AccessDeny:
 		return ToolResponse{
 			Call:  &call,
@@ -53,12 +75,17 @@ func (a *AccessControlTool) Execute(call ToolCall) ToolResponse {
 			Done:  true,
 		}
 	case shared.AccessAsk:
-		// For now, treat "ask" as deny. In a full implementation,
-		// this would prompt the user for permission.
+		// Return ToolPermissionsQuery as error
 		return ToolResponse{
-			Call:  &call,
-			Error: fmt.Errorf("access requires permission for tool: %s", toolName),
-			Done:  true,
+			Call: &call,
+			Error: &ToolPermissionsQuery{
+				Id:      call.ID, // Use tool call ID as query ID for now, or generate new one
+				Tool:    &call,
+				Title:   "Permission Required",
+				Details: fmt.Sprintf("Tool %s requires permission", toolName),
+				Options: []string{"Allow", "Deny"},
+			},
+			Done: true,
 		}
 	default:
 		return ToolResponse{
@@ -91,6 +118,14 @@ func (a *AccessControlTool) resolveAccessFlag(toolName string) shared.AccessFlag
 
 	// No match found, return default deny
 	return shared.AccessDeny
+}
+
+// SetPermission sets the permission for a specific tool pattern.
+func (a *AccessControlTool) SetPermission(pattern string, flag shared.AccessFlag) {
+	if a.privileges == nil {
+		a.privileges = make(map[string]shared.AccessFlag)
+	}
+	a.privileges[pattern] = flag
 }
 
 // matchPattern checks if a pattern matches a tool name and returns the specificity.

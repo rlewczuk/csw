@@ -22,6 +22,11 @@ type MockSessionOutputHandler struct {
 	// ToolCallResults stores all tool responses received via AddToolCallResult.
 	ToolCallResults []*tool.ToolResponse
 
+	// PermissionQueries stores all permission queries received via OnPermissionQuery.
+	PermissionQueries []*tool.ToolPermissionsQuery
+	// permissionQueryCalled is a channel that is signalled when OnPermissionQuery is called.
+	permissionQueryCalled chan struct{}
+
 	// RunFinishedError stores the error from RunFinished call.
 	RunFinishedError error
 
@@ -35,12 +40,30 @@ type MockSessionOutputHandler struct {
 // NewMockSessionOutputHandler creates a new MockSessionOutputHandler.
 func NewMockSessionOutputHandler() *MockSessionOutputHandler {
 	return &MockSessionOutputHandler{
-		MarkdownChunks:    make([]string, 0),
-		ToolCallStarts:    make([]*tool.ToolCall, 0),
-		ToolCallDetails:   make([]*tool.ToolCall, 0),
-		ToolCallResults:   make([]*tool.ToolResponse, 0),
-		runFinishedCalled: make(chan struct{}),
+		MarkdownChunks:        make([]string, 0),
+		ToolCallStarts:        make([]*tool.ToolCall, 0),
+		ToolCallDetails:       make([]*tool.ToolCall, 0),
+		ToolCallResults:       make([]*tool.ToolResponse, 0),
+		PermissionQueries:     make([]*tool.ToolPermissionsQuery, 0),
+		permissionQueryCalled: make(chan struct{}, 10),
+		runFinishedCalled:     make(chan struct{}),
 	}
+}
+
+// OnPermissionQuery records a permission query.
+func (h *MockSessionOutputHandler) OnPermissionQuery(query *tool.ToolPermissionsQuery) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.PermissionQueries = append(h.PermissionQueries, query)
+	select {
+	case h.permissionQueryCalled <- struct{}{}:
+	default:
+	}
+}
+
+// WaitForPermissionQuery blocks until OnPermissionQuery is called.
+func (h *MockSessionOutputHandler) WaitForPermissionQuery() {
+	<-h.permissionQueryCalled
 }
 
 // AddMarkdownChunk records a markdown chunk.

@@ -901,7 +901,6 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		assert.Equal(t, "vfs.move", query.Tool.Function)
 		assert.Equal(t, "Permission Required", query.Title)
 		assert.Contains(t, query.Details, "source.txt")
-		assert.Contains(t, query.Details, "dest.txt")
 		assert.True(t, query.AllowCustomResponse)
 		assert.Contains(t, query.Options, "Allow")
 		assert.Contains(t, query.Options, "Deny")

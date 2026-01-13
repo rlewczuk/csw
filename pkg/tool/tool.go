@@ -402,6 +402,9 @@ type ToolPermissionsQuery struct {
 
 	// AllowCustomResponse indicates whether the user can enter a custom response.
 	AllowCustomResponse bool
+
+	// Meta contains additional information about the query (e.g. file path, operation).
+	Meta map[string]string
 }
 
 // Error returns the error message containing tool name and query ID.
