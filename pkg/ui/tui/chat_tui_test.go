@@ -353,4 +353,112 @@ func TestTuiChatViewBubbletea(t *testing.T) {
 		_, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
 		assert.Nil(t, cmd)
 	})
+
+	t.Run("QueryPermission shows permission widget", func(t *testing.T) {
+		presenter := mock.NewMockChatPresenter()
+		view, err := NewTuiChatView(presenter)
+		assert.NoError(t, err)
+
+		query := &ui.PermissionQueryUI{
+			Id:      "test-query",
+			Title:   "Test Permission",
+			Details: "Do you want to proceed?",
+			Options: []string{"Yes", "No"},
+		}
+
+		err = view.QueryPermission(query)
+		assert.NoError(t, err)
+		assert.True(t, view.model.showingPermission)
+		assert.NotNil(t, view.model.permissionWidget)
+	})
+
+	t.Run("QueryPermission replaces input box in view", func(t *testing.T) {
+		presenter := mock.NewMockChatPresenter()
+		view, err := NewTuiChatView(presenter)
+		assert.NoError(t, err)
+
+		query := &ui.PermissionQueryUI{
+			Id:      "test-query",
+			Title:   "Test Permission",
+			Details: "Do you want to proceed?",
+			Options: []string{"Yes", "No"},
+		}
+
+		err = view.QueryPermission(query)
+		assert.NoError(t, err)
+
+		viewStr := view.model.View()
+		assert.Contains(t, viewStr, "Test Permission")
+	})
+
+	t.Run("QueryPermission callback restores input box", func(t *testing.T) {
+		presenter := mock.NewMockChatPresenter()
+		view, err := NewTuiChatView(presenter)
+		assert.NoError(t, err)
+
+		query := &ui.PermissionQueryUI{
+			Id:      "test-query",
+			Title:   "Test Permission",
+			Details: "Do you want to proceed?",
+			Options: []string{"Yes", "No"},
+		}
+
+		err = view.QueryPermission(query)
+		assert.NoError(t, err)
+
+		// Trigger the callback by selecting an option
+		// Simulate pressing enter to select first option
+		view.model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+		assert.False(t, view.model.showingPermission)
+		assert.Nil(t, view.model.permissionWidget)
+	})
+
+	t.Run("QueryPermission callback calls PermissionResponse", func(t *testing.T) {
+		presenter := mock.NewMockChatPresenter()
+		view, err := NewTuiChatView(presenter)
+		assert.NoError(t, err)
+
+		query := &ui.PermissionQueryUI{
+			Id:      "test-query",
+			Title:   "Test Permission",
+			Details: "Do you want to proceed?",
+			Options: []string{"Yes", "No"},
+		}
+
+		err = view.QueryPermission(query)
+		assert.NoError(t, err)
+
+		// Simulate pressing enter to select first option (Yes)
+		view.model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+		// Check that PermissionResponse was called
+		assert.Equal(t, 1, len(presenter.PermissionResponseCalls))
+		assert.Equal(t, "Yes", presenter.PermissionResponseCalls[0])
+	})
+
+	t.Run("QueryPermission routes keys to widget when showing", func(t *testing.T) {
+		presenter := mock.NewMockChatPresenter()
+		view, err := NewTuiChatView(presenter)
+		assert.NoError(t, err)
+
+		query := &ui.PermissionQueryUI{
+			Id:      "test-query",
+			Title:   "Test Permission",
+			Details: "Do you want to proceed?",
+			Options: []string{"Yes", "No"},
+		}
+
+		err = view.QueryPermission(query)
+		assert.NoError(t, err)
+
+		// Widget should start with cursor at 0
+		assert.Equal(t, 0, view.model.permissionWidget.cursor)
+
+		// Simulate pressing down key
+		view.model.Update(tea.KeyMsg{Type: tea.KeyDown})
+
+		// Widget cursor should have moved
+		assert.Equal(t, 1, view.model.permissionWidget.cursor)
+	})
 }

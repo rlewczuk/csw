@@ -87,6 +87,9 @@ type IChatView interface {
 
 	// MoveToBottom scrolls the view to the bottom.
 	MoveToBottom() error
+
+	// QueryPermission queries user for permission to use a tool.
+	QueryPermission(query *PermissionQueryUI) error
 }
 
 // IChatPresenter is an interface for propagating user input from UI to the chat session.
@@ -105,4 +108,7 @@ type IChatPresenter interface {
 
 	// Resume resumes the chat session (i.e. starts processing).
 	Resume() error
+
+	// PermissionResponse sends user response to permission query.
+	PermissionResponse(response string) error
 }

@@ -95,7 +95,7 @@ func TestMockChatView_UpdateMessage(t *testing.T) {
 		t.Errorf("UpdateMessage() did not record message correctly")
 	}
 	if view.UpdateMessageCalls[0].Text != "Updated text" {
-		t.Errorf("UpdateMessage() did not preserve message Text field")
+		t.Errorf("UpdateMessage() did not preserve message Title field")
 	}
 }
 
@@ -257,7 +257,7 @@ func TestMockChatPresenter_SendUserMessage(t *testing.T) {
 		t.Errorf("SendUserMessage() did not record message correctly")
 	}
 	if presenter.SendUserMessageCalls[0].Text != "Hello, assistant!" {
-		t.Errorf("SendUserMessage() did not preserve message Text field")
+		t.Errorf("SendUserMessage() did not preserve message Title field")
 	}
 }
 
@@ -292,7 +292,7 @@ func TestMockChatPresenter_SaveUserMessage(t *testing.T) {
 		t.Errorf("SaveUserMessage() did not record message correctly")
 	}
 	if presenter.SaveUserMessageCalls[0].Text != "Draft message" {
-		t.Errorf("SaveUserMessage() did not preserve message Text field")
+		t.Errorf("SaveUserMessage() did not preserve message Title field")
 	}
 }
 
