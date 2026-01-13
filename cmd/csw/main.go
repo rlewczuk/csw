@@ -146,8 +146,8 @@ func run(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
-	// Create AppPresenter with the system and default model
-	appPresenter := presenter.NewAppPresenter(sweSystem, modelName)
+	// Create AppPresenter with the system, default model, and role
+	appPresenter := presenter.NewAppPresenter(sweSystem, modelName, roleName)
 
 	// Create TuiAppView with the presenter
 	tuiAppView, err := tui.NewTuiAppView(appPresenter)

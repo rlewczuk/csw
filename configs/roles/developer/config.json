@@ -3,11 +3,19 @@
   "vfs-privileges": {
     "**": {
       "read": "allow",
-      "write": "allow",
-      "delete": "allow",
-      "list": "allow",
-      "find": "allow",
-      "move": "allow"
+      "write": "ask",
+      "delete": "ask",
+      "list": "ask",
+      "find": "ask",
+      "move": "ask"
+    },
+    "/**": {
+      "read": "deny",
+      "write": "deny",
+      "delete": "deny",
+      "list": "deny",
+      "find": "deny",
+      "move": "deny"
     }
   },
   "tools-access": {

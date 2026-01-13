@@ -14,13 +14,15 @@ type AppPresenter struct {
 	system       *core.SweSystem
 	view         ui.IAppView
 	defaultModel string
+	defaultRole  string
 }
 
-// NewAppPresenter creates a new AppPresenter with the given system and default model.
-func NewAppPresenter(system *core.SweSystem, defaultModel string) *AppPresenter {
+// NewAppPresenter creates a new AppPresenter with the given system, default model, and default role.
+func NewAppPresenter(system *core.SweSystem, defaultModel string, defaultRole string) *AppPresenter {
 	return &AppPresenter{
 		system:       system,
 		defaultModel: defaultModel,
+		defaultRole:  defaultRole,
 	}
 }
 
@@ -39,6 +41,7 @@ func (p *AppPresenter) NewSession() error {
 	system := p.system
 	view := p.view
 	defaultModel := p.defaultModel
+	defaultRole := p.defaultRole
 	p.mu.Unlock()
 
 	// Create new SessionThread (will set output handler when creating ChatPresenter)
@@ -47,6 +50,16 @@ func (p *AppPresenter) NewSession() error {
 	// Start the session with default model
 	if err := thread.StartSession(defaultModel); err != nil {
 		return err
+	}
+
+	// Set the default role if provided
+	if defaultRole != "" {
+		session := thread.GetSession()
+		if session != nil {
+			if err := session.SetRole(defaultRole); err != nil {
+				return err
+			}
+		}
 	}
 
 	// Create ChatPresenter for this session
