@@ -48,8 +48,9 @@ func (ac *AccessControlVFS) checkAccess(path string, flag shared.AccessFlag) err
 	if flag == shared.AccessDeny {
 		return ErrPermissionDenied
 	}
-	// AccessAllow and AccessAsk are both allowed for now
-	// AccessAsk would require UI interaction which is not implemented yet
+	if flag == shared.AccessAsk {
+		return ErrAskPermission
+	}
 	return nil
 }
 
