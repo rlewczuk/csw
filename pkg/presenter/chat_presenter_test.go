@@ -6,6 +6,7 @@ import (
 
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/ui"
@@ -372,4 +373,76 @@ func TestChatPresenter_MoveToBottom(t *testing.T) {
 		// Verify MoveToBottom was called
 		assert.Greater(t, mockView.MoveToBottomCalls, 0, "should have called MoveToBottom")
 	})
+}
+
+func TestChatPresenter_PermissionFlow(t *testing.T) {
+	system, mockServer, vfsInstance := setupTestSystem(t)
+
+	// Define a role with VFS permission required
+	roleName := "restricted_role"
+	restrictedRole := core.AgentRole{
+		Name: roleName,
+		VFSPrivileges: map[string]vfs.FileAccess{
+			"**": {Read: shared.AccessAsk, Write: shared.AccessAsk},
+		},
+	}
+	system.Roles = core.NewAgentRoleRegistry()
+	system.Roles.Register(restrictedRole)
+
+	mockHandler := testutil.NewMockSessionOutputHandler()
+	thread := core.NewSessionThread(system, mockHandler)
+
+	err := thread.StartSession("ollama/devstral-small-2:latest")
+	require.NoError(t, err)
+
+	session := thread.GetSession()
+	err = session.SetRole(roleName)
+	require.NoError(t, err)
+
+	presenter := NewChatPresenter(system, thread)
+	mockView := mock.NewMockChatView()
+	err = presenter.SetView(mockView)
+	require.NoError(t, err)
+
+	// Mock response: Assistant tries to write file
+	mockServer.AddStreamingResponse("/api/chat", "POST", false,
+		`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfs.write","arguments":{"path":"protected.txt","content":"secret"}}}]},"done":false}`,
+		`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	// Send user message
+	userMsg := &ui.ChatMessageUI{
+		Id:   "user-1",
+		Role: ui.ChatRoleUser,
+		Text: "Write secret",
+	}
+	err = presenter.SendUserMessage(userMsg)
+	assert.NoError(t, err)
+
+	// Wait for permission query to appear in view
+	require.Eventually(t, func() bool {
+		return len(mockView.QueryPermissionCalls) > 0
+	}, 2*time.Second, 50*time.Millisecond, "should receive permission query")
+
+	// Verify query details
+	query := mockView.QueryPermissionCalls[0]
+	assert.Contains(t, query.Title, "Permission Required")
+	assert.Contains(t, query.Details, "protected.txt")
+
+	// Verify session is paused
+	assert.True(t, thread.IsPaused())
+
+	// Respond with Allow
+	err = presenter.PermissionResponse("Allow")
+	assert.NoError(t, err)
+
+	// Wait for processing to complete
+	require.Eventually(t, func() bool {
+		return !thread.IsPaused() && !thread.IsRunning()
+	}, 2*time.Second, 50*time.Millisecond, "session should resume and finish")
+
+	// Verify file was created
+	bytes, err := vfsInstance.ReadFile("protected.txt")
+	assert.NoError(t, err)
+	assert.Equal(t, "secret", string(bytes))
 }

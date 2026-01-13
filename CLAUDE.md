@@ -35,3 +35,4 @@ Rules regarding implementing tests:
 - following test double implementations are available:
   - `vfs.VFS` test double is implemented in `pkg/vfs/mock.go`;
   - `models.ModelProvider` test double is implemented in `pkg/models/mock/mock.go`;
+- always run tests with timeout of 60 seconds;

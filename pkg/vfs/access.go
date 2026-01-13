@@ -7,6 +7,21 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/shared"
 )
 
+// PermissionError is returned when an operation requires permission.
+type PermissionError struct {
+	Path      string
+	Operation string
+}
+
+func (e *PermissionError) Error() string {
+	return "permission required for " + e.Operation + " on " + e.Path
+}
+
+// Is implements errors.Is interface to allow checking if PermissionError is ErrAskPermission.
+func (e *PermissionError) Is(target error) bool {
+	return target == ErrAskPermission
+}
+
 type FileOperation string
 
 type FileAccess struct {
@@ -44,12 +59,12 @@ func NewAccessControlVFS(vfs VFS, privileges map[string]FileAccess) *AccessContr
 }
 
 // checkAccess checks if the given operation is allowed for the given path.
-func (ac *AccessControlVFS) checkAccess(path string, flag shared.AccessFlag) error {
+func (ac *AccessControlVFS) checkAccess(path string, op string, flag shared.AccessFlag) error {
 	if flag == shared.AccessDeny {
 		return ErrPermissionDenied
 	}
 	if flag == shared.AccessAsk {
-		return ErrAskPermission
+		return &PermissionError{Path: path, Operation: op}
 	}
 	return nil
 }
@@ -139,7 +154,7 @@ func isMoreSpecific(pattern1, pattern2 string) bool {
 // ReadFile reads the content of the file located at the given path and returns its data as a byte slice.
 func (ac *AccessControlVFS) ReadFile(path string) ([]byte, error) {
 	access := ac.getAccess(path)
-	if err := ac.checkAccess(path, access.Read); err != nil {
+	if err := ac.checkAccess(path, "read", access.Read); err != nil {
 		return nil, err
 	}
 	return ac.vfs.ReadFile(path)
@@ -148,7 +163,7 @@ func (ac *AccessControlVFS) ReadFile(path string) ([]byte, error) {
 // WriteFile writes the given content to the file located at the given path.
 func (ac *AccessControlVFS) WriteFile(path string, content []byte) error {
 	access := ac.getAccess(path)
-	if err := ac.checkAccess(path, access.Write); err != nil {
+	if err := ac.checkAccess(path, "write", access.Write); err != nil {
 		return err
 	}
 	return ac.vfs.WriteFile(path, content)
@@ -157,7 +172,7 @@ func (ac *AccessControlVFS) WriteFile(path string, content []byte) error {
 // DeleteFile deletes the file located at the given path.
 func (ac *AccessControlVFS) DeleteFile(path string, recursive bool, force bool) error {
 	access := ac.getAccess(path)
-	if err := ac.checkAccess(path, access.Delete); err != nil {
+	if err := ac.checkAccess(path, "delete", access.Delete); err != nil {
 		return err
 	}
 	return ac.vfs.DeleteFile(path, recursive, force)
@@ -166,7 +181,7 @@ func (ac *AccessControlVFS) DeleteFile(path string, recursive bool, force bool) 
 // ListFiles lists all files and directories located at the given path.
 func (ac *AccessControlVFS) ListFiles(path string, recursive bool) ([]string, error) {
 	access := ac.getAccess(path)
-	if err := ac.checkAccess(path, access.List); err != nil {
+	if err := ac.checkAccess(path, "list", access.List); err != nil {
 		return nil, err
 	}
 	return ac.vfs.ListFiles(path, recursive)
@@ -175,7 +190,7 @@ func (ac *AccessControlVFS) ListFiles(path string, recursive bool) ([]string, er
 // FindFiles searches for files and directories matching the given query.
 func (ac *AccessControlVFS) FindFiles(query string, recursive bool) ([]string, error) {
 	access := ac.getAccess(query)
-	if err := ac.checkAccess(query, access.Find); err != nil {
+	if err := ac.checkAccess(query, "find", access.Find); err != nil {
 		return nil, err
 	}
 	return ac.vfs.FindFiles(query, recursive)
@@ -185,14 +200,42 @@ func (ac *AccessControlVFS) FindFiles(query string, recursive bool) ([]string, e
 func (ac *AccessControlVFS) MoveFile(src, dst string) error {
 	// Check both source and destination
 	accessSrc := ac.getAccess(src)
-	if err := ac.checkAccess(src, accessSrc.Move); err != nil {
+	if err := ac.checkAccess(src, "move", accessSrc.Move); err != nil {
 		return err
 	}
 
 	accessDst := ac.getAccess(dst)
-	if err := ac.checkAccess(dst, accessDst.Write); err != nil {
+	if err := ac.checkAccess(dst, "write", accessDst.Write); err != nil {
 		return err
 	}
 
 	return ac.vfs.MoveFile(src, dst)
+}
+
+// SetPermission sets the permission for a specific path and operation.
+func (ac *AccessControlVFS) SetPermission(path string, op string, flag shared.AccessFlag) {
+	// Get current effective access
+	access := ac.getAccess(path)
+
+	// Update specific operation
+	switch op {
+	case "read":
+		access.Read = flag
+	case "write":
+		access.Write = flag
+	case "delete":
+		access.Delete = flag
+	case "list":
+		access.List = flag
+	case "find":
+		access.Find = flag
+	case "move":
+		access.Move = flag
+	}
+
+	// Store back in privileges map
+	if ac.privileges == nil {
+		ac.privileges = make(map[string]FileAccess)
+	}
+	ac.privileges[path] = access
 }

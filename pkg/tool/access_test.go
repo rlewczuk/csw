@@ -470,7 +470,7 @@ func TestAccessControlTool_Execute_Ask(t *testing.T) {
 
 	assert.False(t, mock.executed, "underlying tool should not be executed for ask")
 	assert.Error(t, response.Error, "should return error for ask (not yet implemented)")
-	assert.Contains(t, response.Error.Error(), "requires permission")
+	assert.Contains(t, response.Error.Error(), "permission query")
 	assert.True(t, response.Done)
 }
 

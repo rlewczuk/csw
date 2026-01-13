@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
@@ -159,6 +160,66 @@ func TestSessionThread(t *testing.T) {
 		err := controller.Interrupt()
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no session running")
+	})
+	t.Run("permission query flow", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		controller := NewSessionThread(system, mockHandler)
+
+		err := controller.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		// Define a role with VFS permission required
+		roleName := "restricted_role"
+		restrictedRole := AgentRole{
+			Name: roleName,
+			VFSPrivileges: map[string]vfs.FileAccess{
+				"**": {Read: shared.AccessAsk, Write: shared.AccessAsk},
+			},
+		}
+		system.Roles = NewAgentRoleRegistry()
+		system.Roles.Register(restrictedRole)
+
+		// Set the role
+		session := controller.GetSession()
+		err = session.SetRole(roleName)
+		require.NoError(t, err)
+
+		// Mock response: Assistant tries to write file
+		mockServer.AddStreamingResponse("/api/chat", "POST", false,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfs.write","arguments":{"path":"protected.txt","content":"secret"}}}]},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+		)
+
+		// Send prompt
+		err = controller.UserPrompt("Write secret")
+		assert.NoError(t, err)
+
+		// Wait for permission query
+		mockHandler.WaitForPermissionQuery()
+
+		// Verify query
+		assert.NotEmpty(t, mockHandler.PermissionQueries)
+		query := mockHandler.PermissionQueries[0]
+		assert.Equal(t, "vfs.write", query.Tool.Function)
+		assert.Equal(t, "protected.txt", query.Meta["path"])
+
+		// Check session is paused
+		assert.True(t, controller.IsPaused())
+
+		// Respond with Allow
+		err = controller.PermissionResponse("Allow")
+		assert.NoError(t, err)
+
+		// Verify resumed
+		assert.False(t, controller.IsPaused())
+
+		// Wait for finish
+		mockHandler.WaitForRunFinished()
+
+		// Verify tool executed
+		bytes, err := vfsInstance.ReadFile("protected.txt")
+		assert.NoError(t, err)
+		assert.Equal(t, "secret", string(bytes))
 	})
 }
 

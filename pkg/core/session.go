@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/codesnort/codesnort-swe/pkg/models"
@@ -50,6 +51,9 @@ type SessionThreadOutput interface {
 	// This is called either when the session completes successfully (err == nil)
 	// or when it encounters an error (err != nil).
 	RunFinished(err error)
+
+	// OnPermissionQuery is called when the session encounters a permission query.
+	OnPermissionQuery(query *tool.ToolPermissionsQuery)
 }
 
 // SessionThread manages a session thread with input and context management.
@@ -59,14 +63,16 @@ type SessionThread struct {
 	system        *SweSystem
 	outputHandler SessionThreadOutput
 
-	mu               sync.Mutex
-	session          *SweSession
-	sessionRunning   bool
-	backgroundCtx    context.Context
-	cancelFunc       context.CancelFunc
-	inputQueue       []string
-	interruptPending bool
-	paused           bool
+	mu                     sync.Mutex
+	session                *SweSession
+	sessionRunning         bool
+	backgroundCtx          context.Context
+	cancelFunc             context.CancelFunc
+	inputQueue             []string
+	interruptPending       bool
+	paused                 bool
+	resumePending          bool
+	pendingPermissionQuery *tool.ToolPermissionsQuery
 }
 
 // NewSessionThread creates a new SessionThread with the given system and output handler.
@@ -218,6 +224,33 @@ func (c *SessionThread) SetOutputHandler(handler SessionThreadOutput) {
 	}
 }
 
+// PermissionResponse handles the user's response to a permission query.
+func (c *SessionThread) PermissionResponse(response string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.pendingPermissionQuery == nil {
+		return fmt.Errorf("no pending permission query")
+	}
+
+	query := c.pendingPermissionQuery
+	c.pendingPermissionQuery = nil
+
+	// Update privileges based on response
+	if err := c.session.UpdatePermission(query, response); err != nil {
+		return err
+	}
+
+	// Resume session
+	c.paused = false
+	c.resumePending = true
+	if !c.sessionRunning {
+		c.startSessionLocked()
+	}
+
+	return nil
+}
+
 // StartSession initializes a new session with the given model.
 // This method is non-blocking and thread-safe.
 func (c *SessionThread) StartSession(model string) error {
@@ -266,6 +299,47 @@ func (c *SessionThread) runSessionLoop() {
 		// Get next input from queue
 		c.mu.Lock()
 		if len(c.inputQueue) == 0 {
+			if c.resumePending {
+				c.resumePending = false
+				c.interruptPending = false
+				c.mu.Unlock()
+
+				// Run the session without new input (processing pending state/tools)
+				err := c.session.Run(ctx)
+				if err != nil {
+					// Handle session error (which could be another permission query)
+					if permErr, ok := err.(*tool.ToolPermissionsQuery); ok {
+						c.mu.Lock()
+						c.pendingPermissionQuery = permErr
+						c.paused = true
+						c.mu.Unlock()
+
+						c.outputHandler.OnPermissionQuery(permErr)
+						return
+					}
+					c.outputHandler.RunFinished(err)
+					return
+				}
+
+				// If successful, check if we need to continue loop (e.g. check queue again)
+				c.mu.Lock()
+				wasInterrupted := c.interruptPending
+				wasPaused := c.paused
+				c.mu.Unlock()
+
+				if wasPaused {
+					c.outputHandler.RunFinished(nil)
+					return
+				}
+				if wasInterrupted {
+					c.outputHandler.RunFinished(fmt.Errorf("interrupted"))
+					return
+				}
+
+				// Continue loop to check for more input
+				continue
+			}
+
 			// No more input, stop the loop
 			c.mu.Unlock()
 			c.outputHandler.RunFinished(nil)
@@ -293,6 +367,17 @@ func (c *SessionThread) runSessionLoop() {
 
 		// Run the session
 		err = c.session.Run(ctx)
+
+		// Check for permission query
+		if permErr, ok := err.(*tool.ToolPermissionsQuery); ok {
+			c.mu.Lock()
+			c.pendingPermissionQuery = permErr
+			c.paused = true
+			c.mu.Unlock()
+
+			c.outputHandler.OnPermissionQuery(permErr)
+			return
+		}
 
 		// Check if we were interrupted or paused
 		c.mu.Lock()
@@ -345,6 +430,20 @@ func (s *SweSession) Run(ctx context.Context) error {
 
 	// Keep processing until the assistant doesn't make any tool calls
 	for {
+		// Check for pending tool calls from previous run (e.g. after permission grant)
+		if len(s.messages) > 0 {
+			lastMsg := s.messages[len(s.messages)-1]
+			if lastMsg.Role == models.ChatRoleAssistant {
+				toolCalls := lastMsg.GetToolCalls()
+				if len(toolCalls) > 0 {
+					// Execute pending tools
+					if err := s.executeToolCalls(toolCalls); err != nil {
+						return err
+					}
+				}
+			}
+		}
+
 		// Use streaming chat API
 		stream := chatModel.ChatStream(ctx, s.messages, nil, tools)
 
@@ -391,21 +490,36 @@ func (s *SweSession) Run(ctx context.Context) error {
 		}
 
 		// Execute tool calls
-		toolResponses := make([]*tool.ToolResponse, 0, len(toolCalls))
-		for _, toolCall := range toolCalls {
-			response := s.system.Tools.Execute(*toolCall)
-			toolResponses = append(toolResponses, &response)
-
-			// Notify UI handler about tool result
-			if s.outputHandler != nil {
-				s.outputHandler.AddToolCallResult(&response)
-			}
+		if err := s.executeToolCalls(toolCalls); err != nil {
+			return err
 		}
-
-		// Add tool responses to the conversation
-		s.messages = append(s.messages, models.NewToolResponseMessage(toolResponses...))
 	}
 
+	return nil
+}
+
+// executeToolCalls executes the given tool calls and appends the results to the conversation.
+func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
+	toolResponses := make([]*tool.ToolResponse, 0, len(toolCalls))
+	for _, toolCall := range toolCalls {
+		// Use s.Tools which might have access control wrappers
+		response := s.Tools.Execute(*toolCall)
+
+		// Check for permission query
+		if _, ok := response.Error.(*tool.ToolPermissionsQuery); ok {
+			return response.Error
+		}
+
+		toolResponses = append(toolResponses, &response)
+
+		// Notify UI handler about tool result
+		if s.outputHandler != nil {
+			s.outputHandler.AddToolCallResult(&response)
+		}
+	}
+
+	// Add tool responses to the conversation
+	s.messages = append(s.messages, models.NewToolResponseMessage(toolResponses...))
 	return nil
 }
 
@@ -461,11 +575,25 @@ func (s *SweSession) SetRole(roleName string) error {
 		s.VFS = s.system.VFS
 	}
 
-	// Create a new tool registry with access-controlled tools
+	// Create a new tool registry for the session
+	// We start with system tools
+	s.Tools = tool.NewToolRegistry()
+	for _, name := range s.system.Tools.List() {
+		t, _ := s.system.Tools.Get(name)
+		s.Tools.Register(name, t)
+	}
+
+	// Re-register VFS tools to use the session's VFS
+	// This ensures that VFS access controls are respected
+	s.Tools.Register("vfs.read", tool.NewVFSReadTool(s.VFS))
+	s.Tools.Register("vfs.write", tool.NewVFSWriteTool(s.VFS))
+	s.Tools.Register("vfs.delete", tool.NewVFSDeleteTool(s.VFS))
+	s.Tools.Register("vfs.list", tool.NewVFSListTool(s.VFS))
+	s.Tools.Register("vfs.move", tool.NewVFSMoveTool(s.VFS))
+
+	// Create a new tool registry with access-controlled tools if needed
 	if role.ToolsAccess != nil {
-		s.Tools = wrapToolsWithAccessControl(s.system.Tools, role.ToolsAccess)
-	} else {
-		s.Tools = s.system.Tools
+		s.Tools = wrapToolsWithAccessControl(s.Tools, role.ToolsAccess)
 	}
 
 	// Update system prompt by rendering the template with current state
@@ -486,6 +614,41 @@ func (s *SweSession) SetRole(roleName string) error {
 		}
 	}
 
+	return nil
+}
+
+// UpdatePermission updates the permission for a tool or VFS operation based on user response.
+func (s *SweSession) UpdatePermission(query *tool.ToolPermissionsQuery, response string) error {
+	allow := strings.ToLower(response) == "allow"
+	flag := shared.AccessDeny
+	if allow {
+		flag = shared.AccessAllow
+	}
+
+	if query.Meta != nil && query.Meta["type"] == "vfs" {
+		path := query.Meta["path"]
+		op := query.Meta["operation"]
+
+		ac, ok := s.VFS.(*vfs.AccessControlVFS)
+		if ok {
+			ac.SetPermission(path, op, flag)
+		}
+	} else {
+		// Tool permission
+		toolName := query.Tool.Function
+
+		// We need to find the AccessControlTool for this tool
+		t, err := s.Tools.Get(toolName)
+		if err != nil {
+			return err
+		}
+
+		ac, ok := t.(*tool.AccessControlTool)
+		if ok {
+			// We set permission for this specific tool name
+			ac.SetPermission(toolName, flag)
+		}
+	}
 	return nil
 }
 
