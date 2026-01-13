@@ -59,12 +59,13 @@ func TestAccessControlVFS_ReadFile(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ask access is allowed",
+			name: "ask access returns ErrAskPermission",
 			privileges: map[string]FileAccess{
 				"test.txt": {Read: shared.AccessAsk},
 			},
 			path:    "test.txt",
-			wantErr: false,
+			wantErr: true,
+			errType: ErrAskPermission,
 		},
 	}
 

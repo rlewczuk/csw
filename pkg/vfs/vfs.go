@@ -10,6 +10,7 @@ var (
 	ErrPermissionDenied = errors.New("permission denied")
 	ErrNotImplemented   = errors.New("not implemented")
 	ErrInvalidPath      = errors.New("invalid path")
+	ErrAskPermission    = errors.New("ask permission")
 )
 
 // VFS represents virtual filesystem. It encapsulates access to local and remote files and directories,

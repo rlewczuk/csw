@@ -2,7 +2,9 @@ package tool
 
 import (
 	"fmt"
+	"path/filepath"
 
+	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
@@ -43,6 +45,26 @@ func (t *VFSReadTool) Execute(args ToolCall) ToolResponse {
 	}
 
 	content, err := t.vfs.ReadFile(path)
+	if err == vfs.ErrAskPermission {
+		query := &ToolPermissionsQuery{
+			Id:      shared.GenerateUUIDv7(),
+			Tool:    &args,
+			Title:   "Permission Required",
+			Details: fmt.Sprintf("Allow reading file at path: %s", path),
+			Options: []string{
+				"Allow",
+				"Deny",
+				fmt.Sprintf("Allow in %s*", filepath.Dir(path)),
+				fmt.Sprintf("Allow from %s/*", path),
+			},
+			AllowCustomResponse: true,
+		}
+		return ToolResponse{
+			Call:  &args,
+			Error: query,
+			Done:  true,
+		}
+	}
 	if err != nil {
 		return ToolResponse{
 			Call:  &args,
@@ -110,6 +132,26 @@ func (t *VFSWriteTool) Execute(args ToolCall) ToolResponse {
 	}
 
 	err := t.vfs.WriteFile(path, []byte(content))
+	if err == vfs.ErrAskPermission {
+		query := &ToolPermissionsQuery{
+			Id:      shared.GenerateUUIDv7(),
+			Tool:    &args,
+			Title:   "Permission Required",
+			Details: fmt.Sprintf("Allow writing to file at path: %s", path),
+			Options: []string{
+				"Allow",
+				"Deny",
+				fmt.Sprintf("Allow in %s*", filepath.Dir(path)),
+				fmt.Sprintf("Allow from %s/*", path),
+			},
+			AllowCustomResponse: true,
+		}
+		return ToolResponse{
+			Call:  &args,
+			Error: query,
+			Done:  true,
+		}
+	}
 	if err != nil {
 		return ToolResponse{
 			Call:  &args,
@@ -161,6 +203,26 @@ func (t *VFSDeleteTool) Execute(args ToolCall) ToolResponse {
 	}
 
 	err := t.vfs.DeleteFile(path, false, false)
+	if err == vfs.ErrAskPermission {
+		query := &ToolPermissionsQuery{
+			Id:      shared.GenerateUUIDv7(),
+			Tool:    &args,
+			Title:   "Permission Required",
+			Details: fmt.Sprintf("Allow deleting file at path: %s", path),
+			Options: []string{
+				"Allow",
+				"Deny",
+				fmt.Sprintf("Allow in %s*", filepath.Dir(path)),
+				fmt.Sprintf("Allow from %s/*", path),
+			},
+			AllowCustomResponse: true,
+		}
+		return ToolResponse{
+			Call:  &args,
+			Error: query,
+			Done:  true,
+		}
+	}
 	if err != nil {
 		return ToolResponse{
 			Call:  &args,
@@ -212,6 +274,26 @@ func (t *VFSListTool) Execute(args ToolCall) ToolResponse {
 	}
 
 	files, err := t.vfs.ListFiles(path, false)
+	if err == vfs.ErrAskPermission {
+		query := &ToolPermissionsQuery{
+			Id:      shared.GenerateUUIDv7(),
+			Tool:    &args,
+			Title:   "Permission Required",
+			Details: fmt.Sprintf("Allow listing files in directory: %s", path),
+			Options: []string{
+				"Allow",
+				"Deny",
+				fmt.Sprintf("Allow in %s*", path),
+				fmt.Sprintf("Allow from %s/*", path),
+			},
+			AllowCustomResponse: true,
+		}
+		return ToolResponse{
+			Call:  &args,
+			Error: query,
+			Done:  true,
+		}
+	}
 	if err != nil {
 		return ToolResponse{
 			Call:  &args,
@@ -285,6 +367,26 @@ func (t *VFSMoveTool) Execute(args ToolCall) ToolResponse {
 	}
 
 	err := t.vfs.MoveFile(path, destination)
+	if err == vfs.ErrAskPermission {
+		query := &ToolPermissionsQuery{
+			Id:      shared.GenerateUUIDv7(),
+			Tool:    &args,
+			Title:   "Permission Required",
+			Details: fmt.Sprintf("Allow moving file from %s to %s", path, destination),
+			Options: []string{
+				"Allow",
+				"Deny",
+				fmt.Sprintf("Allow in %s*", filepath.Dir(path)),
+				fmt.Sprintf("Allow from %s/*", path),
+			},
+			AllowCustomResponse: true,
+		}
+		return ToolResponse{
+			Call:  &args,
+			Error: query,
+			Done:  true,
+		}
+	}
 	if err != nil {
 		return ToolResponse{
 			Call:  &args,
