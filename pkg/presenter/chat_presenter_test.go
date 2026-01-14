@@ -453,3 +453,39 @@ func TestChatPresenter_PermissionFlow(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "secret", string(bytes))
 }
+
+func TestChatPresenter_SetModel(t *testing.T) {
+	system, _, _ := setupTestSystem(t)
+	// Add another provider
+	mockServer2 := testutil.NewMockHTTPServer()
+	t.Cleanup(func() { mockServer2.Close() })
+
+	client2, err := models.NewOllamaClientWithHTTPClient(mockServer2.URL(), mockServer2.Client())
+	require.NoError(t, err)
+	system.ModelProviders["other"] = client2
+
+	mockHandler := testutil.NewMockSessionOutputHandler()
+	thread := core.NewSessionThread(system, mockHandler)
+	err = thread.StartSession("ollama/initial-model")
+	require.NoError(t, err)
+
+	presenter := NewChatPresenter(system, thread)
+
+	t.Run("switch model successfully", func(t *testing.T) {
+		err := presenter.SetModel("other/new-model")
+		assert.NoError(t, err)
+
+		session := thread.GetSession()
+		assert.Equal(t, "new-model", session.Model())
+	})
+
+	t.Run("switch model invalid format", func(t *testing.T) {
+		err := presenter.SetModel("invalid-format")
+		assert.Error(t, err)
+	})
+
+	t.Run("switch model unknown provider", func(t *testing.T) {
+		err := presenter.SetModel("unknown/model")
+		assert.Error(t, err)
+	})
+}

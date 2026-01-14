@@ -111,4 +111,8 @@ type IChatPresenter interface {
 
 	// PermissionResponse sends user response to permission query.
 	PermissionResponse(response string) error
+
+	// SetModel sets the model used for the chat session.
+	// model string should be formatted as `provider/model-name`.
+	SetModel(model string) error
 }
