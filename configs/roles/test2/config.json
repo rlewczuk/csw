@@ -1,0 +1,8 @@
+{
+  "name": "test2",
+  "description": "Test role 2",
+  "vfs-privileges": {},
+  "tools-access": {
+    "read": "allow"
+  }
+}
