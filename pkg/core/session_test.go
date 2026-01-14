@@ -12,6 +12,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// mockPromptGenerator is defined in system_test.go but we need it here too for session tests
+// This is a simple mock implementation of PromptGenerator for testing
+type mockSessionPromptGenerator struct {
+	prompt string
+}
+
+func newMockSessionPromptGenerator(prompt string) *mockSessionPromptGenerator {
+	return &mockSessionPromptGenerator{prompt: prompt}
+}
+
+func (m *mockSessionPromptGenerator) GetPrompt(tags []string, role *AgentRole, state *AgentState) (string, error) {
+	return m.prompt, nil
+}
+
 func TestSessionThread(t *testing.T) {
 	mockServer := testutil.NewMockHTTPServer()
 	defer mockServer.Close()
@@ -23,10 +37,10 @@ func TestSessionThread(t *testing.T) {
 	tool.RegisterVFSTools(tools, vfsInstance)
 
 	system := &SweSystem{
-		ModelProviders: map[string]models.ModelProvider{"ollama": client},
-		SystemPrompt:   "You are skilled software developer.",
-		Tools:          tools,
-		VFS:            vfsInstance,
+		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+		PromptGenerator: newMockSessionPromptGenerator("You are skilled software developer."),
+		Tools:           tools,
+		VFS:             vfsInstance,
 	}
 
 	t.Run("basic initialization and session management", func(t *testing.T) {
@@ -138,8 +152,8 @@ func TestSessionThread(t *testing.T) {
 		// Verify session processed both messages
 		session := controller.GetSession()
 		messages := session.ChatMessages()
-		// Should have: system prompt + user1 + assistant1 + user2 + assistant2
-		assert.GreaterOrEqual(t, len(messages), 5)
+		// Should have: user1 + assistant1 + user2 + assistant2 (no system prompt without SetRole)
+		assert.GreaterOrEqual(t, len(messages), 4)
 	})
 
 	t.Run("error when prompting without session", func(t *testing.T) {
@@ -234,10 +248,10 @@ func TestSessionThreadSafety(t *testing.T) {
 	tool.RegisterVFSTools(tools, vfsInstance)
 
 	system := &SweSystem{
-		ModelProviders: map[string]models.ModelProvider{"ollama": client},
-		SystemPrompt:   "You are skilled software developer.",
-		Tools:          tools,
-		VFS:            vfsInstance,
+		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+		PromptGenerator: newMockSessionPromptGenerator("You are skilled software developer."),
+		Tools:           tools,
+		VFS:             vfsInstance,
 	}
 
 	t.Run("concurrent GetSession calls", func(t *testing.T) {

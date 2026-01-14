@@ -125,13 +125,25 @@ func run(cmd *cobra.Command, args []string) error {
 	toolRegistry := tool.NewToolRegistry()
 	tool.RegisterVFSTools(toolRegistry, localVFS)
 
+	// Create prompt scanner and generator
+	promptScanner, err := core.NewFileBasedPromptScanner(rolesDir)
+	if err != nil {
+		return fmt.Errorf("failed to create prompt scanner: %w", err)
+	}
+	defer promptScanner.Close()
+
+	promptGenerator, err := core.NewFSPromptGenerator(promptScanner)
+	if err != nil {
+		return fmt.Errorf("failed to create prompt generator: %w", err)
+	}
+
 	// Create SweSystem
 	sweSystem := &core.SweSystem{
-		ModelProviders: modelProviders,
-		SystemPrompt:   "",
-		Tools:          toolRegistry,
-		VFS:            localVFS,
-		Roles:          roleRegistry,
+		ModelProviders:  modelProviders,
+		PromptGenerator: promptGenerator,
+		Tools:           toolRegistry,
+		VFS:             localVFS,
+		Roles:           roleRegistry,
 	}
 
 	// Create a context that can be cancelled on interrupt
