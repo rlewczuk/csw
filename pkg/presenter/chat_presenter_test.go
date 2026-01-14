@@ -16,6 +16,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Mock prompt generator for tests
+type mockPromptGen struct{}
+
+func (m *mockPromptGen) GetPrompt(tags []string, role *core.AgentRole, state *core.AgentState) (string, error) {
+	return "You are skilled software developer.", nil
+}
+
 func setupTestSystem(t *testing.T) (*core.SweSystem, *testutil.MockHTTPServer, vfs.VFS) {
 	mockServer := testutil.NewMockHTTPServer()
 	t.Cleanup(func() { mockServer.Close() })
@@ -29,10 +36,10 @@ func setupTestSystem(t *testing.T) (*core.SweSystem, *testutil.MockHTTPServer, v
 	tool.RegisterVFSTools(tools, vfsInstance)
 
 	system := &core.SweSystem{
-		ModelProviders: map[string]models.ModelProvider{"ollama": client},
-		SystemPrompt:   "You are skilled software developer.",
-		Tools:          tools,
-		VFS:            vfsInstance,
+		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+		PromptGenerator: &mockPromptGen{},
+		Tools:           tools,
+		VFS:             vfsInstance,
 	}
 
 	return system, mockServer, vfsInstance

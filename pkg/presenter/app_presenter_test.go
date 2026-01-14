@@ -93,8 +93,7 @@ func TestAppPresenter_NewSession(t *testing.T) {
 		// Setup role in system
 		roleName := "test_role"
 		testRole := core.AgentRole{
-			Name:         roleName,
-			SystemPrompt: "You are a test assistant.",
+			Name: roleName,
 		}
 		roleSystem.Roles = core.NewAgentRoleRegistry()
 		roleSystem.Roles.Register(testRole)

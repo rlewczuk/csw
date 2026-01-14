@@ -596,12 +596,12 @@ func (s *SweSession) SetRole(roleName string) error {
 		s.Tools = wrapToolsWithAccessControl(s.Tools, role.ToolsAccess)
 	}
 
-	// Update system prompt by rendering the template with current state
-	if role.SystemPrompt != "" {
+	// Generate and update system prompt using the prompt generator
+	if s.system.PromptGenerator != nil {
 		state := s.GetState()
-		renderedPrompt, err := role.RenderSystemPrompt(state)
+		renderedPrompt, err := s.system.PromptGenerator.GetPrompt([]string{"all"}, &role, &state)
 		if err != nil {
-			return fmt.Errorf("failed to render system prompt: %w", err)
+			return fmt.Errorf("failed to generate system prompt: %w", err)
 		}
 
 		// Check if there's already a system message

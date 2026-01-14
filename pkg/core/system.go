@@ -16,8 +16,8 @@ type SweSystem struct {
 	// Map of model providers by name
 	ModelProviders map[string]models.ModelProvider
 
-	// System prompt template
-	SystemPrompt string
+	// Prompt generator
+	PromptGenerator PromptGenerator
 
 	// Tool registry
 	Tools *tool.ToolRegistry
@@ -69,11 +69,6 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		Tools:         s.Tools,
 		outputHandler: outputHandler,
 		workDir:       ".",
-	}
-
-	// Add system prompt if provided
-	if s.SystemPrompt != "" {
-		session.messages = append(session.messages, models.NewTextMessage(models.ChatRoleSystem, s.SystemPrompt))
 	}
 
 	// Store session

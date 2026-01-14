@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -11,6 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// stateAwarePromptGenerator is a mock that uses the state in the prompt
+type stateAwarePromptGenerator struct{}
+
+func (s *stateAwarePromptGenerator) GetPrompt(tags []string, role *AgentRole, state *AgentState) (string, error) {
+	return fmt.Sprintf("You are a developer. Work dir: %s", state.Info.WorkDir), nil
+}
 
 func TestAgentRoleRegistry(t *testing.T) {
 	t.Run("Register and Get", func(t *testing.T) {
@@ -61,8 +69,6 @@ func TestAgentRoleRegistry(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "developer", developer.Name)
 		assert.Equal(t, "A software developer role with full VFS access", developer.Description)
-		assert.NotEmpty(t, developer.SystemPrompt)
-		assert.Contains(t, developer.SystemPrompt, "the best coding agent on the planet")
 
 		// Check that explorer role was loaded
 		explorer, ok := registry.Get("explorer")
@@ -78,23 +84,6 @@ func TestAgentRoleRegistry(t *testing.T) {
 		assert.NotNil(t, developer.ToolsAccess)
 		assert.NotNil(t, explorer.ToolsAccess)
 	})
-
-	t.Run("RenderSystemPrompt renders template with state", func(t *testing.T) {
-		role := AgentRole{
-			Name:         "test",
-			SystemPrompt: "Working directory is {{.Info.WorkDir}}.",
-		}
-
-		state := AgentState{
-			Info: AgentStateCommonInfo{
-				WorkDir: "/home/user/project",
-			},
-		}
-
-		rendered, err := role.RenderSystemPrompt(state)
-		require.NoError(t, err)
-		assert.Equal(t, "Working directory is /home/user/project.", rendered)
-	})
 }
 
 func TestAgentRoleIntegration(t *testing.T) {
@@ -108,9 +97,8 @@ func TestAgentRoleIntegration(t *testing.T) {
 
 	// Define test roles
 	developerRole := AgentRole{
-		Name:         "developer",
-		Description:  "A software developer role with full VFS access",
-		SystemPrompt: "You are an experienced software developer.",
+		Name:        "developer",
+		Description: "A software developer role with full VFS access",
 		VFSPrivileges: map[string]vfs.FileAccess{
 			"**": {
 				Read:   shared.AccessAllow,
@@ -127,9 +115,8 @@ func TestAgentRoleIntegration(t *testing.T) {
 	}
 
 	readOnlyRole := AgentRole{
-		Name:         "readonly",
-		Description:  "A read-only role with limited VFS access",
-		SystemPrompt: "You are a code reviewer with read-only access.",
+		Name:        "readonly",
+		Description: "A read-only role with limited VFS access",
 		VFSPrivileges: map[string]vfs.FileAccess{
 			"**": {
 				Read:   shared.AccessAllow,
@@ -174,21 +161,19 @@ func TestAgentRoleIntegration(t *testing.T) {
 		registry.Register(developerRole)
 
 		system := &SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
-			SystemPrompt:   "Initial system prompt",
-			Tools:          tools,
-			VFS:            mockVFS,
-			Roles:          registry,
+			ModelProviders:  map[string]models.ModelProvider{"mock": mockProvider},
+			PromptGenerator: newMockPromptGenerator("You are an experienced software developer."),
+			Tools:           tools,
+			VFS:             mockVFS,
+			Roles:           registry,
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
-		// Check initial system prompt
+		// Check that initially there is no system prompt (no role set yet)
 		messages := session.ChatMessages()
-		require.Len(t, messages, 1)
-		assert.Equal(t, models.ChatRoleSystem, messages[0].Role)
-		assert.Equal(t, "Initial system prompt", messages[0].Parts[0].Text)
+		require.Len(t, messages, 0)
 
 		// Set role and check updated system prompt
 		err = session.SetRole("developer")
@@ -388,19 +373,22 @@ func TestSweSessionGetState(t *testing.T) {
 
 	t.Run("SetRole renders system prompt with current state", func(t *testing.T) {
 		role := AgentRole{
-			Name:         "dev",
-			Description:  "Developer role",
-			SystemPrompt: "You are a developer. Work dir: {{.Info.WorkDir}}",
+			Name:        "dev",
+			Description: "Developer role",
 		}
 
 		registry := NewAgentRoleRegistry()
 		registry.Register(role)
 
+		// Create a simple mock prompt generator
+		mockGen := &stateAwarePromptGenerator{}
+
 		system := &SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
-			Tools:          tools,
-			VFS:            mockVFS,
-			Roles:          registry,
+			ModelProviders:  map[string]models.ModelProvider{"mock": mockProvider},
+			PromptGenerator: mockGen,
+			Tools:           tools,
+			VFS:             mockVFS,
+			Roles:           registry,
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -413,6 +401,7 @@ func TestSweSessionGetState(t *testing.T) {
 		messages := session.ChatMessages()
 		require.Len(t, messages, 1)
 		assert.Equal(t, models.ChatRoleSystem, messages[0].Role)
-		assert.Equal(t, "You are a developer. Work dir: /test/path", messages[0].Parts[0].Text)
+		// The mock generator includes the work dir in the prompt
+		assert.Contains(t, messages[0].Parts[0].Text, "/test/path")
 	})
 }

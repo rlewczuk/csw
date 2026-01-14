@@ -17,6 +17,13 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
+// Mock prompt generator for TUI tests
+type tuiMockPromptGen struct{}
+
+func (m *tuiMockPromptGen) GetPrompt(tags []string, role *core.AgentRole, state *core.AgentState) (string, error) {
+	return "You are a helpful assistant.", nil
+}
+
 func TestTuiAppViewWithChatIntegration(t *testing.T) {
 	t.Run("chat response appears in app view without user interaction", func(t *testing.T) {
 		// Setup mock LLM server
@@ -31,10 +38,10 @@ func TestTuiAppViewWithChatIntegration(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"ollama": client},
-			SystemPrompt:   "You are a helpful assistant.",
-			Tools:          tools,
-			VFS:            vfsInstance,
+			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator: &tuiMockPromptGen{},
+			Tools:           tools,
+			VFS:             vfsInstance,
 		}
 
 		// Create session thread
@@ -100,10 +107,10 @@ func TestTuiAppViewWithChatIntegration(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"ollama": client},
-			SystemPrompt:   "You are a helpful assistant.",
-			Tools:          tools,
-			VFS:            vfsInstance,
+			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator: &tuiMockPromptGen{},
+			Tools:           tools,
+			VFS:             vfsInstance,
 		}
 
 		// Create session thread
@@ -167,10 +174,10 @@ func TestTuiAppViewWithChatIntegration(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"ollama": client},
-			SystemPrompt:   "You are a helpful assistant.",
-			Tools:          tools,
-			VFS:            vfsInstance,
+			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator: &tuiMockPromptGen{},
+			Tools:           tools,
+			VFS:             vfsInstance,
 		}
 
 		// Create session thread
@@ -249,10 +256,10 @@ func TestTuiAppViewWithChatIntegration(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"ollama": client},
-			SystemPrompt:   "You are a helpful assistant.",
-			Tools:          tools,
-			VFS:            vfsInstance,
+			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator: &tuiMockPromptGen{},
+			Tools:           tools,
+			VFS:             vfsInstance,
 		}
 
 		// Create session thread
@@ -329,10 +336,10 @@ func TestTuiAppViewWithChatIntegration(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"ollama": client},
-			SystemPrompt:   "You are a helpful assistant.",
-			Tools:          tools,
-			VFS:            vfsInstance,
+			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator: &tuiMockPromptGen{},
+			Tools:           tools,
+			VFS:             vfsInstance,
 		}
 
 		// Create session thread
@@ -412,10 +419,10 @@ func TestEscKeyOpensMenu(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"ollama": client},
-			SystemPrompt:   "You are a helpful assistant.",
-			Tools:          tools,
-			VFS:            vfsInstance,
+			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator: &tuiMockPromptGen{},
+			Tools:           tools,
+			VFS:             vfsInstance,
 		}
 
 		// Create session thread
@@ -479,10 +486,10 @@ func TestAppViewRefreshBug(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"ollama": client},
-			SystemPrompt:   "You are a helpful assistant.",
-			Tools:          tools,
-			VFS:            vfsInstance,
+			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator: &tuiMockPromptGen{},
+			Tools:           tools,
+			VFS:             vfsInstance,
 		}
 
 		// Create session thread

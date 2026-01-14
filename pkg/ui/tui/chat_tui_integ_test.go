@@ -16,6 +16,13 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
+// Mock prompt generator for chat TUI tests
+type chatTuiMockPromptGen struct{}
+
+func (m *chatTuiMockPromptGen) GetPrompt(tags []string, role *core.AgentRole, state *core.AgentState) (string, error) {
+	return "You are a helpful assistant.", nil
+}
+
 func TestTuiChatViewWithPresenter(t *testing.T) {
 	t.Run("basic chat interaction", func(t *testing.T) {
 		// Setup mock LLM server
@@ -30,10 +37,10 @@ func TestTuiChatViewWithPresenter(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"ollama": client},
-			SystemPrompt:   "You are a helpful assistant.",
-			Tools:          tools,
-			VFS:            vfsInstance,
+			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator: &chatTuiMockPromptGen{},
+			Tools:           tools,
+			VFS:             vfsInstance,
 		}
 
 		// Create session thread
@@ -81,8 +88,8 @@ func TestTuiChatViewWithPresenter(t *testing.T) {
 		// Verify session has the messages
 		session := thread.GetSession()
 		messages := session.ChatMessages()
-		// Should have: system prompt + user message + assistant response
-		assert.GreaterOrEqual(t, len(messages), 3)
+		// Should have: user message + assistant response (no system prompt without SetRole)
+		assert.GreaterOrEqual(t, len(messages), 2)
 
 		// Cleanup
 		term.SendKey("esc")
@@ -102,10 +109,10 @@ func TestTuiChatViewWithPresenter(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"ollama": client},
-			SystemPrompt:   "You are a helpful assistant.",
-			Tools:          tools,
-			VFS:            vfsInstance,
+			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator: &chatTuiMockPromptGen{},
+			Tools:           tools,
+			VFS:             vfsInstance,
 		}
 
 		// Create session thread
@@ -151,8 +158,8 @@ func TestTuiChatViewWithPresenter(t *testing.T) {
 		session := thread.GetSession()
 		messages := session.ChatMessages()
 
-		// Should have system prompt + user message + assistant response
-		assert.GreaterOrEqual(t, len(messages), 3)
+		// Should have user message + assistant response (no system prompt without SetRole)
+		assert.GreaterOrEqual(t, len(messages), 2)
 
 		// Find the user message
 		var foundUserMessage bool
@@ -182,10 +189,10 @@ func TestTuiChatViewWithPresenter(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"ollama": client},
-			SystemPrompt:   "You are a helpful assistant.",
-			Tools:          tools,
-			VFS:            vfsInstance,
+			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator: &chatTuiMockPromptGen{},
+			Tools:           tools,
+			VFS:             vfsInstance,
 		}
 
 		// Create session thread
@@ -261,10 +268,10 @@ func TestTuiChatViewWithPresenter(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"ollama": client},
-			SystemPrompt:   "You are a helpful assistant.",
-			Tools:          tools,
-			VFS:            vfsInstance,
+			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator: &chatTuiMockPromptGen{},
+			Tools:           tools,
+			VFS:             vfsInstance,
 		}
 
 		// Create session thread
@@ -335,10 +342,10 @@ func TestTuiChatViewWithPresenter(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"ollama": client},
-			SystemPrompt:   "You are a helpful assistant.",
-			Tools:          tools,
-			VFS:            vfsInstance,
+			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator: &chatTuiMockPromptGen{},
+			Tools:           tools,
+			VFS:             vfsInstance,
 		}
 
 		// Create session thread
