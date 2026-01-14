@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -460,5 +461,79 @@ func TestTuiChatViewBubbletea(t *testing.T) {
 
 		// Widget cursor should have moved
 		assert.Equal(t, 1, view.model.permissionWidget.cursor)
+	})
+
+	t.Run("QueryPermission overlays on bottom keeping chat visible", func(t *testing.T) {
+		presenter := mock.NewMockChatPresenter()
+		view, err := NewTuiChatView(presenter)
+		assert.NoError(t, err)
+
+		// Set window size
+		view.model.Update(tea.WindowSizeMsg{
+			Width:  80,
+			Height: 24,
+		})
+
+		// Record initial viewport height (before permission query)
+		initialViewportHeight := view.model.viewport.Height
+
+		// Add some chat messages so there's content to verify visibility
+		err = view.AddMessage(&ui.ChatMessageUI{
+			Id:   "msg-1",
+			Role: ui.ChatRoleUser,
+			Text: "User message that should remain visible",
+		})
+		assert.NoError(t, err)
+
+		err = view.AddMessage(&ui.ChatMessageUI{
+			Id:   "msg-2",
+			Role: ui.ChatRoleAssistant,
+			Text: "Assistant response that should remain visible",
+		})
+		assert.NoError(t, err)
+
+		// Query permission
+		query := &ui.PermissionQueryUI{
+			Id:      "test-query",
+			Title:   "Test Permission",
+			Details: "Do you want to proceed?",
+			Options: []string{"Yes", "No"},
+		}
+
+		err = view.QueryPermission(query)
+		assert.NoError(t, err)
+
+		// Get the rendered view AFTER permission query
+		viewAfterPermission := view.model.View()
+
+		// Verify chat messages are still visible in the view
+		assert.Contains(t, viewAfterPermission, "User message that should remain visible", "Chat messages should be visible above permission query")
+		assert.Contains(t, viewAfterPermission, "Assistant response that should remain visible", "Chat messages should be visible above permission query")
+
+		// Verify permission query is shown
+		assert.Contains(t, viewAfterPermission, "Test Permission", "Permission query should be visible")
+		assert.Contains(t, viewAfterPermission, "Do you want to proceed?", "Permission query details should be visible")
+
+		// Verify input box is NOT shown (should be replaced by permission widget)
+		assert.NotContains(t, viewAfterPermission, "Type your message here...", "Input box placeholder should not be visible when permission query is shown")
+
+		// Verify viewport content is present (chat messages)
+		assert.True(t, len(view.model.viewport.View()) > 0, "Viewport should contain chat messages")
+
+		// Verify the permission widget appears AFTER the viewport (at bottom)
+		// by checking the position of chat content vs permission content in the view string
+		chatPos := strings.Index(viewAfterPermission, "User message that should remain visible")
+		permissionPos := strings.Index(viewAfterPermission, "Test Permission")
+		assert.Less(t, chatPos, permissionPos, "Chat messages should appear before permission query in the view (permission at bottom)")
+
+		// CRITICAL: Verify viewport height was adjusted to account for permission widget being larger than input box
+		// The viewport should be reduced in height to make room for the permission widget
+		// This ensures chat content doesn't get scrolled up and hidden
+		viewportHeightAfterPermission := view.model.viewport.Height
+
+		// Permission widget is taller than the textarea (3 lines), so viewport should be smaller
+		// to maintain the same total view height
+		assert.Less(t, viewportHeightAfterPermission, initialViewportHeight,
+			"Viewport height should be reduced when permission query is shown to prevent chat content from scrolling off screen")
 	})
 }

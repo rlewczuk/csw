@@ -226,25 +226,26 @@ func (m *tuiChatViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *tuiChatViewModel) View() string {
-	// If showing permission widget, display it instead of the textarea
-	if m.showingPermission && m.permissionWidget != nil {
-		var view strings.Builder
-		view.WriteString(m.viewport.View())
-		view.WriteString("\n\n")
-		view.WriteString(m.permissionWidget.View())
-		return view.String()
-	}
-
 	var view strings.Builder
 
+	// Always show viewport with chat messages
 	view.WriteString(m.viewport.View())
 	view.WriteString("\n\n")
-	view.WriteString(m.textarea.View())
 
-	if m.err != nil {
-		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-		view.WriteString("\n")
-		view.WriteString(errorStyle.Render(fmt.Sprintf("Error: %v", m.err)))
+	// If showing permission widget, overlay it at the bottom instead of textarea
+	if m.showingPermission && m.permissionWidget != nil {
+		// Render permission widget without centering (just the widget itself)
+		permissionView := m.permissionWidget.ViewAtBottom(m.width)
+		view.WriteString(permissionView)
+	} else {
+		// Show normal input box
+		view.WriteString(m.textarea.View())
+
+		if m.err != nil {
+			errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+			view.WriteString("\n")
+			view.WriteString(errorStyle.Render(fmt.Sprintf("Error: %v", m.err)))
+		}
 	}
 
 	return view.String()
@@ -347,6 +348,10 @@ func (v *TuiChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 		v.model.showingPermission = false
 		v.model.permissionWidget = nil
 		v.model.textarea.Focus()
+
+		// Restore viewport height to normal (account for textarea height + spacing)
+		v.model.viewport.Height = v.model.height - v.model.textarea.Height() - 3
+
 		if v.parent != nil {
 			v.parent.Notify(ui.CompositeNotificationRefresh)
 		}
@@ -357,6 +362,20 @@ func (v *TuiChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 	v.model.permissionWidget.Show()
 	v.model.showingPermission = true
 	v.model.textarea.Blur()
+
+	// Adjust viewport height to account for permission widget being taller than textarea
+	// Permission widget height - textarea height = difference we need to subtract from viewport
+	permissionHeight := v.model.permissionWidget.GetHeight()
+	textareaHeight := v.model.textarea.Height() + 2 // +2 for spacing ("\n\n")
+	heightDifference := permissionHeight - textareaHeight
+
+	if heightDifference > 0 {
+		// Reduce viewport height so permission widget fits without scrolling chat content up
+		v.model.viewport.Height = v.model.height - permissionHeight - 2 // -2 for spacing
+		if v.model.viewport.Height < 1 {
+			v.model.viewport.Height = 1 // Ensure minimum viewport height
+		}
+	}
 
 	if v.parent != nil {
 		v.parent.Notify(ui.CompositeNotificationRefresh)
