@@ -251,6 +251,19 @@ func (c *SessionThread) PermissionResponse(response string) error {
 	return nil
 }
 
+// SetModel sets the model for the current session.
+// model string should be formatted as `provider/model-name`.
+func (c *SessionThread) SetModel(model string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.session == nil {
+		return fmt.Errorf("SessionThread.SetModel() [session.go]: session not initialized")
+	}
+
+	return c.session.SetModel(model)
+}
+
 // StartSession initializes a new session with the given model.
 // This method is non-blocking and thread-safe.
 func (c *SessionThread) StartSession(model string) error {
@@ -554,6 +567,26 @@ func (s *SweSession) SetWorkDir(dir string) {
 // Role returns the current agent role for this session.
 func (s *SweSession) Role() *AgentRole {
 	return s.role
+}
+
+// SetModel sets the model used for the session.
+// model string should be formatted as `provider/model-name`.
+func (s *SweSession) SetModel(modelStr string) error {
+	parts := strings.SplitN(modelStr, "/", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("SweSession.SetModel() [session.go]: invalid model format: %s, expected provider/model-name", modelStr)
+	}
+	providerName := parts[0]
+	modelName := parts[1]
+
+	provider, ok := s.system.ModelProviders[providerName]
+	if !ok {
+		return fmt.Errorf("SweSession.SetModel() [session.go]: provider not found: %s", providerName)
+	}
+
+	s.provider = provider
+	s.model = modelName
+	return nil
 }
 
 // SetRole changes the agent role for this session.

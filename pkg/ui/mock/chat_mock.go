@@ -186,6 +186,13 @@ func (m *MockChatPresenter) PermissionResponse(response string) error {
 	return m.PermissionResponseErr
 }
 
+// SetModel sets the model used for the chat session.
+func (m *MockChatPresenter) SetModel(model string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return nil
+}
+
 // Reset clears all recorded calls and errors.
 func (m *MockChatPresenter) Reset() {
 	m.mu.Lock()

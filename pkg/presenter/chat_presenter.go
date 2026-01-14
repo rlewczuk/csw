@@ -102,6 +102,11 @@ func (p *ChatPresenter) PermissionResponse(response string) error {
 	return p.thread.PermissionResponse(response)
 }
 
+// SetModel sets the model used for the chat session.
+func (p *ChatPresenter) SetModel(model string) error {
+	return p.thread.SetModel(model)
+}
+
 // OnPermissionQuery is called when the session encounters a permission query.
 // Implements core.SessionThreadOutput.
 func (p *ChatPresenter) OnPermissionQuery(query *tool.ToolPermissionsQuery) {
