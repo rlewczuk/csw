@@ -2,5 +2,6 @@
   "type": "ollama",
   "name": "beha",
   "description": "Local server running ollama",
-  "url": "http://beha:11434"
+  "url": "http://beha:11434",
+  "tags": ["devstral"]
 }
