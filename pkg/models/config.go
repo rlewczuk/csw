@@ -29,6 +29,8 @@ type ModelProviderConfig struct {
 	DefaultTopK int `json:"default_top_k,omitempty"`
 	// ContextLengthLimit is the maximum context length in tokens
 	ContextLengthLimit int `json:"context_length_limit,omitempty"`
+	// Tags is a list of tags for the provider
+	Tags []string `json:"tags,omitempty"`
 }
 
 // FromConfig creates a new ModelProvider instance from the configuration.

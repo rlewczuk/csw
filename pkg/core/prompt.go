@@ -1,0 +1,452 @@
+package core
+
+import (
+	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"text/template"
+
+	"github.com/fsnotify/fsnotify"
+)
+
+// PromptScanner scans and loads prompt fragments from a source.
+type PromptScanner interface {
+	// GetFragments generates a prompt for the given tags, role and state.
+	// returns map where keys are filenames (dir/file_prefix with role name or 'all' as dir and no extension)
+	// and values are unprocessed contents of those files
+	GetFragments(tags []string, role *AgentRole) (map[string]string, error)
+
+	// HasChanged returns true if any of the fragments has changed since last scan.
+	HasChanged() bool
+
+	// Close stops watching for changes and releases all resources.
+	Close() error
+}
+
+// PromptGenerator generates a prompt for the given tags, role and state.
+type PromptGenerator interface {
+	// GetPrompt generates a prompt for the given tags, role and state.
+	// Takes map of fragments from GetFragments, concatenates and processes using text/template it to create final prompt;
+	// Also responsible for eventual result caching if any of files has changed or agent state data has changed;
+	GetPrompt(tags []string, role *AgentRole, state *AgentState) (string, error)
+}
+
+// FileBasedPromptScanner implements PromptScanner interface.
+// It reads prompt fragments from the roles directory and caches them.
+// It watches for changes in the roles directory and reloads the cache when needed.
+type FileBasedPromptScanner struct {
+	rolesDir string
+	cache    map[string]string // key: filepath relative to rolesDir, value: content
+	mu       sync.RWMutex
+	watcher  *fsnotify.Watcher
+	stopCh   chan struct{}
+	changed  bool // tracks if fragments have changed since last HasChanged call
+}
+
+// FSPromptGenerator implements PromptGenerator interface.
+// It accepts one or more PromptScanner instances and merges their fragments.
+type FSPromptGenerator struct {
+	scanners []PromptScanner
+}
+
+// promptFragment represents a single prompt fragment file.
+type promptFragment struct {
+	order    int
+	kind     string // "system" or "tools"
+	toolName string // empty for system fragments
+	tag      string // "all" for untagged fragments, or specific tag
+	filename string
+	content  string
+	isAll    bool // true if from "all" directory
+}
+
+// NewFileBasedPromptScanner creates a new FileBasedPromptScanner.
+func NewFileBasedPromptScanner(rolesDir string) (*FileBasedPromptScanner, error) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, fmt.Errorf("NewFileBasedPromptScanner() [prompt.go]: failed to create watcher: %w", err)
+	}
+
+	scanner := &FileBasedPromptScanner{
+		rolesDir: rolesDir,
+		cache:    make(map[string]string),
+		watcher:  watcher,
+		stopCh:   make(chan struct{}),
+		changed:  false,
+	}
+
+	// Load initial cache
+	if err := scanner.loadCache(); err != nil {
+		watcher.Close()
+		return nil, fmt.Errorf("NewFileBasedPromptScanner() [prompt.go]: failed to load initial cache: %w", err)
+	}
+
+	// Start watching
+	go scanner.watch()
+
+	return scanner, nil
+}
+
+// NewFSPromptGenerator creates a new FSPromptGenerator with the given scanners.
+func NewFSPromptGenerator(scanners ...PromptScanner) (*FSPromptGenerator, error) {
+	if len(scanners) == 0 {
+		return nil, fmt.Errorf("NewFSPromptGenerator() [prompt.go]: at least one scanner is required")
+	}
+
+	return &FSPromptGenerator{
+		scanners: scanners,
+	}, nil
+}
+
+// Close stops the watcher and cleans up resources.
+func (s *FileBasedPromptScanner) Close() error {
+	close(s.stopCh)
+	return s.watcher.Close()
+}
+
+// HasChanged returns true if any of the fragments has changed since last call.
+func (s *FileBasedPromptScanner) HasChanged() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := s.changed
+	s.changed = false // reset the flag
+	return result
+}
+
+// loadCache loads all prompt fragments from the roles directory.
+func (s *FileBasedPromptScanner) loadCache() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Clear existing cache
+	s.cache = make(map[string]string)
+
+	// Remove existing watches
+	for _, watch := range s.watcher.WatchList() {
+		s.watcher.Remove(watch)
+	}
+
+	// Walk through roles directory
+	err := filepath.Walk(s.rolesDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Watch directories
+		if info.IsDir() {
+			if err := s.watcher.Add(path); err != nil {
+				return fmt.Errorf("failed to watch directory %s: %w", path, err)
+			}
+			return nil
+		}
+
+		// Read files that match our pattern
+		if strings.HasSuffix(info.Name(), ".md") {
+			relPath, err := filepath.Rel(s.rolesDir, path)
+			if err != nil {
+				return fmt.Errorf("failed to get relative path: %w", err)
+			}
+
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("failed to read file %s: %w", path, err)
+			}
+
+			s.cache[relPath] = string(content)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("loadCache() [prompt.go]: failed to walk directory: %w", err)
+	}
+
+	// Mark as changed
+	s.changed = true
+
+	return nil
+}
+
+// watch monitors the roles directory for changes.
+func (s *FileBasedPromptScanner) watch() {
+	for {
+		select {
+		case <-s.stopCh:
+			return
+		case event, ok := <-s.watcher.Events:
+			if !ok {
+				return
+			}
+			// Reload cache on any write or create event
+			if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) != 0 {
+				s.loadCache()
+			}
+		case err, ok := <-s.watcher.Errors:
+			if !ok {
+				return
+			}
+			// Log error but continue watching
+			fmt.Fprintf(os.Stderr, "FileBasedPromptScanner.watch() [prompt.go]: watcher error: %v\n", err)
+		}
+	}
+}
+
+// parseFilename parses a prompt fragment filename.
+// Returns: order, kind, toolName, tag, ok
+// Format: <num>-system-<tag>.md or <num>-system.md or <num>-tools-<toolname>-<tag>.md
+func parseFilename(filename string) (int, string, string, string, bool) {
+	// Remove .md extension
+	if !strings.HasSuffix(filename, ".md") {
+		return 0, "", "", "", false
+	}
+	name := strings.TrimSuffix(filename, ".md")
+
+	// Split by dash
+	parts := strings.Split(name, "-")
+	if len(parts) < 2 {
+		return 0, "", "", "", false
+	}
+
+	// Parse order
+	order, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, "", "", "", false
+	}
+
+	kind := parts[1]
+
+	switch kind {
+	case "system":
+		// Format: <num>-system-<tag>.md or <num>-system.md
+		tag := "all"
+		if len(parts) > 2 {
+			tag = strings.Join(parts[2:], "-")
+		}
+		return order, kind, "", tag, true
+
+	case "tools":
+		// Format: <num>-tools-<toolname>-<tag>.md or <num>-tools-<toolname>.md
+		if len(parts) < 3 {
+			return 0, "", "", "", false
+		}
+		toolName := parts[2]
+		tag := "all"
+		if len(parts) > 3 {
+			tag = strings.Join(parts[3:], "-")
+		}
+		return order, kind, toolName, tag, true
+
+	default:
+		return 0, "", "", "", false
+	}
+}
+
+// GetFragments generates a prompt for the given tags, role and state.
+// Returns map where keys are filenames (dir/file_prefix with role name or 'all' as dir and no extension)
+// and values are unprocessed contents of those files.
+func (s *FileBasedPromptScanner) GetFragments(tags []string, role *AgentRole) (map[string]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if role == nil {
+		return nil, fmt.Errorf("GetFragments() [prompt.go]: role cannot be nil")
+	}
+
+	// Collect all fragments
+	var fragments []promptFragment
+
+	for relPath, content := range s.cache {
+		// Split path into directory and filename
+		dir := filepath.Dir(relPath)
+		filename := filepath.Base(relPath)
+
+		// Check if it's from "all" or role-specific directory
+		isAll := (dir == "all" || strings.HasPrefix(dir, "all"+string(filepath.Separator)))
+		isRole := (dir == role.Name || strings.HasPrefix(dir, role.Name+string(filepath.Separator)))
+
+		if !isAll && !isRole {
+			continue
+		}
+
+		// Parse filename
+		order, kind, toolName, tag, ok := parseFilename(filename)
+		if !ok {
+			continue
+		}
+
+		// Check if tag matches
+		// A fragment with tag "all" matches any tags list
+		// A fragment with a specific tag only matches if that tag is in the tags list
+		if tag != "all" && !contains(tags, tag) {
+			continue
+		}
+
+		// For tools fragments, check if tool is enabled
+		if kind == "tools" {
+			if role.ToolsAccess == nil {
+				continue
+			}
+			access, ok := role.ToolsAccess[toolName]
+			if !ok || access == "" {
+				continue
+			}
+		}
+
+		fragments = append(fragments, promptFragment{
+			order:    order,
+			kind:     kind,
+			toolName: toolName,
+			tag:      tag,
+			filename: relPath,
+			content:  content,
+			isAll:    isAll,
+		})
+	}
+
+	// Filter out duplicates (role-specific overrides "all")
+	fragments = filterDuplicates(fragments)
+
+	// Sort by order
+	sort.Slice(fragments, func(i, j int) bool {
+		return fragments[i].order < fragments[j].order
+	})
+
+	// Build result map
+	result := make(map[string]string)
+	for _, f := range fragments {
+		// Key format: dir/file_prefix (without extension)
+		dir := "all"
+		if !f.isAll {
+			dir = role.Name
+		}
+
+		// Build key
+		var key string
+		if f.kind == "system" {
+			if f.tag == "all" {
+				key = fmt.Sprintf("%s/%d-system", dir, f.order)
+			} else {
+				key = fmt.Sprintf("%s/%d-system-%s", dir, f.order, f.tag)
+			}
+		} else {
+			if f.tag == "all" {
+				key = fmt.Sprintf("%s/%d-tools-%s", dir, f.order, f.toolName)
+			} else {
+				key = fmt.Sprintf("%s/%d-tools-%s-%s", dir, f.order, f.toolName, f.tag)
+			}
+		}
+		result[key] = f.content
+	}
+
+	return result, nil
+}
+
+// filterDuplicates filters out fragments from "all" directory that have corresponding
+// fragments in role-specific directory with the same order, kind, toolName, and tag.
+func filterDuplicates(fragments []promptFragment) []promptFragment {
+	// Build a set of role-specific fragments
+	roleFragments := make(map[string]bool)
+	for _, f := range fragments {
+		if !f.isAll {
+			key := fmt.Sprintf("%d-%s-%s-%s", f.order, f.kind, f.toolName, f.tag)
+			roleFragments[key] = true
+		}
+	}
+
+	// Filter out "all" fragments that have role-specific counterparts
+	var result []promptFragment
+	for _, f := range fragments {
+		key := fmt.Sprintf("%d-%s-%s-%s", f.order, f.kind, f.toolName, f.tag)
+		if f.isAll && roleFragments[key] {
+			continue
+		}
+		result = append(result, f)
+	}
+
+	return result
+}
+
+// GetPrompt generates a prompt for the given tags, role and state.
+// Takes map of fragments from scanners, concatenates and processes using text/template
+// to create final prompt.
+func (g *FSPromptGenerator) GetPrompt(tags []string, role *AgentRole, state *AgentState) (string, error) {
+	// Get fragments from all scanners
+	fragments := make(map[string]string)
+	// Merge fragments from all scanners in order
+	for _, scanner := range g.scanners {
+		scannerFragments, err := scanner.GetFragments(tags, role)
+		if err != nil {
+			return "", fmt.Errorf("GetPrompt() [prompt.go]: failed to get fragments: %w", err)
+		}
+		// Merge: later scanners override earlier ones
+		for key, value := range scannerFragments {
+			fragments[key] = value
+		}
+	}
+
+	// Sort fragment keys by extracting the order number
+	type keyOrder struct {
+		key   string
+		order int
+	}
+
+	keyOrders := make([]keyOrder, 0, len(fragments))
+	for key := range fragments {
+		// Extract order from key (e.g., "all/10-system" -> 10)
+		parts := strings.Split(filepath.Base(key), "-")
+		if len(parts) > 0 {
+			if order, err := strconv.Atoi(parts[0]); err == nil {
+				keyOrders = append(keyOrders, keyOrder{key: key, order: order})
+				continue
+			}
+		}
+		// Fallback: order = 0 if we can't parse
+		keyOrders = append(keyOrders, keyOrder{key: key, order: 0})
+	}
+
+	// Sort by order, then by key alphabetically for stable sorting
+	sort.Slice(keyOrders, func(i, j int) bool {
+		if keyOrders[i].order != keyOrders[j].order {
+			return keyOrders[i].order < keyOrders[j].order
+		}
+		return keyOrders[i].key < keyOrders[j].key
+	})
+
+	// Concatenate fragments
+	var combined strings.Builder
+	for i, ko := range keyOrders {
+		if i > 0 {
+			combined.WriteString("\n\n")
+		}
+		combined.WriteString(fragments[ko.key])
+	}
+
+	// Process template
+	tmpl, err := template.New("prompt").Parse(combined.String())
+	if err != nil {
+		return "", fmt.Errorf("GetPrompt() [prompt_impl.go]: failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, state); err != nil {
+		return "", fmt.Errorf("GetPrompt() [prompt_impl.go]: failed to execute template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+// contains checks if a string is in a slice.
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
