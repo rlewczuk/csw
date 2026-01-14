@@ -228,6 +228,57 @@ func (w *PermissionQueryWidget) View() string {
 	return w.centerInScreen(rendered)
 }
 
+// ViewAtBottom renders the widget at the bottom of the screen, replacing the input box.
+// This is used for overlay mode where the widget should appear at the bottom while
+// keeping chat content visible above.
+func (w *PermissionQueryWidget) ViewAtBottom(screenWidth int) string {
+	if !w.visible || w.closed {
+		return ""
+	}
+
+	var content strings.Builder
+
+	// Add title
+	if w.query.Title != "" {
+		content.WriteString(w.titleStyle.Render(w.query.Title))
+		content.WriteString("\n")
+	}
+
+	// Add details
+	if w.query.Details != "" {
+		content.WriteString(w.detailsStyle.Render(w.query.Details))
+		content.WriteString("\n")
+	}
+
+	// Add options
+	for i, option := range w.query.Options {
+		if i == w.cursor && !w.isInCustomInputMode() {
+			content.WriteString(w.selectedStyle.Render("▶ " + option))
+		} else {
+			content.WriteString(w.itemStyle.Render("  " + option))
+		}
+		content.WriteString("\n")
+	}
+
+	// Add custom input option if allowed
+	if w.query.AllowCustomResponse != "" {
+		customIdx := len(w.query.Options)
+		if w.isInCustomInputMode() {
+			// Show active text input
+			content.WriteString(w.selectedStyle.Render("▶ "))
+			content.WriteString(w.textInput.View())
+		} else if customIdx == w.cursor {
+			// Show selected but not active
+			content.WriteString(w.selectedStyle.Render("▶ " + w.query.AllowCustomResponse))
+		} else {
+			content.WriteString(w.itemStyle.Render("  " + w.query.AllowCustomResponse))
+		}
+	}
+
+	// Apply container style without centering - just render at bottom
+	return w.containerStyle.Render(content.String())
+}
+
 // selectOption executes the callback with the selected option.
 func (w *PermissionQueryWidget) selectOption() {
 	if w.cursor >= 0 && w.cursor < len(w.query.Options) {
@@ -243,6 +294,41 @@ func (w *PermissionQueryWidget) selectOption() {
 // isInCustomInputMode returns true if the custom input is currently active.
 func (w *PermissionQueryWidget) isInCustomInputMode() bool {
 	return w.textInput.Focused()
+}
+
+// GetHeight returns the rendered height of the permission widget (in lines).
+// This includes title, details, options, and the border/padding from the container style.
+func (w *PermissionQueryWidget) GetHeight() int {
+	if !w.visible || w.closed {
+		return 0
+	}
+
+	height := 0
+
+	// Title + newline
+	if w.query.Title != "" {
+		height += 2 // Title line + margin bottom (1 line)
+	}
+
+	// Details + newline
+	if w.query.Details != "" {
+		height += 2 // Details line + margin bottom (1 line)
+	}
+
+	// Options (one line each)
+	height += len(w.query.Options)
+
+	// Custom input option if allowed
+	if w.query.AllowCustomResponse != "" {
+		height += 1
+	}
+
+	// Container style padding (top and bottom) + border (top and bottom)
+	// From containerStyle: Padding(1, 2) = 1 line top + 1 line bottom
+	// Border adds 2 more lines (top and bottom)
+	height += 4
+
+	return height
 }
 
 // centerInScreen centers the widget content in the terminal.
