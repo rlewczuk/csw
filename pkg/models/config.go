@@ -29,8 +29,11 @@ type ModelProviderConfig struct {
 	DefaultTopK int `json:"default_top_k,omitempty"`
 	// ContextLengthLimit is the maximum context length in tokens
 	ContextLengthLimit int `json:"context_length_limit,omitempty"`
-	// Tags is a list of tags for the provider
+	// Tags is a list of tags for the provider (deprecated, use ModelTags instead)
 	Tags []string `json:"tags,omitempty"`
+	// ModelTags contains model-to-tag mappings specific to this provider.
+	// Each mapping has a regexp pattern for model names and a tag to assign.
+	ModelTags []ModelTagMapping `json:"model_tags,omitempty"`
 }
 
 // FromConfig creates a new ModelProvider instance from the configuration.

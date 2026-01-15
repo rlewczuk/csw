@@ -20,6 +20,7 @@
 - Try to be straighforward, avoid generating extra wrapper functions if it is not really necessary (i.e. at least three or more call sites for wrapper);
 - Use standard library as long as possible, avoid adding dependencies if it is not really necessary;
 - DO NOT use scripts to edit files, always edit files manually; if there are too many changes, just edit bigger chunks manually;
+- When returning errors, always add function name and file name to error message; if function is a receiver, add 'Type.Method()' as a function name;
 
 Packages implemented:
 - `pkg/core`: Core agent logic

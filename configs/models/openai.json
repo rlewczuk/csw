@@ -3,5 +3,18 @@
   "description": "OpenAI API",
   "url": "https://api.openai.com/v1",
   "api_key": "test-api-key",
-  "tags": ["openai"]
+  "model_tags": [
+    {
+      "model": "^gpt-4.*",
+      "tag": "gpt4"
+    },
+    {
+      "model": "^gpt-3\\.5.*",
+      "tag": "gpt35"
+    },
+    {
+      "model": "^gpt-.*",
+      "tag": "openai"
+    }
+  ]
 }

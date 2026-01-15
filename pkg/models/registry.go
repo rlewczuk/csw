@@ -81,9 +81,15 @@ func (r *ProviderRegistry) List() []string {
 // The provider name is derived from the filename (without extension).
 // If the Name field in the JSON is empty or doesn't match the filename, it will be set to the filename.
 func (r *ProviderRegistry) LoadFromDirectory(dirPath string) error {
+	return r.LoadFromDirectoryWithTags(dirPath, nil)
+}
+
+// LoadFromDirectoryWithTags loads provider configurations and registers model tags with the given registry.
+// If tagRegistry is nil, model tags are ignored.
+func (r *ProviderRegistry) LoadFromDirectoryWithTags(dirPath string, tagRegistry *ModelTagRegistry) error {
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		return fmt.Errorf("failed to read directory %s: %w", dirPath, err)
+		return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to read directory %s: %w", dirPath, err)
 	}
 
 	for _, entry := range entries {
@@ -104,12 +110,12 @@ func (r *ProviderRegistry) LoadFromDirectory(dirPath string) error {
 		filePath := filepath.Join(dirPath, fileName)
 		data, err := os.ReadFile(filePath)
 		if err != nil {
-			return fmt.Errorf("failed to read config file %s: %w", filePath, err)
+			return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to read config file %s: %w", filePath, err)
 		}
 
 		var config ModelProviderConfig
 		if err := json.Unmarshal(data, &config); err != nil {
-			return fmt.Errorf("failed to parse config file %s: %w", filePath, err)
+			return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to parse config file %s: %w", filePath, err)
 		}
 
 		// Set or override the name to match the filename
@@ -117,15 +123,22 @@ func (r *ProviderRegistry) LoadFromDirectory(dirPath string) error {
 			config.Name = providerName
 		}
 
+		// Register model tags if tag registry is provided and config has model tags
+		if tagRegistry != nil && len(config.ModelTags) > 0 {
+			if err := tagRegistry.SetProviderMappings(providerName, config.ModelTags); err != nil {
+				return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to set provider mappings for %s: %w", providerName, err)
+			}
+		}
+
 		// Create the provider from config
 		provider, err := FromConfig(&config)
 		if err != nil {
-			return fmt.Errorf("failed to create provider from config file %s: %w", filePath, err)
+			return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to create provider from config file %s: %w", filePath, err)
 		}
 
 		// Register the provider
 		if err := r.Register(providerName, provider); err != nil {
-			return fmt.Errorf("failed to register provider %s: %w", providerName, err)
+			return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to register provider %s: %w", providerName, err)
 		}
 	}
 

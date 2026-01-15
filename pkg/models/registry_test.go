@@ -428,3 +428,95 @@ func TestProviderRegistry_Concurrency(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, provider, p)
 }
+
+func TestProviderRegistry_LoadFromDirectoryWithTags(t *testing.T) {
+	// Create temporary directory
+	tempDir, err := os.MkdirTemp("", "registry-tags-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create test config with model_tags
+	config := `{
+		"type": "ollama",
+		"url": "http://localhost:11434",
+		"model_tags": [
+			{"model": "^llama.*", "tag": "llama"},
+			{"model": "^codellama.*", "tag": "codellama"}
+		]
+	}`
+	err = os.WriteFile(filepath.Join(tempDir, "ollama.json"), []byte(config), 0644)
+	require.NoError(t, err)
+
+	// Create registries
+	providerRegistry := NewProviderRegistry()
+	tagRegistry := NewModelTagRegistry()
+
+	// Load with tag registry
+	err = providerRegistry.LoadFromDirectoryWithTags(tempDir, tagRegistry)
+	require.NoError(t, err)
+
+	// Verify provider was registered
+	names := providerRegistry.List()
+	assert.Equal(t, []string{"ollama"}, names)
+
+	// Verify tags were registered
+	tags := tagRegistry.GetTagsForModel("ollama", "llama-7b")
+	sort.Strings(tags)
+	assert.Equal(t, []string{"llama"}, tags)
+
+	tags = tagRegistry.GetTagsForModel("ollama", "codellama-13b")
+	sort.Strings(tags)
+	assert.Equal(t, []string{"codellama"}, tags)
+}
+
+func TestProviderRegistry_LoadFromDirectoryWithTags_NilTagRegistry(t *testing.T) {
+	// Create temporary directory
+	tempDir, err := os.MkdirTemp("", "registry-tags-nil-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create test config with model_tags
+	config := `{
+		"type": "ollama",
+		"url": "http://localhost:11434",
+		"model_tags": [
+			{"model": "^llama.*", "tag": "llama"}
+		]
+	}`
+	err = os.WriteFile(filepath.Join(tempDir, "ollama.json"), []byte(config), 0644)
+	require.NoError(t, err)
+
+	// Load with nil tag registry (should not error)
+	providerRegistry := NewProviderRegistry()
+	err = providerRegistry.LoadFromDirectoryWithTags(tempDir, nil)
+	require.NoError(t, err)
+
+	// Verify provider was registered
+	names := providerRegistry.List()
+	assert.Equal(t, []string{"ollama"}, names)
+}
+
+func TestProviderRegistry_LoadFromDirectoryWithTags_InvalidRegexp(t *testing.T) {
+	// Create temporary directory
+	tempDir, err := os.MkdirTemp("", "registry-tags-invalid-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create test config with invalid regexp
+	config := `{
+		"type": "ollama",
+		"url": "http://localhost:11434",
+		"model_tags": [
+			{"model": "[invalid", "tag": "test"}
+		]
+	}`
+	err = os.WriteFile(filepath.Join(tempDir, "ollama.json"), []byte(config), 0644)
+	require.NoError(t, err)
+
+	// Load with tag registry should fail due to invalid regexp
+	providerRegistry := NewProviderRegistry()
+	tagRegistry := NewModelTagRegistry()
+	err = providerRegistry.LoadFromDirectoryWithTags(tempDir, tagRegistry)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid regexp")
+}
