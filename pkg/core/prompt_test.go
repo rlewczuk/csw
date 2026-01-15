@@ -116,7 +116,7 @@ func TestFileBasedPromptScanner_GetFragments(t *testing.T) {
 	rolesDir := filepath.Join(tmpDir, "roles")
 
 	// Copy test roles to temp directory
-	err := shared.CopyDir("../../configs/roles", rolesDir)
+	err := shared.CopyDir("../../testdata/conf/roles", rolesDir)
 	require.NoError(t, err)
 
 	// Create scanner
@@ -209,7 +209,7 @@ func TestFileBasedPromptScanner_GetFragments_ToolsFiltering(t *testing.T) {
 	rolesDir := filepath.Join(tmpDir, "roles")
 
 	// Copy test roles to temp directory
-	err := shared.CopyDir("../../configs/roles", rolesDir)
+	err := shared.CopyDir("../../testdata/conf/roles", rolesDir)
 	require.NoError(t, err)
 
 	// Create scanner
@@ -255,7 +255,7 @@ func TestFSPromptGenerator_GetPrompt(t *testing.T) {
 	rolesDir := filepath.Join(tmpDir, "roles")
 
 	// Copy test roles to temp directory
-	err := shared.CopyDir("../../configs/roles", rolesDir)
+	err := shared.CopyDir("../../testdata/conf/roles", rolesDir)
 	require.NoError(t, err)
 
 	// Create scanner
@@ -338,7 +338,7 @@ func TestFSPromptGenerator_GetPrompt_Ordering(t *testing.T) {
 	rolesDir := filepath.Join(tmpDir, "roles")
 
 	// Copy test roles to temp directory
-	err := shared.CopyDir("../../configs/roles", rolesDir)
+	err := shared.CopyDir("../../testdata/conf/roles", rolesDir)
 	require.NoError(t, err)
 
 	// Create scanner

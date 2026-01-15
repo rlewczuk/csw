@@ -330,11 +330,11 @@ func TestProviderRegistry_LoadFromDirectory_NonExistentDirectory(t *testing.T) {
 
 func TestProviderRegistry_LoadFromDirectory_RealConfigs(t *testing.T) {
 	// Test loading from the actual configs/models directory if it exists
-	configDir := "../../configs/models"
+	configDir := "../../testdata/conf/models"
 
 	// Check if directory exists
 	if _, err := os.Stat(configDir); os.IsNotExist(err) {
-		t.Skip("configs/models directory does not exist")
+		t.Skip("testdata/conf/models directory does not exist")
 	}
 
 	registry := NewProviderRegistry()
