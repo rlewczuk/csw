@@ -59,7 +59,7 @@ func TestAgentRoleRegistry(t *testing.T) {
 		registry := NewAgentRoleRegistry()
 
 		// Get the absolute path to the configs/roles directory
-		configsDir := filepath.Join("..", "..", "configs", "roles")
+		configsDir := filepath.Join("..", "..", "testdata", "conf", "roles")
 
 		err := registry.LoadFromDirectory(configsDir)
 		require.NoError(t, err)

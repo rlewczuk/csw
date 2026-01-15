@@ -21,7 +21,6 @@ type ModelTagMapping struct {
 }
 
 // GlobalConfig represents the global configuration file structure.
-// This file is loaded from configs/global.json.
 type GlobalConfig struct {
 	// ModelTags contains global model-to-tag mappings
 	ModelTags []ModelTagMapping `json:"model_tags,omitempty"`
