@@ -4,5 +4,22 @@
   "description": "Anthropic Claude API",
   "url": "https://api.anthropic.com",
   "api_key": "test-api-key",
-  "tags": ["anthropic"]
+  "model_tags": [
+    {
+      "model": "^claude-3-opus.*",
+      "tag": "opus"
+    },
+    {
+      "model": "^claude-3-sonnet.*",
+      "tag": "sonnet"
+    },
+    {
+      "model": "^claude-3-haiku.*",
+      "tag": "haiku"
+    },
+    {
+      "model": "^claude-.*",
+      "tag": "anthropic"
+    }
+  ]
 }

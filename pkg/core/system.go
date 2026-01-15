@@ -16,6 +16,9 @@ type SweSystem struct {
 	// Map of model providers by name
 	ModelProviders map[string]models.ModelProvider
 
+	// Model tag registry for assigning tags to models
+	ModelTags *models.ModelTagRegistry
+
 	// Prompt generator
 	PromptGenerator PromptGenerator
 
@@ -62,6 +65,7 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		id:            shared.GenerateUUIDv7(),
 		system:        s,
 		provider:      provider,
+		providerName:  providerName,
 		model:         modelName,
 		messages:      []*models.ChatMessage{},
 		role:          nil,

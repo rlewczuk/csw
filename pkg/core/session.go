@@ -420,6 +420,7 @@ type SweSession struct {
 	id            string
 	system        *SweSystem
 	provider      models.ModelProvider
+	providerName  string
 	model         string
 	messages      []*models.ChatMessage
 	role          *AgentRole
@@ -569,6 +570,21 @@ func (s *SweSession) Role() *AgentRole {
 	return s.role
 }
 
+// ProviderName returns the name of the provider used for this session.
+func (s *SweSession) ProviderName() string {
+	return s.providerName
+}
+
+// GetModelTags returns all tags assigned to the current model.
+// Tags are determined by matching the model name against regexp patterns
+// from both global config and provider-specific config.
+func (s *SweSession) GetModelTags() []string {
+	if s.system.ModelTags == nil {
+		return nil
+	}
+	return s.system.ModelTags.GetTagsForModel(s.providerName, s.model)
+}
+
 // SetModel sets the model used for the session.
 // model string should be formatted as `provider/model-name`.
 func (s *SweSession) SetModel(modelStr string) error {
@@ -585,6 +601,7 @@ func (s *SweSession) SetModel(modelStr string) error {
 	}
 
 	s.provider = provider
+	s.providerName = providerName
 	s.model = modelName
 	return nil
 }
@@ -632,9 +649,18 @@ func (s *SweSession) SetRole(roleName string) error {
 	// Generate and update system prompt using the prompt generator
 	if s.system.PromptGenerator != nil {
 		state := s.GetState()
-		renderedPrompt, err := s.system.PromptGenerator.GetPrompt([]string{"all"}, &role, &state)
+
+		// Get model tags from registry
+		tags := s.GetModelTags()
+		// If no specific tags are assigned, use empty list
+		// The prompt system will include fragments with tag "all" by default
+		if tags == nil {
+			tags = []string{}
+		}
+
+		renderedPrompt, err := s.system.PromptGenerator.GetPrompt(tags, &role, &state)
 		if err != nil {
-			return fmt.Errorf("failed to generate system prompt: %w", err)
+			return fmt.Errorf("SweSession.SetRole() [session.go]: failed to generate system prompt: %w", err)
 		}
 
 		// Check if there's already a system message

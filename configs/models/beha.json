@@ -3,5 +3,10 @@
   "name": "beha",
   "description": "Local server running ollama",
   "url": "http://beha:11434",
-  "tags": ["devstral"]
+  "model_tags": [
+    {
+      "model": "^devstral.*",
+      "tag": "devstral"
+    }
+  ]
 }
