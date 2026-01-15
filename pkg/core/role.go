@@ -25,6 +25,9 @@ type AgentRole struct {
 
 	// Tools available
 	ToolsAccess map[string]shared.AccessFlag `json:"tools-access"`
+
+	// Run privileges maps command regex patterns to access flags
+	RunPrivileges map[string]shared.AccessFlag `json:"run-privileges"`
 }
 
 type AgentRoleRegistry struct {

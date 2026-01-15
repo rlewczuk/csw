@@ -3,6 +3,8 @@ package tool
 import (
 	"fmt"
 
+	"github.com/codesnort/codesnort-swe/pkg/runner"
+	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
@@ -84,4 +86,9 @@ func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS) {
 	registry.Register("vfs.delete", NewVFSDeleteTool(vfsImpl))
 	registry.Register("vfs.list", NewVFSListTool(vfsImpl))
 	registry.Register("vfs.move", NewVFSMoveTool(vfsImpl))
+}
+
+// RegisterRunBashTool registers the run.bash tool with the given CommandRunner and privileges.
+func RegisterRunBashTool(registry *ToolRegistry, r runner.CommandRunner, privileges map[string]shared.AccessFlag) {
+	registry.Register("run.bash", NewRunBashTool(r, privileges))
 }
