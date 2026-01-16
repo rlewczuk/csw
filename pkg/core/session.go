@@ -428,6 +428,8 @@ type SweSession struct {
 	Tools         *tool.ToolRegistry
 	outputHandler SessionThreadOutput
 	workDir       string
+	todoList      []tool.TodoItem
+	todoMu        sync.Mutex
 }
 
 // Prompt adds user prompt to the conversation and starts processing if processing is not already in progress.
@@ -641,6 +643,9 @@ func (s *SweSession) SetRole(roleName string) error {
 	s.Tools.Register("vfs.list", tool.NewVFSListTool(s.VFS))
 	s.Tools.Register("vfs.move", tool.NewVFSMoveTool(s.VFS))
 
+	// Re-register session-specific tools
+	s.registerSessionTools()
+
 	// Create a new tool registry with access-controlled tools if needed
 	if role.ToolsAccess != nil {
 		s.Tools = wrapToolsWithAccessControl(s.Tools, role.ToolsAccess)
@@ -729,4 +734,45 @@ func wrapToolsWithAccessControl(registry *tool.ToolRegistry, privileges map[stri
 	}
 
 	return newRegistry
+}
+
+// GetTodoList returns a copy of the current todo list.
+func (s *SweSession) GetTodoList() []tool.TodoItem {
+	s.todoMu.Lock()
+	defer s.todoMu.Unlock()
+
+	// Return a copy to prevent external modification
+	list := make([]tool.TodoItem, len(s.todoList))
+	copy(list, s.todoList)
+	return list
+}
+
+// SetTodoList replaces the entire todo list with a new list.
+func (s *SweSession) SetTodoList(todos []tool.TodoItem) {
+	s.todoMu.Lock()
+	defer s.todoMu.Unlock()
+
+	s.todoList = make([]tool.TodoItem, len(todos))
+	copy(s.todoList, todos)
+}
+
+// CountPendingTodos returns the number of pending or in_progress todos.
+func (s *SweSession) CountPendingTodos() int {
+	s.todoMu.Lock()
+	defer s.todoMu.Unlock()
+
+	count := 0
+	for _, item := range s.todoList {
+		if item.Status == "pending" || item.Status == "in_progress" {
+			count++
+		}
+	}
+	return count
+}
+
+// registerSessionTools registers session-specific tools that need access to the session.
+func (s *SweSession) registerSessionTools() {
+	// Register todo tools
+	s.Tools.Register("todo.read", tool.NewTodoReadTool(s))
+	s.Tools.Register("todo.write", tool.NewTodoWriteTool(s))
 }

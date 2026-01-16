@@ -61,6 +61,13 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		return nil, fmt.Errorf("SweSystem.NewSession() [system.go]: provider not found: %s", providerName)
 	}
 
+	// Create a new tool registry for the session by copying system tools
+	sessionTools := tool.NewToolRegistry()
+	for _, name := range s.Tools.List() {
+		t, _ := s.Tools.Get(name)
+		sessionTools.Register(name, t)
+	}
+
 	session := &SweSession{
 		id:            shared.GenerateUUIDv7(),
 		system:        s,
@@ -70,10 +77,14 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		messages:      []*models.ChatMessage{},
 		role:          nil,
 		VFS:           s.VFS,
-		Tools:         s.Tools,
+		Tools:         sessionTools,
 		outputHandler: outputHandler,
 		workDir:       ".",
+		todoList:      make([]tool.TodoItem, 0),
 	}
+
+	// Register session-specific tools (like todo tools)
+	session.registerSessionTools()
 
 	// Store session
 	s.sessionsMu.Lock()
