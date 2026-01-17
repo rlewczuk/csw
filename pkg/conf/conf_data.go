@@ -39,6 +39,9 @@ type AgentRoleConfig struct {
 
 	// Run privileges maps command regex patterns to access flags
 	RunPrivileges map[string]AccessFlag `json:"run-privileges"`
+
+	// Prompt fragments for this role (as a map of filename without extension ->content), this is transient field, not serialized to JSON
+	PromptFragments map[string]string `json:"-"`
 }
 
 // ModelTagMapping represents a single model-to-tag mapping rule.

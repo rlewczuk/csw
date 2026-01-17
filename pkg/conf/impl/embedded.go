@@ -138,6 +138,12 @@ func (s *EmbeddedConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleC
 				configCopy.RunPrivileges[rk] = rv
 			}
 		}
+		if v.PromptFragments != nil {
+			configCopy.PromptFragments = make(map[string]string, len(v.PromptFragments))
+			for fk, fv := range v.PromptFragments {
+				configCopy.PromptFragments[fk] = fv
+			}
+		}
 		configs[k] = &configCopy
 	}
 
@@ -281,11 +287,46 @@ func (s *EmbeddedConfigStore) loadAgentRoleConfigs() error {
 			config.Name = roleName
 		}
 
+		// Load prompt fragments from .md files in the role directory
+		promptFragments, err := s.loadPromptFragments(filepath.Join(rolesDir, roleName))
+		if err != nil {
+			return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, err)
+		}
+		config.PromptFragments = promptFragments
+
 		configs[config.Name] = &config
 	}
 
 	s.agentRoleConfigs = configs
 	return nil
+}
+
+// loadPromptFragments loads all .md files from the given role directory.
+func (s *EmbeddedConfigStore) loadPromptFragments(roleDir string) (map[string]string, error) {
+	fragments := make(map[string]string)
+
+	entries, err := embeddedConfigFS.ReadDir(roleDir)
+	if err != nil {
+		return nil, fmt.Errorf("loadPromptFragments(): failed to read role directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
+			continue
+		}
+
+		fragmentPath := filepath.Join(roleDir, entry.Name())
+		data, err := embeddedConfigFS.ReadFile(fragmentPath)
+		if err != nil {
+			return nil, fmt.Errorf("loadPromptFragments(): failed to read %s: %w", fragmentPath, err)
+		}
+
+		// Use filename without extension as the key
+		fragmentName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
+		fragments[fragmentName] = string(data)
+	}
+
+	return fragments, nil
 }
 
 // isNotExist checks if an error is a "not exist" error for embedded filesystem.

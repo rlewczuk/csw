@@ -177,6 +177,12 @@ func (s *LocalConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConf
 				configCopy.RunPrivileges[rk] = rv
 			}
 		}
+		if v.PromptFragments != nil {
+			configCopy.PromptFragments = make(map[string]string, len(v.PromptFragments))
+			for fk, fv := range v.PromptFragments {
+				configCopy.PromptFragments[fk] = fv
+			}
+		}
 		configs[k] = &configCopy
 	}
 
@@ -328,6 +334,13 @@ func (s *LocalConfigStore) loadAgentRoleConfigs() error {
 			config.Name = roleName
 		}
 
+		// Load prompt fragments from .md files in the role directory
+		promptFragments, err := s.loadPromptFragments(filepath.Join(rolesDir, roleName))
+		if err != nil {
+			return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, err)
+		}
+		config.PromptFragments = promptFragments
+
 		configs[config.Name] = &config
 	}
 
@@ -335,6 +348,34 @@ func (s *LocalConfigStore) loadAgentRoleConfigs() error {
 	s.agentRoleConfigsUpdate = time.Now()
 
 	return nil
+}
+
+// loadPromptFragments loads all .md files from the given role directory.
+func (s *LocalConfigStore) loadPromptFragments(roleDir string) (map[string]string, error) {
+	fragments := make(map[string]string)
+
+	entries, err := os.ReadDir(roleDir)
+	if err != nil {
+		return nil, fmt.Errorf("loadPromptFragments(): failed to read role directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
+			continue
+		}
+
+		fragmentPath := filepath.Join(roleDir, entry.Name())
+		data, err := os.ReadFile(fragmentPath)
+		if err != nil {
+			return nil, fmt.Errorf("loadPromptFragments(): failed to read %s: %w", fragmentPath, err)
+		}
+
+		// Use filename without extension as the key
+		fragmentName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
+		fragments[fragmentName] = string(data)
+	}
+
+	return fragments, nil
 }
 
 // setupWatchers sets up file system watchers for all configuration directories.
@@ -439,9 +480,10 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 		}
 	}
 
-	// Check if it's in a role directory
+	// Check if it's in a role directory (config.json or .md file)
 	eventDir := filepath.Dir(event.Name)
-	if filepath.Dir(eventDir) == rolesDir && filepath.Base(event.Name) == "config.json" {
+	eventExt := filepath.Ext(event.Name)
+	if filepath.Dir(eventDir) == rolesDir && (filepath.Base(event.Name) == "config.json" || eventExt == ".md") {
 		if err := s.loadAgentRoleConfigs(); err != nil {
 			fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload agent role configs: %v\n", err)
 		}
