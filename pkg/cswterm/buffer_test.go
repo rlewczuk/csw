@@ -7,6 +7,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Helper function to create a ScreenVerifier from a ScreenBuffer
+func getVerifier(screen *ScreenBuffer) *ScreenVerifier {
+	width, height, content := screen.GetContent()
+	return NewScreenVerifier(width, height, content)
+}
+
 func TestNewMockScreen(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -40,9 +46,10 @@ func TestNewMockScreen(t *testing.T) {
 			assert.Equal(t, tt.height, h)
 
 			// Verify all cells are initialized with spaces
+			verifier := getVerifier(screen)
 			for y := 0; y < tt.height; y++ {
 				for x := 0; x < tt.width; x++ {
-					cell := screen.GetCell(x, y)
+					cell := verifier.GetCell(x, y)
 					assert.Equal(t, ' ', cell.Rune)
 					assert.Equal(t, CellAttributes{}, cell.Attrs)
 				}
@@ -132,9 +139,10 @@ func TestMockScreen_PutText(t *testing.T) {
 			screen.PutText(tt.x, tt.y, tt.text, tt.attrs)
 
 			// Verify each character
+			verifier := getVerifier(screen)
 			runes := []rune(tt.wantText)
 			for i, r := range runes {
-				cell := screen.GetCell(tt.checkX+i, tt.checkY)
+				cell := verifier.GetCell(tt.checkX+i, tt.checkY)
 				assert.Equal(t, r, cell.Rune, "rune at position %d", i)
 				assert.Equal(t, tt.wantAttrs, cell.Attrs.Attributes, "attributes at position %d", i)
 			}
@@ -187,9 +195,10 @@ func TestMockScreen_PutText_Truncation(t *testing.T) {
 			screen.PutText(tt.x, tt.y, tt.text, AttrBold)
 
 			// Count non-space characters
+			verifier := getVerifier(screen)
 			count := 0
 			for x := tt.x; x < tt.width; x++ {
-				cell := screen.GetCell(x, tt.y)
+				cell := verifier.GetCell(x, tt.y)
 				if cell.Rune != ' ' {
 					count++
 				}
@@ -249,9 +258,10 @@ func TestMockScreen_PutText_OutOfBounds(t *testing.T) {
 			screen.PutText(tt.x, tt.y, tt.text, AttrBold)
 
 			// Verify screen is still all spaces
+			verifier := getVerifier(screen)
 			for y := 0; y < tt.height; y++ {
 				for x := 0; x < tt.width; x++ {
-					cell := screen.GetCell(x, y)
+					cell := verifier.GetCell(x, y)
 					assert.Equal(t, ' ', cell.Rune)
 				}
 			}
@@ -262,6 +272,7 @@ func TestMockScreen_PutText_OutOfBounds(t *testing.T) {
 func TestMockScreen_GetCell(t *testing.T) {
 	screen := NewMockScreen(10, 5)
 	screen.PutText(2, 1, "Test", AttrBold)
+	verifier := getVerifier(screen)
 
 	tests := []struct {
 		name      string
@@ -316,7 +327,7 @@ func TestMockScreen_GetCell(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cell := screen.GetCell(tt.x, tt.y)
+			cell := verifier.GetCell(tt.x, tt.y)
 			assert.Equal(t, tt.wantRune, cell.Rune)
 			assert.Equal(t, tt.wantAttrs, cell.Attrs.Attributes)
 		})
@@ -328,6 +339,7 @@ func TestMockScreen_GetText(t *testing.T) {
 	screen.PutText(0, 0, "Hello", 0)
 	screen.PutText(0, 1, "World", 0)
 	screen.PutText(5, 2, "Test", 0)
+	verifier := getVerifier(screen)
 
 	tests := []struct {
 		name   string
@@ -381,7 +393,7 @@ func TestMockScreen_GetText(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := screen.GetText(tt.x, tt.y, tt.width, tt.height)
+			got := verifier.GetText(tt.x, tt.y, tt.width, tt.height)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -392,6 +404,7 @@ func TestMockScreen_HasText(t *testing.T) {
 	screen.PutText(0, 0, "Hello", 0)
 	screen.PutText(0, 1, "World", 0)
 	screen.PutText(5, 2, "Test", 0)
+	verifier := getVerifier(screen)
 
 	tests := []struct {
 		name   string
@@ -460,7 +473,7 @@ func TestMockScreen_HasText(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := screen.HasText(tt.x, tt.y, tt.width, tt.height, tt.text)
+			got := verifier.HasText(tt.x, tt.y, tt.width, tt.height, tt.text)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -471,6 +484,7 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 	screen.PutText(0, 0, "Bold", AttrBold)
 	screen.PutText(0, 1, "Italic", AttrItalic)
 	screen.PutText(0, 2, "Both", AttrBold|AttrItalic)
+	verifier := getVerifier(screen)
 
 	tests := []struct {
 		name   string
@@ -563,7 +577,7 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := screen.HasTextWithAttrs(tt.x, tt.y, tt.width, tt.height, tt.text, tt.mask)
+			got := verifier.HasTextWithAttrs(tt.x, tt.y, tt.width, tt.height, tt.text, tt.mask)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -579,14 +593,17 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 
 	// Put text and then modify colors
 	screen.PutText(0, 0, "Red", 0)
+	width, _, _ := screen.GetContent()
 	for i := 0; i < 3; i++ {
-		screen.buffer[0][i].Attrs.TextColor = redColor
+		idx := 0*width + i
+		screen.buffer[idx].Attrs.TextColor = redColor
 	}
 
 	screen.PutText(0, 1, "Blue", 0)
 	for i := 0; i < 4; i++ {
-		screen.buffer[1][i].Attrs.TextColor = blueColor
-		screen.buffer[1][i].Attrs.BackColor = greenBack
+		idx := 1*width + i
+		screen.buffer[idx].Attrs.TextColor = blueColor
+		screen.buffer[idx].Attrs.BackColor = greenBack
 	}
 
 	tests := []struct {
@@ -655,9 +672,10 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 		},
 	}
 
+	verifier := getVerifier(screen)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := screen.HasTextWithAttrs(tt.x, tt.y, tt.width, tt.height, tt.text, tt.mask)
+			got := verifier.HasTextWithAttrs(tt.x, tt.y, tt.width, tt.height, tt.text, tt.mask)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -669,15 +687,17 @@ func TestMockScreen_Clear(t *testing.T) {
 	screen.PutText(0, 1, "World", AttrItalic)
 
 	// Verify text is present
-	assert.True(t, screen.HasText(0, 0, 5, 1, "Hello"))
-	assert.True(t, screen.HasText(0, 1, 5, 1, "World"))
+	verifier := getVerifier(screen)
+	assert.True(t, verifier.HasText(0, 0, 5, 1, "Hello"))
+	assert.True(t, verifier.HasText(0, 1, 5, 1, "World"))
 
 	screen.Clear()
 
 	// Verify all cells are spaces with no attributes
+	verifier = getVerifier(screen)
 	for y := 0; y < 5; y++ {
 		for x := 0; x < 10; x++ {
-			cell := screen.GetCell(x, y)
+			cell := verifier.GetCell(x, y)
 			assert.Equal(t, ' ', cell.Rune)
 			assert.Equal(t, CellAttributes{}, cell.Attrs)
 		}
@@ -685,7 +705,7 @@ func TestMockScreen_Clear(t *testing.T) {
 }
 
 func TestMockScreen_InterfaceCompliance(t *testing.T) {
-	var _ Screen = (*MockScreen)(nil)
+	var _ Screen = (*ScreenBuffer)(nil)
 }
 
 func TestAttributeMask_Partial(t *testing.T) {
@@ -693,10 +713,13 @@ func TestAttributeMask_Partial(t *testing.T) {
 
 	// Create text with bold and italic
 	screen.PutText(0, 0, "Text", AttrBold|AttrItalic|AttrUnderline)
+	width, _, _ := screen.GetContent()
 	for i := 0; i < 4; i++ {
-		screen.buffer[0][i].Attrs.TextColor = 0xFF0000
+		idx := 0*width + i
+		screen.buffer[idx].Attrs.TextColor = 0xFF0000
 	}
 
+	verifier := getVerifier(screen)
 	tests := []struct {
 		name string
 		mask AttributeMask
@@ -737,7 +760,7 @@ func TestAttributeMask_Partial(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := screen.HasTextWithAttrs(0, 0, 4, 1, "Text", tt.mask)
+			got := verifier.HasTextWithAttrs(0, 0, 4, 1, "Text", tt.mask)
 			assert.Equal(t, tt.want, got)
 		})
 	}
