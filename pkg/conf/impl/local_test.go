@@ -707,3 +707,263 @@ func TestLocalConfigStore_WithTestdataConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, roleTime.IsZero())
 }
+
+func TestLocalConfigStore_PromptFragments(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	rolesDir := filepath.Join(tmpDir, "roles")
+	require.NoError(t, os.Mkdir(rolesDir, 0755))
+
+	// Create test1 role with prompt fragments
+	test1Dir := filepath.Join(rolesDir, "test1")
+	require.NoError(t, os.Mkdir(test1Dir, 0755))
+	test1Config := conf.AgentRoleConfig{
+		Name:        "test1",
+		Description: "Test role 1",
+	}
+	test1Data, err := json.MarshalIndent(test1Config, "", "  ")
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(test1Dir, "config.json"), test1Data, 0644)
+	require.NoError(t, err)
+
+	// Create prompt fragment files
+	err = os.WriteFile(filepath.Join(test1Dir, "10-system.md"), []byte("You are a helpful assistant."), 0644)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(test1Dir, "20-context.md"), []byte("This is context information."), 0644)
+	require.NoError(t, err)
+
+	// Create a non-md file that should be ignored
+	err = os.WriteFile(filepath.Join(test1Dir, "readme.txt"), []byte("test"), 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	// Test GetAgentRoleConfigs
+	configs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	assert.Len(t, configs, 1)
+
+	test1, ok := configs["test1"]
+	require.True(t, ok)
+
+	// Verify prompt fragments were loaded
+	assert.NotNil(t, test1.PromptFragments)
+	assert.Len(t, test1.PromptFragments, 2)
+
+	systemPrompt, hasSystem := test1.PromptFragments["10-system"]
+	assert.True(t, hasSystem)
+	assert.Equal(t, "You are a helpful assistant.", systemPrompt)
+
+	contextPrompt, hasContext := test1.PromptFragments["20-context"]
+	assert.True(t, hasContext)
+	assert.Equal(t, "This is context information.", contextPrompt)
+
+	// Verify readme.txt was ignored
+	_, hasReadme := test1.PromptFragments["readme"]
+	assert.False(t, hasReadme)
+}
+
+func TestLocalConfigStore_PromptFragments_Empty(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	rolesDir := filepath.Join(tmpDir, "roles")
+	require.NoError(t, os.Mkdir(rolesDir, 0755))
+
+	// Create test1 role without any .md files
+	test1Dir := filepath.Join(rolesDir, "test1")
+	require.NoError(t, os.Mkdir(test1Dir, 0755))
+	test1Config := conf.AgentRoleConfig{
+		Name:        "test1",
+		Description: "Test role 1",
+	}
+	test1Data, err := json.MarshalIndent(test1Config, "", "  ")
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(test1Dir, "config.json"), test1Data, 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	configs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+
+	test1, ok := configs["test1"]
+	require.True(t, ok)
+
+	// Verify prompt fragments is empty but not nil
+	assert.NotNil(t, test1.PromptFragments)
+	assert.Empty(t, test1.PromptFragments)
+}
+
+func TestLocalConfigStore_FileWatching_PromptFragments(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	rolesDir := filepath.Join(tmpDir, "roles")
+	require.NoError(t, os.Mkdir(rolesDir, 0755))
+
+	// Create test1 role
+	test1Dir := filepath.Join(rolesDir, "test1")
+	require.NoError(t, os.Mkdir(test1Dir, 0755))
+	test1Config := conf.AgentRoleConfig{
+		Name:        "test1",
+		Description: "Test role 1",
+	}
+	test1Data, err := json.MarshalIndent(test1Config, "", "  ")
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(test1Dir, "config.json"), test1Data, 0644)
+	require.NoError(t, err)
+
+	// Create initial prompt fragment
+	err = os.WriteFile(filepath.Join(test1Dir, "10-system.md"), []byte("Initial prompt."), 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	// Get initial timestamp
+	initialTime, err := store.LastAgentRoleConfigsUpdate()
+	require.NoError(t, err)
+
+	// Verify initial prompt fragment
+	configs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	test1, ok := configs["test1"]
+	require.True(t, ok)
+	assert.Equal(t, "Initial prompt.", test1.PromptFragments["10-system"])
+
+	// Wait a bit to ensure timestamp difference
+	time.Sleep(100 * time.Millisecond)
+
+	// Modify the prompt fragment
+	err = os.WriteFile(filepath.Join(test1Dir, "10-system.md"), []byte("Updated prompt."), 0644)
+	require.NoError(t, err)
+
+	// Wait for file watcher to process the event
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify prompt fragment was reloaded
+	configs, err = store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	test1, ok = configs["test1"]
+	require.True(t, ok)
+	assert.Equal(t, "Updated prompt.", test1.PromptFragments["10-system"])
+
+	// Verify timestamp was updated
+	newTime, err := store.LastAgentRoleConfigsUpdate()
+	require.NoError(t, err)
+	assert.True(t, newTime.After(initialTime))
+}
+
+func TestLocalConfigStore_FileWatching_NewPromptFragment(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	rolesDir := filepath.Join(tmpDir, "roles")
+	require.NoError(t, os.Mkdir(rolesDir, 0755))
+
+	// Create test1 role
+	test1Dir := filepath.Join(rolesDir, "test1")
+	require.NoError(t, os.Mkdir(test1Dir, 0755))
+	test1Config := conf.AgentRoleConfig{
+		Name:        "test1",
+		Description: "Test role 1",
+	}
+	test1Data, err := json.MarshalIndent(test1Config, "", "  ")
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(test1Dir, "config.json"), test1Data, 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	// Verify no prompt fragments initially
+	configs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	test1, ok := configs["test1"]
+	require.True(t, ok)
+	assert.Empty(t, test1.PromptFragments)
+
+	// Get initial timestamp
+	initialTime, err := store.LastAgentRoleConfigsUpdate()
+	require.NoError(t, err)
+
+	// Wait a bit
+	time.Sleep(100 * time.Millisecond)
+
+	// Add a new prompt fragment
+	err = os.WriteFile(filepath.Join(test1Dir, "10-system.md"), []byte("New prompt fragment."), 0644)
+	require.NoError(t, err)
+
+	// Wait for file watcher to process the event
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify prompt fragment was loaded
+	configs, err = store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	test1, ok = configs["test1"]
+	require.True(t, ok)
+	assert.Len(t, test1.PromptFragments, 1)
+	assert.Equal(t, "New prompt fragment.", test1.PromptFragments["10-system"])
+
+	// Verify timestamp was updated
+	newTime, err := store.LastAgentRoleConfigsUpdate()
+	require.NoError(t, err)
+	assert.True(t, newTime.After(initialTime))
+}
+
+func TestLocalConfigStore_PromptFragments_Copy(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	rolesDir := filepath.Join(tmpDir, "roles")
+	require.NoError(t, os.Mkdir(rolesDir, 0755))
+
+	// Create test1 role with prompt fragments
+	test1Dir := filepath.Join(rolesDir, "test1")
+	require.NoError(t, os.Mkdir(test1Dir, 0755))
+	test1Config := conf.AgentRoleConfig{
+		Name:        "test1",
+		Description: "Test role 1",
+	}
+	test1Data, err := json.MarshalIndent(test1Config, "", "  ")
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(test1Dir, "config.json"), test1Data, 0644)
+	require.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(test1Dir, "10-system.md"), []byte("Original prompt."), 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	// Get configs and modify prompt fragments
+	configs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	test1, ok := configs["test1"]
+	require.True(t, ok)
+	assert.Equal(t, "Original prompt.", test1.PromptFragments["10-system"])
+
+	// Modify the returned config
+	test1.PromptFragments["10-system"] = "Modified prompt."
+
+	// Get configs again and verify it wasn't modified
+	configs2, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	test1_2, ok := configs2["test1"]
+	require.True(t, ok)
+	assert.Equal(t, "Original prompt.", test1_2.PromptFragments["10-system"])
+}

@@ -300,3 +300,55 @@ func TestEmbeddedConfigStore_InterfaceCompliance(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, store)
 }
+
+func TestEmbeddedConfigStore_PromptFragments(t *testing.T) {
+	store, err := NewEmbeddedConfigStore()
+	require.NoError(t, err)
+
+	configs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	require.NotEmpty(t, configs)
+
+	// Check for developer role prompt fragments
+	developer, ok := configs["developer"]
+	if ok {
+		assert.NotNil(t, developer.PromptFragments)
+		assert.NotEmpty(t, developer.PromptFragments)
+
+		// Check for 10-system.md fragment
+		systemPrompt, hasSystem := developer.PromptFragments["10-system"]
+		assert.True(t, hasSystem, "developer role should have 10-system prompt fragment")
+		assert.NotEmpty(t, systemPrompt, "10-system prompt fragment should not be empty")
+		assert.Contains(t, systemPrompt, "You are", "prompt should contain expected content")
+	}
+
+	// Verify that returned configs with fragments are copies
+	if developer != nil && len(developer.PromptFragments) > 0 {
+		for key := range developer.PromptFragments {
+			originalValue := developer.PromptFragments[key]
+			developer.PromptFragments[key] = "modified"
+
+			configs2, err := store.GetAgentRoleConfigs()
+			require.NoError(t, err)
+			developer2 := configs2["developer"]
+			assert.Equal(t, originalValue, developer2.PromptFragments[key])
+			break
+		}
+	}
+}
+
+func TestEmbeddedConfigStore_EmptyPromptFragments(t *testing.T) {
+	store, err := NewEmbeddedConfigStore()
+	require.NoError(t, err)
+
+	configs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+
+	// Check for all role (which should have no .md files)
+	all, ok := configs["all"]
+	if ok {
+		// PromptFragments should be initialized but empty
+		assert.NotNil(t, all.PromptFragments)
+		assert.Empty(t, all.PromptFragments)
+	}
+}
