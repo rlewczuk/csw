@@ -1,4 +1,4 @@
-// Package local provides a filesystem-based configuration store implementation
+// Package impl provides a filesystem-based configuration store implementation
 // that satisfies the conf.ConfigStore interface.
 //
 // The local config store reads configuration from a directory structure:
@@ -20,7 +20,7 @@
 //	globalConfig, err := store.GetGlobalConfig()
 //	providers, err := store.GetModelProviderConfigs()
 //	roles, err := store.GetAgentRoleConfigs()
-package local
+package impl
 
 import (
 	"context"
