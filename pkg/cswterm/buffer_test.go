@@ -38,7 +38,7 @@ func TestNewMockScreen(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			screen := NewMockScreen(tt.width, tt.height)
+			screen := NewMockScreen(tt.width, tt.height, 0)
 			require.NotNil(t, screen)
 
 			w, h := screen.Size()
@@ -59,7 +59,7 @@ func TestNewMockScreen(t *testing.T) {
 }
 
 func TestMockScreen_Size(t *testing.T) {
-	screen := NewMockScreen(100, 50)
+	screen := NewMockScreen(100, 50, 0)
 	w, h := screen.Size()
 	assert.Equal(t, 100, w)
 	assert.Equal(t, 50, h)
@@ -135,7 +135,7 @@ func TestMockScreen_PutText(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			screen := NewMockScreen(tt.width, tt.height)
+			screen := NewMockScreen(tt.width, tt.height, 0)
 			screen.PutText(tt.x, tt.y, tt.text, tt.attrs)
 
 			// Verify each character
@@ -191,7 +191,7 @@ func TestMockScreen_PutText_Truncation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			screen := NewMockScreen(tt.width, tt.height)
+			screen := NewMockScreen(tt.width, tt.height, 0)
 			screen.PutText(tt.x, tt.y, tt.text, AttrBold)
 
 			// Count non-space characters
@@ -253,7 +253,7 @@ func TestMockScreen_PutText_OutOfBounds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			screen := NewMockScreen(tt.width, tt.height)
+			screen := NewMockScreen(tt.width, tt.height, 0)
 			// Should not panic
 			screen.PutText(tt.x, tt.y, tt.text, AttrBold)
 
@@ -270,7 +270,7 @@ func TestMockScreen_PutText_OutOfBounds(t *testing.T) {
 }
 
 func TestMockScreen_GetCell(t *testing.T) {
-	screen := NewMockScreen(10, 5)
+	screen := NewMockScreen(10, 5, 0)
 	screen.PutText(2, 1, "Test", AttrBold)
 	verifier := getVerifier(screen)
 
@@ -335,7 +335,7 @@ func TestMockScreen_GetCell(t *testing.T) {
 }
 
 func TestMockScreen_GetText(t *testing.T) {
-	screen := NewMockScreen(20, 10)
+	screen := NewMockScreen(20, 10, 0)
 	screen.PutText(0, 0, "Hello", 0)
 	screen.PutText(0, 1, "World", 0)
 	screen.PutText(5, 2, "Test", 0)
@@ -400,7 +400,7 @@ func TestMockScreen_GetText(t *testing.T) {
 }
 
 func TestMockScreen_HasText(t *testing.T) {
-	screen := NewMockScreen(20, 10)
+	screen := NewMockScreen(20, 10, 0)
 	screen.PutText(0, 0, "Hello", 0)
 	screen.PutText(0, 1, "World", 0)
 	screen.PutText(5, 2, "Test", 0)
@@ -480,7 +480,7 @@ func TestMockScreen_HasText(t *testing.T) {
 }
 
 func TestMockScreen_HasTextWithAttrs(t *testing.T) {
-	screen := NewMockScreen(20, 10)
+	screen := NewMockScreen(20, 10, 0)
 	screen.PutText(0, 0, "Bold", AttrBold)
 	screen.PutText(0, 1, "Italic", AttrItalic)
 	screen.PutText(0, 2, "Both", AttrBold|AttrItalic)
@@ -584,7 +584,7 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 }
 
 func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
-	screen := NewMockScreen(20, 10)
+	screen := NewMockScreen(20, 10, 0)
 
 	// Create cells with specific colors manually
 	redColor := uint32(0xFF0000)
@@ -682,7 +682,7 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 }
 
 func TestMockScreen_Clear(t *testing.T) {
-	screen := NewMockScreen(10, 5)
+	screen := NewMockScreen(10, 5, 0)
 	screen.PutText(0, 0, "Hello", AttrBold)
 	screen.PutText(0, 1, "World", AttrItalic)
 
@@ -709,7 +709,7 @@ func TestMockScreen_InterfaceCompliance(t *testing.T) {
 }
 
 func TestAttributeMask_Partial(t *testing.T) {
-	screen := NewMockScreen(20, 10)
+	screen := NewMockScreen(20, 10, 0)
 
 	// Create text with bold and italic
 	screen.PutText(0, 0, "Text", AttrBold|AttrItalic|AttrUnderline)
@@ -763,5 +763,276 @@ func TestAttributeMask_Partial(t *testing.T) {
 			got := verifier.HasTextWithAttrs(0, 0, 4, 1, "Text", tt.mask)
 			assert.Equal(t, tt.want, got)
 		})
+	}
+}
+
+func TestScreenBuffer_Listen_Notify(t *testing.T) {
+	tests := []struct {
+		name        string
+		queueSize   int
+		eventCount  int
+		channelSize int
+		wantEvents  int
+	}{
+		{
+			name:        "single event to single listener",
+			queueSize:   10,
+			eventCount:  1,
+			channelSize: 1,
+			wantEvents:  1,
+		},
+		{
+			name:        "multiple events to single listener",
+			queueSize:   10,
+			eventCount:  5,
+			channelSize: 5,
+			wantEvents:  5,
+		},
+		{
+			name:        "events with buffered channel",
+			queueSize:   10,
+			eventCount:  3,
+			channelSize: 10,
+			wantEvents:  3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			screen := NewMockScreen(10, 5, tt.queueSize)
+			ch := make(chan InputEvent, tt.channelSize)
+			screen.Listen(ch)
+
+			// Send events
+			for i := 0; i < tt.eventCount; i++ {
+				event := InputEvent{
+					Type: InputEventKey,
+					Key:  rune('a' + i),
+				}
+				screen.Notify(event)
+			}
+
+			// Receive events
+			receivedCount := 0
+			for i := 0; i < tt.wantEvents; i++ {
+				select {
+				case ev := <-ch:
+					assert.Equal(t, InputEventKey, ev.Type)
+					assert.Equal(t, rune('a'+i), ev.Key)
+					receivedCount++
+				default:
+					t.Fatalf("ScreenBuffer.Notify() at buffer_test.go: expected event %d but channel is empty", i)
+				}
+			}
+
+			assert.Equal(t, tt.wantEvents, receivedCount)
+		})
+	}
+}
+
+func TestScreenBuffer_Notify_MultipleListeners(t *testing.T) {
+	screen := NewMockScreen(10, 5, 10)
+
+	// Create multiple listeners
+	ch1 := make(chan InputEvent, 10)
+	ch2 := make(chan InputEvent, 10)
+	ch3 := make(chan InputEvent, 10)
+
+	screen.Listen(ch1)
+	screen.Listen(ch2)
+	screen.Listen(ch3)
+
+	// Send an event
+	event := InputEvent{
+		Type: InputEventKey,
+		Key:  'x',
+	}
+	screen.Notify(event)
+
+	// All listeners should receive the event
+	ev1 := <-ch1
+	ev2 := <-ch2
+	ev3 := <-ch3
+
+	assert.Equal(t, InputEventKey, ev1.Type)
+	assert.Equal(t, 'x', ev1.Key)
+	assert.Equal(t, InputEventKey, ev2.Type)
+	assert.Equal(t, 'x', ev2.Key)
+	assert.Equal(t, InputEventKey, ev3.Type)
+	assert.Equal(t, 'x', ev3.Key)
+}
+
+func TestScreenBuffer_Notify_FullChannel_Queue(t *testing.T) {
+	screen := NewMockScreen(10, 5, 10)
+
+	// Create a channel with size 1
+	ch := make(chan InputEvent, 1)
+	screen.Listen(ch)
+
+	// Send first event - should go directly to channel
+	event1 := InputEvent{Type: InputEventKey, Key: '1'}
+	screen.Notify(event1)
+
+	// Verify channel has the first event
+	select {
+	case ev := <-ch:
+		assert.Equal(t, '1', ev.Key)
+	default:
+		t.Fatal("ScreenBuffer.Notify() at buffer_test.go: expected event in channel")
+	}
+
+	// Now channel is empty, send multiple events to fill channel and queue
+	screen.Notify(InputEvent{Type: InputEventKey, Key: '2'})
+	screen.Notify(InputEvent{Type: InputEventKey, Key: '3'})
+	screen.Notify(InputEvent{Type: InputEventKey, Key: '4'})
+
+	// Receive events - queued events should be delivered when we make space
+	for i := 2; i <= 4; i++ {
+		// Read from channel
+		var ev InputEvent
+		select {
+		case ev = <-ch:
+			// Got an event
+		default:
+			// Channel empty, notify to trigger queue delivery
+			screen.Notify(InputEvent{Type: InputEventKey, Key: 'X'})
+			ev = <-ch
+		}
+		expectedKey := rune('0' + i)
+		assert.Equal(t, expectedKey, ev.Key, "ScreenBuffer.Notify() at buffer_test.go: event mismatch at position %d", i)
+	}
+}
+
+func TestScreenBuffer_Notify_QueueOverflow(t *testing.T) {
+	queueSize := 3
+	screen := NewMockScreen(10, 5, queueSize)
+
+	// Create a buffered channel
+	ch := make(chan InputEvent, 1)
+	screen.Listen(ch)
+
+	// Fill the channel first
+	screen.Notify(InputEvent{Type: InputEventKey, Key: '0'})
+
+	// Now send more events than queue size - they will be queued
+	// Send queueSize + 2 more events (total queueSize + 3)
+	for i := 1; i < queueSize+3; i++ {
+		event := InputEvent{Type: InputEventKey, Key: rune('0' + i)}
+		screen.Notify(event)
+	}
+
+	// Read the first event from channel
+	ev := <-ch
+	assert.Equal(t, '0', ev.Key)
+
+	// Notify to trigger delivery of queued events
+	screen.Notify(InputEvent{Type: InputEventKey, Key: 'X'})
+
+	// Count how many events we can receive
+	// We should get at most queueSize events (oldest ones were dropped)
+	receivedCount := 0
+	for {
+		select {
+		case ev := <-ch:
+			receivedCount++
+			t.Logf("ScreenBuffer.Notify() at buffer_test.go: received event with key %c", ev.Key)
+		default:
+			// No more events available
+			goto done
+		}
+	}
+done:
+	// We should have received at most queueSize + 1 events
+	// (queue size + the trigger event 'X')
+	assert.LessOrEqual(t, receivedCount, queueSize+1, "ScreenBuffer.Notify() at buffer_test.go: received too many events")
+}
+
+func TestScreenBuffer_Notify_ClosedChannel(t *testing.T) {
+	screen := NewMockScreen(10, 5, 10)
+
+	// Create and register a channel
+	ch := make(chan InputEvent, 10)
+	screen.Listen(ch)
+
+	// Send an event
+	event1 := InputEvent{Type: InputEventKey, Key: 'a'}
+	screen.Notify(event1)
+
+	// Receive it
+	ev := <-ch
+	assert.Equal(t, 'a', ev.Key)
+
+	// Close the channel
+	close(ch)
+
+	// Send another event - should not panic
+	event2 := InputEvent{Type: InputEventKey, Key: 'b'}
+	require.NotPanics(t, func() {
+		screen.Notify(event2)
+	})
+}
+
+func TestScreenBuffer_Notify_EventOrder(t *testing.T) {
+	screen := NewMockScreen(10, 5, 100)
+
+	ch := make(chan InputEvent, 1)
+	screen.Listen(ch)
+
+	// Fill the channel
+	screen.Notify(InputEvent{Type: InputEventKey, Key: '0'})
+
+	// Queue multiple events
+	for i := 1; i <= 10; i++ {
+		screen.Notify(InputEvent{Type: InputEventKey, Key: rune('0' + i)})
+	}
+
+	// Receive all events and verify order
+	for i := 0; i <= 10; i++ {
+		// Read from channel to make space
+		ev := <-ch
+
+		// Trigger delivery of queued events
+		if i < 10 {
+			screen.Notify(InputEvent{Type: InputEventKey, Key: 'X'})
+		}
+
+		expectedKey := rune('0' + i)
+		assert.Equal(t, expectedKey, ev.Key, "ScreenBuffer.Notify() at buffer_test.go: event order mismatch at position %d", i)
+	}
+}
+
+func TestScreenBuffer_Notify_NoListeners(t *testing.T) {
+	screen := NewMockScreen(10, 5, 10)
+
+	// Send event with no listeners - should not panic
+	event := InputEvent{Type: InputEventKey, Key: 'a'}
+	require.NotPanics(t, func() {
+		screen.Notify(event)
+	})
+}
+
+func TestScreenBuffer_Listen_MultipleRegistrations(t *testing.T) {
+	screen := NewMockScreen(10, 5, 10)
+
+	ch := make(chan InputEvent, 10)
+
+	// Register the same channel multiple times
+	screen.Listen(ch)
+	screen.Listen(ch)
+
+	// Send an event
+	event := InputEvent{Type: InputEventKey, Key: 'a'}
+	screen.Notify(event)
+
+	// Should only receive one event (channel registered once)
+	ev := <-ch
+	assert.Equal(t, 'a', ev.Key)
+
+	// Channel should be empty now
+	select {
+	case <-ch:
+		t.Fatal("ScreenBuffer.Listen() at buffer_test.go: unexpected duplicate event received")
+	default:
+		// Expected - channel is empty
 	}
 }
