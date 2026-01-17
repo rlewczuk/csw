@@ -1283,6 +1283,476 @@ func TestVFSFindToolPermissionQuery(t *testing.T) {
 	})
 }
 
+func TestVFSEditTool(t *testing.T) {
+	t.Run("should replace first occurrence by default", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		err := mockVFS.WriteFile("test.txt", []byte("hello world hello"))
+		require.NoError(t, err)
+
+		tool := NewVFSEditTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":  "test.txt",
+				"oldString": "hello",
+				"newString": "hi",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Verify only first occurrence was replaced
+		content, err := mockVFS.ReadFile("test.txt")
+		require.NoError(t, err)
+		assert.Equal(t, "hi world hello", string(content))
+	})
+
+	t.Run("should replace all occurrences when replaceAll is true", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		err := mockVFS.WriteFile("test.txt", []byte("hello world hello"))
+		require.NoError(t, err)
+
+		tool := NewVFSEditTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":   "test.txt",
+				"oldString":  "hello",
+				"newString":  "hi",
+				"replaceAll": true,
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Verify all occurrences were replaced
+		content, err := mockVFS.ReadFile("test.txt")
+		require.NoError(t, err)
+		assert.Equal(t, "hi world hi", string(content))
+	})
+
+	t.Run("should return error for missing filePath argument", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSEditTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"oldString": "hello",
+				"newString": "hi",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.Error(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Equal(t, 0, response.Result.Len())
+	})
+
+	t.Run("should return error for missing oldString argument", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSEditTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":  "test.txt",
+				"newString": "hi",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.Error(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Equal(t, 0, response.Result.Len())
+	})
+
+	t.Run("should return error for missing newString argument", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSEditTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":  "test.txt",
+				"oldString": "hello",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.Error(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Equal(t, 0, response.Result.Len())
+	})
+
+	t.Run("should return error for non-existent file", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSEditTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":  "non-existent.txt",
+				"oldString": "hello",
+				"newString": "hi",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.Error(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Equal(t, 0, response.Result.Len())
+	})
+
+	t.Run("should handle empty oldString", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		err := mockVFS.WriteFile("test.txt", []byte("hello world"))
+		require.NoError(t, err)
+
+		tool := NewVFSEditTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":  "test.txt",
+				"oldString": "",
+				"newString": "hi",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Verify content unchanged
+		content, err := mockVFS.ReadFile("test.txt")
+		require.NoError(t, err)
+		assert.Equal(t, "hello world", string(content))
+	})
+
+	t.Run("should handle oldString not found", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		err := mockVFS.WriteFile("test.txt", []byte("hello world"))
+		require.NoError(t, err)
+
+		tool := NewVFSEditTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":  "test.txt",
+				"oldString": "goodbye",
+				"newString": "hi",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Verify content unchanged
+		content, err := mockVFS.ReadFile("test.txt")
+		require.NoError(t, err)
+		assert.Equal(t, "hello world", string(content))
+	})
+
+	t.Run("should replace with empty string", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		err := mockVFS.WriteFile("test.txt", []byte("hello world"))
+		require.NoError(t, err)
+
+		tool := NewVFSEditTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":  "test.txt",
+				"oldString": "hello ",
+				"newString": "",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Verify replacement
+		content, err := mockVFS.ReadFile("test.txt")
+		require.NoError(t, err)
+		assert.Equal(t, "world", string(content))
+	})
+
+	t.Run("should handle multiline content", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		content := "line1\nline2\nline3\nline1\nline4"
+		err := mockVFS.WriteFile("test.txt", []byte(content))
+		require.NoError(t, err)
+
+		tool := NewVFSEditTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":   "test.txt",
+				"oldString":  "line1",
+				"newString":  "first",
+				"replaceAll": true,
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Verify all occurrences replaced
+		result, err := mockVFS.ReadFile("test.txt")
+		require.NoError(t, err)
+		assert.Equal(t, "first\nline2\nline3\nfirst\nline4", string(result))
+	})
+
+	t.Run("should have correct tool info", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSEditTool(mockVFS)
+		info := tool.Info()
+		assert.Equal(t, "vfs.edit", info.Name)
+		assert.NotEmpty(t, info.Description)
+		assert.Equal(t, SchemaTypeObject, info.Schema.Type)
+		assert.Contains(t, info.Schema.Properties, "filePath")
+		assert.Contains(t, info.Schema.Properties, "oldString")
+		assert.Contains(t, info.Schema.Properties, "newString")
+		assert.Contains(t, info.Schema.Properties, "replaceAll")
+		assert.Contains(t, info.Schema.Required, "filePath")
+		assert.Contains(t, info.Schema.Required, "oldString")
+		assert.Contains(t, info.Schema.Required, "newString")
+		assert.NotContains(t, info.Schema.Required, "replaceAll")
+	})
+}
+
+func TestVFSEditToolPermissionQuery(t *testing.T) {
+	t.Run("should return permission query when read access is ask", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		err := mockVFS.WriteFile("test.txt", []byte("hello"))
+		require.NoError(t, err)
+
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Read: conf.AccessAsk},
+		}
+		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
+
+		tool := NewVFSEditTool(accessVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":  "test.txt",
+				"oldString": "hello",
+				"newString": "hi",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.Error(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Check that error is ToolPermissionsQuery
+		query, ok := response.Error.(*ToolPermissionsQuery)
+		require.True(t, ok, "Error should be ToolPermissionsQuery")
+		assert.NotEmpty(t, query.Id)
+		assert.Equal(t, "vfs.edit", query.Tool.Function)
+		assert.Equal(t, "Permission Required", query.Title)
+		assert.Contains(t, query.Details, "test.txt")
+		assert.True(t, query.AllowCustomResponse)
+		assert.Contains(t, query.Options, "Allow")
+		assert.Contains(t, query.Options, "Deny")
+	})
+
+	t.Run("should return permission query when write access is ask", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		err := mockVFS.WriteFile("test.txt", []byte("hello"))
+		require.NoError(t, err)
+
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Read: conf.AccessAllow, Write: conf.AccessAsk},
+		}
+		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
+
+		tool := NewVFSEditTool(accessVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":  "test.txt",
+				"oldString": "hello",
+				"newString": "hi",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.Error(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Check that error is ToolPermissionsQuery
+		query, ok := response.Error.(*ToolPermissionsQuery)
+		require.True(t, ok, "Error should be ToolPermissionsQuery")
+		assert.NotEmpty(t, query.Id)
+		assert.Equal(t, "vfs.edit", query.Tool.Function)
+		assert.Equal(t, "Permission Required", query.Title)
+		assert.Contains(t, query.Details, "test.txt")
+		assert.True(t, query.AllowCustomResponse)
+		assert.Contains(t, query.Options, "Allow")
+		assert.Contains(t, query.Options, "Deny")
+	})
+
+	t.Run("should succeed when read and write access are allow", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		err := mockVFS.WriteFile("test.txt", []byte("hello world hello"))
+		require.NoError(t, err)
+
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Read: conf.AccessAllow, Write: conf.AccessAllow},
+		}
+		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
+
+		tool := NewVFSEditTool(accessVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":   "test.txt",
+				"oldString":  "hello",
+				"newString":  "hi",
+				"replaceAll": true,
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Verify all occurrences were replaced
+		content, err := mockVFS.ReadFile("test.txt")
+		require.NoError(t, err)
+		assert.Equal(t, "hi world hi", string(content))
+	})
+
+	t.Run("should fail when read access is deny", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Read: conf.AccessDeny},
+		}
+		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
+
+		tool := NewVFSEditTool(accessVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":  "test.txt",
+				"oldString": "hello",
+				"newString": "hi",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.Error(t, response.Error)
+		assert.ErrorIs(t, response.Error, vfs.ErrPermissionDenied)
+		assert.True(t, response.Done)
+	})
+
+	t.Run("should fail when write access is deny", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		err := mockVFS.WriteFile("test.txt", []byte("hello"))
+		require.NoError(t, err)
+
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Read: conf.AccessAllow, Write: conf.AccessDeny},
+		}
+		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
+
+		tool := NewVFSEditTool(accessVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.edit",
+			Arguments: NewToolValue(map[string]any{
+				"filePath":  "test.txt",
+				"oldString": "hello",
+				"newString": "hi",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.Error(t, response.Error)
+		assert.ErrorIs(t, response.Error, vfs.ErrPermissionDenied)
+		assert.True(t, response.Done)
+	})
+}
+
 func TestToolPermissionsQueryError(t *testing.T) {
 	t.Run("should return correct error message", func(t *testing.T) {
 		query := &ToolPermissionsQuery{
