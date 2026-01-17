@@ -705,7 +705,7 @@ func TestMockScreen_Clear(t *testing.T) {
 }
 
 func TestMockScreen_InterfaceCompliance(t *testing.T) {
-	var _ Screen = (*ScreenBuffer)(nil)
+	var _ ScreenOutput = (*ScreenBuffer)(nil)
 }
 
 func TestAttributeMask_Partial(t *testing.T) {

@@ -1,6 +1,9 @@
 package cswterm
 
-import "strings"
+import (
+	"strings"
+	"sync"
+)
 
 // ScreenVerifier provides methods to verify screen buffer content in tests.
 type ScreenVerifier struct {
@@ -159,4 +162,48 @@ func (v *ScreenVerifier) HasTextWithAttrs(x, y, width, height int, text string, 
 
 	// Check if we matched all the text
 	return textIdx >= len(runes)
+}
+
+// MockInputEventHandler is a test double implementation of InputEventHandler.
+// It records all received events and provides methods to retrieve them.
+type MockInputEventHandler struct {
+	events []InputEvent
+	mu     sync.Mutex
+}
+
+// NewMockInputEventHandler creates a new MockInputEventHandler instance.
+func NewMockInputEventHandler() *MockInputEventHandler {
+	return &MockInputEventHandler{
+		events: make([]InputEvent, 0),
+	}
+}
+
+// Notify records the input event.
+func (m *MockInputEventHandler) Notify(event InputEvent) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.events = append(m.events, event)
+}
+
+// GetEvents returns all recorded events.
+func (m *MockInputEventHandler) GetEvents() []InputEvent {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([]InputEvent, len(m.events))
+	copy(result, m.events)
+	return result
+}
+
+// Clear clears all recorded events.
+func (m *MockInputEventHandler) Clear() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.events = make([]InputEvent, 0)
+}
+
+// EventCount returns the number of recorded events.
+func (m *MockInputEventHandler) EventCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.events)
 }

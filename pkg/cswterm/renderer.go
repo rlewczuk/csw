@@ -10,7 +10,7 @@ import (
 // It performs optimal differential rendering by tracking changes and only updating
 // modified regions of the screen.
 type ScreenRenderer struct {
-	screen     Screen
+	screen     ScreenOutput
 	writer     io.Writer
 	lastBuffer []Cell
 	width      int
@@ -20,7 +20,7 @@ type ScreenRenderer struct {
 
 // NewScreenRenderer creates a new ScreenRenderer that renders the given screen
 // to the specified writer.
-func NewScreenRenderer(screen Screen, writer io.Writer) *ScreenRenderer {
+func NewScreenRenderer(screen ScreenOutput, writer io.Writer) *ScreenRenderer {
 	width, height := screen.Size()
 	lastBuffer := make([]Cell, width*height)
 	// Initialize with spaces to match ScreenBuffer initialization

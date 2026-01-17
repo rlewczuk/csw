@@ -16,7 +16,7 @@ type listener struct {
 	queue []InputEvent
 }
 
-// ScreenBuffer is a test double implementation of Screen interface.
+// ScreenBuffer is a test double implementation of ScreenOutput interface.
 // It maintains an in-memory buffer and does not output to terminal.
 type ScreenBuffer struct {
 	width     int
