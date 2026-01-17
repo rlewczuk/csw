@@ -1,4 +1,4 @@
-// Package embedded provides an embedded configuration store implementation
+// Package impl provides an embedded configuration store implementation
 // that satisfies the conf.ConfigStore interface.
 //
 // The embedded config store provides read-only access to configuration
@@ -20,7 +20,7 @@
 //	globalConfig, err := store.GetGlobalConfig()
 //	providers, err := store.GetModelProviderConfigs()
 //	roles, err := store.GetAgentRoleConfigs()
-package embedded
+package impl
 
 import (
 	"embed"
