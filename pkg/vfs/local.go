@@ -244,7 +244,13 @@ func (l *LocalVFS) ListFiles(path string, recursive bool) ([]string, error) {
 }
 
 // FindFiles searches for files and directories matching the given query.
-// The query is matched using filepath.Match pattern.
+// The query supports glob patterns:
+//   - * matches any number of characters except /
+//   - ? matches any single character except /
+//   - [abc] matches any character in the set
+//   - [a-z] matches any character in the range
+//   - ** matches any number of characters including /
+//
 // If recursive is true, it searches recursively from the root.
 // Returns paths relative to the VFS root.
 func (l *LocalVFS) FindFiles(query string, recursive bool) ([]string, error) {
@@ -277,8 +283,8 @@ func (l *LocalVFS) FindFiles(query string, recursive bool) ([]string, error) {
 				return nil
 			}
 
-			// Match against the filename or relative path
-			matched, err := filepath.Match(query, filepath.Base(p))
+			// Match against the relative path using glob pattern
+			matched, err := matchGlob(query, relPath)
 			if err != nil {
 				return err
 			}
@@ -303,7 +309,7 @@ func (l *LocalVFS) FindFiles(query string, recursive bool) ([]string, error) {
 		}
 
 		for _, entry := range entries {
-			matched, err := filepath.Match(query, entry.Name())
+			matched, err := matchGlob(query, entry.Name())
 			if err != nil {
 				return nil, err
 			}

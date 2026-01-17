@@ -359,7 +359,13 @@ func (m *MockVFS) ListFiles(path string, recursive bool) ([]string, error) {
 }
 
 // FindFiles searches for files and directories matching the given query.
-// The query is matched using filepath.Match pattern.
+// The query supports glob patterns:
+//   - * matches any number of characters except /
+//   - ? matches any single character except /
+//   - [abc] matches any character in the set
+//   - [a-z] matches any character in the range
+//   - ** matches any number of characters including /
+//
 // If recursive is true, it searches recursively from the root.
 // Returns paths relative to the VFS root.
 func (m *MockVFS) FindFiles(query string, recursive bool) ([]string, error) {
@@ -377,18 +383,19 @@ func (m *MockVFS) FindFiles(query string, recursive bool) ([]string, error) {
 		var walk func(prefix string, e *fileEntry) error
 		walk = func(prefix string, e *fileEntry) error {
 			for name, child := range e.children {
-				matched, err := filepath.Match(query, name)
+				childPath := filepath.Join(prefix, name)
+				relPath := childPath
+				if prefix == "" {
+					relPath = name
+				}
+
+				matched, err := matchGlob(query, relPath)
 				if err != nil {
 					return err
 				}
 
-				childPath := filepath.Join(prefix, name)
 				if matched {
-					if prefix == "" {
-						result = append(result, name)
-					} else {
-						result = append(result, childPath)
-					}
+					result = append(result, relPath)
 				}
 
 				if child.isDir {
@@ -406,7 +413,7 @@ func (m *MockVFS) FindFiles(query string, recursive bool) ([]string, error) {
 	} else {
 		// Non-recursive search
 		for name := range m.root.children {
-			matched, err := filepath.Match(query, name)
+			matched, err := matchGlob(query, name)
 			if err != nil {
 				return nil, err
 			}
