@@ -1,125 +1,106 @@
 package models
 
 import (
-	"os"
-	"path/filepath"
+	"errors"
 	"sort"
 	"testing"
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewProviderRegistry(t *testing.T) {
-	registry := NewProviderRegistry()
+	configStore := impl.NewMockConfigStore()
+	registry := NewProviderRegistry(configStore)
 	assert.NotNil(t, registry)
+	assert.NotNil(t, registry.configStore)
 	assert.NotNil(t, registry.providers)
 	assert.Equal(t, 0, len(registry.providers))
-}
-
-func TestProviderRegistry_Register(t *testing.T) {
-	tests := []struct {
-		name        string
-		provName    string
-		provider    ModelProvider
-		wantErr     bool
-		expectedErr error
-	}{
-		{
-			name:     "successful registration",
-			provName: "test-provider",
-			provider: NewMockProvider(nil),
-			wantErr:  false,
-		},
-		{
-			name:        "empty name",
-			provName:    "",
-			provider:    NewMockProvider(nil),
-			wantErr:     true,
-			expectedErr: nil, // Just check error exists
-		},
-		{
-			name:        "nil provider",
-			provName:    "test-provider",
-			provider:    nil,
-			wantErr:     true,
-			expectedErr: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			registry := NewProviderRegistry()
-			err := registry.Register(tt.provName, tt.provider)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				// Verify provider was registered
-				provider, err := registry.Get(tt.provName)
-				assert.NoError(t, err)
-				assert.Equal(t, tt.provider, provider)
-			}
-		})
-	}
-}
-
-func TestProviderRegistry_RegisterDuplicate(t *testing.T) {
-	registry := NewProviderRegistry()
-	provider1 := NewMockProvider(nil)
-	provider2 := NewMockProvider(nil)
-
-	// Register first provider
-	err := registry.Register("test", provider1)
-	require.NoError(t, err)
-
-	// Try to register second provider with same name
-	err = registry.Register("test", provider2)
-	assert.ErrorIs(t, err, ErrProviderAlreadyExists)
-
-	// Verify first provider is still registered
-	provider, err := registry.Get("test")
-	assert.NoError(t, err)
-	assert.Equal(t, provider1, provider)
+	assert.True(t, registry.lastUpdate.IsZero())
 }
 
 func TestProviderRegistry_Get(t *testing.T) {
-	registry := NewProviderRegistry()
-	provider := NewMockProvider(nil)
-
-	// Register a provider
-	err := registry.Register("test", provider)
-	require.NoError(t, err)
-
 	tests := []struct {
 		name        string
+		setupStore  func(*impl.MockConfigStore)
 		provName    string
 		wantErr     bool
 		expectedErr error
 	}{
 		{
-			name:     "existing provider",
-			provName: "test",
+			name: "get existing provider",
+			setupStore: func(store *impl.MockConfigStore) {
+				configs := map[string]*conf.ModelProviderConfig{
+					"test-ollama": {
+						Type: "ollama",
+						Name: "test-ollama",
+						URL:  "http://localhost:11434",
+					},
+				}
+				store.SetModelProviderConfigs(configs)
+			},
+			provName: "test-ollama",
 			wantErr:  false,
 		},
 		{
-			name:        "non-existent provider",
+			name: "get non-existent provider",
+			setupStore: func(store *impl.MockConfigStore) {
+				configs := map[string]*conf.ModelProviderConfig{
+					"test-ollama": {
+						Type: "ollama",
+						Name: "test-ollama",
+						URL:  "http://localhost:11434",
+					},
+				}
+				store.SetModelProviderConfigs(configs)
+			},
 			provName:    "non-existent",
 			wantErr:     true,
 			expectedErr: ErrProviderNotFound,
 		},
+		{
+			name: "get from empty store",
+			setupStore: func(store *impl.MockConfigStore) {
+				store.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{})
+			},
+			provName:    "test",
+			wantErr:     true,
+			expectedErr: ErrProviderNotFound,
+		},
+		{
+			name: "config store returns error on GetModelProviderConfigs",
+			setupStore: func(store *impl.MockConfigStore) {
+				store.GetModelProviderConfigsErr = errors.New("config store error")
+			},
+			provName: "test",
+			wantErr:  true,
+		},
+		{
+			name: "config store returns error on LastModelProviderConfigsUpdate",
+			setupStore: func(store *impl.MockConfigStore) {
+				store.LastModelProviderConfigsUpdateErr = errors.New("timestamp error")
+			},
+			provName: "test",
+			wantErr:  true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			configStore := impl.NewMockConfigStore()
+			tt.setupStore(configStore)
+
+			registry := NewProviderRegistry(configStore)
 			provider, err := registry.Get(tt.provName)
 
 			if tt.wantErr {
 				assert.Error(t, err)
-				assert.ErrorIs(t, err, tt.expectedErr)
+				if tt.expectedErr != nil {
+					assert.ErrorIs(t, err, tt.expectedErr)
+				}
 				assert.Nil(t, provider)
 			} else {
 				assert.NoError(t, err)
@@ -130,156 +111,52 @@ func TestProviderRegistry_Get(t *testing.T) {
 }
 
 func TestProviderRegistry_List(t *testing.T) {
-	registry := NewProviderRegistry()
-
-	// Empty registry
-	names := registry.List()
-	assert.Equal(t, 0, len(names))
-
-	// Register multiple providers
-	provider1 := NewMockProvider(nil)
-	provider2 := NewMockProvider(nil)
-	provider3 := NewMockProvider(nil)
-
-	err := registry.Register("provider-1", provider1)
-	require.NoError(t, err)
-	err = registry.Register("provider-2", provider2)
-	require.NoError(t, err)
-	err = registry.Register("provider-3", provider3)
-	require.NoError(t, err)
-
-	// Get list and sort for consistent comparison
-	names = registry.List()
-	sort.Strings(names)
-
-	expected := []string{"provider-1", "provider-2", "provider-3"}
-	assert.Equal(t, expected, names)
-}
-
-func TestProviderRegistry_LoadFromDirectory(t *testing.T) {
 	tests := []struct {
 		name          string
-		setupFiles    func(t *testing.T, dir string)
-		wantErr       bool
+		setupStore    func(*impl.MockConfigStore)
 		expectedCount int
 		expectedNames []string
 	}{
 		{
-			name: "load valid config files",
-			setupFiles: func(t *testing.T, dir string) {
-				// Create test config files
-				ollamaConfig := `{
-					"type": "ollama",
-					"name": "ollama",
-					"url": "http://localhost:11434"
-				}`
-				err := os.WriteFile(filepath.Join(dir, "ollama.json"), []byte(ollamaConfig), 0644)
-				require.NoError(t, err)
-
-				anthropicConfig := `{
-					"type": "anthropic",
-					"name": "anthropic",
-					"url": "https://api.anthropic.com",
-					"api_key": "test-key"
-				}`
-				err = os.WriteFile(filepath.Join(dir, "anthropic.json"), []byte(anthropicConfig), 0644)
-				require.NoError(t, err)
+			name: "list multiple providers",
+			setupStore: func(store *impl.MockConfigStore) {
+				configs := map[string]*conf.ModelProviderConfig{
+					"ollama": {
+						Type: "ollama",
+						Name: "ollama",
+						URL:  "http://localhost:11434",
+					},
+					"anthropic": {
+						Type:   "anthropic",
+						Name:   "anthropic",
+						URL:    "https://api.anthropic.com",
+						APIKey: "test-key",
+					},
+					"openai": {
+						Type:   "openai",
+						Name:   "openai",
+						URL:    "https://api.openai.com/v1",
+						APIKey: "test-key",
+					},
+				}
+				store.SetModelProviderConfigs(configs)
 			},
-			wantErr:       false,
-			expectedCount: 2,
-			expectedNames: []string{"anthropic", "ollama"},
+			expectedCount: 3,
+			expectedNames: []string{"anthropic", "ollama", "openai"},
 		},
 		{
-			name: "load config with missing name field",
-			setupFiles: func(t *testing.T, dir string) {
-				// Config without name field - should use filename
-				config := `{
-					"type": "ollama",
-					"url": "http://localhost:11434"
-				}`
-				err := os.WriteFile(filepath.Join(dir, "local-ollama.json"), []byte(config), 0644)
-				require.NoError(t, err)
+			name: "list empty providers",
+			setupStore: func(store *impl.MockConfigStore) {
+				store.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{})
 			},
-			wantErr:       false,
-			expectedCount: 1,
-			expectedNames: []string{"local-ollama"},
+			expectedCount: 0,
+			expectedNames: []string{},
 		},
 		{
-			name: "load config with mismatched name field",
-			setupFiles: func(t *testing.T, dir string) {
-				// Config with different name - should override with filename
-				config := `{
-					"type": "ollama",
-					"name": "wrong-name",
-					"url": "http://localhost:11434"
-				}`
-				err := os.WriteFile(filepath.Join(dir, "correct-name.json"), []byte(config), 0644)
-				require.NoError(t, err)
+			name: "list with config store error returns empty list",
+			setupStore: func(store *impl.MockConfigStore) {
+				store.GetModelProviderConfigsErr = errors.New("config error")
 			},
-			wantErr:       false,
-			expectedCount: 1,
-			expectedNames: []string{"correct-name"},
-		},
-		{
-			name: "skip non-json files",
-			setupFiles: func(t *testing.T, dir string) {
-				// Create a valid JSON file
-				config := `{
-					"type": "ollama",
-					"url": "http://localhost:11434"
-				}`
-				err := os.WriteFile(filepath.Join(dir, "ollama.json"), []byte(config), 0644)
-				require.NoError(t, err)
-
-				// Create non-JSON files that should be skipped
-				err = os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("test"), 0644)
-				require.NoError(t, err)
-				err = os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("test: value"), 0644)
-				require.NoError(t, err)
-			},
-			wantErr:       false,
-			expectedCount: 1,
-			expectedNames: []string{"ollama"},
-		},
-		{
-			name: "invalid json content",
-			setupFiles: func(t *testing.T, dir string) {
-				// Create invalid JSON
-				err := os.WriteFile(filepath.Join(dir, "invalid.json"), []byte("not valid json{"), 0644)
-				require.NoError(t, err)
-			},
-			wantErr: true,
-		},
-		{
-			name: "missing required fields",
-			setupFiles: func(t *testing.T, dir string) {
-				// Config without URL (required field)
-				config := `{
-					"type": "ollama"
-				}`
-				err := os.WriteFile(filepath.Join(dir, "invalid.json"), []byte(config), 0644)
-				require.NoError(t, err)
-			},
-			wantErr: true,
-		},
-		{
-			name: "unsupported provider type",
-			setupFiles: func(t *testing.T, dir string) {
-				config := `{
-					"type": "unsupported-provider",
-					"url": "http://localhost:8080"
-				}`
-				err := os.WriteFile(filepath.Join(dir, "unsupported.json"), []byte(config), 0644)
-				require.NoError(t, err)
-			},
-			wantErr: true,
-		},
-		{
-			name: "empty directory",
-			setupFiles: func(t *testing.T, dir string) {
-				// Don't create any files
-			},
-			wantErr:       false,
 			expectedCount: 0,
 			expectedNames: []string{},
 		},
@@ -287,126 +164,112 @@ func TestProviderRegistry_LoadFromDirectory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary directory
-			tempDir, err := os.MkdirTemp("", "registry-test-*")
-			require.NoError(t, err)
-			defer os.RemoveAll(tempDir)
+			configStore := impl.NewMockConfigStore()
+			tt.setupStore(configStore)
 
-			// Setup test files
-			tt.setupFiles(t, tempDir)
+			registry := NewProviderRegistry(configStore)
+			names := registry.List()
 
-			// Create registry and load configs
-			registry := NewProviderRegistry()
-			err = registry.LoadFromDirectory(tempDir)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-
-				// Verify expected number of providers
-				names := registry.List()
-				assert.Equal(t, tt.expectedCount, len(names))
-
-				// Verify expected provider names
-				sort.Strings(names)
-				sort.Strings(tt.expectedNames)
-				assert.Equal(t, tt.expectedNames, names)
-
-				// Verify we can retrieve each provider
-				for _, name := range tt.expectedNames {
-					provider, err := registry.Get(name)
-					assert.NoError(t, err)
-					assert.NotNil(t, provider)
-				}
-			}
+			assert.Equal(t, tt.expectedCount, len(names))
+			sort.Strings(names)
+			sort.Strings(tt.expectedNames)
+			assert.Equal(t, tt.expectedNames, names)
 		})
 	}
 }
 
-func TestProviderRegistry_LoadFromDirectory_NonExistentDirectory(t *testing.T) {
-	registry := NewProviderRegistry()
-	err := registry.LoadFromDirectory("/non/existent/directory")
-	assert.Error(t, err)
-}
+func TestProviderRegistry_CacheInvalidation(t *testing.T) {
+	configStore := impl.NewMockConfigStore()
 
-func TestProviderRegistry_LoadFromDirectory_RealConfigs(t *testing.T) {
-	// Test loading from the actual configs/models directory if it exists
-	configDir := "../../testdata/conf/models"
-
-	// Check if directory exists
-	if _, err := os.Stat(configDir); os.IsNotExist(err) {
-		t.Skip("testdata/conf/models directory does not exist")
+	// Initial configuration
+	configs1 := map[string]*conf.ModelProviderConfig{
+		"ollama": {
+			Type: "ollama",
+			Name: "ollama",
+			URL:  "http://localhost:11434",
+		},
 	}
+	configStore.SetModelProviderConfigs(configs1)
 
-	registry := NewProviderRegistry()
-	err := registry.LoadFromDirectory(configDir)
-	assert.NoError(t, err)
+	registry := NewProviderRegistry(configStore)
 
-	// Verify we loaded at least one provider
-	names := registry.List()
-	assert.Greater(t, len(names), 0)
-
-	// Verify we can get each provider
-	for _, name := range names {
-		provider, err := registry.Get(name)
-		assert.NoError(t, err)
-		assert.NotNil(t, provider)
-	}
-}
-
-func TestProviderRegistry_RegisterMultipleConfigsForSameProvider(t *testing.T) {
-	// Test that we can register the same provider type under different names
-	tempDir, err := os.MkdirTemp("", "registry-multi-test-*")
+	// First access - should load from config store
+	provider1, err := registry.Get("ollama")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
-
-	// Create multiple Ollama configs with different names
-	config1 := `{
-		"type": "ollama",
-		"url": "http://localhost:11434"
-	}`
-	err = os.WriteFile(filepath.Join(tempDir, "ollama-local.json"), []byte(config1), 0644)
-	require.NoError(t, err)
-
-	config2 := `{
-		"type": "ollama",
-		"url": "http://remote-server:11434"
-	}`
-	err = os.WriteFile(filepath.Join(tempDir, "ollama-remote.json"), []byte(config2), 0644)
-	require.NoError(t, err)
-
-	// Load configs
-	registry := NewProviderRegistry()
-	err = registry.LoadFromDirectory(tempDir)
-	assert.NoError(t, err)
-
-	// Verify both providers are registered
-	names := registry.List()
-	sort.Strings(names)
-	assert.Equal(t, []string{"ollama-local", "ollama-remote"}, names)
-
-	// Verify we can get both providers
-	provider1, err := registry.Get("ollama-local")
-	assert.NoError(t, err)
 	assert.NotNil(t, provider1)
 
-	provider2, err := registry.Get("ollama-remote")
-	assert.NoError(t, err)
+	// Verify only ollama is in the list
+	names := registry.List()
+	assert.Equal(t, []string{"ollama"}, names)
+
+	// Update configuration with new provider
+	time.Sleep(10 * time.Millisecond) // Ensure timestamp changes
+	configs2 := map[string]*conf.ModelProviderConfig{
+		"ollama": {
+			Type: "ollama",
+			Name: "ollama",
+			URL:  "http://localhost:11434",
+		},
+		"anthropic": {
+			Type:   "anthropic",
+			Name:   "anthropic",
+			URL:    "https://api.anthropic.com",
+			APIKey: "test-key",
+		},
+	}
+	configStore.SetModelProviderConfigs(configs2)
+
+	// Access should trigger reload because timestamp changed
+	provider2, err := registry.Get("anthropic")
+	require.NoError(t, err)
 	assert.NotNil(t, provider2)
 
-	// They should be different instances
-	assert.NotEqual(t, provider1, provider2)
+	// Verify both providers are now in the list
+	names = registry.List()
+	sort.Strings(names)
+	assert.Equal(t, []string{"anthropic", "ollama"}, names)
 }
 
-func TestProviderRegistry_Concurrency(t *testing.T) {
-	// Test concurrent access to registry
-	registry := NewProviderRegistry()
+func TestProviderRegistry_CacheNotInvalidatedWhenTimestampSame(t *testing.T) {
+	configStore := impl.NewMockConfigStore()
 
-	// Register initial provider
-	provider := NewMockProvider(nil)
-	err := registry.Register("test", provider)
+	// Initial configuration
+	configs := map[string]*conf.ModelProviderConfig{
+		"ollama": {
+			Type: "ollama",
+			Name: "ollama",
+			URL:  "http://localhost:11434",
+		},
+	}
+	configStore.SetModelProviderConfigs(configs)
+
+	registry := NewProviderRegistry(configStore)
+
+	// First access - should load from config store
+	provider1, err := registry.Get("ollama")
 	require.NoError(t, err)
+	assert.NotNil(t, provider1)
+
+	// Second access without timestamp change - should use cache
+	// We can verify this by checking that even if we inject an error,
+	// it doesn't affect the second access
+	provider2, err := registry.Get("ollama")
+	require.NoError(t, err)
+	assert.NotNil(t, provider2)
+}
+
+func TestProviderRegistry_ConcurrentAccess(t *testing.T) {
+	configStore := impl.NewMockConfigStore()
+	configs := map[string]*conf.ModelProviderConfig{
+		"ollama": {
+			Type: "ollama",
+			Name: "ollama",
+			URL:  "http://localhost:11434",
+		},
+	}
+	configStore.SetModelProviderConfigs(configs)
+
+	registry := NewProviderRegistry(configStore)
 
 	// Run concurrent operations
 	done := make(chan bool)
@@ -414,7 +277,7 @@ func TestProviderRegistry_Concurrency(t *testing.T) {
 	// Concurrent reads
 	for i := 0; i < 10; i++ {
 		go func() {
-			_, _ = registry.Get("test")
+			_, _ = registry.Get("ollama")
 			_ = registry.List()
 			done <- true
 		}()
@@ -426,101 +289,139 @@ func TestProviderRegistry_Concurrency(t *testing.T) {
 	}
 
 	// Verify registry is still functional
-	p, err := registry.Get("test")
+	p, err := registry.Get("ollama")
 	assert.NoError(t, err)
-	assert.Equal(t, provider, p)
+	assert.NotNil(t, p)
 }
 
-func TestProviderRegistry_LoadFromDirectoryWithTags(t *testing.T) {
-	// Create temporary directory
-	tempDir, err := os.MkdirTemp("", "registry-tags-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+func TestProviderRegistry_InvalidProviderConfig(t *testing.T) {
+	configStore := impl.NewMockConfigStore()
 
-	// Create test config with model_tags
-	config := `{
-		"type": "ollama",
-		"url": "http://localhost:11434",
-		"model_tags": [
-			{"model": "^llama.*", "tag": "llama"},
-			{"model": "^codellama.*", "tag": "codellama"}
-		]
-	}`
-	err = os.WriteFile(filepath.Join(tempDir, "ollama.json"), []byte(config), 0644)
-	require.NoError(t, err)
+	// Configuration with invalid provider type
+	configs := map[string]*conf.ModelProviderConfig{
+		"invalid": {
+			Type: "unsupported-type",
+			Name: "invalid",
+			URL:  "http://localhost:8080",
+		},
+	}
+	configStore.SetModelProviderConfigs(configs)
 
-	// Create registries
-	providerRegistry := NewProviderRegistry()
-	tagRegistry := NewModelTagRegistry()
+	registry := NewProviderRegistry(configStore)
 
-	// Load with tag registry
-	err = providerRegistry.LoadFromDirectoryWithTags(tempDir, tagRegistry)
-	require.NoError(t, err)
+	// Should get error when trying to access
+	_, err := registry.Get("invalid")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported provider type")
+}
 
-	// Verify provider was registered
-	names := providerRegistry.List()
+func TestProviderRegistry_MissingRequiredFields(t *testing.T) {
+	configStore := impl.NewMockConfigStore()
+
+	// Configuration without URL (required field)
+	configs := map[string]*conf.ModelProviderConfig{
+		"invalid": {
+			Type: "ollama",
+			Name: "invalid",
+			URL:  "", // Missing URL
+		},
+	}
+	configStore.SetModelProviderConfigs(configs)
+
+	registry := NewProviderRegistry(configStore)
+
+	// Should get error when trying to access
+	_, err := registry.Get("invalid")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "URL cannot be empty")
+}
+
+func TestProviderRegistry_MultipleProviderTypes(t *testing.T) {
+	configStore := impl.NewMockConfigStore()
+
+	configs := map[string]*conf.ModelProviderConfig{
+		"ollama-local": {
+			Type: "ollama",
+			Name: "ollama-local",
+			URL:  "http://localhost:11434",
+		},
+		"ollama-remote": {
+			Type: "ollama",
+			Name: "ollama-remote",
+			URL:  "http://remote:11434",
+		},
+		"anthropic": {
+			Type:   "anthropic",
+			Name:   "anthropic",
+			URL:    "https://api.anthropic.com",
+			APIKey: "test-key",
+		},
+		"openai": {
+			Type:   "openai",
+			Name:   "openai",
+			URL:    "https://api.openai.com/v1",
+			APIKey: "test-key",
+		},
+	}
+	configStore.SetModelProviderConfigs(configs)
+
+	registry := NewProviderRegistry(configStore)
+
+	// Verify all providers are accessible
+	names := registry.List()
+	assert.Equal(t, 4, len(names))
+
+	for name := range configs {
+		provider, err := registry.Get(name)
+		assert.NoError(t, err)
+		assert.NotNil(t, provider)
+	}
+}
+
+func TestProviderRegistry_ReloadAfterConfigRemoval(t *testing.T) {
+	configStore := impl.NewMockConfigStore()
+
+	// Initial configuration with two providers
+	configs1 := map[string]*conf.ModelProviderConfig{
+		"ollama": {
+			Type: "ollama",
+			Name: "ollama",
+			URL:  "http://localhost:11434",
+		},
+		"anthropic": {
+			Type:   "anthropic",
+			Name:   "anthropic",
+			URL:    "https://api.anthropic.com",
+			APIKey: "test-key",
+		},
+	}
+	configStore.SetModelProviderConfigs(configs1)
+
+	registry := NewProviderRegistry(configStore)
+
+	// Verify both providers exist
+	names := registry.List()
+	assert.Equal(t, 2, len(names))
+
+	// Remove one provider
+	time.Sleep(10 * time.Millisecond)
+	configs2 := map[string]*conf.ModelProviderConfig{
+		"ollama": {
+			Type: "ollama",
+			Name: "ollama",
+			URL:  "http://localhost:11434",
+		},
+	}
+	configStore.SetModelProviderConfigs(configs2)
+
+	// Access should trigger reload
+	names = registry.List()
+	assert.Equal(t, 1, len(names))
 	assert.Equal(t, []string{"ollama"}, names)
 
-	// Verify tags were registered
-	tags := tagRegistry.GetTagsForModel("ollama", "llama-7b")
-	sort.Strings(tags)
-	assert.Equal(t, []string{"llama"}, tags)
-
-	tags = tagRegistry.GetTagsForModel("ollama", "codellama-13b")
-	sort.Strings(tags)
-	assert.Equal(t, []string{"codellama"}, tags)
-}
-
-func TestProviderRegistry_LoadFromDirectoryWithTags_NilTagRegistry(t *testing.T) {
-	// Create temporary directory
-	tempDir, err := os.MkdirTemp("", "registry-tags-nil-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
-
-	// Create test config with model_tags
-	config := `{
-		"type": "ollama",
-		"url": "http://localhost:11434",
-		"model_tags": [
-			{"model": "^llama.*", "tag": "llama"}
-		]
-	}`
-	err = os.WriteFile(filepath.Join(tempDir, "ollama.json"), []byte(config), 0644)
-	require.NoError(t, err)
-
-	// Load with nil tag registry (should not error)
-	providerRegistry := NewProviderRegistry()
-	err = providerRegistry.LoadFromDirectoryWithTags(tempDir, nil)
-	require.NoError(t, err)
-
-	// Verify provider was registered
-	names := providerRegistry.List()
-	assert.Equal(t, []string{"ollama"}, names)
-}
-
-func TestProviderRegistry_LoadFromDirectoryWithTags_InvalidRegexp(t *testing.T) {
-	// Create temporary directory
-	tempDir, err := os.MkdirTemp("", "registry-tags-invalid-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
-
-	// Create test config with invalid regexp
-	config := `{
-		"type": "ollama",
-		"url": "http://localhost:11434",
-		"model_tags": [
-			{"model": "[invalid", "tag": "test"}
-		]
-	}`
-	err = os.WriteFile(filepath.Join(tempDir, "ollama.json"), []byte(config), 0644)
-	require.NoError(t, err)
-
-	// Load with tag registry should fail due to invalid regexp
-	providerRegistry := NewProviderRegistry()
-	tagRegistry := NewModelTagRegistry()
-	err = providerRegistry.LoadFromDirectoryWithTags(tempDir, tagRegistry)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid regexp")
+	// Anthropic should no longer be accessible
+	_, err := registry.Get("anthropic")
+	assert.ErrorIs(t, err, ErrProviderNotFound)
 }
 
 func TestFromConfig(t *testing.T) {

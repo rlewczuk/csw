@@ -77,16 +77,18 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config directory does not exist: %s", configDir)
 	}
 
-	// Load model providers from config
-	modelsDir := filepath.Join(configDir, "models")
-	providerRegistry := models.NewProviderRegistry()
-	if err := providerRegistry.LoadFromDirectory(modelsDir); err != nil {
-		return fmt.Errorf("failed to load model providers: %w", err)
+	// Create config store
+	configStore, err := impl.NewLocalConfigStore(configDir)
+	if err != nil {
+		return fmt.Errorf("failed to create config store: %w", err)
 	}
+
+	// Create provider registry using config store
+	providerRegistry := models.NewProviderRegistry(configStore)
 
 	// Check if any providers were loaded
 	if len(providerRegistry.List()) == 0 {
-		return fmt.Errorf("no model providers found in %s", modelsDir)
+		return fmt.Errorf("no model providers found in config")
 	}
 
 	// Create model provider map for SweSystem
@@ -125,12 +127,6 @@ func run(cmd *cobra.Command, args []string) error {
 	// Create tool registry and register VFS tools
 	toolRegistry := tool.NewToolRegistry()
 	tool.RegisterVFSTools(toolRegistry, localVFS)
-
-	// Create config store
-	configStore, err := impl.NewLocalConfigStore(configDir)
-	if err != nil {
-		return fmt.Errorf("failed to create config store: %w", err)
-	}
 
 	// Create prompt generator
 	promptGenerator, err := core.NewConfPromptGenerator(configStore)

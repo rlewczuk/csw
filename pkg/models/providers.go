@@ -1,12 +1,8 @@
 package models
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -14,138 +10,102 @@ import (
 )
 
 var (
-	ErrProviderNotFound      = errors.New("provider not found")
-	ErrProviderAlreadyExists = errors.New("provider already exists")
+	ErrProviderNotFound = errors.New("provider not found")
 )
 
 // ProviderRegistry manages a collection of model providers.
-// It allows registration, retrieval, and listing of providers.
+// It loads provider configurations from a ConfigStore and caches the created providers.
+// The cache is invalidated when the ConfigStore reports that configurations have changed.
 type ProviderRegistry struct {
-	mu        sync.RWMutex
-	providers map[string]ModelProvider
+	mu          sync.RWMutex
+	configStore conf.ConfigStore
+	providers   map[string]ModelProvider
+	lastUpdate  time.Time
 }
 
-// NewProviderRegistry creates a new provider registry.
-func NewProviderRegistry() *ProviderRegistry {
+// NewProviderRegistry creates a new provider registry that uses the given ConfigStore.
+// Providers are loaded lazily when accessed via Get() or List().
+func NewProviderRegistry(configStore conf.ConfigStore) *ProviderRegistry {
 	return &ProviderRegistry{
-		providers: make(map[string]ModelProvider),
+		configStore: configStore,
+		providers:   make(map[string]ModelProvider),
+		lastUpdate:  time.Time{},
 	}
 }
 
-// Register registers a provider with the given name.
-// It returns an error if a provider with the same name already exists.
-func (r *ProviderRegistry) Register(name string, provider ModelProvider) error {
-	if name == "" {
-		return fmt.Errorf("ProviderRegistry.Register() [registry.go]: provider name cannot be empty")
-	}
-	if provider == nil {
-		return fmt.Errorf("ProviderRegistry.Register() [registry.go]: provider cannot be nil")
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if _, exists := r.providers[name]; exists {
-		return fmt.Errorf("ProviderRegistry.Register() [registry.go]: %w", ErrProviderAlreadyExists)
+// ensureLoaded checks if the provider cache needs to be refreshed and reloads if necessary.
+// It must be called with the write lock held.
+func (r *ProviderRegistry) ensureLoaded() error {
+	// Get the last update timestamp from config store
+	lastConfigUpdate, err := r.configStore.LastModelProviderConfigsUpdate()
+	if err != nil {
+		return fmt.Errorf("ProviderRegistry.ensureLoaded() [providers.go]: failed to get last update timestamp: %w", err)
 	}
 
-	r.providers[name] = provider
+	// If cache is up to date, no need to reload
+	if !r.lastUpdate.IsZero() && !lastConfigUpdate.After(r.lastUpdate) {
+		return nil
+	}
+
+	// Load configurations from config store
+	configs, err := r.configStore.GetModelProviderConfigs()
+	if err != nil {
+		return fmt.Errorf("ProviderRegistry.ensureLoaded() [providers.go]: failed to load provider configs: %w", err)
+	}
+
+	// Clear existing providers
+	r.providers = make(map[string]ModelProvider)
+
+	// Create providers from configurations
+	for name, config := range configs {
+		provider, err := ModelFromConfig(config)
+		if err != nil {
+			return fmt.Errorf("ProviderRegistry.ensureLoaded() [providers.go]: failed to create provider %s: %w", name, err)
+		}
+		r.providers[name] = provider
+	}
+
+	// Update the last loaded timestamp
+	r.lastUpdate = lastConfigUpdate
+
 	return nil
 }
 
 // Get retrieves a provider by name.
+// It loads providers from the ConfigStore if the cache is stale or empty.
 // It returns an error if the provider is not found.
 func (r *ProviderRegistry) Get(name string) (ModelProvider, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Ensure providers are loaded and up to date
+	if err := r.ensureLoaded(); err != nil {
+		return nil, err
+	}
 
 	provider, exists := r.providers[name]
 	if !exists {
-		return nil, fmt.Errorf("ProviderRegistry.Get() [registry.go]: %w", ErrProviderNotFound)
+		return nil, fmt.Errorf("ProviderRegistry.Get() [providers.go]: %w", ErrProviderNotFound)
 	}
 
 	return provider, nil
 }
 
 // List returns a list of all registered provider names.
+// It loads providers from the ConfigStore if the cache is stale or empty.
 func (r *ProviderRegistry) List() []string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Ensure providers are loaded and up to date
+	// Ignore errors here - just return empty list
+	_ = r.ensureLoaded()
 
 	names := make([]string, 0, len(r.providers))
 	for name := range r.providers {
 		names = append(names, name)
 	}
 	return names
-}
-
-// LoadFromDirectory loads provider configurations from JSON files in the specified directory.
-// Each JSON file should contain a ModelProviderConfig.
-// The provider name is derived from the filename (without extension).
-// If the Name field in the JSON is empty or doesn't match the filename, it will be set to the filename.
-func (r *ProviderRegistry) LoadFromDirectory(dirPath string) error {
-	return r.LoadFromDirectoryWithTags(dirPath, nil)
-}
-
-// LoadFromDirectoryWithTags loads provider configurations and registers model tags with the given registry.
-// If tagRegistry is nil, model tags are ignored.
-func (r *ProviderRegistry) LoadFromDirectoryWithTags(dirPath string, tagRegistry *ModelTagRegistry) error {
-	entries, err := os.ReadDir(dirPath)
-	if err != nil {
-		return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to read directory %s: %w", dirPath, err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		// Only process .json files
-		if !strings.HasSuffix(entry.Name(), ".json") {
-			continue
-		}
-
-		// Extract provider name from filename
-		fileName := entry.Name()
-		providerName := strings.TrimSuffix(fileName, ".json")
-
-		// Read and parse the config file
-		filePath := filepath.Join(dirPath, fileName)
-		data, err := os.ReadFile(filePath)
-		if err != nil {
-			return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to read config file %s: %w", filePath, err)
-		}
-
-		var config conf.ModelProviderConfig
-		if err := json.Unmarshal(data, &config); err != nil {
-			return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to parse config file %s: %w", filePath, err)
-		}
-
-		// Set or override the name to match the filename
-		if config.Name == "" || config.Name != providerName {
-			config.Name = providerName
-		}
-
-		// Register model tags if tag registry is provided and config has model tags
-		if tagRegistry != nil && len(config.ModelTags) > 0 {
-			if err := tagRegistry.SetProviderMappings(providerName, config.ModelTags); err != nil {
-				return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to set provider mappings for %s: %w", providerName, err)
-			}
-		}
-
-		// Create the provider from config
-		provider, err := ModelFromConfig(&config)
-		if err != nil {
-			return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to create provider from config file %s: %w", filePath, err)
-		}
-
-		// Register the provider
-		if err := r.Register(providerName, provider); err != nil {
-			return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to register provider %s: %w", providerName, err)
-		}
-	}
-
-	return nil
 }
 
 // ModelFromConfig creates a new ModelProvider instance from the configuration.
