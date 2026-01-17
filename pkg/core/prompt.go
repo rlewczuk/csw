@@ -3,16 +3,13 @@ package core
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"text/template"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/fsnotify/fsnotify"
 )
 
 // PromptScanner scans and loads prompt fragments from a source.
@@ -35,18 +32,6 @@ type PromptGenerator interface {
 	// Takes map of fragments from GetFragments, concatenates and processes using text/template it to create final prompt;
 	// Also responsible for eventual result caching if any of files has changed or agent state data has changed;
 	GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error)
-}
-
-// FileBasedPromptScanner implements PromptScanner interface.
-// It reads prompt fragments from the roles directory and caches them.
-// It watches for changes in the roles directory and reloads the cache when needed.
-type FileBasedPromptScanner struct {
-	rolesDir string
-	cache    map[string]string // key: filepath relative to rolesDir, value: content
-	mu       sync.RWMutex
-	watcher  *fsnotify.Watcher
-	stopCh   chan struct{}
-	changed  bool // tracks if fragments have changed since last HasChanged call
 }
 
 // FSPromptGenerator implements PromptGenerator interface.
@@ -72,33 +57,6 @@ type promptFragment struct {
 	isAll    bool // true if from "all" directory
 }
 
-// NewFileBasedPromptScanner creates a new FileBasedPromptScanner.
-func NewFileBasedPromptScanner(rolesDir string) (*FileBasedPromptScanner, error) {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return nil, fmt.Errorf("NewFileBasedPromptScanner() [prompt.go]: failed to create watcher: %w", err)
-	}
-
-	scanner := &FileBasedPromptScanner{
-		rolesDir: rolesDir,
-		cache:    make(map[string]string),
-		watcher:  watcher,
-		stopCh:   make(chan struct{}),
-		changed:  false,
-	}
-
-	// Load initial cache
-	if err := scanner.loadCache(); err != nil {
-		watcher.Close()
-		return nil, fmt.Errorf("NewFileBasedPromptScanner() [prompt.go]: failed to load initial cache: %w", err)
-	}
-
-	// Start watching
-	go scanner.watch()
-
-	return scanner, nil
-}
-
 // NewFSPromptGenerator creates a new FSPromptGenerator with the given scanners.
 func NewFSPromptGenerator(scanners ...PromptScanner) (*FSPromptGenerator, error) {
 	if len(scanners) == 0 {
@@ -119,100 +77,6 @@ func NewConfPromptGenerator(store conf.ConfigStore) (*ConfPromptGenerator, error
 	return &ConfPromptGenerator{
 		store: store,
 	}, nil
-}
-
-// Close stops the watcher and cleans up resources.
-func (s *FileBasedPromptScanner) Close() error {
-	close(s.stopCh)
-	return s.watcher.Close()
-}
-
-// HasChanged returns true if any of the fragments has changed since last call.
-func (s *FileBasedPromptScanner) HasChanged() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	result := s.changed
-	s.changed = false // reset the flag
-	return result
-}
-
-// loadCache loads all prompt fragments from the roles directory.
-func (s *FileBasedPromptScanner) loadCache() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Clear existing cache
-	s.cache = make(map[string]string)
-
-	// Remove existing watches
-	for _, watch := range s.watcher.WatchList() {
-		s.watcher.Remove(watch)
-	}
-
-	// Walk through roles directory
-	err := filepath.Walk(s.rolesDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Watch directories
-		if info.IsDir() {
-			if err := s.watcher.Add(path); err != nil {
-				return fmt.Errorf("failed to watch directory %s: %w", path, err)
-			}
-			return nil
-		}
-
-		// Read files that match our pattern
-		if strings.HasSuffix(info.Name(), ".md") {
-			relPath, err := filepath.Rel(s.rolesDir, path)
-			if err != nil {
-				return fmt.Errorf("failed to get relative path: %w", err)
-			}
-
-			content, err := os.ReadFile(path)
-			if err != nil {
-				return fmt.Errorf("failed to read file %s: %w", path, err)
-			}
-
-			s.cache[relPath] = string(content)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("loadCache() [prompt.go]: failed to walk directory: %w", err)
-	}
-
-	// Mark as changed
-	s.changed = true
-
-	return nil
-}
-
-// watch monitors the roles directory for changes.
-func (s *FileBasedPromptScanner) watch() {
-	for {
-		select {
-		case <-s.stopCh:
-			return
-		case event, ok := <-s.watcher.Events:
-			if !ok {
-				return
-			}
-			// Reload cache on any write or create event
-			if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) != 0 {
-				s.loadCache()
-			}
-		case err, ok := <-s.watcher.Errors:
-			if !ok {
-				return
-			}
-			// Log error but continue watching
-			fmt.Fprintf(os.Stderr, "FileBasedPromptScanner.watch() [prompt.go]: watcher error: %v\n", err)
-		}
-	}
 }
 
 // parseFilename parses a prompt fragment filename.
@@ -263,106 +127,6 @@ func parseFilename(filename string) (int, string, string, string, bool) {
 	default:
 		return 0, "", "", "", false
 	}
-}
-
-// GetFragments generates a prompt for the given tags, role and state.
-// Returns map where keys are filenames (dir/file_prefix with role name or 'all' as dir and no extension)
-// and values are unprocessed contents of those files.
-func (s *FileBasedPromptScanner) GetFragments(tags []string, role *conf.AgentRoleConfig) (map[string]string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	if role == nil {
-		return nil, fmt.Errorf("GetFragments() [prompt.go]: role cannot be nil")
-	}
-
-	// Collect all fragments
-	var fragments []promptFragment
-
-	for relPath, content := range s.cache {
-		// Split path into directory and filename
-		dir := filepath.Dir(relPath)
-		filename := filepath.Base(relPath)
-
-		// Check if it's from "all" or role-specific directory
-		isAll := (dir == "all" || strings.HasPrefix(dir, "all"+string(filepath.Separator)))
-		isRole := (dir == role.Name || strings.HasPrefix(dir, role.Name+string(filepath.Separator)))
-
-		if !isAll && !isRole {
-			continue
-		}
-
-		// Parse filename
-		order, kind, toolName, tag, ok := parseFilename(filename)
-		if !ok {
-			continue
-		}
-
-		// Check if tag matches
-		// A fragment with tag "all" matches any tags list
-		// A fragment with a specific tag only matches if that tag is in the tags list
-		if tag != "all" && !contains(tags, tag) {
-			continue
-		}
-
-		// For tools fragments, check if tool is enabled
-		if kind == "tools" {
-			if role.ToolsAccess == nil {
-				continue
-			}
-			access, ok := role.ToolsAccess[toolName]
-			if !ok || access == "" {
-				continue
-			}
-		}
-
-		fragments = append(fragments, promptFragment{
-			order:    order,
-			kind:     kind,
-			toolName: toolName,
-			tag:      tag,
-			filename: relPath,
-			content:  content,
-			isAll:    isAll,
-		})
-	}
-
-	// Filter out duplicates (role-specific overrides "all")
-	fragments = filterDuplicates(fragments)
-
-	// Sort by order
-	sort.Slice(fragments, func(i, j int) bool {
-		return fragments[i].order < fragments[j].order
-	})
-
-	// Build result map
-	result := make(map[string]string)
-	for _, f := range fragments {
-		// Key format: dir/file_prefix (without extension)
-		dir := "all"
-		if !f.isAll {
-			dir = role.Name
-		}
-
-		// Build key
-		var key string
-		if f.kind == "system" {
-			if f.tag == "all" {
-				key = fmt.Sprintf("%s/%d-system", dir, f.order)
-			} else {
-				key = fmt.Sprintf("%s/%d-system-%s", dir, f.order, f.tag)
-			}
-		} else {
-			if f.tag == "all" {
-				key = fmt.Sprintf("%s/%d-tools-%s", dir, f.order, f.toolName)
-			} else {
-				key = fmt.Sprintf("%s/%d-tools-%s-%s", dir, f.order, f.toolName, f.tag)
-			}
-		}
-		result[key] = f.content
-	}
-
-	return result, nil
 }
 
 // filterDuplicates filters out fragments from "all" directory that have corresponding
