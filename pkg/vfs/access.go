@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/codesnort/codesnort-swe/pkg/shared"
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 )
 
 // PermissionError is returned when an operation requires permission.
@@ -24,22 +24,13 @@ func (e *PermissionError) Is(target error) bool {
 
 type FileOperation string
 
-type FileAccess struct {
-	Read   shared.AccessFlag `json:"read"`
-	Write  shared.AccessFlag `json:"write"`
-	Delete shared.AccessFlag `json:"delete"`
-	List   shared.AccessFlag `json:"list"`
-	Find   shared.AccessFlag `json:"find"`
-	Move   shared.AccessFlag `json:"move"`
-}
-
-var denyAll = FileAccess{
-	Read:   shared.AccessDeny,
-	Write:  shared.AccessDeny,
-	Delete: shared.AccessDeny,
-	List:   shared.AccessDeny,
-	Find:   shared.AccessDeny,
-	Move:   shared.AccessDeny,
+var denyAll = conf.FileAccess{
+	Read:   conf.AccessDeny,
+	Write:  conf.AccessDeny,
+	Delete: conf.AccessDeny,
+	List:   conf.AccessDeny,
+	Find:   conf.AccessDeny,
+	Move:   conf.AccessDeny,
 }
 
 type AccessControlVFS struct {
@@ -47,11 +38,11 @@ type AccessControlVFS struct {
 	vfs VFS
 
 	// map of glob patterns to FileAccess
-	privileges map[string]FileAccess
+	privileges map[string]conf.FileAccess
 }
 
 // NewAccessControlVFS creates a new AccessControlVFS with the given underlying VFS and privileges map.
-func NewAccessControlVFS(vfs VFS, privileges map[string]FileAccess) *AccessControlVFS {
+func NewAccessControlVFS(vfs VFS, privileges map[string]conf.FileAccess) *AccessControlVFS {
 	return &AccessControlVFS{
 		vfs:        vfs,
 		privileges: privileges,
@@ -59,20 +50,20 @@ func NewAccessControlVFS(vfs VFS, privileges map[string]FileAccess) *AccessContr
 }
 
 // checkAccess checks if the given operation is allowed for the given path.
-func (ac *AccessControlVFS) checkAccess(path string, op string, flag shared.AccessFlag) error {
-	if flag == shared.AccessDeny {
+func (ac *AccessControlVFS) checkAccess(path string, op string, flag conf.AccessFlag) error {
+	if flag == conf.AccessDeny {
 		return ErrPermissionDenied
 	}
-	if flag == shared.AccessAsk {
+	if flag == conf.AccessAsk {
 		return &PermissionError{Path: path, Operation: op}
 	}
 	return nil
 }
 
 // getAccess returns the FileAccess for the given path by finding the most specific matching glob pattern.
-func (ac *AccessControlVFS) getAccess(path string) FileAccess {
+func (ac *AccessControlVFS) getAccess(path string) conf.FileAccess {
 	var bestMatch string
-	var bestAccess FileAccess
+	var bestAccess conf.FileAccess
 	found := false
 
 	for pattern, access := range ac.privileges {
@@ -213,7 +204,7 @@ func (ac *AccessControlVFS) MoveFile(src, dst string) error {
 }
 
 // SetPermission sets the permission for a specific path and operation.
-func (ac *AccessControlVFS) SetPermission(path string, op string, flag shared.AccessFlag) {
+func (ac *AccessControlVFS) SetPermission(path string, op string, flag conf.AccessFlag) {
 	// Get current effective access
 	access := ac.getAccess(path)
 
@@ -235,7 +226,7 @@ func (ac *AccessControlVFS) SetPermission(path string, op string, flag shared.Ac
 
 	// Store back in privileges map
 	if ac.privileges == nil {
-		ac.privileges = make(map[string]FileAccess)
+		ac.privileges = make(map[string]conf.FileAccess)
 	}
 	ac.privileges[path] = access
 }

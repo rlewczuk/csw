@@ -5,7 +5,9 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+	"time"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -519,4 +521,118 @@ func TestProviderRegistry_LoadFromDirectoryWithTags_InvalidRegexp(t *testing.T) 
 	err = providerRegistry.LoadFromDirectoryWithTags(tempDir, tagRegistry)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid regexp")
+}
+
+func TestFromConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      *conf.ModelProviderConfig
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "creates ollama provider with valid config",
+			config: &conf.ModelProviderConfig{
+				Type:               "ollama",
+				Name:               "local-ollama",
+				URL:                "http://localhost:11434",
+				ConnectTimeout:     5 * time.Second,
+				RequestTimeout:     30 * time.Second,
+				DefaultTemperature: 0.7,
+				DefaultTopP:        0.9,
+				DefaultTopK:        40,
+				ContextLengthLimit: 4096,
+			},
+			expectError: false,
+		},
+		{
+			name: "creates openai provider with valid config",
+			config: &conf.ModelProviderConfig{
+				Type:               "openai",
+				Name:               "openai-cloud",
+				URL:                "http://localhost:11434/v1",
+				APIKey:             "test-key",
+				ConnectTimeout:     5 * time.Second,
+				RequestTimeout:     30 * time.Second,
+				DefaultTemperature: 0.7,
+				DefaultTopP:        0.9,
+				ContextLengthLimit: 8192,
+			},
+			expectError: false,
+		},
+		{
+			name: "creates anthropic provider with valid config",
+			config: &conf.ModelProviderConfig{
+				Type:               "anthropic",
+				Name:               "anthropic-cloud",
+				URL:                "https://api.anthropic.com",
+				APIKey:             "test-key",
+				ConnectTimeout:     5 * time.Second,
+				RequestTimeout:     30 * time.Second,
+				DefaultTemperature: 0.7,
+				DefaultTopP:        0.9,
+				DefaultTopK:        40,
+				ContextLengthLimit: 100000,
+			},
+			expectError: false,
+		},
+		{
+			name: "uses default timeouts when not specified",
+			config: &conf.ModelProviderConfig{
+				Type: "ollama",
+				Name: "local-ollama",
+				URL:  "http://localhost:11434",
+			},
+			expectError: false,
+		},
+		{
+			name:        "returns error for nil config",
+			config:      nil,
+			expectError: true,
+			errorMsg:    "config cannot be nil",
+		},
+		{
+			name: "returns error for empty URL",
+			config: &conf.ModelProviderConfig{
+				Type: "ollama",
+				Name: "local-ollama",
+				URL:  "",
+			},
+			expectError: true,
+			errorMsg:    "URL cannot be empty",
+		},
+		{
+			name: "returns error for unsupported provider type",
+			config: &conf.ModelProviderConfig{
+				Type: "unsupported",
+				Name: "test",
+				URL:  "http://localhost:11434",
+			},
+			expectError: true,
+			errorMsg:    "unsupported provider type: unsupported",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider, err := ModelFromConfig(tt.config)
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+				assert.Nil(t, provider)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, provider)
+
+				// Verify the provider can create chat models
+				chatModel := provider.ChatModel("test-model", nil)
+				assert.NotNil(t, chatModel)
+
+				// Verify the provider can create embedding models
+				embedModel := provider.EmbeddingModel("test-model")
+				assert.NotNil(t, embedModel)
+			}
+		})
+	}
 }

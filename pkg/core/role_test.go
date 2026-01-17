@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +16,7 @@ import (
 // stateAwarePromptGenerator is a mock that uses the state in the prompt
 type stateAwarePromptGenerator struct{}
 
-func (s *stateAwarePromptGenerator) GetPrompt(tags []string, role *AgentRole, state *AgentState) (string, error) {
+func (s *stateAwarePromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error) {
 	return fmt.Sprintf("You are a developer. Work dir: %s", state.Info.WorkDir), nil
 }
 
@@ -24,7 +24,7 @@ func TestAgentRoleRegistry(t *testing.T) {
 	t.Run("Register and Get", func(t *testing.T) {
 		registry := NewAgentRoleRegistry()
 
-		role := AgentRole{
+		role := conf.AgentRoleConfig{
 			Name:        "test-role",
 			Description: "A test role",
 		}
@@ -43,8 +43,8 @@ func TestAgentRoleRegistry(t *testing.T) {
 	t.Run("List returns all role names", func(t *testing.T) {
 		registry := NewAgentRoleRegistry()
 
-		role1 := AgentRole{Name: "role1", Description: "Role 1"}
-		role2 := AgentRole{Name: "role2", Description: "Role 2"}
+		role1 := conf.AgentRoleConfig{Name: "role1", Description: "Role 1"}
+		role2 := conf.AgentRoleConfig{Name: "role2", Description: "Role 2"}
 
 		registry.Register(role1)
 		registry.Register(role2)
@@ -96,41 +96,41 @@ func TestAgentRoleIntegration(t *testing.T) {
 	tool.RegisterVFSTools(tools, mockVFS)
 
 	// Define test roles
-	developerRole := AgentRole{
+	developerRole := conf.AgentRoleConfig{
 		Name:        "developer",
 		Description: "A software developer role with full VFS access",
-		VFSPrivileges: map[string]vfs.FileAccess{
+		VFSPrivileges: map[string]conf.FileAccess{
 			"**": {
-				Read:   shared.AccessAllow,
-				Write:  shared.AccessAllow,
-				Delete: shared.AccessAllow,
-				List:   shared.AccessAllow,
-				Find:   shared.AccessAllow,
-				Move:   shared.AccessAllow,
+				Read:   conf.AccessAllow,
+				Write:  conf.AccessAllow,
+				Delete: conf.AccessAllow,
+				List:   conf.AccessAllow,
+				Find:   conf.AccessAllow,
+				Move:   conf.AccessAllow,
 			},
 		},
-		ToolsAccess: map[string]shared.AccessFlag{
-			"**": shared.AccessAllow,
+		ToolsAccess: map[string]conf.AccessFlag{
+			"**": conf.AccessAllow,
 		},
 	}
 
-	readOnlyRole := AgentRole{
+	readOnlyRole := conf.AgentRoleConfig{
 		Name:        "readonly",
 		Description: "A read-only role with limited VFS access",
-		VFSPrivileges: map[string]vfs.FileAccess{
+		VFSPrivileges: map[string]conf.FileAccess{
 			"**": {
-				Read:   shared.AccessAllow,
-				Write:  shared.AccessDeny,
-				Delete: shared.AccessDeny,
-				List:   shared.AccessAllow,
-				Find:   shared.AccessAllow,
-				Move:   shared.AccessDeny,
+				Read:   conf.AccessAllow,
+				Write:  conf.AccessDeny,
+				Delete: conf.AccessDeny,
+				List:   conf.AccessAllow,
+				Find:   conf.AccessAllow,
+				Move:   conf.AccessDeny,
 			},
 		},
-		ToolsAccess: map[string]shared.AccessFlag{
-			"vfs.read": shared.AccessAllow,
-			"vfs.list": shared.AccessAllow,
-			"**":       shared.AccessDeny,
+		ToolsAccess: map[string]conf.AccessFlag{
+			"vfs.read": conf.AccessAllow,
+			"vfs.list": conf.AccessAllow,
+			"**":       conf.AccessDeny,
 		},
 	}
 
@@ -372,7 +372,7 @@ func TestSweSessionGetState(t *testing.T) {
 	})
 
 	t.Run("SetRole renders system prompt with current state", func(t *testing.T) {
-		role := AgentRole{
+		role := conf.AgentRoleConfig{
 			Name:        "dev",
 			Description: "Developer role",
 		}

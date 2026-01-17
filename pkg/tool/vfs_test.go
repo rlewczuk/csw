@@ -3,7 +3,7 @@ package tool
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/shared"
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -477,8 +477,8 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 	t.Run("should return permission query when access is ask", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
-		privileges := map[string]vfs.FileAccess{
-			"*.txt": {Read: shared.AccessAsk},
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Read: conf.AccessAsk},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -516,8 +516,8 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 		err := mockVFS.WriteFile("test.txt", []byte("hello"))
 		require.NoError(t, err)
 
-		privileges := map[string]vfs.FileAccess{
-			"*.txt": {Read: shared.AccessAllow},
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Read: conf.AccessAllow},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -542,8 +542,8 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 	t.Run("should fail when access is deny", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
-		privileges := map[string]vfs.FileAccess{
-			"*.txt": {Read: shared.AccessDeny},
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Read: conf.AccessDeny},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -570,8 +570,8 @@ func TestVFSWriteToolPermissionQuery(t *testing.T) {
 	t.Run("should return permission query when access is ask", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
-		privileges := map[string]vfs.FileAccess{
-			"*.txt": {Write: shared.AccessAsk},
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Write: conf.AccessAsk},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -607,8 +607,8 @@ func TestVFSWriteToolPermissionQuery(t *testing.T) {
 	t.Run("should succeed when access is allow", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
-		privileges := map[string]vfs.FileAccess{
-			"*.txt": {Write: shared.AccessAllow},
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Write: conf.AccessAllow},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -638,8 +638,8 @@ func TestVFSWriteToolPermissionQuery(t *testing.T) {
 	t.Run("should fail when access is deny", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
-		privileges := map[string]vfs.FileAccess{
-			"*.txt": {Write: shared.AccessDeny},
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Write: conf.AccessDeny},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -670,8 +670,8 @@ func TestVFSDeleteToolPermissionQuery(t *testing.T) {
 		err := mockVFS.WriteFile("test.txt", []byte("hello"))
 		require.NoError(t, err)
 
-		privileges := map[string]vfs.FileAccess{
-			"*.txt": {Delete: shared.AccessAsk},
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Delete: conf.AccessAsk},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -709,8 +709,8 @@ func TestVFSDeleteToolPermissionQuery(t *testing.T) {
 		err := mockVFS.WriteFile("test.txt", []byte("hello"))
 		require.NoError(t, err)
 
-		privileges := map[string]vfs.FileAccess{
-			"*.txt": {Delete: shared.AccessAllow},
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Delete: conf.AccessAllow},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -741,8 +741,8 @@ func TestVFSDeleteToolPermissionQuery(t *testing.T) {
 		err := mockVFS.WriteFile("test.txt", []byte("hello"))
 		require.NoError(t, err)
 
-		privileges := map[string]vfs.FileAccess{
-			"*.txt": {Delete: shared.AccessDeny},
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Delete: conf.AccessDeny},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -772,8 +772,8 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		err := mockVFS.WriteFile("dir/test.txt", []byte("hello"))
 		require.NoError(t, err)
 
-		privileges := map[string]vfs.FileAccess{
-			"*": {List: shared.AccessAsk},
+		privileges := map[string]conf.FileAccess{
+			"*": {List: conf.AccessAsk},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -813,8 +813,8 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		err = mockVFS.WriteFile("file2.txt", []byte("world"))
 		require.NoError(t, err)
 
-		privileges := map[string]vfs.FileAccess{
-			"*": {List: shared.AccessAllow},
+		privileges := map[string]conf.FileAccess{
+			"*": {List: conf.AccessAllow},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -841,8 +841,8 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 	t.Run("should fail when access is deny", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
-		privileges := map[string]vfs.FileAccess{
-			"*": {List: shared.AccessDeny},
+		privileges := map[string]conf.FileAccess{
+			"*": {List: conf.AccessDeny},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -872,8 +872,8 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		err := mockVFS.WriteFile("source.txt", []byte("hello"))
 		require.NoError(t, err)
 
-		privileges := map[string]vfs.FileAccess{
-			"*.txt": {Move: shared.AccessAsk, Write: shared.AccessAllow},
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Move: conf.AccessAsk, Write: conf.AccessAllow},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -912,8 +912,8 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		err := mockVFS.WriteFile("source.txt", []byte("hello"))
 		require.NoError(t, err)
 
-		privileges := map[string]vfs.FileAccess{
-			"*.txt": {Move: shared.AccessAllow, Write: shared.AccessAllow},
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Move: conf.AccessAllow, Write: conf.AccessAllow},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
@@ -948,8 +948,8 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		err := mockVFS.WriteFile("source.txt", []byte("hello"))
 		require.NoError(t, err)
 
-		privileges := map[string]vfs.FileAccess{
-			"*.txt": {Move: shared.AccessDeny, Write: shared.AccessAllow},
+		privileges := map[string]conf.FileAccess{
+			"*.txt": {Move: conf.AccessDeny, Write: conf.AccessAllow},
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 

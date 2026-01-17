@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -125,19 +126,19 @@ func TestFileBasedPromptScanner_GetFragments(t *testing.T) {
 	defer scanner.Close()
 
 	// Load test role
-	role := AgentRole{
+	role := conf.AgentRoleConfig{
 		Name: "test1",
-		ToolsAccess: map[string]shared.AccessFlag{
-			"read":  shared.AccessAllow,
-			"write": shared.AccessAllow,
-			"bash":  shared.AccessAllow,
+		ToolsAccess: map[string]conf.AccessFlag{
+			"read":  conf.AccessAllow,
+			"write": conf.AccessAllow,
+			"bash":  conf.AccessAllow,
 		},
 	}
 
 	tests := []struct {
 		name     string
 		tags     []string
-		role     *AgentRole
+		role     *conf.AgentRoleConfig
 		wantKeys []string
 	}{
 		{
@@ -218,10 +219,10 @@ func TestFileBasedPromptScanner_GetFragments_ToolsFiltering(t *testing.T) {
 	defer scanner.Close()
 
 	// Test with role that only has read access
-	role := AgentRole{
+	role := conf.AgentRoleConfig{
 		Name: "test2",
-		ToolsAccess: map[string]shared.AccessFlag{
-			"read": shared.AccessAllow,
+		ToolsAccess: map[string]conf.AccessFlag{
+			"read": conf.AccessAllow,
 		},
 	}
 
@@ -268,12 +269,12 @@ func TestFSPromptGenerator_GetPrompt(t *testing.T) {
 	require.NoError(t, err)
 
 	// Load test role
-	role := AgentRole{
+	role := conf.AgentRoleConfig{
 		Name: "test1",
-		ToolsAccess: map[string]shared.AccessFlag{
-			"read":  shared.AccessAllow,
-			"write": shared.AccessAllow,
-			"bash":  shared.AccessAllow,
+		ToolsAccess: map[string]conf.AccessFlag{
+			"read":  conf.AccessAllow,
+			"write": conf.AccessAllow,
+			"bash":  conf.AccessAllow,
 		},
 	}
 
@@ -351,12 +352,12 @@ func TestFSPromptGenerator_GetPrompt_Ordering(t *testing.T) {
 	require.NoError(t, err)
 
 	// Load test role
-	role := AgentRole{
+	role := conf.AgentRoleConfig{
 		Name: "test1",
-		ToolsAccess: map[string]shared.AccessFlag{
-			"read":  shared.AccessAllow,
-			"write": shared.AccessAllow,
-			"bash":  shared.AccessAllow,
+		ToolsAccess: map[string]conf.AccessFlag{
+			"read":  conf.AccessAllow,
+			"write": conf.AccessAllow,
+			"bash":  conf.AccessAllow,
 		},
 	}
 
@@ -415,9 +416,9 @@ func TestFileBasedPromptScanner_CacheReload(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create role
-	role := AgentRole{
+	role := conf.AgentRoleConfig{
 		Name:        "testcache",
-		ToolsAccess: map[string]shared.AccessFlag{},
+		ToolsAccess: map[string]conf.AccessFlag{},
 	}
 
 	// Get initial prompt
@@ -570,9 +571,9 @@ func TestFSPromptGenerator_MultipleScanners(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create test role
-	role := AgentRole{
+	role := conf.AgentRoleConfig{
 		Name:        "test",
-		ToolsAccess: map[string]shared.AccessFlag{},
+		ToolsAccess: map[string]conf.AccessFlag{},
 	}
 
 	// Get prompt

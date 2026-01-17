@@ -6,6 +6,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +15,7 @@ func TestModelTagRegistry_GetTagsForModel_GlobalMappings(t *testing.T) {
 	registry := NewModelTagRegistry()
 
 	// Set global mappings
-	err := registry.SetGlobalMappings([]ModelTagMapping{
+	err := registry.SetGlobalMappings([]conf.ModelTagMapping{
 		{Model: "^claude-.*", Tag: "anthropic"},
 		{Model: "^gpt-.*", Tag: "openai"},
 		{Model: ".*-instruct$", Tag: "instruct"},
@@ -67,13 +68,13 @@ func TestModelTagRegistry_GetTagsForModel_ProviderMappings(t *testing.T) {
 	registry := NewModelTagRegistry()
 
 	// Set provider-specific mappings
-	err := registry.SetProviderMappings("anthropic", []ModelTagMapping{
+	err := registry.SetProviderMappings("anthropic", []conf.ModelTagMapping{
 		{Model: "^claude-3-opus.*", Tag: "opus"},
 		{Model: "^claude-3-sonnet.*", Tag: "sonnet"},
 	})
 	require.NoError(t, err)
 
-	err = registry.SetProviderMappings("openai", []ModelTagMapping{
+	err = registry.SetProviderMappings("openai", []conf.ModelTagMapping{
 		{Model: "^gpt-4.*", Tag: "gpt4"},
 	})
 	require.NoError(t, err)
@@ -124,14 +125,14 @@ func TestModelTagRegistry_GetTagsForModel_MergedMappings(t *testing.T) {
 	registry := NewModelTagRegistry()
 
 	// Set global mappings
-	err := registry.SetGlobalMappings([]ModelTagMapping{
+	err := registry.SetGlobalMappings([]conf.ModelTagMapping{
 		{Model: "^claude-.*", Tag: "anthropic"},
 		{Model: "^gpt-.*", Tag: "openai"},
 	})
 	require.NoError(t, err)
 
 	// Set provider-specific mappings
-	err = registry.SetProviderMappings("anthropic", []ModelTagMapping{
+	err = registry.SetProviderMappings("anthropic", []conf.ModelTagMapping{
 		{Model: "^claude-3-opus.*", Tag: "opus"},
 	})
 	require.NoError(t, err)
@@ -240,7 +241,7 @@ func TestModelTagRegistry_LoadGlobalConfig_InvalidRegexp(t *testing.T) {
 func TestModelTagRegistry_SetGlobalMappings_InvalidRegexp(t *testing.T) {
 	registry := NewModelTagRegistry()
 
-	err := registry.SetGlobalMappings([]ModelTagMapping{
+	err := registry.SetGlobalMappings([]conf.ModelTagMapping{
 		{Model: "[invalid", Tag: "test"},
 	})
 	require.Error(t, err)
@@ -250,7 +251,7 @@ func TestModelTagRegistry_SetGlobalMappings_InvalidRegexp(t *testing.T) {
 func TestModelTagRegistry_SetProviderMappings_InvalidRegexp(t *testing.T) {
 	registry := NewModelTagRegistry()
 
-	err := registry.SetProviderMappings("test", []ModelTagMapping{
+	err := registry.SetProviderMappings("test", []conf.ModelTagMapping{
 		{Model: "[invalid", Tag: "test"},
 	})
 	require.Error(t, err)
@@ -261,9 +262,9 @@ func TestModelTagRegistry_GetAllProviderNames(t *testing.T) {
 	registry := NewModelTagRegistry()
 
 	// Set some provider mappings
-	err := registry.SetProviderMappings("anthropic", []ModelTagMapping{{Model: ".*", Tag: "test"}})
+	err := registry.SetProviderMappings("anthropic", []conf.ModelTagMapping{{Model: ".*", Tag: "test"}})
 	require.NoError(t, err)
-	err = registry.SetProviderMappings("openai", []ModelTagMapping{{Model: ".*", Tag: "test"}})
+	err = registry.SetProviderMappings("openai", []conf.ModelTagMapping{{Model: ".*", Tag: "test"}})
 	require.NoError(t, err)
 
 	names := registry.GetAllProviderNames()
@@ -275,12 +276,12 @@ func TestModelTagRegistry_DuplicateTags(t *testing.T) {
 	registry := NewModelTagRegistry()
 
 	// Both global and provider mappings assign the same tag
-	err := registry.SetGlobalMappings([]ModelTagMapping{
+	err := registry.SetGlobalMappings([]conf.ModelTagMapping{
 		{Model: "^claude-.*", Tag: "claude"},
 	})
 	require.NoError(t, err)
 
-	err = registry.SetProviderMappings("anthropic", []ModelTagMapping{
+	err = registry.SetProviderMappings("anthropic", []conf.ModelTagMapping{
 		{Model: "^claude-.*", Tag: "claude"},
 	})
 	require.NoError(t, err)
@@ -294,7 +295,7 @@ func TestModelTagRegistry_MultiplePatternsSameTag(t *testing.T) {
 	registry := NewModelTagRegistry()
 
 	// Multiple patterns can assign the same tag
-	err := registry.SetGlobalMappings([]ModelTagMapping{
+	err := registry.SetGlobalMappings([]conf.ModelTagMapping{
 		{Model: "^claude-.*", Tag: "large-model"},
 		{Model: "^gpt-4.*", Tag: "large-model"},
 	})

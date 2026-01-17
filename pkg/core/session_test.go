@@ -3,8 +3,8 @@ package core
 import (
 	"testing"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
@@ -22,7 +22,7 @@ func newMockSessionPromptGenerator(prompt string) *mockSessionPromptGenerator {
 	return &mockSessionPromptGenerator{prompt: prompt}
 }
 
-func (m *mockSessionPromptGenerator) GetPrompt(tags []string, role *AgentRole, state *AgentState) (string, error) {
+func (m *mockSessionPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error) {
 	return m.prompt, nil
 }
 
@@ -184,10 +184,10 @@ func TestSessionThread(t *testing.T) {
 
 		// Define a role with VFS permission required
 		roleName := "restricted_role"
-		restrictedRole := AgentRole{
+		restrictedRole := conf.AgentRoleConfig{
 			Name: roleName,
-			VFSPrivileges: map[string]vfs.FileAccess{
-				"**": {Read: shared.AccessAsk, Write: shared.AccessAsk},
+			VFSPrivileges: map[string]conf.FileAccess{
+				"**": {Read: conf.AccessAsk, Write: conf.AccessAsk},
 			},
 		}
 		system.Roles = NewAgentRoleRegistry()

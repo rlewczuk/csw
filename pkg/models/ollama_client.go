@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
@@ -39,7 +40,7 @@ type OllamaEmbeddingModel struct {
 }
 
 // NewOllamaClient creates a new Ollama client with the given config
-func NewOllamaClient(config *ModelProviderConfig) (*OllamaClient, error) {
+func NewOllamaClient(config *conf.ModelProviderConfig) (*OllamaClient, error) {
 	if config == nil {
 		return nil, fmt.Errorf("NewOllamaClient() [ollama_client.go]: config cannot be nil")
 	}

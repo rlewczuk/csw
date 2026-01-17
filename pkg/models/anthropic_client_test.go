@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +43,7 @@ func getAnthropicTestClient(t *testing.T) *anthropicTestClient {
 			t.Skip("Skipping test: _integ/anthropic.key not configured")
 		}
 
-		client, err := NewAnthropicClient(&ModelProviderConfig{
+		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
 			URL:            defaultAnthropicTestURL,
 			APIKey:         apiKey,
 			ConnectTimeout: connectAnthropicTimeout,
@@ -63,7 +64,7 @@ func getAnthropicTestClient(t *testing.T) *anthropicTestClient {
 
 func TestNewAnthropicClient(t *testing.T) {
 	t.Run("creates client with valid configuration", func(t *testing.T) {
-		client, err := NewAnthropicClient(&ModelProviderConfig{
+		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
 			URL:            defaultAnthropicTestURL,
 			APIKey:         "test-api-key",
 			ConnectTimeout: connectAnthropicTimeout,
@@ -81,7 +82,7 @@ func TestNewAnthropicClient(t *testing.T) {
 	})
 
 	t.Run("returns error for empty URL", func(t *testing.T) {
-		_, err := NewAnthropicClient(&ModelProviderConfig{
+		_, err := NewAnthropicClient(&conf.ModelProviderConfig{
 			URL: "",
 		})
 
@@ -793,7 +794,7 @@ func TestAnthropicClient_ToolCallingStream(t *testing.T) {
 
 func TestAnthropicClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		client, err := NewAnthropicClient(&ModelProviderConfig{
+		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
 			URL:            "http://nonexistent-host:11434",
 			APIKey:         "test-key",
 			ConnectTimeout: 1 * time.Second,

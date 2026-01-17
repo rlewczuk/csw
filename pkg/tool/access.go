@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/codesnort/codesnort-swe/pkg/shared"
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
@@ -12,7 +12,7 @@ import (
 // It checks access permissions before delegating to the underlying tool implementation.
 type AccessControlTool struct {
 	tool       Tool
-	privileges map[string]shared.AccessFlag
+	privileges map[string]conf.AccessFlag
 }
 
 // NewAccessControlTool creates a new AccessControlTool that wraps the given tool.
@@ -26,7 +26,7 @@ type AccessControlTool struct {
 //
 // If multiple patterns match a tool name, the most specific one is used.
 // If no pattern matches and there is no "**" default, access is denied.
-func NewAccessControlTool(tool Tool, privileges map[string]shared.AccessFlag) *AccessControlTool {
+func NewAccessControlTool(tool Tool, privileges map[string]conf.AccessFlag) *AccessControlTool {
 	return &AccessControlTool{
 		tool:       tool,
 		privileges: privileges,
@@ -45,7 +45,7 @@ func (a *AccessControlTool) Execute(call ToolCall) ToolResponse {
 	flag := a.resolveAccessFlag(toolName)
 
 	switch flag {
-	case shared.AccessAllow:
+	case conf.AccessAllow:
 		resp := a.tool.Execute(call)
 		if resp.Error != nil {
 			if perr, ok := resp.Error.(*vfs.PermissionError); ok {
@@ -68,13 +68,13 @@ func (a *AccessControlTool) Execute(call ToolCall) ToolResponse {
 			}
 		}
 		return resp
-	case shared.AccessDeny:
+	case conf.AccessDeny:
 		return ToolResponse{
 			Call:  &call,
 			Error: fmt.Errorf("AccessControlTool.Execute() [access.go]: access denied for tool: %s", toolName),
 			Done:  true,
 		}
-	case shared.AccessAsk:
+	case conf.AccessAsk:
 		// Return ToolPermissionsQuery as error
 		return ToolResponse{
 			Call: &call,
@@ -99,8 +99,8 @@ func (a *AccessControlTool) Execute(call ToolCall) ToolResponse {
 // resolveAccessFlag determines the access flag for a given tool name.
 // It finds the most specific matching pattern and returns its access flag.
 // If no pattern matches, it returns AccessDeny as the default.
-func (a *AccessControlTool) resolveAccessFlag(toolName string) shared.AccessFlag {
-	var bestFlag shared.AccessFlag
+func (a *AccessControlTool) resolveAccessFlag(toolName string) conf.AccessFlag {
+	var bestFlag conf.AccessFlag
 	bestSpecificity := -1
 
 	for pattern, flag := range a.privileges {
@@ -117,13 +117,13 @@ func (a *AccessControlTool) resolveAccessFlag(toolName string) shared.AccessFlag
 	}
 
 	// No match found, return default deny
-	return shared.AccessDeny
+	return conf.AccessDeny
 }
 
 // SetPermission sets the permission for a specific tool pattern.
-func (a *AccessControlTool) SetPermission(pattern string, flag shared.AccessFlag) {
+func (a *AccessControlTool) SetPermission(pattern string, flag conf.AccessFlag) {
 	if a.privileges == nil {
-		a.privileges = make(map[string]shared.AccessFlag)
+		a.privileges = make(map[string]conf.AccessFlag)
 	}
 	a.privileges[pattern] = flag
 }

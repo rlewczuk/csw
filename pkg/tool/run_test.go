@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/codesnort/codesnort-swe/pkg/shared"
 )
 
 func TestRunBashTool_Info(t *testing.T) {
@@ -46,8 +45,8 @@ func TestRunBashTool_Execute_AllowedCommand(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 	mockRunner.SetResponse("echo 'test'", "test\n", 0, nil)
 
-	privileges := map[string]shared.AccessFlag{
-		"echo.*": shared.AccessAllow,
+	privileges := map[string]conf.AccessFlag{
+		"echo.*": conf.AccessAllow,
 	}
 	tool := NewRunBashTool(mockRunner, privileges)
 
@@ -71,8 +70,8 @@ func TestRunBashTool_Execute_AllowedCommand(t *testing.T) {
 func TestRunBashTool_Execute_DeniedCommand(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 
-	privileges := map[string]shared.AccessFlag{
-		"rm.*": shared.AccessDeny,
+	privileges := map[string]conf.AccessFlag{
+		"rm.*": conf.AccessDeny,
 	}
 	tool := NewRunBashTool(mockRunner, privileges)
 
@@ -124,8 +123,8 @@ func TestRunBashTool_Execute_AskPermission(t *testing.T) {
 func TestRunBashTool_Execute_ExplicitAskPermission(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 
-	privileges := map[string]shared.AccessFlag{
-		".*": shared.AccessAsk,
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAsk,
 	}
 	tool := NewRunBashTool(mockRunner, privileges)
 
@@ -152,8 +151,8 @@ func TestRunBashTool_Execute_CommandWithNonZeroExitCode(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 	mockRunner.SetResponse("exit 42", "", 42, nil)
 
-	privileges := map[string]shared.AccessFlag{
-		".*": shared.AccessAllow,
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
 	}
 	tool := NewRunBashTool(mockRunner, privileges)
 
@@ -177,8 +176,8 @@ func TestRunBashTool_Execute_CommandWithError(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 	mockRunner.SetResponse("timeout command", "", 124, fmt.Errorf("command timed out"))
 
-	privileges := map[string]shared.AccessFlag{
-		".*": shared.AccessAllow,
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
 	}
 	tool := NewRunBashTool(mockRunner, privileges)
 
@@ -202,35 +201,35 @@ func TestRunBashTool_CheckPermission_MostSpecificMatch(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 	mockRunner.SetResponse("echo test", "test\n", 0, nil)
 
-	privileges := map[string]shared.AccessFlag{
-		".*":       shared.AccessDeny,  // Deny all
-		"echo.*":   shared.AccessAllow, // Allow echo commands (more specific)
-		"echo foo": shared.AccessDeny,  // Deny "echo foo" specifically (most specific)
+	privileges := map[string]conf.AccessFlag{
+		".*":       conf.AccessDeny,  // Deny all
+		"echo.*":   conf.AccessAllow, // Allow echo commands (more specific)
+		"echo foo": conf.AccessDeny,  // Deny "echo foo" specifically (most specific)
 	}
 	tool := NewRunBashTool(mockRunner, privileges)
 
 	tests := []struct {
 		name          string
 		command       string
-		wantAccess    shared.AccessFlag
+		wantAccess    conf.AccessFlag
 		shouldExecute bool
 	}{
 		{
 			name:          "most specific deny",
 			command:       "echo foo",
-			wantAccess:    shared.AccessDeny,
+			wantAccess:    conf.AccessDeny,
 			shouldExecute: false,
 		},
 		{
 			name:          "specific allow",
 			command:       "echo test",
-			wantAccess:    shared.AccessAllow,
+			wantAccess:    conf.AccessAllow,
 			shouldExecute: true,
 		},
 		{
 			name:          "general deny",
 			command:       "ls -la",
-			wantAccess:    shared.AccessDeny,
+			wantAccess:    conf.AccessDeny,
 			shouldExecute: false,
 		},
 	}

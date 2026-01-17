@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
@@ -423,7 +423,7 @@ type SweSession struct {
 	providerName  string
 	model         string
 	messages      []*models.ChatMessage
-	role          *AgentRole
+	role          *conf.AgentRoleConfig
 	VFS           vfs.VFS
 	Tools         *tool.ToolRegistry
 	outputHandler SessionThreadOutput
@@ -568,7 +568,7 @@ func (s *SweSession) SetWorkDir(dir string) {
 }
 
 // Role returns the current agent role for this session.
-func (s *SweSession) Role() *AgentRole {
+func (s *SweSession) Role() *conf.AgentRoleConfig {
 	return s.role
 }
 
@@ -684,9 +684,9 @@ func (s *SweSession) SetRole(roleName string) error {
 // UpdatePermission updates the permission for a tool or VFS operation based on user response.
 func (s *SweSession) UpdatePermission(query *tool.ToolPermissionsQuery, response string) error {
 	allow := strings.ToLower(response) == "allow"
-	flag := shared.AccessDeny
+	flag := conf.AccessDeny
 	if allow {
-		flag = shared.AccessAllow
+		flag = conf.AccessAllow
 	}
 
 	if query.Meta != nil && query.Meta["type"] == "vfs" {
@@ -717,7 +717,7 @@ func (s *SweSession) UpdatePermission(query *tool.ToolPermissionsQuery, response
 }
 
 // wrapToolsWithAccessControl creates a new tool registry with all tools wrapped in access control.
-func wrapToolsWithAccessControl(registry *tool.ToolRegistry, privileges map[string]shared.AccessFlag) *tool.ToolRegistry {
+func wrapToolsWithAccessControl(registry *tool.ToolRegistry, privileges map[string]conf.AccessFlag) *tool.ToolRegistry {
 	newRegistry := tool.NewToolRegistry()
 
 	// Get all tool names from the original registry

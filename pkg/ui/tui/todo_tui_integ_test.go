@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/presenter"
@@ -17,7 +18,7 @@ import (
 // Mock prompt generator for todo TUI tests
 type todoTuiMockPromptGen struct{}
 
-func (m *todoTuiMockPromptGen) GetPrompt(tags []string, role *core.AgentRole, state *core.AgentState) (string, error) {
+func (m *todoTuiMockPromptGen) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *core.AgentState) (string, error) {
 	return "You are a helpful assistant with access to todo list management tools.", nil
 }
 

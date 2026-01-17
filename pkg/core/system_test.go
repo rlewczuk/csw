@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
@@ -21,7 +22,7 @@ func newMockPromptGenerator(prompt string) *mockPromptGenerator {
 	return &mockPromptGenerator{prompt: prompt}
 }
 
-func (m *mockPromptGenerator) GetPrompt(tags []string, role *AgentRole, state *AgentState) (string, error) {
+func (m *mockPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error) {
 	return m.prompt, nil
 }
 

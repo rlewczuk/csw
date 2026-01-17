@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/ui"
@@ -19,7 +19,7 @@ import (
 // Mock prompt generator for tests
 type mockPromptGen struct{}
 
-func (m *mockPromptGen) GetPrompt(tags []string, role *core.AgentRole, state *core.AgentState) (string, error) {
+func (m *mockPromptGen) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *core.AgentState) (string, error) {
 	return "You are skilled software developer.", nil
 }
 
@@ -387,10 +387,10 @@ func TestChatPresenter_PermissionFlow(t *testing.T) {
 
 	// Define a role with VFS permission required
 	roleName := "restricted_role"
-	restrictedRole := core.AgentRole{
+	restrictedRole := conf.AgentRoleConfig{
 		Name: roleName,
-		VFSPrivileges: map[string]vfs.FileAccess{
-			"**": {Read: shared.AccessAsk, Write: shared.AccessAsk},
+		VFSPrivileges: map[string]conf.FileAccess{
+			"**": {Read: conf.AccessAsk, Write: conf.AccessAsk},
 		},
 	}
 	system.Roles = core.NewAgentRoleRegistry()

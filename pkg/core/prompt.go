@@ -11,6 +11,7 @@ import (
 	"sync"
 	"text/template"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -19,7 +20,7 @@ type PromptScanner interface {
 	// GetFragments generates a prompt for the given tags, role and state.
 	// returns map where keys are filenames (dir/file_prefix with role name or 'all' as dir and no extension)
 	// and values are unprocessed contents of those files
-	GetFragments(tags []string, role *AgentRole) (map[string]string, error)
+	GetFragments(tags []string, role *conf.AgentRoleConfig) (map[string]string, error)
 
 	// HasChanged returns true if any of the fragments has changed since last scan.
 	HasChanged() bool
@@ -33,7 +34,7 @@ type PromptGenerator interface {
 	// GetPrompt generates a prompt for the given tags, role and state.
 	// Takes map of fragments from GetFragments, concatenates and processes using text/template it to create final prompt;
 	// Also responsible for eventual result caching if any of files has changed or agent state data has changed;
-	GetPrompt(tags []string, role *AgentRole, state *AgentState) (string, error)
+	GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error)
 }
 
 // FileBasedPromptScanner implements PromptScanner interface.
@@ -250,7 +251,7 @@ func parseFilename(filename string) (int, string, string, string, bool) {
 // GetFragments generates a prompt for the given tags, role and state.
 // Returns map where keys are filenames (dir/file_prefix with role name or 'all' as dir and no extension)
 // and values are unprocessed contents of those files.
-func (s *FileBasedPromptScanner) GetFragments(tags []string, role *AgentRole) (map[string]string, error) {
+func (s *FileBasedPromptScanner) GetFragments(tags []string, role *conf.AgentRoleConfig) (map[string]string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -375,7 +376,7 @@ func filterDuplicates(fragments []promptFragment) []promptFragment {
 // GetPrompt generates a prompt for the given tags, role and state.
 // Takes map of fragments from scanners, concatenates and processes using text/template
 // to create final prompt.
-func (g *FSPromptGenerator) GetPrompt(tags []string, role *AgentRole, state *AgentState) (string, error) {
+func (g *FSPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error) {
 	// Get fragments from all scanners
 	fragments := make(map[string]string)
 	// Merge fragments from all scanners in order
