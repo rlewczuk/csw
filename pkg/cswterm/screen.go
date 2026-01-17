@@ -115,9 +115,9 @@ type InputEvent struct {
 	X, Y uint16
 }
 
-// Screen represents a terminal screen. It consists of a grid of cells.
+// ScreenOutput represents a terminal screen. It consists of a grid of cells.
 // Each cell contains a rune and a set of attributes.
-type Screen interface {
+type ScreenOutput interface {
 
 	// Size returns the size of the screen in characters.
 	Size() (width int, height int)
@@ -130,10 +130,17 @@ type Screen interface {
 	// PutText puts text at the specified position with the specified attributes.
 	// if the text is longer than the width of the screen, it is truncated.
 	PutText(x int, y int, text string, attrs CellAttributes)
+}
 
+// InputEventHandler represents a terminal screen input handler.
+// It is responsible for handling input events from the terminal.
+// Events representation is agnostic to the underlying terminal implementation.
+type InputEventHandler interface {
 	// Notify notifies the screen about an input event.
 	Notify(event InputEvent)
+}
 
+type InputEventSource interface {
 	// Listen registers a channel to receive input events.
 	Listen(ch chan InputEvent)
 }
