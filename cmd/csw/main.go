@@ -101,16 +101,12 @@ func run(cmd *cobra.Command, args []string) error {
 		modelProviders[name] = provider
 	}
 
-	// Load roles from config
-	rolesDir := filepath.Join(configDir, "roles")
-	roleRegistry := core.NewAgentRoleRegistry()
-	if err := roleRegistry.LoadFromDirectory(rolesDir); err != nil {
-		return fmt.Errorf("failed to load roles: %w", err)
-	}
+	// Create role registry using config store
+	roleRegistry := core.NewAgentRoleRegistry(configStore)
 
 	// Check if any roles were loaded
 	if len(roleRegistry.List()) == 0 {
-		return fmt.Errorf("no roles found in %s", rolesDir)
+		return fmt.Errorf("no roles found in config")
 	}
 
 	// Check if the requested role exists

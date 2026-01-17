@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
@@ -184,14 +185,17 @@ func TestSessionThread(t *testing.T) {
 
 		// Define a role with VFS permission required
 		roleName := "restricted_role"
-		restrictedRole := conf.AgentRoleConfig{
+		restrictedRole := &conf.AgentRoleConfig{
 			Name: roleName,
 			VFSPrivileges: map[string]conf.FileAccess{
 				"**": {Read: conf.AccessAsk, Write: conf.AccessAsk},
 			},
 		}
-		system.Roles = NewAgentRoleRegistry()
-		system.Roles.Register(restrictedRole)
+		mockStore := impl.NewMockConfigStore()
+		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+			roleName: restrictedRole,
+		})
+		system.Roles = NewAgentRoleRegistry(mockStore)
 
 		// Set the role
 		session := controller.GetSession()

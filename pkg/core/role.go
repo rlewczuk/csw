@@ -1,92 +1,99 @@
 package core
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
+	"sync"
+	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 )
 
-// AccessFlag represents access flag for a file or directory.
-
+// AgentRoleRegistry manages agent role configurations loaded from a ConfigStore.
+// It implements caching with automatic invalidation based on config update timestamps.
 type AgentRoleRegistry struct {
-	roles map[string]conf.AgentRoleConfig
+	configStore  conf.ConfigStore
+	mu           sync.RWMutex
+	cache        map[string]conf.AgentRoleConfig
+	lastUpdate   time.Time
+	cacheInvalid bool
 }
 
-func NewAgentRoleRegistry() *AgentRoleRegistry {
+// NewAgentRoleRegistry creates a new AgentRoleRegistry with the given ConfigStore.
+func NewAgentRoleRegistry(configStore conf.ConfigStore) *AgentRoleRegistry {
 	return &AgentRoleRegistry{
-		roles: make(map[string]conf.AgentRoleConfig),
+		configStore:  configStore,
+		cache:        make(map[string]conf.AgentRoleConfig),
+		cacheInvalid: true, // Force initial load
 	}
 }
 
-// Get returns a role by name and a boolean indicating if it was found.
-func (r *AgentRoleRegistry) Get(name string) (conf.AgentRoleConfig, bool) {
-	role, ok := r.roles[name]
-	return role, ok
-}
-
-// Register adds a role to the registry.
-func (r *AgentRoleRegistry) Register(role conf.AgentRoleConfig) {
-	r.roles[role.Name] = role
-}
-
-// List returns all role names in the registry.
-func (r *AgentRoleRegistry) List() []string {
-	names := make([]string, 0, len(r.roles))
-	for name := range r.roles {
-		names = append(names, name)
-	}
-	return names
-}
-
-// LoadFromDirectory loads all roles from a directory structure.
-// Each subdirectory is expected to contain:
-// - config.json: JSON file with AgentRoleConfig fields (description, vfs-privileges, tools-access)
-// - system.md: Markdown file with system prompt template
-// The role name is derived from the subdirectory name.
-func (r *AgentRoleRegistry) LoadFromDirectory(dir string) error {
-	entries, err := os.ReadDir(dir)
+// refreshCacheIfNeeded checks if the cache needs to be refreshed and does so if necessary.
+// Must be called with r.mu held for writing.
+func (r *AgentRoleRegistry) refreshCacheIfNeeded() error {
+	// Check timestamp to determine if cache is stale
+	lastConfigUpdate, err := r.configStore.LastAgentRoleConfigsUpdate()
 	if err != nil {
-		return fmt.Errorf("AgentRoleRegistry.LoadFromDirectory() [role.go]: failed to read roles directory: %w", err)
+		return fmt.Errorf("AgentRoleRegistry.refreshCacheIfNeeded() [role.go]: failed to get last update timestamp: %w", err)
 	}
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		roleName := entry.Name()
-		rolePath := filepath.Join(dir, roleName)
-
-		role, err := loadRole(roleName, rolePath)
-		if err != nil {
-			return fmt.Errorf("AgentRoleRegistry.LoadFromDirectory() [role.go]: failed to load role %s: %w", roleName, err)
-		}
-
-		r.Register(role)
+	// If cache is valid and timestamps match, no refresh needed
+	if !r.cacheInvalid && !lastConfigUpdate.After(r.lastUpdate) {
+		return nil
 	}
+
+	// Fetch fresh configs from store
+	configs, err := r.configStore.GetAgentRoleConfigs()
+	if err != nil {
+		return fmt.Errorf("AgentRoleRegistry.refreshCacheIfNeeded() [role.go]: failed to get agent role configs: %w", err)
+	}
+
+	// Update cache
+	r.cache = make(map[string]conf.AgentRoleConfig, len(configs))
+	for name, config := range configs {
+		if config != nil {
+			r.cache[name] = *config
+		}
+	}
+
+	r.lastUpdate = lastConfigUpdate
+	r.cacheInvalid = false
 
 	return nil
 }
 
-// loadRole loads a single role from a directory.
-func loadRole(name, dir string) (conf.AgentRoleConfig, error) {
-	role := conf.AgentRoleConfig{
-		Name: name,
+// Get returns a role by name and a boolean indicating if it was found.
+// It automatically refreshes the cache if the configuration has been updated.
+func (r *AgentRoleRegistry) Get(name string) (conf.AgentRoleConfig, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Refresh cache if needed
+	if err := r.refreshCacheIfNeeded(); err != nil {
+		// Log error but return not found rather than panicking
+		// In production code, consider proper logging
+		return conf.AgentRoleConfig{}, false
 	}
 
-	// Load config.json
-	configPath := filepath.Join(dir, "config.json")
-	configData, err := os.ReadFile(configPath)
-	if err != nil {
-		return role, fmt.Errorf("loadRole() [role.go]: failed to read config.json: %w", err)
+	role, ok := r.cache[name]
+	return role, ok
+}
+
+// List returns all role names in the registry.
+// It automatically refreshes the cache if the configuration has been updated.
+func (r *AgentRoleRegistry) List() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Refresh cache if needed
+	if err := r.refreshCacheIfNeeded(); err != nil {
+		// Log error but return empty list rather than panicking
+		// In production code, consider proper logging
+		return []string{}
 	}
 
-	if err := json.Unmarshal(configData, &role); err != nil {
-		return role, fmt.Errorf("loadRole() [role.go]: failed to parse config.json: %w", err)
+	names := make([]string, 0, len(r.cache))
+	for name := range r.cache {
+		names = append(names, name)
 	}
-
-	return role, nil
+	return names
 }
