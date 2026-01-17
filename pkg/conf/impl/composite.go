@@ -209,6 +209,12 @@ func (c *CompositeConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRole
 				configCopy.RunPrivileges[rk] = rv
 			}
 		}
+		if v.PromptFragments != nil {
+			configCopy.PromptFragments = make(map[string]string, len(v.PromptFragments))
+			for fk, fv := range v.PromptFragments {
+				configCopy.PromptFragments[fk] = fv
+			}
+		}
 		configs[k] = &configCopy
 	}
 
@@ -356,6 +362,9 @@ func (c *CompositeConfigStore) refreshAgentRoleConfigs() error {
 
 		// Merge: later sources override earlier ones entirely (per role)
 		for name, config := range configs {
+			// Check if we already have this role from a previous source
+			existingConfig, exists := merged[name]
+
 			// Deep copy the config
 			configCopy := *config
 			if config.VFSPrivileges != nil {
@@ -376,6 +385,33 @@ func (c *CompositeConfigStore) refreshAgentRoleConfigs() error {
 					configCopy.RunPrivileges[k] = v
 				}
 			}
+
+			// Merge PromptFragments: per-filename from all sources
+			if exists && existingConfig.PromptFragments != nil {
+				// Start with existing fragments
+				configCopy.PromptFragments = make(map[string]string, len(existingConfig.PromptFragments))
+				for k, v := range existingConfig.PromptFragments {
+					configCopy.PromptFragments[k] = v
+				}
+			} else {
+				configCopy.PromptFragments = make(map[string]string)
+			}
+
+			// Merge in new fragments from current source
+			if config.PromptFragments != nil {
+				for filename, content := range config.PromptFragments {
+					// Check if content is empty or only whitespace
+					trimmedContent := strings.TrimSpace(content)
+					if trimmedContent == "" {
+						// Remove the fragment if it exists
+						delete(configCopy.PromptFragments, filename)
+					} else {
+						// Override with new content
+						configCopy.PromptFragments[filename] = content
+					}
+				}
+			}
+
 			merged[name] = &configCopy
 		}
 

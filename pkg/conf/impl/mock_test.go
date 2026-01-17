@@ -180,6 +180,12 @@ func (m *MockConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfi
 				configCopy.RunPrivileges[rk] = rv
 			}
 		}
+		if v.PromptFragments != nil {
+			configCopy.PromptFragments = make(map[string]string, len(v.PromptFragments))
+			for fk, fv := range v.PromptFragments {
+				configCopy.PromptFragments[fk] = fv
+			}
+		}
 		configs[k] = &configCopy
 	}
 
