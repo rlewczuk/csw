@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
@@ -387,14 +388,17 @@ func TestChatPresenter_PermissionFlow(t *testing.T) {
 
 	// Define a role with VFS permission required
 	roleName := "restricted_role"
-	restrictedRole := conf.AgentRoleConfig{
+	restrictedRole := &conf.AgentRoleConfig{
 		Name: roleName,
 		VFSPrivileges: map[string]conf.FileAccess{
 			"**": {Read: conf.AccessAsk, Write: conf.AccessAsk},
 		},
 	}
-	system.Roles = core.NewAgentRoleRegistry()
-	system.Roles.Register(restrictedRole)
+	mockStore := impl.NewMockConfigStore()
+	mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		roleName: restrictedRole,
+	})
+	system.Roles = core.NewAgentRoleRegistry(mockStore)
 
 	mockHandler := testutil.NewMockSessionOutputHandler()
 	thread := core.NewSessionThread(system, mockHandler)

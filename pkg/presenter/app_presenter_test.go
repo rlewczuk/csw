@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/ui"
@@ -93,11 +94,14 @@ func TestAppPresenter_NewSession(t *testing.T) {
 
 		// Setup role in system
 		roleName := "test_role"
-		testRole := conf.AgentRoleConfig{
+		testRole := &conf.AgentRoleConfig{
 			Name: roleName,
 		}
-		roleSystem.Roles = core.NewAgentRoleRegistry()
-		roleSystem.Roles.Register(testRole)
+		mockStore := impl.NewMockConfigStore()
+		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+			roleName: testRole,
+		})
+		roleSystem.Roles = core.NewAgentRoleRegistry(mockStore)
 
 		presenter := NewAppPresenter(roleSystem, "ollama/devstral-small-2:latest", roleName)
 
