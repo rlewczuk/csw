@@ -1,6 +1,8 @@
 package conf
 
 import (
+	"encoding/json"
+	"fmt"
 	"regexp"
 	"time"
 )
@@ -80,6 +82,43 @@ type ModelProviderConfig struct {
 	// ModelTags contains model-to-tag mappings specific to this provider.
 	// Each mapping has a regexp pattern for model names and a tag to assign.
 	ModelTags []ModelTagMapping `json:"model_tags,omitempty"`
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for ModelProviderConfig.
+// It handles duration fields that are represented as strings in JSON (e.g., "30s", "5m").
+func (c *ModelProviderConfig) UnmarshalJSON(data []byte) error {
+	// Define a temporary struct with string fields for durations
+	type Alias ModelProviderConfig
+	aux := &struct {
+		ConnectTimeout string `json:"connect_timeout,omitempty"`
+		RequestTimeout string `json:"request_timeout,omitempty"`
+		*Alias
+	}{
+		Alias: (*Alias)(c),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return fmt.Errorf("ModelProviderConfig.UnmarshalJSON(): %w", err)
+	}
+
+	// Parse duration strings
+	if aux.ConnectTimeout != "" {
+		d, err := time.ParseDuration(aux.ConnectTimeout)
+		if err != nil {
+			return fmt.Errorf("ModelProviderConfig.UnmarshalJSON(): invalid connect_timeout: %w", err)
+		}
+		c.ConnectTimeout = d
+	}
+
+	if aux.RequestTimeout != "" {
+		d, err := time.ParseDuration(aux.RequestTimeout)
+		if err != nil {
+			return fmt.Errorf("ModelProviderConfig.UnmarshalJSON(): invalid request_timeout: %w", err)
+		}
+		c.RequestTimeout = d
+	}
+
+	return nil
 }
 
 // GlobalConfig represents the global configuration file structure.
