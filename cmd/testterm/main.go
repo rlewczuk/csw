@@ -24,6 +24,7 @@ type DemoApp struct {
 	statusText   string
 	borderStyle  int
 	flashCount   int
+	oldTermState *term.State // Store terminal state for restoration
 }
 
 // NewDemoApp creates a new demo application.
@@ -51,7 +52,8 @@ func (app *DemoApp) Notify(event cswterm.InputEvent) {
 
 	// Handle specific keys to trigger visual changes
 	if event.Type == cswterm.InputEventKey {
-		// Handle arrow keys first (they have no modifiers from CSI sequences)
+		// Handle arrow keys first (they come from CSI sequences as uppercase letters without modifiers)
+		// Note: Shift+letter comes as lowercase with ModShift, so 'A' without modifiers is Up arrow
 		if event.Key == 'A' && event.Modifiers == 0 {
 			// Up arrow
 			app.scrollOffset = max(0, app.scrollOffset-1)
@@ -72,25 +74,27 @@ func (app *DemoApp) Notify(event cswterm.InputEvent) {
 			app.statusText = "Scrolled down (page)"
 		} else {
 			// Regular key handling
+			// Note: uppercase letters now come as lowercase with ModShift
+			// So 'q' handles both lowercase q and Shift+Q (which is 'q' + ModShift)
 			switch event.Key {
-			case 'q', 'Q':
-				// Quit on 'q' or 'Q'
+			case 'q':
+				// Quit on 'q' or Shift+Q
 				app.cleanup()
 				os.Exit(0)
-			case 'c', 'C':
-				// Change color on 'c' or 'C'
+			case 'c':
+				// Change color on 'c' or Shift+C
 				app.colorIndex = (app.colorIndex + 1) % len(app.colors)
 				app.statusText = fmt.Sprintf("Color changed to #%06X", app.colors[app.colorIndex])
 			case 'b':
 				// Change border style on 'b'
 				app.borderStyle = (app.borderStyle + 1) % 3
 				app.statusText = "Border style changed"
-			case 'f', 'F':
-				// Flash animation on 'f' or 'F'
+			case 'f':
+				// Flash animation on 'f' or Shift+F
 				app.flashCount = (app.flashCount + 1) % 10
 				app.statusText = fmt.Sprintf("Flash count: %d", app.flashCount)
-			case 'r', 'R':
-				// Reset on 'r' or 'R'
+			case 'r':
+				// Reset on 'r' or Shift+R
 				app.events = make([]cswterm.InputEvent, 0)
 				app.scrollOffset = 0
 				app.colorIndex = 0
@@ -239,7 +243,7 @@ func formatEvent(index int, event cswterm.InputEvent) string {
 
 	details := ""
 	if event.Type == cswterm.InputEventKey {
-		keyName := formatKey(event.Key)
+		keyName := formatKey(event.Key, event.Modifiers)
 		modStr := formatModifiers(event.Modifiers)
 		if modStr != "" {
 			details = fmt.Sprintf("%s+%s", modStr, keyName)
@@ -256,7 +260,9 @@ func formatEvent(index int, event cswterm.InputEvent) string {
 }
 
 // formatKey formats a key code as a string.
-func formatKey(key rune) string {
+// The modifiers parameter is used to distinguish between arrow keys (no modifiers)
+// and letter keys with Shift modifier.
+func formatKey(key rune, mods cswterm.EventModifiers) string {
 	switch key {
 	case 0x1B:
 		return "ESC"
@@ -267,12 +273,16 @@ func formatKey(key rune) string {
 	case 0x0A:
 		return "LF"
 	case 'A':
+		// 'A' without Shift = Up arrow (from CSI sequence)
 		return "↑"
 	case 'B':
+		// 'B' without Shift = Down arrow (from CSI sequence)
 		return "↓"
 	case 'C':
+		// 'C' without Shift = Right arrow (from CSI sequence)
 		return "→"
 	case 'D':
+		// 'D' without Shift = Left arrow (from CSI sequence)
 		return "←"
 	case 'H':
 		return "HOME"
@@ -367,10 +377,18 @@ func padRight(text string, width int) string {
 
 // cleanup restores terminal state.
 func (app *DemoApp) cleanup() {
+	// Restore terminal to original state (this re-enables echo and line buffering)
+	if app.oldTermState != nil {
+		term.Restore(int(os.Stdin.Fd()), app.oldTermState)
+	}
+
 	app.renderer.ShowCursor()
 	fmt.Print("\x1b[?1049l") // Disable alternative buffer
 	fmt.Print("\x1b[?25h")   // Show cursor
 	fmt.Print("\x1b[?1000l") // Disable mouse tracking
+	fmt.Print("\x1b[?1002l") // Disable mouse motion tracking
+	fmt.Print("\x1b[?1015l") // Disable urxvt mouse mode
+	fmt.Print("\x1b[?1006l") // Disable SGR mouse mode
 	fmt.Print("\x1b[2J")     // Clear screen
 	fmt.Print("\x1b[H")      // Move cursor to home
 }
@@ -385,7 +403,7 @@ func main() {
 	// Create demo app
 	app := NewDemoApp(width, height)
 
-	// Set up signal handling
+	// Set up signal handling for interrupt/terminate
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -394,12 +412,26 @@ func main() {
 		os.Exit(0)
 	}()
 
+	// Set up SIGWINCH handling for terminal resize
+	winchCh := make(chan os.Signal, 1)
+	signal.Notify(winchCh, syscall.SIGWINCH)
+	go func() {
+		for range winchCh {
+			// Get new terminal size
+			newWidth, newHeight, err := term.GetSize(int(os.Stdin.Fd()))
+			if err == nil && app.eventReader != nil {
+				app.eventReader.NotifyResize(newWidth, newHeight)
+			}
+		}
+	}()
+
 	// Enable raw mode
 	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to enable raw mode: %v\n", err)
 		os.Exit(1)
 	}
+	app.oldTermState = oldState // Store for cleanup
 	defer term.Restore(int(os.Stdin.Fd()), oldState)
 
 	// Enable alternative buffer
