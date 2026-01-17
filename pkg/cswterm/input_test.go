@@ -135,22 +135,22 @@ func TestInputEventReader_ArrowKeys(t *testing.T) {
 		{
 			name:     "Up arrow",
 			input:    []byte("\x1b[A"),
-			expected: InputEvent{Type: InputEventKey, Key: 'A'},
+			expected: InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModFn},
 		},
 		{
 			name:     "Down arrow",
 			input:    []byte("\x1b[B"),
-			expected: InputEvent{Type: InputEventKey, Key: 'B'},
+			expected: InputEvent{Type: InputEventKey, Key: 'B', Modifiers: ModFn},
 		},
 		{
 			name:     "Right arrow",
 			input:    []byte("\x1b[C"),
-			expected: InputEvent{Type: InputEventKey, Key: 'C'},
+			expected: InputEvent{Type: InputEventKey, Key: 'C', Modifiers: ModFn},
 		},
 		{
 			name:     "Left arrow",
 			input:    []byte("\x1b[D"),
-			expected: InputEvent{Type: InputEventKey, Key: 'D'},
+			expected: InputEvent{Type: InputEventKey, Key: 'D', Modifiers: ModFn},
 		},
 	}
 
@@ -179,37 +179,37 @@ func TestInputEventReader_SpecialKeys(t *testing.T) {
 		{
 			name:     "Home key (CSI H)",
 			input:    []byte("\x1b[H"),
-			expected: InputEvent{Type: InputEventKey, Key: 'H'},
+			expected: InputEvent{Type: InputEventKey, Key: 'H', Modifiers: ModFn},
 		},
 		{
 			name:     "End key (CSI F)",
 			input:    []byte("\x1b[F"),
-			expected: InputEvent{Type: InputEventKey, Key: 'F'},
+			expected: InputEvent{Type: InputEventKey, Key: 'F', Modifiers: ModFn},
 		},
 		{
 			name:     "Home key (tilde)",
 			input:    []byte("\x1b[1~"),
-			expected: InputEvent{Type: InputEventKey, Key: 'H'},
+			expected: InputEvent{Type: InputEventKey, Key: 'H', Modifiers: ModFn},
 		},
 		{
 			name:     "Insert key",
 			input:    []byte("\x1b[2~"),
-			expected: InputEvent{Type: InputEventKey, Key: 'I'},
+			expected: InputEvent{Type: InputEventKey, Key: 'I', Modifiers: ModFn},
 		},
 		{
 			name:     "Delete key",
 			input:    []byte("\x1b[3~"),
-			expected: InputEvent{Type: InputEventKey, Key: 'D'},
+			expected: InputEvent{Type: InputEventKey, Key: 'D', Modifiers: ModFn},
 		},
 		{
 			name:     "Page Up",
 			input:    []byte("\x1b[5~"),
-			expected: InputEvent{Type: InputEventKey, Key: 'P'},
+			expected: InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn},
 		},
 		{
 			name:     "Page Down",
 			input:    []byte("\x1b[6~"),
-			expected: InputEvent{Type: InputEventKey, Key: 'N'},
+			expected: InputEvent{Type: InputEventKey, Key: 'N', Modifiers: ModFn},
 		},
 	}
 
@@ -235,25 +235,88 @@ func TestInputEventReader_FunctionKeys(t *testing.T) {
 		input    []byte
 		expected InputEvent
 	}{
+		// F1-F4 use ESC O sequences (vt100/xterm)
 		{
-			name:     "F1",
+			name:     "F1 (ESC O P)",
+			input:    []byte("\x1bOP"),
+			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn},
+		},
+		{
+			name:     "F2 (ESC O Q)",
+			input:    []byte("\x1bOQ"),
+			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn},
+		},
+		{
+			name:     "F3 (ESC O R)",
+			input:    []byte("\x1bOR"),
+			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn},
+		},
+		{
+			name:     "F4 (ESC O S)",
+			input:    []byte("\x1bOS"),
+			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn},
+		},
+		// F1-F4 also have CSI tilde format (urxvt)
+		{
+			name:     "F1 (CSI 11~)",
 			input:    []byte("\x1b[11~"),
-			expected: InputEvent{Type: InputEventKey, Key: 'F', Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn},
 		},
 		{
-			name:     "F2",
+			name:     "F2 (CSI 12~)",
 			input:    []byte("\x1b[12~"),
-			expected: InputEvent{Type: InputEventKey, Key: 'G', Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn},
 		},
+		{
+			name:     "F3 (CSI 13~)",
+			input:    []byte("\x1b[13~"),
+			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn},
+		},
+		{
+			name:     "F4 (CSI 14~)",
+			input:    []byte("\x1b[14~"),
+			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn},
+		},
+		// F5-F12 use CSI tilde format
 		{
 			name:     "F5",
 			input:    []byte("\x1b[15~"),
-			expected: InputEvent{Type: InputEventKey, Key: 'L', Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 5, Modifiers: ModFn},
+		},
+		{
+			name:     "F6",
+			input:    []byte("\x1b[17~"),
+			expected: InputEvent{Type: InputEventKey, Key: 6, Modifiers: ModFn},
+		},
+		{
+			name:     "F7",
+			input:    []byte("\x1b[18~"),
+			expected: InputEvent{Type: InputEventKey, Key: 7, Modifiers: ModFn},
+		},
+		{
+			name:     "F8",
+			input:    []byte("\x1b[19~"),
+			expected: InputEvent{Type: InputEventKey, Key: 8, Modifiers: ModFn},
+		},
+		{
+			name:     "F9",
+			input:    []byte("\x1b[20~"),
+			expected: InputEvent{Type: InputEventKey, Key: 9, Modifiers: ModFn},
+		},
+		{
+			name:     "F10",
+			input:    []byte("\x1b[21~"),
+			expected: InputEvent{Type: InputEventKey, Key: 10, Modifiers: ModFn},
+		},
+		{
+			name:     "F11",
+			input:    []byte("\x1b[23~"),
+			expected: InputEvent{Type: InputEventKey, Key: 11, Modifiers: ModFn},
 		},
 		{
 			name:     "F12",
 			input:    []byte("\x1b[24~"),
-			expected: InputEvent{Type: InputEventKey, Key: 'U', Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 12, Modifiers: ModFn},
 		},
 	}
 
@@ -266,8 +329,323 @@ func TestInputEventReader_FunctionKeys(t *testing.T) {
 			eventReader.parseInput(tt.input)
 
 			events := handler.GetEvents()
-			require.Len(t, events, 1)
+			require.Len(t, events, 1, "Expected exactly one event for %s", tt.name)
+			assert.Equal(t, tt.expected, events[0], "Event mismatch for %s", tt.name)
+		})
+	}
+}
+
+// TestInputEventReader_F1ToF4_NotParsedAsThreeEvents tests that F1-F4 keys
+// are parsed as single events, not as three separate events (Esc, O, P).
+// This is a regression test for the bug where ESC O sequences were not recognized.
+func TestInputEventReader_F1ToF4_NotParsedAsThreeEvents(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected InputEvent
+	}{
+		{
+			name:     "F1 should be one event, not Esc+O+P",
+			input:    []byte("\x1bOP"),
+			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn},
+		},
+		{
+			name:     "F2 should be one event, not Esc+O+Q",
+			input:    []byte("\x1bOQ"),
+			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn},
+		},
+		{
+			name:     "F3 should be one event, not Esc+O+R",
+			input:    []byte("\x1bOR"),
+			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn},
+		},
+		{
+			name:     "F4 should be one event, not Esc+O+S",
+			input:    []byte("\x1bOS"),
+			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewMockInputEventHandler()
+			reader := bytes.NewReader(tt.input)
+			eventReader := NewInputEventReader(reader, nil, handler)
+
+			eventReader.parseInput(tt.input)
+
+			events := handler.GetEvents()
+			// This is the key assertion: we should get exactly 1 event, not 3
+			require.Len(t, events, 1, "F-keys should produce exactly one event, not multiple")
 			assert.Equal(t, tt.expected, events[0])
+		})
+	}
+}
+
+// TestInputEventReader_ModifiedFunctionKeys tests parsing of F1-F4 with Shift/Ctrl/Alt modifiers.
+func TestInputEventReader_ModifiedFunctionKeys(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected InputEvent
+	}{
+		// Shift+F1-F4 (also known as F13-F16 in some contexts)
+		{
+			name:     "Shift+F1",
+			input:    []byte("\x1b[1;2P"),
+			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModShift},
+		},
+		{
+			name:     "Shift+F2",
+			input:    []byte("\x1b[1;2Q"),
+			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModShift},
+		},
+		{
+			name:     "Shift+F3",
+			input:    []byte("\x1b[1;2R"),
+			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModShift},
+		},
+		{
+			name:     "Shift+F4",
+			input:    []byte("\x1b[1;2S"),
+			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModShift},
+		},
+		// Alt+F1-F4
+		{
+			name:     "Alt+F1",
+			input:    []byte("\x1b[1;3P"),
+			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModAlt},
+		},
+		{
+			name:     "Alt+F2",
+			input:    []byte("\x1b[1;3Q"),
+			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModAlt},
+		},
+		{
+			name:     "Alt+F3",
+			input:    []byte("\x1b[1;3R"),
+			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModAlt},
+		},
+		{
+			name:     "Alt+F4",
+			input:    []byte("\x1b[1;3S"),
+			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModAlt},
+		},
+		// Shift+Alt+F1-F4
+		{
+			name:     "Shift+Alt+F1",
+			input:    []byte("\x1b[1;4P"),
+			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModShift | ModAlt},
+		},
+		{
+			name:     "Shift+Alt+F2",
+			input:    []byte("\x1b[1;4Q"),
+			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModShift | ModAlt},
+		},
+		{
+			name:     "Shift+Alt+F3",
+			input:    []byte("\x1b[1;4R"),
+			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModShift | ModAlt},
+		},
+		{
+			name:     "Shift+Alt+F4",
+			input:    []byte("\x1b[1;4S"),
+			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModShift | ModAlt},
+		},
+		// Ctrl+F1-F4
+		{
+			name:     "Ctrl+F1",
+			input:    []byte("\x1b[1;5P"),
+			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModCtrl},
+		},
+		{
+			name:     "Ctrl+F2",
+			input:    []byte("\x1b[1;5Q"),
+			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModCtrl},
+		},
+		{
+			name:     "Ctrl+F3",
+			input:    []byte("\x1b[1;5R"),
+			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModCtrl},
+		},
+		{
+			name:     "Ctrl+F4",
+			input:    []byte("\x1b[1;5S"),
+			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModCtrl},
+		},
+		// Ctrl+Shift+F1-F4
+		{
+			name:     "Ctrl+Shift+F1",
+			input:    []byte("\x1b[1;6P"),
+			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModCtrl | ModShift},
+		},
+		{
+			name:     "Ctrl+Shift+F2",
+			input:    []byte("\x1b[1;6Q"),
+			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModCtrl | ModShift},
+		},
+		{
+			name:     "Ctrl+Shift+F3",
+			input:    []byte("\x1b[1;6R"),
+			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModCtrl | ModShift},
+		},
+		{
+			name:     "Ctrl+Shift+F4",
+			input:    []byte("\x1b[1;6S"),
+			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModCtrl | ModShift},
+		},
+		// Ctrl+Alt+F1-F4
+		{
+			name:     "Ctrl+Alt+F1",
+			input:    []byte("\x1b[1;7P"),
+			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModCtrl | ModAlt},
+		},
+		{
+			name:     "Ctrl+Alt+F2",
+			input:    []byte("\x1b[1;7Q"),
+			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModCtrl | ModAlt},
+		},
+		{
+			name:     "Ctrl+Alt+F3",
+			input:    []byte("\x1b[1;7R"),
+			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModCtrl | ModAlt},
+		},
+		{
+			name:     "Ctrl+Alt+F4",
+			input:    []byte("\x1b[1;7S"),
+			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModCtrl | ModAlt},
+		},
+		// Ctrl+Shift+Alt+F1-F4
+		{
+			name:     "Ctrl+Shift+Alt+F1",
+			input:    []byte("\x1b[1;8P"),
+			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModCtrl | ModShift | ModAlt},
+		},
+		{
+			name:     "Ctrl+Shift+Alt+F2",
+			input:    []byte("\x1b[1;8Q"),
+			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModCtrl | ModShift | ModAlt},
+		},
+		{
+			name:     "Ctrl+Shift+Alt+F3",
+			input:    []byte("\x1b[1;8R"),
+			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModCtrl | ModShift | ModAlt},
+		},
+		{
+			name:     "Ctrl+Shift+Alt+F4",
+			input:    []byte("\x1b[1;8S"),
+			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModCtrl | ModShift | ModAlt},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewMockInputEventHandler()
+			reader := bytes.NewReader(tt.input)
+			eventReader := NewInputEventReader(reader, nil, handler)
+
+			eventReader.parseInput(tt.input)
+
+			events := handler.GetEvents()
+			require.Len(t, events, 1, "Expected exactly one event for %s", tt.name)
+			assert.Equal(t, tt.expected, events[0], "Event mismatch for %s", tt.name)
+		})
+	}
+}
+
+// TestInputEventReader_ModifiedF5toF12Keys tests parsing of F5-F12 with modifiers.
+func TestInputEventReader_ModifiedF5toF12Keys(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected InputEvent
+	}{
+		// Alt+F5-F12 (CSI tilde format with modifier)
+		{
+			name:     "Alt+F5",
+			input:    []byte("\x1b[15;3~"),
+			expected: InputEvent{Type: InputEventKey, Key: 5, Modifiers: ModFn | ModAlt},
+		},
+		{
+			name:     "Alt+F6",
+			input:    []byte("\x1b[17;3~"),
+			expected: InputEvent{Type: InputEventKey, Key: 6, Modifiers: ModFn | ModAlt},
+		},
+		{
+			name:     "Alt+F7",
+			input:    []byte("\x1b[18;3~"),
+			expected: InputEvent{Type: InputEventKey, Key: 7, Modifiers: ModFn | ModAlt},
+		},
+		{
+			name:     "Alt+F8",
+			input:    []byte("\x1b[19;3~"),
+			expected: InputEvent{Type: InputEventKey, Key: 8, Modifiers: ModFn | ModAlt},
+		},
+		{
+			name:     "Alt+F9",
+			input:    []byte("\x1b[20;3~"),
+			expected: InputEvent{Type: InputEventKey, Key: 9, Modifiers: ModFn | ModAlt},
+		},
+		{
+			name:     "Alt+F10",
+			input:    []byte("\x1b[21;3~"),
+			expected: InputEvent{Type: InputEventKey, Key: 10, Modifiers: ModFn | ModAlt},
+		},
+		{
+			name:     "Alt+F11",
+			input:    []byte("\x1b[23;3~"),
+			expected: InputEvent{Type: InputEventKey, Key: 11, Modifiers: ModFn | ModAlt},
+		},
+		{
+			name:     "Alt+F12",
+			input:    []byte("\x1b[24;3~"),
+			expected: InputEvent{Type: InputEventKey, Key: 12, Modifiers: ModFn | ModAlt},
+		},
+		// Ctrl+F5-F12
+		{
+			name:     "Ctrl+F5",
+			input:    []byte("\x1b[15;5~"),
+			expected: InputEvent{Type: InputEventKey, Key: 5, Modifiers: ModFn | ModCtrl},
+		},
+		{
+			name:     "Ctrl+F6",
+			input:    []byte("\x1b[17;5~"),
+			expected: InputEvent{Type: InputEventKey, Key: 6, Modifiers: ModFn | ModCtrl},
+		},
+		{
+			name:     "Ctrl+F12",
+			input:    []byte("\x1b[24;5~"),
+			expected: InputEvent{Type: InputEventKey, Key: 12, Modifiers: ModFn | ModCtrl},
+		},
+		// Shift+F5-F12
+		{
+			name:     "Shift+F5",
+			input:    []byte("\x1b[15;2~"),
+			expected: InputEvent{Type: InputEventKey, Key: 5, Modifiers: ModFn | ModShift},
+		},
+		{
+			name:     "Shift+F6",
+			input:    []byte("\x1b[17;2~"),
+			expected: InputEvent{Type: InputEventKey, Key: 6, Modifiers: ModFn | ModShift},
+		},
+		{
+			name:     "Shift+F12",
+			input:    []byte("\x1b[24;2~"),
+			expected: InputEvent{Type: InputEventKey, Key: 12, Modifiers: ModFn | ModShift},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewMockInputEventHandler()
+			reader := bytes.NewReader(tt.input)
+			eventReader := NewInputEventReader(reader, nil, handler)
+
+			eventReader.parseInput(tt.input)
+
+			events := handler.GetEvents()
+			require.Len(t, events, 1, "Expected exactly one event for %s", tt.name)
+			assert.Equal(t, tt.expected, events[0], "Event mismatch for %s", tt.name)
 		})
 	}
 }
@@ -362,9 +740,9 @@ func TestInputEventReader_MixedInput(t *testing.T) {
 	require.Len(t, events, 5)
 
 	assert.Equal(t, InputEvent{Type: InputEventKey, Key: 'a'}, events[0])
-	assert.Equal(t, InputEvent{Type: InputEventKey, Key: 'A'}, events[1])
+	assert.Equal(t, InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModFn}, events[1])
 	assert.Equal(t, InputEvent{Type: InputEventKey, Key: 'b'}, events[2])
-	assert.Equal(t, InputEvent{Type: InputEventKey, Key: 'B'}, events[3])
+	assert.Equal(t, InputEvent{Type: InputEventKey, Key: 'B', Modifiers: ModFn}, events[3])
 	assert.Equal(t, InputEvent{Type: InputEventKey, Key: 'c'}, events[4])
 }
 
@@ -426,22 +804,22 @@ func TestInputEventReader_ShiftArrowKeys(t *testing.T) {
 		{
 			name:     "Shift+Up",
 			input:    []byte("\x1b[1;2A"),
-			expected: InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModShift | ModFn},
 		},
 		{
 			name:     "Shift+Down",
 			input:    []byte("\x1b[1;2B"),
-			expected: InputEvent{Type: InputEventKey, Key: 'B', Modifiers: ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'B', Modifiers: ModShift | ModFn},
 		},
 		{
 			name:     "Shift+Right",
 			input:    []byte("\x1b[1;2C"),
-			expected: InputEvent{Type: InputEventKey, Key: 'C', Modifiers: ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'C', Modifiers: ModShift | ModFn},
 		},
 		{
 			name:     "Shift+Left",
 			input:    []byte("\x1b[1;2D"),
-			expected: InputEvent{Type: InputEventKey, Key: 'D', Modifiers: ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'D', Modifiers: ModShift | ModFn},
 		},
 	}
 
@@ -470,22 +848,22 @@ func TestInputEventReader_CtrlArrowKeys(t *testing.T) {
 		{
 			name:     "Ctrl+Up",
 			input:    []byte("\x1b[1;5A"),
-			expected: InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModCtrl},
+			expected: InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModCtrl | ModFn},
 		},
 		{
 			name:     "Ctrl+Down",
 			input:    []byte("\x1b[1;5B"),
-			expected: InputEvent{Type: InputEventKey, Key: 'B', Modifiers: ModCtrl},
+			expected: InputEvent{Type: InputEventKey, Key: 'B', Modifiers: ModCtrl | ModFn},
 		},
 		{
 			name:     "Ctrl+Right",
 			input:    []byte("\x1b[1;5C"),
-			expected: InputEvent{Type: InputEventKey, Key: 'C', Modifiers: ModCtrl},
+			expected: InputEvent{Type: InputEventKey, Key: 'C', Modifiers: ModCtrl | ModFn},
 		},
 		{
 			name:     "Ctrl+Left",
 			input:    []byte("\x1b[1;5D"),
-			expected: InputEvent{Type: InputEventKey, Key: 'D', Modifiers: ModCtrl},
+			expected: InputEvent{Type: InputEventKey, Key: 'D', Modifiers: ModCtrl | ModFn},
 		},
 	}
 
@@ -514,22 +892,22 @@ func TestInputEventReader_AltArrowKeys(t *testing.T) {
 		{
 			name:     "Alt+Up",
 			input:    []byte("\x1b[1;3A"),
-			expected: InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModAlt | ModFn},
 		},
 		{
 			name:     "Alt+Down",
 			input:    []byte("\x1b[1;3B"),
-			expected: InputEvent{Type: InputEventKey, Key: 'B', Modifiers: ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'B', Modifiers: ModAlt | ModFn},
 		},
 		{
 			name:     "Alt+Right",
 			input:    []byte("\x1b[1;3C"),
-			expected: InputEvent{Type: InputEventKey, Key: 'C', Modifiers: ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'C', Modifiers: ModAlt | ModFn},
 		},
 		{
 			name:     "Alt+Left",
 			input:    []byte("\x1b[1;3D"),
-			expected: InputEvent{Type: InputEventKey, Key: 'D', Modifiers: ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'D', Modifiers: ModAlt | ModFn},
 		},
 	}
 
@@ -558,22 +936,22 @@ func TestInputEventReader_CtrlShiftArrowKeys(t *testing.T) {
 		{
 			name:     "Ctrl+Shift+Up",
 			input:    []byte("\x1b[1;6A"),
-			expected: InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModCtrl | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModCtrl | ModShift | ModFn},
 		},
 		{
 			name:     "Ctrl+Shift+Down",
 			input:    []byte("\x1b[1;6B"),
-			expected: InputEvent{Type: InputEventKey, Key: 'B', Modifiers: ModCtrl | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'B', Modifiers: ModCtrl | ModShift | ModFn},
 		},
 		{
 			name:     "Ctrl+Shift+Right",
 			input:    []byte("\x1b[1;6C"),
-			expected: InputEvent{Type: InputEventKey, Key: 'C', Modifiers: ModCtrl | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'C', Modifiers: ModCtrl | ModShift | ModFn},
 		},
 		{
 			name:     "Ctrl+Shift+Left",
 			input:    []byte("\x1b[1;6D"),
-			expected: InputEvent{Type: InputEventKey, Key: 'D', Modifiers: ModCtrl | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'D', Modifiers: ModCtrl | ModShift | ModFn},
 		},
 	}
 
@@ -652,17 +1030,17 @@ func TestInputEventReader_ShiftLetterKeys(t *testing.T) {
 		{
 			name:     "Shift+A (uppercase A)",
 			input:    []byte("A"),
-			expected: InputEvent{Type: InputEventKey, Key: 'a', Modifiers: ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModShift},
 		},
 		{
 			name:     "Shift+D (uppercase D)",
 			input:    []byte("D"),
-			expected: InputEvent{Type: InputEventKey, Key: 'd', Modifiers: ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'D', Modifiers: ModShift},
 		},
 		{
 			name:     "Shift+Z (uppercase Z)",
 			input:    []byte("Z"),
-			expected: InputEvent{Type: InputEventKey, Key: 'z', Modifiers: ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'Z', Modifiers: ModShift},
 		},
 	}
 
@@ -696,13 +1074,271 @@ func TestInputEventReader_ShiftLetterVsArrowKey(t *testing.T) {
 	events := handler.GetEvents()
 	require.Len(t, events, 2)
 
-	// First event: Shift+A letter - should be lowercase 'a' with Shift modifier
+	// First event: Shift+A letter - should be uppercase 'A' with Shift modifier
 	assert.Equal(t, InputEventKey, events[0].Type)
-	assert.Equal(t, 'a', events[0].Key)
+	assert.Equal(t, 'A', events[0].Key)
 	assert.Equal(t, ModShift, events[0].Modifiers)
 
-	// Second event: Up arrow - should be uppercase 'A' without Shift modifier
+	// Second event: Up arrow - should be 'A' with ModFn modifier
 	assert.Equal(t, InputEventKey, events[1].Type)
 	assert.Equal(t, 'A', events[1].Key)
-	assert.Equal(t, EventModifiers(0), events[1].Modifiers)
+	assert.Equal(t, ModFn, events[1].Modifiers)
+}
+
+// TestInputEventReader_SGRMouseEvents tests parsing of SGR mouse events.
+// SGR mouse mode uses sequences like ESC[<btn;x;y;m (release) or ESC[<btn;x;y;M (press).
+// This test ensures that mouse events are correctly parsed and not misinterpreted as key events.
+func TestInputEventReader_SGRMouseEvents(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected []InputEvent
+	}{
+		{
+			name:  "SGR left button press",
+			input: []byte("\x1b[<0;10;20;M"),
+			expected: []InputEvent{
+				{Type: InputEventMouse, X: 9, Y: 19, Modifiers: 0},
+			},
+		},
+		{
+			name:  "SGR left button release",
+			input: []byte("\x1b[<0;10;20;m"),
+			expected: []InputEvent{
+				{Type: InputEventMouse, X: 9, Y: 19, Modifiers: 0},
+			},
+		},
+		{
+			name:  "SGR right button press",
+			input: []byte("\x1b[<2;50;10;M"),
+			expected: []InputEvent{
+				{Type: InputEventMouse, X: 49, Y: 9, Modifiers: 0},
+			},
+		},
+		{
+			name:  "SGR right button release",
+			input: []byte("\x1b[<2;50;10;m"),
+			expected: []InputEvent{
+				{Type: InputEventMouse, X: 49, Y: 9, Modifiers: 0},
+			},
+		},
+		{
+			name:  "SGR middle button press",
+			input: []byte("\x1b[<1;25;15;M"),
+			expected: []InputEvent{
+				{Type: InputEventMouse, X: 24, Y: 14, Modifiers: 0},
+			},
+		},
+		{
+			name:  "SGR mouse drag with right button",
+			input: []byte("\x1b[<34;50;10;M"),
+			expected: []InputEvent{
+				{Type: InputEventMouse, X: 49, Y: 9, Modifiers: ModMove},
+			},
+		},
+		{
+			name:  "SGR mouse drag with left button",
+			input: []byte("\x1b[<32;30;20;M"),
+			expected: []InputEvent{
+				{Type: InputEventMouse, X: 29, Y: 19, Modifiers: ModMove},
+			},
+		},
+		{
+			name:  "SGR scroll up",
+			input: []byte("\x1b[<64;40;30;M"),
+			expected: []InputEvent{
+				{Type: InputEventMouse, X: 39, Y: 29, Modifiers: ModScrollUp},
+			},
+		},
+		{
+			name:  "SGR scroll down",
+			input: []byte("\x1b[<65;40;30;M"),
+			expected: []InputEvent{
+				{Type: InputEventMouse, X: 39, Y: 29, Modifiers: ModScrollDown},
+			},
+		},
+		{
+			name:  "SGR mouse with Shift modifier",
+			input: []byte("\x1b[<4;10;10;M"),
+			expected: []InputEvent{
+				{Type: InputEventMouse, X: 9, Y: 9, Modifiers: ModShift},
+			},
+		},
+		{
+			name:  "SGR mouse with Alt modifier",
+			input: []byte("\x1b[<8;10;10;M"),
+			expected: []InputEvent{
+				{Type: InputEventMouse, X: 9, Y: 9, Modifiers: ModAlt},
+			},
+		},
+		{
+			name:  "SGR mouse with Ctrl modifier",
+			input: []byte("\x1b[<16;10;10;M"),
+			expected: []InputEvent{
+				{Type: InputEventMouse, X: 9, Y: 9, Modifiers: ModCtrl},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewMockInputEventHandler()
+			reader := bytes.NewReader(tt.input)
+			eventReader := NewInputEventReader(reader, nil, handler)
+
+			// Parse the input directly (without starting the reader)
+			eventReader.parseInput(tt.input)
+
+			events := handler.GetEvents()
+			require.Len(t, events, len(tt.expected), "Expected %d events, got %d", len(tt.expected), len(events))
+			for i, expected := range tt.expected {
+				assert.Equal(t, expected.Type, events[i].Type, "Event %d: type mismatch", i)
+				assert.Equal(t, expected.X, events[i].X, "Event %d: X coordinate mismatch", i)
+				assert.Equal(t, expected.Y, events[i].Y, "Event %d: Y coordinate mismatch", i)
+				assert.Equal(t, expected.Modifiers, events[i].Modifiers, "Event %d: modifiers mismatch", i)
+			}
+		})
+	}
+}
+
+// TestInputEvent_String tests the String() method of InputEvent.
+func TestInputEvent_String(t *testing.T) {
+	tests := []struct {
+		name     string
+		event    InputEvent
+		expected string
+	}{
+		{
+			name:     "lowercase letter",
+			event:    InputEvent{Type: InputEventKey, Key: 'a'},
+			expected: "a",
+		},
+		{
+			name:     "uppercase letter with Shift",
+			event:    InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModShift},
+			expected: "A",
+		},
+		{
+			name:     "Ctrl+C",
+			event:    InputEvent{Type: InputEventKey, Key: 'c', Modifiers: ModCtrl},
+			expected: "Ctrl-c",
+		},
+		{
+			name:     "Ctrl+Shift+A",
+			event:    InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModCtrl | ModShift},
+			expected: "Ctrl-A",
+		},
+		{
+			name:     "Up arrow",
+			event:    InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModFn},
+			expected: "Up",
+		},
+		{
+			name:     "Down arrow",
+			event:    InputEvent{Type: InputEventKey, Key: 'B', Modifiers: ModFn},
+			expected: "Down",
+		},
+		{
+			name:     "Left arrow",
+			event:    InputEvent{Type: InputEventKey, Key: 'D', Modifiers: ModFn},
+			expected: "Left",
+		},
+		{
+			name:     "Right arrow",
+			event:    InputEvent{Type: InputEventKey, Key: 'C', Modifiers: ModFn},
+			expected: "Right",
+		},
+		{
+			name:     "Shift+Up",
+			event:    InputEvent{Type: InputEventKey, Key: 'A', Modifiers: ModShift | ModFn},
+			expected: "Shift-Up",
+		},
+		{
+			name:     "Ctrl+Left",
+			event:    InputEvent{Type: InputEventKey, Key: 'D', Modifiers: ModCtrl | ModFn},
+			expected: "Ctrl-Left",
+		},
+		{
+			name:     "Home",
+			event:    InputEvent{Type: InputEventKey, Key: 'H', Modifiers: ModFn},
+			expected: "Home",
+		},
+		{
+			name:     "End",
+			event:    InputEvent{Type: InputEventKey, Key: 'F', Modifiers: ModFn},
+			expected: "End",
+		},
+		{
+			name:     "PageUp",
+			event:    InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn},
+			expected: "PageUp",
+		},
+		{
+			name:     "PageDown",
+			event:    InputEvent{Type: InputEventKey, Key: 'N', Modifiers: ModFn},
+			expected: "PageDown",
+		},
+		{
+			name:     "Insert",
+			event:    InputEvent{Type: InputEventKey, Key: 'I', Modifiers: ModFn},
+			expected: "Insert",
+		},
+		{
+			name:     "F1",
+			event:    InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn},
+			expected: "F1",
+		},
+		{
+			name:     "F5",
+			event:    InputEvent{Type: InputEventKey, Key: 5, Modifiers: ModFn},
+			expected: "F5",
+		},
+		{
+			name:     "F10",
+			event:    InputEvent{Type: InputEventKey, Key: 10, Modifiers: ModFn},
+			expected: "F10",
+		},
+		{
+			name:     "F12",
+			event:    InputEvent{Type: InputEventKey, Key: 12, Modifiers: ModFn},
+			expected: "F12",
+		},
+		{
+			name:     "Shift+F1",
+			event:    InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModShift | ModFn},
+			expected: "Shift-F1",
+		},
+		{
+			name:     "Tab",
+			event:    InputEvent{Type: InputEventKey, Key: '\t', Modifiers: ModCtrl},
+			expected: "Ctrl-Tab",
+		},
+		{
+			name:     "Enter",
+			event:    InputEvent{Type: InputEventKey, Key: '\r', Modifiers: ModCtrl},
+			expected: "Ctrl-Enter",
+		},
+		{
+			name:     "Esc",
+			event:    InputEvent{Type: InputEventKey, Key: 0x1B},
+			expected: "Esc",
+		},
+		{
+			name:     "Mouse event",
+			event:    InputEvent{Type: InputEventMouse},
+			expected: "Mouse",
+		},
+		{
+			name:     "Resize event",
+			event:    InputEvent{Type: InputEventResize},
+			expected: "Resize",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.event.String()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

@@ -160,6 +160,14 @@ func (r *InputEventReader) parseInput(data []byte) {
 						continue
 					}
 				}
+				// ESC O sequence (function keys F1-F4, arrow keys in some modes)
+				if data[i+1] == 'O' {
+					consumed := r.parseEscO(data[i:])
+					if consumed > 0 {
+						i += consumed
+						continue
+					}
+				}
 				// Other escape sequences can be added here
 			}
 
@@ -178,11 +186,125 @@ func (r *InputEventReader) parseInput(data []byte) {
 	}
 }
 
+// parseEscO parses an ESC O sequence (used for F1-F4 and some other keys).
+// Returns the number of bytes consumed, or 0 if not a valid ESC O sequence.
+func (r *InputEventReader) parseEscO(data []byte) int {
+	if len(data) < 3 || data[0] != 0x1B || data[1] != 'O' {
+		return 0
+	}
+
+	// ESC O sequences are followed by a single character
+	ch := data[2]
+
+	switch ch {
+	case 'P': // F1
+		r.handler.Notify(InputEvent{
+			Type:      InputEventKey,
+			Key:       1,
+			Modifiers: ModFn,
+		})
+		return 3
+	case 'Q': // F2
+		r.handler.Notify(InputEvent{
+			Type:      InputEventKey,
+			Key:       2,
+			Modifiers: ModFn,
+		})
+		return 3
+	case 'R': // F3
+		r.handler.Notify(InputEvent{
+			Type:      InputEventKey,
+			Key:       3,
+			Modifiers: ModFn,
+		})
+		return 3
+	case 'S': // F4
+		r.handler.Notify(InputEvent{
+			Type:      InputEventKey,
+			Key:       4,
+			Modifiers: ModFn,
+		})
+		return 3
+	case 'A': // Up arrow (alternate mode)
+		r.handler.Notify(InputEvent{
+			Type:      InputEventKey,
+			Key:       'A',
+			Modifiers: ModFn,
+		})
+		return 3
+	case 'B': // Down arrow (alternate mode)
+		r.handler.Notify(InputEvent{
+			Type:      InputEventKey,
+			Key:       'B',
+			Modifiers: ModFn,
+		})
+		return 3
+	case 'C': // Right arrow (alternate mode)
+		r.handler.Notify(InputEvent{
+			Type:      InputEventKey,
+			Key:       'C',
+			Modifiers: ModFn,
+		})
+		return 3
+	case 'D': // Left arrow (alternate mode)
+		r.handler.Notify(InputEvent{
+			Type:      InputEventKey,
+			Key:       'D',
+			Modifiers: ModFn,
+		})
+		return 3
+	case 'H': // Home (alternate mode)
+		r.handler.Notify(InputEvent{
+			Type:      InputEventKey,
+			Key:       'H',
+			Modifiers: ModFn,
+		})
+		return 3
+	case 'F': // End (alternate mode)
+		r.handler.Notify(InputEvent{
+			Type:      InputEventKey,
+			Key:       'F',
+			Modifiers: ModFn,
+		})
+		return 3
+	default:
+		// Unknown ESC O sequence, don't consume it
+		return 0
+	}
+}
+
 // parseCSI parses a CSI (Control Sequence Introducer) sequence.
 // Returns the number of bytes consumed, or 0 if not a valid CSI sequence.
 func (r *InputEventReader) parseCSI(data []byte) int {
 	if len(data) < 3 || data[0] != 0x1B || data[1] != '[' {
 		return 0
+	}
+
+	// Check for SGR mouse mode: ESC[<btn;x;y;M or ESC[<btn;x;y;m
+	if data[2] == '<' {
+		// Find the end of the SGR mouse sequence
+		end := 3
+		for end < len(data) {
+			ch := data[end]
+			if ch == 'M' || ch == 'm' {
+				end++
+				break
+			}
+			end++
+		}
+
+		if end > len(data) || (end == len(data) && data[end-1] != 'M' && data[end-1] != 'm') {
+			// Incomplete sequence
+			return 0
+		}
+
+		// Extract parameters from the sequence (everything between '<' and final 'M' or 'm')
+		paramSeq := data[3 : end-1]
+		params := r.parseCSIParams(paramSeq)
+
+		// Handle SGR mouse event
+		r.handleSGRMouse(params)
+		return end
 	}
 
 	// Find the end of CSI sequence (a letter or specific character)
@@ -214,12 +336,13 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 	params := r.parseCSIParams(seq[:len(seq)-1])
 
 	// Handle different CSI sequences
+	// According to doc: "For arrow keys and other special navigation keys, Key is a letter and ModFn modifier set"
 	switch lastChar {
 	case 'A': // Up arrow
 		r.handler.Notify(InputEvent{
 			Type:      InputEventKey,
 			Key:       'A',
-			Modifiers: r.getModifiers(params),
+			Modifiers: r.getModifiers(params) | ModFn,
 		})
 		return end
 
@@ -227,7 +350,7 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 		r.handler.Notify(InputEvent{
 			Type:      InputEventKey,
 			Key:       'B',
-			Modifiers: r.getModifiers(params),
+			Modifiers: r.getModifiers(params) | ModFn,
 		})
 		return end
 
@@ -235,7 +358,7 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 		r.handler.Notify(InputEvent{
 			Type:      InputEventKey,
 			Key:       'C',
-			Modifiers: r.getModifiers(params),
+			Modifiers: r.getModifiers(params) | ModFn,
 		})
 		return end
 
@@ -243,7 +366,7 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 		r.handler.Notify(InputEvent{
 			Type:      InputEventKey,
 			Key:       'D',
-			Modifiers: r.getModifiers(params),
+			Modifiers: r.getModifiers(params) | ModFn,
 		})
 		return end
 
@@ -251,7 +374,7 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 		r.handler.Notify(InputEvent{
 			Type:      InputEventKey,
 			Key:       'H',
-			Modifiers: r.getModifiers(params),
+			Modifiers: r.getModifiers(params) | ModFn,
 		})
 		return end
 
@@ -259,8 +382,58 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 		r.handler.Notify(InputEvent{
 			Type:      InputEventKey,
 			Key:       'F',
-			Modifiers: r.getModifiers(params),
+			Modifiers: r.getModifiers(params) | ModFn,
 		})
+		return end
+
+	case 'P': // F1 with modifiers (CSI format: ESC[1;modP)
+		// Check if this is a modified F1 key (has params like [1;2P] for Shift+F1)
+		if len(params) >= 2 && params[0] == 1 {
+			r.handler.Notify(InputEvent{
+				Type:      InputEventKey,
+				Key:       1,
+				Modifiers: r.getModifiers(params) | ModFn,
+			})
+			return end
+		}
+		// Unknown sequence, ignore
+		return end
+
+	case 'Q': // F2 with modifiers (CSI format: ESC[1;modQ)
+		if len(params) >= 2 && params[0] == 1 {
+			r.handler.Notify(InputEvent{
+				Type:      InputEventKey,
+				Key:       2,
+				Modifiers: r.getModifiers(params) | ModFn,
+			})
+			return end
+		}
+		return end
+
+	case 'R': // F3 with modifiers (CSI format: ESC[1;modR) or cursor position report
+		if len(params) >= 2 && params[0] == 1 {
+			// Modified F3 key
+			r.handler.Notify(InputEvent{
+				Type:      InputEventKey,
+				Key:       3,
+				Modifiers: r.getModifiers(params) | ModFn,
+			})
+			return end
+		}
+		// Cursor position report (response to CSI 6 n)
+		// This is typically used for terminal size detection
+		// We can ignore it for now or handle it specially
+		return end
+
+	case 'S': // F4 with modifiers (CSI format: ESC[1;modS)
+		if len(params) >= 2 && params[0] == 1 {
+			r.handler.Notify(InputEvent{
+				Type:      InputEventKey,
+				Key:       4,
+				Modifiers: r.getModifiers(params) | ModFn,
+			})
+			return end
+		}
 		return end
 
 	case '~': // Special keys (F1-F12, Insert, Delete, Page Up/Down, etc.)
@@ -269,20 +442,12 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 		}
 		return end
 
-	case 'M': // Mouse event
+	case 'M': // X10 mouse event (not SGR mode, which is handled earlier)
+		// X10 mouse events: ESC[Mbxy (where b, x, y are single bytes)
 		if len(data) >= end+3 {
 			r.handleMouseEvent(data[end:end+3], false)
 			return end + 3
 		}
-		return end
-
-	case 'm': // Mouse event (SGR mode)
-		r.handleSGRMouse(params)
-		return end
-
-	case 'R': // Cursor position report (response to CSI 6 n)
-		// This is typically used for terminal size detection
-		// We can ignore it for now or handle it specially
 		return end
 
 	default:
@@ -344,51 +509,57 @@ func (r *InputEventReader) handleTildeKey(keyCode int, params []int) {
 	switch keyCode {
 	case 1, 7: // Home
 		key = 'H'
+		mods |= ModFn
 	case 2: // Insert
 		key = 'I'
+		mods |= ModFn
 	case 3: // Delete
 		key = 'D'
+		mods |= ModFn
 	case 4, 8: // End
 		key = 'F'
+		mods |= ModFn
 	case 5: // Page Up
 		key = 'P'
+		mods |= ModFn
 	case 6: // Page Down
 		key = 'N'
+		mods |= ModFn
 	case 11: // F1
-		key = 'F'
+		key = 1
 		mods |= ModFn
 	case 12: // F2
-		key = 'G'
+		key = 2
 		mods |= ModFn
 	case 13: // F3
-		key = 'J'
+		key = 3
 		mods |= ModFn
 	case 14: // F4
-		key = 'K'
+		key = 4
 		mods |= ModFn
 	case 15: // F5
-		key = 'L'
+		key = 5
 		mods |= ModFn
 	case 17: // F6
-		key = 'M'
+		key = 6
 		mods |= ModFn
 	case 18: // F7
-		key = 'O'
+		key = 7
 		mods |= ModFn
 	case 19: // F8
-		key = 'Q'
+		key = 8
 		mods |= ModFn
 	case 20: // F9
-		key = 'R'
+		key = 9
 		mods |= ModFn
 	case 21: // F10
-		key = 'S'
+		key = 10
 		mods |= ModFn
 	case 23: // F11
-		key = 'T'
+		key = 11
 		mods |= ModFn
 	case 24: // F12
-		key = 'U'
+		key = 12
 		mods |= ModFn
 	default:
 		// Unknown key code, ignore
@@ -560,10 +731,11 @@ func (r *InputEventReader) parseRegularKey(b byte) {
 	}
 
 	// Handle uppercase letters (A-Z) - these indicate Shift was pressed
+	// According to doc: "For letter keys, Key is a Unicode code point of the letter (uppercase if shift is pressed plus shift modifier set)"
 	if b >= 'A' && b <= 'Z' {
 		r.handler.Notify(InputEvent{
 			Type:      InputEventKey,
-			Key:       rune(b - 'A' + 'a'), // Convert to lowercase
+			Key:       rune(b), // Keep uppercase
 			Modifiers: ModShift,
 		})
 		return

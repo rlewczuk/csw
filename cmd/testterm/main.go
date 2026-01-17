@@ -243,107 +243,14 @@ func formatEvent(index int, event cswterm.InputEvent) string {
 
 	details := ""
 	if event.Type == cswterm.InputEventKey {
-		keyName := formatKey(event.Key, event.Modifiers)
-		modStr := formatModifiers(event.Modifiers)
-		if modStr != "" {
-			details = fmt.Sprintf("%s+%s", modStr, keyName)
-		} else {
-			details = keyName
-		}
+		details = event.String()
 	} else if event.Type == cswterm.InputEventMouse {
-		details = fmt.Sprintf("x=%d y=%d %s", event.X, event.Y, formatModifiers(event.Modifiers))
+		details = fmt.Sprintf("x=%d y=%d", event.X, event.Y)
 	} else if event.Type == cswterm.InputEventResize {
 		details = fmt.Sprintf("w=%d h=%d", event.X, event.Y)
 	}
 
 	return fmt.Sprintf("%4d | %-6s | %s", index, typeStr, details)
-}
-
-// formatKey formats a key code as a string.
-// The modifiers parameter is used to distinguish between arrow keys (no modifiers)
-// and letter keys with Shift modifier.
-func formatKey(key rune, mods cswterm.EventModifiers) string {
-	switch key {
-	case 0x1B:
-		return "ESC"
-	case 0x09:
-		return "TAB"
-	case 0x0D:
-		return "ENTER"
-	case 0x0A:
-		return "LF"
-	case 'A':
-		// 'A' without Shift = Up arrow (from CSI sequence)
-		return "↑"
-	case 'B':
-		// 'B' without Shift = Down arrow (from CSI sequence)
-		return "↓"
-	case 'C':
-		// 'C' without Shift = Right arrow (from CSI sequence)
-		return "→"
-	case 'D':
-		// 'D' without Shift = Left arrow (from CSI sequence)
-		return "←"
-	case 'H':
-		return "HOME"
-	case 'F':
-		return "END"
-	case 'I':
-		return "INSERT"
-	case 'P':
-		return "PGUP"
-	case 'N':
-		return "PGDN"
-	default:
-		if key >= 32 && key < 127 {
-			return fmt.Sprintf("'%c'", key)
-		}
-		return fmt.Sprintf("0x%02X", key)
-	}
-}
-
-// formatModifiers formats event modifiers as a string.
-func formatModifiers(mods cswterm.EventModifiers) string {
-	parts := []string{}
-	if mods&cswterm.ModCtrl != 0 {
-		parts = append(parts, "Ctrl")
-	}
-	if mods&cswterm.ModAlt != 0 {
-		parts = append(parts, "Alt")
-	}
-	if mods&cswterm.ModShift != 0 {
-		parts = append(parts, "Shift")
-	}
-	if mods&cswterm.ModMeta != 0 {
-		parts = append(parts, "Meta")
-	}
-	if mods&cswterm.ModFn != 0 {
-		parts = append(parts, "Fn")
-	}
-	if mods&cswterm.ModPress != 0 {
-		parts = append(parts, "Press")
-	}
-	if mods&cswterm.ModRelease != 0 {
-		parts = append(parts, "Release")
-	}
-	if mods&cswterm.ModMove != 0 {
-		parts = append(parts, "Move")
-	}
-	if mods&cswterm.ModScrollUp != 0 {
-		parts = append(parts, "ScrollUp")
-	}
-	if mods&cswterm.ModScrollDown != 0 {
-		parts = append(parts, "ScrollDown")
-	}
-
-	result := ""
-	for i, part := range parts {
-		if i > 0 {
-			result += "+"
-		}
-		result += part
-	}
-	return result
 }
 
 // centerText centers text in a given width.

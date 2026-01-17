@@ -97,24 +97,6 @@ const (
 	ModFn
 )
 
-// InputEvent represents an input event from the terminal.
-type InputEvent struct {
-	// Type is a general type of the input event.
-	Type InputEventType
-
-	// Key is a key code for keyboard events.
-	Key rune
-
-	// Content is a content of the copy/paste event
-	Content string
-
-	// Modifiers is a bitfield of modifiers
-	Modifiers EventModifiers
-
-	// X and Y are coordinates of the mouse event or width and height for resize event
-	X, Y uint16
-}
-
 // ScreenOutput represents a terminal screen. It consists of a grid of cells.
 // Each cell contains a rune and a set of attributes.
 type ScreenOutput interface {
@@ -143,4 +125,132 @@ type InputEventHandler interface {
 type InputEventSource interface {
 	// Listen registers a channel to receive input events.
 	Listen(ch chan InputEvent)
+}
+
+// InputEvent represents an input event from the terminal.
+type InputEvent struct {
+	// Type is a general type of the input event.
+	Type InputEventType
+
+	// Key is a key code for keyboard events.
+	// For letter keys, Key is a Unicode code point of the letter (uppercase if shift is pressed plus shift modifier set)
+	// For function keys F1..F10, Key is a rune from 1..10 and ModFn modifier set
+	// For arrow keys and other special navigation keys, Key is a letter and ModFn modifier set
+	Key rune
+
+	// Content is a content of the copy/paste event
+	// For other keys content is nil
+	Content string
+
+	// Modifiers is a bitfield of modifiers
+	Modifiers EventModifiers
+
+	// X and Y are coordinates of the mouse event or width and height for resize event
+	X, Y uint16
+}
+
+func (e *InputEvent) String() string {
+	// Handle non-keyboard events
+	switch e.Type {
+	case InputEventMouse:
+		return "Mouse"
+	case InputEventResize:
+		return "Resize"
+	case InputEventCopy:
+		return "Copy"
+	case InputEventPaste:
+		return "Paste"
+	case InputEventFocus:
+		return "Focus"
+	case InputEventBlur:
+		return "Blur"
+	}
+
+	// Handle keyboard events
+	var result string
+
+	// Add modifiers prefix
+	if e.Modifiers&ModCtrl != 0 {
+		result += "Ctrl-"
+	}
+	if e.Modifiers&ModAlt != 0 {
+		result += "Alt-"
+	}
+	if e.Modifiers&ModMeta != 0 {
+		result += "Meta-"
+	}
+
+	// Determine the key name
+	var keyName string
+
+	// Function keys F1-F12
+	if e.Modifiers&ModFn != 0 && e.Key >= 1 && e.Key <= 12 {
+		keyName = "F" + string(rune('0'+e.Key/10)) + string(rune('0'+e.Key%10))
+		if e.Key < 10 {
+			keyName = "F" + string(rune('0'+e.Key))
+		}
+		if e.Modifiers&ModShift != 0 {
+			result += "Shift-"
+		}
+		return result + keyName
+	}
+
+	// Navigation keys (arrow keys, Home, End, etc.)
+	if e.Modifiers&ModFn != 0 {
+		if e.Modifiers&ModShift != 0 {
+			result += "Shift-"
+		}
+		switch e.Key {
+		case 'A':
+			return result + "Up"
+		case 'B':
+			return result + "Down"
+		case 'C':
+			return result + "Right"
+		case 'D':
+			return result + "Left"
+		case 'H':
+			return result + "Home"
+		case 'F':
+			return result + "End"
+		case 'I':
+			return result + "Insert"
+		case 'P':
+			return result + "PageUp"
+		case 'N':
+			return result + "PageDown"
+		default:
+			return result + string(e.Key)
+		}
+	}
+
+	// Regular letter keys with Shift
+	if e.Modifiers&ModShift != 0 && e.Key >= 'A' && e.Key <= 'Z' {
+		return result + string(e.Key)
+	}
+
+	// Regular keys
+	if e.Key >= 32 && e.Key <= 126 {
+		return result + string(e.Key)
+	}
+
+	// Special control characters
+	switch e.Key {
+	case '\t':
+		return result + "Tab"
+	case '\r':
+		return result + "Enter"
+	case '\n':
+		return result + "Enter"
+	case 0x1B:
+		return result + "Esc"
+	case 0x7F:
+		return result + "Backspace"
+	default:
+		// For other control characters, show as Ctrl-letter
+		if e.Key >= 1 && e.Key <= 26 {
+			return result + string(rune('a'+e.Key-1))
+		}
+		return result + string(e.Key)
+	}
 }
