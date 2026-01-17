@@ -55,6 +55,12 @@ type FSPromptGenerator struct {
 	scanners []PromptScanner
 }
 
+// ConfPromptGenerator implements PromptGenerator interface.
+// It uses conf.ConfigStore to get prompt fragments from AgentRoleConfig.PromptFragments.
+type ConfPromptGenerator struct {
+	store conf.ConfigStore
+}
+
 // promptFragment represents a single prompt fragment file.
 type promptFragment struct {
 	order    int
@@ -101,6 +107,17 @@ func NewFSPromptGenerator(scanners ...PromptScanner) (*FSPromptGenerator, error)
 
 	return &FSPromptGenerator{
 		scanners: scanners,
+	}, nil
+}
+
+// NewConfPromptGenerator creates a new ConfPromptGenerator with the given ConfigStore.
+func NewConfPromptGenerator(store conf.ConfigStore) (*ConfPromptGenerator, error) {
+	if store == nil {
+		return nil, fmt.Errorf("NewConfPromptGenerator() [prompt.go]: store cannot be nil")
+	}
+
+	return &ConfPromptGenerator{
+		store: store,
 	}, nil
 }
 
@@ -440,6 +457,225 @@ func (g *FSPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig,
 	}
 
 	return buf.String(), nil
+}
+
+// GetPrompt generates a prompt for the given tags, role and state.
+// It retrieves prompt fragments from the role's PromptFragments field in ConfigStore,
+// applies the same filtering and merging logic as FSPromptGenerator.
+func (g *ConfPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error) {
+	if role == nil {
+		return "", fmt.Errorf("GetPrompt() [prompt.go]: role cannot be nil")
+	}
+
+	// Get all role configs from store to access both "all" and role-specific fragments
+	roleConfigs, err := g.store.GetAgentRoleConfigs()
+	if err != nil {
+		return "", fmt.Errorf("GetPrompt() [prompt.go]: failed to get role configs: %w", err)
+	}
+
+	// Collect fragments from "all" role and the specific role
+	var allFragments []promptFragment
+
+	// Process "all" role first
+	if allRole, ok := roleConfigs["all"]; ok && allRole.PromptFragments != nil {
+		for filename, content := range allRole.PromptFragments {
+			fragment := parseFragmentFromKey(filename, content, true)
+			if fragment == nil {
+				continue
+			}
+
+			// Check if tag matches
+			if fragment.tag != "all" && !contains(tags, fragment.tag) {
+				continue
+			}
+
+			// For tools fragments, check if tool is enabled
+			if fragment.kind == "tools" {
+				if role.ToolsAccess == nil {
+					continue
+				}
+				access, ok := role.ToolsAccess[fragment.toolName]
+				if !ok || access == "" {
+					continue
+				}
+			}
+
+			allFragments = append(allFragments, *fragment)
+		}
+	}
+
+	// Process role-specific fragments
+	if role.PromptFragments != nil {
+		for filename, content := range role.PromptFragments {
+			fragment := parseFragmentFromKey(filename, content, false)
+			if fragment == nil {
+				continue
+			}
+
+			// Check if tag matches
+			if fragment.tag != "all" && !contains(tags, fragment.tag) {
+				continue
+			}
+
+			// For tools fragments, check if tool is enabled
+			if fragment.kind == "tools" {
+				if role.ToolsAccess == nil {
+					continue
+				}
+				access, ok := role.ToolsAccess[fragment.toolName]
+				if !ok || access == "" {
+					continue
+				}
+			}
+
+			allFragments = append(allFragments, *fragment)
+		}
+	}
+
+	// Filter out duplicates (role-specific overrides "all")
+	allFragments = filterDuplicates(allFragments)
+
+	// Sort by order
+	sort.Slice(allFragments, func(i, j int) bool {
+		return allFragments[i].order < allFragments[j].order
+	})
+
+	// Build result map (using same format as FSPromptGenerator)
+	fragments := make(map[string]string)
+	for _, f := range allFragments {
+		// Key format: dir/file_prefix (without extension)
+		dir := "all"
+		if !f.isAll {
+			dir = role.Name
+		}
+
+		// Build key
+		var key string
+		if f.kind == "system" {
+			if f.tag == "all" {
+				key = fmt.Sprintf("%s/%d-system", dir, f.order)
+			} else {
+				key = fmt.Sprintf("%s/%d-system-%s", dir, f.order, f.tag)
+			}
+		} else {
+			if f.tag == "all" {
+				key = fmt.Sprintf("%s/%d-tools-%s", dir, f.order, f.toolName)
+			} else {
+				key = fmt.Sprintf("%s/%d-tools-%s-%s", dir, f.order, f.toolName, f.tag)
+			}
+		}
+		fragments[key] = f.content
+	}
+
+	// Sort fragment keys by extracting the order number (same as FSPromptGenerator)
+	type keyOrder struct {
+		key   string
+		order int
+	}
+
+	keyOrders := make([]keyOrder, 0, len(fragments))
+	for key := range fragments {
+		// Extract order from key (e.g., "all/10-system" -> 10)
+		parts := strings.Split(filepath.Base(key), "-")
+		if len(parts) > 0 {
+			if order, err := strconv.Atoi(parts[0]); err == nil {
+				keyOrders = append(keyOrders, keyOrder{key: key, order: order})
+				continue
+			}
+		}
+		// Fallback: order = 0 if we can't parse
+		keyOrders = append(keyOrders, keyOrder{key: key, order: 0})
+	}
+
+	// Sort by order, then by key alphabetically for stable sorting
+	sort.Slice(keyOrders, func(i, j int) bool {
+		if keyOrders[i].order != keyOrders[j].order {
+			return keyOrders[i].order < keyOrders[j].order
+		}
+		return keyOrders[i].key < keyOrders[j].key
+	})
+
+	// Concatenate fragments
+	var combined strings.Builder
+	for i, ko := range keyOrders {
+		if i > 0 {
+			combined.WriteString("\n\n")
+		}
+		combined.WriteString(fragments[ko.key])
+	}
+
+	// Process template
+	tmpl, err := template.New("prompt").Parse(combined.String())
+	if err != nil {
+		return "", fmt.Errorf("GetPrompt() [prompt.go]: failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, state); err != nil {
+		return "", fmt.Errorf("GetPrompt() [prompt.go]: failed to execute template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+// parseFragmentFromKey parses a fragment key (filename without extension) and returns a promptFragment.
+// Key format: "<num>-system" or "<num>-system-<tag>" or "<num>-tools-<toolname>" or "<num>-tools-<toolname>-<tag>"
+// Returns nil if the key is invalid.
+func parseFragmentFromKey(key string, content string, isAll bool) *promptFragment {
+	// Parse filename part (same format as parseFilename but without .md extension)
+	parts := strings.Split(key, "-")
+	if len(parts) < 2 {
+		return nil
+	}
+
+	// Parse order
+	order, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return nil
+	}
+
+	kind := parts[1]
+
+	switch kind {
+	case "system":
+		// Format: <num>-system-<tag> or <num>-system
+		tag := "all"
+		if len(parts) > 2 {
+			tag = strings.Join(parts[2:], "-")
+		}
+		return &promptFragment{
+			order:    order,
+			kind:     kind,
+			toolName: "",
+			tag:      tag,
+			filename: key,
+			content:  content,
+			isAll:    isAll,
+		}
+
+	case "tools":
+		// Format: <num>-tools-<toolname>-<tag> or <num>-tools-<toolname>
+		if len(parts) < 3 {
+			return nil
+		}
+		toolName := parts[2]
+		tag := "all"
+		if len(parts) > 3 {
+			tag = strings.Join(parts[3:], "-")
+		}
+		return &promptFragment{
+			order:    order,
+			kind:     kind,
+			toolName: toolName,
+			tag:      tag,
+			filename: key,
+			content:  content,
+			isAll:    isAll,
+		}
+
+	default:
+		return nil
+	}
 }
 
 // contains checks if a string is in a slice.
