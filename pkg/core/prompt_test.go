@@ -588,3 +588,330 @@ func TestFSPromptGenerator_MultipleScanners(t *testing.T) {
 	// Should also contain unique content from scanner 2
 	assert.Contains(t, prompt, content3, "should contain unique content from scanner 2")
 }
+
+func TestParseFragmentFromKey(t *testing.T) {
+	tests := []struct {
+		name         string
+		key          string
+		content      string
+		isAll        bool
+		wantOrder    int
+		wantKind     string
+		wantToolName string
+		wantTag      string
+		wantIsAll    bool
+		wantNil      bool
+	}{
+		{
+			name:      "system fragment without tag",
+			key:       "10-system",
+			content:   "content",
+			isAll:     true,
+			wantOrder: 10,
+			wantKind:  "system",
+			wantTag:   "all",
+			wantIsAll: true,
+		},
+		{
+			name:      "system fragment with tag",
+			key:       "20-system-anthropic",
+			content:   "content",
+			isAll:     true,
+			wantOrder: 20,
+			wantKind:  "system",
+			wantTag:   "anthropic",
+			wantIsAll: true,
+		},
+		{
+			name:      "system fragment with multi-part tag",
+			key:       "20-system-anthropic-v2",
+			content:   "content",
+			isAll:     false,
+			wantOrder: 20,
+			wantKind:  "system",
+			wantTag:   "anthropic-v2",
+			wantIsAll: false,
+		},
+		{
+			name:         "tools fragment without tag",
+			key:          "30-tools-read",
+			content:      "content",
+			isAll:        true,
+			wantOrder:    30,
+			wantKind:     "tools",
+			wantToolName: "read",
+			wantTag:      "all",
+			wantIsAll:    true,
+		},
+		{
+			name:         "tools fragment with tag",
+			key:          "40-tools-write-anthropic",
+			content:      "content",
+			isAll:        false,
+			wantOrder:    40,
+			wantKind:     "tools",
+			wantToolName: "write",
+			wantTag:      "anthropic",
+			wantIsAll:    false,
+		},
+		{
+			name:    "invalid no number",
+			key:     "system",
+			content: "content",
+			isAll:   true,
+			wantNil: true,
+		},
+		{
+			name:    "invalid number",
+			key:     "abc-system",
+			content: "content",
+			isAll:   true,
+			wantNil: true,
+		},
+		{
+			name:    "invalid kind",
+			key:     "10-unknown",
+			content: "content",
+			isAll:   true,
+			wantNil: true,
+		},
+		{
+			name:    "invalid tools without toolname",
+			key:     "10-tools",
+			content: "content",
+			isAll:   true,
+			wantNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fragment := parseFragmentFromKey(tt.key, tt.content, tt.isAll)
+			if tt.wantNil {
+				assert.Nil(t, fragment)
+			} else {
+				require.NotNil(t, fragment)
+				assert.Equal(t, tt.wantOrder, fragment.order)
+				assert.Equal(t, tt.wantKind, fragment.kind)
+				assert.Equal(t, tt.wantToolName, fragment.toolName)
+				assert.Equal(t, tt.wantTag, fragment.tag)
+				assert.Equal(t, tt.wantIsAll, fragment.isAll)
+				assert.Equal(t, tt.content, fragment.content)
+			}
+		})
+	}
+}
+
+func TestConfPromptGenerator_GetPrompt(t *testing.T) {
+	// Import the mock config store
+	mockStore := newMockConfigStoreWithFragments()
+
+	// Create generator
+	gen, err := NewConfPromptGenerator(mockStore)
+	require.NoError(t, err)
+
+	// Load test role
+	role := conf.AgentRoleConfig{
+		Name: "test1",
+		ToolsAccess: map[string]conf.AccessFlag{
+			"read":  conf.AccessAllow,
+			"write": conf.AccessAllow,
+			"bash":  conf.AccessAllow,
+		},
+		PromptFragments: map[string]string{
+			"10-system":     "# Test1 Core Instructions (Overrides all/10-system.md)\n\nYou are an AI assistant for test1 role working in: {{.Info.WorkDir}}",
+			"60-system":     "# Test1-Specific Guidelines\n\nFollow test1 guidelines.",
+			"70-tools-bash": "# Bash Tool Instructions (Test1)\n\nUse bash carefully in test1.",
+		},
+	}
+
+	// Create agent state
+	state := &AgentState{
+		Info: AgentStateCommonInfo{
+			WorkDir: "/test/dir",
+		},
+	}
+
+	tests := []struct {
+		name         string
+		tags         []string
+		wantContains []string
+	}{
+		{
+			name: "anthropic tags",
+			tags: []string{"anthropic", "all"},
+			wantContains: []string{
+				"/test/dir",                           // from template substitution
+				"Test1 Core Instructions",             // from test1/10-system.md
+				"Anthropic-Specific Instructions",     // from all/20-system-anthropic.md
+				"General Guidelines",                  // from all/30-system.md
+				"Read Tool Instructions",              // from all/40-tools-read.md
+				"Write Tool Instructions (Anthropic)", // from all/50-tools-write-anthropic.md
+				"Test1-Specific Guidelines",           // from test1/60-system.md
+				"Bash Tool Instructions (Test1)",      // from test1/70-tools-bash.md
+			},
+		},
+		{
+			name: "openai tags",
+			tags: []string{"openai", "all"},
+			wantContains: []string{
+				"/test/dir",
+				"Test1 Core Instructions",
+				"OpenAI-Specific Instructions", // from all/20-system-openai.md instead of anthropic
+				"General Guidelines",
+				"Read Tool Instructions",
+				// Note: no write-anthropic fragment
+				"Test1-Specific Guidelines",
+				"Bash Tool Instructions (Test1)",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prompt, err := gen.GetPrompt(tt.tags, &role, state)
+			require.NoError(t, err)
+			assert.NotEmpty(t, prompt)
+
+			for _, want := range tt.wantContains {
+				assert.Contains(t, prompt, want, "prompt should contain: %s", want)
+			}
+		})
+	}
+}
+
+func TestConfPromptGenerator_GetPrompt_Ordering(t *testing.T) {
+	// Import the mock config store
+	mockStore := newMockConfigStoreWithFragments()
+
+	// Create generator
+	gen, err := NewConfPromptGenerator(mockStore)
+	require.NoError(t, err)
+
+	// Load test role
+	role := conf.AgentRoleConfig{
+		Name: "test1",
+		ToolsAccess: map[string]conf.AccessFlag{
+			"read":  conf.AccessAllow,
+			"write": conf.AccessAllow,
+			"bash":  conf.AccessAllow,
+		},
+		PromptFragments: map[string]string{
+			"10-system":     "# Test1 Core Instructions (Overrides all/10-system.md)\n\nYou are an AI assistant for test1 role working in: {{.Info.WorkDir}}",
+			"60-system":     "# Test1-Specific Guidelines\n\nFollow test1 guidelines.",
+			"70-tools-bash": "# Bash Tool Instructions (Test1)\n\nUse bash carefully in test1.",
+		},
+	}
+
+	// Create agent state
+	state := &AgentState{
+		Info: AgentStateCommonInfo{
+			WorkDir: "/test/dir",
+		},
+	}
+
+	prompt, err := gen.GetPrompt([]string{"anthropic", "all"}, &role, state)
+	require.NoError(t, err)
+
+	// Check ordering by finding positions
+	markers := []string{
+		"Test1 Core Instructions",             // 10
+		"Anthropic-Specific Instructions",     // 20
+		"General Guidelines",                  // 30
+		"Read Tool Instructions",              // 40
+		"Write Tool Instructions (Anthropic)", // 50
+		"Test1-Specific Guidelines",           // 60
+		"Bash Tool Instructions (Test1)",      // 70
+	}
+
+	lastPos := -1
+	for _, marker := range markers {
+		pos := strings.Index(prompt, marker)
+		assert.NotEqual(t, -1, pos, "marker not found: %s", marker)
+		assert.Greater(t, pos, lastPos, "marker %s should come after previous marker", marker)
+		lastPos = pos
+	}
+}
+
+func TestConfPromptGenerator_GetPrompt_ToolsFiltering(t *testing.T) {
+	// Import the mock config store
+	mockStore := newMockConfigStoreWithFragments()
+
+	// Create generator
+	gen, err := NewConfPromptGenerator(mockStore)
+	require.NoError(t, err)
+
+	// Test with role that only has read access
+	role := conf.AgentRoleConfig{
+		Name: "test2",
+		ToolsAccess: map[string]conf.AccessFlag{
+			"read": conf.AccessAllow,
+		},
+		PromptFragments: map[string]string{},
+	}
+
+	// Create agent state
+	state := &AgentState{
+		Info: AgentStateCommonInfo{
+			WorkDir: "/test/dir",
+		},
+	}
+
+	prompt, err := gen.GetPrompt([]string{"all"}, &role, state)
+	require.NoError(t, err)
+
+	// Should have read tool instructions
+	assert.Contains(t, prompt, "Read Tool Instructions")
+
+	// Should NOT have write or bash tool instructions
+	assert.NotContains(t, prompt, "Write Tool Instructions")
+	assert.NotContains(t, prompt, "Bash Tool Instructions")
+}
+
+// newMockConfigStoreWithFragments creates a mock config store with test fragment data.
+func newMockConfigStoreWithFragments() *mockConfigStore {
+	return &mockConfigStore{
+		roleConfigs: map[string]*conf.AgentRoleConfig{
+			"all": {
+				Name: "all",
+				PromptFragments: map[string]string{
+					"10-system":                "# All Core Instructions\n\nYou are an AI assistant working in: {{.Info.WorkDir}}",
+					"20-system-anthropic":      "# Anthropic-Specific Instructions\n\nUse Anthropic-specific features.",
+					"20-system-openai":         "# OpenAI-Specific Instructions\n\nUse OpenAI-specific features.",
+					"30-system":                "# General Guidelines\n\nFollow general guidelines.",
+					"40-tools-read":            "# Read Tool Instructions\n\nUse read tool carefully.",
+					"50-tools-write-anthropic": "# Write Tool Instructions (Anthropic)\n\nUse write tool with Anthropic.",
+				},
+			},
+		},
+	}
+}
+
+// mockConfigStore is a simple mock for testing ConfPromptGenerator.
+type mockConfigStore struct {
+	roleConfigs map[string]*conf.AgentRoleConfig
+}
+
+func (m *mockConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelProviderConfig, error) {
+	return nil, nil
+}
+
+func (m *mockConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
+	return time.Time{}, nil
+}
+
+func (m *mockConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfig, error) {
+	return m.roleConfigs, nil
+}
+
+func (m *mockConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
+	return time.Time{}, nil
+}
+
+func (m *mockConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
+	return nil, nil
+}
+
+func (m *mockConfigStore) LastGlobalConfigUpdate() (time.Time, error) {
+	return time.Time{}, nil
+}
