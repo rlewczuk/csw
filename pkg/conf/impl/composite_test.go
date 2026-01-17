@@ -547,3 +547,273 @@ func TestCompositeConfigStore_ConcurrentAccess(t *testing.T) {
 		<-done
 	}
 }
+
+func TestCompositeConfigStore_PromptFragmentsMerging(t *testing.T) {
+	// Create mock stores with different prompt fragments
+	store1 := NewMockConfigStore()
+	store2 := NewMockConfigStore()
+	store3 := NewMockConfigStore()
+
+	// Store 1: role1 with fragment1 and fragment2
+	store1.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"role1": {
+			Name:        "role1",
+			Description: "Role 1 from store 1",
+			PromptFragments: map[string]string{
+				"fragment1": "Content 1 from store 1",
+				"fragment2": "Content 2 from store 1",
+			},
+		},
+	})
+
+	// Store 2: role1 with fragment2 (overrides) and fragment3 (new)
+	store2.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"role1": {
+			Name:        "role1",
+			Description: "Role 1 from store 2",
+			PromptFragments: map[string]string{
+				"fragment2": "Content 2 from store 2 (overridden)",
+				"fragment3": "Content 3 from store 2",
+			},
+		},
+	})
+
+	// Store 3: role1 with empty fragment1 (removes it) and fragment4 (new)
+	store3.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"role1": {
+			Name:        "role1",
+			Description: "Role 1 from store 3",
+			PromptFragments: map[string]string{
+				"fragment1": "   \n\t  ", // Only whitespace, should be removed
+				"fragment4": "Content 4 from store 3",
+			},
+		},
+	})
+
+	// Create composite store
+	composite := &CompositeConfigStore{
+		stores:             []conf.ConfigStore{store1, store2, store3},
+		storeGlobalUpdates: make([]time.Time, 3),
+		storeModelUpdates:  make([]time.Time, 3),
+		storeRoleUpdates:   make([]time.Time, 3),
+	}
+
+	require.NoError(t, composite.refresh())
+
+	// Get role configs
+	roleConfigs, err := composite.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	require.Contains(t, roleConfigs, "role1")
+
+	role1 := roleConfigs["role1"]
+
+	// Verify fragments are merged correctly:
+	// - fragment1 should be removed (empty in store3)
+	// - fragment2 should have content from store2 (last non-empty override)
+	// - fragment3 should have content from store2
+	// - fragment4 should have content from store3
+	assert.NotContains(t, role1.PromptFragments, "fragment1", "fragment1 should be removed due to empty content in store3")
+	assert.Equal(t, "Content 2 from store 2 (overridden)", role1.PromptFragments["fragment2"])
+	assert.Equal(t, "Content 3 from store 2", role1.PromptFragments["fragment3"])
+	assert.Equal(t, "Content 4 from store 3", role1.PromptFragments["fragment4"])
+	assert.Len(t, role1.PromptFragments, 3)
+}
+
+func TestCompositeConfigStore_PromptFragmentsRemovalAndReaddition(t *testing.T) {
+	// Test that a fragment can be removed and then re-added
+	store1 := NewMockConfigStore()
+	store2 := NewMockConfigStore()
+	store3 := NewMockConfigStore()
+
+	// Store 1: role1 with fragment1
+	store1.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"role1": {
+			Name: "role1",
+			PromptFragments: map[string]string{
+				"fragment1": "Original content",
+			},
+		},
+	})
+
+	// Store 2: role1 with empty fragment1 (removes it)
+	store2.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"role1": {
+			Name: "role1",
+			PromptFragments: map[string]string{
+				"fragment1": "",
+			},
+		},
+	})
+
+	// Store 3: role1 with fragment1 (re-adds it with new content)
+	store3.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"role1": {
+			Name: "role1",
+			PromptFragments: map[string]string{
+				"fragment1": "New content after removal",
+			},
+		},
+	})
+
+	composite := &CompositeConfigStore{
+		stores:             []conf.ConfigStore{store1, store2, store3},
+		storeGlobalUpdates: make([]time.Time, 3),
+		storeModelUpdates:  make([]time.Time, 3),
+		storeRoleUpdates:   make([]time.Time, 3),
+	}
+
+	require.NoError(t, composite.refresh())
+
+	roleConfigs, err := composite.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	require.Contains(t, roleConfigs, "role1")
+
+	role1 := roleConfigs["role1"]
+
+	// fragment1 should be present with the new content from store3
+	assert.Contains(t, role1.PromptFragments, "fragment1")
+	assert.Equal(t, "New content after removal", role1.PromptFragments["fragment1"])
+}
+
+func TestCompositeConfigStore_PromptFragmentsEmptyString(t *testing.T) {
+	// Test that empty string and whitespace-only strings are treated the same
+	store1 := NewMockConfigStore()
+	store2 := NewMockConfigStore()
+
+	store1.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"role1": {
+			Name: "role1",
+			PromptFragments: map[string]string{
+				"fragment1": "Content 1",
+				"fragment2": "Content 2",
+			},
+		},
+	})
+
+	store2.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"role1": {
+			Name: "role1",
+			PromptFragments: map[string]string{
+				"fragment1": "",        // Empty string
+				"fragment2": " \n \t ", // Whitespace only
+			},
+		},
+	})
+
+	composite := &CompositeConfigStore{
+		stores:             []conf.ConfigStore{store1, store2},
+		storeGlobalUpdates: make([]time.Time, 2),
+		storeModelUpdates:  make([]time.Time, 2),
+		storeRoleUpdates:   make([]time.Time, 2),
+	}
+
+	require.NoError(t, composite.refresh())
+
+	roleConfigs, err := composite.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	require.Contains(t, roleConfigs, "role1")
+
+	role1 := roleConfigs["role1"]
+
+	// Both fragments should be removed
+	assert.NotContains(t, role1.PromptFragments, "fragment1")
+	assert.NotContains(t, role1.PromptFragments, "fragment2")
+	assert.Empty(t, role1.PromptFragments)
+}
+
+func TestCompositeConfigStore_PromptFragmentsMultipleRoles(t *testing.T) {
+	// Test that prompt fragments are merged independently for different roles
+	store1 := NewMockConfigStore()
+	store2 := NewMockConfigStore()
+
+	store1.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"role1": {
+			Name: "role1",
+			PromptFragments: map[string]string{
+				"fragment1": "Role1 Fragment1 from store1",
+			},
+		},
+		"role2": {
+			Name: "role2",
+			PromptFragments: map[string]string{
+				"fragment1": "Role2 Fragment1 from store1",
+			},
+		},
+	})
+
+	store2.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"role1": {
+			Name: "role1",
+			PromptFragments: map[string]string{
+				"fragment1": "Role1 Fragment1 from store2",
+				"fragment2": "Role1 Fragment2 from store2",
+			},
+		},
+		"role2": {
+			Name: "role2",
+			PromptFragments: map[string]string{
+				"fragment2": "Role2 Fragment2 from store2",
+			},
+		},
+	})
+
+	composite := &CompositeConfigStore{
+		stores:             []conf.ConfigStore{store1, store2},
+		storeGlobalUpdates: make([]time.Time, 2),
+		storeModelUpdates:  make([]time.Time, 2),
+		storeRoleUpdates:   make([]time.Time, 2),
+	}
+
+	require.NoError(t, composite.refresh())
+
+	roleConfigs, err := composite.GetAgentRoleConfigs()
+	require.NoError(t, err)
+
+	// Verify role1 fragments
+	require.Contains(t, roleConfigs, "role1")
+	role1 := roleConfigs["role1"]
+	assert.Equal(t, "Role1 Fragment1 from store2", role1.PromptFragments["fragment1"])
+	assert.Equal(t, "Role1 Fragment2 from store2", role1.PromptFragments["fragment2"])
+	assert.Len(t, role1.PromptFragments, 2)
+
+	// Verify role2 fragments
+	require.Contains(t, roleConfigs, "role2")
+	role2 := roleConfigs["role2"]
+	assert.Equal(t, "Role2 Fragment1 from store1", role2.PromptFragments["fragment1"])
+	assert.Equal(t, "Role2 Fragment2 from store2", role2.PromptFragments["fragment2"])
+	assert.Len(t, role2.PromptFragments, 2)
+}
+
+func TestCompositeConfigStore_PromptFragmentsCopyProtection(t *testing.T) {
+	// Test that modifying returned PromptFragments doesn't affect internal state
+	mockStore := NewMockConfigStore()
+	mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"role1": {
+			Name: "role1",
+			PromptFragments: map[string]string{
+				"fragment1": "Original content",
+			},
+		},
+	})
+
+	composite := &CompositeConfigStore{
+		stores:             []conf.ConfigStore{mockStore},
+		storeGlobalUpdates: make([]time.Time, 1),
+		storeModelUpdates:  make([]time.Time, 1),
+		storeRoleUpdates:   make([]time.Time, 1),
+	}
+
+	require.NoError(t, composite.refresh())
+
+	// Get configs and modify
+	configs1, err := composite.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	configs1["role1"].PromptFragments["fragment1"] = "Modified content"
+	configs1["role1"].PromptFragments["fragment2"] = "New fragment"
+
+	// Get configs again - should not be affected
+	configs2, err := composite.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	assert.Equal(t, "Original content", configs2["role1"].PromptFragments["fragment1"])
+	assert.NotContains(t, configs2["role1"].PromptFragments, "fragment2")
+}
