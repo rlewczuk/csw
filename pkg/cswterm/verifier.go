@@ -2,90 +2,52 @@ package cswterm
 
 import "strings"
 
-// Cell represents a single character cell in the screen buffer.
-type Cell struct {
-	Rune  rune
-	Attrs CellAttributes
+// ScreenVerifier provides methods to verify screen buffer content in tests.
+type ScreenVerifier struct {
+	width   int
+	height  int
+	content []Cell
 }
 
-// MockScreen is a test double implementation of Screen interface.
-// It maintains an in-memory buffer and does not output to terminal.
-type MockScreen struct {
-	width  int
-	height int
-	buffer [][]Cell
-}
-
-// NewMockScreen creates a new MockScreen with the specified dimensions.
-func NewMockScreen(width, height int) *MockScreen {
-	buffer := make([][]Cell, height)
-	for i := range buffer {
-		buffer[i] = make([]Cell, width)
-		// Initialize with spaces
-		for j := range buffer[i] {
-			buffer[i][j] = Cell{Rune: ' ', Attrs: CellAttributes{}}
-		}
+// NewScreenVerifier creates a new ScreenVerifier instance.
+// The content must have exactly width * height cells.
+func NewScreenVerifier(width, height int, content []Cell) *ScreenVerifier {
+	if len(content) != width*height {
+		panic("NewScreenVerifier: len(content) must equal width * height")
 	}
-	return &MockScreen{
-		width:  width,
-		height: height,
-		buffer: buffer,
-	}
-}
-
-// Size returns the size of the screen in characters.
-func (m *MockScreen) Size() (width int, height int) {
-	return m.width, m.height
-}
-
-// PutText puts text at the specified position with the specified attributes.
-// If the text is longer than the width of the screen, it is truncated.
-func (m *MockScreen) PutText(x int, y int, text string, attrs TextAttributes) {
-	if y < 0 || y >= m.height {
-		return
-	}
-	if x < 0 || x >= m.width {
-		return
-	}
-
-	cellAttrs := CellAttributes{Attributes: attrs}
-	col := x
-	for _, r := range text {
-		if col >= m.width {
-			break
-		}
-		m.buffer[y][col] = Cell{
-			Rune:  r,
-			Attrs: cellAttrs,
-		}
-		col++
+	return &ScreenVerifier{
+		width:   width,
+		height:  height,
+		content: content,
 	}
 }
 
 // GetCell returns the cell at the specified position.
 // Returns a Cell with space rune if position is out of bounds.
-func (m *MockScreen) GetCell(x, y int) Cell {
-	if x < 0 || x >= m.width || y < 0 || y >= m.height {
+func (v *ScreenVerifier) GetCell(x, y int) Cell {
+	if x < 0 || x >= v.width || y < 0 || y >= v.height {
 		return Cell{Rune: ' ', Attrs: CellAttributes{}}
 	}
-	return m.buffer[y][x]
+	idx := y*v.width + x
+	return v.content[idx]
 }
 
 // GetText returns the text content in the specified rectangle.
 // Rectangle is defined by top-left corner (x, y) and dimensions (width, height).
-func (m *MockScreen) GetText(x, y, width, height int) string {
+func (v *ScreenVerifier) GetText(x, y, width, height int) string {
 	var sb strings.Builder
-	for row := y; row < y+height && row < m.height; row++ {
+	for row := y; row < y+height && row < v.height; row++ {
 		if row < 0 {
 			continue
 		}
-		for col := x; col < x+width && col < m.width; col++ {
+		for col := x; col < x+width && col < v.width; col++ {
 			if col < 0 {
 				continue
 			}
-			sb.WriteRune(m.buffer[row][col].Rune)
+			idx := row*v.width + col
+			sb.WriteRune(v.content[idx].Rune)
 		}
-		if row < y+height-1 && row < m.height-1 {
+		if row < y+height-1 && row < v.height-1 {
 			sb.WriteRune('\n')
 		}
 	}
@@ -94,8 +56,8 @@ func (m *MockScreen) GetText(x, y, width, height int) string {
 
 // HasText checks if the specified text is present in the given rectangle.
 // Rectangle is defined by top-left corner (x, y) and dimensions (width, height).
-func (m *MockScreen) HasText(x, y, width, height int, text string) bool {
-	actualText := m.GetText(x, y, width, height)
+func (v *ScreenVerifier) HasText(x, y, width, height int, text string) bool {
+	actualText := v.GetText(x, y, width, height)
 	return actualText == text
 }
 
@@ -140,7 +102,7 @@ func (mask *AttributeMask) matchesAttributes(attrs CellAttributes) bool {
 // HasTextWithAttrs checks if the specified text with attributes is present in the given rectangle.
 // Rectangle is defined by top-left corner (x, y) and dimensions (width, height).
 // The mask parameter specifies which attributes to check.
-func (m *MockScreen) HasTextWithAttrs(x, y, width, height int, text string, mask AttributeMask) bool {
+func (v *ScreenVerifier) HasTextWithAttrs(x, y, width, height int, text string, mask AttributeMask) bool {
 	// Convert text to runes for proper indexing
 	runes := []rune(text)
 
@@ -150,8 +112,8 @@ func (m *MockScreen) HasTextWithAttrs(x, y, width, height int, text string, mask
 	if startY < 0 {
 		startY = 0
 	}
-	if endY > m.height {
-		endY = m.height
+	if endY > v.height {
+		endY = v.height
 	}
 
 	startX := x
@@ -159,8 +121,8 @@ func (m *MockScreen) HasTextWithAttrs(x, y, width, height int, text string, mask
 	if startX < 0 {
 		startX = 0
 	}
-	if endX > m.width {
-		endX = m.width
+	if endX > v.width {
+		endX = v.width
 	}
 
 	// Track position in the text
@@ -173,7 +135,8 @@ func (m *MockScreen) HasTextWithAttrs(x, y, width, height int, text string, mask
 				return true
 			}
 
-			cell := m.buffer[row][col]
+			idx := row*v.width + col
+			cell := v.content[idx]
 
 			// Check if rune matches
 			if cell.Rune != runes[textIdx] {
@@ -196,13 +159,4 @@ func (m *MockScreen) HasTextWithAttrs(x, y, width, height int, text string, mask
 
 	// Check if we matched all the text
 	return textIdx >= len(runes)
-}
-
-// Clear resets all cells to spaces with default attributes.
-func (m *MockScreen) Clear() {
-	for i := range m.buffer {
-		for j := range m.buffer[i] {
-			m.buffer[i][j] = Cell{Rune: ' ', Attrs: CellAttributes{}}
-		}
-	}
 }
