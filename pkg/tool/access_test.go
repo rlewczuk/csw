@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/shared"
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -281,109 +281,109 @@ func TestMatchSegmentPattern(t *testing.T) {
 func TestAccessControlTool_ResolveAccessFlag(t *testing.T) {
 	tests := []struct {
 		name       string
-		privileges map[string]shared.AccessFlag
+		privileges map[string]conf.AccessFlag
 		toolName   string
-		expected   shared.AccessFlag
+		expected   conf.AccessFlag
 	}{
 		{
 			name: "exact match allow",
-			privileges: map[string]shared.AccessFlag{
-				"vfs.read": shared.AccessAllow,
+			privileges: map[string]conf.AccessFlag{
+				"vfs.read": conf.AccessAllow,
 			},
 			toolName: "vfs.read",
-			expected: shared.AccessAllow,
+			expected: conf.AccessAllow,
 		},
 		{
 			name: "exact match deny",
-			privileges: map[string]shared.AccessFlag{
-				"vfs.write": shared.AccessDeny,
+			privileges: map[string]conf.AccessFlag{
+				"vfs.write": conf.AccessDeny,
 			},
 			toolName: "vfs.write",
-			expected: shared.AccessDeny,
+			expected: conf.AccessDeny,
 		},
 		{
 			name: "wildcard match",
-			privileges: map[string]shared.AccessFlag{
-				"vfs.*": shared.AccessAllow,
+			privileges: map[string]conf.AccessFlag{
+				"vfs.*": conf.AccessAllow,
 			},
 			toolName: "vfs.read",
-			expected: shared.AccessAllow,
+			expected: conf.AccessAllow,
 		},
 		{
 			name: "multi wildcard match",
-			privileges: map[string]shared.AccessFlag{
-				"vfs.**": shared.AccessAllow,
+			privileges: map[string]conf.AccessFlag{
+				"vfs.**": conf.AccessAllow,
 			},
 			toolName: "vfs.local.read",
-			expected: shared.AccessAllow,
+			expected: conf.AccessAllow,
 		},
 		{
 			name: "global default allow",
-			privileges: map[string]shared.AccessFlag{
-				"**": shared.AccessAllow,
+			privileges: map[string]conf.AccessFlag{
+				"**": conf.AccessAllow,
 			},
 			toolName: "any.tool.name",
-			expected: shared.AccessAllow,
+			expected: conf.AccessAllow,
 		},
 		{
 			name: "global default deny",
-			privileges: map[string]shared.AccessFlag{
-				"**": shared.AccessDeny,
+			privileges: map[string]conf.AccessFlag{
+				"**": conf.AccessDeny,
 			},
 			toolName: "any.tool.name",
-			expected: shared.AccessDeny,
+			expected: conf.AccessDeny,
 		},
 		{
 			name:       "no match defaults to deny",
-			privileges: map[string]shared.AccessFlag{},
+			privileges: map[string]conf.AccessFlag{},
 			toolName:   "vfs.read",
-			expected:   shared.AccessDeny,
+			expected:   conf.AccessDeny,
 		},
 		{
 			name: "most specific wins - exact over wildcard",
-			privileges: map[string]shared.AccessFlag{
-				"vfs.*":    shared.AccessDeny,
-				"vfs.read": shared.AccessAllow,
+			privileges: map[string]conf.AccessFlag{
+				"vfs.*":    conf.AccessDeny,
+				"vfs.read": conf.AccessAllow,
 			},
 			toolName: "vfs.read",
-			expected: shared.AccessAllow,
+			expected: conf.AccessAllow,
 		},
 		{
 			name: "most specific wins - wildcard over global",
-			privileges: map[string]shared.AccessFlag{
-				"**":    shared.AccessDeny,
-				"vfs.*": shared.AccessAllow,
+			privileges: map[string]conf.AccessFlag{
+				"**":    conf.AccessDeny,
+				"vfs.*": conf.AccessAllow,
 			},
 			toolName: "vfs.read",
-			expected: shared.AccessAllow,
+			expected: conf.AccessAllow,
 		},
 		{
 			name: "most specific wins - partial over full wildcard",
-			privileges: map[string]shared.AccessFlag{
-				"vfs.*":  shared.AccessDeny,
-				"vfs.r*": shared.AccessAllow,
+			privileges: map[string]conf.AccessFlag{
+				"vfs.*":  conf.AccessDeny,
+				"vfs.r*": conf.AccessAllow,
 			},
 			toolName: "vfs.read",
-			expected: shared.AccessAllow,
+			expected: conf.AccessAllow,
 		},
 		{
 			name: "complex hierarchy",
-			privileges: map[string]shared.AccessFlag{
-				"**":           shared.AccessDeny,
-				"vfs.**":       shared.AccessAllow,
-				"vfs.local.*":  shared.AccessDeny,
-				"vfs.local.ro": shared.AccessAllow,
+			privileges: map[string]conf.AccessFlag{
+				"**":           conf.AccessDeny,
+				"vfs.**":       conf.AccessAllow,
+				"vfs.local.*":  conf.AccessDeny,
+				"vfs.local.ro": conf.AccessAllow,
 			},
 			toolName: "vfs.local.ro",
-			expected: shared.AccessAllow,
+			expected: conf.AccessAllow,
 		},
 		{
 			name: "ask flag",
-			privileges: map[string]shared.AccessFlag{
-				"sensitive.*": shared.AccessAsk,
+			privileges: map[string]conf.AccessFlag{
+				"sensitive.*": conf.AccessAsk,
 			},
 			toolName: "sensitive.operation",
-			expected: shared.AccessAsk,
+			expected: conf.AccessAsk,
 		},
 	}
 
@@ -404,8 +404,8 @@ func TestAccessControlTool_Execute_Allow(t *testing.T) {
 		err:    nil,
 	}
 
-	privileges := map[string]shared.AccessFlag{
-		"vfs.*": shared.AccessAllow,
+	privileges := map[string]conf.AccessFlag{
+		"vfs.*": conf.AccessAllow,
 	}
 
 	ac := NewAccessControlTool(mock, privileges)
@@ -429,8 +429,8 @@ func TestAccessControlTool_Execute_Deny(t *testing.T) {
 		err:    nil,
 	}
 
-	privileges := map[string]shared.AccessFlag{
-		"vfs.write": shared.AccessDeny,
+	privileges := map[string]conf.AccessFlag{
+		"vfs.write": conf.AccessDeny,
 	}
 
 	ac := NewAccessControlTool(mock, privileges)
@@ -455,8 +455,8 @@ func TestAccessControlTool_Execute_Ask(t *testing.T) {
 		err:    nil,
 	}
 
-	privileges := map[string]shared.AccessFlag{
-		"sensitive.*": shared.AccessAsk,
+	privileges := map[string]conf.AccessFlag{
+		"sensitive.*": conf.AccessAsk,
 	}
 
 	ac := NewAccessControlTool(mock, privileges)
@@ -482,7 +482,7 @@ func TestAccessControlTool_Execute_DefaultDeny(t *testing.T) {
 	}
 
 	// Empty privileges - should default to deny
-	privileges := map[string]shared.AccessFlag{}
+	privileges := map[string]conf.AccessFlag{}
 
 	ac := NewAccessControlTool(mock, privileges)
 	call := ToolCall{
@@ -505,8 +505,8 @@ func TestAccessControlTool_Execute_ToolError(t *testing.T) {
 		err:    errors.New("file not found"),
 	}
 
-	privileges := map[string]shared.AccessFlag{
-		"vfs.*": shared.AccessAllow,
+	privileges := map[string]conf.AccessFlag{
+		"vfs.*": conf.AccessAllow,
 	}
 
 	ac := NewAccessControlTool(mock, privileges)
@@ -529,8 +529,8 @@ func TestAccessControlTool_Info(t *testing.T) {
 		description: "A test tool",
 	}
 
-	privileges := map[string]shared.AccessFlag{
-		"**": shared.AccessAllow,
+	privileges := map[string]conf.AccessFlag{
+		"**": conf.AccessAllow,
 	}
 
 	ac := NewAccessControlTool(mock, privileges)
@@ -543,19 +543,19 @@ func TestAccessControlTool_Info(t *testing.T) {
 func TestAccessControlTool_MultipleMatchingPatterns(t *testing.T) {
 	mock := &mockTool{name: "api.v1.users.read"}
 
-	privileges := map[string]shared.AccessFlag{
-		"**":              shared.AccessDeny,
-		"api.**":          shared.AccessAllow,
-		"api.v1.**":       shared.AccessDeny,
-		"api.v1.users.*":  shared.AccessAllow,
-		"api.v1.users.r*": shared.AccessDeny,
+	privileges := map[string]conf.AccessFlag{
+		"**":              conf.AccessDeny,
+		"api.**":          conf.AccessAllow,
+		"api.v1.**":       conf.AccessDeny,
+		"api.v1.users.*":  conf.AccessAllow,
+		"api.v1.users.r*": conf.AccessDeny,
 	}
 
 	ac := NewAccessControlTool(mock, privileges)
 
 	// The most specific pattern "api.v1.users.r*" should win
 	flag := ac.resolveAccessFlag("api.v1.users.read")
-	assert.Equal(t, shared.AccessDeny, flag, "most specific pattern should win")
+	assert.Equal(t, conf.AccessDeny, flag, "most specific pattern should win")
 
 	call := ToolCall{
 		ID:        "test-id",
@@ -571,26 +571,26 @@ func TestAccessControlTool_MultipleMatchingPatterns(t *testing.T) {
 func TestAccessControlTool_GlobalDefault(t *testing.T) {
 	tests := []struct {
 		name       string
-		privileges map[string]shared.AccessFlag
+		privileges map[string]conf.AccessFlag
 		toolNames  []string
-		expected   shared.AccessFlag
+		expected   conf.AccessFlag
 	}{
 		{
 			name: "global allow as default",
-			privileges: map[string]shared.AccessFlag{
-				"**": shared.AccessAllow,
+			privileges: map[string]conf.AccessFlag{
+				"**": conf.AccessAllow,
 			},
 			toolNames: []string{"any.tool", "another.tool.nested", "simple"},
-			expected:  shared.AccessAllow,
+			expected:  conf.AccessAllow,
 		},
 		{
 			name: "global deny with specific allows",
-			privileges: map[string]shared.AccessFlag{
-				"**":       shared.AccessDeny,
-				"vfs.read": shared.AccessAllow,
+			privileges: map[string]conf.AccessFlag{
+				"**":       conf.AccessDeny,
+				"vfs.read": conf.AccessAllow,
 			},
 			toolNames: []string{"vfs.write", "api.call", "other"},
-			expected:  shared.AccessDeny,
+			expected:  conf.AccessDeny,
 		},
 	}
 

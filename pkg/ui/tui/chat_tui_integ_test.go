@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,7 +13,6 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/presenter"
-	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
@@ -21,7 +21,7 @@ import (
 // Mock prompt generator for chat TUI tests
 type chatTuiMockPromptGen struct{}
 
-func (m *chatTuiMockPromptGen) GetPrompt(tags []string, role *core.AgentRole, state *core.AgentState) (string, error) {
+func (m *chatTuiMockPromptGen) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *core.AgentState) (string, error) {
 	return "You are a helpful assistant.", nil
 }
 
@@ -426,8 +426,8 @@ func TestTuiChatViewWithRunBashTool(t *testing.T) {
 		mockRunner.SetResponse("echo 'test output'", "test output\n", 0, nil)
 
 		// Register run.bash tool with Allow privilege for echo command
-		privileges := map[string]shared.AccessFlag{
-			"echo.*": shared.AccessAllow,
+		privileges := map[string]conf.AccessFlag{
+			"echo.*": conf.AccessAllow,
 		}
 		tool.RegisterRunBashTool(tools, mockRunner, privileges)
 
@@ -505,8 +505,8 @@ func TestTuiChatViewWithRunBashTool(t *testing.T) {
 		mockRunner := runner.NewMockRunner()
 
 		// Register run.bash tool with Deny privilege for rm command
-		privileges := map[string]shared.AccessFlag{
-			"rm.*": shared.AccessDeny,
+		privileges := map[string]conf.AccessFlag{
+			"rm.*": conf.AccessDeny,
 		}
 		tool.RegisterRunBashTool(tools, mockRunner, privileges)
 

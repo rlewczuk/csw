@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/stretchr/testify/assert"
@@ -53,7 +54,7 @@ func getOllamaTestClient(t *testing.T) *ollamaTestClient {
 			t.Skip("Skipping test: _integ/ollama.url not configured")
 		}
 
-		client, err := NewOllamaClient(&ModelProviderConfig{
+		client, err := NewOllamaClient(&conf.ModelProviderConfig{
 			URL:            url,
 			ConnectTimeout: connectOllamaTimeout,
 			RequestTimeout: testOllamaTimeout,
@@ -73,7 +74,7 @@ func getOllamaTestClient(t *testing.T) *ollamaTestClient {
 
 func TestNewOllamaClient(t *testing.T) {
 	t.Run("creates client with valid configuration", func(t *testing.T) {
-		client, err := NewOllamaClient(&ModelProviderConfig{
+		client, err := NewOllamaClient(&conf.ModelProviderConfig{
 			URL:            getOllamaHost(),
 			ConnectTimeout: connectOllamaTimeout,
 			RequestTimeout: testOllamaTimeout,
@@ -90,7 +91,7 @@ func TestNewOllamaClient(t *testing.T) {
 	})
 
 	t.Run("returns error for empty URL", func(t *testing.T) {
-		_, err := NewOllamaClient(&ModelProviderConfig{
+		_, err := NewOllamaClient(&conf.ModelProviderConfig{
 			URL: "",
 		})
 
@@ -633,7 +634,7 @@ func TestOllamaClient_EmbeddingModel(t *testing.T) {
 
 func TestOllamaClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint not found", func(t *testing.T) {
-		client, err := NewOllamaClient(&ModelProviderConfig{
+		client, err := NewOllamaClient(&conf.ModelProviderConfig{
 			URL:            "http://beha:11434/nonexistent",
 			ConnectTimeout: connectOllamaTimeout,
 			RequestTimeout: testOllamaTimeout,
@@ -646,7 +647,7 @@ func TestOllamaClient_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		client, err := NewOllamaClient(&ModelProviderConfig{
+		client, err := NewOllamaClient(&conf.ModelProviderConfig{
 			URL:            "http://nonexistent-host:11434",
 			ConnectTimeout: 1 * time.Second,
 			RequestTimeout: 2 * time.Second,

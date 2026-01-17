@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
@@ -38,7 +39,7 @@ type OpenAIEmbeddingModel struct {
 }
 
 // NewOpenAIClient creates a new OpenAI-compatible client with the given config
-func NewOpenAIClient(config *ModelProviderConfig) (*OpenAIClient, error) {
+func NewOpenAIClient(config *conf.ModelProviderConfig) (*OpenAIClient, error) {
 	if config == nil {
 		return nil, fmt.Errorf("NewOpenAIClient() [openai_client.go]: config cannot be nil")
 	}

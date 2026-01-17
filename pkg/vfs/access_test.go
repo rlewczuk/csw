@@ -3,7 +3,7 @@ package vfs
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/shared"
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -11,23 +11,23 @@ import (
 func TestAccessControlVFS_ReadFile(t *testing.T) {
 	tests := []struct {
 		name       string
-		privileges map[string]FileAccess
+		privileges map[string]conf.FileAccess
 		path       string
 		wantErr    bool
 		errType    error
 	}{
 		{
 			name: "allow read with specific pattern",
-			privileges: map[string]FileAccess{
-				"test.txt": {Read: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"test.txt": {Read: conf.AccessAllow},
 			},
 			path:    "test.txt",
 			wantErr: false,
 		},
 		{
 			name: "deny read with specific pattern",
-			privileges: map[string]FileAccess{
-				"test.txt": {Read: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"test.txt": {Read: conf.AccessDeny},
 			},
 			path:    "test.txt",
 			wantErr: true,
@@ -35,16 +35,16 @@ func TestAccessControlVFS_ReadFile(t *testing.T) {
 		},
 		{
 			name: "allow read with wildcard pattern",
-			privileges: map[string]FileAccess{
-				"*.txt": {Read: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"*.txt": {Read: conf.AccessAllow},
 			},
 			path:    "test.txt",
 			wantErr: false,
 		},
 		{
 			name: "deny read by default",
-			privileges: map[string]FileAccess{
-				"other.txt": {Read: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"other.txt": {Read: conf.AccessAllow},
 			},
 			path:    "test.txt",
 			wantErr: true,
@@ -52,16 +52,16 @@ func TestAccessControlVFS_ReadFile(t *testing.T) {
 		},
 		{
 			name: "allow read with default wildcard",
-			privileges: map[string]FileAccess{
-				"*": {Read: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"*": {Read: conf.AccessAllow},
 			},
 			path:    "test.txt",
 			wantErr: false,
 		},
 		{
 			name: "ask access returns ErrAskPermission",
-			privileges: map[string]FileAccess{
-				"test.txt": {Read: shared.AccessAsk},
+			privileges: map[string]conf.FileAccess{
+				"test.txt": {Read: conf.AccessAsk},
 			},
 			path:    "test.txt",
 			wantErr: true,
@@ -92,23 +92,23 @@ func TestAccessControlVFS_ReadFile(t *testing.T) {
 func TestAccessControlVFS_WriteFile(t *testing.T) {
 	tests := []struct {
 		name       string
-		privileges map[string]FileAccess
+		privileges map[string]conf.FileAccess
 		path       string
 		wantErr    bool
 		errType    error
 	}{
 		{
 			name: "allow write",
-			privileges: map[string]FileAccess{
-				"test.txt": {Write: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"test.txt": {Write: conf.AccessAllow},
 			},
 			path:    "test.txt",
 			wantErr: false,
 		},
 		{
 			name: "deny write",
-			privileges: map[string]FileAccess{
-				"test.txt": {Write: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"test.txt": {Write: conf.AccessDeny},
 			},
 			path:    "test.txt",
 			wantErr: true,
@@ -116,8 +116,8 @@ func TestAccessControlVFS_WriteFile(t *testing.T) {
 		},
 		{
 			name: "deny write by default",
-			privileges: map[string]FileAccess{
-				"other.txt": {Write: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"other.txt": {Write: conf.AccessAllow},
 			},
 			path:    "test.txt",
 			wantErr: true,
@@ -146,23 +146,23 @@ func TestAccessControlVFS_WriteFile(t *testing.T) {
 func TestAccessControlVFS_DeleteFile(t *testing.T) {
 	tests := []struct {
 		name       string
-		privileges map[string]FileAccess
+		privileges map[string]conf.FileAccess
 		path       string
 		wantErr    bool
 		errType    error
 	}{
 		{
 			name: "allow delete",
-			privileges: map[string]FileAccess{
-				"test.txt": {Delete: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"test.txt": {Delete: conf.AccessAllow},
 			},
 			path:    "test.txt",
 			wantErr: false,
 		},
 		{
 			name: "deny delete",
-			privileges: map[string]FileAccess{
-				"test.txt": {Delete: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"test.txt": {Delete: conf.AccessDeny},
 			},
 			path:    "test.txt",
 			wantErr: true,
@@ -193,23 +193,23 @@ func TestAccessControlVFS_DeleteFile(t *testing.T) {
 func TestAccessControlVFS_ListFiles(t *testing.T) {
 	tests := []struct {
 		name       string
-		privileges map[string]FileAccess
+		privileges map[string]conf.FileAccess
 		path       string
 		wantErr    bool
 		errType    error
 	}{
 		{
 			name: "allow list",
-			privileges: map[string]FileAccess{
-				"dir": {List: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"dir": {List: conf.AccessAllow},
 			},
 			path:    "dir",
 			wantErr: false,
 		},
 		{
 			name: "deny list",
-			privileges: map[string]FileAccess{
-				"dir": {List: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"dir": {List: conf.AccessDeny},
 			},
 			path:    "dir",
 			wantErr: true,
@@ -241,23 +241,23 @@ func TestAccessControlVFS_ListFiles(t *testing.T) {
 func TestAccessControlVFS_FindFiles(t *testing.T) {
 	tests := []struct {
 		name       string
-		privileges map[string]FileAccess
+		privileges map[string]conf.FileAccess
 		query      string
 		wantErr    bool
 		errType    error
 	}{
 		{
 			name: "allow find",
-			privileges: map[string]FileAccess{
-				"*.txt": {Find: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"*.txt": {Find: conf.AccessAllow},
 			},
 			query:   "*.txt",
 			wantErr: false,
 		},
 		{
 			name: "deny find",
-			privileges: map[string]FileAccess{
-				"*.txt": {Find: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"*.txt": {Find: conf.AccessDeny},
 			},
 			query:   "*.txt",
 			wantErr: true,
@@ -286,7 +286,7 @@ func TestAccessControlVFS_FindFiles(t *testing.T) {
 func TestAccessControlVFS_MoveFile(t *testing.T) {
 	tests := []struct {
 		name       string
-		privileges map[string]FileAccess
+		privileges map[string]conf.FileAccess
 		src        string
 		dst        string
 		wantErr    bool
@@ -294,9 +294,9 @@ func TestAccessControlVFS_MoveFile(t *testing.T) {
 	}{
 		{
 			name: "allow move with both permissions",
-			privileges: map[string]FileAccess{
-				"src.txt": {Move: shared.AccessAllow},
-				"dst.txt": {Write: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"src.txt": {Move: conf.AccessAllow},
+				"dst.txt": {Write: conf.AccessAllow},
 			},
 			src:     "src.txt",
 			dst:     "dst.txt",
@@ -304,9 +304,9 @@ func TestAccessControlVFS_MoveFile(t *testing.T) {
 		},
 		{
 			name: "deny move on source",
-			privileges: map[string]FileAccess{
-				"src.txt": {Move: shared.AccessDeny},
-				"dst.txt": {Write: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"src.txt": {Move: conf.AccessDeny},
+				"dst.txt": {Write: conf.AccessAllow},
 			},
 			src:     "src.txt",
 			dst:     "dst.txt",
@@ -315,9 +315,9 @@ func TestAccessControlVFS_MoveFile(t *testing.T) {
 		},
 		{
 			name: "deny write on destination",
-			privileges: map[string]FileAccess{
-				"src.txt": {Move: shared.AccessAllow},
-				"dst.txt": {Write: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"src.txt": {Move: conf.AccessAllow},
+				"dst.txt": {Write: conf.AccessDeny},
 			},
 			src:     "src.txt",
 			dst:     "dst.txt",
@@ -326,9 +326,9 @@ func TestAccessControlVFS_MoveFile(t *testing.T) {
 		},
 		{
 			name: "deny both",
-			privileges: map[string]FileAccess{
-				"src.txt": {Move: shared.AccessDeny},
-				"dst.txt": {Write: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"src.txt": {Move: conf.AccessDeny},
+				"dst.txt": {Write: conf.AccessDeny},
 			},
 			src:     "src.txt",
 			dst:     "dst.txt",
@@ -360,50 +360,50 @@ func TestAccessControlVFS_MoveFile(t *testing.T) {
 func TestAccessControlVFS_GlobMatching(t *testing.T) {
 	tests := []struct {
 		name       string
-		privileges map[string]FileAccess
+		privileges map[string]conf.FileAccess
 		path       string
 		wantErr    bool
 	}{
 		{
 			name: "exact match takes precedence over wildcard",
-			privileges: map[string]FileAccess{
-				"test.txt": {Read: shared.AccessAllow},
-				"*.txt":    {Read: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"test.txt": {Read: conf.AccessAllow},
+				"*.txt":    {Read: conf.AccessDeny},
 			},
 			path:    "test.txt",
 			wantErr: false,
 		},
 		{
 			name: "more specific wildcard takes precedence",
-			privileges: map[string]FileAccess{
-				"test*.txt": {Read: shared.AccessAllow},
-				"*.txt":     {Read: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"test*.txt": {Read: conf.AccessAllow},
+				"*.txt":     {Read: conf.AccessDeny},
 			},
 			path:    "test123.txt",
 			wantErr: false,
 		},
 		{
 			name: "path with slashes - specific takes precedence",
-			privileges: map[string]FileAccess{
-				"dir/test.txt": {Read: shared.AccessAllow},
-				"dir/*.txt":    {Read: shared.AccessDeny},
-				"*":            {Read: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"dir/test.txt": {Read: conf.AccessAllow},
+				"dir/*.txt":    {Read: conf.AccessDeny},
+				"*":            {Read: conf.AccessDeny},
 			},
 			path:    "dir/test.txt",
 			wantErr: false,
 		},
 		{
 			name: "default wildcard allows all",
-			privileges: map[string]FileAccess{
-				"*": {Read: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"*": {Read: conf.AccessAllow},
 			},
 			path:    "any/path/file.txt",
 			wantErr: false,
 		},
 		{
 			name: "no match defaults to deny",
-			privileges: map[string]FileAccess{
-				"other.txt": {Read: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"other.txt": {Read: conf.AccessAllow},
 			},
 			path:    "test.txt",
 			wantErr: true,
@@ -430,16 +430,16 @@ func TestAccessControlVFS_GlobMatching(t *testing.T) {
 func TestAccessControlVFS_SpecificityRules(t *testing.T) {
 	tests := []struct {
 		name       string
-		privileges map[string]FileAccess
+		privileges map[string]conf.FileAccess
 		path       string
 		wantErr    bool
 		desc       string
 	}{
 		{
 			name: "fewer wildcards is more specific",
-			privileges: map[string]FileAccess{
-				"test.txt": {Read: shared.AccessAllow}, // 0 wildcards
-				"*.txt":    {Read: shared.AccessDeny},  // 1 wildcard
+			privileges: map[string]conf.FileAccess{
+				"test.txt": {Read: conf.AccessAllow}, // 0 wildcards
+				"*.txt":    {Read: conf.AccessDeny},  // 1 wildcard
 			},
 			path:    "test.txt",
 			wantErr: false,
@@ -447,10 +447,10 @@ func TestAccessControlVFS_SpecificityRules(t *testing.T) {
 		},
 		{
 			name: "more directory levels is more specific",
-			privileges: map[string]FileAccess{
-				"a/b/c/test.txt": {Read: shared.AccessAllow}, // 3 levels
-				"a/b/*.txt":      {Read: shared.AccessDeny},  // 2 levels
-				"a/*.txt":        {Read: shared.AccessDeny},  // 1 level
+			privileges: map[string]conf.FileAccess{
+				"a/b/c/test.txt": {Read: conf.AccessAllow}, // 3 levels
+				"a/b/*.txt":      {Read: conf.AccessDeny},  // 2 levels
+				"a/*.txt":        {Read: conf.AccessDeny},  // 1 level
 			},
 			path:    "a/b/c/test.txt",
 			wantErr: false,
@@ -458,9 +458,9 @@ func TestAccessControlVFS_SpecificityRules(t *testing.T) {
 		},
 		{
 			name: "longer pattern is more specific",
-			privileges: map[string]FileAccess{
-				"testfile.txt": {Read: shared.AccessAllow}, // 12 chars
-				"test*.txt":    {Read: shared.AccessDeny},  // 10 chars (but has wildcard)
+			privileges: map[string]conf.FileAccess{
+				"testfile.txt": {Read: conf.AccessAllow}, // 12 chars
+				"test*.txt":    {Read: conf.AccessDeny},  // 10 chars (but has wildcard)
 			},
 			path:    "testfile.txt",
 			wantErr: false,
@@ -468,9 +468,9 @@ func TestAccessControlVFS_SpecificityRules(t *testing.T) {
 		},
 		{
 			name: "wildcard count takes precedence over length",
-			privileges: map[string]FileAccess{
-				"ab.txt": {Read: shared.AccessAllow}, // shorter but exact
-				"*.txt":  {Read: shared.AccessDeny},  // longer but has wildcard
+			privileges: map[string]conf.FileAccess{
+				"ab.txt": {Read: conf.AccessAllow}, // shorter but exact
+				"*.txt":  {Read: conf.AccessDeny},  // longer but has wildcard
 			},
 			path:    "ab.txt",
 			wantErr: false,
@@ -498,21 +498,21 @@ func TestAccessControlVFS_SpecificityRules(t *testing.T) {
 func TestAccessControlVFS_MultipleOperations(t *testing.T) {
 	mockVFS := NewMockVFS()
 
-	privileges := map[string]FileAccess{
+	privileges := map[string]conf.FileAccess{
 		"read-only.txt": {
-			Read:   shared.AccessAllow,
-			Write:  shared.AccessDeny,
-			Delete: shared.AccessDeny,
+			Read:   conf.AccessAllow,
+			Write:  conf.AccessDeny,
+			Delete: conf.AccessDeny,
 		},
 		"read-write.txt": {
-			Read:  shared.AccessAllow,
-			Write: shared.AccessAllow,
+			Read:  conf.AccessAllow,
+			Write: conf.AccessAllow,
 		},
 		"dir": {
-			List: shared.AccessAllow,
+			List: conf.AccessAllow,
 		},
 		"dir/*": {
-			Find: shared.AccessAllow,
+			Find: conf.AccessAllow,
 		},
 	}
 
@@ -659,16 +659,16 @@ func TestIsMoreSpecific(t *testing.T) {
 func TestNuancedGlobPatterns(t *testing.T) {
 	tests := []struct {
 		name       string
-		privileges map[string]FileAccess
+		privileges map[string]conf.FileAccess
 		path       string
 		wantErr    bool
 		desc       string
 	}{
 		{
 			name: "/foo/bar* is more specific than /foo/*",
-			privileges: map[string]FileAccess{
-				"foo/bar*": {Read: shared.AccessAllow},
-				"foo/*":    {Read: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"foo/bar*": {Read: conf.AccessAllow},
+				"foo/*":    {Read: conf.AccessDeny},
 			},
 			path:    "foo/bar123",
 			wantErr: false,
@@ -676,9 +676,9 @@ func TestNuancedGlobPatterns(t *testing.T) {
 		},
 		{
 			name: "/foo/* denies when /foo/bar* doesn't match",
-			privileges: map[string]FileAccess{
-				"foo/bar*": {Read: shared.AccessAllow},
-				"foo/*":    {Read: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"foo/bar*": {Read: conf.AccessAllow},
+				"foo/*":    {Read: conf.AccessDeny},
 			},
 			path:    "foo/baz123",
 			wantErr: true,
@@ -686,9 +686,9 @@ func TestNuancedGlobPatterns(t *testing.T) {
 		},
 		{
 			name: "/foo/bar/baz* is more specific than /foo/b*/baz*",
-			privileges: map[string]FileAccess{
-				"foo/bar/baz*": {Read: shared.AccessAllow},
-				"foo/b*/baz*":  {Read: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"foo/bar/baz*": {Read: conf.AccessAllow},
+				"foo/b*/baz*":  {Read: conf.AccessDeny},
 			},
 			path:    "foo/bar/baz123",
 			wantErr: false,
@@ -696,9 +696,9 @@ func TestNuancedGlobPatterns(t *testing.T) {
 		},
 		{
 			name: "/foo/b*/baz* matches when more specific doesn't",
-			privileges: map[string]FileAccess{
-				"foo/bar/baz*": {Read: shared.AccessAllow},
-				"foo/b*/baz*":  {Read: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"foo/bar/baz*": {Read: conf.AccessAllow},
+				"foo/b*/baz*":  {Read: conf.AccessDeny},
 			},
 			path:    "foo/bbb/baz123",
 			wantErr: true,
@@ -706,11 +706,11 @@ func TestNuancedGlobPatterns(t *testing.T) {
 		},
 		{
 			name: "a/b/c/d.txt vs a/b/*/d.txt vs a/*/c/d.txt vs a/*/*/d.txt",
-			privileges: map[string]FileAccess{
-				"a/b/c/d.txt": {Read: shared.AccessAllow}, // 0 wildcards, most specific
-				"a/b/*/d.txt": {Read: shared.AccessDeny},  // 1 wildcard
-				"a/*/c/d.txt": {Read: shared.AccessDeny},  // 1 wildcard
-				"a/*/*/d.txt": {Read: shared.AccessDeny},  // 2 wildcards
+			privileges: map[string]conf.FileAccess{
+				"a/b/c/d.txt": {Read: conf.AccessAllow}, // 0 wildcards, most specific
+				"a/b/*/d.txt": {Read: conf.AccessDeny},  // 1 wildcard
+				"a/*/c/d.txt": {Read: conf.AccessDeny},  // 1 wildcard
+				"a/*/*/d.txt": {Read: conf.AccessDeny},  // 2 wildcards
 			},
 			path:    "a/b/c/d.txt",
 			wantErr: false,
@@ -718,9 +718,9 @@ func TestNuancedGlobPatterns(t *testing.T) {
 		},
 		{
 			name: "a/b/x/d.txt matches a/b/*/d.txt not a/*/c/d.txt",
-			privileges: map[string]FileAccess{
-				"a/b/*/d.txt": {Read: shared.AccessAllow}, // matches
-				"a/*/c/d.txt": {Read: shared.AccessDeny},  // doesn't match
+			privileges: map[string]conf.FileAccess{
+				"a/b/*/d.txt": {Read: conf.AccessAllow}, // matches
+				"a/*/c/d.txt": {Read: conf.AccessDeny},  // doesn't match
 			},
 			path:    "a/b/x/d.txt",
 			wantErr: false,
@@ -728,9 +728,9 @@ func TestNuancedGlobPatterns(t *testing.T) {
 		},
 		{
 			name: "deeper path with wildcard vs shallow exact",
-			privileges: map[string]FileAccess{
-				"a/b/c/*.txt": {Read: shared.AccessAllow}, // 1 wildcard, 3 levels
-				"a/b/*.txt":   {Read: shared.AccessDeny},  // 1 wildcard, 2 levels
+			privileges: map[string]conf.FileAccess{
+				"a/b/c/*.txt": {Read: conf.AccessAllow}, // 1 wildcard, 3 levels
+				"a/b/*.txt":   {Read: conf.AccessDeny},  // 1 wildcard, 2 levels
 			},
 			path:    "a/b/c/file.txt",
 			wantErr: false,
@@ -738,9 +738,9 @@ func TestNuancedGlobPatterns(t *testing.T) {
 		},
 		{
 			name: "wildcard count takes precedence over depth",
-			privileges: map[string]FileAccess{
-				"a/b/c/d/e/*.txt": {Read: shared.AccessDeny},  // 1 wildcard, 5 levels
-				"a/b/*.txt":       {Read: shared.AccessAllow}, // 1 wildcard, 2 levels
+			privileges: map[string]conf.FileAccess{
+				"a/b/c/d/e/*.txt": {Read: conf.AccessDeny},  // 1 wildcard, 5 levels
+				"a/b/*.txt":       {Read: conf.AccessAllow}, // 1 wildcard, 2 levels
 			},
 			path:    "a/b/file.txt",
 			wantErr: false,
@@ -748,10 +748,10 @@ func TestNuancedGlobPatterns(t *testing.T) {
 		},
 		{
 			name: "prefix matching - longer literal prefix wins",
-			privileges: map[string]FileAccess{
-				"test*.txt": {Read: shared.AccessAllow}, // 4 char prefix
-				"t*.txt":    {Read: shared.AccessDeny},  // 1 char prefix
-				"*.txt":     {Read: shared.AccessDeny},  // 0 char prefix
+			privileges: map[string]conf.FileAccess{
+				"test*.txt": {Read: conf.AccessAllow}, // 4 char prefix
+				"t*.txt":    {Read: conf.AccessDeny},  // 1 char prefix
+				"*.txt":     {Read: conf.AccessDeny},  // 0 char prefix
 			},
 			path:    "test123.txt",
 			wantErr: false,
@@ -759,9 +759,9 @@ func TestNuancedGlobPatterns(t *testing.T) {
 		},
 		{
 			name: "suffix matching - file extensions",
-			privileges: map[string]FileAccess{
-				"*.test.txt": {Read: shared.AccessAllow}, // more specific suffix
-				"*.txt":      {Read: shared.AccessDeny},  // less specific suffix
+			privileges: map[string]conf.FileAccess{
+				"*.test.txt": {Read: conf.AccessAllow}, // more specific suffix
+				"*.txt":      {Read: conf.AccessDeny},  // less specific suffix
 			},
 			path:    "file.test.txt",
 			wantErr: false,
@@ -790,52 +790,52 @@ func TestNuancedGlobPatterns(t *testing.T) {
 func TestGetAccess(t *testing.T) {
 	tests := []struct {
 		name       string
-		privileges map[string]FileAccess
+		privileges map[string]conf.FileAccess
 		path       string
-		wantAccess FileAccess
+		wantAccess conf.FileAccess
 	}{
 		{
 			name: "exact match",
-			privileges: map[string]FileAccess{
-				"test.txt": {Read: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"test.txt": {Read: conf.AccessAllow},
 			},
 			path:       "test.txt",
-			wantAccess: FileAccess{Read: shared.AccessAllow},
+			wantAccess: conf.FileAccess{Read: conf.AccessAllow},
 		},
 		{
 			name: "wildcard match",
-			privileges: map[string]FileAccess{
-				"*.txt": {Read: shared.AccessAllow, Write: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"*.txt": {Read: conf.AccessAllow, Write: conf.AccessDeny},
 			},
 			path:       "test.txt",
-			wantAccess: FileAccess{Read: shared.AccessAllow, Write: shared.AccessDeny},
+			wantAccess: conf.FileAccess{Read: conf.AccessAllow, Write: conf.AccessDeny},
 		},
 		{
 			name: "no match returns deny all",
-			privileges: map[string]FileAccess{
-				"other.txt": {Read: shared.AccessAllow},
+			privileges: map[string]conf.FileAccess{
+				"other.txt": {Read: conf.AccessAllow},
 			},
 			path:       "test.txt",
 			wantAccess: denyAll,
 		},
 		{
 			name: "most specific wins",
-			privileges: map[string]FileAccess{
-				"test.txt": {Read: shared.AccessAllow},
-				"*.txt":    {Read: shared.AccessDeny},
-				"*":        {Read: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"test.txt": {Read: conf.AccessAllow},
+				"*.txt":    {Read: conf.AccessDeny},
+				"*":        {Read: conf.AccessDeny},
 			},
 			path:       "test.txt",
-			wantAccess: FileAccess{Read: shared.AccessAllow},
+			wantAccess: conf.FileAccess{Read: conf.AccessAllow},
 		},
 		{
 			name: "invalid pattern is ignored",
-			privileges: map[string]FileAccess{
-				"[invalid": {Read: shared.AccessAllow},
-				"*.txt":    {Read: shared.AccessDeny},
+			privileges: map[string]conf.FileAccess{
+				"[invalid": {Read: conf.AccessAllow},
+				"*.txt":    {Read: conf.AccessDeny},
 			},
 			path:       "test.txt",
-			wantAccess: FileAccess{Read: shared.AccessDeny},
+			wantAccess: conf.FileAccess{Read: conf.AccessDeny},
 		},
 	}
 

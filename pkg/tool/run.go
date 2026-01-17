@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/runner"
 	"github.com/codesnort/codesnort-swe/pkg/shared"
 )
@@ -22,13 +23,13 @@ func (e *RunCommandError) Error() string {
 // RunBashTool implements the run.bash tool for executing bash commands.
 type RunBashTool struct {
 	runner     runner.CommandRunner
-	privileges map[string]shared.AccessFlag
+	privileges map[string]conf.AccessFlag
 }
 
 // NewRunBashTool creates a new RunBashTool instance.
 // runner is the CommandRunner to use for executing commands.
 // privileges is a map of command regex patterns to access flags.
-func NewRunBashTool(r runner.CommandRunner, privileges map[string]shared.AccessFlag) *RunBashTool {
+func NewRunBashTool(r runner.CommandRunner, privileges map[string]conf.AccessFlag) *RunBashTool {
 	return &RunBashTool{
 		runner:     r,
 		privileges: privileges,
@@ -65,7 +66,7 @@ func (t *RunBashTool) Execute(args ToolCall) ToolResponse {
 	access := t.checkPermission(command)
 
 	switch access {
-	case shared.AccessDeny:
+	case conf.AccessDeny:
 		return ToolResponse{
 			Call: &args,
 			Error: &RunCommandError{
@@ -74,9 +75,9 @@ func (t *RunBashTool) Execute(args ToolCall) ToolResponse {
 			},
 			Done: true,
 		}
-	case shared.AccessAsk:
+	case conf.AccessAsk:
 		return t.createPermissionQuery(args, command)
-	case shared.AccessAllow:
+	case conf.AccessAllow:
 		// Execute the command
 		return t.executeCommand(args, command)
 	default:
@@ -86,14 +87,14 @@ func (t *RunBashTool) Execute(args ToolCall) ToolResponse {
 }
 
 // checkPermission checks if the command is allowed based on the privileges.
-func (t *RunBashTool) checkPermission(command string) shared.AccessFlag {
+func (t *RunBashTool) checkPermission(command string) conf.AccessFlag {
 	if t.privileges == nil {
-		return shared.AccessAsk
+		return conf.AccessAsk
 	}
 
 	// Try to match against all patterns
 	var bestMatch string
-	var bestAccess shared.AccessFlag
+	var bestAccess conf.AccessFlag
 	bestSpecificity := -1
 
 	for pattern, access := range t.privileges {
@@ -122,7 +123,7 @@ func (t *RunBashTool) checkPermission(command string) shared.AccessFlag {
 	}
 
 	// No match found, return Ask
-	return shared.AccessAsk
+	return conf.AccessAsk
 }
 
 // countWildcards counts the number of wildcard characters in a pattern.

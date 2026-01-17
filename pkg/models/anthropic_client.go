@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
@@ -39,7 +40,7 @@ type AnthropicEmbeddingModel struct {
 }
 
 // NewAnthropicClient creates a new Anthropic client with the given config
-func NewAnthropicClient(config *ModelProviderConfig) (*AnthropicClient, error) {
+func NewAnthropicClient(config *conf.ModelProviderConfig) (*AnthropicClient, error) {
 	if config == nil {
 		return nil, fmt.Errorf("NewAnthropicClient() [anthropic_client.go]: config cannot be nil")
 	}

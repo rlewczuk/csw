@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/ui"
@@ -92,7 +93,7 @@ func TestAppPresenter_NewSession(t *testing.T) {
 
 		// Setup role in system
 		roleName := "test_role"
-		testRole := core.AgentRole{
+		testRole := conf.AgentRoleConfig{
 			Name: roleName,
 		}
 		roleSystem.Roles = core.NewAgentRoleRegistry()

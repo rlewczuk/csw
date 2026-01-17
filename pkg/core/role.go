@@ -6,48 +6,29 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/codesnort/codesnort-swe/pkg/shared"
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 )
 
 // AccessFlag represents access flag for a file or directory.
 
-// Contains all information
-type AgentRole struct {
-	// Name of the role (short name, used to select role and identify it in logs etc.)
-	Name string `json:"name"`
-
-	// Description of the role (longer text, used in UI to describe role to user)
-	Description string `json:"description"`
-
-	// Privileges for VFS and runtime
-	VFSPrivileges map[string]vfs.FileAccess `json:"vfs-privileges"`
-
-	// Tools available
-	ToolsAccess map[string]shared.AccessFlag `json:"tools-access"`
-
-	// Run privileges maps command regex patterns to access flags
-	RunPrivileges map[string]shared.AccessFlag `json:"run-privileges"`
-}
-
 type AgentRoleRegistry struct {
-	roles map[string]AgentRole
+	roles map[string]conf.AgentRoleConfig
 }
 
 func NewAgentRoleRegistry() *AgentRoleRegistry {
 	return &AgentRoleRegistry{
-		roles: make(map[string]AgentRole),
+		roles: make(map[string]conf.AgentRoleConfig),
 	}
 }
 
 // Get returns a role by name and a boolean indicating if it was found.
-func (r *AgentRoleRegistry) Get(name string) (AgentRole, bool) {
+func (r *AgentRoleRegistry) Get(name string) (conf.AgentRoleConfig, bool) {
 	role, ok := r.roles[name]
 	return role, ok
 }
 
 // Register adds a role to the registry.
-func (r *AgentRoleRegistry) Register(role AgentRole) {
+func (r *AgentRoleRegistry) Register(role conf.AgentRoleConfig) {
 	r.roles[role.Name] = role
 }
 
@@ -62,7 +43,7 @@ func (r *AgentRoleRegistry) List() []string {
 
 // LoadFromDirectory loads all roles from a directory structure.
 // Each subdirectory is expected to contain:
-// - config.json: JSON file with AgentRole fields (description, vfs-privileges, tools-access)
+// - config.json: JSON file with AgentRoleConfig fields (description, vfs-privileges, tools-access)
 // - system.md: Markdown file with system prompt template
 // The role name is derived from the subdirectory name.
 func (r *AgentRoleRegistry) LoadFromDirectory(dir string) error {
@@ -91,8 +72,8 @@ func (r *AgentRoleRegistry) LoadFromDirectory(dir string) error {
 }
 
 // loadRole loads a single role from a directory.
-func loadRole(name, dir string) (AgentRole, error) {
-	role := AgentRole{
+func loadRole(name, dir string) (conf.AgentRoleConfig, error) {
+	role := conf.AgentRoleConfig{
 		Name: name,
 	}
 

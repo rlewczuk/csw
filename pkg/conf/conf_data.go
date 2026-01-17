@@ -1,9 +1,55 @@
-package models
+package conf
 
 import (
-	"fmt"
+	"regexp"
 	"time"
 )
+
+type AccessFlag string
+
+const (
+	AccessAllow AccessFlag = "allow"
+	AccessDeny  AccessFlag = "deny"
+	AccessAsk   AccessFlag = "ask"
+)
+
+type FileAccess struct {
+	Read   AccessFlag `json:"read"`
+	Write  AccessFlag `json:"write"`
+	Delete AccessFlag `json:"delete"`
+	List   AccessFlag `json:"list"`
+	Find   AccessFlag `json:"find"`
+	Move   AccessFlag `json:"move"`
+}
+
+type AgentRoleConfig struct {
+	// Name of the role (short name, used to select role and identify it in logs etc.)
+	Name string `json:"name"`
+
+	// Description of the role (longer text, used in UI to describe role to user)
+	Description string `json:"description"`
+
+	// Privileges for VFS and runtime
+	VFSPrivileges map[string]FileAccess `json:"vfs-privileges"`
+
+	// Tools available
+	ToolsAccess map[string]AccessFlag `json:"tools-access"`
+
+	// Run privileges maps command regex patterns to access flags
+	RunPrivileges map[string]AccessFlag `json:"run-privileges"`
+}
+
+// ModelTagMapping represents a single model-to-tag mapping rule.
+// Model names are matched against the Model regexp pattern, and if they match,
+// the Tag is assigned to the model.
+type ModelTagMapping struct {
+	// Model is a regexp pattern to match model names
+	Model string `json:"model"`
+	// Tag is the tag name to assign to matching models
+	Tag string `json:"tag"`
+	// Compiled is the Compiled regexp pattern
+	Compiled *regexp.Regexp
+}
 
 // ModelProviderConfig represents common configuration for model providers.
 type ModelProviderConfig struct {
@@ -36,34 +82,8 @@ type ModelProviderConfig struct {
 	ModelTags []ModelTagMapping `json:"model_tags,omitempty"`
 }
 
-// FromConfig creates a new ModelProvider instance from the configuration.
-// It automatically selects the right implementation based on the Type field.
-func FromConfig(config *ModelProviderConfig) (ModelProvider, error) {
-	if config == nil {
-		return nil, fmt.Errorf("FromConfig() [config.go]: config cannot be nil")
-	}
-
-	if config.URL == "" {
-		return nil, fmt.Errorf("FromConfig() [config.go]: URL cannot be empty")
-	}
-
-	// Set defaults if not specified
-	if config.ConnectTimeout == 0 {
-		config.ConnectTimeout = 10 * time.Second
-	}
-	if config.RequestTimeout == 0 {
-		config.RequestTimeout = 60 * time.Second
-	}
-
-	// Call factory function directly based on provider type
-	switch config.Type {
-	case "ollama":
-		return NewOllamaClient(config)
-	case "openai":
-		return NewOpenAIClient(config)
-	case "anthropic":
-		return NewAnthropicClient(config)
-	default:
-		return nil, fmt.Errorf("FromConfig() [config.go]: unsupported provider type: %s", config.Type)
-	}
+// GlobalConfig represents the global configuration file structure.
+type GlobalConfig struct {
+	// ModelTags contains global model-to-tag mappings
+	ModelTags []ModelTagMapping `json:"model_tags,omitempty"`
 }

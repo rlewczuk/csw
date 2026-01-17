@@ -6,39 +6,23 @@ import (
 	"os"
 	"regexp"
 	"sync"
+
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 )
-
-// ModelTagMapping represents a single model-to-tag mapping rule.
-// Model names are matched against the Model regexp pattern, and if they match,
-// the Tag is assigned to the model.
-type ModelTagMapping struct {
-	// Model is a regexp pattern to match model names
-	Model string `json:"model"`
-	// Tag is the tag name to assign to matching models
-	Tag string `json:"tag"`
-	// compiled is the compiled regexp pattern
-	compiled *regexp.Regexp
-}
-
-// GlobalConfig represents the global configuration file structure.
-type GlobalConfig struct {
-	// ModelTags contains global model-to-tag mappings
-	ModelTags []ModelTagMapping `json:"model_tags,omitempty"`
-}
 
 // ModelTagRegistry manages model tag assignments from global and provider-specific sources.
 type ModelTagRegistry struct {
 	mu sync.RWMutex
 	// globalMappings contains mappings from the global config
-	globalMappings []ModelTagMapping
+	globalMappings []conf.ModelTagMapping
 	// providerMappings contains mappings from provider configs, keyed by provider name
-	providerMappings map[string][]ModelTagMapping
+	providerMappings map[string][]conf.ModelTagMapping
 }
 
 // NewModelTagRegistry creates a new ModelTagRegistry.
 func NewModelTagRegistry() *ModelTagRegistry {
 	return &ModelTagRegistry{
-		providerMappings: make(map[string][]ModelTagMapping),
+		providerMappings: make(map[string][]conf.ModelTagMapping),
 	}
 }
 
@@ -53,7 +37,7 @@ func (r *ModelTagRegistry) LoadGlobalConfig(path string) error {
 		return fmt.Errorf("ModelTagRegistry.LoadGlobalConfig() [tags.go]: failed to read file: %w", err)
 	}
 
-	var config GlobalConfig
+	var config conf.GlobalConfig
 	if err := json.Unmarshal(data, &config); err != nil {
 		return fmt.Errorf("ModelTagRegistry.LoadGlobalConfig() [tags.go]: failed to parse JSON: %w", err)
 	}
@@ -64,7 +48,7 @@ func (r *ModelTagRegistry) LoadGlobalConfig(path string) error {
 		if err != nil {
 			return fmt.Errorf("ModelTagRegistry.LoadGlobalConfig() [tags.go]: invalid regexp %q: %w", config.ModelTags[i].Model, err)
 		}
-		config.ModelTags[i].compiled = compiled
+		config.ModelTags[i].Compiled = compiled
 	}
 
 	r.mu.Lock()
@@ -76,14 +60,14 @@ func (r *ModelTagRegistry) LoadGlobalConfig(path string) error {
 
 // SetGlobalMappings sets the global model tag mappings.
 // This is useful for testing or programmatic configuration.
-func (r *ModelTagRegistry) SetGlobalMappings(mappings []ModelTagMapping) error {
+func (r *ModelTagRegistry) SetGlobalMappings(mappings []conf.ModelTagMapping) error {
 	// Compile regexps
 	for i := range mappings {
 		compiled, err := regexp.Compile(mappings[i].Model)
 		if err != nil {
 			return fmt.Errorf("ModelTagRegistry.SetGlobalMappings() [tags.go]: invalid regexp %q: %w", mappings[i].Model, err)
 		}
-		mappings[i].compiled = compiled
+		mappings[i].Compiled = compiled
 	}
 
 	r.mu.Lock()
@@ -94,14 +78,14 @@ func (r *ModelTagRegistry) SetGlobalMappings(mappings []ModelTagMapping) error {
 }
 
 // SetProviderMappings sets the model tag mappings for a specific provider.
-func (r *ModelTagRegistry) SetProviderMappings(providerName string, mappings []ModelTagMapping) error {
+func (r *ModelTagRegistry) SetProviderMappings(providerName string, mappings []conf.ModelTagMapping) error {
 	// Compile regexps
 	for i := range mappings {
 		compiled, err := regexp.Compile(mappings[i].Model)
 		if err != nil {
 			return fmt.Errorf("ModelTagRegistry.SetProviderMappings() [tags.go]: invalid regexp %q: %w", mappings[i].Model, err)
 		}
-		mappings[i].compiled = compiled
+		mappings[i].Compiled = compiled
 	}
 
 	r.mu.Lock()
@@ -122,7 +106,7 @@ func (r *ModelTagRegistry) GetTagsForModel(providerName, modelName string) []str
 
 	// Match against global mappings first
 	for _, mapping := range r.globalMappings {
-		if mapping.compiled != nil && mapping.compiled.MatchString(modelName) {
+		if mapping.Compiled != nil && mapping.Compiled.MatchString(modelName) {
 			tagSet[mapping.Tag] = true
 		}
 	}
@@ -130,7 +114,7 @@ func (r *ModelTagRegistry) GetTagsForModel(providerName, modelName string) []str
 	// Match against provider-specific mappings
 	if providerMappings, ok := r.providerMappings[providerName]; ok {
 		for _, mapping := range providerMappings {
-			if mapping.compiled != nil && mapping.compiled.MatchString(modelName) {
+			if mapping.Compiled != nil && mapping.Compiled.MatchString(modelName) {
 				tagSet[mapping.Tag] = true
 			}
 		}

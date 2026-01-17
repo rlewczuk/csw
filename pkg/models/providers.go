@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 )
 
 var (
@@ -113,7 +116,7 @@ func (r *ProviderRegistry) LoadFromDirectoryWithTags(dirPath string, tagRegistry
 			return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to read config file %s: %w", filePath, err)
 		}
 
-		var config ModelProviderConfig
+		var config conf.ModelProviderConfig
 		if err := json.Unmarshal(data, &config); err != nil {
 			return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to parse config file %s: %w", filePath, err)
 		}
@@ -131,7 +134,7 @@ func (r *ProviderRegistry) LoadFromDirectoryWithTags(dirPath string, tagRegistry
 		}
 
 		// Create the provider from config
-		provider, err := FromConfig(&config)
+		provider, err := ModelFromConfig(&config)
 		if err != nil {
 			return fmt.Errorf("ProviderRegistry.LoadFromDirectoryWithTags() [registry.go]: failed to create provider from config file %s: %w", filePath, err)
 		}
@@ -143,4 +146,36 @@ func (r *ProviderRegistry) LoadFromDirectoryWithTags(dirPath string, tagRegistry
 	}
 
 	return nil
+}
+
+// ModelFromConfig creates a new ModelProvider instance from the configuration.
+// It automatically selects the right implementation based on the Type field.
+func ModelFromConfig(config *conf.ModelProviderConfig) (ModelProvider, error) {
+	if config == nil {
+		return nil, fmt.Errorf("ModelFromConfig() [config.go]: config cannot be nil")
+	}
+
+	if config.URL == "" {
+		return nil, fmt.Errorf("ModelFromConfig() [config.go]: URL cannot be empty")
+	}
+
+	// Set defaults if not specified
+	if config.ConnectTimeout == 0 {
+		config.ConnectTimeout = 10 * time.Second
+	}
+	if config.RequestTimeout == 0 {
+		config.RequestTimeout = 60 * time.Second
+	}
+
+	// Call factory function directly based on provider type
+	switch config.Type {
+	case "ollama":
+		return NewOllamaClient(config)
+	case "openai":
+		return NewOpenAIClient(config)
+	case "anthropic":
+		return NewAnthropicClient(config)
+	default:
+		return nil, fmt.Errorf("ModelFromConfig() [config.go]: unsupported provider type: %s", config.Type)
+	}
 }
