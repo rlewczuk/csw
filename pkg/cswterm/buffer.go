@@ -63,7 +63,7 @@ func (m *ScreenBuffer) GetContent() (width int, height int, content []Cell) {
 
 // PutText puts text at the specified position with the specified attributes.
 // If the text is longer than the width of the screen, it is truncated.
-func (m *ScreenBuffer) PutText(x int, y int, text string, attrs TextAttributes) {
+func (m *ScreenBuffer) PutText(x int, y int, text string, attrs CellAttributes) {
 	if y < 0 || y >= m.height {
 		return
 	}
@@ -71,7 +71,6 @@ func (m *ScreenBuffer) PutText(x int, y int, text string, attrs TextAttributes) 
 		return
 	}
 
-	cellAttrs := CellAttributes{Attributes: attrs}
 	col := x
 	for _, r := range text {
 		if col >= m.width {
@@ -80,7 +79,7 @@ func (m *ScreenBuffer) PutText(x int, y int, text string, attrs TextAttributes) 
 		idx := y*m.width + col
 		m.buffer[idx] = Cell{
 			Rune:  r,
-			Attrs: cellAttrs,
+			Attrs: attrs,
 		}
 		col++
 	}

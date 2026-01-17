@@ -31,6 +31,20 @@ type CellAttributes struct {
 	StrikeColor uint32
 }
 
+// Attrs creates CellAttributes with only text attributes (no colors).
+func Attrs(attrs TextAttributes) CellAttributes {
+	return CellAttributes{Attributes: attrs}
+}
+
+// AttrsWithColor creates CellAttributes with text attributes and colors.
+func AttrsWithColor(attrs TextAttributes, textColor, backColor uint32) CellAttributes {
+	return CellAttributes{
+		Attributes: attrs,
+		TextColor:  textColor,
+		BackColor:  backColor,
+	}
+}
+
 // InputEventType represents general type of the input event.
 type InputEventType uint16
 
@@ -41,8 +55,14 @@ const (
 	InputEventMouse
 	// InputEventResize represents terminal resize event
 	InputEventResize
+	// InputEventCopy represents a copy event
+	InputEventCopy
 	// InputEventPaste represents a paste event
 	InputEventPaste
+	// InputEventFocus represents a focus event
+	InputEventFocus
+	// InputEventBlur represents loss of focus event
+	InputEventBlur
 )
 
 // EventModifiers represents modifiers of the input event.
@@ -85,6 +105,9 @@ type InputEvent struct {
 	// Key is a key code for keyboard events.
 	Key rune
 
+	// Content is a content of the copy/paste event
+	Content string
+
 	// Modifiers is a bitfield of modifiers
 	Modifiers EventModifiers
 
@@ -99,9 +122,14 @@ type Screen interface {
 	// Size returns the size of the screen in characters.
 	Size() (width int, height int)
 
+	// GetContent returns the whole content of the screen.
+	// Returns width, height, and the internal buffer array.
+	// The content is a single dimensional array where index = y*width + x.
+	GetContent() (width int, height int, content []Cell)
+
 	// PutText puts text at the specified position with the specified attributes.
 	// if the text is longer than the width of the screen, it is truncated.
-	PutText(x int, y int, text string, attrs TextAttributes)
+	PutText(x int, y int, text string, attrs CellAttributes)
 
 	// Notify notifies the screen about an input event.
 	Notify(event InputEvent)

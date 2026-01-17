@@ -136,7 +136,7 @@ func TestMockScreen_PutText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewMockScreen(tt.width, tt.height, 0)
-			screen.PutText(tt.x, tt.y, tt.text, tt.attrs)
+			screen.PutText(tt.x, tt.y, tt.text, Attrs(tt.attrs))
 
 			// Verify each character
 			verifier := getVerifier(screen)
@@ -192,7 +192,7 @@ func TestMockScreen_PutText_Truncation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewMockScreen(tt.width, tt.height, 0)
-			screen.PutText(tt.x, tt.y, tt.text, AttrBold)
+			screen.PutText(tt.x, tt.y, tt.text, Attrs(AttrBold))
 
 			// Count non-space characters
 			verifier := getVerifier(screen)
@@ -255,7 +255,7 @@ func TestMockScreen_PutText_OutOfBounds(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewMockScreen(tt.width, tt.height, 0)
 			// Should not panic
-			screen.PutText(tt.x, tt.y, tt.text, AttrBold)
+			screen.PutText(tt.x, tt.y, tt.text, Attrs(AttrBold))
 
 			// Verify screen is still all spaces
 			verifier := getVerifier(screen)
@@ -271,7 +271,7 @@ func TestMockScreen_PutText_OutOfBounds(t *testing.T) {
 
 func TestMockScreen_GetCell(t *testing.T) {
 	screen := NewMockScreen(10, 5, 0)
-	screen.PutText(2, 1, "Test", AttrBold)
+	screen.PutText(2, 1, "Test", Attrs(AttrBold))
 	verifier := getVerifier(screen)
 
 	tests := []struct {
@@ -336,9 +336,9 @@ func TestMockScreen_GetCell(t *testing.T) {
 
 func TestMockScreen_GetText(t *testing.T) {
 	screen := NewMockScreen(20, 10, 0)
-	screen.PutText(0, 0, "Hello", 0)
-	screen.PutText(0, 1, "World", 0)
-	screen.PutText(5, 2, "Test", 0)
+	screen.PutText(0, 0, "Hello", Attrs(0))
+	screen.PutText(0, 1, "World", Attrs(0))
+	screen.PutText(5, 2, "Test", Attrs(0))
 	verifier := getVerifier(screen)
 
 	tests := []struct {
@@ -401,9 +401,9 @@ func TestMockScreen_GetText(t *testing.T) {
 
 func TestMockScreen_HasText(t *testing.T) {
 	screen := NewMockScreen(20, 10, 0)
-	screen.PutText(0, 0, "Hello", 0)
-	screen.PutText(0, 1, "World", 0)
-	screen.PutText(5, 2, "Test", 0)
+	screen.PutText(0, 0, "Hello", Attrs(0))
+	screen.PutText(0, 1, "World", Attrs(0))
+	screen.PutText(5, 2, "Test", Attrs(0))
 	verifier := getVerifier(screen)
 
 	tests := []struct {
@@ -481,9 +481,9 @@ func TestMockScreen_HasText(t *testing.T) {
 
 func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 	screen := NewMockScreen(20, 10, 0)
-	screen.PutText(0, 0, "Bold", AttrBold)
-	screen.PutText(0, 1, "Italic", AttrItalic)
-	screen.PutText(0, 2, "Both", AttrBold|AttrItalic)
+	screen.PutText(0, 0, "Bold", Attrs(AttrBold))
+	screen.PutText(0, 1, "Italic", Attrs(AttrItalic))
+	screen.PutText(0, 2, "Both", Attrs(AttrBold|AttrItalic))
 	verifier := getVerifier(screen)
 
 	tests := []struct {
@@ -592,14 +592,14 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 	greenBack := uint32(0x00FF00)
 
 	// Put text and then modify colors
-	screen.PutText(0, 0, "Red", 0)
+	screen.PutText(0, 0, "Red", Attrs(0))
 	width, _, _ := screen.GetContent()
 	for i := 0; i < 3; i++ {
 		idx := 0*width + i
 		screen.buffer[idx].Attrs.TextColor = redColor
 	}
 
-	screen.PutText(0, 1, "Blue", 0)
+	screen.PutText(0, 1, "Blue", Attrs(0))
 	for i := 0; i < 4; i++ {
 		idx := 1*width + i
 		screen.buffer[idx].Attrs.TextColor = blueColor
@@ -683,8 +683,8 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 
 func TestMockScreen_Clear(t *testing.T) {
 	screen := NewMockScreen(10, 5, 0)
-	screen.PutText(0, 0, "Hello", AttrBold)
-	screen.PutText(0, 1, "World", AttrItalic)
+	screen.PutText(0, 0, "Hello", Attrs(AttrBold))
+	screen.PutText(0, 1, "World", Attrs(AttrItalic))
 
 	// Verify text is present
 	verifier := getVerifier(screen)
@@ -712,7 +712,7 @@ func TestAttributeMask_Partial(t *testing.T) {
 	screen := NewMockScreen(20, 10, 0)
 
 	// Create text with bold and italic
-	screen.PutText(0, 0, "Text", AttrBold|AttrItalic|AttrUnderline)
+	screen.PutText(0, 0, "Text", Attrs(AttrBold|AttrItalic|AttrUnderline))
 	width, _, _ := screen.GetContent()
 	for i := 0; i < 4; i++ {
 		idx := 0*width + i
