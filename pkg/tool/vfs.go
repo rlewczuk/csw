@@ -430,3 +430,161 @@ func (t *VFSFindTool) Execute(args ToolCall) ToolResponse {
 		Done:   true,
 	}
 }
+
+// VFSEditTool implements the vfs.edit tool.
+type VFSEditTool struct {
+	vfs vfs.VFS
+}
+
+// NewVFSEditTool creates a new VFSEditTool instance.
+func NewVFSEditTool(v vfs.VFS) *VFSEditTool {
+	return &VFSEditTool{vfs: v}
+}
+
+// Info returns information about the tool including its name, description, and argument schema.
+func (t *VFSEditTool) Info() ToolInfo {
+	schema := NewToolSchema()
+	schema.AddProperty("filePath", PropertySchema{
+		Type:        SchemaTypeString,
+		Description: "The path to the file to edit.",
+	}, true)
+	schema.AddProperty("oldString", PropertySchema{
+		Type:        SchemaTypeString,
+		Description: "The string to replace.",
+	}, true)
+	schema.AddProperty("newString", PropertySchema{
+		Type:        SchemaTypeString,
+		Description: "The new string to replace with.",
+	}, true)
+	schema.AddProperty("replaceAll", PropertySchema{
+		Type:        SchemaTypeBoolean,
+		Description: "If true, replaces all occurrences of oldString. If false, replaces only the first occurrence. Default is false.",
+	}, false)
+
+	return ToolInfo{
+		Name:        "vfs.edit",
+		Description: "Edits a file in place by replacing oldString with newString. Replaces only the first occurrence unless replaceAll is true.",
+		Schema:      schema,
+	}
+}
+
+// Execute executes the tool with the given arguments and returns the response.
+func (t *VFSEditTool) Execute(args ToolCall) ToolResponse {
+	filePath, ok := args.Arguments.StringOK("filePath")
+	if !ok {
+		return ToolResponse{
+			Call:  &args,
+			Error: fmt.Errorf("VFSEditTool.Execute() [vfs.go]: missing required argument: filePath"),
+			Done:  true,
+		}
+	}
+
+	oldString, ok := args.Arguments.StringOK("oldString")
+	if !ok {
+		return ToolResponse{
+			Call:  &args,
+			Error: fmt.Errorf("VFSEditTool.Execute() [vfs.go]: missing required argument: oldString"),
+			Done:  true,
+		}
+	}
+
+	newString, ok := args.Arguments.StringOK("newString")
+	if !ok {
+		return ToolResponse{
+			Call:  &args,
+			Error: fmt.Errorf("VFSEditTool.Execute() [vfs.go]: missing required argument: newString"),
+			Done:  true,
+		}
+	}
+
+	// Get replaceAll flag, default to false if not provided
+	replaceAll := args.Arguments.Bool("replaceAll")
+
+	// Read file content
+	content, err := t.vfs.ReadFile(filePath)
+	if err == vfs.ErrAskPermission {
+		return createPermissionQuery(args, filePath, "reading file", "read")
+	}
+	if perr, ok := err.(*vfs.PermissionError); ok {
+		return createPermissionQuery(args, perr.Path, "reading file", "read")
+	}
+	if err != nil {
+		return ToolResponse{
+			Call:  &args,
+			Error: err,
+			Done:  true,
+		}
+	}
+
+	// Perform the replacement
+	contentStr := string(content)
+	var newContent string
+	if replaceAll {
+		newContent = replaceAllOccurrences(contentStr, oldString, newString)
+	} else {
+		newContent = replaceFirstOccurrence(contentStr, oldString, newString)
+	}
+
+	// Write back the modified content
+	err = t.vfs.WriteFile(filePath, []byte(newContent))
+	if err == vfs.ErrAskPermission {
+		return createPermissionQuery(args, filePath, "editing file", "write")
+	}
+	if perr, ok := err.(*vfs.PermissionError); ok {
+		return createPermissionQuery(args, perr.Path, "editing file", "write")
+	}
+	if err != nil {
+		return ToolResponse{
+			Call:  &args,
+			Error: err,
+			Done:  true,
+		}
+	}
+
+	return ToolResponse{
+		Call: &args,
+		Done: true,
+	}
+}
+
+// replaceFirstOccurrence replaces only the first occurrence of oldString with newString in content.
+func replaceFirstOccurrence(content, oldString, newString string) string {
+	return replaceContent(content, oldString, newString, 1)
+}
+
+// replaceAllOccurrences replaces all occurrences of oldString with newString in content.
+func replaceAllOccurrences(content, oldString, newString string) string {
+	return replaceContent(content, oldString, newString, -1)
+}
+
+// replaceContent replaces up to n occurrences of oldString with newString in content.
+// If n is -1, replaces all occurrences.
+func replaceContent(content, oldString, newString string, n int) string {
+	if oldString == "" {
+		return content
+	}
+	count := 0
+	result := ""
+	for {
+		index := findSubstring(content, oldString)
+		if index == -1 || (n != -1 && count >= n) {
+			result += content
+			break
+		}
+		result += content[:index] + newString
+		content = content[index+len(oldString):]
+		count++
+	}
+	return result
+}
+
+// findSubstring finds the index of the first occurrence of substring in s.
+// Returns -1 if not found.
+func findSubstring(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
+}
