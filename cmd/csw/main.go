@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/presenter"
@@ -125,14 +126,14 @@ func run(cmd *cobra.Command, args []string) error {
 	toolRegistry := tool.NewToolRegistry()
 	tool.RegisterVFSTools(toolRegistry, localVFS)
 
-	// Create prompt scanner and generator
-	promptScanner, err := core.NewFileBasedPromptScanner(rolesDir)
+	// Create config store
+	configStore, err := impl.NewLocalConfigStore(configDir)
 	if err != nil {
-		return fmt.Errorf("failed to create prompt scanner: %w", err)
+		return fmt.Errorf("failed to create config store: %w", err)
 	}
-	defer promptScanner.Close()
 
-	promptGenerator, err := core.NewFSPromptGenerator(promptScanner)
+	// Create prompt generator
+	promptGenerator, err := core.NewConfPromptGenerator(configStore)
 	if err != nil {
 		return fmt.Errorf("failed to create prompt generator: %w", err)
 	}
