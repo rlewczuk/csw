@@ -357,3 +357,76 @@ func (t *VFSMoveTool) Execute(args ToolCall) ToolResponse {
 		Done: true,
 	}
 }
+
+// VFSFindTool implements the vfs.find tool.
+type VFSFindTool struct {
+	vfs vfs.VFS
+}
+
+// NewVFSFindTool creates a new VFSFindTool instance.
+func NewVFSFindTool(v vfs.VFS) *VFSFindTool {
+	return &VFSFindTool{vfs: v}
+}
+
+// Info returns information about the tool including its name, description, and argument schema.
+func (t *VFSFindTool) Info() ToolInfo {
+	schema := NewToolSchema()
+	schema.AddProperty("query", PropertySchema{
+		Type:        SchemaTypeString,
+		Description: "The search pattern to match files and directories (supports glob patterns like *.txt, file*).",
+	}, true)
+	schema.AddProperty("recursive", PropertySchema{
+		Type:        SchemaTypeBoolean,
+		Description: "Whether to search recursively in subdirectories.",
+	}, false)
+
+	return ToolInfo{
+		Name:        "vfs.find",
+		Description: "Searches for files and directories matching the given pattern. Supports glob patterns.",
+		Schema:      schema,
+	}
+}
+
+// Execute executes the tool with the given arguments and returns the response.
+func (t *VFSFindTool) Execute(args ToolCall) ToolResponse {
+	query, ok := args.Arguments.StringOK("query")
+	if !ok {
+		return ToolResponse{
+			Call:  &args,
+			Error: fmt.Errorf("VFSFindTool.Execute() [vfs.go]: missing required argument: query"),
+			Done:  true,
+		}
+	}
+
+	// Get recursive flag, default to false if not provided
+	recursive := args.Arguments.Bool("recursive")
+
+	files, err := t.vfs.FindFiles(query, recursive)
+	if err == vfs.ErrAskPermission {
+		return createPermissionQuery(args, query, "finding files", "find")
+	}
+	if perr, ok := err.(*vfs.PermissionError); ok {
+		return createPermissionQuery(args, perr.Path, "finding files", "find")
+	}
+	if err != nil {
+		return ToolResponse{
+			Call:  &args,
+			Error: err,
+			Done:  true,
+		}
+	}
+
+	// Convert files to array of any for ToolValue
+	filesArray := make([]any, len(files))
+	for i, f := range files {
+		filesArray[i] = f
+	}
+
+	var result ToolValue
+	result.Set("files", filesArray)
+	return ToolResponse{
+		Call:   &args,
+		Result: result,
+		Done:   true,
+	}
+}
