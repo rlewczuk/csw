@@ -83,6 +83,16 @@ func (r *InputEventReader) Stop() {
 	r.running = false
 }
 
+// NotifyResize sends a resize event to the handler with the given dimensions.
+// This method should be called when the terminal is resized (e.g., from a SIGWINCH handler).
+func (r *InputEventReader) NotifyResize(width, height int) {
+	r.handler.Notify(InputEvent{
+		Type: InputEventResize,
+		X:    uint16(width),
+		Y:    uint16(height),
+	})
+}
+
 // getTerminalSize returns the current terminal size in characters.
 func (r *InputEventReader) getTerminalSize() (width, height int, err error) {
 	// Try to get terminal size from file descriptor
@@ -301,10 +311,15 @@ func (r *InputEventReader) parseCSIParams(data []byte) []int {
 }
 
 // getModifiers extracts modifiers from CSI parameters.
+// The modifier parameter in xterm CSI sequences is encoded as modParam = modifier + 1,
+// where modifier is a bitmask: bit 0 = Shift, bit 1 = Alt, bit 2 = Ctrl, bit 3 = Meta.
+// For example: \x1b[1;2A means Shift+Up (modParam=2, modifier=1=Shift).
 func (r *InputEventReader) getModifiers(params []int) EventModifiers {
 	var mods EventModifiers
 	if len(params) >= 2 {
-		modParam := params[1]
+		// xterm modifier encoding: modParam = modifier + 1
+		// So we need to subtract 1 to get the actual modifier bits.
+		modParam := params[1] - 1
 		if modParam&1 != 0 {
 			mods |= ModShift
 		}
@@ -540,6 +555,16 @@ func (r *InputEventReader) parseRegularKey(b byte) {
 			Type:      InputEventKey,
 			Key:       rune(b),
 			Modifiers: mods,
+		})
+		return
+	}
+
+	// Handle uppercase letters (A-Z) - these indicate Shift was pressed
+	if b >= 'A' && b <= 'Z' {
+		r.handler.Notify(InputEvent{
+			Type:      InputEventKey,
+			Key:       rune(b - 'A' + 'a'), // Convert to lowercase
+			Modifiers: ModShift,
 		})
 		return
 	}
