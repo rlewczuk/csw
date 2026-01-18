@@ -45,6 +45,51 @@ func AttrsWithColor(attrs TextAttributes, textColor, backColor uint32) CellAttri
 	}
 }
 
+// Cell represents a single character cell in the screen buffer.
+type Cell struct {
+	Rune  rune
+	Attrs CellAttributes
+}
+
+// TRect represents a rectangle on the screen.
+type TRect struct {
+	X, Y, W, H uint16
+}
+
+func (r TRect) Contains(x, y uint16) bool {
+	return x >= r.X && x < r.X+r.W && y >= r.Y && y < r.Y+r.H
+}
+
+// RelativeTo converts relative-to-parent coordinates to absolute-to-parent coordinates.
+// If the relative rectangle would overflow the parent, it is clipped.
+func (r TRect) RelativeTo(parent TRect) TRect {
+	w := r.W
+	if w+r.X > parent.W {
+		if r.X >= parent.W {
+			// Child starts beyond parent's right edge
+			w = 0
+		} else {
+			w = parent.W - r.X
+		}
+	}
+	h := r.H
+	if h+r.Y > parent.H {
+		if r.Y >= parent.H {
+			// Child starts beyond parent's bottom edge
+			h = 0
+		} else {
+			h = parent.H - r.Y
+		}
+	}
+
+	return TRect{
+		X: r.X + parent.X,
+		Y: r.Y + parent.Y,
+		W: w,
+		H: h,
+	}
+}
+
 // InputEventType represents general type of the input event.
 type InputEventType uint16
 
@@ -97,12 +142,6 @@ const (
 	ModFn
 )
 
-// Cell represents a single character cell in the screen buffer.
-type Cell struct {
-	Rune  rune
-	Attrs CellAttributes
-}
-
 // CursorStyle represents how cursor is displayed
 type CursorStyle uint32
 
@@ -141,8 +180,11 @@ type IScreenOutput interface {
 	GetContent() (width int, height int, content []Cell)
 
 	// PutText puts text at the specified position with the specified attributes.
-	// if the text is longer than the width of the screen, it is truncated.
-	PutText(x int, y int, text string, attrs CellAttributes)
+	// The rect parameter specifies the position (X, Y) and optional clipping rectangle (W, H).
+	// If W and H are 0, the text is clipped only to screen boundaries.
+	// If W and H are non-zero, the text is clipped to both the rectangle and screen boundaries.
+	// Text is always rendered on a single line (Y coordinate from rect).
+	PutText(rect TRect, text string, attrs CellAttributes)
 
 	// MoveCursor moves the cursor to the specified position.
 	MoveCursor(x int, y int)

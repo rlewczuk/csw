@@ -161,12 +161,12 @@ func (app *DemoApp) render() {
 
 	// Draw header
 	headerColor := app.colors[app.colorIndex]
-	app.screen.PutText(0, 0, centerText("Terminal Input Event Demo", app.width),
+	app.screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, centerText("Terminal Input Event Demo", app.width),
 		gophertv.AttrsWithColor(gophertv.AttrBold, headerColor, 0))
 
 	// Draw instructions
 	instructionColor := uint32(0xAAAAAA)
-	app.screen.PutText(0, 1, centerText("q=quit c=color b=border f=flash r=reset Ins=cursor PgDn=move", app.width),
+	app.screen.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, centerText("q=quit c=color b=border f=flash r=reset Ins=cursor PgDn=move", app.width),
 		gophertv.AttrsWithColor(0, instructionColor, 0))
 
 	// Draw top border
@@ -180,13 +180,13 @@ func (app *DemoApp) render() {
 	statusBg := uint32(0x333333)
 	statusLine := fmt.Sprintf(" Status: %s | Events: %d ",
 		app.statusText, app.eventCount)
-	app.screen.PutText(0, app.height-1, padRight(statusLine, app.width),
+	app.screen.PutText(gophertv.TRect{X: 0, Y: uint16(app.height - 1), W: 0, H: 0}, padRight(statusLine, app.width),
 		gophertv.AttrsWithColor(gophertv.AttrBold, statusColor, statusBg))
 
 	// Draw flash indicator if active
 	if app.flashCount > 0 {
 		flashColor := app.colors[(app.flashCount)%len(app.colors)]
-		app.screen.PutText(app.width-10, 3, "* FLASH *",
+		app.screen.PutText(gophertv.TRect{X: uint16(app.width - 10), Y: 3, W: 0, H: 0}, "* FLASH *",
 			gophertv.AttrsWithColor(gophertv.AttrBold|gophertv.AttrBlink, flashColor, 0))
 	}
 
@@ -209,7 +209,7 @@ func (app *DemoApp) drawBorder() {
 		fullBorder += string([]rune(borderChar)[i%len([]rune(borderChar))])
 	}
 
-	app.screen.PutText(0, 2, fullBorder,
+	app.screen.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, fullBorder,
 		gophertv.AttrsWithColor(0, borderColor, 0))
 }
 
@@ -220,7 +220,7 @@ func (app *DemoApp) drawEventList() {
 
 	if app.lastEvent == nil {
 		emptyText := "No events yet. Press some keys!"
-		app.screen.PutText((app.width-len(emptyText))/2, (startY+endY)/2, emptyText,
+		app.screen.PutText(gophertv.TRect{X: uint16((app.width - len(emptyText)) / 2), Y: uint16((startY + endY) / 2), W: 0, H: 0}, emptyText,
 			gophertv.AttrsWithColor(gophertv.AttrItalic, 0x888888, 0))
 		return
 	}
@@ -234,16 +234,16 @@ func (app *DemoApp) drawEventList() {
 	// Draw frame border
 	borderColor := uint32(0x00AAFF)
 	// Top border
-	app.screen.PutText(frameX, frameY, "┌"+padRight("", frameWidth-2)+"┐",
+	app.screen.PutText(gophertv.TRect{X: uint16(frameX), Y: uint16(frameY), W: 0, H: 0}, "┌"+padRight("", frameWidth-2)+"┐",
 		gophertv.AttrsWithColor(0, borderColor, 0))
 	// Bottom border
-	app.screen.PutText(frameX, frameY+frameHeight-1, "└"+padRight("", frameWidth-2)+"┘",
+	app.screen.PutText(gophertv.TRect{X: uint16(frameX), Y: uint16(frameY + frameHeight - 1), W: 0, H: 0}, "└"+padRight("", frameWidth-2)+"┘",
 		gophertv.AttrsWithColor(0, borderColor, 0))
 	// Side borders
 	for i := 1; i < frameHeight-1; i++ {
-		app.screen.PutText(frameX, frameY+i, "│",
+		app.screen.PutText(gophertv.TRect{X: uint16(frameX), Y: uint16(frameY + i), W: 0, H: 0}, "│",
 			gophertv.AttrsWithColor(0, borderColor, 0))
-		app.screen.PutText(frameX+frameWidth-1, frameY+i, "│",
+		app.screen.PutText(gophertv.TRect{X: uint16(frameX + frameWidth - 1), Y: uint16(frameY + i), W: 0, H: 0}, "│",
 			gophertv.AttrsWithColor(0, borderColor, 0))
 	}
 
@@ -255,9 +255,9 @@ func (app *DemoApp) drawEventList() {
 
 	// Event string representation
 	if y < frameY+frameHeight-1 {
-		app.screen.PutText(frameX+2, y, "Event:",
+		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Event:",
 			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
-		app.screen.PutText(frameX+12, y, event.String(),
+		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, event.String(),
 			gophertv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
@@ -265,9 +265,9 @@ func (app *DemoApp) drawEventList() {
 	// Event type
 	if y < frameY+frameHeight-1 {
 		y++
-		app.screen.PutText(frameX+2, y, "Type:",
+		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Type:",
 			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
-		app.screen.PutText(frameX+12, y, eventTypeName(event.Type),
+		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, eventTypeName(event.Type),
 			gophertv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
@@ -275,13 +275,13 @@ func (app *DemoApp) drawEventList() {
 	// Key value (hex and character)
 	if y < frameY+frameHeight-1 {
 		y++
-		app.screen.PutText(frameX+2, y, "Key:",
+		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Key:",
 			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
 		keyStr := fmt.Sprintf("0x%04X", event.Key)
 		if event.Key >= 32 && event.Key <= 126 {
 			keyStr += fmt.Sprintf(" ('%c')", event.Key)
 		}
-		app.screen.PutText(frameX+12, y, keyStr,
+		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, keyStr,
 			gophertv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
@@ -289,9 +289,9 @@ func (app *DemoApp) drawEventList() {
 	// X and Y coordinates
 	if y < frameY+frameHeight-1 {
 		y++
-		app.screen.PutText(frameX+2, y, "X, Y:",
+		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "X, Y:",
 			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
-		app.screen.PutText(frameX+12, y, fmt.Sprintf("%d, %d", event.X, event.Y),
+		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, fmt.Sprintf("%d, %d", event.X, event.Y),
 			gophertv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
@@ -299,14 +299,14 @@ func (app *DemoApp) drawEventList() {
 	// Content (for copy/paste events)
 	if event.Content != "" && y < frameY+frameHeight-1 {
 		y++
-		app.screen.PutText(frameX+2, y, "Content:",
+		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Content:",
 			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
 		content := event.Content
 		maxLen := frameWidth - 14
 		if len(content) > maxLen {
 			content = content[:maxLen-3] + "..."
 		}
-		app.screen.PutText(frameX+12, y, content,
+		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, content,
 			gophertv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
@@ -314,17 +314,17 @@ func (app *DemoApp) drawEventList() {
 	// Modifiers
 	if y < frameY+frameHeight-1 {
 		y++
-		app.screen.PutText(frameX+2, y, "Modifiers:",
+		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Modifiers:",
 			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
 		modNames := modifierNames(event.Modifiers)
 		if len(modNames) == 0 {
-			app.screen.PutText(frameX+12, y, "(none)",
+			app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, "(none)",
 				gophertv.AttrsWithColor(0, 0x888888, 0))
 		} else {
 			modY := y
 			for i, name := range modNames {
 				if modY < frameY+frameHeight-1 {
-					app.screen.PutText(frameX+12, modY, name,
+					app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(modY), W: 0, H: 0}, name,
 						gophertv.AttrsWithColor(0, valueColor, 0))
 					modY++
 				}

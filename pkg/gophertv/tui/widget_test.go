@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/codesnort/codesnort-swe/pkg/gophertv"
-	"github.com/codesnort/codesnort-swe/pkg/gophertv/term"
+	"github.com/codesnort/codesnort-swe/pkg/gophertv/tio"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,11 +32,11 @@ func (m *mockWidget) HandleEvent(event *TEvent) {
 func TestTWidget_Draw_NoChildren(t *testing.T) {
 	// Create a widget with no children
 	widget := &TWidget{
-		Position: WidgetPosition{X: 0, Y: 0, W: 10, H: 5},
+		Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
 	}
 
 	// Create a mock screen
-	screen := t.NewScreenBuffer(80, 24, 0)
+	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Draw should not panic when there are no children
 	widget.Draw(screen)
@@ -48,28 +48,28 @@ func TestTWidget_Draw_WithChildren(t *testing.T) {
 	// Create child widgets
 	child1 := &mockWidget{
 		TWidget: TWidget{
-			Position: WidgetPosition{X: 0, Y: 0, W: 10, H: 5},
+			Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
 		},
 	}
 	child2 := &mockWidget{
 		TWidget: TWidget{
-			Position: WidgetPosition{X: 10, Y: 0, W: 10, H: 5},
+			Position: gophertv.TRect{X: 10, Y: 0, W: 10, H: 5},
 		},
 	}
 	child3 := &mockWidget{
 		TWidget: TWidget{
-			Position: WidgetPosition{X: 20, Y: 0, W: 10, H: 5},
+			Position: gophertv.TRect{X: 20, Y: 0, W: 10, H: 5},
 		},
 	}
 
 	// Create parent widget with children
 	parent := &TWidget{
-		Position: WidgetPosition{X: 0, Y: 0, W: 30, H: 5},
+		Position: gophertv.TRect{X: 0, Y: 0, W: 30, H: 5},
 		Children: []IWidget{child1, child2, child3},
 	}
 
 	// Create a mock screen
-	screen := t.NewScreenBuffer(80, 24, 0)
+	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Draw the parent
 	parent.Draw(screen)
@@ -84,30 +84,30 @@ func TestTWidget_Draw_WithNestedChildren(t *testing.T) {
 	// Create nested structure: parent -> child1 -> grandchild
 	grandchild := &mockWidget{
 		TWidget: TWidget{
-			Position: WidgetPosition{X: 0, Y: 0, W: 5, H: 3},
+			Position: gophertv.TRect{X: 0, Y: 0, W: 5, H: 3},
 		},
 	}
 
 	child1 := &mockWidget{
 		TWidget: TWidget{
-			Position: WidgetPosition{X: 0, Y: 0, W: 10, H: 5},
+			Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
 			Children: []IWidget{grandchild},
 		},
 	}
 
 	child2 := &mockWidget{
 		TWidget: TWidget{
-			Position: WidgetPosition{X: 10, Y: 0, W: 10, H: 5},
+			Position: gophertv.TRect{X: 10, Y: 0, W: 10, H: 5},
 		},
 	}
 
 	parent := &TWidget{
-		Position: WidgetPosition{X: 0, Y: 0, W: 30, H: 5},
+		Position: gophertv.TRect{X: 0, Y: 0, W: 30, H: 5},
 		Children: []IWidget{child1, child2},
 	}
 
 	// Create a mock screen
-	screen := t.NewScreenBuffer(80, 24, 0)
+	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Draw the parent
 	parent.Draw(screen)
@@ -121,7 +121,7 @@ func TestTWidget_Draw_WithNestedChildren(t *testing.T) {
 func TestTWidget_HandleEvent_NoActiveChild(t *testing.T) {
 	// Create a widget with no active child
 	widget := &TWidget{
-		Position: WidgetPosition{X: 0, Y: 0, W: 10, H: 5},
+		Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
 	}
 
 	// Create an event
@@ -142,13 +142,13 @@ func TestTWidget_HandleEvent_WithActiveChild(t *testing.T) {
 	// Create an active child widget
 	activeChild := &mockWidget{
 		TWidget: TWidget{
-			Position: WidgetPosition{X: 0, Y: 0, W: 10, H: 5},
+			Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
 		},
 	}
 
 	// Create parent widget with active child
 	parent := &TWidget{
-		Position:    WidgetPosition{X: 0, Y: 0, W: 30, H: 5},
+		Position:    gophertv.TRect{X: 0, Y: 0, W: 30, H: 5},
 		ActiveChild: activeChild,
 	}
 
@@ -172,13 +172,13 @@ func TestTWidget_HandleEvent_MultipleEvents(t *testing.T) {
 	// Create an active child widget
 	activeChild := &mockWidget{
 		TWidget: TWidget{
-			Position: WidgetPosition{X: 0, Y: 0, W: 10, H: 5},
+			Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
 		},
 	}
 
 	// Create parent widget with active child
 	parent := &TWidget{
-		Position:    WidgetPosition{X: 0, Y: 0, W: 30, H: 5},
+		Position:    gophertv.TRect{X: 0, Y: 0, W: 30, H: 5},
 		ActiveChild: activeChild,
 	}
 
@@ -202,18 +202,18 @@ func TestTWidget_HandleEvent_ChildrenButNoActiveChild(t *testing.T) {
 	// Create child widgets
 	child1 := &mockWidget{
 		TWidget: TWidget{
-			Position: WidgetPosition{X: 0, Y: 0, W: 10, H: 5},
+			Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
 		},
 	}
 	child2 := &mockWidget{
 		TWidget: TWidget{
-			Position: WidgetPosition{X: 10, Y: 0, W: 10, H: 5},
+			Position: gophertv.TRect{X: 10, Y: 0, W: 10, H: 5},
 		},
 	}
 
 	// Create parent with children but no active child
 	parent := &TWidget{
-		Position:    WidgetPosition{X: 0, Y: 0, W: 30, H: 5},
+		Position:    gophertv.TRect{X: 0, Y: 0, W: 30, H: 5},
 		Children:    []IWidget{child1, child2},
 		ActiveChild: nil,
 	}
@@ -232,152 +232,146 @@ func TestTWidget_HandleEvent_ChildrenButNoActiveChild(t *testing.T) {
 func TestTWidget_GetAbsolutePosition_NoParent(t *testing.T) {
 	// Create a widget with no parent
 	widget := &TWidget{
-		Position: WidgetPosition{X: 10, Y: 20, W: 30, H: 40},
+		Position: gophertv.TRect{X: 10, Y: 20, W: 30, H: 40},
 	}
 
 	// Get absolute position
-	absPos := widget.GetAbsolutePosition()
+	absPos := widget.GetAbsolutePos()
 
 	// Should return the widget's own position
-	assert.Equal(t, 10, absPos.X, "X should match widget position")
-	assert.Equal(t, 20, absPos.Y, "Y should match widget position")
-	assert.Equal(t, 30, absPos.W, "W should match widget position")
-	assert.Equal(t, 40, absPos.H, "H should match widget position")
+	assert.Equal(t, uint16(10), absPos.X, "X should match widget position")
+	assert.Equal(t, uint16(20), absPos.Y, "Y should match widget position")
+	assert.Equal(t, uint16(30), absPos.W, "W should match widget position")
+	assert.Equal(t, uint16(40), absPos.H, "H should match widget position")
 }
 
 func TestTWidget_GetAbsolutePosition_WithParent(t *testing.T) {
 	// Create parent widget
 	parent := &TWidget{
-		Position: WidgetPosition{X: 10, Y: 20, W: 100, H: 100},
+		Position: gophertv.TRect{X: 10, Y: 20, W: 100, H: 100},
 	}
 
 	// Create child widget
 	child := &TWidget{
-		Position: WidgetPosition{X: 5, Y: 10, W: 30, H: 40},
+		Position: gophertv.TRect{X: 5, Y: 10, W: 30, H: 40},
 		Parent:   parent,
 	}
 
 	// Get absolute position
-	absPos := child.GetAbsolutePosition()
+	absPos := child.GetAbsolutePos()
 
 	// Should return parent position + child position
-	assert.Equal(t, 15, absPos.X, "X should be parent.X + child.X")
-	assert.Equal(t, 30, absPos.Y, "Y should be parent.Y + child.Y")
-	assert.Equal(t, 30, absPos.W, "W should match child position")
-	assert.Equal(t, 40, absPos.H, "H should match child position")
+	assert.Equal(t, uint16(15), absPos.X, "X should be parent.X + child.X")
+	assert.Equal(t, uint16(30), absPos.Y, "Y should be parent.Y + child.Y")
+	assert.Equal(t, uint16(30), absPos.W, "W should match child position")
+	assert.Equal(t, uint16(40), absPos.H, "H should match child position")
 }
 
 func TestTWidget_GetAbsolutePosition_NestedParents(t *testing.T) {
 	// Create grandparent widget
 	grandparent := &TWidget{
-		Position: WidgetPosition{X: 10, Y: 20, W: 200, H: 200},
+		Position: gophertv.TRect{X: 10, Y: 20, W: 200, H: 200},
 	}
 
 	// Create parent widget
 	parent := &TWidget{
-		Position: WidgetPosition{X: 5, Y: 10, W: 100, H: 100},
+		Position: gophertv.TRect{X: 5, Y: 10, W: 100, H: 100},
 		Parent:   grandparent,
 	}
 
 	// Create child widget
 	child := &TWidget{
-		Position: WidgetPosition{X: 3, Y: 7, W: 30, H: 40},
+		Position: gophertv.TRect{X: 3, Y: 7, W: 30, H: 40},
 		Parent:   parent,
 	}
 
 	// Get absolute position
-	absPos := child.GetAbsolutePosition()
+	absPos := child.GetAbsolutePos()
 
 	// Should return grandparent.X + parent.X + child.X
-	assert.Equal(t, 18, absPos.X, "X should be sum of all parent X positions")
-	assert.Equal(t, 37, absPos.Y, "Y should be sum of all parent Y positions")
-	assert.Equal(t, 30, absPos.W, "W should match child position")
-	assert.Equal(t, 40, absPos.H, "H should match child position")
+	assert.Equal(t, uint16(18), absPos.X, "X should be sum of all parent X positions")
+	assert.Equal(t, uint16(37), absPos.Y, "Y should be sum of all parent Y positions")
+	assert.Equal(t, uint16(30), absPos.W, "W should match child position")
+	assert.Equal(t, uint16(40), absPos.H, "H should match child position")
 }
 
 func TestTWidget_HandleEvent_PositionEvent(t *testing.T) {
 	// Create a widget with initial position
 	widget := &TWidget{
-		Position: WidgetPosition{X: 10, Y: 20, W: 30, H: 40},
+		Position: gophertv.TRect{X: 10, Y: 20, W: 30, H: 40},
 	}
 
 	// Create a position event with new values
 	event := &TEvent{
 		Type: TEventTypePosition,
-		X:    50,
-		Y:    60,
-		W:    70,
-		H:    80,
+		Rect: gophertv.TRect{X: 50, Y: 60, W: 70, H: 80},
 	}
 
 	// Handle the position event
 	widget.HandleEvent(event)
 
 	// Verify that the widget's position was updated
-	assert.Equal(t, 50, widget.Position.X, "X should be updated to event.X")
-	assert.Equal(t, 60, widget.Position.Y, "Y should be updated to event.Y")
-	assert.Equal(t, 70, widget.Position.W, "W should be updated to event.W")
-	assert.Equal(t, 80, widget.Position.H, "H should be updated to event.H")
+	assert.Equal(t, uint16(50), widget.Position.X, "X should be updated to event.X")
+	assert.Equal(t, uint16(60), widget.Position.Y, "Y should be updated to event.Y")
+	assert.Equal(t, uint16(70), widget.Position.W, "W should be updated to event.W")
+	assert.Equal(t, uint16(80), widget.Position.H, "H should be updated to event.H")
 }
 
 func TestTWidget_HandleEvent_PositionEvent_NotPropagatedToChildren(t *testing.T) {
 	// Create an active child widget
 	activeChild := &mockWidget{
 		TWidget: TWidget{
-			Position: WidgetPosition{X: 5, Y: 10, W: 15, H: 20},
+			Position: gophertv.TRect{X: 5, Y: 10, W: 15, H: 20},
 		},
 	}
 
 	// Create parent widget with active child
 	parent := &TWidget{
-		Position:    WidgetPosition{X: 10, Y: 20, W: 30, H: 40},
+		Position:    gophertv.TRect{X: 10, Y: 20, W: 30, H: 40},
 		ActiveChild: activeChild,
 	}
 
 	// Create a position event
 	event := &TEvent{
 		Type: TEventTypePosition,
-		X:    50,
-		Y:    60,
-		W:    70,
-		H:    80,
+		Rect: gophertv.TRect{X: 50, Y: 60, W: 70, H: 80},
 	}
 
 	// Handle the position event
 	parent.HandleEvent(event)
 
 	// Verify that the parent's position was updated
-	assert.Equal(t, 50, parent.Position.X, "Parent X should be updated")
-	assert.Equal(t, 60, parent.Position.Y, "Parent Y should be updated")
-	assert.Equal(t, 70, parent.Position.W, "Parent W should be updated")
-	assert.Equal(t, 80, parent.Position.H, "Parent H should be updated")
+	assert.Equal(t, uint16(50), parent.Position.X, "Parent X should be updated")
+	assert.Equal(t, uint16(60), parent.Position.Y, "Parent Y should be updated")
+	assert.Equal(t, uint16(70), parent.Position.W, "Parent W should be updated")
+	assert.Equal(t, uint16(80), parent.Position.H, "Parent H should be updated")
 
 	// Verify that the event was NOT propagated to the active child
 	assert.False(t, activeChild.handleEventCalled, "Position event should not be propagated to children")
 
 	// Verify that the child's position remains unchanged
-	assert.Equal(t, 5, activeChild.Position.X, "Child X should remain unchanged")
-	assert.Equal(t, 10, activeChild.Position.Y, "Child Y should remain unchanged")
-	assert.Equal(t, 15, activeChild.Position.W, "Child W should remain unchanged")
-	assert.Equal(t, 20, activeChild.Position.H, "Child H should remain unchanged")
+	assert.Equal(t, uint16(5), activeChild.Position.X, "Child X should remain unchanged")
+	assert.Equal(t, uint16(10), activeChild.Position.Y, "Child Y should remain unchanged")
+	assert.Equal(t, uint16(15), activeChild.Position.W, "Child W should remain unchanged")
+	assert.Equal(t, uint16(20), activeChild.Position.H, "Child H should remain unchanged")
 }
 
 func TestTWidget_HandleEvent_PositionEvent_WithMultipleChildren(t *testing.T) {
 	// Create multiple child widgets
 	child1 := &mockWidget{
 		TWidget: TWidget{
-			Position: WidgetPosition{X: 0, Y: 0, W: 10, H: 10},
+			Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 10},
 		},
 	}
 	child2 := &mockWidget{
 		TWidget: TWidget{
-			Position: WidgetPosition{X: 10, Y: 0, W: 10, H: 10},
+			Position: gophertv.TRect{X: 10, Y: 0, W: 10, H: 10},
 		},
 	}
 
 	// Create parent widget with children and an active child
 	parent := &TWidget{
-		Position:    WidgetPosition{X: 10, Y: 20, W: 30, H: 40},
+		Position:    gophertv.TRect{X: 10, Y: 20, W: 30, H: 40},
 		Children:    []IWidget{child1, child2},
 		ActiveChild: child1,
 	}
@@ -385,20 +379,17 @@ func TestTWidget_HandleEvent_PositionEvent_WithMultipleChildren(t *testing.T) {
 	// Create a position event
 	event := &TEvent{
 		Type: TEventTypePosition,
-		X:    100,
-		Y:    200,
-		W:    300,
-		H:    400,
+		Rect: gophertv.TRect{X: 100, Y: 200, W: 300, H: 400},
 	}
 
 	// Handle the position event
 	parent.HandleEvent(event)
 
 	// Verify that the parent's position was updated
-	assert.Equal(t, 100, parent.Position.X, "Parent X should be updated")
-	assert.Equal(t, 200, parent.Position.Y, "Parent Y should be updated")
-	assert.Equal(t, 300, parent.Position.W, "Parent W should be updated")
-	assert.Equal(t, 400, parent.Position.H, "Parent H should be updated")
+	assert.Equal(t, uint16(100), parent.Position.X, "Parent X should be updated")
+	assert.Equal(t, uint16(200), parent.Position.Y, "Parent Y should be updated")
+	assert.Equal(t, uint16(300), parent.Position.W, "Parent W should be updated")
+	assert.Equal(t, uint16(400), parent.Position.H, "Parent H should be updated")
 
 	// Verify that no children received the event
 	assert.False(t, child1.handleEventCalled, "Position event should not be propagated to child1")
