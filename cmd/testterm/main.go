@@ -15,8 +15,8 @@ type DemoApp struct {
 	screen       *cswterm.ScreenBuffer
 	renderer     *cswterm.ScreenRenderer
 	eventReader  *cswterm.InputEventReader
-	events       []cswterm.InputEvent
-	scrollOffset int
+	lastEvent    *cswterm.InputEvent
+	eventCount   int
 	width        int
 	height       int
 	colors       []uint32
@@ -37,7 +37,8 @@ func NewDemoApp(width, height int) *DemoApp {
 		renderer:    renderer,
 		width:       width,
 		height:      height,
-		events:      make([]cswterm.InputEvent, 0),
+		lastEvent:   nil,
+		eventCount:  0,
 		colors:      []uint32{0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00, 0xFF00FF, 0x00FFFF, 0xFF8800, 0x8800FF},
 		colorIndex:  0,
 		statusText:  "Ready",
@@ -47,67 +48,47 @@ func NewDemoApp(width, height int) *DemoApp {
 
 // Notify handles input events.
 func (app *DemoApp) Notify(event cswterm.InputEvent) {
-	// Add event to history
-	app.events = append(app.events, event)
+	// Store the event
+	app.lastEvent = &event
+	app.eventCount++
 
 	// Handle specific keys to trigger visual changes
 	if event.Type == cswterm.InputEventKey {
-		// Handle arrow keys first (they come from CSI sequences as uppercase letters without modifiers)
-		// Note: Shift+letter comes as lowercase with ModShift, so 'A' without modifiers is Up arrow
-		if event.Key == 'A' && event.Modifiers == 0 {
-			// Up arrow
-			app.scrollOffset = max(0, app.scrollOffset-1)
-			app.statusText = "Scrolled up"
-		} else if event.Key == 'B' && event.Modifiers == 0 {
-			// Down arrow
-			maxScroll := max(0, len(app.events)-(app.height-8))
-			app.scrollOffset = min(maxScroll, app.scrollOffset+1)
-			app.statusText = "Scrolled down"
-		} else if event.Key == 'P' && event.Modifiers == 0 {
-			// Page Up
-			app.scrollOffset = max(0, app.scrollOffset-10)
-			app.statusText = "Scrolled up (page)"
-		} else if event.Key == 'N' && event.Modifiers == 0 {
-			// Page Down
-			maxScroll := max(0, len(app.events)-(app.height-8))
-			app.scrollOffset = min(maxScroll, app.scrollOffset+10)
-			app.statusText = "Scrolled down (page)"
-		} else {
-			// Regular key handling
-			// Note: uppercase letters now come as lowercase with ModShift
-			// So 'q' handles both lowercase q and Shift+Q (which is 'q' + ModShift)
-			switch event.Key {
-			case 'q':
-				// Quit on 'q' or Shift+Q
-				app.cleanup()
-				os.Exit(0)
-			case 'c':
-				// Change color on 'c' or Shift+C
-				app.colorIndex = (app.colorIndex + 1) % len(app.colors)
-				app.statusText = fmt.Sprintf("Color changed to #%06X", app.colors[app.colorIndex])
-			case 'b':
-				// Change border style on 'b'
-				app.borderStyle = (app.borderStyle + 1) % 3
-				app.statusText = "Border style changed"
-			case 'f':
-				// Flash animation on 'f' or Shift+F
-				app.flashCount = (app.flashCount + 1) % 10
-				app.statusText = fmt.Sprintf("Flash count: %d", app.flashCount)
-			case 'r':
-				// Reset on 'r' or Shift+R
-				app.events = make([]cswterm.InputEvent, 0)
-				app.scrollOffset = 0
-				app.colorIndex = 0
-				app.borderStyle = 0
-				app.flashCount = 0
-				app.statusText = "Reset complete"
-			}
+		switch event.Key {
+		case 'q':
+			// Quit on 'q' or Shift+Q
+			app.cleanup()
+			os.Exit(0)
+		case 'c':
+			// Change color on 'c' or Shift+C
+			app.colorIndex = (app.colorIndex + 1) % len(app.colors)
+			app.statusText = fmt.Sprintf("Color changed to #%06X", app.colors[app.colorIndex])
+		case 'b':
+			// Change border style on 'b'
+			app.borderStyle = (app.borderStyle + 1) % 3
+			app.statusText = "Border style changed"
+		case 'f':
+			// Flash animation on 'f' or Shift+F
+			app.flashCount = (app.flashCount + 1) % 10
+			app.statusText = fmt.Sprintf("Flash count: %d", app.flashCount)
+		case 'r':
+			// Reset on 'r' or Shift+R
+			app.lastEvent = nil
+			app.eventCount = 0
+			app.colorIndex = 0
+			app.borderStyle = 0
+			app.flashCount = 0
+			app.statusText = "Reset complete"
 		}
 	} else if event.Type == cswterm.InputEventResize {
 		// Update size
 		app.width = int(event.X)
 		app.height = int(event.Y)
 		app.statusText = fmt.Sprintf("Resized to %dx%d", app.width, app.height)
+
+		// Create new screen buffer with new dimensions to avoid mangled frame
+		app.screen = cswterm.NewMockScreen(app.width, app.height, 0)
+		app.renderer = cswterm.NewScreenRenderer(app.screen, os.Stdout)
 	}
 
 	// Render the updated screen
@@ -138,8 +119,8 @@ func (app *DemoApp) render() {
 	// Draw status bar
 	statusColor := uint32(0x00FFFF)
 	statusBg := uint32(0x333333)
-	statusLine := fmt.Sprintf(" Status: %s | Events: %d | Scroll: %d ",
-		app.statusText, len(app.events), app.scrollOffset)
+	statusLine := fmt.Sprintf(" Status: %s | Events: %d ",
+		app.statusText, app.eventCount)
 	app.screen.PutText(0, app.height-1, padRight(statusLine, app.width),
 		cswterm.AttrsWithColor(cswterm.AttrBold, statusColor, statusBg))
 
@@ -173,84 +154,197 @@ func (app *DemoApp) drawBorder() {
 		cswterm.AttrsWithColor(0, borderColor, 0))
 }
 
-// drawEventList draws the scrollable event list.
+// drawEventList draws the event details in a centered frame.
 func (app *DemoApp) drawEventList() {
 	startY := 3
 	endY := app.height - 2
-	visibleLines := endY - startY
 
-	if len(app.events) == 0 {
+	if app.lastEvent == nil {
 		emptyText := "No events yet. Press some keys!"
 		app.screen.PutText((app.width-len(emptyText))/2, (startY+endY)/2, emptyText,
 			cswterm.AttrsWithColor(cswterm.AttrItalic, 0x888888, 0))
 		return
 	}
 
-	// Draw events from the scroll offset
-	for i := 0; i < visibleLines; i++ {
-		eventIdx := app.scrollOffset + i
-		if eventIdx >= len(app.events) {
-			break
-		}
+	// Calculate frame dimensions
+	frameWidth := min(app.width-4, 70)
+	frameHeight := min(endY-startY-2, 20)
+	frameX := (app.width - frameWidth) / 2
+	frameY := startY + (endY-startY-frameHeight)/2
 
-		event := app.events[eventIdx]
-		eventText := formatEvent(eventIdx+1, event)
-
-		// Truncate if too long
-		if len(eventText) > app.width {
-			eventText = eventText[:app.width-3] + "..."
-		}
-
-		// Use different colors for different event types
-		var color uint32
-		switch event.Type {
-		case cswterm.InputEventKey:
-			color = 0x00FF88
-		case cswterm.InputEventMouse:
-			color = 0xFF8800
-		case cswterm.InputEventResize:
-			color = 0x8800FF
-		default:
-			color = 0xFFFFFF
-		}
-
-		app.screen.PutText(0, startY+i, eventText,
-			cswterm.AttrsWithColor(0, color, 0))
+	// Draw frame border
+	borderColor := uint32(0x00AAFF)
+	// Top border
+	app.screen.PutText(frameX, frameY, "┌"+padRight("", frameWidth-2)+"┐",
+		cswterm.AttrsWithColor(0, borderColor, 0))
+	// Bottom border
+	app.screen.PutText(frameX, frameY+frameHeight-1, "└"+padRight("", frameWidth-2)+"┘",
+		cswterm.AttrsWithColor(0, borderColor, 0))
+	// Side borders
+	for i := 1; i < frameHeight-1; i++ {
+		app.screen.PutText(frameX, frameY+i, "│",
+			cswterm.AttrsWithColor(0, borderColor, 0))
+		app.screen.PutText(frameX+frameWidth-1, frameY+i, "│",
+			cswterm.AttrsWithColor(0, borderColor, 0))
 	}
 
-	// Draw scroll indicator
-	if len(app.events) > visibleLines {
-		scrollColor := uint32(0xFFFF00)
-		scrollIndicator := fmt.Sprintf("[%d/%d]", app.scrollOffset+1, len(app.events))
-		app.screen.PutText(app.width-len(scrollIndicator), startY,
-			scrollIndicator, cswterm.AttrsWithColor(cswterm.AttrBold, scrollColor, 0))
+	// Draw event details
+	event := *app.lastEvent
+	y := frameY + 1
+	labelColor := uint32(0xAAAAAAA)
+	valueColor := uint32(0xFFFFFF)
+
+	// Event string representation
+	if y < frameY+frameHeight-1 {
+		app.screen.PutText(frameX+2, y, "Event:",
+			cswterm.AttrsWithColor(cswterm.AttrBold, labelColor, 0))
+		app.screen.PutText(frameX+12, y, event.String(),
+			cswterm.AttrsWithColor(0, valueColor, 0))
+		y++
+	}
+
+	// Event type
+	if y < frameY+frameHeight-1 {
+		y++
+		app.screen.PutText(frameX+2, y, "Type:",
+			cswterm.AttrsWithColor(cswterm.AttrBold, labelColor, 0))
+		app.screen.PutText(frameX+12, y, eventTypeName(event.Type),
+			cswterm.AttrsWithColor(0, valueColor, 0))
+		y++
+	}
+
+	// Key value (hex and character)
+	if y < frameY+frameHeight-1 {
+		y++
+		app.screen.PutText(frameX+2, y, "Key:",
+			cswterm.AttrsWithColor(cswterm.AttrBold, labelColor, 0))
+		keyStr := fmt.Sprintf("0x%04X", event.Key)
+		if event.Key >= 32 && event.Key <= 126 {
+			keyStr += fmt.Sprintf(" ('%c')", event.Key)
+		}
+		app.screen.PutText(frameX+12, y, keyStr,
+			cswterm.AttrsWithColor(0, valueColor, 0))
+		y++
+	}
+
+	// X and Y coordinates
+	if y < frameY+frameHeight-1 {
+		y++
+		app.screen.PutText(frameX+2, y, "X, Y:",
+			cswterm.AttrsWithColor(cswterm.AttrBold, labelColor, 0))
+		app.screen.PutText(frameX+12, y, fmt.Sprintf("%d, %d", event.X, event.Y),
+			cswterm.AttrsWithColor(0, valueColor, 0))
+		y++
+	}
+
+	// Content (for copy/paste events)
+	if event.Content != "" && y < frameY+frameHeight-1 {
+		y++
+		app.screen.PutText(frameX+2, y, "Content:",
+			cswterm.AttrsWithColor(cswterm.AttrBold, labelColor, 0))
+		content := event.Content
+		maxLen := frameWidth - 14
+		if len(content) > maxLen {
+			content = content[:maxLen-3] + "..."
+		}
+		app.screen.PutText(frameX+12, y, content,
+			cswterm.AttrsWithColor(0, valueColor, 0))
+		y++
+	}
+
+	// Modifiers
+	if y < frameY+frameHeight-1 {
+		y++
+		app.screen.PutText(frameX+2, y, "Modifiers:",
+			cswterm.AttrsWithColor(cswterm.AttrBold, labelColor, 0))
+		modNames := modifierNames(event.Modifiers)
+		if len(modNames) == 0 {
+			app.screen.PutText(frameX+12, y, "(none)",
+				cswterm.AttrsWithColor(0, 0x888888, 0))
+		} else {
+			modY := y
+			for i, name := range modNames {
+				if modY < frameY+frameHeight-1 {
+					app.screen.PutText(frameX+12, modY, name,
+						cswterm.AttrsWithColor(0, valueColor, 0))
+					modY++
+				}
+				if i == 0 {
+					y = modY
+				}
+			}
+			if modY > y {
+				y = modY
+			}
+		}
 	}
 }
 
-// formatEvent formats an input event as a string.
-func formatEvent(index int, event cswterm.InputEvent) string {
-	typeStr := ""
-	switch event.Type {
+// eventTypeName returns the human-readable name of an event type.
+func eventTypeName(t cswterm.InputEventType) string {
+	switch t {
 	case cswterm.InputEventKey:
-		typeStr = "KEY"
+		return "Key"
 	case cswterm.InputEventMouse:
-		typeStr = "MOUSE"
+		return "Mouse"
 	case cswterm.InputEventResize:
-		typeStr = "RESIZE"
+		return "Resize"
+	case cswterm.InputEventCopy:
+		return "Copy"
+	case cswterm.InputEventPaste:
+		return "Paste"
+	case cswterm.InputEventFocus:
+		return "Focus"
+	case cswterm.InputEventBlur:
+		return "Blur"
 	default:
-		typeStr = "OTHER"
+		return "Unknown"
 	}
+}
 
-	details := ""
-	if event.Type == cswterm.InputEventKey {
-		details = event.String()
-	} else if event.Type == cswterm.InputEventMouse {
-		details = fmt.Sprintf("x=%d y=%d", event.X, event.Y)
-	} else if event.Type == cswterm.InputEventResize {
-		details = fmt.Sprintf("w=%d h=%d", event.X, event.Y)
+// modifierNames returns a list of modifier names from the modifiers bitfield.
+func modifierNames(mods cswterm.EventModifiers) []string {
+	var names []string
+	if mods&cswterm.ModShift != 0 {
+		names = append(names, "Shift")
 	}
-
-	return fmt.Sprintf("%4d | %-6s | %s", index, typeStr, details)
+	if mods&cswterm.ModAlt != 0 {
+		names = append(names, "Alt")
+	}
+	if mods&cswterm.ModCtrl != 0 {
+		names = append(names, "Ctrl")
+	}
+	if mods&cswterm.ModMeta != 0 {
+		names = append(names, "Meta")
+	}
+	if mods&cswterm.ModClick != 0 {
+		names = append(names, "Click")
+	}
+	if mods&cswterm.ModDoubleClick != 0 {
+		names = append(names, "DoubleClick")
+	}
+	if mods&cswterm.ModDrag != 0 {
+		names = append(names, "Drag")
+	}
+	if mods&cswterm.ModPress != 0 {
+		names = append(names, "Press")
+	}
+	if mods&cswterm.ModRelease != 0 {
+		names = append(names, "Release")
+	}
+	if mods&cswterm.ModMove != 0 {
+		names = append(names, "Move")
+	}
+	if mods&cswterm.ModScrollUp != 0 {
+		names = append(names, "ScrollUp")
+	}
+	if mods&cswterm.ModScrollDown != 0 {
+		names = append(names, "ScrollDown")
+	}
+	if mods&cswterm.ModFn != 0 {
+		names = append(names, "Fn")
+	}
+	return names
 }
 
 // centerText centers text in a given width.
