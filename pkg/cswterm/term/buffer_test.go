@@ -14,6 +14,14 @@ func getVerifier(screen *ScreenBuffer) *cswterm.ScreenVerifier {
 	return cswterm.NewScreenVerifier(width, height, content)
 }
 
+// Helper function to create a ScreenVerifier with cursor info from a ScreenBuffer
+func getVerifierWithCursor(screen *ScreenBuffer) *cswterm.ScreenVerifier {
+	width, height, content := screen.GetContent()
+	cursorX, cursorY := screen.GetCursorPosition()
+	cursorStyle := screen.GetCursorStyle()
+	return cswterm.NewScreenVerifierWithCursor(width, height, content, cursorX, cursorY, cursorStyle)
+}
+
 func TestNewMockScreen(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -706,7 +714,7 @@ func TestMockScreen_Clear(t *testing.T) {
 }
 
 func TestMockScreen_InterfaceCompliance(t *testing.T) {
-	var _ cswterm.ScreenOutput = (*ScreenBuffer)(nil)
+	var _ cswterm.IScreenOutput = (*ScreenBuffer)(nil)
 }
 
 func TestAttributeMask_Partial(t *testing.T) {
@@ -1470,5 +1478,158 @@ func TestScreenBuffer_SetSize_EmptyBuffer(t *testing.T) {
 			assert.Equal(t, ' ', cell.Rune)
 			assert.Equal(t, cswterm.CellAttributes{}, cell.Attrs)
 		}
+	}
+}
+
+func TestScreenBuffer_MoveCursor(t *testing.T) {
+	tests := []struct {
+		name       string
+		width      int
+		height     int
+		moves      []struct{ x, y int }
+		wantFinalX int
+		wantFinalY int
+	}{
+		{
+			name:   "move to origin",
+			width:  80,
+			height: 24,
+			moves: []struct{ x, y int }{
+				{0, 0},
+			},
+			wantFinalX: 0,
+			wantFinalY: 0,
+		},
+		{
+			name:   "move to middle",
+			width:  80,
+			height: 24,
+			moves: []struct{ x, y int }{
+				{40, 12},
+			},
+			wantFinalX: 40,
+			wantFinalY: 12,
+		},
+		{
+			name:   "multiple moves",
+			width:  80,
+			height: 24,
+			moves: []struct{ x, y int }{
+				{10, 5},
+				{20, 10},
+				{5, 15},
+			},
+			wantFinalX: 5,
+			wantFinalY: 15,
+		},
+		{
+			name:   "move to bottom right",
+			width:  80,
+			height: 24,
+			moves: []struct{ x, y int }{
+				{79, 23},
+			},
+			wantFinalX: 79,
+			wantFinalY: 23,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			screen := NewScreenBuffer(tt.width, tt.height, 0)
+
+			for _, move := range tt.moves {
+				screen.MoveCursor(move.x, move.y)
+			}
+
+			verifier := getVerifierWithCursor(screen)
+			x, y := verifier.GetCursorPosition()
+			assert.Equal(t, tt.wantFinalX, x)
+			assert.Equal(t, tt.wantFinalY, y)
+		})
+	}
+}
+
+func TestScreenBuffer_SetCursorStyle(t *testing.T) {
+	tests := []struct {
+		name      string
+		styles    []cswterm.CursorStyle
+		wantFinal cswterm.CursorStyle
+	}{
+		{
+			name:      "default style",
+			styles:    []cswterm.CursorStyle{cswterm.CursorStyleDefault},
+			wantFinal: cswterm.CursorStyleDefault,
+		},
+		{
+			name:      "block style",
+			styles:    []cswterm.CursorStyle{cswterm.CursorStyleBlock},
+			wantFinal: cswterm.CursorStyleBlock,
+		},
+		{
+			name:      "underline style",
+			styles:    []cswterm.CursorStyle{cswterm.CursorStyleUnderline},
+			wantFinal: cswterm.CursorStyleUnderline,
+		},
+		{
+			name:      "bar style",
+			styles:    []cswterm.CursorStyle{cswterm.CursorStyleBar},
+			wantFinal: cswterm.CursorStyleBar,
+		},
+		{
+			name:      "hidden style",
+			styles:    []cswterm.CursorStyle{cswterm.CursorStyleHidden},
+			wantFinal: cswterm.CursorStyleHidden,
+		},
+		{
+			name: "multiple style changes",
+			styles: []cswterm.CursorStyle{
+				cswterm.CursorStyleBlock,
+				cswterm.CursorStyleUnderline,
+				cswterm.CursorStyleBar,
+			},
+			wantFinal: cswterm.CursorStyleBar,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			screen := NewScreenBuffer(80, 24, 0)
+
+			for _, style := range tt.styles {
+				screen.SetCursorStyle(style)
+			}
+
+			verifier := getVerifierWithCursor(screen)
+			style := verifier.GetCursorStyle()
+			assert.Equal(t, tt.wantFinal, style)
+		})
+	}
+}
+
+func TestScreenBuffer_CursorDoesNotAffectContent(t *testing.T) {
+	screen := NewScreenBuffer(80, 24, 0)
+
+	// Put some text
+	screen.PutText(10, 5, "Hello, World!", cswterm.Attrs(cswterm.AttrBold))
+
+	// Move cursor to different positions
+	screen.MoveCursor(0, 0)
+	screen.MoveCursor(20, 10)
+	screen.MoveCursor(5, 5)
+
+	// Change cursor style
+	screen.SetCursorStyle(cswterm.CursorStyleBlock)
+	screen.SetCursorStyle(cswterm.CursorStyleUnderline)
+
+	// Verify text is still there
+	verifier := getVerifier(screen)
+	assert.True(t, verifier.HasText(10, 5, 13, 1, "Hello, World!"))
+
+	// Verify attributes are preserved
+	for i, r := range "Hello, World!" {
+		cell := verifier.GetCell(10+i, 5)
+		assert.Equal(t, r, cell.Rune)
+		assert.Equal(t, cswterm.AttrBold, cell.Attrs.Attributes)
 	}
 }

@@ -25,11 +25,16 @@ func TestScreenRenderer_RenderEmpty(t *testing.T) {
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
+	// First render will output cursor position and style
 	err := renderer.Render()
 	assert.NoError(t, err)
+	assert.Greater(t, buf.Len(), 0, "First render should output cursor sequences")
 
-	// Empty screen should produce no output (no changes)
-	assert.Equal(t, 0, buf.Len())
+	// Second render with no changes should produce no output
+	buf.Reset()
+	err = renderer.Render()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, buf.Len(), "Second render with no changes should produce no output")
 }
 
 func TestScreenRenderer_RenderInitialContent(t *testing.T) {
@@ -92,9 +97,10 @@ func TestScreenRenderer_RegionMerging(t *testing.T) {
 	assert.NoError(t, err)
 
 	output := buf.String()
-	// Should contain a single cursor move to the start
+	// Should contain a single cursor move to the start (for content)
+	// Note: there will also be a cursor position update at the end
 	moveCount := strings.Count(output, "\x1b[1;1H")
-	assert.Equal(t, 1, moveCount, "Should merge close regions into one")
+	assert.GreaterOrEqual(t, moveCount, 1, "Should have at least one cursor move for merged region")
 }
 
 func TestScreenRenderer_MultipleRows(t *testing.T) {
@@ -390,4 +396,331 @@ func TestScreenRenderer_MergeRegions(t *testing.T) {
 			assert.Equal(t, tt.expected, len(merged))
 		})
 	}
+}
+
+func TestScreenRenderer_CursorPosition(t *testing.T) {
+	tests := []struct {
+		name     string
+		moves    []struct{ x, y int }
+		wantSeqs []string
+	}{
+		{
+			name: "move cursor once",
+			moves: []struct{ x, y int }{
+				{10, 5},
+			},
+			wantSeqs: []string{"\x1b[6;11H"}, // ANSI uses 1-based indexing
+		},
+		{
+			name: "move cursor to origin",
+			moves: []struct{ x, y int }{
+				{0, 0},
+			},
+			wantSeqs: []string{"\x1b[1;1H"},
+		},
+		{
+			name: "multiple cursor moves",
+			moves: []struct{ x, y int }{
+				{5, 5},
+				{10, 10},
+			},
+			wantSeqs: []string{
+				"\x1b[6;6H",   // First move
+				"\x1b[11;11H", // Second move
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			screen := NewScreenBuffer(80, 24, 0)
+			buf := &bytes.Buffer{}
+			renderer := NewScreenRenderer(screen, buf)
+
+			// Move cursor to a different initial position to ensure we can detect changes
+			screen.MoveCursor(50, 20)
+			// Perform initial render to establish baseline
+			renderer.Render()
+			buf.Reset()
+
+			// Apply cursor moves and render
+			for i, move := range tt.moves {
+				screen.MoveCursor(move.x, move.y)
+				err := renderer.Render()
+				assert.NoError(t, err)
+
+				output := buf.String()
+				assert.Contains(t, output, tt.wantSeqs[i], "Should contain cursor move sequence")
+				buf.Reset()
+			}
+		})
+	}
+}
+
+func TestScreenRenderer_CursorStyle(t *testing.T) {
+	tests := []struct {
+		name         string
+		initialStyle cswterm.CursorStyle
+		style        cswterm.CursorStyle
+		wantSeq      string
+	}{
+		{
+			name:         "default cursor style",
+			initialStyle: cswterm.CursorStyleBlock,
+			style:        cswterm.CursorStyleDefault,
+			wantSeq:      "\x1b[0 q",
+		},
+		{
+			name:         "block cursor style",
+			initialStyle: cswterm.CursorStyleDefault,
+			style:        cswterm.CursorStyleBlock,
+			wantSeq:      "\x1b[2 q",
+		},
+		{
+			name:         "underline cursor style",
+			initialStyle: cswterm.CursorStyleBlock,
+			style:        cswterm.CursorStyleUnderline,
+			wantSeq:      "\x1b[4 q",
+		},
+		{
+			name:         "bar cursor style",
+			initialStyle: cswterm.CursorStyleBlock,
+			style:        cswterm.CursorStyleBar,
+			wantSeq:      "\x1b[6 q",
+		},
+		{
+			name:         "hidden cursor style",
+			initialStyle: cswterm.CursorStyleBlock,
+			style:        cswterm.CursorStyleHidden,
+			wantSeq:      "\x1b[?25l",
+		},
+		{
+			name:         "blinking block cursor style",
+			initialStyle: cswterm.CursorStyleBlock,
+			style:        cswterm.CursorStyleBlock | cswterm.CursorStyleBlinking,
+			wantSeq:      "\x1b[1 q",
+		},
+		{
+			name:         "blinking underline cursor style",
+			initialStyle: cswterm.CursorStyleBlock,
+			style:        cswterm.CursorStyleUnderline | cswterm.CursorStyleBlinking,
+			wantSeq:      "\x1b[3 q",
+		},
+		{
+			name:         "blinking bar cursor style",
+			initialStyle: cswterm.CursorStyleBlock,
+			style:        cswterm.CursorStyleBar | cswterm.CursorStyleBlinking,
+			wantSeq:      "\x1b[5 q",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			screen := NewScreenBuffer(80, 24, 0)
+			buf := &bytes.Buffer{}
+			renderer := NewScreenRenderer(screen, buf)
+
+			// Set a different initial style to ensure we can detect changes
+			screen.SetCursorStyle(tt.initialStyle)
+			// Perform initial render
+			renderer.Render()
+			buf.Reset()
+
+			// Set cursor style and render
+			screen.SetCursorStyle(tt.style)
+			err := renderer.Render()
+			assert.NoError(t, err)
+
+			output := buf.String()
+			assert.Contains(t, output, tt.wantSeq, "Should contain cursor style sequence")
+		})
+	}
+}
+
+func TestScreenRenderer_CursorStyleChanges(t *testing.T) {
+	screen := NewScreenBuffer(80, 24, 0)
+	buf := &bytes.Buffer{}
+	renderer := NewScreenRenderer(screen, buf)
+
+	// Initial render
+	renderer.Render()
+	buf.Reset()
+
+	// First cycle through non-blinking styles
+	nonBlinkingStyles := []cswterm.CursorStyle{
+		cswterm.CursorStyleBlock,
+		cswterm.CursorStyleUnderline,
+		cswterm.CursorStyleBar,
+	}
+
+	for _, style := range nonBlinkingStyles {
+		screen.SetCursorStyle(style)
+		err := renderer.Render()
+		assert.NoError(t, err)
+
+		output := buf.String()
+		assert.Greater(t, len(output), 0, "Should output style change")
+		buf.Reset()
+	}
+
+	// Then cycle through blinking styles
+	blinkingStyles := []cswterm.CursorStyle{
+		cswterm.CursorStyleBlock | cswterm.CursorStyleBlinking,
+		cswterm.CursorStyleUnderline | cswterm.CursorStyleBlinking,
+		cswterm.CursorStyleBar | cswterm.CursorStyleBlinking,
+	}
+
+	for _, style := range blinkingStyles {
+		screen.SetCursorStyle(style)
+		err := renderer.Render()
+		assert.NoError(t, err)
+
+		output := buf.String()
+		assert.Greater(t, len(output), 0, "Should output style change")
+		buf.Reset()
+	}
+
+	// Finally cycle through all styles with blinking (combination test)
+	allStylesWithBlinking := []cswterm.CursorStyle{
+		cswterm.CursorStyleDefault | cswterm.CursorStyleBlinking,
+		cswterm.CursorStyleBlock | cswterm.CursorStyleBlinking,
+		cswterm.CursorStyleUnderline | cswterm.CursorStyleBlinking,
+		cswterm.CursorStyleBar | cswterm.CursorStyleBlinking,
+	}
+
+	for _, style := range allStylesWithBlinking {
+		screen.SetCursorStyle(style)
+		err := renderer.Render()
+		assert.NoError(t, err)
+
+		output := buf.String()
+		assert.Greater(t, len(output), 0, "Should output style change")
+		buf.Reset()
+	}
+
+	// Render again without changes - should produce no output
+	err := renderer.Render()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, buf.Len(), "No output expected when cursor style unchanged")
+}
+
+func TestScreenRenderer_CursorStyleTransitionFromHidden(t *testing.T) {
+	screen := NewScreenBuffer(80, 24, 0)
+	buf := &bytes.Buffer{}
+	renderer := NewScreenRenderer(screen, buf)
+
+	// Initial render
+	renderer.Render()
+	buf.Reset()
+
+	// Hide cursor
+	screen.SetCursorStyle(cswterm.CursorStyleHidden)
+	err := renderer.Render()
+	assert.NoError(t, err)
+	output := buf.String()
+	assert.Contains(t, output, "\x1b[?25l", "Should contain hide cursor sequence")
+	buf.Reset()
+
+	// Transition from hidden to block - should show cursor
+	screen.SetCursorStyle(cswterm.CursorStyleBlock)
+	err = renderer.Render()
+	assert.NoError(t, err)
+	output = buf.String()
+	assert.Contains(t, output, "\x1b[?25h", "Should contain show cursor sequence when transitioning from hidden")
+	assert.Contains(t, output, "\x1b[2 q", "Should contain block cursor style sequence")
+	buf.Reset()
+
+	// Transition from hidden to underline
+	screen.SetCursorStyle(cswterm.CursorStyleHidden)
+	renderer.Render()
+	buf.Reset()
+	screen.SetCursorStyle(cswterm.CursorStyleUnderline)
+	err = renderer.Render()
+	assert.NoError(t, err)
+	output = buf.String()
+	assert.Contains(t, output, "\x1b[?25h", "Should contain show cursor sequence when transitioning from hidden")
+	assert.Contains(t, output, "\x1b[4 q", "Should contain underline cursor style sequence")
+	buf.Reset()
+
+	// Transition from hidden to bar
+	screen.SetCursorStyle(cswterm.CursorStyleHidden)
+	renderer.Render()
+	buf.Reset()
+	screen.SetCursorStyle(cswterm.CursorStyleBar)
+	err = renderer.Render()
+	assert.NoError(t, err)
+	output = buf.String()
+	assert.Contains(t, output, "\x1b[?25h", "Should contain show cursor sequence when transitioning from hidden")
+	assert.Contains(t, output, "\x1b[6 q", "Should contain bar cursor style sequence")
+	buf.Reset()
+
+	// Transition from hidden to default
+	screen.SetCursorStyle(cswterm.CursorStyleHidden)
+	renderer.Render()
+	buf.Reset()
+	screen.SetCursorStyle(cswterm.CursorStyleDefault)
+	err = renderer.Render()
+	assert.NoError(t, err)
+	output = buf.String()
+	assert.Contains(t, output, "\x1b[?25h", "Should contain show cursor sequence when transitioning from hidden")
+	assert.Contains(t, output, "\x1b[0 q", "Should contain default cursor style sequence")
+	buf.Reset()
+
+	// Transition from hidden to blinking block
+	screen.SetCursorStyle(cswterm.CursorStyleHidden)
+	renderer.Render()
+	buf.Reset()
+	screen.SetCursorStyle(cswterm.CursorStyleBlock | cswterm.CursorStyleBlinking)
+	err = renderer.Render()
+	assert.NoError(t, err)
+	output = buf.String()
+	assert.Contains(t, output, "\x1b[?25h", "Should contain show cursor sequence when transitioning from hidden")
+	assert.Contains(t, output, "\x1b[1 q", "Should contain blinking block cursor style sequence")
+	buf.Reset()
+
+	// Transition from hidden to blinking underline
+	screen.SetCursorStyle(cswterm.CursorStyleHidden)
+	renderer.Render()
+	buf.Reset()
+	screen.SetCursorStyle(cswterm.CursorStyleUnderline | cswterm.CursorStyleBlinking)
+	err = renderer.Render()
+	assert.NoError(t, err)
+	output = buf.String()
+	assert.Contains(t, output, "\x1b[?25h", "Should contain show cursor sequence when transitioning from hidden")
+	assert.Contains(t, output, "\x1b[3 q", "Should contain blinking underline cursor style sequence")
+	buf.Reset()
+
+	// Transition from hidden to blinking bar
+	screen.SetCursorStyle(cswterm.CursorStyleHidden)
+	renderer.Render()
+	buf.Reset()
+	screen.SetCursorStyle(cswterm.CursorStyleBar | cswterm.CursorStyleBlinking)
+	err = renderer.Render()
+	assert.NoError(t, err)
+	output = buf.String()
+	assert.Contains(t, output, "\x1b[?25h", "Should contain show cursor sequence when transitioning from hidden")
+	assert.Contains(t, output, "\x1b[5 q", "Should contain blinking bar cursor style sequence")
+}
+
+func TestScreenRenderer_CursorDoesNotAffectContent(t *testing.T) {
+	screen := NewScreenBuffer(20, 5, 0)
+	buf := &bytes.Buffer{}
+	renderer := NewScreenRenderer(screen, buf)
+
+	// Add text
+	screen.PutText(0, 0, "Hello", cswterm.Attrs(0))
+	renderer.Render()
+	buf.Reset()
+
+	// Move cursor and change style
+	screen.MoveCursor(10, 2)
+	screen.SetCursorStyle(cswterm.CursorStyleBlock)
+	err := renderer.Render()
+	assert.NoError(t, err)
+
+	output := buf.String()
+	// Should contain cursor sequences but not re-render the text
+	assert.NotContains(t, output, "Hello", "Should not re-render unchanged text")
+	assert.Contains(t, output, "\x1b[3;11H", "Should contain cursor move")
+	assert.Contains(t, output, "\x1b[2 q", "Should contain cursor style")
 }

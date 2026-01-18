@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"syscall"
@@ -26,6 +27,7 @@ type DemoApp struct {
 	borderStyle  int
 	flashCount   int
 	oldTermState *term.State // Store terminal state for restoration
+	cursorStyle  int         // Current cursor style index
 }
 
 // NewDemoApp creates a new demo application.
@@ -55,31 +57,86 @@ func (app *DemoApp) Notify(event cswterm.InputEvent) {
 
 	// Handle specific keys to trigger visual changes
 	if event.Type == cswterm.InputEventKey {
-		switch event.Key {
-		case 'q':
-			// Quit on 'q' or Shift+Q
-			app.cleanup()
-			os.Exit(0)
-		case 'c':
-			// Change color on 'c' or Shift+C
-			app.colorIndex = (app.colorIndex + 1) % len(app.colors)
-			app.statusText = fmt.Sprintf("Color changed to #%06X", app.colors[app.colorIndex])
-		case 'b':
-			// Change border style on 'b'
-			app.borderStyle = (app.borderStyle + 1) % 3
-			app.statusText = "Border style changed"
-		case 'f':
-			// Flash animation on 'f' or Shift+F
-			app.flashCount = (app.flashCount + 1) % 10
-			app.statusText = fmt.Sprintf("Flash count: %d", app.flashCount)
-		case 'r':
-			// Reset on 'r' or Shift+R
-			app.lastEvent = nil
-			app.eventCount = 0
-			app.colorIndex = 0
-			app.borderStyle = 0
-			app.flashCount = 0
-			app.statusText = "Reset complete"
+		// Handle function keys (ModFn set)
+		if event.Modifiers&cswterm.ModFn != 0 {
+			switch event.Key {
+			case 'I':
+				// Insert key - rotate cursor style
+				// First cycle through non-blinking styles, then blinking styles, then all combined
+				app.cursorStyle = (app.cursorStyle + 1) % 13
+				styles := []cswterm.CursorStyle{
+					cswterm.CursorStyleDefault,
+					cswterm.CursorStyleBlock,
+					cswterm.CursorStyleUnderline,
+					cswterm.CursorStyleBar,
+					cswterm.CursorStyleHidden,
+					cswterm.CursorStyleDefault | cswterm.CursorStyleBlinking,
+					cswterm.CursorStyleBlock | cswterm.CursorStyleBlinking,
+					cswterm.CursorStyleUnderline | cswterm.CursorStyleBlinking,
+					cswterm.CursorStyleBar | cswterm.CursorStyleBlinking,
+					cswterm.CursorStyleDefault | cswterm.CursorStyleBlinking,
+					cswterm.CursorStyleBlock | cswterm.CursorStyleBlinking,
+					cswterm.CursorStyleUnderline | cswterm.CursorStyleBlinking,
+					cswterm.CursorStyleBar | cswterm.CursorStyleBlinking,
+				}
+				styleNames := []string{
+					"Default",
+					"Block",
+					"Underline",
+					"Bar",
+					"Hidden",
+					"Default Blinking",
+					"Block Blinking",
+					"Underline Blinking",
+					"Bar Blinking",
+					"Default Blinking",
+					"Block Blinking",
+					"Underline Blinking",
+					"Bar Blinking",
+				}
+				app.screen.SetCursorStyle(styles[app.cursorStyle])
+				// Set cursor to random position to demonstrate cursor positioning
+				x := rand.Intn(app.width)
+				y := rand.Intn(app.height)
+				app.screen.MoveCursor(x, y)
+				app.statusText = fmt.Sprintf("Cursor style: %s at (%d, %d)", styleNames[app.cursorStyle], x, y)
+			case 'N':
+				// PageDown key - move cursor to random location
+				x := rand.Intn(app.width)
+				y := rand.Intn(app.height)
+				app.screen.MoveCursor(x, y)
+				app.statusText = fmt.Sprintf("Cursor moved to (%d, %d)", x, y)
+			}
+		} else {
+			switch event.Key {
+			case 'q':
+				// Quit on 'q' or Shift+Q
+				app.cleanup()
+				os.Exit(0)
+			case 'c':
+				// Change color on 'c' or Shift+C
+				app.colorIndex = (app.colorIndex + 1) % len(app.colors)
+				app.statusText = fmt.Sprintf("Color changed to #%06X", app.colors[app.colorIndex])
+			case 'b':
+				// Change border style on 'b'
+				app.borderStyle = (app.borderStyle + 1) % 3
+				app.statusText = "Border style changed"
+			case 'f':
+				// Flash animation on 'f' or Shift+F
+				app.flashCount = (app.flashCount + 1) % 10
+				app.statusText = fmt.Sprintf("Flash count: %d", app.flashCount)
+			case 'r':
+				// Reset on 'r' or Shift+R
+				app.lastEvent = nil
+				app.eventCount = 0
+				app.colorIndex = 0
+				app.borderStyle = 0
+				app.flashCount = 0
+				app.cursorStyle = 0
+				app.screen.SetCursorStyle(cswterm.CursorStyleDefault)
+				app.screen.MoveCursor(0, 0)
+				app.statusText = "Reset complete"
+			}
 		}
 	} else if event.Type == cswterm.InputEventResize {
 		// Update size
@@ -109,7 +166,7 @@ func (app *DemoApp) render() {
 
 	// Draw instructions
 	instructionColor := uint32(0xAAAAAA)
-	app.screen.PutText(0, 1, centerText("Press keys to see events | q=quit c=color b=border f=flash r=reset", app.width),
+	app.screen.PutText(0, 1, centerText("q=quit c=color b=border f=flash r=reset Ins=cursor PgDn=move", app.width),
 		cswterm.AttrsWithColor(0, instructionColor, 0))
 
 	// Draw top border
@@ -447,13 +504,6 @@ func main() {
 	fmt.Print("\x1b[?1015h") // Enable urxvt mouse mode
 	fmt.Print("\x1b[?1006h") // Enable SGR mouse mode
 	defer fmt.Print("\x1b[?1000l")
-
-	// Hide cursor
-	if err := app.renderer.HideCursor(); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to hide cursor: %v\n", err)
-		os.Exit(1)
-	}
-	defer app.renderer.ShowCursor()
 
 	// Create and start input event reader
 	app.eventReader = term2.NewInputEventReader(os.Stdin, os.Stdout, app)

@@ -12,15 +12,18 @@ type listener struct {
 	queue []cswterm.InputEvent
 }
 
-// ScreenBuffer is a test double implementation of ScreenOutput interface.
+// ScreenBuffer is a test double implementation of IScreenOutput interface.
 // It maintains an in-memory buffer and does not output to terminal.
 type ScreenBuffer struct {
-	width     int
-	height    int
-	buffer    []cswterm.Cell
-	listeners map[chan cswterm.InputEvent]*listener
-	mu        sync.Mutex
-	queueSize int
+	width       int
+	height      int
+	buffer      []cswterm.Cell
+	listeners   map[chan cswterm.InputEvent]*listener
+	mu          sync.Mutex
+	queueSize   int
+	cursorX     int
+	cursorY     int
+	cursorStyle cswterm.CursorStyle
 }
 
 // NewScreenBuffer creates a new ScreenBuffer with the specified dimensions.
@@ -131,6 +134,27 @@ func (m *ScreenBuffer) Clear() {
 	for i := range m.buffer {
 		m.buffer[i] = cswterm.Cell{Rune: ' ', Attrs: cswterm.CellAttributes{}}
 	}
+}
+
+// MoveCursor moves the cursor to the specified position.
+func (m *ScreenBuffer) MoveCursor(x int, y int) {
+	m.cursorX = x
+	m.cursorY = y
+}
+
+// SetCursorStyle sets the cursor style.
+func (m *ScreenBuffer) SetCursorStyle(style cswterm.CursorStyle) {
+	m.cursorStyle = style
+}
+
+// GetCursorPosition returns the current cursor position.
+func (m *ScreenBuffer) GetCursorPosition() (x int, y int) {
+	return m.cursorX, m.cursorY
+}
+
+// GetCursorStyle returns the current cursor style.
+func (m *ScreenBuffer) GetCursorStyle() cswterm.CursorStyle {
+	return m.cursorStyle
 }
 
 // Listen registers a channel to receive input events.

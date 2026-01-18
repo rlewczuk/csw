@@ -12,17 +12,20 @@ import (
 // It performs optimal differential rendering by tracking changes and only updating
 // modified regions of the screen.
 type ScreenRenderer struct {
-	screen     cswterm.ScreenOutput
-	writer     io.Writer
-	lastBuffer []cswterm.Cell
-	width      int
-	height     int
-	lastAttrs  cswterm.CellAttributes
+	screen          cswterm.IScreenOutput
+	writer          io.Writer
+	lastBuffer      []cswterm.Cell
+	width           int
+	height          int
+	lastAttrs       cswterm.CellAttributes
+	lastCursorX     int
+	lastCursorY     int
+	lastCursorStyle cswterm.CursorStyle
 }
 
 // NewScreenRenderer creates a new ScreenRenderer that renders the given screen
 // to the specified writer.
-func NewScreenRenderer(screen cswterm.ScreenOutput, writer io.Writer) *ScreenRenderer {
+func NewScreenRenderer(screen cswterm.IScreenOutput, writer io.Writer) *ScreenRenderer {
 	width, height := screen.GetSize()
 	lastBuffer := make([]cswterm.Cell, width*height)
 	// Initialize with spaces to match ScreenBuffer initialization
@@ -30,12 +33,15 @@ func NewScreenRenderer(screen cswterm.ScreenOutput, writer io.Writer) *ScreenRen
 		lastBuffer[i] = cswterm.Cell{Rune: ' ', Attrs: cswterm.CellAttributes{}}
 	}
 	return &ScreenRenderer{
-		screen:     screen,
-		writer:     writer,
-		lastBuffer: lastBuffer,
-		width:      width,
-		height:     height,
-		lastAttrs:  cswterm.CellAttributes{},
+		screen:          screen,
+		writer:          writer,
+		lastBuffer:      lastBuffer,
+		width:           width,
+		height:          height,
+		lastAttrs:       cswterm.CellAttributes{},
+		lastCursorX:     -1,
+		lastCursorY:     -1,
+		lastCursorStyle: cswterm.CursorStyle(0xFF), // Invalid style to force first render
 	}
 }
 
@@ -64,9 +70,13 @@ func (r *ScreenRenderer) Render() error {
 
 	// Render each region
 	buf := &bytes.Buffer{}
+	hasRenderedContent := len(regions) > 0
 	for _, region := range regions {
 		r.renderRegion(buf, content, region)
 	}
+
+	// Handle cursor position and style changes
+	r.renderCursor(buf, hasRenderedContent)
 
 	// Write all changes at once
 	if buf.Len() > 0 {
@@ -314,4 +324,87 @@ func (r *ScreenRenderer) Reset() {
 	r.height = height
 	r.lastBuffer = make([]cswterm.Cell, width*height)
 	r.lastAttrs = cswterm.CellAttributes{}
+	r.lastCursorX = -1
+	r.lastCursorY = -1
+	r.lastCursorStyle = cswterm.CursorStyle(0xFF)
+}
+
+// renderCursor renders cursor position and style changes.
+// If hasRenderedContent is true, the cursor will always be repositioned because
+// rendering content leaves the cursor at an arbitrary position.
+func (r *ScreenRenderer) renderCursor(buf *bytes.Buffer, hasRenderedContent bool) {
+	// Try to get cursor position and style from the screen
+	// This requires the screen to be a *ScreenBuffer or compatible type
+	if screenBuffer, ok := r.screen.(*ScreenBuffer); ok {
+		cursorX, cursorY := screenBuffer.GetCursorPosition()
+		cursorStyle := screenBuffer.GetCursorStyle()
+
+		// Always move cursor to the desired position after rendering content
+		// because rendering leaves the cursor at the end of the last rendered character
+		// Also move if cursor position changed from last render
+		if hasRenderedContent || cursorX != r.lastCursorX || cursorY != r.lastCursorY {
+			r.moveCursor(buf, cursorX, cursorY)
+			r.lastCursorX = cursorX
+			r.lastCursorY = cursorY
+		}
+
+		// Check if cursor style changed
+		if cursorStyle != r.lastCursorStyle {
+			r.setCursorStyle(buf, cursorStyle)
+			r.lastCursorStyle = cursorStyle
+		}
+	}
+}
+
+// setCursorStyle writes ANSI sequences to set cursor style.
+func (r *ScreenRenderer) setCursorStyle(buf *bytes.Buffer, style cswterm.CursorStyle) {
+	// If transitioning from hidden to visible, show cursor first
+	if r.lastCursorStyle == cswterm.CursorStyleHidden && style != cswterm.CursorStyleHidden {
+		buf.WriteString("\x1b[?25h")
+	}
+
+	// Handle hidden cursor separately
+	if style == cswterm.CursorStyleHidden {
+		buf.WriteString("\x1b[?25l")
+		return
+	}
+
+	// Extract blinking flag
+	blinking := style&cswterm.CursorStyleBlinking != 0
+	// Remove blinking flag to get base style
+	baseStyle := style &^ cswterm.CursorStyleBlinking
+
+	// Determine ANSI cursor shape code
+	// ANSI cursor codes: 0=default, 1=blinking block, 2=steady block,
+	//                    3=blinking underline, 4=steady underline,
+	//                    5=blinking bar, 6=steady bar
+	var code int
+	switch baseStyle {
+	case cswterm.CursorStyleDefault:
+		// Default cursor (blinking block in most terminals)
+		code = 0
+	case cswterm.CursorStyleBlock:
+		if blinking {
+			code = 1
+		} else {
+			code = 2
+		}
+	case cswterm.CursorStyleUnderline:
+		if blinking {
+			code = 3
+		} else {
+			code = 4
+		}
+	case cswterm.CursorStyleBar:
+		if blinking {
+			code = 5
+		} else {
+			code = 6
+		}
+	default:
+		// Default to code 0 for unknown styles
+		code = 0
+	}
+
+	fmt.Fprintf(buf, "\x1b[%d q", code)
 }
