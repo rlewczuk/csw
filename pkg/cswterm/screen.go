@@ -103,9 +103,26 @@ type Cell struct {
 	Attrs CellAttributes
 }
 
-// ScreenOutput represents a terminal screen. It consists of a grid of cells.
+// CursorStyle represents how cursor is displayed
+type CursorStyle uint32
+
+const (
+	// CursorStyleDefault is the default cursor style (dependend on terminal)
+	CursorStyleDefault CursorStyle = 1 << iota
+	// CursorStyleBlock is a block cursor
+	CursorStyleBlock
+	// CursorStyleUnderline is an underline cursor
+	CursorStyleUnderline
+	// CursorStyleBar is a bar cursor
+	CursorStyleBar
+	// CursorStyleHidden is a hidden cursor
+	CursorStyleHidden
+	CursorStyleBlinking
+)
+
+// IScreenOutput represents a terminal screen. It consists of a grid of cells.
 // Each cell contains a rune and a set of attributes.
-type ScreenOutput interface {
+type IScreenOutput interface {
 
 	// GetSize returns the size of the screen in characters.
 	GetSize() (width int, height int)
@@ -126,6 +143,12 @@ type ScreenOutput interface {
 	// PutText puts text at the specified position with the specified attributes.
 	// if the text is longer than the width of the screen, it is truncated.
 	PutText(x int, y int, text string, attrs CellAttributes)
+
+	// MoveCursor moves the cursor to the specified position.
+	MoveCursor(x int, y int)
+
+	// SetCursorStyle sets the cursor style.
+	SetCursorStyle(style CursorStyle)
 }
 
 // InputEventHandler represents a terminal screen input handler.

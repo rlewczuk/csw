@@ -7,9 +7,12 @@ import (
 
 // ScreenVerifier provides methods to verify screen buffer content in tests.
 type ScreenVerifier struct {
-	width   int
-	height  int
-	content []Cell
+	width       int
+	height      int
+	content     []Cell
+	cursorX     int
+	cursorY     int
+	cursorStyle CursorStyle
 }
 
 // NewScreenVerifier creates a new ScreenVerifier instance.
@@ -22,6 +25,22 @@ func NewScreenVerifier(width, height int, content []Cell) *ScreenVerifier {
 		width:   width,
 		height:  height,
 		content: content,
+	}
+}
+
+// NewScreenVerifierWithCursor creates a new ScreenVerifier instance with cursor information.
+// The content must have exactly width * height cells.
+func NewScreenVerifierWithCursor(width, height int, content []Cell, cursorX, cursorY int, cursorStyle CursorStyle) *ScreenVerifier {
+	if len(content) != width*height {
+		panic("NewScreenVerifierWithCursor: len(content) must equal width * height")
+	}
+	return &ScreenVerifier{
+		width:       width,
+		height:      height,
+		content:     content,
+		cursorX:     cursorX,
+		cursorY:     cursorY,
+		cursorStyle: cursorStyle,
 	}
 }
 
@@ -206,4 +225,14 @@ func (m *MockInputEventHandler) EventCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return len(m.events)
+}
+
+// GetCursorPosition returns the cursor position.
+func (v *ScreenVerifier) GetCursorPosition() (x int, y int) {
+	return v.cursorX, v.cursorY
+}
+
+// GetCursorStyle returns the cursor style.
+func (v *ScreenVerifier) GetCursorStyle() CursorStyle {
+	return v.cursorStyle
 }
