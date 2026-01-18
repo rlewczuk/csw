@@ -101,8 +101,8 @@ const (
 // Each cell contains a rune and a set of attributes.
 type ScreenOutput interface {
 
-	// Size returns the size of the screen in characters.
-	Size() (width int, height int)
+	// GetSize returns the size of the screen in characters.
+	GetSize() (width int, height int)
 
 	// GetContent returns the whole content of the screen.
 	// Returns width, height, and the internal buffer array.

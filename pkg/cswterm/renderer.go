@@ -21,7 +21,7 @@ type ScreenRenderer struct {
 // NewScreenRenderer creates a new ScreenRenderer that renders the given screen
 // to the specified writer.
 func NewScreenRenderer(screen ScreenOutput, writer io.Writer) *ScreenRenderer {
-	width, height := screen.Size()
+	width, height := screen.GetSize()
 	lastBuffer := make([]Cell, width*height)
 	// Initialize with spaces to match ScreenBuffer initialization
 	for i := range lastBuffer {
@@ -305,7 +305,7 @@ func (r *ScreenRenderer) ShowCursor() error {
 
 // Reset resets the renderer state, clearing the last buffer
 func (r *ScreenRenderer) Reset() {
-	width, height := r.screen.Size()
+	width, height := r.screen.GetSize()
 	r.width = width
 	r.height = height
 	r.lastBuffer = make([]Cell, width*height)

@@ -29,7 +29,7 @@ type DemoApp struct {
 
 // NewDemoApp creates a new demo application.
 func NewDemoApp(width, height int) *DemoApp {
-	screen := cswterm.NewMockScreen(width, height, 0)
+	screen := cswterm.NewScreenBuffer(width, height, 0)
 	renderer := cswterm.NewScreenRenderer(screen, os.Stdout)
 
 	return &DemoApp{
@@ -87,7 +87,7 @@ func (app *DemoApp) Notify(event cswterm.InputEvent) {
 		app.statusText = fmt.Sprintf("Resized to %dx%d", app.width, app.height)
 
 		// Create new screen buffer with new dimensions to avoid mangled frame
-		app.screen = cswterm.NewMockScreen(app.width, app.height, 0)
+		app.screen = cswterm.NewScreenBuffer(app.width, app.height, 0)
 		app.renderer = cswterm.NewScreenRenderer(app.screen, os.Stdout)
 	}
 

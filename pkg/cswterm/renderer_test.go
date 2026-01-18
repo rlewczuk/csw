@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewScreenRenderer(t *testing.T) {
-	screen := NewMockScreen(80, 24, 0)
+	screen := NewScreenBuffer(80, 24, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -20,7 +20,7 @@ func TestNewScreenRenderer(t *testing.T) {
 }
 
 func TestScreenRenderer_RenderEmpty(t *testing.T) {
-	screen := NewMockScreen(10, 5, 0)
+	screen := NewScreenBuffer(10, 5, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -32,7 +32,7 @@ func TestScreenRenderer_RenderEmpty(t *testing.T) {
 }
 
 func TestScreenRenderer_RenderInitialContent(t *testing.T) {
-	screen := NewMockScreen(10, 5, 0)
+	screen := NewScreenBuffer(10, 5, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -49,7 +49,7 @@ func TestScreenRenderer_RenderInitialContent(t *testing.T) {
 }
 
 func TestScreenRenderer_DifferentialRendering(t *testing.T) {
-	screen := NewMockScreen(20, 5, 0)
+	screen := NewScreenBuffer(20, 5, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -79,7 +79,7 @@ func TestScreenRenderer_DifferentialRendering(t *testing.T) {
 }
 
 func TestScreenRenderer_RegionMerging(t *testing.T) {
-	screen := NewMockScreen(80, 5, 0)
+	screen := NewScreenBuffer(80, 5, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -97,7 +97,7 @@ func TestScreenRenderer_RegionMerging(t *testing.T) {
 }
 
 func TestScreenRenderer_MultipleRows(t *testing.T) {
-	screen := NewMockScreen(10, 5, 0)
+	screen := NewScreenBuffer(10, 5, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -117,7 +117,7 @@ func TestScreenRenderer_MultipleRows(t *testing.T) {
 }
 
 func TestScreenRenderer_Attributes(t *testing.T) {
-	screen := NewMockScreen(20, 5, 0)
+	screen := NewScreenBuffer(20, 5, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -134,7 +134,7 @@ func TestScreenRenderer_Attributes(t *testing.T) {
 }
 
 func TestScreenRenderer_MultipleAttributes(t *testing.T) {
-	screen := NewMockScreen(20, 5, 0)
+	screen := NewScreenBuffer(20, 5, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -151,7 +151,7 @@ func TestScreenRenderer_MultipleAttributes(t *testing.T) {
 }
 
 func TestScreenRenderer_HideShowCursor(t *testing.T) {
-	screen := NewMockScreen(10, 5, 0)
+	screen := NewScreenBuffer(10, 5, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -168,7 +168,7 @@ func TestScreenRenderer_HideShowCursor(t *testing.T) {
 }
 
 func TestScreenRenderer_ClearScreen(t *testing.T) {
-	screen := NewMockScreen(10, 5, 0)
+	screen := NewScreenBuffer(10, 5, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -181,7 +181,7 @@ func TestScreenRenderer_ClearScreen(t *testing.T) {
 }
 
 func TestScreenRenderer_Reset(t *testing.T) {
-	screen := NewMockScreen(10, 5, 0)
+	screen := NewScreenBuffer(10, 5, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -204,7 +204,7 @@ func TestScreenRenderer_Reset(t *testing.T) {
 }
 
 func TestScreenRenderer_SizeChange(t *testing.T) {
-	screen := NewMockScreen(10, 5, 0)
+	screen := NewScreenBuffer(10, 5, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -220,7 +220,7 @@ func TestScreenRenderer_SizeChange(t *testing.T) {
 }
 
 func TestScreenRenderer_UnicodeCharacters(t *testing.T) {
-	screen := NewMockScreen(20, 5, 0)
+	screen := NewScreenBuffer(20, 5, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -239,7 +239,7 @@ func TestScreenRenderer_UnicodeCharacters(t *testing.T) {
 }
 
 func TestScreenRenderer_ComplexScene(t *testing.T) {
-	screen := NewMockScreen(40, 10, 0)
+	screen := NewScreenBuffer(40, 10, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
@@ -325,7 +325,7 @@ func TestScreenRenderer_FindChangedRegions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			screen := NewMockScreen(tt.width, tt.height, 0)
+			screen := NewScreenBuffer(tt.width, tt.height, 0)
 			buf := &bytes.Buffer{}
 			renderer := NewScreenRenderer(screen, buf)
 
@@ -344,7 +344,7 @@ func TestScreenRenderer_FindChangedRegions(t *testing.T) {
 }
 
 func TestScreenRenderer_MergeRegions(t *testing.T) {
-	screen := NewMockScreen(80, 5, 0)
+	screen := NewScreenBuffer(80, 5, 0)
 	buf := &bytes.Buffer{}
 	renderer := NewScreenRenderer(screen, buf)
 
