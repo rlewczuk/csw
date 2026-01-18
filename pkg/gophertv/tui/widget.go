@@ -1,6 +1,8 @@
-package tv
+package tui
 
-import "github.com/codesnort/codesnort-swe/pkg/cswterm"
+import (
+	"github.com/codesnort/codesnort-swe/pkg/gophertv"
+)
 
 // WidgetPosition represents position and size of the widget.
 // Depending on context, position can be absolute (i.e. relative to the screen) or relative (to parent widgets)
@@ -26,7 +28,7 @@ const (
 // CursorState represents state of the cursor: style and position
 type CursorState struct {
 	// Cursor style
-	Style cswterm.CursorStyle
+	Style gophertv.CursorStyle
 	// Cursor position relative to the widget
 	X, Y int
 }
@@ -45,7 +47,7 @@ const (
 type TEvent struct {
 	Type TEventType
 	// Input event for TEventTypeInput if any
-	InputEvent *cswterm.InputEvent
+	InputEvent *gophertv.InputEvent
 
 	// Position data for TEventTypePosition
 	X, Y, W, H uint32
@@ -59,7 +61,7 @@ type IWidget interface {
 	GetAbsolutePosition() WidgetPosition
 
 	// Draw draws the widget on the screen
-	Draw(screen cswterm.IScreenOutput)
+	Draw(screen gophertv.IScreenOutput)
 
 	// HandleEvent handles an event
 	HandleEvent(event *TEvent)
@@ -96,7 +98,7 @@ func (w *TWidget) GetAbsolutePosition() WidgetPosition {
 }
 
 // Draw draws the widget on the screen by calling Draw() on all children.
-func (w *TWidget) Draw(screen cswterm.IScreenOutput) {
+func (w *TWidget) Draw(screen gophertv.IScreenOutput) {
 	for _, child := range w.Children {
 		child.Draw(screen)
 	}

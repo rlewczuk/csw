@@ -1,12 +1,11 @@
-package tv
+package tui
 
 import (
 	"testing"
 
+	"github.com/codesnort/codesnort-swe/pkg/gophertv"
+	"github.com/codesnort/codesnort-swe/pkg/gophertv/term"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/codesnort/codesnort-swe/pkg/cswterm"
-	"github.com/codesnort/codesnort-swe/pkg/cswterm/term"
 )
 
 // mockWidget is a test double for IWidget that tracks method calls
@@ -17,7 +16,7 @@ type mockWidget struct {
 	lastEvent         *TEvent
 }
 
-func (m *mockWidget) Draw(screen cswterm.IScreenOutput) {
+func (m *mockWidget) Draw(screen gophertv.IScreenOutput) {
 	m.drawCalled = true
 	// Also call the base implementation to test composition
 	m.TWidget.Draw(screen)
@@ -37,7 +36,7 @@ func TestTWidget_Draw_NoChildren(t *testing.T) {
 	}
 
 	// Create a mock screen
-	screen := term.NewScreenBuffer(80, 24, 0)
+	screen := t.NewScreenBuffer(80, 24, 0)
 
 	// Draw should not panic when there are no children
 	widget.Draw(screen)
@@ -70,7 +69,7 @@ func TestTWidget_Draw_WithChildren(t *testing.T) {
 	}
 
 	// Create a mock screen
-	screen := term.NewScreenBuffer(80, 24, 0)
+	screen := t.NewScreenBuffer(80, 24, 0)
 
 	// Draw the parent
 	parent.Draw(screen)
@@ -108,7 +107,7 @@ func TestTWidget_Draw_WithNestedChildren(t *testing.T) {
 	}
 
 	// Create a mock screen
-	screen := term.NewScreenBuffer(80, 24, 0)
+	screen := t.NewScreenBuffer(80, 24, 0)
 
 	// Draw the parent
 	parent.Draw(screen)
@@ -128,8 +127,8 @@ func TestTWidget_HandleEvent_NoActiveChild(t *testing.T) {
 	// Create an event
 	event := &TEvent{
 		Type: TEventTypeInput,
-		InputEvent: &cswterm.InputEvent{
-			Type: cswterm.InputEventKey,
+		InputEvent: &gophertv.InputEvent{
+			Type: gophertv.InputEventKey,
 		},
 	}
 
@@ -156,8 +155,8 @@ func TestTWidget_HandleEvent_WithActiveChild(t *testing.T) {
 	// Create an event
 	event := &TEvent{
 		Type: TEventTypeInput,
-		InputEvent: &cswterm.InputEvent{
-			Type: cswterm.InputEventKey,
+		InputEvent: &gophertv.InputEvent{
+			Type: gophertv.InputEventKey,
 		},
 	}
 
