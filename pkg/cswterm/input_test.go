@@ -204,7 +204,7 @@ func TestInputEventReader_SpecialKeys(t *testing.T) {
 		{
 			name:     "Page Up",
 			input:    []byte("\x1b[5~"),
-			expected: InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'G', Modifiers: ModFn},
 		},
 		{
 			name:     "Page Down",
@@ -239,84 +239,84 @@ func TestInputEventReader_FunctionKeys(t *testing.T) {
 		{
 			name:     "F1 (ESC O P)",
 			input:    []byte("\x1bOP"),
-			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn},
 		},
 		{
 			name:     "F2 (ESC O Q)",
 			input:    []byte("\x1bOQ"),
-			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'Q', Modifiers: ModFn},
 		},
 		{
 			name:     "F3 (ESC O R)",
 			input:    []byte("\x1bOR"),
-			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'R', Modifiers: ModFn},
 		},
 		{
 			name:     "F4 (ESC O S)",
 			input:    []byte("\x1bOS"),
-			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'S', Modifiers: ModFn},
 		},
 		// F1-F4 also have CSI tilde format (urxvt)
 		{
 			name:     "F1 (CSI 11~)",
 			input:    []byte("\x1b[11~"),
-			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn},
 		},
 		{
 			name:     "F2 (CSI 12~)",
 			input:    []byte("\x1b[12~"),
-			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'Q', Modifiers: ModFn},
 		},
 		{
 			name:     "F3 (CSI 13~)",
 			input:    []byte("\x1b[13~"),
-			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'R', Modifiers: ModFn},
 		},
 		{
 			name:     "F4 (CSI 14~)",
 			input:    []byte("\x1b[14~"),
-			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'S', Modifiers: ModFn},
 		},
 		// F5-F12 use CSI tilde format
 		{
 			name:     "F5",
 			input:    []byte("\x1b[15~"),
-			expected: InputEvent{Type: InputEventKey, Key: 5, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'T', Modifiers: ModFn},
 		},
 		{
 			name:     "F6",
 			input:    []byte("\x1b[17~"),
-			expected: InputEvent{Type: InputEventKey, Key: 6, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'U', Modifiers: ModFn},
 		},
 		{
 			name:     "F7",
 			input:    []byte("\x1b[18~"),
-			expected: InputEvent{Type: InputEventKey, Key: 7, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'V', Modifiers: ModFn},
 		},
 		{
 			name:     "F8",
 			input:    []byte("\x1b[19~"),
-			expected: InputEvent{Type: InputEventKey, Key: 8, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'W', Modifiers: ModFn},
 		},
 		{
 			name:     "F9",
 			input:    []byte("\x1b[20~"),
-			expected: InputEvent{Type: InputEventKey, Key: 9, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'X', Modifiers: ModFn},
 		},
 		{
 			name:     "F10",
 			input:    []byte("\x1b[21~"),
-			expected: InputEvent{Type: InputEventKey, Key: 10, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'Y', Modifiers: ModFn},
 		},
 		{
 			name:     "F11",
 			input:    []byte("\x1b[23~"),
-			expected: InputEvent{Type: InputEventKey, Key: 11, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'Z', Modifiers: ModFn},
 		},
 		{
 			name:     "F12",
 			input:    []byte("\x1b[24~"),
-			expected: InputEvent{Type: InputEventKey, Key: 12, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: '[', Modifiers: ModFn},
 		},
 	}
 
@@ -347,22 +347,22 @@ func TestInputEventReader_F1ToF4_NotParsedAsThreeEvents(t *testing.T) {
 		{
 			name:     "F1 should be one event, not Esc+O+P",
 			input:    []byte("\x1bOP"),
-			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn},
 		},
 		{
 			name:     "F2 should be one event, not Esc+O+Q",
 			input:    []byte("\x1bOQ"),
-			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'Q', Modifiers: ModFn},
 		},
 		{
 			name:     "F3 should be one event, not Esc+O+R",
 			input:    []byte("\x1bOR"),
-			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'R', Modifiers: ModFn},
 		},
 		{
 			name:     "F4 should be one event, not Esc+O+S",
 			input:    []byte("\x1bOS"),
-			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn},
+			expected: InputEvent{Type: InputEventKey, Key: 'S', Modifiers: ModFn},
 		},
 	}
 
@@ -393,148 +393,148 @@ func TestInputEventReader_ModifiedFunctionKeys(t *testing.T) {
 		{
 			name:     "Shift+F1",
 			input:    []byte("\x1b[1;2P"),
-			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn | ModShift},
 		},
 		{
 			name:     "Shift+F2",
 			input:    []byte("\x1b[1;2Q"),
-			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'Q', Modifiers: ModFn | ModShift},
 		},
 		{
 			name:     "Shift+F3",
 			input:    []byte("\x1b[1;2R"),
-			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'R', Modifiers: ModFn | ModShift},
 		},
 		{
 			name:     "Shift+F4",
 			input:    []byte("\x1b[1;2S"),
-			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'S', Modifiers: ModFn | ModShift},
 		},
 		// Alt+F1-F4
 		{
 			name:     "Alt+F1",
 			input:    []byte("\x1b[1;3P"),
-			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn | ModAlt},
 		},
 		{
 			name:     "Alt+F2",
 			input:    []byte("\x1b[1;3Q"),
-			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'Q', Modifiers: ModFn | ModAlt},
 		},
 		{
 			name:     "Alt+F3",
 			input:    []byte("\x1b[1;3R"),
-			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'R', Modifiers: ModFn | ModAlt},
 		},
 		{
 			name:     "Alt+F4",
 			input:    []byte("\x1b[1;3S"),
-			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'S', Modifiers: ModFn | ModAlt},
 		},
 		// Shift+Alt+F1-F4
 		{
 			name:     "Shift+Alt+F1",
 			input:    []byte("\x1b[1;4P"),
-			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModShift | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn | ModShift | ModAlt},
 		},
 		{
 			name:     "Shift+Alt+F2",
 			input:    []byte("\x1b[1;4Q"),
-			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModShift | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'Q', Modifiers: ModFn | ModShift | ModAlt},
 		},
 		{
 			name:     "Shift+Alt+F3",
 			input:    []byte("\x1b[1;4R"),
-			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModShift | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'R', Modifiers: ModFn | ModShift | ModAlt},
 		},
 		{
 			name:     "Shift+Alt+F4",
 			input:    []byte("\x1b[1;4S"),
-			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModShift | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'S', Modifiers: ModFn | ModShift | ModAlt},
 		},
 		// Ctrl+F1-F4
 		{
 			name:     "Ctrl+F1",
 			input:    []byte("\x1b[1;5P"),
-			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModCtrl},
+			expected: InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn | ModCtrl},
 		},
 		{
 			name:     "Ctrl+F2",
 			input:    []byte("\x1b[1;5Q"),
-			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModCtrl},
+			expected: InputEvent{Type: InputEventKey, Key: 'Q', Modifiers: ModFn | ModCtrl},
 		},
 		{
 			name:     "Ctrl+F3",
 			input:    []byte("\x1b[1;5R"),
-			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModCtrl},
+			expected: InputEvent{Type: InputEventKey, Key: 'R', Modifiers: ModFn | ModCtrl},
 		},
 		{
 			name:     "Ctrl+F4",
 			input:    []byte("\x1b[1;5S"),
-			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModCtrl},
+			expected: InputEvent{Type: InputEventKey, Key: 'S', Modifiers: ModFn | ModCtrl},
 		},
 		// Ctrl+Shift+F1-F4
 		{
 			name:     "Ctrl+Shift+F1",
 			input:    []byte("\x1b[1;6P"),
-			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModCtrl | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn | ModCtrl | ModShift},
 		},
 		{
 			name:     "Ctrl+Shift+F2",
 			input:    []byte("\x1b[1;6Q"),
-			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModCtrl | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'Q', Modifiers: ModFn | ModCtrl | ModShift},
 		},
 		{
 			name:     "Ctrl+Shift+F3",
 			input:    []byte("\x1b[1;6R"),
-			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModCtrl | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'R', Modifiers: ModFn | ModCtrl | ModShift},
 		},
 		{
 			name:     "Ctrl+Shift+F4",
 			input:    []byte("\x1b[1;6S"),
-			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModCtrl | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'S', Modifiers: ModFn | ModCtrl | ModShift},
 		},
 		// Ctrl+Alt+F1-F4
 		{
 			name:     "Ctrl+Alt+F1",
 			input:    []byte("\x1b[1;7P"),
-			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModCtrl | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn | ModCtrl | ModAlt},
 		},
 		{
 			name:     "Ctrl+Alt+F2",
 			input:    []byte("\x1b[1;7Q"),
-			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModCtrl | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'Q', Modifiers: ModFn | ModCtrl | ModAlt},
 		},
 		{
 			name:     "Ctrl+Alt+F3",
 			input:    []byte("\x1b[1;7R"),
-			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModCtrl | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'R', Modifiers: ModFn | ModCtrl | ModAlt},
 		},
 		{
 			name:     "Ctrl+Alt+F4",
 			input:    []byte("\x1b[1;7S"),
-			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModCtrl | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'S', Modifiers: ModFn | ModCtrl | ModAlt},
 		},
 		// Ctrl+Shift+Alt+F1-F4
 		{
 			name:     "Ctrl+Shift+Alt+F1",
 			input:    []byte("\x1b[1;8P"),
-			expected: InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn | ModCtrl | ModShift | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn | ModCtrl | ModShift | ModAlt},
 		},
 		{
 			name:     "Ctrl+Shift+Alt+F2",
 			input:    []byte("\x1b[1;8Q"),
-			expected: InputEvent{Type: InputEventKey, Key: 2, Modifiers: ModFn | ModCtrl | ModShift | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'Q', Modifiers: ModFn | ModCtrl | ModShift | ModAlt},
 		},
 		{
 			name:     "Ctrl+Shift+Alt+F3",
 			input:    []byte("\x1b[1;8R"),
-			expected: InputEvent{Type: InputEventKey, Key: 3, Modifiers: ModFn | ModCtrl | ModShift | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'R', Modifiers: ModFn | ModCtrl | ModShift | ModAlt},
 		},
 		{
 			name:     "Ctrl+Shift+Alt+F4",
 			input:    []byte("\x1b[1;8S"),
-			expected: InputEvent{Type: InputEventKey, Key: 4, Modifiers: ModFn | ModCtrl | ModShift | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'S', Modifiers: ModFn | ModCtrl | ModShift | ModAlt},
 		},
 	}
 
@@ -564,74 +564,74 @@ func TestInputEventReader_ModifiedF5toF12Keys(t *testing.T) {
 		{
 			name:     "Alt+F5",
 			input:    []byte("\x1b[15;3~"),
-			expected: InputEvent{Type: InputEventKey, Key: 5, Modifiers: ModFn | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'T', Modifiers: ModFn | ModAlt},
 		},
 		{
 			name:     "Alt+F6",
 			input:    []byte("\x1b[17;3~"),
-			expected: InputEvent{Type: InputEventKey, Key: 6, Modifiers: ModFn | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'U', Modifiers: ModFn | ModAlt},
 		},
 		{
 			name:     "Alt+F7",
 			input:    []byte("\x1b[18;3~"),
-			expected: InputEvent{Type: InputEventKey, Key: 7, Modifiers: ModFn | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'V', Modifiers: ModFn | ModAlt},
 		},
 		{
 			name:     "Alt+F8",
 			input:    []byte("\x1b[19;3~"),
-			expected: InputEvent{Type: InputEventKey, Key: 8, Modifiers: ModFn | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'W', Modifiers: ModFn | ModAlt},
 		},
 		{
 			name:     "Alt+F9",
 			input:    []byte("\x1b[20;3~"),
-			expected: InputEvent{Type: InputEventKey, Key: 9, Modifiers: ModFn | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'X', Modifiers: ModFn | ModAlt},
 		},
 		{
 			name:     "Alt+F10",
 			input:    []byte("\x1b[21;3~"),
-			expected: InputEvent{Type: InputEventKey, Key: 10, Modifiers: ModFn | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'Y', Modifiers: ModFn | ModAlt},
 		},
 		{
 			name:     "Alt+F11",
 			input:    []byte("\x1b[23;3~"),
-			expected: InputEvent{Type: InputEventKey, Key: 11, Modifiers: ModFn | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: 'Z', Modifiers: ModFn | ModAlt},
 		},
 		{
 			name:     "Alt+F12",
 			input:    []byte("\x1b[24;3~"),
-			expected: InputEvent{Type: InputEventKey, Key: 12, Modifiers: ModFn | ModAlt},
+			expected: InputEvent{Type: InputEventKey, Key: '[', Modifiers: ModFn | ModAlt},
 		},
 		// Ctrl+F5-F12
 		{
 			name:     "Ctrl+F5",
 			input:    []byte("\x1b[15;5~"),
-			expected: InputEvent{Type: InputEventKey, Key: 5, Modifiers: ModFn | ModCtrl},
+			expected: InputEvent{Type: InputEventKey, Key: 'T', Modifiers: ModFn | ModCtrl},
 		},
 		{
 			name:     "Ctrl+F6",
 			input:    []byte("\x1b[17;5~"),
-			expected: InputEvent{Type: InputEventKey, Key: 6, Modifiers: ModFn | ModCtrl},
+			expected: InputEvent{Type: InputEventKey, Key: 'U', Modifiers: ModFn | ModCtrl},
 		},
 		{
 			name:     "Ctrl+F12",
 			input:    []byte("\x1b[24;5~"),
-			expected: InputEvent{Type: InputEventKey, Key: 12, Modifiers: ModFn | ModCtrl},
+			expected: InputEvent{Type: InputEventKey, Key: '[', Modifiers: ModFn | ModCtrl},
 		},
 		// Shift+F5-F12
 		{
 			name:     "Shift+F5",
 			input:    []byte("\x1b[15;2~"),
-			expected: InputEvent{Type: InputEventKey, Key: 5, Modifiers: ModFn | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'T', Modifiers: ModFn | ModShift},
 		},
 		{
 			name:     "Shift+F6",
 			input:    []byte("\x1b[17;2~"),
-			expected: InputEvent{Type: InputEventKey, Key: 6, Modifiers: ModFn | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: 'U', Modifiers: ModFn | ModShift},
 		},
 		{
 			name:     "Shift+F12",
 			input:    []byte("\x1b[24;2~"),
-			expected: InputEvent{Type: InputEventKey, Key: 12, Modifiers: ModFn | ModShift},
+			expected: InputEvent{Type: InputEventKey, Key: '[', Modifiers: ModFn | ModShift},
 		},
 	}
 
@@ -1270,7 +1270,7 @@ func TestInputEvent_String(t *testing.T) {
 		},
 		{
 			name:     "PageUp",
-			event:    InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn},
+			event:    InputEvent{Type: InputEventKey, Key: 'G', Modifiers: ModFn},
 			expected: "PageUp",
 		},
 		{
@@ -1285,27 +1285,27 @@ func TestInputEvent_String(t *testing.T) {
 		},
 		{
 			name:     "F1",
-			event:    InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModFn},
+			event:    InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModFn},
 			expected: "F1",
 		},
 		{
 			name:     "F5",
-			event:    InputEvent{Type: InputEventKey, Key: 5, Modifiers: ModFn},
+			event:    InputEvent{Type: InputEventKey, Key: 'T', Modifiers: ModFn},
 			expected: "F5",
 		},
 		{
 			name:     "F10",
-			event:    InputEvent{Type: InputEventKey, Key: 10, Modifiers: ModFn},
+			event:    InputEvent{Type: InputEventKey, Key: 'Y', Modifiers: ModFn},
 			expected: "F10",
 		},
 		{
 			name:     "F12",
-			event:    InputEvent{Type: InputEventKey, Key: 12, Modifiers: ModFn},
+			event:    InputEvent{Type: InputEventKey, Key: '[', Modifiers: ModFn},
 			expected: "F12",
 		},
 		{
 			name:     "Shift+F1",
-			event:    InputEvent{Type: InputEventKey, Key: 1, Modifiers: ModShift | ModFn},
+			event:    InputEvent{Type: InputEventKey, Key: 'P', Modifiers: ModShift | ModFn},
 			expected: "Shift-F1",
 		},
 		{
