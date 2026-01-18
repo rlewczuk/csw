@@ -106,18 +106,41 @@ func (m *ScreenBuffer) GetContent() (width int, height int, content []gophertv.C
 }
 
 // PutText puts text at the specified position with the specified attributes.
-// If the text is longer than the width of the screen, it is truncated.
-func (m *ScreenBuffer) PutText(x int, y int, text string, attrs gophertv.CellAttributes) {
+// The rect parameter specifies the position (X, Y) and optional clipping rectangle (W, H).
+// If W and H are 0, the text is clipped only to screen boundaries.
+// If W and H are non-zero, the text is clipped to both the rectangle and screen boundaries.
+// Text is always rendered on a single line (Y coordinate from rect).
+func (m *ScreenBuffer) PutText(rect gophertv.TRect, text string, attrs gophertv.CellAttributes) {
+	x := int(rect.X)
+	y := int(rect.Y)
+
+	// Check if Y is within screen bounds
 	if y < 0 || y >= m.height {
 		return
 	}
+
+	// Check if X is within screen bounds
 	if x < 0 || x >= m.width {
 		return
 	}
 
+	// Determine the clipping rectangle
+	var clipWidth int
+	if rect.W == 0 {
+		// Use full screen width
+		clipWidth = m.width
+	} else {
+		// Use specified width, but clip to screen boundaries
+		clipWidth = int(rect.X + rect.W)
+		if clipWidth > m.width {
+			clipWidth = m.width
+		}
+	}
+
 	col := x
 	for _, r := range text {
-		if col >= m.width {
+		// Check against clipping rectangle
+		if col >= clipWidth {
 			break
 		}
 		idx := y*m.width + col

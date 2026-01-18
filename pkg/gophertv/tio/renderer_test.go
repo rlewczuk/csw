@@ -43,7 +43,7 @@ func TestScreenRenderer_RenderInitialContent(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add some text
-	screen.PutText(0, 0, "Hello", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gophertv.Attrs(0))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -60,7 +60,7 @@ func TestScreenRenderer_DifferentialRendering(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// First render
-	screen.PutText(0, 0, "Hello", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gophertv.Attrs(0))
 	err := renderer.Render()
 	assert.NoError(t, err)
 
@@ -74,7 +74,7 @@ func TestScreenRenderer_DifferentialRendering(t *testing.T) {
 
 	// Third render with a change
 	buf.Reset()
-	screen.PutText(6, 0, "World", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 6, Y: 0, W: 0, H: 0}, "World", gophertv.Attrs(0))
 	err = renderer.Render()
 	assert.NoError(t, err)
 
@@ -90,8 +90,8 @@ func TestScreenRenderer_RegionMerging(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Create two close changes that should be merged
-	screen.PutText(0, 0, "A", gophertv.Attrs(0))
-	screen.PutText(5, 0, "B", gophertv.Attrs(0)) // Only 4 cells apart
+	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "A", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 5, Y: 0, W: 0, H: 0}, "B", gophertv.Attrs(0)) // Only 4 cells apart
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -109,8 +109,8 @@ func TestScreenRenderer_MultipleRows(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add text on multiple rows
-	screen.PutText(0, 0, "Row1", gophertv.Attrs(0))
-	screen.PutText(0, 2, "Row3", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Row1", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Row3", gophertv.Attrs(0))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -129,7 +129,7 @@ func TestScreenRenderer_Attributes(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add text with bold attribute
-	screen.PutText(0, 0, "Bold", gophertv.Attrs(gophertv.AttrBold))
+	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Bold", gophertv.Attrs(gophertv.AttrBold))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -146,7 +146,7 @@ func TestScreenRenderer_MultipleAttributes(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add text with multiple attributes
-	screen.PutText(0, 0, "Test", gophertv.Attrs(gophertv.AttrBold|gophertv.AttrItalic|gophertv.AttrUnderline))
+	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Test", gophertv.Attrs(gophertv.AttrBold|gophertv.AttrItalic|gophertv.AttrUnderline))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -193,7 +193,7 @@ func TestScreenRenderer_Reset(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Render some content
-	screen.PutText(0, 0, "Test", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Test", gophertv.Attrs(0))
 	err := renderer.Render()
 	assert.NoError(t, err)
 
@@ -216,7 +216,7 @@ func TestScreenRenderer_SizeChange(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Initial render
-	screen.PutText(0, 0, "Test", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Test", gophertv.Attrs(0))
 	err := renderer.Render()
 	assert.NoError(t, err)
 
@@ -232,9 +232,9 @@ func TestScreenRenderer_UnicodeCharacters(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Test with Unicode box-drawing characters
-	screen.PutText(0, 0, "┌─┐", gophertv.Attrs(0))
-	screen.PutText(0, 1, "│X│", gophertv.Attrs(0))
-	screen.PutText(0, 2, "└─┘", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "┌─┐", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, "│X│", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, "└─┘", gophertv.Attrs(0))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -251,10 +251,10 @@ func TestScreenRenderer_ComplexScene(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Create a complex scene
-	screen.PutText(0, 0, "Header", gophertv.Attrs(gophertv.AttrBold))
-	screen.PutText(0, 2, "Normal text", gophertv.Attrs(0))
-	screen.PutText(0, 3, "Italic text", gophertv.Attrs(gophertv.AttrItalic))
-	screen.PutText(20, 3, "Bold", gophertv.Attrs(gophertv.AttrBold))
+	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Header", gophertv.Attrs(gophertv.AttrBold))
+	screen.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Normal text", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 0, Y: 3, W: 0, H: 0}, "Italic text", gophertv.Attrs(gophertv.AttrItalic))
+	screen.PutText(gophertv.TRect{X: 20, Y: 3, W: 0, H: 0}, "Bold", gophertv.Attrs(gophertv.AttrBold))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -267,7 +267,7 @@ func TestScreenRenderer_ComplexScene(t *testing.T) {
 
 	// Now modify only one line
 	buf.Reset()
-	screen.PutText(0, 2, "Changed text", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Changed text", gophertv.Attrs(0))
 
 	err = renderer.Render()
 	assert.NoError(t, err)
@@ -338,7 +338,7 @@ func TestScreenRenderer_FindChangedRegions(t *testing.T) {
 
 			// Apply changes
 			for _, change := range tt.changes {
-				screen.PutText(change.x, change.y, change.text, gophertv.Attrs(0))
+				screen.PutText(gophertv.TRect{X: uint16(change.x), Y: uint16(change.y), W: 0, H: 0}, change.text, gophertv.Attrs(0))
 			}
 
 			// Get content and find regions
@@ -708,7 +708,7 @@ func TestScreenRenderer_CursorDoesNotAffectContent(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add text
-	screen.PutText(0, 0, "Hello", gophertv.Attrs(0))
+	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gophertv.Attrs(0))
 	renderer.Render()
 	buf.Reset()
 
