@@ -1,4 +1,4 @@
-package cswterm
+package gophertv
 
 import (
 	"strings"

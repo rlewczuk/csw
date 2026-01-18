@@ -7,17 +7,17 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/codesnort/codesnort-swe/pkg/cswterm"
-	term2 "github.com/codesnort/codesnort-swe/pkg/cswterm/term"
+	"github.com/codesnort/codesnort-swe/pkg/gophertv"
+	"github.com/codesnort/codesnort-swe/pkg/gophertv/tio"
 	"golang.org/x/term"
 )
 
 // DemoApp represents the demo application state.
 type DemoApp struct {
-	screen       *term2.ScreenBuffer
-	renderer     *term2.ScreenRenderer
-	eventReader  *term2.InputEventReader
-	lastEvent    *cswterm.InputEvent
+	screen       *tio.ScreenBuffer
+	renderer     *tio.ScreenRenderer
+	eventReader  *tio.InputEventReader
+	lastEvent    *gophertv.InputEvent
 	eventCount   int
 	width        int
 	height       int
@@ -32,8 +32,8 @@ type DemoApp struct {
 
 // NewDemoApp creates a new demo application.
 func NewDemoApp(width, height int) *DemoApp {
-	screen := term2.NewScreenBuffer(width, height, 0)
-	renderer := term2.NewScreenRenderer(screen, os.Stdout)
+	screen := tio.NewScreenBuffer(width, height, 0)
+	renderer := tio.NewScreenRenderer(screen, os.Stdout)
 
 	return &DemoApp{
 		screen:      screen,
@@ -50,34 +50,34 @@ func NewDemoApp(width, height int) *DemoApp {
 }
 
 // Notify handles input events.
-func (app *DemoApp) Notify(event cswterm.InputEvent) {
+func (app *DemoApp) Notify(event gophertv.InputEvent) {
 	// Store the event
 	app.lastEvent = &event
 	app.eventCount++
 
 	// Handle specific keys to trigger visual changes
-	if event.Type == cswterm.InputEventKey {
+	if event.Type == gophertv.InputEventKey {
 		// Handle function keys (ModFn set)
-		if event.Modifiers&cswterm.ModFn != 0 {
+		if event.Modifiers&gophertv.ModFn != 0 {
 			switch event.Key {
 			case 'I':
 				// Insert key - rotate cursor style
 				// First cycle through non-blinking styles, then blinking styles, then all combined
 				app.cursorStyle = (app.cursorStyle + 1) % 13
-				styles := []cswterm.CursorStyle{
-					cswterm.CursorStyleDefault,
-					cswterm.CursorStyleBlock,
-					cswterm.CursorStyleUnderline,
-					cswterm.CursorStyleBar,
-					cswterm.CursorStyleHidden,
-					cswterm.CursorStyleDefault | cswterm.CursorStyleBlinking,
-					cswterm.CursorStyleBlock | cswterm.CursorStyleBlinking,
-					cswterm.CursorStyleUnderline | cswterm.CursorStyleBlinking,
-					cswterm.CursorStyleBar | cswterm.CursorStyleBlinking,
-					cswterm.CursorStyleDefault | cswterm.CursorStyleBlinking,
-					cswterm.CursorStyleBlock | cswterm.CursorStyleBlinking,
-					cswterm.CursorStyleUnderline | cswterm.CursorStyleBlinking,
-					cswterm.CursorStyleBar | cswterm.CursorStyleBlinking,
+				styles := []gophertv.CursorStyle{
+					gophertv.CursorStyleDefault,
+					gophertv.CursorStyleBlock,
+					gophertv.CursorStyleUnderline,
+					gophertv.CursorStyleBar,
+					gophertv.CursorStyleHidden,
+					gophertv.CursorStyleDefault | gophertv.CursorStyleBlinking,
+					gophertv.CursorStyleBlock | gophertv.CursorStyleBlinking,
+					gophertv.CursorStyleUnderline | gophertv.CursorStyleBlinking,
+					gophertv.CursorStyleBar | gophertv.CursorStyleBlinking,
+					gophertv.CursorStyleDefault | gophertv.CursorStyleBlinking,
+					gophertv.CursorStyleBlock | gophertv.CursorStyleBlinking,
+					gophertv.CursorStyleUnderline | gophertv.CursorStyleBlinking,
+					gophertv.CursorStyleBar | gophertv.CursorStyleBlinking,
 				}
 				styleNames := []string{
 					"Default",
@@ -133,12 +133,12 @@ func (app *DemoApp) Notify(event cswterm.InputEvent) {
 				app.borderStyle = 0
 				app.flashCount = 0
 				app.cursorStyle = 0
-				app.screen.SetCursorStyle(cswterm.CursorStyleDefault)
+				app.screen.SetCursorStyle(gophertv.CursorStyleDefault)
 				app.screen.MoveCursor(0, 0)
 				app.statusText = "Reset complete"
 			}
 		}
-	} else if event.Type == cswterm.InputEventResize {
+	} else if event.Type == gophertv.InputEventResize {
 		// Update size
 		app.width = int(event.X)
 		app.height = int(event.Y)
@@ -162,12 +162,12 @@ func (app *DemoApp) render() {
 	// Draw header
 	headerColor := app.colors[app.colorIndex]
 	app.screen.PutText(0, 0, centerText("Terminal Input Event Demo", app.width),
-		cswterm.AttrsWithColor(cswterm.AttrBold, headerColor, 0))
+		gophertv.AttrsWithColor(gophertv.AttrBold, headerColor, 0))
 
 	// Draw instructions
 	instructionColor := uint32(0xAAAAAA)
 	app.screen.PutText(0, 1, centerText("q=quit c=color b=border f=flash r=reset Ins=cursor PgDn=move", app.width),
-		cswterm.AttrsWithColor(0, instructionColor, 0))
+		gophertv.AttrsWithColor(0, instructionColor, 0))
 
 	// Draw top border
 	app.drawBorder()
@@ -181,13 +181,13 @@ func (app *DemoApp) render() {
 	statusLine := fmt.Sprintf(" Status: %s | Events: %d ",
 		app.statusText, app.eventCount)
 	app.screen.PutText(0, app.height-1, padRight(statusLine, app.width),
-		cswterm.AttrsWithColor(cswterm.AttrBold, statusColor, statusBg))
+		gophertv.AttrsWithColor(gophertv.AttrBold, statusColor, statusBg))
 
 	// Draw flash indicator if active
 	if app.flashCount > 0 {
 		flashColor := app.colors[(app.flashCount)%len(app.colors)]
 		app.screen.PutText(app.width-10, 3, "* FLASH *",
-			cswterm.AttrsWithColor(cswterm.AttrBold|cswterm.AttrBlink, flashColor, 0))
+			gophertv.AttrsWithColor(gophertv.AttrBold|gophertv.AttrBlink, flashColor, 0))
 	}
 
 	// Render to terminal
@@ -210,7 +210,7 @@ func (app *DemoApp) drawBorder() {
 	}
 
 	app.screen.PutText(0, 2, fullBorder,
-		cswterm.AttrsWithColor(0, borderColor, 0))
+		gophertv.AttrsWithColor(0, borderColor, 0))
 }
 
 // drawEventList draws the event details in a centered frame.
@@ -221,7 +221,7 @@ func (app *DemoApp) drawEventList() {
 	if app.lastEvent == nil {
 		emptyText := "No events yet. Press some keys!"
 		app.screen.PutText((app.width-len(emptyText))/2, (startY+endY)/2, emptyText,
-			cswterm.AttrsWithColor(cswterm.AttrItalic, 0x888888, 0))
+			gophertv.AttrsWithColor(gophertv.AttrItalic, 0x888888, 0))
 		return
 	}
 
@@ -235,16 +235,16 @@ func (app *DemoApp) drawEventList() {
 	borderColor := uint32(0x00AAFF)
 	// Top border
 	app.screen.PutText(frameX, frameY, "┌"+padRight("", frameWidth-2)+"┐",
-		cswterm.AttrsWithColor(0, borderColor, 0))
+		gophertv.AttrsWithColor(0, borderColor, 0))
 	// Bottom border
 	app.screen.PutText(frameX, frameY+frameHeight-1, "└"+padRight("", frameWidth-2)+"┘",
-		cswterm.AttrsWithColor(0, borderColor, 0))
+		gophertv.AttrsWithColor(0, borderColor, 0))
 	// Side borders
 	for i := 1; i < frameHeight-1; i++ {
 		app.screen.PutText(frameX, frameY+i, "│",
-			cswterm.AttrsWithColor(0, borderColor, 0))
+			gophertv.AttrsWithColor(0, borderColor, 0))
 		app.screen.PutText(frameX+frameWidth-1, frameY+i, "│",
-			cswterm.AttrsWithColor(0, borderColor, 0))
+			gophertv.AttrsWithColor(0, borderColor, 0))
 	}
 
 	// Draw event details
@@ -256,9 +256,9 @@ func (app *DemoApp) drawEventList() {
 	// Event string representation
 	if y < frameY+frameHeight-1 {
 		app.screen.PutText(frameX+2, y, "Event:",
-			cswterm.AttrsWithColor(cswterm.AttrBold, labelColor, 0))
+			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
 		app.screen.PutText(frameX+12, y, event.String(),
-			cswterm.AttrsWithColor(0, valueColor, 0))
+			gophertv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
 
@@ -266,9 +266,9 @@ func (app *DemoApp) drawEventList() {
 	if y < frameY+frameHeight-1 {
 		y++
 		app.screen.PutText(frameX+2, y, "Type:",
-			cswterm.AttrsWithColor(cswterm.AttrBold, labelColor, 0))
+			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
 		app.screen.PutText(frameX+12, y, eventTypeName(event.Type),
-			cswterm.AttrsWithColor(0, valueColor, 0))
+			gophertv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
 
@@ -276,13 +276,13 @@ func (app *DemoApp) drawEventList() {
 	if y < frameY+frameHeight-1 {
 		y++
 		app.screen.PutText(frameX+2, y, "Key:",
-			cswterm.AttrsWithColor(cswterm.AttrBold, labelColor, 0))
+			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
 		keyStr := fmt.Sprintf("0x%04X", event.Key)
 		if event.Key >= 32 && event.Key <= 126 {
 			keyStr += fmt.Sprintf(" ('%c')", event.Key)
 		}
 		app.screen.PutText(frameX+12, y, keyStr,
-			cswterm.AttrsWithColor(0, valueColor, 0))
+			gophertv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
 
@@ -290,9 +290,9 @@ func (app *DemoApp) drawEventList() {
 	if y < frameY+frameHeight-1 {
 		y++
 		app.screen.PutText(frameX+2, y, "X, Y:",
-			cswterm.AttrsWithColor(cswterm.AttrBold, labelColor, 0))
+			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
 		app.screen.PutText(frameX+12, y, fmt.Sprintf("%d, %d", event.X, event.Y),
-			cswterm.AttrsWithColor(0, valueColor, 0))
+			gophertv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
 
@@ -300,14 +300,14 @@ func (app *DemoApp) drawEventList() {
 	if event.Content != "" && y < frameY+frameHeight-1 {
 		y++
 		app.screen.PutText(frameX+2, y, "Content:",
-			cswterm.AttrsWithColor(cswterm.AttrBold, labelColor, 0))
+			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
 		content := event.Content
 		maxLen := frameWidth - 14
 		if len(content) > maxLen {
 			content = content[:maxLen-3] + "..."
 		}
 		app.screen.PutText(frameX+12, y, content,
-			cswterm.AttrsWithColor(0, valueColor, 0))
+			gophertv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
 
@@ -315,17 +315,17 @@ func (app *DemoApp) drawEventList() {
 	if y < frameY+frameHeight-1 {
 		y++
 		app.screen.PutText(frameX+2, y, "Modifiers:",
-			cswterm.AttrsWithColor(cswterm.AttrBold, labelColor, 0))
+			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
 		modNames := modifierNames(event.Modifiers)
 		if len(modNames) == 0 {
 			app.screen.PutText(frameX+12, y, "(none)",
-				cswterm.AttrsWithColor(0, 0x888888, 0))
+				gophertv.AttrsWithColor(0, 0x888888, 0))
 		} else {
 			modY := y
 			for i, name := range modNames {
 				if modY < frameY+frameHeight-1 {
 					app.screen.PutText(frameX+12, modY, name,
-						cswterm.AttrsWithColor(0, valueColor, 0))
+						gophertv.AttrsWithColor(0, valueColor, 0))
 					modY++
 				}
 				if i == 0 {
@@ -340,21 +340,21 @@ func (app *DemoApp) drawEventList() {
 }
 
 // eventTypeName returns the human-readable name of an event type.
-func eventTypeName(t cswterm.InputEventType) string {
+func eventTypeName(t gophertv.InputEventType) string {
 	switch t {
-	case cswterm.InputEventKey:
+	case gophertv.InputEventKey:
 		return "Key"
-	case cswterm.InputEventMouse:
+	case gophertv.InputEventMouse:
 		return "Mouse"
-	case cswterm.InputEventResize:
+	case gophertv.InputEventResize:
 		return "Resize"
-	case cswterm.InputEventCopy:
+	case gophertv.InputEventCopy:
 		return "Copy"
-	case cswterm.InputEventPaste:
+	case gophertv.InputEventPaste:
 		return "Paste"
-	case cswterm.InputEventFocus:
+	case gophertv.InputEventFocus:
 		return "Focus"
-	case cswterm.InputEventBlur:
+	case gophertv.InputEventBlur:
 		return "Blur"
 	default:
 		return "Unknown"
@@ -362,45 +362,45 @@ func eventTypeName(t cswterm.InputEventType) string {
 }
 
 // modifierNames returns a list of modifier names from the modifiers bitfield.
-func modifierNames(mods cswterm.EventModifiers) []string {
+func modifierNames(mods gophertv.EventModifiers) []string {
 	var names []string
-	if mods&cswterm.ModShift != 0 {
+	if mods&gophertv.ModShift != 0 {
 		names = append(names, "Shift")
 	}
-	if mods&cswterm.ModAlt != 0 {
+	if mods&gophertv.ModAlt != 0 {
 		names = append(names, "Alt")
 	}
-	if mods&cswterm.ModCtrl != 0 {
+	if mods&gophertv.ModCtrl != 0 {
 		names = append(names, "Ctrl")
 	}
-	if mods&cswterm.ModMeta != 0 {
+	if mods&gophertv.ModMeta != 0 {
 		names = append(names, "Meta")
 	}
-	if mods&cswterm.ModClick != 0 {
+	if mods&gophertv.ModClick != 0 {
 		names = append(names, "Click")
 	}
-	if mods&cswterm.ModDoubleClick != 0 {
+	if mods&gophertv.ModDoubleClick != 0 {
 		names = append(names, "DoubleClick")
 	}
-	if mods&cswterm.ModDrag != 0 {
+	if mods&gophertv.ModDrag != 0 {
 		names = append(names, "Drag")
 	}
-	if mods&cswterm.ModPress != 0 {
+	if mods&gophertv.ModPress != 0 {
 		names = append(names, "Press")
 	}
-	if mods&cswterm.ModRelease != 0 {
+	if mods&gophertv.ModRelease != 0 {
 		names = append(names, "Release")
 	}
-	if mods&cswterm.ModMove != 0 {
+	if mods&gophertv.ModMove != 0 {
 		names = append(names, "Move")
 	}
-	if mods&cswterm.ModScrollUp != 0 {
+	if mods&gophertv.ModScrollUp != 0 {
 		names = append(names, "ScrollUp")
 	}
-	if mods&cswterm.ModScrollDown != 0 {
+	if mods&gophertv.ModScrollDown != 0 {
 		names = append(names, "ScrollDown")
 	}
-	if mods&cswterm.ModFn != 0 {
+	if mods&gophertv.ModFn != 0 {
 		names = append(names, "Fn")
 	}
 	return names
@@ -506,7 +506,7 @@ func main() {
 	defer fmt.Print("\x1b[?1000l")
 
 	// Create and start input event reader
-	app.eventReader = term2.NewInputEventReader(os.Stdin, os.Stdout, app)
+	app.eventReader = tio.NewInputEventReader(os.Stdin, os.Stdout, app)
 	if err := app.eventReader.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start event reader: %v\n", err)
 		os.Exit(1)

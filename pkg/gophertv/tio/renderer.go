@@ -1,36 +1,36 @@
-package term
+package tio
 
 import (
 	"bytes"
 	"fmt"
 	"io"
 
-	"github.com/codesnort/codesnort-swe/pkg/cswterm"
+	"github.com/codesnort/codesnort-swe/pkg/gophertv"
 )
 
 // ScreenRenderer renders a screen buffer to a terminal using ANSI escape sequences.
 // It performs optimal differential rendering by tracking changes and only updating
 // modified regions of the screen.
 type ScreenRenderer struct {
-	screen          cswterm.IScreenOutput
+	screen          gophertv.IScreenOutput
 	writer          io.Writer
-	lastBuffer      []cswterm.Cell
+	lastBuffer      []gophertv.Cell
 	width           int
 	height          int
-	lastAttrs       cswterm.CellAttributes
+	lastAttrs       gophertv.CellAttributes
 	lastCursorX     int
 	lastCursorY     int
-	lastCursorStyle cswterm.CursorStyle
+	lastCursorStyle gophertv.CursorStyle
 }
 
 // NewScreenRenderer creates a new ScreenRenderer that renders the given screen
 // to the specified writer.
-func NewScreenRenderer(screen cswterm.IScreenOutput, writer io.Writer) *ScreenRenderer {
+func NewScreenRenderer(screen gophertv.IScreenOutput, writer io.Writer) *ScreenRenderer {
 	width, height := screen.GetSize()
-	lastBuffer := make([]cswterm.Cell, width*height)
+	lastBuffer := make([]gophertv.Cell, width*height)
 	// Initialize with spaces to match ScreenBuffer initialization
 	for i := range lastBuffer {
-		lastBuffer[i] = cswterm.Cell{Rune: ' ', Attrs: cswterm.CellAttributes{}}
+		lastBuffer[i] = gophertv.Cell{Rune: ' ', Attrs: gophertv.CellAttributes{}}
 	}
 	return &ScreenRenderer{
 		screen:          screen,
@@ -38,10 +38,10 @@ func NewScreenRenderer(screen cswterm.IScreenOutput, writer io.Writer) *ScreenRe
 		lastBuffer:      lastBuffer,
 		width:           width,
 		height:          height,
-		lastAttrs:       cswterm.CellAttributes{},
+		lastAttrs:       gophertv.CellAttributes{},
 		lastCursorX:     -1,
 		lastCursorY:     -1,
-		lastCursorStyle: cswterm.CursorStyle(0xFF), // Invalid style to force first render
+		lastCursorStyle: gophertv.CursorStyle(0xFF), // Invalid style to force first render
 	}
 }
 
@@ -55,7 +55,7 @@ func (r *ScreenRenderer) Render() error {
 	if width != r.width || height != r.height {
 		r.width = width
 		r.height = height
-		r.lastBuffer = make([]cswterm.Cell, width*height)
+		r.lastBuffer = make([]gophertv.Cell, width*height)
 		// Clear screen and reset cursor
 		if err := r.clearScreen(); err != nil {
 			return fmt.Errorf("ScreenRenderer.Render(): failed to clear screen: %w", err)
@@ -98,7 +98,7 @@ type region struct {
 }
 
 // findChangedRegions identifies all regions that have changed since last render
-func (r *ScreenRenderer) findChangedRegions(content []cswterm.Cell) []region {
+func (r *ScreenRenderer) findChangedRegions(content []gophertv.Cell) []region {
 	var regions []region
 
 	for y := 0; y < r.height; y++ {
@@ -144,7 +144,7 @@ func (r *ScreenRenderer) findChangedRegions(content []cswterm.Cell) []region {
 
 // TODO replace with cell method Equal(Cell)
 // cellsEqual compares two cells for equality
-func (r *ScreenRenderer) cellsEqual(a, b cswterm.Cell) bool {
+func (r *ScreenRenderer) cellsEqual(a, b gophertv.Cell) bool {
 	return a.Rune == b.Rune &&
 		a.Attrs.Attributes == b.Attrs.Attributes &&
 		a.Attrs.TextColor == b.Attrs.TextColor &&
@@ -178,12 +178,12 @@ func (r *ScreenRenderer) mergeRegions(regions []region, threshold int) []region 
 }
 
 // renderRegion renders a single region to the buffer
-func (r *ScreenRenderer) renderRegion(buf *bytes.Buffer, content []cswterm.Cell, reg region) {
+func (r *ScreenRenderer) renderRegion(buf *bytes.Buffer, content []gophertv.Cell, reg region) {
 	// Move cursor to start of region
 	r.moveCursor(buf, reg.x1, reg.y1)
 
 	// Reset attributes at start of each region
-	currentAttrs := cswterm.CellAttributes{}
+	currentAttrs := gophertv.CellAttributes{}
 
 	// Render each cell in the region
 	for y := reg.y1; y <= reg.y2; y++ {
@@ -215,7 +215,7 @@ func (r *ScreenRenderer) moveCursor(buf *bytes.Buffer, x, y int) {
 }
 
 // attrsEqual compares two CellAttributes for equality
-func (r *ScreenRenderer) attrsEqual(a, b cswterm.CellAttributes) bool {
+func (r *ScreenRenderer) attrsEqual(a, b gophertv.CellAttributes) bool {
 	return a.Attributes == b.Attributes &&
 		a.TextColor == b.TextColor &&
 		a.BackColor == b.BackColor &&
@@ -223,7 +223,7 @@ func (r *ScreenRenderer) attrsEqual(a, b cswterm.CellAttributes) bool {
 }
 
 // setAttributes writes ANSI sequences to set cell attributes
-func (r *ScreenRenderer) setAttributes(buf *bytes.Buffer, attrs cswterm.CellAttributes) {
+func (r *ScreenRenderer) setAttributes(buf *bytes.Buffer, attrs gophertv.CellAttributes) {
 	// Build all SGR parameters together
 	var params []int
 
@@ -231,33 +231,33 @@ func (r *ScreenRenderer) setAttributes(buf *bytes.Buffer, attrs cswterm.CellAttr
 	params = append(params, 0)
 
 	// Text attributes
-	if attrs.Attributes&cswterm.AttrBold != 0 {
+	if attrs.Attributes&gophertv.AttrBold != 0 {
 		params = append(params, 1)
 	}
-	if attrs.Attributes&cswterm.AttrDim != 0 {
+	if attrs.Attributes&gophertv.AttrDim != 0 {
 		params = append(params, 2)
 	}
-	if attrs.Attributes&cswterm.AttrItalic != 0 {
+	if attrs.Attributes&gophertv.AttrItalic != 0 {
 		params = append(params, 3)
 	}
-	if attrs.Attributes&cswterm.AttrUnderline != 0 {
+	if attrs.Attributes&gophertv.AttrUnderline != 0 {
 		params = append(params, 4)
 	}
-	if attrs.Attributes&cswterm.AttrBlink != 0 {
+	if attrs.Attributes&gophertv.AttrBlink != 0 {
 		params = append(params, 5)
 	}
-	if attrs.Attributes&cswterm.AttrReverse != 0 {
+	if attrs.Attributes&gophertv.AttrReverse != 0 {
 		params = append(params, 7)
 	}
-	if attrs.Attributes&cswterm.AttrHidden != 0 {
+	if attrs.Attributes&gophertv.AttrHidden != 0 {
 		params = append(params, 8)
 	}
-	if attrs.Attributes&cswterm.AttrStrikethrough != 0 {
+	if attrs.Attributes&gophertv.AttrStrikethrough != 0 {
 		params = append(params, 9)
 	}
 
 	// Underline styles (need special handling)
-	if attrs.Attributes&cswterm.AttrDoubleUnderline != 0 {
+	if attrs.Attributes&gophertv.AttrDoubleUnderline != 0 {
 		params = append(params, 21)
 	}
 
@@ -322,11 +322,11 @@ func (r *ScreenRenderer) Reset() {
 	width, height := r.screen.GetSize()
 	r.width = width
 	r.height = height
-	r.lastBuffer = make([]cswterm.Cell, width*height)
-	r.lastAttrs = cswterm.CellAttributes{}
+	r.lastBuffer = make([]gophertv.Cell, width*height)
+	r.lastAttrs = gophertv.CellAttributes{}
 	r.lastCursorX = -1
 	r.lastCursorY = -1
-	r.lastCursorStyle = cswterm.CursorStyle(0xFF)
+	r.lastCursorStyle = gophertv.CursorStyle(0xFF)
 }
 
 // renderCursor renders cursor position and style changes.
@@ -357,22 +357,22 @@ func (r *ScreenRenderer) renderCursor(buf *bytes.Buffer, hasRenderedContent bool
 }
 
 // setCursorStyle writes ANSI sequences to set cursor style.
-func (r *ScreenRenderer) setCursorStyle(buf *bytes.Buffer, style cswterm.CursorStyle) {
+func (r *ScreenRenderer) setCursorStyle(buf *bytes.Buffer, style gophertv.CursorStyle) {
 	// If transitioning from hidden to visible, show cursor first
-	if r.lastCursorStyle == cswterm.CursorStyleHidden && style != cswterm.CursorStyleHidden {
+	if r.lastCursorStyle == gophertv.CursorStyleHidden && style != gophertv.CursorStyleHidden {
 		buf.WriteString("\x1b[?25h")
 	}
 
 	// Handle hidden cursor separately
-	if style == cswterm.CursorStyleHidden {
+	if style == gophertv.CursorStyleHidden {
 		buf.WriteString("\x1b[?25l")
 		return
 	}
 
 	// Extract blinking flag
-	blinking := style&cswterm.CursorStyleBlinking != 0
+	blinking := style&gophertv.CursorStyleBlinking != 0
 	// Remove blinking flag to get base style
-	baseStyle := style &^ cswterm.CursorStyleBlinking
+	baseStyle := style &^ gophertv.CursorStyleBlinking
 
 	// Determine ANSI cursor shape code
 	// ANSI cursor codes: 0=default, 1=blinking block, 2=steady block,
@@ -380,22 +380,22 @@ func (r *ScreenRenderer) setCursorStyle(buf *bytes.Buffer, style cswterm.CursorS
 	//                    5=blinking bar, 6=steady bar
 	var code int
 	switch baseStyle {
-	case cswterm.CursorStyleDefault:
+	case gophertv.CursorStyleDefault:
 		// Default cursor (blinking block in most terminals)
 		code = 0
-	case cswterm.CursorStyleBlock:
+	case gophertv.CursorStyleBlock:
 		if blinking {
 			code = 1
 		} else {
 			code = 2
 		}
-	case cswterm.CursorStyleUnderline:
+	case gophertv.CursorStyleUnderline:
 		if blinking {
 			code = 3
 		} else {
 			code = 4
 		}
-	case cswterm.CursorStyleBar:
+	case gophertv.CursorStyleBar:
 		if blinking {
 			code = 5
 		} else {
