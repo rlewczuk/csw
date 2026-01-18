@@ -134,7 +134,7 @@ type InputEvent struct {
 
 	// Key is a key code for keyboard events.
 	// For letter keys, Key is a Unicode code point of the letter (uppercase if shift is pressed plus shift modifier set)
-	// For function keys F1..F10, Key is a rune from 1..10 and ModFn modifier set
+	// For function keys F1-F12, Key is a letter from their CSI codes (P-S for F1-F4, T-Z and [ for F5-F12) and ModFn modifier set
 	// For arrow keys and other special navigation keys, Key is a letter and ModFn modifier set
 	Key rune
 
@@ -183,23 +183,48 @@ func (e *InputEvent) String() string {
 	// Determine the key name
 	var keyName string
 
-	// Function keys F1-F12
-	if e.Modifiers&ModFn != 0 && e.Key >= 1 && e.Key <= 12 {
-		keyName = "F" + string(rune('0'+e.Key/10)) + string(rune('0'+e.Key%10))
-		if e.Key < 10 {
-			keyName = "F" + string(rune('0'+e.Key))
-		}
-		if e.Modifiers&ModShift != 0 {
-			result += "Shift-"
-		}
-		return result + keyName
-	}
-
-	// Navigation keys (arrow keys, Home, End, etc.)
+	// Function keys F1-F12 (using letter codes from CSI sequences)
 	if e.Modifiers&ModFn != 0 {
 		if e.Modifiers&ModShift != 0 {
 			result += "Shift-"
 		}
+		// Map letter codes to function key numbers
+		var fnNum int
+		switch e.Key {
+		case 'P':
+			fnNum = 1
+		case 'Q':
+			fnNum = 2
+		case 'R':
+			fnNum = 3
+		case 'S':
+			fnNum = 4
+		case 'T':
+			fnNum = 5
+		case 'U':
+			fnNum = 6
+		case 'V':
+			fnNum = 7
+		case 'W':
+			fnNum = 8
+		case 'X':
+			fnNum = 9
+		case 'Y':
+			fnNum = 10
+		case 'Z':
+			fnNum = 11
+		case '[':
+			fnNum = 12
+		}
+		if fnNum > 0 {
+			keyName = "F" + string(rune('0'+fnNum/10)) + string(rune('0'+fnNum%10))
+			if fnNum < 10 {
+				keyName = "F" + string(rune('0'+fnNum))
+			}
+			return result + keyName
+		}
+
+		// Navigation keys (arrow keys, Home, End, etc.)
 		switch e.Key {
 		case 'A':
 			return result + "Up"
@@ -215,7 +240,7 @@ func (e *InputEvent) String() string {
 			return result + "End"
 		case 'I':
 			return result + "Insert"
-		case 'P':
+		case 'G':
 			return result + "PageUp"
 		case 'N':
 			return result + "PageDown"

@@ -200,28 +200,28 @@ func (r *InputEventReader) parseEscO(data []byte) int {
 	case 'P': // F1
 		r.handler.Notify(InputEvent{
 			Type:      InputEventKey,
-			Key:       1,
+			Key:       'P',
 			Modifiers: ModFn,
 		})
 		return 3
 	case 'Q': // F2
 		r.handler.Notify(InputEvent{
 			Type:      InputEventKey,
-			Key:       2,
+			Key:       'Q',
 			Modifiers: ModFn,
 		})
 		return 3
 	case 'R': // F3
 		r.handler.Notify(InputEvent{
 			Type:      InputEventKey,
-			Key:       3,
+			Key:       'R',
 			Modifiers: ModFn,
 		})
 		return 3
 	case 'S': // F4
 		r.handler.Notify(InputEvent{
 			Type:      InputEventKey,
-			Key:       4,
+			Key:       'S',
 			Modifiers: ModFn,
 		})
 		return 3
@@ -391,7 +391,7 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 		if len(params) >= 2 && params[0] == 1 {
 			r.handler.Notify(InputEvent{
 				Type:      InputEventKey,
-				Key:       1,
+				Key:       'P',
 				Modifiers: r.getModifiers(params) | ModFn,
 			})
 			return end
@@ -403,7 +403,7 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 		if len(params) >= 2 && params[0] == 1 {
 			r.handler.Notify(InputEvent{
 				Type:      InputEventKey,
-				Key:       2,
+				Key:       'Q',
 				Modifiers: r.getModifiers(params) | ModFn,
 			})
 			return end
@@ -415,7 +415,7 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 			// Modified F3 key
 			r.handler.Notify(InputEvent{
 				Type:      InputEventKey,
-				Key:       3,
+				Key:       'R',
 				Modifiers: r.getModifiers(params) | ModFn,
 			})
 			return end
@@ -429,7 +429,7 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 		if len(params) >= 2 && params[0] == 1 {
 			r.handler.Notify(InputEvent{
 				Type:      InputEventKey,
-				Key:       4,
+				Key:       'S',
 				Modifiers: r.getModifiers(params) | ModFn,
 			})
 			return end
@@ -520,46 +520,46 @@ func (r *InputEventReader) handleTildeKey(keyCode int, params []int) {
 		key = 'F'
 		mods |= ModFn
 	case 5: // Page Up
-		key = 'P'
+		key = 'G'
 		mods |= ModFn
 	case 6: // Page Down
 		key = 'N'
 		mods |= ModFn
 	case 11: // F1
-		key = 1
+		key = 'P'
 		mods |= ModFn
 	case 12: // F2
-		key = 2
+		key = 'Q'
 		mods |= ModFn
 	case 13: // F3
-		key = 3
+		key = 'R'
 		mods |= ModFn
 	case 14: // F4
-		key = 4
+		key = 'S'
 		mods |= ModFn
 	case 15: // F5
-		key = 5
+		key = 'T'
 		mods |= ModFn
 	case 17: // F6
-		key = 6
+		key = 'U'
 		mods |= ModFn
 	case 18: // F7
-		key = 7
+		key = 'V'
 		mods |= ModFn
 	case 19: // F8
-		key = 8
+		key = 'W'
 		mods |= ModFn
 	case 20: // F9
-		key = 9
+		key = 'X'
 		mods |= ModFn
 	case 21: // F10
-		key = 10
+		key = 'Y'
 		mods |= ModFn
 	case 23: // F11
-		key = 11
+		key = 'Z'
 		mods |= ModFn
 	case 24: // F12
-		key = 12
+		key = '['
 		mods |= ModFn
 	default:
 		// Unknown key code, ignore
