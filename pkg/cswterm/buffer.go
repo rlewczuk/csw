@@ -49,9 +49,54 @@ func NewScreenBuffer(width, height int, queueSize int) *ScreenBuffer {
 	}
 }
 
-// Size returns the size of the screen in characters.
+// GetSize returns the size of the screen in characters.
 func (m *ScreenBuffer) GetSize() (width int, height int) {
 	return m.width, m.height
+}
+
+// SetSize changes the size of the screen in characters.
+// When resizing, content is preserved:
+// - horizontal expansion: new cells on the right are filled with spaces
+// - vertical expansion: new rows at the bottom are filled with spaces
+// - horizontal shrinking: leftmost columns are kept
+// - vertical shrinking: topmost rows are kept
+func (m *ScreenBuffer) SetSize(newWidth int, newHeight int) {
+	if newWidth == m.width && newHeight == m.height {
+		return
+	}
+
+	// Create new buffer
+	newBuffer := make([]Cell, newWidth*newHeight)
+
+	// Initialize all cells with spaces
+	for i := range newBuffer {
+		newBuffer[i] = Cell{Rune: ' ', Attrs: CellAttributes{}}
+	}
+
+	// Copy existing content, preserving as much as possible
+	// We copy row by row, taking the minimum of old and new dimensions
+	rowsToCopy := m.height
+	if newHeight < rowsToCopy {
+		rowsToCopy = newHeight
+	}
+
+	colsToCopy := m.width
+	if newWidth < colsToCopy {
+		colsToCopy = newWidth
+	}
+
+	for y := 0; y < rowsToCopy; y++ {
+		for x := 0; x < colsToCopy; x++ {
+			oldIdx := y*m.width + x
+			newIdx := y*newWidth + x
+			newBuffer[newIdx] = m.buffer[oldIdx]
+		}
+	}
+
+	// Update the buffer and dimensions
+	m.buffer = newBuffer
+	m.width = newWidth
+	m.height = newHeight
 }
 
 // GetContent returns the whole content of the screen.

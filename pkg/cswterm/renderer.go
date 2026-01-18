@@ -304,6 +304,7 @@ func (r *ScreenRenderer) ShowCursor() error {
 }
 
 // Reset resets the renderer state, clearing the last buffer
+// This is useful for example when screen size changes.
 func (r *ScreenRenderer) Reset() {
 	width, height := r.screen.GetSize()
 	r.width = width

@@ -87,8 +87,9 @@ func (app *DemoApp) Notify(event cswterm.InputEvent) {
 		app.statusText = fmt.Sprintf("Resized to %dx%d", app.width, app.height)
 
 		// Create new screen buffer with new dimensions to avoid mangled frame
-		app.screen = cswterm.NewScreenBuffer(app.width, app.height, 0)
-		app.renderer = cswterm.NewScreenRenderer(app.screen, os.Stdout)
+		//app.screen = cswterm.NewScreenBuffer(app.width, app.height, 0)
+		//app.renderer = cswterm.NewScreenRenderer(app.screen, os.Stdout)
+		app.renderer.Reset()
 	}
 
 	// Render the updated screen

@@ -1036,3 +1036,438 @@ func TestScreenBuffer_Listen_MultipleRegistrations(t *testing.T) {
 		// Expected - channel is empty
 	}
 }
+
+func TestScreenBuffer_SetSize_HorizontalExpansion(t *testing.T) {
+	tests := []struct {
+		name      string
+		oldWidth  int
+		oldHeight int
+		newWidth  int
+		newHeight int
+		text      string
+		textX     int
+		textY     int
+	}{
+		{
+			name:      "expand width by 5",
+			oldWidth:  10,
+			oldHeight: 5,
+			newWidth:  15,
+			newHeight: 5,
+			text:      "Hello",
+			textX:     0,
+			textY:     0,
+		},
+		{
+			name:      "expand width significantly",
+			oldWidth:  5,
+			oldHeight: 3,
+			newWidth:  20,
+			newHeight: 3,
+			text:      "Test",
+			textX:     0,
+			textY:     1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			screen := NewScreenBuffer(tt.oldWidth, tt.oldHeight, 0)
+			screen.PutText(tt.textX, tt.textY, tt.text, Attrs(AttrBold))
+
+			// Resize
+			screen.SetSize(tt.newWidth, tt.newHeight)
+
+			// Verify size changed
+			w, h := screen.GetSize()
+			assert.Equal(t, tt.newWidth, w)
+			assert.Equal(t, tt.newHeight, h)
+
+			// Verify original content is preserved
+			verifier := getVerifier(screen)
+			assert.True(t, verifier.HasText(tt.textX, tt.textY, len(tt.text), 1, tt.text))
+
+			// Verify new cells on the right are spaces
+			for y := 0; y < tt.newHeight; y++ {
+				for x := tt.oldWidth; x < tt.newWidth; x++ {
+					cell := verifier.GetCell(x, y)
+					assert.Equal(t, ' ', cell.Rune, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should be space", x, y)
+					assert.Equal(t, CellAttributes{}, cell.Attrs, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should have default attrs", x, y)
+				}
+			}
+		})
+	}
+}
+
+func TestScreenBuffer_SetSize_VerticalExpansion(t *testing.T) {
+	tests := []struct {
+		name      string
+		oldWidth  int
+		oldHeight int
+		newWidth  int
+		newHeight int
+		lines     []string
+	}{
+		{
+			name:      "expand height by 3",
+			oldWidth:  10,
+			oldHeight: 5,
+			newWidth:  10,
+			newHeight: 8,
+			lines:     []string{"Line 1", "Line 2", "Line 3"},
+		},
+		{
+			name:      "expand height significantly",
+			oldWidth:  20,
+			oldHeight: 3,
+			newWidth:  20,
+			newHeight: 10,
+			lines:     []string{"First", "Second"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			screen := NewScreenBuffer(tt.oldWidth, tt.oldHeight, 0)
+			for i, line := range tt.lines {
+				screen.PutText(0, i, line, Attrs(AttrBold))
+			}
+
+			// Resize
+			screen.SetSize(tt.newWidth, tt.newHeight)
+
+			// Verify size changed
+			w, h := screen.GetSize()
+			assert.Equal(t, tt.newWidth, w)
+			assert.Equal(t, tt.newHeight, h)
+
+			// Verify original content is preserved
+			verifier := getVerifier(screen)
+			for i, line := range tt.lines {
+				assert.True(t, verifier.HasText(0, i, len(line), 1, line))
+			}
+
+			// Verify new rows at the bottom are spaces
+			for y := tt.oldHeight; y < tt.newHeight; y++ {
+				for x := 0; x < tt.newWidth; x++ {
+					cell := verifier.GetCell(x, y)
+					assert.Equal(t, ' ', cell.Rune, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should be space", x, y)
+					assert.Equal(t, CellAttributes{}, cell.Attrs, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should have default attrs", x, y)
+				}
+			}
+		})
+	}
+}
+
+func TestScreenBuffer_SetSize_HorizontalShrinking(t *testing.T) {
+	tests := []struct {
+		name      string
+		oldWidth  int
+		oldHeight int
+		newWidth  int
+		newHeight int
+		text      string
+		textX     int
+		textY     int
+		wantText  string
+	}{
+		{
+			name:      "shrink width - keep leftmost",
+			oldWidth:  20,
+			oldHeight: 5,
+			newWidth:  10,
+			newHeight: 5,
+			text:      "HelloWorld1234567890",
+			textX:     0,
+			textY:     0,
+			wantText:  "HelloWorld",
+		},
+		{
+			name:      "shrink width significantly",
+			oldWidth:  15,
+			oldHeight: 3,
+			newWidth:  5,
+			newHeight: 3,
+			text:      "VeryLongText",
+			textX:     0,
+			textY:     1,
+			wantText:  "VeryL",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			screen := NewScreenBuffer(tt.oldWidth, tt.oldHeight, 0)
+			screen.PutText(tt.textX, tt.textY, tt.text, Attrs(AttrBold))
+
+			// Resize
+			screen.SetSize(tt.newWidth, tt.newHeight)
+
+			// Verify size changed
+			w, h := screen.GetSize()
+			assert.Equal(t, tt.newWidth, w)
+			assert.Equal(t, tt.newHeight, h)
+
+			// Verify leftmost content is preserved
+			verifier := getVerifier(screen)
+			assert.True(t, verifier.HasText(tt.textX, tt.textY, len(tt.wantText), 1, tt.wantText))
+		})
+	}
+}
+
+func TestScreenBuffer_SetSize_VerticalShrinking(t *testing.T) {
+	tests := []struct {
+		name      string
+		oldWidth  int
+		oldHeight int
+		newWidth  int
+		newHeight int
+		lines     []string
+		wantLines []string
+	}{
+		{
+			name:      "shrink height - keep topmost",
+			oldWidth:  10,
+			oldHeight: 5,
+			newWidth:  10,
+			newHeight: 3,
+			lines:     []string{"Line 1", "Line 2", "Line 3", "Line 4", "Line 5"},
+			wantLines: []string{"Line 1", "Line 2", "Line 3"},
+		},
+		{
+			name:      "shrink height significantly",
+			oldWidth:  20,
+			oldHeight: 10,
+			newWidth:  20,
+			newHeight: 2,
+			lines:     []string{"First", "Second", "Third", "Fourth", "Fifth"},
+			wantLines: []string{"First", "Second"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			screen := NewScreenBuffer(tt.oldWidth, tt.oldHeight, 0)
+			for i, line := range tt.lines {
+				if i < tt.oldHeight {
+					screen.PutText(0, i, line, Attrs(AttrBold))
+				}
+			}
+
+			// Resize
+			screen.SetSize(tt.newWidth, tt.newHeight)
+
+			// Verify size changed
+			w, h := screen.GetSize()
+			assert.Equal(t, tt.newWidth, w)
+			assert.Equal(t, tt.newHeight, h)
+
+			// Verify topmost content is preserved
+			verifier := getVerifier(screen)
+			for i, line := range tt.wantLines {
+				assert.True(t, verifier.HasText(0, i, len(line), 1, line))
+			}
+		})
+	}
+}
+
+func TestScreenBuffer_SetSize_Combined(t *testing.T) {
+	tests := []struct {
+		name       string
+		oldWidth   int
+		oldHeight  int
+		newWidth   int
+		newHeight  int
+		setupFunc  func(*ScreenBuffer)
+		verifyFunc func(*testing.T, *ScreenVerifier)
+	}{
+		{
+			name:      "expand both dimensions",
+			oldWidth:  5,
+			oldHeight: 3,
+			newWidth:  10,
+			newHeight: 6,
+			setupFunc: func(s *ScreenBuffer) {
+				s.PutText(0, 0, "Hello", Attrs(AttrBold))
+				s.PutText(0, 1, "World", Attrs(AttrItalic))
+			},
+			verifyFunc: func(t *testing.T, v *ScreenVerifier) {
+				assert.True(t, v.HasText(0, 0, 5, 1, "Hello"))
+				assert.True(t, v.HasText(0, 1, 5, 1, "World"))
+				// Check new columns are spaces
+				for y := 0; y < 3; y++ {
+					for x := 5; x < 10; x++ {
+						cell := v.GetCell(x, y)
+						assert.Equal(t, ' ', cell.Rune)
+					}
+				}
+				// Check new rows are spaces
+				for y := 3; y < 6; y++ {
+					for x := 0; x < 10; x++ {
+						cell := v.GetCell(x, y)
+						assert.Equal(t, ' ', cell.Rune)
+					}
+				}
+			},
+		},
+		{
+			name:      "shrink both dimensions",
+			oldWidth:  20,
+			oldHeight: 10,
+			newWidth:  10,
+			newHeight: 5,
+			setupFunc: func(s *ScreenBuffer) {
+				s.PutText(0, 0, "This is a long line", Attrs(0))
+				s.PutText(0, 1, "Another long line!!", Attrs(0))
+				s.PutText(0, 2, "Third line here!!!!", Attrs(0))
+			},
+			verifyFunc: func(t *testing.T, v *ScreenVerifier) {
+				assert.True(t, v.HasText(0, 0, 10, 1, "This is a "))
+				assert.True(t, v.HasText(0, 1, 10, 1, "Another lo"))
+				assert.True(t, v.HasText(0, 2, 10, 1, "Third line"))
+			},
+		},
+		{
+			name:      "expand width, shrink height",
+			oldWidth:  5,
+			oldHeight: 10,
+			newWidth:  15,
+			newHeight: 3,
+			setupFunc: func(s *ScreenBuffer) {
+				s.PutText(0, 0, "Line1", Attrs(0))
+				s.PutText(0, 1, "Line2", Attrs(0))
+				s.PutText(0, 2, "Line3", Attrs(0))
+				s.PutText(0, 5, "Line6", Attrs(0))
+			},
+			verifyFunc: func(t *testing.T, v *ScreenVerifier) {
+				assert.True(t, v.HasText(0, 0, 5, 1, "Line1"))
+				assert.True(t, v.HasText(0, 1, 5, 1, "Line2"))
+				assert.True(t, v.HasText(0, 2, 5, 1, "Line3"))
+				// Line6 should not be present (was at y=5, now height is 3)
+				// Check new columns are spaces
+				for y := 0; y < 3; y++ {
+					for x := 5; x < 15; x++ {
+						cell := v.GetCell(x, y)
+						assert.Equal(t, ' ', cell.Rune)
+					}
+				}
+			},
+		},
+		{
+			name:      "shrink width, expand height",
+			oldWidth:  20,
+			oldHeight: 3,
+			newWidth:  8,
+			newHeight: 8,
+			setupFunc: func(s *ScreenBuffer) {
+				s.PutText(0, 0, "VeryLongLineOfText!!", Attrs(0))
+				s.PutText(0, 1, "AnotherLongLine!!!!!", Attrs(0))
+			},
+			verifyFunc: func(t *testing.T, v *ScreenVerifier) {
+				assert.True(t, v.HasText(0, 0, 8, 1, "VeryLong"))
+				assert.True(t, v.HasText(0, 1, 8, 1, "AnotherL"))
+				// Check new rows are spaces
+				for y := 3; y < 8; y++ {
+					for x := 0; x < 8; x++ {
+						cell := v.GetCell(x, y)
+						assert.Equal(t, ' ', cell.Rune)
+					}
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			screen := NewScreenBuffer(tt.oldWidth, tt.oldHeight, 0)
+			tt.setupFunc(screen)
+
+			// Resize
+			screen.SetSize(tt.newWidth, tt.newHeight)
+
+			// Verify size changed
+			w, h := screen.GetSize()
+			assert.Equal(t, tt.newWidth, w)
+			assert.Equal(t, tt.newHeight, h)
+
+			// Verify content
+			verifier := getVerifier(screen)
+			tt.verifyFunc(t, verifier)
+		})
+	}
+}
+
+func TestScreenBuffer_SetSize_SameDimensions(t *testing.T) {
+	screen := NewScreenBuffer(10, 5, 0)
+	screen.PutText(0, 0, "Hello", Attrs(AttrBold))
+	screen.PutText(0, 1, "World", Attrs(0))
+
+	// Get buffer reference before resize
+	_, _, originalBuffer := screen.GetContent()
+
+	// Resize to same dimensions
+	screen.SetSize(10, 5)
+
+	// Verify size unchanged
+	w, h := screen.GetSize()
+	assert.Equal(t, 10, w)
+	assert.Equal(t, 5, h)
+
+	// Verify content is unchanged
+	verifier := getVerifier(screen)
+	assert.True(t, verifier.HasText(0, 0, 5, 1, "Hello"))
+	assert.True(t, verifier.HasText(0, 1, 5, 1, "World"))
+
+	// Verify buffer reference is the same (no reallocation)
+	_, _, currentBuffer := screen.GetContent()
+	assert.Equal(t, len(originalBuffer), len(currentBuffer))
+}
+
+func TestScreenBuffer_SetSize_PreservesAttributes(t *testing.T) {
+	screen := NewScreenBuffer(10, 5, 0)
+
+	// Put text with different attributes
+	screen.PutText(0, 0, "Bold", Attrs(AttrBold))
+	screen.PutText(0, 1, "Italic", Attrs(AttrItalic))
+	screen.PutText(0, 2, "Under", Attrs(AttrUnderline))
+
+	// Resize to larger dimensions
+	screen.SetSize(15, 8)
+
+	// Verify attributes are preserved
+	verifier := getVerifier(screen)
+	assert.True(t, verifier.HasTextWithAttrs(0, 0, 4, 1, "Bold", AttributeMask{
+		CheckAttributes: true,
+		Attributes:      AttrBold,
+	}))
+	assert.True(t, verifier.HasTextWithAttrs(0, 1, 6, 1, "Italic", AttributeMask{
+		CheckAttributes: true,
+		Attributes:      AttrItalic,
+	}))
+	assert.True(t, verifier.HasTextWithAttrs(0, 2, 5, 1, "Under", AttributeMask{
+		CheckAttributes: true,
+		Attributes:      AttrUnderline,
+	}))
+}
+
+func TestScreenBuffer_SetSize_EmptyBuffer(t *testing.T) {
+	screen := NewScreenBuffer(10, 5, 0)
+
+	// Don't put any text, resize empty buffer
+	screen.SetSize(15, 8)
+
+	// Verify size changed
+	w, h := screen.GetSize()
+	assert.Equal(t, 15, w)
+	assert.Equal(t, 8, h)
+
+	// Verify all cells are spaces
+	verifier := getVerifier(screen)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			cell := verifier.GetCell(x, y)
+			assert.Equal(t, ' ', cell.Rune)
+			assert.Equal(t, CellAttributes{}, cell.Attrs)
+		}
+	}
+}
