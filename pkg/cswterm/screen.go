@@ -104,6 +104,14 @@ type ScreenOutput interface {
 	// GetSize returns the size of the screen in characters.
 	GetSize() (width int, height int)
 
+	// SetSize changes the size of the screen in characters.
+	// When resizing, content is preserved:
+	// - horizontal expansion: new cells on the right are filled with spaces
+	// - vertical expansion: new rows at the bottom are filled with spaces
+	// - horizontal shrinking: leftmost columns are kept
+	// - vertical shrinking: topmost rows are kept
+	SetSize(width int, height int)
+
 	// GetContent returns the whole content of the screen.
 	// Returns width, height, and the internal buffer array.
 	// The content is a single dimensional array where index = y*width + x.
