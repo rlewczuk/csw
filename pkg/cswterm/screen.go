@@ -97,6 +97,12 @@ const (
 	ModFn
 )
 
+// Cell represents a single character cell in the screen buffer.
+type Cell struct {
+	Rune  rune
+	Attrs CellAttributes
+}
+
 // ScreenOutput represents a terminal screen. It consists of a grid of cells.
 // Each cell contains a rune and a set of attributes.
 type ScreenOutput interface {

@@ -7,14 +7,15 @@ import (
 	"syscall"
 
 	"github.com/codesnort/codesnort-swe/pkg/cswterm"
+	term2 "github.com/codesnort/codesnort-swe/pkg/cswterm/term"
 	"golang.org/x/term"
 )
 
 // DemoApp represents the demo application state.
 type DemoApp struct {
-	screen       *cswterm.ScreenBuffer
-	renderer     *cswterm.ScreenRenderer
-	eventReader  *cswterm.InputEventReader
+	screen       *term2.ScreenBuffer
+	renderer     *term2.ScreenRenderer
+	eventReader  *term2.InputEventReader
 	lastEvent    *cswterm.InputEvent
 	eventCount   int
 	width        int
@@ -29,8 +30,8 @@ type DemoApp struct {
 
 // NewDemoApp creates a new demo application.
 func NewDemoApp(width, height int) *DemoApp {
-	screen := cswterm.NewScreenBuffer(width, height, 0)
-	renderer := cswterm.NewScreenRenderer(screen, os.Stdout)
+	screen := term2.NewScreenBuffer(width, height, 0)
+	renderer := term2.NewScreenRenderer(screen, os.Stdout)
 
 	return &DemoApp{
 		screen:      screen,
@@ -455,7 +456,7 @@ func main() {
 	defer app.renderer.ShowCursor()
 
 	// Create and start input event reader
-	app.eventReader = cswterm.NewInputEventReader(os.Stdin, os.Stdout, app)
+	app.eventReader = term2.NewInputEventReader(os.Stdin, os.Stdout, app)
 	if err := app.eventReader.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start event reader: %v\n", err)
 		os.Exit(1)

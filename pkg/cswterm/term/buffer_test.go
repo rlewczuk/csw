@@ -1,16 +1,17 @@
-package cswterm
+package term
 
 import (
 	"testing"
 
+	"github.com/codesnort/codesnort-swe/pkg/cswterm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // Helper function to create a ScreenVerifier from a ScreenBuffer
-func getVerifier(screen *ScreenBuffer) *ScreenVerifier {
+func getVerifier(screen *ScreenBuffer) *cswterm.ScreenVerifier {
 	width, height, content := screen.GetContent()
-	return NewScreenVerifier(width, height, content)
+	return cswterm.NewScreenVerifier(width, height, content)
 }
 
 func TestNewMockScreen(t *testing.T) {
@@ -51,7 +52,7 @@ func TestNewMockScreen(t *testing.T) {
 				for x := 0; x < tt.width; x++ {
 					cell := verifier.GetCell(x, y)
 					assert.Equal(t, ' ', cell.Rune)
-					assert.Equal(t, CellAttributes{}, cell.Attrs)
+					assert.Equal(t, cswterm.CellAttributes{}, cell.Attrs)
 				}
 			}
 		})
@@ -73,9 +74,9 @@ func TestMockScreen_PutText(t *testing.T) {
 		x         int
 		y         int
 		text      string
-		attrs     TextAttributes
+		attrs     cswterm.TextAttributes
 		wantText  string
-		wantAttrs TextAttributes
+		wantAttrs cswterm.TextAttributes
 		checkX    int
 		checkY    int
 	}{
@@ -86,9 +87,9 @@ func TestMockScreen_PutText(t *testing.T) {
 			x:         0,
 			y:         0,
 			text:      "Hello",
-			attrs:     AttrBold,
+			attrs:     cswterm.AttrBold,
 			wantText:  "Hello",
-			wantAttrs: AttrBold,
+			wantAttrs: cswterm.AttrBold,
 			checkX:    0,
 			checkY:    0,
 		},
@@ -99,9 +100,9 @@ func TestMockScreen_PutText(t *testing.T) {
 			x:         5,
 			y:         3,
 			text:      "World",
-			attrs:     AttrItalic | AttrUnderline,
+			attrs:     cswterm.AttrItalic | cswterm.AttrUnderline,
 			wantText:  "World",
-			wantAttrs: AttrItalic | AttrUnderline,
+			wantAttrs: cswterm.AttrItalic | cswterm.AttrUnderline,
 			checkX:    5,
 			checkY:    3,
 		},
@@ -125,9 +126,9 @@ func TestMockScreen_PutText(t *testing.T) {
 			x:         0,
 			y:         0,
 			text:      "Hello 世界",
-			attrs:     AttrBold,
+			attrs:     cswterm.AttrBold,
 			wantText:  "Hello 世界",
-			wantAttrs: AttrBold,
+			wantAttrs: cswterm.AttrBold,
 			checkX:    0,
 			checkY:    0,
 		},
@@ -136,7 +137,7 @@ func TestMockScreen_PutText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.width, tt.height, 0)
-			screen.PutText(tt.x, tt.y, tt.text, Attrs(tt.attrs))
+			screen.PutText(tt.x, tt.y, tt.text, cswterm.Attrs(tt.attrs))
 
 			// Verify each character
 			verifier := getVerifier(screen)
@@ -192,7 +193,7 @@ func TestMockScreen_PutText_Truncation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.width, tt.height, 0)
-			screen.PutText(tt.x, tt.y, tt.text, Attrs(AttrBold))
+			screen.PutText(tt.x, tt.y, tt.text, cswterm.Attrs(cswterm.AttrBold))
 
 			// Count non-space characters
 			verifier := getVerifier(screen)
@@ -255,7 +256,7 @@ func TestMockScreen_PutText_OutOfBounds(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.width, tt.height, 0)
 			// Should not panic
-			screen.PutText(tt.x, tt.y, tt.text, Attrs(AttrBold))
+			screen.PutText(tt.x, tt.y, tt.text, cswterm.Attrs(cswterm.AttrBold))
 
 			// Verify screen is still all spaces
 			verifier := getVerifier(screen)
@@ -271,7 +272,7 @@ func TestMockScreen_PutText_OutOfBounds(t *testing.T) {
 
 func TestMockScreen_GetCell(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 0)
-	screen.PutText(2, 1, "Test", Attrs(AttrBold))
+	screen.PutText(2, 1, "Test", cswterm.Attrs(cswterm.AttrBold))
 	verifier := getVerifier(screen)
 
 	tests := []struct {
@@ -279,21 +280,21 @@ func TestMockScreen_GetCell(t *testing.T) {
 		x         int
 		y         int
 		wantRune  rune
-		wantAttrs TextAttributes
+		wantAttrs cswterm.TextAttributes
 	}{
 		{
 			name:      "first character",
 			x:         2,
 			y:         1,
 			wantRune:  'T',
-			wantAttrs: AttrBold,
+			wantAttrs: cswterm.AttrBold,
 		},
 		{
 			name:      "middle character",
 			x:         3,
 			y:         1,
 			wantRune:  'e',
-			wantAttrs: AttrBold,
+			wantAttrs: cswterm.AttrBold,
 		},
 		{
 			name:      "empty cell",
@@ -336,9 +337,9 @@ func TestMockScreen_GetCell(t *testing.T) {
 
 func TestMockScreen_GetText(t *testing.T) {
 	screen := NewScreenBuffer(20, 10, 0)
-	screen.PutText(0, 0, "Hello", Attrs(0))
-	screen.PutText(0, 1, "World", Attrs(0))
-	screen.PutText(5, 2, "Test", Attrs(0))
+	screen.PutText(0, 0, "Hello", cswterm.Attrs(0))
+	screen.PutText(0, 1, "World", cswterm.Attrs(0))
+	screen.PutText(5, 2, "Test", cswterm.Attrs(0))
 	verifier := getVerifier(screen)
 
 	tests := []struct {
@@ -401,9 +402,9 @@ func TestMockScreen_GetText(t *testing.T) {
 
 func TestMockScreen_HasText(t *testing.T) {
 	screen := NewScreenBuffer(20, 10, 0)
-	screen.PutText(0, 0, "Hello", Attrs(0))
-	screen.PutText(0, 1, "World", Attrs(0))
-	screen.PutText(5, 2, "Test", Attrs(0))
+	screen.PutText(0, 0, "Hello", cswterm.Attrs(0))
+	screen.PutText(0, 1, "World", cswterm.Attrs(0))
+	screen.PutText(5, 2, "Test", cswterm.Attrs(0))
 	verifier := getVerifier(screen)
 
 	tests := []struct {
@@ -481,9 +482,9 @@ func TestMockScreen_HasText(t *testing.T) {
 
 func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 	screen := NewScreenBuffer(20, 10, 0)
-	screen.PutText(0, 0, "Bold", Attrs(AttrBold))
-	screen.PutText(0, 1, "Italic", Attrs(AttrItalic))
-	screen.PutText(0, 2, "Both", Attrs(AttrBold|AttrItalic))
+	screen.PutText(0, 0, "Bold", cswterm.Attrs(cswterm.AttrBold))
+	screen.PutText(0, 1, "Italic", cswterm.Attrs(cswterm.AttrItalic))
+	screen.PutText(0, 2, "Both", cswterm.Attrs(cswterm.AttrBold|cswterm.AttrItalic))
 	verifier := getVerifier(screen)
 
 	tests := []struct {
@@ -493,7 +494,7 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 		width  int
 		height int
 		text   string
-		mask   AttributeMask
+		mask   cswterm.AttributeMask
 		want   bool
 	}{
 		{
@@ -503,9 +504,9 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Bold",
-			mask: AttributeMask{
+			mask: cswterm.AttributeMask{
 				CheckAttributes: true,
-				Attributes:      AttrBold,
+				Attributes:      cswterm.AttrBold,
 			},
 			want: true,
 		},
@@ -516,9 +517,9 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 			width:  6,
 			height: 1,
 			text:   "Italic",
-			mask: AttributeMask{
+			mask: cswterm.AttributeMask{
 				CheckAttributes: true,
-				Attributes:      AttrItalic,
+				Attributes:      cswterm.AttrItalic,
 			},
 			want: true,
 		},
@@ -529,9 +530,9 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Both",
-			mask: AttributeMask{
+			mask: cswterm.AttributeMask{
 				CheckAttributes: true,
-				Attributes:      AttrBold | AttrItalic,
+				Attributes:      cswterm.AttrBold | cswterm.AttrItalic,
 			},
 			want: true,
 		},
@@ -542,9 +543,9 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Bold",
-			mask: AttributeMask{
+			mask: cswterm.AttributeMask{
 				CheckAttributes: true,
-				Attributes:      AttrItalic,
+				Attributes:      cswterm.AttrItalic,
 			},
 			want: false,
 		},
@@ -555,7 +556,7 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Bold",
-			mask: AttributeMask{
+			mask: cswterm.AttributeMask{
 				CheckAttributes: false,
 			},
 			want: true,
@@ -567,9 +568,9 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Test",
-			mask: AttributeMask{
+			mask: cswterm.AttributeMask{
 				CheckAttributes: true,
-				Attributes:      AttrBold,
+				Attributes:      cswterm.AttrBold,
 			},
 			want: false,
 		},
@@ -592,14 +593,14 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 	greenBack := uint32(0x00FF00)
 
 	// Put text and then modify colors
-	screen.PutText(0, 0, "Red", Attrs(0))
+	screen.PutText(0, 0, "Red", cswterm.Attrs(0))
 	width, _, _ := screen.GetContent()
 	for i := 0; i < 3; i++ {
 		idx := 0*width + i
 		screen.buffer[idx].Attrs.TextColor = redColor
 	}
 
-	screen.PutText(0, 1, "Blue", Attrs(0))
+	screen.PutText(0, 1, "Blue", cswterm.Attrs(0))
 	for i := 0; i < 4; i++ {
 		idx := 1*width + i
 		screen.buffer[idx].Attrs.TextColor = blueColor
@@ -613,7 +614,7 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 		width  int
 		height int
 		text   string
-		mask   AttributeMask
+		mask   cswterm.AttributeMask
 		want   bool
 	}{
 		{
@@ -623,7 +624,7 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 			width:  3,
 			height: 1,
 			text:   "Red",
-			mask: AttributeMask{
+			mask: cswterm.AttributeMask{
 				CheckTextColor: true,
 				TextColor:      redColor,
 			},
@@ -636,7 +637,7 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Blue",
-			mask: AttributeMask{
+			mask: cswterm.AttributeMask{
 				CheckTextColor: true,
 				CheckBackColor: true,
 				TextColor:      blueColor,
@@ -651,7 +652,7 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 			width:  3,
 			height: 1,
 			text:   "Red",
-			mask: AttributeMask{
+			mask: cswterm.AttributeMask{
 				CheckTextColor: true,
 				TextColor:      blueColor,
 			},
@@ -664,7 +665,7 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Blue",
-			mask: AttributeMask{
+			mask: cswterm.AttributeMask{
 				CheckBackColor: true,
 				BackColor:      greenBack,
 			},
@@ -683,8 +684,8 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 
 func TestMockScreen_Clear(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 0)
-	screen.PutText(0, 0, "Hello", Attrs(AttrBold))
-	screen.PutText(0, 1, "World", Attrs(AttrItalic))
+	screen.PutText(0, 0, "Hello", cswterm.Attrs(cswterm.AttrBold))
+	screen.PutText(0, 1, "World", cswterm.Attrs(cswterm.AttrItalic))
 
 	// Verify text is present
 	verifier := getVerifier(screen)
@@ -699,20 +700,20 @@ func TestMockScreen_Clear(t *testing.T) {
 		for x := 0; x < 10; x++ {
 			cell := verifier.GetCell(x, y)
 			assert.Equal(t, ' ', cell.Rune)
-			assert.Equal(t, CellAttributes{}, cell.Attrs)
+			assert.Equal(t, cswterm.CellAttributes{}, cell.Attrs)
 		}
 	}
 }
 
 func TestMockScreen_InterfaceCompliance(t *testing.T) {
-	var _ ScreenOutput = (*ScreenBuffer)(nil)
+	var _ cswterm.ScreenOutput = (*ScreenBuffer)(nil)
 }
 
 func TestAttributeMask_Partial(t *testing.T) {
 	screen := NewScreenBuffer(20, 10, 0)
 
 	// Create text with bold and italic
-	screen.PutText(0, 0, "Text", Attrs(AttrBold|AttrItalic|AttrUnderline))
+	screen.PutText(0, 0, "Text", cswterm.Attrs(cswterm.AttrBold|cswterm.AttrItalic|cswterm.AttrUnderline))
 	width, _, _ := screen.GetContent()
 	for i := 0; i < 4; i++ {
 		idx := 0*width + i
@@ -722,20 +723,20 @@ func TestAttributeMask_Partial(t *testing.T) {
 	verifier := getVerifier(screen)
 	tests := []struct {
 		name string
-		mask AttributeMask
+		mask cswterm.AttributeMask
 		want bool
 	}{
 		{
 			name: "check only bold (ignore italic and underline)",
-			mask: AttributeMask{
+			mask: cswterm.AttributeMask{
 				CheckAttributes: true,
-				Attributes:      AttrBold | AttrItalic | AttrUnderline,
+				Attributes:      cswterm.AttrBold | cswterm.AttrItalic | cswterm.AttrUnderline,
 			},
 			want: true,
 		},
 		{
 			name: "check only text color (ignore attributes)",
-			mask: AttributeMask{
+			mask: cswterm.AttributeMask{
 				CheckTextColor: true,
 				TextColor:      0xFF0000,
 			},
@@ -743,17 +744,17 @@ func TestAttributeMask_Partial(t *testing.T) {
 		},
 		{
 			name: "check both color and attributes",
-			mask: AttributeMask{
+			mask: cswterm.AttributeMask{
 				CheckAttributes: true,
 				CheckTextColor:  true,
-				Attributes:      AttrBold | AttrItalic | AttrUnderline,
+				Attributes:      cswterm.AttrBold | cswterm.AttrItalic | cswterm.AttrUnderline,
 				TextColor:       0xFF0000,
 			},
 			want: true,
 		},
 		{
 			name: "check nothing - always matches",
-			mask: AttributeMask{},
+			mask: cswterm.AttributeMask{},
 			want: true,
 		},
 	}
@@ -800,13 +801,13 @@ func TestScreenBuffer_Listen_Notify(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(10, 5, tt.queueSize)
-			ch := make(chan InputEvent, tt.channelSize)
+			ch := make(chan cswterm.InputEvent, tt.channelSize)
 			screen.Listen(ch)
 
 			// Send events
 			for i := 0; i < tt.eventCount; i++ {
-				event := InputEvent{
-					Type: InputEventKey,
+				event := cswterm.InputEvent{
+					Type: cswterm.InputEventKey,
 					Key:  rune('a' + i),
 				}
 				screen.Notify(event)
@@ -817,7 +818,7 @@ func TestScreenBuffer_Listen_Notify(t *testing.T) {
 			for i := 0; i < tt.wantEvents; i++ {
 				select {
 				case ev := <-ch:
-					assert.Equal(t, InputEventKey, ev.Type)
+					assert.Equal(t, cswterm.InputEventKey, ev.Type)
 					assert.Equal(t, rune('a'+i), ev.Key)
 					receivedCount++
 				default:
@@ -834,17 +835,17 @@ func TestScreenBuffer_Notify_MultipleListeners(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 10)
 
 	// Create multiple listeners
-	ch1 := make(chan InputEvent, 10)
-	ch2 := make(chan InputEvent, 10)
-	ch3 := make(chan InputEvent, 10)
+	ch1 := make(chan cswterm.InputEvent, 10)
+	ch2 := make(chan cswterm.InputEvent, 10)
+	ch3 := make(chan cswterm.InputEvent, 10)
 
 	screen.Listen(ch1)
 	screen.Listen(ch2)
 	screen.Listen(ch3)
 
 	// Send an event
-	event := InputEvent{
-		Type: InputEventKey,
+	event := cswterm.InputEvent{
+		Type: cswterm.InputEventKey,
 		Key:  'x',
 	}
 	screen.Notify(event)
@@ -854,11 +855,11 @@ func TestScreenBuffer_Notify_MultipleListeners(t *testing.T) {
 	ev2 := <-ch2
 	ev3 := <-ch3
 
-	assert.Equal(t, InputEventKey, ev1.Type)
+	assert.Equal(t, cswterm.InputEventKey, ev1.Type)
 	assert.Equal(t, 'x', ev1.Key)
-	assert.Equal(t, InputEventKey, ev2.Type)
+	assert.Equal(t, cswterm.InputEventKey, ev2.Type)
 	assert.Equal(t, 'x', ev2.Key)
-	assert.Equal(t, InputEventKey, ev3.Type)
+	assert.Equal(t, cswterm.InputEventKey, ev3.Type)
 	assert.Equal(t, 'x', ev3.Key)
 }
 
@@ -866,11 +867,11 @@ func TestScreenBuffer_Notify_FullChannel_Queue(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 10)
 
 	// Create a channel with size 1
-	ch := make(chan InputEvent, 1)
+	ch := make(chan cswterm.InputEvent, 1)
 	screen.Listen(ch)
 
 	// Send first event - should go directly to channel
-	event1 := InputEvent{Type: InputEventKey, Key: '1'}
+	event1 := cswterm.InputEvent{Type: cswterm.InputEventKey, Key: '1'}
 	screen.Notify(event1)
 
 	// Verify channel has the first event
@@ -882,20 +883,20 @@ func TestScreenBuffer_Notify_FullChannel_Queue(t *testing.T) {
 	}
 
 	// Now channel is empty, send multiple events to fill channel and queue
-	screen.Notify(InputEvent{Type: InputEventKey, Key: '2'})
-	screen.Notify(InputEvent{Type: InputEventKey, Key: '3'})
-	screen.Notify(InputEvent{Type: InputEventKey, Key: '4'})
+	screen.Notify(cswterm.InputEvent{Type: cswterm.InputEventKey, Key: '2'})
+	screen.Notify(cswterm.InputEvent{Type: cswterm.InputEventKey, Key: '3'})
+	screen.Notify(cswterm.InputEvent{Type: cswterm.InputEventKey, Key: '4'})
 
 	// Receive events - queued events should be delivered when we make space
 	for i := 2; i <= 4; i++ {
 		// Read from channel
-		var ev InputEvent
+		var ev cswterm.InputEvent
 		select {
 		case ev = <-ch:
 			// Got an event
 		default:
 			// Channel empty, notify to trigger queue delivery
-			screen.Notify(InputEvent{Type: InputEventKey, Key: 'X'})
+			screen.Notify(cswterm.InputEvent{Type: cswterm.InputEventKey, Key: 'X'})
 			ev = <-ch
 		}
 		expectedKey := rune('0' + i)
@@ -908,16 +909,16 @@ func TestScreenBuffer_Notify_QueueOverflow(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, queueSize)
 
 	// Create a buffered channel
-	ch := make(chan InputEvent, 1)
+	ch := make(chan cswterm.InputEvent, 1)
 	screen.Listen(ch)
 
 	// Fill the channel first
-	screen.Notify(InputEvent{Type: InputEventKey, Key: '0'})
+	screen.Notify(cswterm.InputEvent{Type: cswterm.InputEventKey, Key: '0'})
 
 	// Now send more events than queue size - they will be queued
 	// Send queueSize + 2 more events (total queueSize + 3)
 	for i := 1; i < queueSize+3; i++ {
-		event := InputEvent{Type: InputEventKey, Key: rune('0' + i)}
+		event := cswterm.InputEvent{Type: cswterm.InputEventKey, Key: rune('0' + i)}
 		screen.Notify(event)
 	}
 
@@ -926,7 +927,7 @@ func TestScreenBuffer_Notify_QueueOverflow(t *testing.T) {
 	assert.Equal(t, '0', ev.Key)
 
 	// Notify to trigger delivery of queued events
-	screen.Notify(InputEvent{Type: InputEventKey, Key: 'X'})
+	screen.Notify(cswterm.InputEvent{Type: cswterm.InputEventKey, Key: 'X'})
 
 	// Count how many events we can receive
 	// We should get at most queueSize events (oldest ones were dropped)
@@ -951,11 +952,11 @@ func TestScreenBuffer_Notify_ClosedChannel(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 10)
 
 	// Create and register a channel
-	ch := make(chan InputEvent, 10)
+	ch := make(chan cswterm.InputEvent, 10)
 	screen.Listen(ch)
 
 	// Send an event
-	event1 := InputEvent{Type: InputEventKey, Key: 'a'}
+	event1 := cswterm.InputEvent{Type: cswterm.InputEventKey, Key: 'a'}
 	screen.Notify(event1)
 
 	// Receive it
@@ -966,7 +967,7 @@ func TestScreenBuffer_Notify_ClosedChannel(t *testing.T) {
 	close(ch)
 
 	// Send another event - should not panic
-	event2 := InputEvent{Type: InputEventKey, Key: 'b'}
+	event2 := cswterm.InputEvent{Type: cswterm.InputEventKey, Key: 'b'}
 	require.NotPanics(t, func() {
 		screen.Notify(event2)
 	})
@@ -975,15 +976,15 @@ func TestScreenBuffer_Notify_ClosedChannel(t *testing.T) {
 func TestScreenBuffer_Notify_EventOrder(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 100)
 
-	ch := make(chan InputEvent, 1)
+	ch := make(chan cswterm.InputEvent, 1)
 	screen.Listen(ch)
 
 	// Fill the channel
-	screen.Notify(InputEvent{Type: InputEventKey, Key: '0'})
+	screen.Notify(cswterm.InputEvent{Type: cswterm.InputEventKey, Key: '0'})
 
 	// Queue multiple events
 	for i := 1; i <= 10; i++ {
-		screen.Notify(InputEvent{Type: InputEventKey, Key: rune('0' + i)})
+		screen.Notify(cswterm.InputEvent{Type: cswterm.InputEventKey, Key: rune('0' + i)})
 	}
 
 	// Receive all events and verify order
@@ -993,7 +994,7 @@ func TestScreenBuffer_Notify_EventOrder(t *testing.T) {
 
 		// Trigger delivery of queued events
 		if i < 10 {
-			screen.Notify(InputEvent{Type: InputEventKey, Key: 'X'})
+			screen.Notify(cswterm.InputEvent{Type: cswterm.InputEventKey, Key: 'X'})
 		}
 
 		expectedKey := rune('0' + i)
@@ -1005,7 +1006,7 @@ func TestScreenBuffer_Notify_NoListeners(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 10)
 
 	// Send event with no listeners - should not panic
-	event := InputEvent{Type: InputEventKey, Key: 'a'}
+	event := cswterm.InputEvent{Type: cswterm.InputEventKey, Key: 'a'}
 	require.NotPanics(t, func() {
 		screen.Notify(event)
 	})
@@ -1014,14 +1015,14 @@ func TestScreenBuffer_Notify_NoListeners(t *testing.T) {
 func TestScreenBuffer_Listen_MultipleRegistrations(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 10)
 
-	ch := make(chan InputEvent, 10)
+	ch := make(chan cswterm.InputEvent, 10)
 
 	// Register the same channel multiple times
 	screen.Listen(ch)
 	screen.Listen(ch)
 
 	// Send an event
-	event := InputEvent{Type: InputEventKey, Key: 'a'}
+	event := cswterm.InputEvent{Type: cswterm.InputEventKey, Key: 'a'}
 	screen.Notify(event)
 
 	// Should only receive one event (channel registered once)
@@ -1073,7 +1074,7 @@ func TestScreenBuffer_SetSize_HorizontalExpansion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.oldWidth, tt.oldHeight, 0)
-			screen.PutText(tt.textX, tt.textY, tt.text, Attrs(AttrBold))
+			screen.PutText(tt.textX, tt.textY, tt.text, cswterm.Attrs(cswterm.AttrBold))
 
 			// Resize
 			screen.SetSize(tt.newWidth, tt.newHeight)
@@ -1092,7 +1093,7 @@ func TestScreenBuffer_SetSize_HorizontalExpansion(t *testing.T) {
 				for x := tt.oldWidth; x < tt.newWidth; x++ {
 					cell := verifier.GetCell(x, y)
 					assert.Equal(t, ' ', cell.Rune, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should be space", x, y)
-					assert.Equal(t, CellAttributes{}, cell.Attrs, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should have default attrs", x, y)
+					assert.Equal(t, cswterm.CellAttributes{}, cell.Attrs, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should have default attrs", x, y)
 				}
 			}
 		})
@@ -1130,7 +1131,7 @@ func TestScreenBuffer_SetSize_VerticalExpansion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.oldWidth, tt.oldHeight, 0)
 			for i, line := range tt.lines {
-				screen.PutText(0, i, line, Attrs(AttrBold))
+				screen.PutText(0, i, line, cswterm.Attrs(cswterm.AttrBold))
 			}
 
 			// Resize
@@ -1152,7 +1153,7 @@ func TestScreenBuffer_SetSize_VerticalExpansion(t *testing.T) {
 				for x := 0; x < tt.newWidth; x++ {
 					cell := verifier.GetCell(x, y)
 					assert.Equal(t, ' ', cell.Rune, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should be space", x, y)
-					assert.Equal(t, CellAttributes{}, cell.Attrs, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should have default attrs", x, y)
+					assert.Equal(t, cswterm.CellAttributes{}, cell.Attrs, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should have default attrs", x, y)
 				}
 			}
 		})
@@ -1198,7 +1199,7 @@ func TestScreenBuffer_SetSize_HorizontalShrinking(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.oldWidth, tt.oldHeight, 0)
-			screen.PutText(tt.textX, tt.textY, tt.text, Attrs(AttrBold))
+			screen.PutText(tt.textX, tt.textY, tt.text, cswterm.Attrs(cswterm.AttrBold))
 
 			// Resize
 			screen.SetSize(tt.newWidth, tt.newHeight)
@@ -1250,7 +1251,7 @@ func TestScreenBuffer_SetSize_VerticalShrinking(t *testing.T) {
 			screen := NewScreenBuffer(tt.oldWidth, tt.oldHeight, 0)
 			for i, line := range tt.lines {
 				if i < tt.oldHeight {
-					screen.PutText(0, i, line, Attrs(AttrBold))
+					screen.PutText(0, i, line, cswterm.Attrs(cswterm.AttrBold))
 				}
 			}
 
@@ -1279,7 +1280,7 @@ func TestScreenBuffer_SetSize_Combined(t *testing.T) {
 		newWidth   int
 		newHeight  int
 		setupFunc  func(*ScreenBuffer)
-		verifyFunc func(*testing.T, *ScreenVerifier)
+		verifyFunc func(*testing.T, *cswterm.ScreenVerifier)
 	}{
 		{
 			name:      "expand both dimensions",
@@ -1288,10 +1289,10 @@ func TestScreenBuffer_SetSize_Combined(t *testing.T) {
 			newWidth:  10,
 			newHeight: 6,
 			setupFunc: func(s *ScreenBuffer) {
-				s.PutText(0, 0, "Hello", Attrs(AttrBold))
-				s.PutText(0, 1, "World", Attrs(AttrItalic))
+				s.PutText(0, 0, "Hello", cswterm.Attrs(cswterm.AttrBold))
+				s.PutText(0, 1, "World", cswterm.Attrs(cswterm.AttrItalic))
 			},
-			verifyFunc: func(t *testing.T, v *ScreenVerifier) {
+			verifyFunc: func(t *testing.T, v *cswterm.ScreenVerifier) {
 				assert.True(t, v.HasText(0, 0, 5, 1, "Hello"))
 				assert.True(t, v.HasText(0, 1, 5, 1, "World"))
 				// Check new columns are spaces
@@ -1317,11 +1318,11 @@ func TestScreenBuffer_SetSize_Combined(t *testing.T) {
 			newWidth:  10,
 			newHeight: 5,
 			setupFunc: func(s *ScreenBuffer) {
-				s.PutText(0, 0, "This is a long line", Attrs(0))
-				s.PutText(0, 1, "Another long line!!", Attrs(0))
-				s.PutText(0, 2, "Third line here!!!!", Attrs(0))
+				s.PutText(0, 0, "This is a long line", cswterm.Attrs(0))
+				s.PutText(0, 1, "Another long line!!", cswterm.Attrs(0))
+				s.PutText(0, 2, "Third line here!!!!", cswterm.Attrs(0))
 			},
-			verifyFunc: func(t *testing.T, v *ScreenVerifier) {
+			verifyFunc: func(t *testing.T, v *cswterm.ScreenVerifier) {
 				assert.True(t, v.HasText(0, 0, 10, 1, "This is a "))
 				assert.True(t, v.HasText(0, 1, 10, 1, "Another lo"))
 				assert.True(t, v.HasText(0, 2, 10, 1, "Third line"))
@@ -1334,12 +1335,12 @@ func TestScreenBuffer_SetSize_Combined(t *testing.T) {
 			newWidth:  15,
 			newHeight: 3,
 			setupFunc: func(s *ScreenBuffer) {
-				s.PutText(0, 0, "Line1", Attrs(0))
-				s.PutText(0, 1, "Line2", Attrs(0))
-				s.PutText(0, 2, "Line3", Attrs(0))
-				s.PutText(0, 5, "Line6", Attrs(0))
+				s.PutText(0, 0, "Line1", cswterm.Attrs(0))
+				s.PutText(0, 1, "Line2", cswterm.Attrs(0))
+				s.PutText(0, 2, "Line3", cswterm.Attrs(0))
+				s.PutText(0, 5, "Line6", cswterm.Attrs(0))
 			},
-			verifyFunc: func(t *testing.T, v *ScreenVerifier) {
+			verifyFunc: func(t *testing.T, v *cswterm.ScreenVerifier) {
 				assert.True(t, v.HasText(0, 0, 5, 1, "Line1"))
 				assert.True(t, v.HasText(0, 1, 5, 1, "Line2"))
 				assert.True(t, v.HasText(0, 2, 5, 1, "Line3"))
@@ -1360,10 +1361,10 @@ func TestScreenBuffer_SetSize_Combined(t *testing.T) {
 			newWidth:  8,
 			newHeight: 8,
 			setupFunc: func(s *ScreenBuffer) {
-				s.PutText(0, 0, "VeryLongLineOfText!!", Attrs(0))
-				s.PutText(0, 1, "AnotherLongLine!!!!!", Attrs(0))
+				s.PutText(0, 0, "VeryLongLineOfText!!", cswterm.Attrs(0))
+				s.PutText(0, 1, "AnotherLongLine!!!!!", cswterm.Attrs(0))
 			},
-			verifyFunc: func(t *testing.T, v *ScreenVerifier) {
+			verifyFunc: func(t *testing.T, v *cswterm.ScreenVerifier) {
 				assert.True(t, v.HasText(0, 0, 8, 1, "VeryLong"))
 				assert.True(t, v.HasText(0, 1, 8, 1, "AnotherL"))
 				// Check new rows are spaces
@@ -1399,8 +1400,8 @@ func TestScreenBuffer_SetSize_Combined(t *testing.T) {
 
 func TestScreenBuffer_SetSize_SameDimensions(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 0)
-	screen.PutText(0, 0, "Hello", Attrs(AttrBold))
-	screen.PutText(0, 1, "World", Attrs(0))
+	screen.PutText(0, 0, "Hello", cswterm.Attrs(cswterm.AttrBold))
+	screen.PutText(0, 1, "World", cswterm.Attrs(0))
 
 	// Get buffer reference before resize
 	_, _, originalBuffer := screen.GetContent()
@@ -1427,26 +1428,26 @@ func TestScreenBuffer_SetSize_PreservesAttributes(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 0)
 
 	// Put text with different attributes
-	screen.PutText(0, 0, "Bold", Attrs(AttrBold))
-	screen.PutText(0, 1, "Italic", Attrs(AttrItalic))
-	screen.PutText(0, 2, "Under", Attrs(AttrUnderline))
+	screen.PutText(0, 0, "Bold", cswterm.Attrs(cswterm.AttrBold))
+	screen.PutText(0, 1, "Italic", cswterm.Attrs(cswterm.AttrItalic))
+	screen.PutText(0, 2, "Under", cswterm.Attrs(cswterm.AttrUnderline))
 
 	// Resize to larger dimensions
 	screen.SetSize(15, 8)
 
 	// Verify attributes are preserved
 	verifier := getVerifier(screen)
-	assert.True(t, verifier.HasTextWithAttrs(0, 0, 4, 1, "Bold", AttributeMask{
+	assert.True(t, verifier.HasTextWithAttrs(0, 0, 4, 1, "Bold", cswterm.AttributeMask{
 		CheckAttributes: true,
-		Attributes:      AttrBold,
+		Attributes:      cswterm.AttrBold,
 	}))
-	assert.True(t, verifier.HasTextWithAttrs(0, 1, 6, 1, "Italic", AttributeMask{
+	assert.True(t, verifier.HasTextWithAttrs(0, 1, 6, 1, "Italic", cswterm.AttributeMask{
 		CheckAttributes: true,
-		Attributes:      AttrItalic,
+		Attributes:      cswterm.AttrItalic,
 	}))
-	assert.True(t, verifier.HasTextWithAttrs(0, 2, 5, 1, "Under", AttributeMask{
+	assert.True(t, verifier.HasTextWithAttrs(0, 2, 5, 1, "Under", cswterm.AttributeMask{
 		CheckAttributes: true,
-		Attributes:      AttrUnderline,
+		Attributes:      cswterm.AttrUnderline,
 	}))
 }
 
@@ -1467,7 +1468,7 @@ func TestScreenBuffer_SetSize_EmptyBuffer(t *testing.T) {
 		for x := 0; x < w; x++ {
 			cell := verifier.GetCell(x, y)
 			assert.Equal(t, ' ', cell.Rune)
-			assert.Equal(t, CellAttributes{}, cell.Attrs)
+			assert.Equal(t, cswterm.CellAttributes{}, cell.Attrs)
 		}
 	}
 }

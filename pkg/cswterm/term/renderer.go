@@ -1,31 +1,33 @@
-package cswterm
+package term
 
 import (
 	"bytes"
 	"fmt"
 	"io"
+
+	"github.com/codesnort/codesnort-swe/pkg/cswterm"
 )
 
 // ScreenRenderer renders a screen buffer to a terminal using ANSI escape sequences.
 // It performs optimal differential rendering by tracking changes and only updating
 // modified regions of the screen.
 type ScreenRenderer struct {
-	screen     ScreenOutput
+	screen     cswterm.ScreenOutput
 	writer     io.Writer
-	lastBuffer []Cell
+	lastBuffer []cswterm.Cell
 	width      int
 	height     int
-	lastAttrs  CellAttributes
+	lastAttrs  cswterm.CellAttributes
 }
 
 // NewScreenRenderer creates a new ScreenRenderer that renders the given screen
 // to the specified writer.
-func NewScreenRenderer(screen ScreenOutput, writer io.Writer) *ScreenRenderer {
+func NewScreenRenderer(screen cswterm.ScreenOutput, writer io.Writer) *ScreenRenderer {
 	width, height := screen.GetSize()
-	lastBuffer := make([]Cell, width*height)
+	lastBuffer := make([]cswterm.Cell, width*height)
 	// Initialize with spaces to match ScreenBuffer initialization
 	for i := range lastBuffer {
-		lastBuffer[i] = Cell{Rune: ' ', Attrs: CellAttributes{}}
+		lastBuffer[i] = cswterm.Cell{Rune: ' ', Attrs: cswterm.CellAttributes{}}
 	}
 	return &ScreenRenderer{
 		screen:     screen,
@@ -33,7 +35,7 @@ func NewScreenRenderer(screen ScreenOutput, writer io.Writer) *ScreenRenderer {
 		lastBuffer: lastBuffer,
 		width:      width,
 		height:     height,
-		lastAttrs:  CellAttributes{},
+		lastAttrs:  cswterm.CellAttributes{},
 	}
 }
 
@@ -47,7 +49,7 @@ func (r *ScreenRenderer) Render() error {
 	if width != r.width || height != r.height {
 		r.width = width
 		r.height = height
-		r.lastBuffer = make([]Cell, width*height)
+		r.lastBuffer = make([]cswterm.Cell, width*height)
 		// Clear screen and reset cursor
 		if err := r.clearScreen(); err != nil {
 			return fmt.Errorf("ScreenRenderer.Render(): failed to clear screen: %w", err)
@@ -86,7 +88,7 @@ type region struct {
 }
 
 // findChangedRegions identifies all regions that have changed since last render
-func (r *ScreenRenderer) findChangedRegions(content []Cell) []region {
+func (r *ScreenRenderer) findChangedRegions(content []cswterm.Cell) []region {
 	var regions []region
 
 	for y := 0; y < r.height; y++ {
@@ -130,8 +132,9 @@ func (r *ScreenRenderer) findChangedRegions(content []Cell) []region {
 	return regions
 }
 
+// TODO replace with cell method Equal(Cell)
 // cellsEqual compares two cells for equality
-func (r *ScreenRenderer) cellsEqual(a, b Cell) bool {
+func (r *ScreenRenderer) cellsEqual(a, b cswterm.Cell) bool {
 	return a.Rune == b.Rune &&
 		a.Attrs.Attributes == b.Attrs.Attributes &&
 		a.Attrs.TextColor == b.Attrs.TextColor &&
@@ -165,12 +168,12 @@ func (r *ScreenRenderer) mergeRegions(regions []region, threshold int) []region 
 }
 
 // renderRegion renders a single region to the buffer
-func (r *ScreenRenderer) renderRegion(buf *bytes.Buffer, content []Cell, reg region) {
+func (r *ScreenRenderer) renderRegion(buf *bytes.Buffer, content []cswterm.Cell, reg region) {
 	// Move cursor to start of region
 	r.moveCursor(buf, reg.x1, reg.y1)
 
 	// Reset attributes at start of each region
-	currentAttrs := CellAttributes{}
+	currentAttrs := cswterm.CellAttributes{}
 
 	// Render each cell in the region
 	for y := reg.y1; y <= reg.y2; y++ {
@@ -202,7 +205,7 @@ func (r *ScreenRenderer) moveCursor(buf *bytes.Buffer, x, y int) {
 }
 
 // attrsEqual compares two CellAttributes for equality
-func (r *ScreenRenderer) attrsEqual(a, b CellAttributes) bool {
+func (r *ScreenRenderer) attrsEqual(a, b cswterm.CellAttributes) bool {
 	return a.Attributes == b.Attributes &&
 		a.TextColor == b.TextColor &&
 		a.BackColor == b.BackColor &&
@@ -210,7 +213,7 @@ func (r *ScreenRenderer) attrsEqual(a, b CellAttributes) bool {
 }
 
 // setAttributes writes ANSI sequences to set cell attributes
-func (r *ScreenRenderer) setAttributes(buf *bytes.Buffer, attrs CellAttributes) {
+func (r *ScreenRenderer) setAttributes(buf *bytes.Buffer, attrs cswterm.CellAttributes) {
 	// Build all SGR parameters together
 	var params []int
 
@@ -218,33 +221,33 @@ func (r *ScreenRenderer) setAttributes(buf *bytes.Buffer, attrs CellAttributes) 
 	params = append(params, 0)
 
 	// Text attributes
-	if attrs.Attributes&AttrBold != 0 {
+	if attrs.Attributes&cswterm.AttrBold != 0 {
 		params = append(params, 1)
 	}
-	if attrs.Attributes&AttrDim != 0 {
+	if attrs.Attributes&cswterm.AttrDim != 0 {
 		params = append(params, 2)
 	}
-	if attrs.Attributes&AttrItalic != 0 {
+	if attrs.Attributes&cswterm.AttrItalic != 0 {
 		params = append(params, 3)
 	}
-	if attrs.Attributes&AttrUnderline != 0 {
+	if attrs.Attributes&cswterm.AttrUnderline != 0 {
 		params = append(params, 4)
 	}
-	if attrs.Attributes&AttrBlink != 0 {
+	if attrs.Attributes&cswterm.AttrBlink != 0 {
 		params = append(params, 5)
 	}
-	if attrs.Attributes&AttrReverse != 0 {
+	if attrs.Attributes&cswterm.AttrReverse != 0 {
 		params = append(params, 7)
 	}
-	if attrs.Attributes&AttrHidden != 0 {
+	if attrs.Attributes&cswterm.AttrHidden != 0 {
 		params = append(params, 8)
 	}
-	if attrs.Attributes&AttrStrikethrough != 0 {
+	if attrs.Attributes&cswterm.AttrStrikethrough != 0 {
 		params = append(params, 9)
 	}
 
 	// Underline styles (need special handling)
-	if attrs.Attributes&AttrDoubleUnderline != 0 {
+	if attrs.Attributes&cswterm.AttrDoubleUnderline != 0 {
 		params = append(params, 21)
 	}
 
@@ -309,6 +312,6 @@ func (r *ScreenRenderer) Reset() {
 	width, height := r.screen.GetSize()
 	r.width = width
 	r.height = height
-	r.lastBuffer = make([]Cell, width*height)
-	r.lastAttrs = CellAttributes{}
+	r.lastBuffer = make([]cswterm.Cell, width*height)
+	r.lastAttrs = cswterm.CellAttributes{}
 }
