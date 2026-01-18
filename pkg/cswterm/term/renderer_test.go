@@ -1,10 +1,11 @@
-package cswterm
+package term
 
 import (
 	"bytes"
 	"strings"
 	"testing"
 
+	"github.com/codesnort/codesnort-swe/pkg/cswterm"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,7 +38,7 @@ func TestScreenRenderer_RenderInitialContent(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add some text
-	screen.PutText(0, 0, "Hello", Attrs(0))
+	screen.PutText(0, 0, "Hello", cswterm.Attrs(0))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -54,7 +55,7 @@ func TestScreenRenderer_DifferentialRendering(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// First render
-	screen.PutText(0, 0, "Hello", Attrs(0))
+	screen.PutText(0, 0, "Hello", cswterm.Attrs(0))
 	err := renderer.Render()
 	assert.NoError(t, err)
 
@@ -68,7 +69,7 @@ func TestScreenRenderer_DifferentialRendering(t *testing.T) {
 
 	// Third render with a change
 	buf.Reset()
-	screen.PutText(6, 0, "World", Attrs(0))
+	screen.PutText(6, 0, "World", cswterm.Attrs(0))
 	err = renderer.Render()
 	assert.NoError(t, err)
 
@@ -84,8 +85,8 @@ func TestScreenRenderer_RegionMerging(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Create two close changes that should be merged
-	screen.PutText(0, 0, "A", Attrs(0))
-	screen.PutText(5, 0, "B", Attrs(0)) // Only 4 cells apart
+	screen.PutText(0, 0, "A", cswterm.Attrs(0))
+	screen.PutText(5, 0, "B", cswterm.Attrs(0)) // Only 4 cells apart
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -102,8 +103,8 @@ func TestScreenRenderer_MultipleRows(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add text on multiple rows
-	screen.PutText(0, 0, "Row1", Attrs(0))
-	screen.PutText(0, 2, "Row3", Attrs(0))
+	screen.PutText(0, 0, "Row1", cswterm.Attrs(0))
+	screen.PutText(0, 2, "Row3", cswterm.Attrs(0))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -122,7 +123,7 @@ func TestScreenRenderer_Attributes(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add text with bold attribute
-	screen.PutText(0, 0, "Bold", Attrs(AttrBold))
+	screen.PutText(0, 0, "Bold", cswterm.Attrs(cswterm.AttrBold))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -139,7 +140,7 @@ func TestScreenRenderer_MultipleAttributes(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add text with multiple attributes
-	screen.PutText(0, 0, "Test", Attrs(AttrBold|AttrItalic|AttrUnderline))
+	screen.PutText(0, 0, "Test", cswterm.Attrs(cswterm.AttrBold|cswterm.AttrItalic|cswterm.AttrUnderline))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -186,7 +187,7 @@ func TestScreenRenderer_Reset(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Render some content
-	screen.PutText(0, 0, "Test", Attrs(0))
+	screen.PutText(0, 0, "Test", cswterm.Attrs(0))
 	err := renderer.Render()
 	assert.NoError(t, err)
 
@@ -209,7 +210,7 @@ func TestScreenRenderer_SizeChange(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Initial render
-	screen.PutText(0, 0, "Test", Attrs(0))
+	screen.PutText(0, 0, "Test", cswterm.Attrs(0))
 	err := renderer.Render()
 	assert.NoError(t, err)
 
@@ -225,9 +226,9 @@ func TestScreenRenderer_UnicodeCharacters(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Test with Unicode box-drawing characters
-	screen.PutText(0, 0, "┌─┐", Attrs(0))
-	screen.PutText(0, 1, "│X│", Attrs(0))
-	screen.PutText(0, 2, "└─┘", Attrs(0))
+	screen.PutText(0, 0, "┌─┐", cswterm.Attrs(0))
+	screen.PutText(0, 1, "│X│", cswterm.Attrs(0))
+	screen.PutText(0, 2, "└─┘", cswterm.Attrs(0))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -244,10 +245,10 @@ func TestScreenRenderer_ComplexScene(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Create a complex scene
-	screen.PutText(0, 0, "Header", Attrs(AttrBold))
-	screen.PutText(0, 2, "Normal text", Attrs(0))
-	screen.PutText(0, 3, "Italic text", Attrs(AttrItalic))
-	screen.PutText(20, 3, "Bold", Attrs(AttrBold))
+	screen.PutText(0, 0, "Header", cswterm.Attrs(cswterm.AttrBold))
+	screen.PutText(0, 2, "Normal text", cswterm.Attrs(0))
+	screen.PutText(0, 3, "Italic text", cswterm.Attrs(cswterm.AttrItalic))
+	screen.PutText(20, 3, "Bold", cswterm.Attrs(cswterm.AttrBold))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -260,7 +261,7 @@ func TestScreenRenderer_ComplexScene(t *testing.T) {
 
 	// Now modify only one line
 	buf.Reset()
-	screen.PutText(0, 2, "Changed text", Attrs(0))
+	screen.PutText(0, 2, "Changed text", cswterm.Attrs(0))
 
 	err = renderer.Render()
 	assert.NoError(t, err)
@@ -331,7 +332,7 @@ func TestScreenRenderer_FindChangedRegions(t *testing.T) {
 
 			// Apply changes
 			for _, change := range tt.changes {
-				screen.PutText(change.x, change.y, change.text, Attrs(0))
+				screen.PutText(change.x, change.y, change.text, cswterm.Attrs(0))
 			}
 
 			// Get content and find regions
