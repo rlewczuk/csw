@@ -27,11 +27,11 @@ type ScreenBuffer struct {
 	queueSize int
 }
 
-// NewMockScreen creates a new ScreenBuffer with the specified dimensions.
+// NewScreenBuffer creates a new ScreenBuffer with the specified dimensions.
 // The queueSize parameter specifies the maximum number of events that can be
 // queued for each listener when the listener's channel is full.
 // If queueSize is 0, a default value of 100 is used.
-func NewMockScreen(width, height int, queueSize int) *ScreenBuffer {
+func NewScreenBuffer(width, height int, queueSize int) *ScreenBuffer {
 	buffer := make([]Cell, width*height)
 	// Initialize with spaces
 	for i := range buffer {
@@ -50,7 +50,7 @@ func NewMockScreen(width, height int, queueSize int) *ScreenBuffer {
 }
 
 // Size returns the size of the screen in characters.
-func (m *ScreenBuffer) Size() (width int, height int) {
+func (m *ScreenBuffer) GetSize() (width int, height int) {
 	return m.width, m.height
 }
 

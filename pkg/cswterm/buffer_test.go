@@ -38,10 +38,10 @@ func TestNewMockScreen(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			screen := NewMockScreen(tt.width, tt.height, 0)
+			screen := NewScreenBuffer(tt.width, tt.height, 0)
 			require.NotNil(t, screen)
 
-			w, h := screen.Size()
+			w, h := screen.GetSize()
 			assert.Equal(t, tt.width, w)
 			assert.Equal(t, tt.height, h)
 
@@ -59,8 +59,8 @@ func TestNewMockScreen(t *testing.T) {
 }
 
 func TestMockScreen_Size(t *testing.T) {
-	screen := NewMockScreen(100, 50, 0)
-	w, h := screen.Size()
+	screen := NewScreenBuffer(100, 50, 0)
+	w, h := screen.GetSize()
 	assert.Equal(t, 100, w)
 	assert.Equal(t, 50, h)
 }
@@ -135,7 +135,7 @@ func TestMockScreen_PutText(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			screen := NewMockScreen(tt.width, tt.height, 0)
+			screen := NewScreenBuffer(tt.width, tt.height, 0)
 			screen.PutText(tt.x, tt.y, tt.text, Attrs(tt.attrs))
 
 			// Verify each character
@@ -191,7 +191,7 @@ func TestMockScreen_PutText_Truncation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			screen := NewMockScreen(tt.width, tt.height, 0)
+			screen := NewScreenBuffer(tt.width, tt.height, 0)
 			screen.PutText(tt.x, tt.y, tt.text, Attrs(AttrBold))
 
 			// Count non-space characters
@@ -253,7 +253,7 @@ func TestMockScreen_PutText_OutOfBounds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			screen := NewMockScreen(tt.width, tt.height, 0)
+			screen := NewScreenBuffer(tt.width, tt.height, 0)
 			// Should not panic
 			screen.PutText(tt.x, tt.y, tt.text, Attrs(AttrBold))
 
@@ -270,7 +270,7 @@ func TestMockScreen_PutText_OutOfBounds(t *testing.T) {
 }
 
 func TestMockScreen_GetCell(t *testing.T) {
-	screen := NewMockScreen(10, 5, 0)
+	screen := NewScreenBuffer(10, 5, 0)
 	screen.PutText(2, 1, "Test", Attrs(AttrBold))
 	verifier := getVerifier(screen)
 
@@ -335,7 +335,7 @@ func TestMockScreen_GetCell(t *testing.T) {
 }
 
 func TestMockScreen_GetText(t *testing.T) {
-	screen := NewMockScreen(20, 10, 0)
+	screen := NewScreenBuffer(20, 10, 0)
 	screen.PutText(0, 0, "Hello", Attrs(0))
 	screen.PutText(0, 1, "World", Attrs(0))
 	screen.PutText(5, 2, "Test", Attrs(0))
@@ -400,7 +400,7 @@ func TestMockScreen_GetText(t *testing.T) {
 }
 
 func TestMockScreen_HasText(t *testing.T) {
-	screen := NewMockScreen(20, 10, 0)
+	screen := NewScreenBuffer(20, 10, 0)
 	screen.PutText(0, 0, "Hello", Attrs(0))
 	screen.PutText(0, 1, "World", Attrs(0))
 	screen.PutText(5, 2, "Test", Attrs(0))
@@ -480,7 +480,7 @@ func TestMockScreen_HasText(t *testing.T) {
 }
 
 func TestMockScreen_HasTextWithAttrs(t *testing.T) {
-	screen := NewMockScreen(20, 10, 0)
+	screen := NewScreenBuffer(20, 10, 0)
 	screen.PutText(0, 0, "Bold", Attrs(AttrBold))
 	screen.PutText(0, 1, "Italic", Attrs(AttrItalic))
 	screen.PutText(0, 2, "Both", Attrs(AttrBold|AttrItalic))
@@ -584,7 +584,7 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 }
 
 func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
-	screen := NewMockScreen(20, 10, 0)
+	screen := NewScreenBuffer(20, 10, 0)
 
 	// Create cells with specific colors manually
 	redColor := uint32(0xFF0000)
@@ -682,7 +682,7 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 }
 
 func TestMockScreen_Clear(t *testing.T) {
-	screen := NewMockScreen(10, 5, 0)
+	screen := NewScreenBuffer(10, 5, 0)
 	screen.PutText(0, 0, "Hello", Attrs(AttrBold))
 	screen.PutText(0, 1, "World", Attrs(AttrItalic))
 
@@ -709,7 +709,7 @@ func TestMockScreen_InterfaceCompliance(t *testing.T) {
 }
 
 func TestAttributeMask_Partial(t *testing.T) {
-	screen := NewMockScreen(20, 10, 0)
+	screen := NewScreenBuffer(20, 10, 0)
 
 	// Create text with bold and italic
 	screen.PutText(0, 0, "Text", Attrs(AttrBold|AttrItalic|AttrUnderline))
@@ -799,7 +799,7 @@ func TestScreenBuffer_Listen_Notify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			screen := NewMockScreen(10, 5, tt.queueSize)
+			screen := NewScreenBuffer(10, 5, tt.queueSize)
 			ch := make(chan InputEvent, tt.channelSize)
 			screen.Listen(ch)
 
@@ -831,7 +831,7 @@ func TestScreenBuffer_Listen_Notify(t *testing.T) {
 }
 
 func TestScreenBuffer_Notify_MultipleListeners(t *testing.T) {
-	screen := NewMockScreen(10, 5, 10)
+	screen := NewScreenBuffer(10, 5, 10)
 
 	// Create multiple listeners
 	ch1 := make(chan InputEvent, 10)
@@ -863,7 +863,7 @@ func TestScreenBuffer_Notify_MultipleListeners(t *testing.T) {
 }
 
 func TestScreenBuffer_Notify_FullChannel_Queue(t *testing.T) {
-	screen := NewMockScreen(10, 5, 10)
+	screen := NewScreenBuffer(10, 5, 10)
 
 	// Create a channel with size 1
 	ch := make(chan InputEvent, 1)
@@ -905,7 +905,7 @@ func TestScreenBuffer_Notify_FullChannel_Queue(t *testing.T) {
 
 func TestScreenBuffer_Notify_QueueOverflow(t *testing.T) {
 	queueSize := 3
-	screen := NewMockScreen(10, 5, queueSize)
+	screen := NewScreenBuffer(10, 5, queueSize)
 
 	// Create a buffered channel
 	ch := make(chan InputEvent, 1)
@@ -948,7 +948,7 @@ done:
 }
 
 func TestScreenBuffer_Notify_ClosedChannel(t *testing.T) {
-	screen := NewMockScreen(10, 5, 10)
+	screen := NewScreenBuffer(10, 5, 10)
 
 	// Create and register a channel
 	ch := make(chan InputEvent, 10)
@@ -973,7 +973,7 @@ func TestScreenBuffer_Notify_ClosedChannel(t *testing.T) {
 }
 
 func TestScreenBuffer_Notify_EventOrder(t *testing.T) {
-	screen := NewMockScreen(10, 5, 100)
+	screen := NewScreenBuffer(10, 5, 100)
 
 	ch := make(chan InputEvent, 1)
 	screen.Listen(ch)
@@ -1002,7 +1002,7 @@ func TestScreenBuffer_Notify_EventOrder(t *testing.T) {
 }
 
 func TestScreenBuffer_Notify_NoListeners(t *testing.T) {
-	screen := NewMockScreen(10, 5, 10)
+	screen := NewScreenBuffer(10, 5, 10)
 
 	// Send event with no listeners - should not panic
 	event := InputEvent{Type: InputEventKey, Key: 'a'}
@@ -1012,7 +1012,7 @@ func TestScreenBuffer_Notify_NoListeners(t *testing.T) {
 }
 
 func TestScreenBuffer_Listen_MultipleRegistrations(t *testing.T) {
-	screen := NewMockScreen(10, 5, 10)
+	screen := NewScreenBuffer(10, 5, 10)
 
 	ch := make(chan InputEvent, 10)
 
