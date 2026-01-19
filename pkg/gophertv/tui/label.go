@@ -183,7 +183,7 @@ func (l *TLabel) Draw(screen gophertv.IScreenOutput) {
 // Labels are passive widgets and only handle position events.
 func (l *TLabel) HandleEvent(event *TEvent) {
 	// Handle position events directly
-	if event.Type == TEventTypePosition {
+	if event.Type == TEventTypeResize {
 		l.Position.X = event.Rect.X
 		l.Position.Y = event.Rect.Y
 		l.Position.W = event.Rect.W

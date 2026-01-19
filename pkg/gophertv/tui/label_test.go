@@ -274,7 +274,7 @@ func TestTLabel_HandleEvent_Position(t *testing.T) {
 
 	// Create position event
 	event := &TEvent{
-		Type: TEventTypePosition,
+		Type: TEventTypeResize,
 		Rect: gophertv.TRect{X: 30, Y: 40, W: 50, H: 2},
 	}
 
