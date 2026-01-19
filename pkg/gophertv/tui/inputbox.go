@@ -56,7 +56,7 @@ type IInputBox interface {
 }
 
 // TInputBox is a widget that allows single-line text input with cursor, selection, and editing capabilities.
-// It extends TWidget and implements IInputBox interface.
+// It extends TFocusable and implements IInputBox interface.
 //
 // Features:
 // - Single line text input
@@ -68,7 +68,7 @@ type IInputBox interface {
 // - Text replacement when typing over selection
 // - Focus/blur handling
 type TInputBox struct {
-	TWidget
+	TFocusable
 
 	// Text content
 	text string
@@ -80,12 +80,6 @@ type TInputBox struct {
 	// If selectionStart == selectionEnd, there is no selection
 	selectionStart int
 	selectionEnd   int
-
-	// Text attributes for normal state
-	attrs gophertv.CellAttributes
-
-	// Text attributes for focused state
-	focusedAttrs gophertv.CellAttributes
 
 	// Horizontal scroll offset for long text
 	scrollOffset int
@@ -102,17 +96,11 @@ type TInputBox struct {
 // The focusedAttrs parameter specifies text attributes for focused state.
 func NewInputBox(parent IWidget, text string, rect gophertv.TRect, attrs, focusedAttrs gophertv.CellAttributes) *TInputBox {
 	inputBox := &TInputBox{
-		TWidget: TWidget{
-			Position: rect,
-			Parent:   parent,
-			Flags:    WidgetFlagNone,
-		},
+		TFocusable:     *newFocusableBase(parent, rect, attrs, focusedAttrs),
 		text:           text,
 		cursorPos:      len([]rune(text)), // Start at end of text
 		selectionStart: 0,
 		selectionEnd:   0,
-		attrs:          attrs,
-		focusedAttrs:   focusedAttrs,
 		scrollOffset:   0,
 		isDragging:     false,
 	}
@@ -143,40 +131,11 @@ func (i *TInputBox) SetText(text string) {
 	i.updateScrollOffset()
 }
 
-// GetAttrs returns the text attributes for normal state.
-func (i *TInputBox) GetAttrs() gophertv.CellAttributes {
-	return i.attrs
-}
-
-// SetAttrs sets the text attributes for normal state.
-func (i *TInputBox) SetAttrs(attrs gophertv.CellAttributes) {
-	i.attrs = attrs
-}
-
-// GetFocusedAttrs returns the text attributes for focused state.
-func (i *TInputBox) GetFocusedAttrs() gophertv.CellAttributes {
-	return i.focusedAttrs
-}
-
-// SetFocusedAttrs sets the text attributes for focused state.
-func (i *TInputBox) SetFocusedAttrs(attrs gophertv.CellAttributes) {
-	i.focusedAttrs = attrs
-}
-
-// Focus sets focus to the input box.
-func (i *TInputBox) Focus() {
-	i.Flags |= WidgetFlagFocused | WidgetFlagCursor
-}
-
-// Blur removes focus from the input box.
+// Blur removes focus from the input box and clears selection.
+// This overrides the TFocusable.Blur() method to add selection clearing.
 func (i *TInputBox) Blur() {
-	i.Flags &= ^(WidgetFlagFocused | WidgetFlagCursor)
+	i.TFocusable.Blur()
 	i.ClearSelection()
-}
-
-// IsFocused returns true if the input box is focused.
-func (i *TInputBox) IsFocused() bool {
-	return i.Flags&WidgetFlagFocused != 0
 }
 
 // SetCursorPos sets the cursor position.
@@ -288,9 +247,9 @@ func (i *TInputBox) Draw(screen gophertv.IScreenOutput) {
 	absPos := i.GetAbsolutePos()
 
 	// Determine which attributes to use
-	currentAttrs := i.attrs
+	currentAttrs := i.GetAttrs()
 	if i.IsFocused() {
-		currentAttrs = i.focusedAttrs
+		currentAttrs = i.GetFocusedAttrs()
 	}
 
 	// Get text as runes for proper indexing
@@ -344,7 +303,7 @@ func (i *TInputBox) Draw(screen gophertv.IScreenOutput) {
 	}
 
 	// Draw children (if any)
-	i.TWidget.Draw(screen)
+	i.TFocusable.Draw(screen)
 }
 
 // HandleEvent handles events for the input box.
@@ -377,7 +336,7 @@ func (i *TInputBox) HandleEvent(event *TEvent) {
 	}
 
 	// Delegate other events to base widget
-	i.TWidget.HandleEvent(event)
+	i.TFocusable.HandleEvent(event)
 }
 
 // handleMouseEvent handles mouse events for focus and text selection.

@@ -1,0 +1,150 @@
+package tui
+
+import (
+	"github.com/codesnort/codesnort-swe/pkg/gophertv"
+)
+
+// IFocusable is an interface for widgets that can receive focus.
+// It extends IWidget with focus-specific methods.
+type IFocusable interface {
+	IWidget
+
+	// GetAttrs returns the text attributes for normal state.
+	GetAttrs() gophertv.CellAttributes
+
+	// SetAttrs sets the text attributes for normal state.
+	SetAttrs(attrs gophertv.CellAttributes)
+
+	// GetFocusedAttrs returns the text attributes for focused state.
+	GetFocusedAttrs() gophertv.CellAttributes
+
+	// SetFocusedAttrs sets the text attributes for focused state.
+	SetFocusedAttrs(attrs gophertv.CellAttributes)
+
+	// Focus sets focus to the widget.
+	Focus()
+
+	// Blur removes focus from the widget.
+	Blur()
+
+	// IsFocused returns true if the widget is focused.
+	IsFocused() bool
+}
+
+// TFocusable is a base widget that provides focus management functionality.
+// It extends TWidget and implements IFocusable interface.
+//
+// This widget is designed to be embedded in other widgets that need focus management,
+// such as input boxes, buttons, text areas, etc.
+//
+// Features:
+// - Focus/blur state management
+// - Normal and focused text attributes
+// - Automatic flag management for focus and cursor
+type TFocusable struct {
+	TWidget
+
+	// Text attributes for normal state
+	attrs gophertv.CellAttributes
+
+	// Text attributes for focused state
+	focusedAttrs gophertv.CellAttributes
+}
+
+// NewFocusable creates a new focusable widget with the specified position and attributes.
+// The parent parameter is optional (can be nil for root widgets).
+// The rect parameter specifies the position and size of the widget.
+// The attrs parameter specifies text attributes for normal state.
+// The focusedAttrs parameter specifies text attributes for focused state.
+//
+// Note: When creating a derived widget that embeds TFocusable, use newFocusableBase
+// to avoid double registration with the parent. This constructor registers with the parent.
+func NewFocusable(parent IWidget, rect gophertv.TRect, attrs, focusedAttrs gophertv.CellAttributes) *TFocusable {
+	focusable := newFocusableBase(parent, rect, attrs, focusedAttrs)
+
+	// Register with parent if provided
+	if parent != nil {
+		parent.AddChild(focusable)
+	}
+
+	return focusable
+}
+
+// newFocusableBase creates a focusable widget without registering with parent.
+// This is used internally by derived widgets to avoid double registration.
+func newFocusableBase(parent IWidget, rect gophertv.TRect, attrs, focusedAttrs gophertv.CellAttributes) *TFocusable {
+	return &TFocusable{
+		TWidget: TWidget{
+			Position: rect,
+			Parent:   parent,
+			Flags:    WidgetFlagNone,
+		},
+		attrs:        attrs,
+		focusedAttrs: focusedAttrs,
+	}
+}
+
+// GetAttrs returns the text attributes for normal state.
+func (f *TFocusable) GetAttrs() gophertv.CellAttributes {
+	return f.attrs
+}
+
+// SetAttrs sets the text attributes for normal state.
+func (f *TFocusable) SetAttrs(attrs gophertv.CellAttributes) {
+	f.attrs = attrs
+}
+
+// GetFocusedAttrs returns the text attributes for focused state.
+func (f *TFocusable) GetFocusedAttrs() gophertv.CellAttributes {
+	return f.focusedAttrs
+}
+
+// SetFocusedAttrs sets the text attributes for focused state.
+func (f *TFocusable) SetFocusedAttrs(attrs gophertv.CellAttributes) {
+	f.focusedAttrs = attrs
+}
+
+// Focus sets focus to the widget.
+func (f *TFocusable) Focus() {
+	f.Flags |= WidgetFlagFocused | WidgetFlagCursor
+}
+
+// Blur removes focus from the widget.
+func (f *TFocusable) Blur() {
+	f.Flags &= ^(WidgetFlagFocused | WidgetFlagCursor)
+}
+
+// IsFocused returns true if the widget is focused.
+func (f *TFocusable) IsFocused() bool {
+	return f.Flags&WidgetFlagFocused != 0
+}
+
+// Draw draws the focusable widget on the screen.
+// This is a minimal implementation that just draws children.
+// Derived widgets should override this method to provide custom rendering.
+func (f *TFocusable) Draw(screen gophertv.IScreenOutput) {
+	// Don't draw if hidden
+	if f.Flags&WidgetFlagHidden != 0 {
+		return
+	}
+
+	// Draw children (if any)
+	f.TWidget.Draw(screen)
+}
+
+// HandleEvent handles events for the focusable widget.
+// This is a minimal implementation that handles resize events.
+// Derived widgets should override this method to provide custom event handling.
+func (f *TFocusable) HandleEvent(event *TEvent) {
+	// Handle position events directly
+	if event.Type == TEventTypeResize {
+		f.Position.X = event.Rect.X
+		f.Position.Y = event.Rect.Y
+		f.Position.W = event.Rect.W
+		f.Position.H = event.Rect.H
+		return
+	}
+
+	// Delegate other events to base widget
+	f.TWidget.HandleEvent(event)
+}
