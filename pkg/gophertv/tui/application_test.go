@@ -12,31 +12,6 @@ import (
 // TestNewApplication tests the NewApplication constructor.
 func TestNewApplication(t *testing.T) {
 	tests := []struct {
-		name        string
-		mainWidget  IWidget
-		expectError bool
-	}{
-		{
-			name: "valid widget",
-			mainWidget: &TWidget{
-				Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
-			},
-			expectError: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// We can't test with real os.Stdin/os.Stdout in unit tests
-			// This test primarily validates the interface
-			assert.NotNil(t, tt.mainWidget)
-		})
-	}
-}
-
-// TestNewApplicationForTest tests the NewApplicationForTest constructor.
-func TestNewApplicationForTest(t *testing.T) {
-	tests := []struct {
 		name       string
 		width      int
 		height     int
@@ -77,53 +52,18 @@ func TestNewApplicationForTest(t *testing.T) {
 			}
 
 			// Create application
-			app := NewApplicationForTest(widget, screen)
+			app := NewApplication(widget, screen)
 
 			// Verify application was created
 			require.NotNil(t, app)
 			assert.NotNil(t, app.mainWidget)
 			assert.NotNil(t, app.screen)
-			assert.Nil(t, app.renderer) // No renderer in test mode
-			assert.True(t, app.testMode)
+			assert.Nil(t, app.renderer)    // No renderer until Run() is called
+			assert.Nil(t, app.eventReader) // No event reader until Run() is called
 
 			// Verify widget was resized to screen size
 			pos := widget.GetPos()
 			assert.Equal(t, tt.expectSize, pos)
-		})
-	}
-}
-
-// TestApplicationRun tests the Run method in test mode.
-func TestApplicationRun(t *testing.T) {
-	tests := []struct {
-		name   string
-		width  int
-		height int
-	}{
-		{
-			name:   "standard size",
-			width:  80,
-			height: 24,
-		},
-		{
-			name:   "large size",
-			width:  120,
-			height: 40,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			screen := tio.NewScreenBuffer(tt.width, tt.height, 0)
-			widget := &TWidget{
-				Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
-			}
-
-			app := NewApplicationForTest(widget, screen)
-
-			// Run should return immediately in test mode
-			err := app.Run()
-			assert.NoError(t, err)
 		})
 	}
 }
@@ -135,7 +75,7 @@ func TestApplicationQuit(t *testing.T) {
 		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
-	app := NewApplicationForTest(widget, screen)
+	app := NewApplication(widget, screen)
 
 	// Call Quit
 	app.Quit()
@@ -156,7 +96,7 @@ func TestApplicationGetScreen(t *testing.T) {
 		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
-	app := NewApplicationForTest(widget, screen)
+	app := NewApplication(widget, screen)
 
 	// Get screen
 	retrievedScreen := app.GetScreen()
@@ -165,62 +105,42 @@ func TestApplicationGetScreen(t *testing.T) {
 	assert.Equal(t, screen, retrievedScreen)
 }
 
-// TestApplicationInjectEvent tests the InjectEvent method.
-func TestApplicationInjectEvent(t *testing.T) {
+// TestApplicationNotify tests the Notify method (InputEventHandler interface).
+func TestApplicationNotify(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
 		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
-	app := NewApplicationForTest(widget, screen)
+	app := NewApplication(widget, screen)
 
-	// Inject an event
+	// Call Notify with an event - it should handle it synchronously without panicking
 	event := gophertv.InputEvent{
 		Type: gophertv.InputEventKey,
 		Key:  'a',
 	}
 
-	app.InjectEvent(event)
-
-	// Verify event was queued
-	select {
-	case e := <-app.eventCh:
-		assert.Equal(t, event, e)
-	default:
-		t.Error("Event was not queued")
-	}
+	// Should not panic
+	app.Notify(event)
 }
 
-// TestApplicationProcessEvents tests the ProcessEvents method.
-func TestApplicationProcessEvents(t *testing.T) {
+// TestApplicationExecuteOnUiThread tests the ExecuteOnUiThread method.
+func TestApplicationExecuteOnUiThread(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
 		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
-	app := NewApplicationForTest(widget, screen)
+	app := NewApplication(widget, screen)
 
-	// Inject multiple events
-	events := []gophertv.InputEvent{
-		{Type: gophertv.InputEventKey, Key: 'a'},
-		{Type: gophertv.InputEventKey, Key: 'b'},
-		{Type: gophertv.InputEventKey, Key: 'c'},
-	}
+	// Execute a function on the UI thread
+	executed := false
+	app.ExecuteOnUiThread(func() {
+		executed = true
+	})
 
-	for _, event := range events {
-		app.InjectEvent(event)
-	}
-
-	// Process all events
-	app.ProcessEvents()
-
-	// Verify all events were processed (channel should be empty)
-	select {
-	case <-app.eventCh:
-		t.Error("Not all events were processed")
-	default:
-		// All events processed successfully
-	}
+	// Verify function was executed
+	assert.True(t, executed)
 }
 
 // TestApplicationHandleResize tests resize event handling.
@@ -270,19 +190,14 @@ func TestApplicationHandleResize(t *testing.T) {
 				Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
 			}
 
-			app := NewApplicationForTest(widget, screen)
-			err := app.Run()
-			require.NoError(t, err)
+			app := NewApplication(widget, screen)
 
-			// Inject resize event
-			app.InjectEvent(gophertv.InputEvent{
+			// Notify resize event (now processed synchronously)
+			app.Notify(gophertv.InputEvent{
 				Type: gophertv.InputEventResize,
 				X:    tt.newW,
 				Y:    tt.newH,
 			})
-
-			// Process events
-			app.ProcessEvents()
 
 			// Verify screen was resized
 			w, h := screen.GetSize()
@@ -304,19 +219,14 @@ func TestApplicationHandleCtrlC(t *testing.T) {
 		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
-	app := NewApplicationForTest(widget, screen)
-	err := app.Run()
-	require.NoError(t, err)
+	app := NewApplication(widget, screen)
 
-	// Inject Ctrl+C event
-	app.InjectEvent(gophertv.InputEvent{
+	// Notify Ctrl+C event (now processed synchronously)
+	app.Notify(gophertv.InputEvent{
 		Type:      gophertv.InputEventKey,
 		Key:       'c',
 		Modifiers: gophertv.ModCtrl,
 	})
-
-	// Process events
-	app.ProcessEvents()
 
 	// Verify quit signal was sent
 	select {
@@ -334,11 +244,9 @@ func TestApplicationHandleMultipleResizes(t *testing.T) {
 		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
-	app := NewApplicationForTest(widget, screen)
-	err := app.Run()
-	require.NoError(t, err)
+	app := NewApplication(widget, screen)
 
-	// Inject multiple resize events
+	// Notify multiple resize events
 	resizes := []struct {
 		w uint16
 		h uint16
@@ -350,15 +258,13 @@ func TestApplicationHandleMultipleResizes(t *testing.T) {
 	}
 
 	for _, r := range resizes {
-		app.InjectEvent(gophertv.InputEvent{
+		// Each Notify is now processed synchronously
+		app.Notify(gophertv.InputEvent{
 			Type: gophertv.InputEventResize,
 			X:    r.w,
 			Y:    r.h,
 		})
 	}
-
-	// Process all events
-	app.ProcessEvents()
 
 	// Verify final size matches last resize
 	w, h := screen.GetSize()
@@ -371,32 +277,6 @@ func TestApplicationHandleMultipleResizes(t *testing.T) {
 	assert.Equal(t, resizes[len(resizes)-1].h, pos.H)
 }
 
-// TestApplicationNotify tests the Notify method (InputEventHandler interface).
-func TestApplicationNotify(t *testing.T) {
-	screen := tio.NewScreenBuffer(80, 24, 0)
-	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
-	}
-
-	app := NewApplicationForTest(widget, screen)
-
-	// Call Notify directly
-	event := gophertv.InputEvent{
-		Type: gophertv.InputEventKey,
-		Key:  'x',
-	}
-
-	app.Notify(event)
-
-	// Verify event was queued
-	select {
-	case e := <-app.eventCh:
-		assert.Equal(t, event, e)
-	default:
-		t.Error("Event was not queued by Notify")
-	}
-}
-
 // TestApplicationEventOrdering tests that events are processed in order.
 func TestApplicationEventOrdering(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
@@ -404,51 +284,51 @@ func TestApplicationEventOrdering(t *testing.T) {
 		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
-	app := NewApplicationForTest(widget, screen)
-	err := app.Run()
-	require.NoError(t, err)
+	app := NewApplication(widget, screen)
 
-	// Track event order
-	var processedEvents []rune
-
-	// We can't directly track events in the base TWidget,
-	// but we can verify that multiple events are processed
-	// by checking the event channel is empty after processing
-
-	// Inject events
+	// Notify events - they are now processed synchronously in order
 	keys := []rune{'a', 'b', 'c', 'd', 'e'}
 	for _, key := range keys {
-		app.InjectEvent(gophertv.InputEvent{
+		app.Notify(gophertv.InputEvent{
 			Type: gophertv.InputEventKey,
 			Key:  key,
 		})
 	}
 
-	// Process all events
-	app.ProcessEvents()
-
-	// Verify all events were processed
-	assert.Equal(t, 0, len(app.eventCh))
-
+	// All events are already processed synchronously
 	// Note: In a real scenario with a custom widget, we would verify
 	// the order by tracking which events the widget received
-	_ = processedEvents // Unused in this simple test
 }
 
-// TestApplicationEmptyEventQueue tests ProcessEvents with empty queue.
-func TestApplicationEmptyEventQueue(t *testing.T) {
+// TestApplicationExecuteOnUiThreadConcurrent tests ExecuteOnUiThread with concurrent access.
+func TestApplicationExecuteOnUiThreadConcurrent(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
 		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
-	app := NewApplicationForTest(widget, screen)
+	app := NewApplication(widget, screen)
 
-	// Process events when queue is empty (should not block or panic)
-	app.ProcessEvents()
+	// Execute multiple functions concurrently to test mutex
+	var counter int
+	done := make(chan bool, 10)
 
-	// Verify no errors occurred
-	assert.Equal(t, 0, len(app.eventCh))
+	for i := 0; i < 10; i++ {
+		go func() {
+			app.ExecuteOnUiThread(func() {
+				counter++
+			})
+			done <- true
+		}()
+	}
+
+	// Wait for all goroutines to finish
+	for i := 0; i < 10; i++ {
+		<-done
+	}
+
+	// Verify all increments were applied
+	assert.Equal(t, 10, counter)
 }
 
 // TestApplicationMixedEvents tests handling of mixed event types.
@@ -458,38 +338,32 @@ func TestApplicationMixedEvents(t *testing.T) {
 		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
-	app := NewApplicationForTest(widget, screen)
-	err := app.Run()
-	require.NoError(t, err)
+	app := NewApplication(widget, screen)
 
-	// Inject mixed events
-	app.InjectEvent(gophertv.InputEvent{
+	// Notify mixed events
+	app.Notify(gophertv.InputEvent{
 		Type: gophertv.InputEventKey,
 		Key:  'a',
 	})
 
-	app.InjectEvent(gophertv.InputEvent{
+	app.Notify(gophertv.InputEvent{
 		Type: gophertv.InputEventResize,
 		X:    100,
 		Y:    30,
 	})
 
-	app.InjectEvent(gophertv.InputEvent{
+	app.Notify(gophertv.InputEvent{
 		Type: gophertv.InputEventKey,
 		Key:  'b',
 	})
 
-	app.InjectEvent(gophertv.InputEvent{
+	app.Notify(gophertv.InputEvent{
 		Type: gophertv.InputEventMouse,
 		X:    10,
 		Y:    15,
 	})
 
-	// Process all events
-	app.ProcessEvents()
-
-	// Verify all events were processed
-	assert.Equal(t, 0, len(app.eventCh))
+	// All events are now processed synchronously
 
 	// Verify resize was applied
 	w, h := screen.GetSize()
