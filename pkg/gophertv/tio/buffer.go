@@ -152,6 +152,50 @@ func (m *ScreenBuffer) PutText(rect gophertv.TRect, text string, attrs gophertv.
 	}
 }
 
+// PutContent puts raw cell content at the specified position.
+// The rect parameter specifies the position (X, Y) and optional clipping rectangle (W, H).
+// If W and H are 0, the content is clipped only to screen boundaries.
+// If W and H are non-zero, the content is clipped to both the rectangle and screen boundaries.
+// Content is always rendered on a single line (Y coordinate from rect).
+func (m *ScreenBuffer) PutContent(rect gophertv.TRect, content []gophertv.Cell) {
+	x := int(rect.X)
+	y := int(rect.Y)
+
+	// Check if Y is within screen bounds
+	if y < 0 || y >= m.height {
+		return
+	}
+
+	// Check if X is within screen bounds
+	if x < 0 || x >= m.width {
+		return
+	}
+
+	// Determine the clipping rectangle
+	var clipWidth int
+	if rect.W == 0 {
+		// Use full screen width
+		clipWidth = m.width
+	} else {
+		// Use specified width, but clip to screen boundaries
+		clipWidth = int(rect.X + rect.W)
+		if clipWidth > m.width {
+			clipWidth = m.width
+		}
+	}
+
+	col := x
+	for _, cell := range content {
+		// Check against clipping rectangle
+		if col >= clipWidth {
+			break
+		}
+		idx := y*m.width + col
+		m.buffer[idx] = cell
+		col++
+	}
+}
+
 // Clear resets all cells to spaces with default attributes.
 func (m *ScreenBuffer) Clear() {
 	for i := range m.buffer {

@@ -29,6 +29,9 @@ type CellAttributes struct {
 	BackColor uint32
 	// StrikeColor sets color of the strike through line. It is 24-bit color in RGB format.
 	StrikeColor uint32
+	// ThemeTag is a tag that can be used to apply theme to the text.
+	// If non-zero, it will automatically fill color fields if they are not explicitly set (i.e. zero)
+	ThemeTag uint32
 }
 
 // Attrs creates CellAttributes with only text attributes (no colors).
@@ -185,6 +188,13 @@ type IScreenOutput interface {
 	// If W and H are non-zero, the text is clipped to both the rectangle and screen boundaries.
 	// Text is always rendered on a single line (Y coordinate from rect).
 	PutText(rect TRect, text string, attrs CellAttributes)
+
+	// PutContent puts raw cell content at the specified position.
+	// The rect parameter specifies the position (X, Y) and optional clipping rectangle (W, H).
+	// If W and H are 0, the content is clipped only to screen boundaries.
+	// If W and H are non-zero, the content is clipped to both the rectangle and screen boundaries.
+	// Content is always rendered on a single line (Y coordinate from rect).
+	PutContent(rect TRect, content []Cell)
 
 	// MoveCursor moves the cursor to the specified position.
 	MoveCursor(x int, y int)
