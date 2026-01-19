@@ -51,6 +51,10 @@ type TEvent struct {
 // IWidget is an interface implemented by all widgets
 // It contains basic widget functionality for positioning, drawing and event handling
 type IWidget interface {
+	// GetPos returns position of the widget relative to its parent.
+	// If widget has no parent, returns position relative to the screen.
+	GetPos() gophertv.TRect
+
 	// GetAbsolutePos returns absolute position of the widget.
 	// If widget has a parent, returns parent position + position to the parent
 	GetAbsolutePos() gophertv.TRect
@@ -77,6 +81,12 @@ type TWidget struct {
 	Flags WidgetFlag
 	// Cursor state
 	Cursor CursorState
+}
+
+// GetPos returns position of the widget relative to its parent.
+// If widget has no parent, returns position relative to the screen.
+func (w *TWidget) GetPos() gophertv.TRect {
+	return w.Position
 }
 
 // GetAbsolutePos returns absolute position of the widget.
