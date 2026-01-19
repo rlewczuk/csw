@@ -149,8 +149,8 @@ func TestApplicationHandleResize(t *testing.T) {
 		name     string
 		initialW int
 		initialH int
-		newW     uint16
-		newH     uint16
+		newW     int
+		newH     int
 		expectW  int
 		expectH  int
 	}{
@@ -192,12 +192,9 @@ func TestApplicationHandleResize(t *testing.T) {
 
 			app := NewApplication(widget, screen)
 
-			// Notify resize event (now processed synchronously)
-			app.Notify(gophertv.InputEvent{
-				Type: gophertv.InputEventResize,
-				X:    tt.newW,
-				Y:    tt.newH,
-			})
+			// Create mock input reader and send resize event
+			mockInput := tio.NewMockInputEventReader(app)
+			mockInput.Resize(tt.newW, tt.newH)
 
 			// Verify screen was resized
 			w, h := screen.GetSize()
@@ -206,8 +203,8 @@ func TestApplicationHandleResize(t *testing.T) {
 
 			// Verify widget was resized
 			pos := widget.GetPos()
-			assert.Equal(t, tt.newW, pos.W)
-			assert.Equal(t, tt.newH, pos.H)
+			assert.Equal(t, uint16(tt.newW), pos.W)
+			assert.Equal(t, uint16(tt.newH), pos.H)
 		})
 	}
 }
@@ -221,12 +218,9 @@ func TestApplicationHandleCtrlC(t *testing.T) {
 
 	app := NewApplication(widget, screen)
 
-	// Notify Ctrl+C event (now processed synchronously)
-	app.Notify(gophertv.InputEvent{
-		Type:      gophertv.InputEventKey,
-		Key:       'c',
-		Modifiers: gophertv.ModCtrl,
-	})
+	// Create mock input reader and send Ctrl+C
+	mockInput := tio.NewMockInputEventReader(app)
+	mockInput.TypeKeysByName("Ctrl+C")
 
 	// Verify quit signal was sent
 	select {
@@ -246,10 +240,13 @@ func TestApplicationHandleMultipleResizes(t *testing.T) {
 
 	app := NewApplication(widget, screen)
 
-	// Notify multiple resize events
+	// Create mock input reader
+	mockInput := tio.NewMockInputEventReader(app)
+
+	// Send multiple resize events
 	resizes := []struct {
-		w uint16
-		h uint16
+		w int
+		h int
 	}{
 		{100, 30},
 		{120, 40},
@@ -258,23 +255,18 @@ func TestApplicationHandleMultipleResizes(t *testing.T) {
 	}
 
 	for _, r := range resizes {
-		// Each Notify is now processed synchronously
-		app.Notify(gophertv.InputEvent{
-			Type: gophertv.InputEventResize,
-			X:    r.w,
-			Y:    r.h,
-		})
+		mockInput.Resize(r.w, r.h)
 	}
 
 	// Verify final size matches last resize
 	w, h := screen.GetSize()
-	assert.Equal(t, int(resizes[len(resizes)-1].w), w)
-	assert.Equal(t, int(resizes[len(resizes)-1].h), h)
+	assert.Equal(t, resizes[len(resizes)-1].w, w)
+	assert.Equal(t, resizes[len(resizes)-1].h, h)
 
 	// Verify widget size matches final size
 	pos := widget.GetPos()
-	assert.Equal(t, resizes[len(resizes)-1].w, pos.W)
-	assert.Equal(t, resizes[len(resizes)-1].h, pos.H)
+	assert.Equal(t, uint16(resizes[len(resizes)-1].w), pos.W)
+	assert.Equal(t, uint16(resizes[len(resizes)-1].h), pos.H)
 }
 
 // TestApplicationEventOrdering tests that events are processed in order.
@@ -286,14 +278,9 @@ func TestApplicationEventOrdering(t *testing.T) {
 
 	app := NewApplication(widget, screen)
 
-	// Notify events - they are now processed synchronously in order
-	keys := []rune{'a', 'b', 'c', 'd', 'e'}
-	for _, key := range keys {
-		app.Notify(gophertv.InputEvent{
-			Type: gophertv.InputEventKey,
-			Key:  key,
-		})
-	}
+	// Create mock input reader and send key events
+	mockInput := tio.NewMockInputEventReader(app)
+	mockInput.TypeKeys("abcde")
 
 	// All events are already processed synchronously
 	// Note: In a real scenario with a custom widget, we would verify
@@ -340,28 +327,13 @@ func TestApplicationMixedEvents(t *testing.T) {
 
 	app := NewApplication(widget, screen)
 
-	// Notify mixed events
-	app.Notify(gophertv.InputEvent{
-		Type: gophertv.InputEventKey,
-		Key:  'a',
-	})
+	// Create mock input reader and send mixed events
+	mockInput := tio.NewMockInputEventReader(app)
 
-	app.Notify(gophertv.InputEvent{
-		Type: gophertv.InputEventResize,
-		X:    100,
-		Y:    30,
-	})
-
-	app.Notify(gophertv.InputEvent{
-		Type: gophertv.InputEventKey,
-		Key:  'b',
-	})
-
-	app.Notify(gophertv.InputEvent{
-		Type: gophertv.InputEventMouse,
-		X:    10,
-		Y:    15,
-	})
+	mockInput.TypeKeys("a")
+	mockInput.Resize(100, 30)
+	mockInput.TypeKeys("b")
+	mockInput.MouseClick(10, 15, 0)
 
 	// All events are now processed synchronously
 
@@ -369,4 +341,52 @@ func TestApplicationMixedEvents(t *testing.T) {
 	w, h := screen.GetSize()
 	assert.Equal(t, 100, w)
 	assert.Equal(t, 30, h)
+}
+
+// TestApplicationMockInputKeysByName tests TypeKeysByName method.
+func TestApplicationMockInputKeysByName(t *testing.T) {
+	screen := tio.NewScreenBuffer(80, 24, 0)
+	widget := &TWidget{
+		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+	}
+
+	app := NewApplication(widget, screen)
+
+	// Create mock input reader
+	mockInput := tio.NewMockInputEventReader(app)
+
+	// Test various key names
+	mockInput.TypeKeysByName("a", "Enter", "F1", "Up", "Ctrl+C")
+
+	// Verify Ctrl+C triggered quit
+	select {
+	case <-app.quitCh:
+		// Quit signal was sent successfully
+	default:
+		t.Error("Ctrl+C did not send quit signal")
+	}
+}
+
+// TestApplicationMockInputMouseEvents tests mouse event methods.
+func TestApplicationMockInputMouseEvents(t *testing.T) {
+	screen := tio.NewScreenBuffer(80, 24, 0)
+	widget := &TWidget{
+		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+	}
+
+	app := NewApplication(widget, screen)
+
+	// Create mock input reader
+	mockInput := tio.NewMockInputEventReader(app)
+
+	// Test mouse click
+	mockInput.MouseClick(10, 15, 0)
+
+	// Test mouse wheel
+	mockInput.MouseWheel(20, 25, gophertv.ModScrollUp)
+
+	// Test mouse drag
+	mockInput.MouseDrag(5, 5, 15, 15)
+
+	// All events should be processed without errors
 }

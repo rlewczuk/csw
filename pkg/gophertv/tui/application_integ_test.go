@@ -95,7 +95,7 @@ func TestApplicationIntegration_BasicRendering(t *testing.T) {
 // input events and passes them to widgets.
 //
 // This test demonstrates:
-// - Notifying input events
+// - Notifying input events using mock input reader
 // - Processing events synchronously
 // - Verifying event handling by widgets
 func TestApplicationIntegration_InputHandling(t *testing.T) {
@@ -119,23 +119,11 @@ func TestApplicationIntegration_InputHandling(t *testing.T) {
 	app := tui.NewApplication(tracker, screen)
 	require.NotNil(t, app)
 
-	// Notify some input events (skip Ctrl+C which would quit)
-	app.Notify(gophertv.InputEvent{
-		Type: gophertv.InputEventKey,
-		Key:  'a',
-	})
+	// Create mock input reader and send events
+	mockInput := tio.NewMockInputEventReader(app)
+	mockInput.TypeKeys("abq")
 
-	app.Notify(gophertv.InputEvent{
-		Type: gophertv.InputEventKey,
-		Key:  'b',
-	})
-
-	app.Notify(gophertv.InputEvent{
-		Type: gophertv.InputEventKey,
-		Key:  'q',
-	})
-
-	// Events are now processed synchronously by Notify
+	// Events are now processed synchronously by the mock reader
 	// In this simple test, we just verify that events were processed without errors
 	// A more sophisticated test would use a custom widget implementation that tracks events
 }
@@ -144,7 +132,7 @@ func TestApplicationIntegration_InputHandling(t *testing.T) {
 // terminal resize events.
 //
 // This test demonstrates:
-// - Notifying resize events
+// - Notifying resize events using mock input reader
 // - Verifying screen buffer resize
 // - Verifying widget resize notification
 func TestApplicationIntegration_ResizeHandling(t *testing.T) {
@@ -176,12 +164,9 @@ func TestApplicationIntegration_ResizeHandling(t *testing.T) {
 	assert.Equal(t, uint16(80), layoutPos.W)
 	assert.Equal(t, uint16(24), layoutPos.H)
 
-	// Notify a resize event (120x30) - processed synchronously
-	app.Notify(gophertv.InputEvent{
-		Type: gophertv.InputEventResize,
-		X:    120,
-		Y:    30,
-	})
+	// Create mock input reader and send resize event
+	mockInput := tio.NewMockInputEventReader(app)
+	mockInput.Resize(120, 30)
 
 	// Verify screen buffer was resized
 	width, height = screen.GetSize()
@@ -359,7 +344,7 @@ func TestApplicationIntegration_QuitSignal(t *testing.T) {
 // TestApplicationIntegration_CtrlC tests that the application handles Ctrl+C correctly.
 //
 // This test demonstrates:
-// - Notifying Ctrl+C key event
+// - Notifying Ctrl+C key event using mock input reader
 // - Verifying that the application signals quit
 func TestApplicationIntegration_CtrlC(t *testing.T) {
 	// Create a screen buffer for testing
@@ -372,12 +357,9 @@ func TestApplicationIntegration_CtrlC(t *testing.T) {
 	app := tui.NewApplication(layout, screen)
 	require.NotNil(t, app)
 
-	// Notify Ctrl+C event - processed synchronously
-	app.Notify(gophertv.InputEvent{
-		Type:      gophertv.InputEventKey,
-		Key:       'c',
-		Modifiers: gophertv.ModCtrl,
-	})
+	// Create mock input reader and send Ctrl+C
+	mockInput := tio.NewMockInputEventReader(app)
+	mockInput.TypeKeysByName("Ctrl+C")
 
 	// The application should have signaled quit
 	// We can verify this without running the event loop

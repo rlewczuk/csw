@@ -1,5 +1,11 @@
 package gophertv
 
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
 type TextAttributes uint32
 
 const (
@@ -367,4 +373,129 @@ func (e *InputEvent) String() string {
 		}
 		return result + string(e.Key)
 	}
+}
+
+// ParseKey parses a key name and returns an InputEvent.
+// Supported formats:
+// - Single character: "a", "A", "1", "!", etc.
+// - Special keys: "Enter", "Tab", "Esc", "Backspace", "Delete", "Insert"
+// - Navigation keys: "Up", "Down", "Left", "Right", "Home", "End", "PageUp", "PageDown"
+// - Function keys: "F1", "F2", ..., "F12"
+// - Modified keys: "Ctrl+C", "Alt+Enter", "Shift+F1", "Ctrl+Alt+Delete"
+func ParseKey(name string) (InputEvent, error) {
+	if name == "" {
+		return InputEvent{}, fmt.Errorf("ParseKey(): empty key name")
+	}
+
+	var mods EventModifiers
+	var key rune
+	var eventType = InputEventKey
+
+	// Parse modifiers (Ctrl+, Alt+, Meta+, Shift+)
+	parts := strings.Split(name, "+")
+	if len(parts) > 1 {
+		// Last part is the actual key, everything before is modifiers
+		for i := 0; i < len(parts)-1; i++ {
+			mod := strings.ToLower(strings.TrimSpace(parts[i]))
+			switch mod {
+			case "ctrl", "control":
+				mods |= ModCtrl
+			case "alt":
+				mods |= ModAlt
+			case "meta":
+				mods |= ModMeta
+			case "shift":
+				mods |= ModShift
+			default:
+				return InputEvent{}, fmt.Errorf("ParseKey(): unknown modifier: %s", parts[i])
+			}
+		}
+		name = strings.TrimSpace(parts[len(parts)-1])
+	}
+
+	// Parse the key name (case-insensitive for special keys)
+	lowerName := strings.ToLower(name)
+
+	// Check for special keys
+	switch lowerName {
+	case "enter", "return":
+		key = '\r'
+	case "tab":
+		key = '\t'
+	case "esc", "escape":
+		key = 0x1B
+	case "backspace":
+		key = 0x7F
+	case "space":
+		key = ' '
+	case "delete":
+		key = 'D'
+		mods |= ModFn
+	case "insert":
+		key = 'I'
+		mods |= ModFn
+	case "up":
+		key = 'A'
+		mods |= ModFn
+	case "down":
+		key = 'B'
+		mods |= ModFn
+	case "right":
+		key = 'C'
+		mods |= ModFn
+	case "left":
+		key = 'D'
+		mods |= ModFn
+	case "home":
+		key = 'H'
+		mods |= ModFn
+	case "end":
+		key = 'F'
+		mods |= ModFn
+	case "pageup":
+		key = 'G'
+		mods |= ModFn
+	case "pagedown":
+		key = 'N'
+		mods |= ModFn
+	default:
+		// Check for function keys (F1-F12)
+		if strings.HasPrefix(lowerName, "f") && len(lowerName) >= 2 {
+			fnNumStr := lowerName[1:]
+			fnNum, err := strconv.Atoi(fnNumStr)
+			if err == nil && fnNum >= 1 && fnNum <= 12 {
+				// Map function key number to letter code
+				fnKeys := []rune{'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '['}
+				key = fnKeys[fnNum-1]
+				mods |= ModFn
+			} else {
+				return InputEvent{}, fmt.Errorf("ParseKey(): invalid function key: %s", name)
+			}
+		} else if len(name) == 1 {
+			// Single character key
+			key = rune(name[0])
+			// If it's an uppercase letter and Ctrl is present, normalize to lowercase
+			// Ctrl+letter combinations should always use lowercase keys
+			if mods&ModCtrl != 0 && key >= 'A' && key <= 'Z' {
+				key = key + ('a' - 'A') // Convert to lowercase
+			} else if key >= 'A' && key <= 'Z' && mods&ModShift == 0 {
+				// If it's an uppercase letter and Shift wasn't explicitly specified
+				mods |= ModShift
+			}
+		} else {
+			return InputEvent{}, fmt.Errorf("ParseKey(): unknown key name: %s", name)
+		}
+	}
+
+	// Handle Ctrl combinations for letter keys
+	if mods&ModCtrl != 0 && key >= 'a' && key <= 'z' {
+		// For Ctrl+letter, the key should remain lowercase
+		// The ModCtrl flag indicates it's a Ctrl combination
+	}
+
+	return InputEvent{
+		Type:      eventType,
+		Key:       key,
+		Modifiers: mods,
+	}, nil
 }
