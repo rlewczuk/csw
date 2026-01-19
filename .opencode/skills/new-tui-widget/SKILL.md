@@ -3,12 +3,10 @@ name: new-tui-widget
 description: Create new TUI widget
 license: MIT
 compatibility: opencode
-metadata:
-  audience: maintainers
-  workflow: github
 ---
 
 ## What I do
+
 Analyze user requirements and create new TUI widget in `pkg/gophertv/tui/<widget-name>.go` taking into account following considerations:
 
 - Widget should be implemented as a struct that embeds `tui.TWidget` and implements `tui.IWidget` interface
