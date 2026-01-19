@@ -47,12 +47,11 @@ func TestApplicationIntegration_BasicRendering(t *testing.T) {
 	)
 
 	// Create application with the layout as main widget
-	app := tui.NewApplicationForTest(layout, screen)
+	app := tui.NewApplication(layout, screen)
 	require.NotNil(t, app)
 
-	// Run the application (in test mode, this just does initial render and returns)
-	err := app.Run()
-	require.NoError(t, err)
+	// Draw initial frame (without running the event loop)
+	layout.Draw(screen)
 
 	// Verify screen content
 	width, height, content := screen.GetContent()
@@ -96,7 +95,7 @@ func TestApplicationIntegration_BasicRendering(t *testing.T) {
 // input events and passes them to widgets.
 //
 // This test demonstrates:
-// - Injecting input events
+// - Notifying input events
 // - Processing events synchronously
 // - Verifying event handling by widgets
 func TestApplicationIntegration_InputHandling(t *testing.T) {
@@ -117,32 +116,26 @@ func TestApplicationIntegration_InputHandling(t *testing.T) {
 	}
 
 	// Create application
-	app := tui.NewApplicationForTest(tracker, screen)
+	app := tui.NewApplication(tracker, screen)
 	require.NotNil(t, app)
 
-	// Run the application
-	err := app.Run()
-	require.NoError(t, err)
-
-	// Inject some input events (skip Ctrl+C which would quit)
-	app.InjectEvent(gophertv.InputEvent{
+	// Notify some input events (skip Ctrl+C which would quit)
+	app.Notify(gophertv.InputEvent{
 		Type: gophertv.InputEventKey,
 		Key:  'a',
 	})
 
-	app.InjectEvent(gophertv.InputEvent{
+	app.Notify(gophertv.InputEvent{
 		Type: gophertv.InputEventKey,
 		Key:  'b',
 	})
 
-	app.InjectEvent(gophertv.InputEvent{
+	app.Notify(gophertv.InputEvent{
 		Type: gophertv.InputEventKey,
 		Key:  'q',
 	})
 
-	// Process events synchronously
-	app.ProcessEvents()
-
+	// Events are now processed synchronously by Notify
 	// In this simple test, we just verify that events were processed without errors
 	// A more sophisticated test would use a custom widget implementation that tracks events
 }
@@ -151,7 +144,7 @@ func TestApplicationIntegration_InputHandling(t *testing.T) {
 // terminal resize events.
 //
 // This test demonstrates:
-// - Injecting resize events
+// - Notifying resize events
 // - Verifying screen buffer resize
 // - Verifying widget resize notification
 func TestApplicationIntegration_ResizeHandling(t *testing.T) {
@@ -170,12 +163,8 @@ func TestApplicationIntegration_ResizeHandling(t *testing.T) {
 	)
 
 	// Create application
-	app := tui.NewApplicationForTest(layout, screen)
+	app := tui.NewApplication(layout, screen)
 	require.NotNil(t, app)
-
-	// Run the application
-	err := app.Run()
-	require.NoError(t, err)
 
 	// Verify initial screen size
 	width, height := screen.GetSize()
@@ -187,15 +176,12 @@ func TestApplicationIntegration_ResizeHandling(t *testing.T) {
 	assert.Equal(t, uint16(80), layoutPos.W)
 	assert.Equal(t, uint16(24), layoutPos.H)
 
-	// Inject a resize event (120x30)
-	app.InjectEvent(gophertv.InputEvent{
+	// Notify a resize event (120x30) - processed synchronously
+	app.Notify(gophertv.InputEvent{
 		Type: gophertv.InputEventResize,
 		X:    120,
 		Y:    30,
 	})
-
-	// Process events synchronously
-	app.ProcessEvents()
 
 	// Verify screen buffer was resized
 	width, height = screen.GetSize()
@@ -283,12 +269,11 @@ func TestApplicationIntegration_ComplexLayout(t *testing.T) {
 	)
 
 	// Create application
-	app := tui.NewApplicationForTest(mainLayout, screen)
+	app := tui.NewApplication(mainLayout, screen)
 	require.NotNil(t, app)
 
-	// Run the application
-	err := app.Run()
-	require.NoError(t, err)
+	// Draw the layout (without running the event loop)
+	mainLayout.Draw(screen)
 
 	// Verify screen content
 	width, height, content := screen.GetContent()
@@ -357,17 +342,13 @@ func TestApplicationIntegration_QuitSignal(t *testing.T) {
 	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
 	// Create application
-	app := tui.NewApplicationForTest(layout, screen)
+	app := tui.NewApplication(layout, screen)
 	require.NotNil(t, app)
-
-	// Run the application
-	err := app.Run()
-	require.NoError(t, err)
 
 	// Signal quit
 	app.Quit()
 
-	// In test mode, Quit() just sends a signal to quitCh
+	// Quit() just sends a signal to quitCh
 	// We can't test the actual exit behavior without running the event loop,
 	// but we can verify that the signal was sent by checking that the channel
 	// is not blocked (which would happen if Quit() didn't work)
@@ -378,7 +359,7 @@ func TestApplicationIntegration_QuitSignal(t *testing.T) {
 // TestApplicationIntegration_CtrlC tests that the application handles Ctrl+C correctly.
 //
 // This test demonstrates:
-// - Injecting Ctrl+C key event
+// - Notifying Ctrl+C key event
 // - Verifying that the application signals quit
 func TestApplicationIntegration_CtrlC(t *testing.T) {
 	// Create a screen buffer for testing
@@ -388,24 +369,16 @@ func TestApplicationIntegration_CtrlC(t *testing.T) {
 	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
 	// Create application
-	app := tui.NewApplicationForTest(layout, screen)
+	app := tui.NewApplication(layout, screen)
 	require.NotNil(t, app)
 
-	// Run the application
-	err := app.Run()
-	require.NoError(t, err)
-
-	// Inject Ctrl+C event
-	app.InjectEvent(gophertv.InputEvent{
+	// Notify Ctrl+C event - processed synchronously
+	app.Notify(gophertv.InputEvent{
 		Type:      gophertv.InputEventKey,
 		Key:       'c',
 		Modifiers: gophertv.ModCtrl,
 	})
 
-	// Process events synchronously
-	app.ProcessEvents()
-
 	// The application should have signaled quit
-	// In test mode, we can't easily verify this without running the event loop,
-	// but we can check that the event was processed without errors
+	// We can verify this without running the event loop
 }

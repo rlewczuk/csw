@@ -5,12 +5,24 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/codesnort/codesnort-swe/pkg/gophertv"
 	"github.com/codesnort/codesnort-swe/pkg/gophertv/tio"
 	"golang.org/x/term"
 )
+
+// eventChannelAdapter is an adapter that implements InputEventHandler interface
+// and forwards events to a channel. This is used internally in Run() method.
+type eventChannelAdapter struct {
+	eventCh chan gophertv.InputEvent
+}
+
+// Notify implements the InputEventHandler interface.
+func (a *eventChannelAdapter) Notify(event gophertv.InputEvent) {
+	a.eventCh <- event
+}
 
 // IApplication is an interface for the application that manages the main event loop,
 // screen rendering, and input handling.
@@ -25,13 +37,9 @@ type IApplication interface {
 	// GetScreen returns the screen buffer for testing purposes.
 	GetScreen() gophertv.IScreenOutput
 
-	// InjectEvent injects an input event for testing purposes.
-	// This allows deterministic testing without involving real terminal I/O.
-	InjectEvent(event gophertv.InputEvent)
-
-	// ProcessEvents processes all pending events in the event queue.
-	// This is useful for testing to ensure all events are processed synchronously.
-	ProcessEvents()
+	// ExecuteOnUiThread executes the given function with the UI mutex locked.
+	// This ensures that application state is not modified concurrently.
+	ExecuteOnUiThread(f func())
 }
 
 // TApplication is the main application struct that manages the TUI event loop.
@@ -43,17 +51,17 @@ type TApplication struct {
 	// Screen buffer for rendering
 	screen gophertv.IScreenOutput
 
-	// Renderer for outputting to terminal (nil in test mode)
+	// Renderer for outputting to terminal (nil when not running)
 	renderer *tio.ScreenRenderer
 
-	// Input event reader for reading from terminal (nil in test mode)
+	// Input event reader for reading from terminal (nil when not running)
 	eventReader *tio.InputEventReader
-
-	// Event channel for receiving input events
-	eventCh chan gophertv.InputEvent
 
 	// Quit channel signals the application to exit
 	quitCh chan struct{}
+
+	// Mutex for synchronizing access to application and widget state
+	mu sync.Mutex
 
 	// Terminal state management
 	stdin           io.Reader
@@ -64,76 +72,13 @@ type TApplication struct {
 	savedCursorX    int
 	savedCursorY    int
 	termInitialized bool
-
-	// Test mode flag - when true, Run() returns immediately after initialization
-	// and events are processed synchronously via ProcessEvents()
-	testMode bool
 }
 
-// NewApplication creates a new TApplication with the given main widget.
-// For production use with real terminal I/O:
-//   - stdin should be os.Stdin
-//   - stdout should be os.Stdout
-//
-// For testing without real terminal I/O:
-//   - use NewApplicationForTest instead
-func NewApplication(mainWidget IWidget, stdin io.Reader, stdout io.Writer) (*TApplication, error) {
-	// Get terminal size
-	var width, height int
-	if f, ok := stdin.(*os.File); ok {
-		w, h, err := term.GetSize(int(f.Fd()))
-		if err != nil {
-			// Use default size if we can't get terminal size
-			width, height = 80, 24
-		} else {
-			width, height = w, h
-		}
-	} else {
-		// Not a real terminal, use default size
-		width, height = 80, 24
-	}
-
-	// Create screen buffer
-	screen := tio.NewScreenBuffer(width, height, 0)
-
-	// Create renderer
-	renderer := tio.NewScreenRenderer(screen, stdout)
-
-	// Set main widget size to fill screen
-	mainWidget.HandleEvent(&TEvent{
-		Type: TEventTypeResize,
-		Rect: gophertv.TRect{X: 0, Y: 0, W: uint16(width), H: uint16(height)},
-	})
-
-	// Create event channel
-	eventCh := make(chan gophertv.InputEvent, 100)
-
-	// Get terminal file descriptor if available
-	var termFd int = -1
-	if f, ok := stdin.(*os.File); ok {
-		termFd = int(f.Fd())
-	}
-
-	app := &TApplication{
-		mainWidget:  mainWidget,
-		screen:      screen,
-		renderer:    renderer,
-		eventReader: nil, // Will be created in Run()
-		eventCh:     eventCh,
-		quitCh:      make(chan struct{}, 1), // Buffered to allow non-blocking Quit()
-		stdin:       stdin,
-		stdout:      stdout,
-		termFd:      termFd,
-		testMode:    false,
-	}
-
-	return app, nil
-}
-
-// NewApplicationForTest creates a new TApplication for testing without real terminal I/O.
-// The application uses the provided screen buffer and processes events synchronously.
-// Use InjectEvent() to inject events and ProcessEvents() to process them.
-func NewApplicationForTest(mainWidget IWidget, screen *tio.ScreenBuffer) *TApplication {
+// NewApplication creates a new TApplication with the given main widget and screen buffer.
+// The screen buffer size determines the initial widget size.
+// Call Run() to start the application with real terminal I/O, or use Notify() and ExecuteOnUiThread()
+// for testing without real terminal I/O.
+func NewApplication(mainWidget IWidget, screen gophertv.IScreenOutput) *TApplication {
 	// Get screen size
 	width, height := screen.GetSize()
 
@@ -143,22 +88,18 @@ func NewApplicationForTest(mainWidget IWidget, screen *tio.ScreenBuffer) *TAppli
 		Rect: gophertv.TRect{X: 0, Y: 0, W: uint16(width), H: uint16(height)},
 	})
 
-	// Create event channel
-	eventCh := make(chan gophertv.InputEvent, 100)
-
 	app := &TApplication{
-		mainWidget: mainWidget,
-		screen:     screen,
-		renderer:   nil, // No renderer in test mode
-		eventCh:    eventCh,
-		quitCh:     make(chan struct{}, 1), // Buffered to allow non-blocking Quit()
-		testMode:   true,
+		mainWidget:  mainWidget,
+		screen:      screen,
+		renderer:    nil,                    // Will be created in Run()
+		eventReader: nil,                    // Will be created in Run()
+		quitCh:      make(chan struct{}, 1), // Buffered to allow non-blocking Quit()
 	}
 
 	return app
 }
 
-// Run starts the application main loop.
+// Run starts the application main loop with real terminal I/O.
 // This method blocks until the application exits.
 // It performs the following:
 // - Saves terminal state
@@ -168,13 +109,40 @@ func NewApplicationForTest(mainWidget IWidget, screen *tio.ScreenBuffer) *TAppli
 // - Starts input event reader
 // - Enters main event loop
 // - Restores terminal state on exit
-func (app *TApplication) Run() error {
-	// In test mode, just do initial render and return
-	if app.testMode {
-		// Draw initial frame
-		app.mainWidget.Draw(app.screen)
-		return nil
+//
+// stdin should be os.Stdin and stdout should be os.Stdout for production use.
+func (app *TApplication) Run(stdin io.Reader, stdout io.Writer) error {
+	// Get terminal file descriptor
+	var termFd int = -1
+	if f, ok := stdin.(*os.File); ok {
+		termFd = int(f.Fd())
 	}
+	if termFd < 0 {
+		return fmt.Errorf("TApplication.Run(): stdin is not a valid terminal file")
+	}
+
+	// Get terminal size
+	width, height, err := term.GetSize(termFd)
+	if err != nil {
+		return fmt.Errorf("TApplication.Run(): failed to get terminal size: %w", err)
+	}
+
+	// Resize screen buffer to match terminal
+	app.screen.SetSize(width, height)
+
+	// Notify main widget of resize
+	app.mainWidget.HandleEvent(&TEvent{
+		Type: TEventTypeResize,
+		Rect: gophertv.TRect{X: 0, Y: 0, W: uint16(width), H: uint16(height)},
+	})
+
+	// Create renderer
+	app.renderer = tio.NewScreenRenderer(app.screen, stdout)
+
+	// Store terminal state
+	app.stdin = stdin
+	app.stdout = stdout
+	app.termFd = termFd
 
 	// Initialize terminal
 	if err := app.initTerminal(); err != nil {
@@ -185,15 +153,20 @@ func (app *TApplication) Run() error {
 	// Set up signal handlers
 	app.setupSignalHandlers()
 
-	// Create and start input event reader
-	app.eventReader = tio.NewInputEventReader(app.stdin, app.stdout, app)
+	// Create local event channel for the event reader
+	eventCh := make(chan gophertv.InputEvent, 100)
+
+	// Create and start input event reader with local channel
+	app.eventReader = tio.NewInputEventReader(app.stdin, app.stdout, &eventChannelAdapter{eventCh: eventCh})
 	if err := app.eventReader.Start(); err != nil {
 		return fmt.Errorf("TApplication.Run(): failed to start event reader: %w", err)
 	}
 	defer app.eventReader.Stop()
 
 	// Draw initial frame
+	app.mu.Lock()
 	app.mainWidget.Draw(app.screen)
+	app.mu.Unlock()
 	if err := app.renderer.Render(); err != nil {
 		return fmt.Errorf("TApplication.Run(): failed to render initial frame: %w", err)
 	}
@@ -204,8 +177,10 @@ func (app *TApplication) Run() error {
 		case <-app.quitCh:
 			return nil
 
-		case event := <-app.eventCh:
+		case event := <-eventCh:
+			app.mu.Lock()
 			app.handleEvent(event)
+			app.mu.Unlock()
 		}
 	}
 }
@@ -226,30 +201,21 @@ func (app *TApplication) GetScreen() gophertv.IScreenOutput {
 	return app.screen
 }
 
-// InjectEvent injects an input event for testing purposes.
-// This allows deterministic testing without involving real terminal I/O.
-func (app *TApplication) InjectEvent(event gophertv.InputEvent) {
-	app.eventCh <- event
-}
-
-// ProcessEvents processes all pending events in the event queue.
-// This is useful for testing to ensure all events are processed synchronously.
-func (app *TApplication) ProcessEvents() {
-	for {
-		select {
-		case event := <-app.eventCh:
-			app.handleEvent(event)
-		default:
-			// No more events
-			return
-		}
-	}
+// ExecuteOnUiThread executes the given function with the UI mutex locked.
+// This ensures that application state is not modified concurrently.
+func (app *TApplication) ExecuteOnUiThread(f func()) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	f()
 }
 
 // Notify handles input events from the InputEventReader.
 // This implements the InputEventHandler interface.
+// It calls handleEvent directly with the mutex locked.
 func (app *TApplication) Notify(event gophertv.InputEvent) {
-	app.eventCh <- event
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	app.handleEvent(event)
 }
 
 // handleEvent processes a single input event.
