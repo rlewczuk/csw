@@ -303,7 +303,7 @@ func TestTWidget_HandleEvent_PositionEvent(t *testing.T) {
 
 	// Create a position event with new values
 	event := &TEvent{
-		Type: TEventTypePosition,
+		Type: TEventTypeResize,
 		Rect: gophertv.TRect{X: 50, Y: 60, W: 70, H: 80},
 	}
 
@@ -333,7 +333,7 @@ func TestTWidget_HandleEvent_PositionEvent_NotPropagatedToChildren(t *testing.T)
 
 	// Create a position event
 	event := &TEvent{
-		Type: TEventTypePosition,
+		Type: TEventTypeResize,
 		Rect: gophertv.TRect{X: 50, Y: 60, W: 70, H: 80},
 	}
 
@@ -378,7 +378,7 @@ func TestTWidget_HandleEvent_PositionEvent_WithMultipleChildren(t *testing.T) {
 
 	// Create a position event
 	event := &TEvent{
-		Type: TEventTypePosition,
+		Type: TEventTypeResize,
 		Rect: gophertv.TRect{X: 100, Y: 200, W: 300, H: 400},
 	}
 

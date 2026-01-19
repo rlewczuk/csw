@@ -29,9 +29,13 @@ type TEventType uint32
 
 const (
 	TEventTypeNone TEventType = iota
+	// TEventTypeInput conveys input event from the terminal
 	TEventTypeInput
+	// TEventTypeTimer conveys timer event
 	TEventTypeTimer
-	TEventTypePosition
+	// TEventTypeResize conveys resize/reposition event
+	TEventTypeResize
+	// TEventTypeRedraw conveys redraw event
 	TEventTypeRedraw
 )
 
@@ -40,7 +44,7 @@ type TEvent struct {
 	// Input event for TEventTypeInput if any
 	InputEvent *gophertv.InputEvent
 
-	// Position data for TEventTypePosition
+	// Position data for TEventTypeResize
 	Rect gophertv.TRect
 }
 
@@ -100,7 +104,7 @@ func (w *TWidget) Draw(screen gophertv.IScreenOutput) {
 // HandleEvent handles an event by delegating to the active child if any.
 func (w *TWidget) HandleEvent(event *TEvent) {
 	// Handle position events directly without propagating to children
-	if event.Type == TEventTypePosition {
+	if event.Type == TEventTypeResize {
 		w.Position.X = event.Rect.X
 		w.Position.Y = event.Rect.Y
 		w.Position.W = event.Rect.W
