@@ -1,4 +1,4 @@
-package gophertv
+package gtv
 
 import (
 	"testing"

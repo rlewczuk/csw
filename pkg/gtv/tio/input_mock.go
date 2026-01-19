@@ -1,18 +1,18 @@
 package tio
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
 )
 
 // MockInputEventReader is a mock implementation of InputEventReader for testing.
 // It allows sending input events programmatically without requiring a real terminal.
 type MockInputEventReader struct {
-	handler gophertv.InputEventHandler
+	handler gtv.InputEventHandler
 }
 
 // NewMockInputEventReader creates a new MockInputEventReader instance.
 // The handler is called for each input event sent via the mock methods.
-func NewMockInputEventReader(handler gophertv.InputEventHandler) *MockInputEventReader {
+func NewMockInputEventReader(handler gtv.InputEventHandler) *MockInputEventReader {
 	return &MockInputEventReader{
 		handler: handler,
 	}
@@ -23,16 +23,16 @@ func NewMockInputEventReader(handler gophertv.InputEventHandler) *MockInputEvent
 // For uppercase letters, the Shift modifier is automatically added.
 func (m *MockInputEventReader) TypeKeys(keys string) {
 	for _, r := range keys {
-		var mods gophertv.EventModifiers
+		var mods gtv.EventModifiers
 		key := r
 
 		// Handle uppercase letters
 		if r >= 'A' && r <= 'Z' {
-			mods |= gophertv.ModShift
+			mods |= gtv.ModShift
 		}
 
-		m.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		m.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       key,
 			Modifiers: mods,
 		})
@@ -44,7 +44,7 @@ func (m *MockInputEventReader) TypeKeys(keys string) {
 // Examples: "a", "Enter", "Ctrl+C", "F1", "Shift+Up"
 func (m *MockInputEventReader) TypeKeysByName(keys ...string) {
 	for _, keyName := range keys {
-		event, err := gophertv.ParseKey(keyName)
+		event, err := gtv.ParseKey(keyName)
 		if err != nil {
 			// Skip invalid key names silently in tests
 			// In a real scenario, this could panic or log an error
@@ -55,9 +55,9 @@ func (m *MockInputEventReader) TypeKeysByName(keys ...string) {
 }
 
 // PressKey sends a single key event with the given key and modifiers.
-func (m *MockInputEventReader) PressKey(key rune, modifiers gophertv.EventModifiers) {
-	m.handler.Notify(gophertv.InputEvent{
-		Type:      gophertv.InputEventKey,
+func (m *MockInputEventReader) PressKey(key rune, modifiers gtv.EventModifiers) {
+	m.handler.Notify(gtv.InputEvent{
+		Type:      gtv.InputEventKey,
 		Key:       key,
 		Modifiers: modifiers,
 	})
@@ -65,8 +65,8 @@ func (m *MockInputEventReader) PressKey(key rune, modifiers gophertv.EventModifi
 
 // Resize sends a resize event with the given width and height.
 func (m *MockInputEventReader) Resize(width, height int) {
-	m.handler.Notify(gophertv.InputEvent{
-		Type: gophertv.InputEventResize,
+	m.handler.Notify(gtv.InputEvent{
+		Type: gtv.InputEventResize,
 		X:    uint16(width),
 		Y:    uint16(height),
 	})
@@ -74,28 +74,28 @@ func (m *MockInputEventReader) Resize(width, height int) {
 
 // MouseClick sends a mouse click event at the given coordinates with the specified button.
 // The button parameter should be one of the mouse button modifiers (ModClick, etc.).
-func (m *MockInputEventReader) MouseClick(x, y int, button gophertv.EventModifiers) {
-	m.handler.Notify(gophertv.InputEvent{
-		Type:      gophertv.InputEventMouse,
+func (m *MockInputEventReader) MouseClick(x, y int, button gtv.EventModifiers) {
+	m.handler.Notify(gtv.InputEvent{
+		Type:      gtv.InputEventMouse,
 		X:         uint16(x),
 		Y:         uint16(y),
-		Modifiers: button | gophertv.ModClick | gophertv.ModPress,
+		Modifiers: button | gtv.ModClick | gtv.ModPress,
 	})
 
 	// Send release event
-	m.handler.Notify(gophertv.InputEvent{
-		Type:      gophertv.InputEventMouse,
+	m.handler.Notify(gtv.InputEvent{
+		Type:      gtv.InputEventMouse,
 		X:         uint16(x),
 		Y:         uint16(y),
-		Modifiers: button | gophertv.ModRelease,
+		Modifiers: button | gtv.ModRelease,
 	})
 }
 
 // MouseWheel sends a mouse wheel event at the given coordinates with the specified direction.
 // The direction parameter should be either ModScrollUp or ModScrollDown.
-func (m *MockInputEventReader) MouseWheel(x, y int, direction gophertv.EventModifiers) {
-	m.handler.Notify(gophertv.InputEvent{
-		Type:      gophertv.InputEventMouse,
+func (m *MockInputEventReader) MouseWheel(x, y int, direction gtv.EventModifiers) {
+	m.handler.Notify(gtv.InputEvent{
+		Type:      gtv.InputEventMouse,
 		X:         uint16(x),
 		Y:         uint16(y),
 		Modifiers: direction,
@@ -106,11 +106,11 @@ func (m *MockInputEventReader) MouseWheel(x, y int, direction gophertv.EventModi
 // It sends a press event at the start, move events along the path, and a release event at the end.
 func (m *MockInputEventReader) MouseDrag(x1, y1, x2, y2 int) {
 	// Send press event at start position
-	m.handler.Notify(gophertv.InputEvent{
-		Type:      gophertv.InputEventMouse,
+	m.handler.Notify(gtv.InputEvent{
+		Type:      gtv.InputEventMouse,
 		X:         uint16(x1),
 		Y:         uint16(y1),
-		Modifiers: gophertv.ModPress,
+		Modifiers: gtv.ModPress,
 	})
 
 	// Send drag events
@@ -119,19 +119,19 @@ func (m *MockInputEventReader) MouseDrag(x1, y1, x2, y2 int) {
 	for i := 1; i <= steps; i++ {
 		x := x1 + (x2-x1)*i/steps
 		y := y1 + (y2-y1)*i/steps
-		m.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventMouse,
+		m.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventMouse,
 			X:         uint16(x),
 			Y:         uint16(y),
-			Modifiers: gophertv.ModDrag | gophertv.ModMove,
+			Modifiers: gtv.ModDrag | gtv.ModMove,
 		})
 	}
 
 	// Send release event at end position
-	m.handler.Notify(gophertv.InputEvent{
-		Type:      gophertv.InputEventMouse,
+	m.handler.Notify(gtv.InputEvent{
+		Type:      gtv.InputEventMouse,
 		X:         uint16(x2),
 		Y:         uint16(y2),
-		Modifiers: gophertv.ModRelease,
+		Modifiers: gtv.ModRelease,
 	})
 }

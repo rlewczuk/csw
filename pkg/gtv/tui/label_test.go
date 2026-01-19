@@ -3,18 +3,19 @@ package tui
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
-	"github.com/codesnort/codesnort-swe/pkg/gophertv/tio"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewLabel_BasicCreation(t *testing.T) {
 	// Create a label with explicit dimensions
-	attrs := gophertv.CellAttributes{
+	attrs := gtv.CellAttributes{
 		TextColor: 0xFF0000,
 		BackColor: 0x00FF00,
 	}
-	rect := gophertv.TRect{X: 10, Y: 5, W: 20, H: 1}
+	rect := gtv.TRect{X: 10, Y: 5, W: 20, H: 1}
 	label := NewLabel(nil, "Hello World", rect, attrs)
 
 	assert.NotNil(t, label, "Label should be created")
@@ -29,8 +30,8 @@ func TestNewLabel_BasicCreation(t *testing.T) {
 
 func TestNewLabel_AutoSize(t *testing.T) {
 	// Create a label with zero dimensions (auto-size)
-	attrs := gophertv.CellAttributes{}
-	rect := gophertv.TRect{X: 10, Y: 5, W: 0, H: 0}
+	attrs := gtv.CellAttributes{}
+	rect := gtv.TRect{X: 10, Y: 5, W: 0, H: 0}
 	label := NewLabel(nil, "Hello", rect, attrs)
 
 	assert.NotNil(t, label, "Label should be created")
@@ -40,8 +41,8 @@ func TestNewLabel_AutoSize(t *testing.T) {
 
 func TestNewLabel_AutoSizeEmpty(t *testing.T) {
 	// Create a label with empty text and zero dimensions
-	attrs := gophertv.CellAttributes{}
-	rect := gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}
+	attrs := gtv.CellAttributes{}
+	rect := gtv.TRect{X: 0, Y: 0, W: 0, H: 0}
 	label := NewLabel(nil, "", rect, attrs)
 
 	assert.NotNil(t, label, "Label should be created")
@@ -52,12 +53,12 @@ func TestNewLabel_AutoSizeEmpty(t *testing.T) {
 func TestNewLabel_WithParent(t *testing.T) {
 	// Create parent widget
 	parent := &TWidget{
-		Position: gophertv.TRect{X: 10, Y: 20, W: 100, H: 100},
+		Position: gtv.TRect{X: 10, Y: 20, W: 100, H: 100},
 	}
 
 	// Create child label
-	attrs := gophertv.CellAttributes{}
-	rect := gophertv.TRect{X: 5, Y: 10, W: 15, H: 1}
+	attrs := gtv.CellAttributes{}
+	rect := gtv.TRect{X: 5, Y: 10, W: 15, H: 1}
 	label := NewLabel(parent, "Test", rect, attrs)
 
 	assert.NotNil(t, label, "Label should be created")
@@ -67,12 +68,12 @@ func TestNewLabel_WithParent(t *testing.T) {
 }
 
 func TestTLabel_GetText(t *testing.T) {
-	label := NewLabel(nil, "Test Text", gophertv.TRect{X: 0, Y: 0, W: 10, H: 1}, gophertv.CellAttributes{})
+	label := NewLabel(nil, "Test Text", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, gtv.CellAttributes{})
 	assert.Equal(t, "Test Text", label.GetText(), "GetText should return the current text")
 }
 
 func TestTLabel_SetText(t *testing.T) {
-	label := NewLabel(nil, "Initial", gophertv.TRect{X: 0, Y: 0, W: 10, H: 1}, gophertv.CellAttributes{})
+	label := NewLabel(nil, "Initial", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, gtv.CellAttributes{})
 	assert.Equal(t, "Initial", label.GetText(), "Initial text should match")
 
 	label.SetText("Updated")
@@ -80,7 +81,7 @@ func TestTLabel_SetText(t *testing.T) {
 }
 
 func TestTLabel_SetText_InvalidatesCache(t *testing.T) {
-	label := NewLabel(nil, "Initial", gophertv.TRect{X: 0, Y: 0, W: 10, H: 1}, gophertv.CellAttributes{})
+	label := NewLabel(nil, "Initial", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, gtv.CellAttributes{})
 
 	// Force cache to be populated
 	_ = label.getFormattedCells()
@@ -92,7 +93,7 @@ func TestTLabel_SetText_InvalidatesCache(t *testing.T) {
 }
 
 func TestTLabel_SetText_SameText_NoInvalidation(t *testing.T) {
-	label := NewLabel(nil, "Same", gophertv.TRect{X: 0, Y: 0, W: 10, H: 1}, gophertv.CellAttributes{})
+	label := NewLabel(nil, "Same", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, gtv.CellAttributes{})
 
 	// Force cache to be populated
 	_ = label.getFormattedCells()
@@ -104,21 +105,21 @@ func TestTLabel_SetText_SameText_NoInvalidation(t *testing.T) {
 }
 
 func TestTLabel_GetAttrs(t *testing.T) {
-	attrs := gophertv.CellAttributes{
+	attrs := gtv.CellAttributes{
 		TextColor: 0xFF0000,
 		BackColor: 0x00FF00,
 	}
-	label := NewLabel(nil, "Test", gophertv.TRect{X: 0, Y: 0, W: 10, H: 1}, attrs)
+	label := NewLabel(nil, "Test", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, attrs)
 	assert.Equal(t, attrs, label.GetAttrs(), "GetAttrs should return the current attributes")
 }
 
 func TestTLabel_SetAttrs(t *testing.T) {
-	initialAttrs := gophertv.CellAttributes{
+	initialAttrs := gtv.CellAttributes{
 		TextColor: 0xFF0000,
 	}
-	label := NewLabel(nil, "Test", gophertv.TRect{X: 0, Y: 0, W: 10, H: 1}, initialAttrs)
+	label := NewLabel(nil, "Test", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, initialAttrs)
 
-	newAttrs := gophertv.CellAttributes{
+	newAttrs := gtv.CellAttributes{
 		TextColor: 0x00FF00,
 	}
 	label.SetAttrs(newAttrs)
@@ -126,15 +127,15 @@ func TestTLabel_SetAttrs(t *testing.T) {
 }
 
 func TestTLabel_SetAttrs_InvalidatesCache(t *testing.T) {
-	attrs := gophertv.CellAttributes{TextColor: 0xFF0000}
-	label := NewLabel(nil, "Test", gophertv.TRect{X: 0, Y: 0, W: 10, H: 1}, attrs)
+	attrs := gtv.CellAttributes{TextColor: 0xFF0000}
+	label := NewLabel(nil, "Test", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, attrs)
 
 	// Force cache to be populated
 	_ = label.getFormattedCells()
 	assert.True(t, label.cacheValid, "Cache should be valid after first call")
 
 	// Set new attributes
-	newAttrs := gophertv.CellAttributes{TextColor: 0x00FF00}
+	newAttrs := gtv.CellAttributes{TextColor: 0x00FF00}
 	label.SetAttrs(newAttrs)
 	assert.False(t, label.cacheValid, "Cache should be invalid after SetAttrs")
 }
@@ -144,22 +145,22 @@ func TestTLabel_Draw_PlainText(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create label
-	attrs := gophertv.CellAttributes{
+	attrs := gtv.CellAttributes{
 		TextColor: 0xFF0000,
 	}
-	label := NewLabel(nil, "Hello", gophertv.TRect{X: 5, Y: 10, W: 10, H: 1}, attrs)
+	label := NewLabel(nil, "Hello", gtv.TRect{X: 5, Y: 10, W: 10, H: 1}, attrs)
 
 	// Draw label
 	label.Draw(screen)
 
 	// Verify output
 	_, _, content := screen.GetContent()
-	verifier := gophertv.NewScreenVerifier(80, 24, content)
+	verifier := gtv.NewScreenVerifier(80, 24, content)
 
 	assert.True(t, verifier.HasText(5, 10, 5, 1, "Hello"), "Text should be drawn at correct position")
 
 	// Verify attributes
-	mask := gophertv.AttributeMask{
+	mask := gtv.AttributeMask{
 		CheckTextColor: true,
 		TextColor:      0xFF0000,
 	}
@@ -171,32 +172,32 @@ func TestTLabel_Draw_FormattedText(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create label with formatted text
-	attrs := gophertv.CellAttributes{
+	attrs := gtv.CellAttributes{
 		TextColor: 0xFF0000,
 	}
-	label := NewLabel(nil, "**bold** text", gophertv.TRect{X: 0, Y: 0, W: 20, H: 1}, attrs)
+	label := NewLabel(nil, "**bold** text", gtv.TRect{X: 0, Y: 0, W: 20, H: 1}, attrs)
 
 	// Draw label
 	label.Draw(screen)
 
 	// Verify output
 	_, _, content := screen.GetContent()
-	verifier := gophertv.NewScreenVerifier(80, 24, content)
+	verifier := gtv.NewScreenVerifier(80, 24, content)
 
 	// Check that the text "bold text" is rendered (without markdown markers)
 	assert.True(t, verifier.HasText(0, 0, 9, 1, "bold text"), "Formatted text should be rendered without markers")
 
 	// Verify bold attribute on "bold" portion
-	boldMask := gophertv.AttributeMask{
+	boldMask := gtv.AttributeMask{
 		CheckAttributes: true,
 		CheckTextColor:  true,
-		Attributes:      gophertv.AttrBold,
+		Attributes:      gtv.AttrBold,
 		TextColor:       0xFF0000,
 	}
 	assert.True(t, verifier.HasTextWithAttrs(0, 0, 4, 1, "bold", boldMask), "Bold portion should have bold attribute and color")
 
 	// Verify non-bold portion has only color
-	plainMask := gophertv.AttributeMask{
+	plainMask := gtv.AttributeMask{
 		CheckTextColor: true,
 		TextColor:      0xFF0000,
 	}
@@ -208,24 +209,24 @@ func TestTLabel_Draw_AttributeCombination(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create label with base attributes
-	attrs := gophertv.CellAttributes{
-		Attributes: gophertv.AttrDim,
+	attrs := gtv.CellAttributes{
+		Attributes: gtv.AttrDim,
 		TextColor:  0xFF0000,
 	}
-	label := NewLabel(nil, "*italic*", gophertv.TRect{X: 0, Y: 0, W: 10, H: 1}, attrs)
+	label := NewLabel(nil, "*italic*", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, attrs)
 
 	// Draw label
 	label.Draw(screen)
 
 	// Verify output
 	_, _, content := screen.GetContent()
-	verifier := gophertv.NewScreenVerifier(80, 24, content)
+	verifier := gtv.NewScreenVerifier(80, 24, content)
 
 	// Verify that italic text has both Dim (from base) and Italic (from format) attributes
-	combinedMask := gophertv.AttributeMask{
+	combinedMask := gtv.AttributeMask{
 		CheckAttributes: true,
 		CheckTextColor:  true,
-		Attributes:      gophertv.AttrDim | gophertv.AttrItalic,
+		Attributes:      gtv.AttrDim | gtv.AttrItalic,
 		TextColor:       0xFF0000,
 	}
 	assert.True(t, verifier.HasTextWithAttrs(0, 0, 6, 1, "italic", combinedMask), "Text should have combined attributes")
@@ -236,7 +237,7 @@ func TestTLabel_Draw_Hidden(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create label
-	label := NewLabel(nil, "Hidden", gophertv.TRect{X: 0, Y: 0, W: 10, H: 1}, gophertv.CellAttributes{})
+	label := NewLabel(nil, "Hidden", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, gtv.CellAttributes{})
 	label.Flags = WidgetFlagHidden
 
 	// Draw label
@@ -244,7 +245,7 @@ func TestTLabel_Draw_Hidden(t *testing.T) {
 
 	// Verify that nothing is drawn
 	_, _, content := screen.GetContent()
-	verifier := gophertv.NewScreenVerifier(80, 24, content)
+	verifier := gtv.NewScreenVerifier(80, 24, content)
 	assert.False(t, verifier.HasText(0, 0, 6, 1, "Hidden"), "Hidden label should not be drawn")
 }
 
@@ -254,28 +255,28 @@ func TestTLabel_Draw_WithParent(t *testing.T) {
 
 	// Create parent widget
 	parent := &TWidget{
-		Position: gophertv.TRect{X: 10, Y: 20, W: 100, H: 100},
+		Position: gtv.TRect{X: 10, Y: 20, W: 100, H: 100},
 	}
 
 	// Create child label
-	label := NewLabel(parent, "Child", gophertv.TRect{X: 5, Y: 3, W: 10, H: 1}, gophertv.CellAttributes{})
+	label := NewLabel(parent, "Child", gtv.TRect{X: 5, Y: 3, W: 10, H: 1}, gtv.CellAttributes{})
 
 	// Draw label
 	label.Draw(screen)
 
 	// Verify output at absolute position (parent + child)
 	_, _, content := screen.GetContent()
-	verifier := gophertv.NewScreenVerifier(80, 24, content)
+	verifier := gtv.NewScreenVerifier(80, 24, content)
 	assert.True(t, verifier.HasText(15, 23, 5, 1, "Child"), "Label should be drawn at absolute position")
 }
 
 func TestTLabel_HandleEvent_Position(t *testing.T) {
-	label := NewLabel(nil, "Test", gophertv.TRect{X: 10, Y: 20, W: 10, H: 1}, gophertv.CellAttributes{})
+	label := NewLabel(nil, "Test", gtv.TRect{X: 10, Y: 20, W: 10, H: 1}, gtv.CellAttributes{})
 
 	// Create position event
 	event := &TEvent{
 		Type: TEventTypeResize,
-		Rect: gophertv.TRect{X: 30, Y: 40, W: 50, H: 2},
+		Rect: gtv.TRect{X: 30, Y: 40, W: 50, H: 2},
 	}
 
 	// Handle event
@@ -289,13 +290,13 @@ func TestTLabel_HandleEvent_Position(t *testing.T) {
 }
 
 func TestTLabel_HandleEvent_Input(t *testing.T) {
-	label := NewLabel(nil, "Test", gophertv.TRect{X: 0, Y: 0, W: 10, H: 1}, gophertv.CellAttributes{})
+	label := NewLabel(nil, "Test", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, gtv.CellAttributes{})
 
 	// Create input event
 	event := &TEvent{
 		Type: TEventTypeInput,
-		InputEvent: &gophertv.InputEvent{
-			Type: gophertv.InputEventKey,
+		InputEvent: &gtv.InputEvent{
+			Type: gtv.InputEventKey,
 		},
 	}
 
@@ -304,7 +305,7 @@ func TestTLabel_HandleEvent_Input(t *testing.T) {
 }
 
 func TestTLabel_GetAbsolutePos_NoParent(t *testing.T) {
-	label := NewLabel(nil, "Test", gophertv.TRect{X: 10, Y: 20, W: 30, H: 1}, gophertv.CellAttributes{})
+	label := NewLabel(nil, "Test", gtv.TRect{X: 10, Y: 20, W: 30, H: 1}, gtv.CellAttributes{})
 
 	absPos := label.GetAbsolutePos()
 	assert.Equal(t, uint16(10), absPos.X, "X should match label position")
@@ -316,11 +317,11 @@ func TestTLabel_GetAbsolutePos_NoParent(t *testing.T) {
 func TestTLabel_GetAbsolutePos_WithParent(t *testing.T) {
 	// Create parent widget
 	parent := &TWidget{
-		Position: gophertv.TRect{X: 10, Y: 20, W: 100, H: 100},
+		Position: gtv.TRect{X: 10, Y: 20, W: 100, H: 100},
 	}
 
 	// Create child label
-	label := NewLabel(parent, "Test", gophertv.TRect{X: 5, Y: 10, W: 30, H: 1}, gophertv.CellAttributes{})
+	label := NewLabel(parent, "Test", gtv.TRect{X: 5, Y: 10, W: 30, H: 1}, gtv.CellAttributes{})
 
 	absPos := label.GetAbsolutePos()
 	assert.Equal(t, uint16(15), absPos.X, "X should be parent.X + label.X")
@@ -334,46 +335,46 @@ func TestTLabel_ComplexFormatting(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create label with complex formatted text
-	attrs := gophertv.CellAttributes{
-		Attributes: gophertv.AttrUnderline,
+	attrs := gtv.CellAttributes{
+		Attributes: gtv.AttrUnderline,
 		TextColor:  0x00FF00,
 	}
-	label := NewLabel(nil, "**bold** and *italic* and ~~strike~~", gophertv.TRect{X: 0, Y: 0, W: 50, H: 1}, attrs)
+	label := NewLabel(nil, "**bold** and *italic* and ~~strike~~", gtv.TRect{X: 0, Y: 0, W: 50, H: 1}, attrs)
 
 	// Draw label
 	label.Draw(screen)
 
 	// Verify output
 	_, _, content := screen.GetContent()
-	verifier := gophertv.NewScreenVerifier(80, 24, content)
+	verifier := gtv.NewScreenVerifier(80, 24, content)
 
 	// Verify the text is rendered correctly
 	expectedText := "bold and italic and strike"
 	assert.True(t, verifier.HasText(0, 0, len(expectedText), 1, expectedText), "Complex formatted text should be rendered")
 
 	// Verify bold portion has both underline (base) and bold (format)
-	boldMask := gophertv.AttributeMask{
+	boldMask := gtv.AttributeMask{
 		CheckAttributes: true,
 		CheckTextColor:  true,
-		Attributes:      gophertv.AttrUnderline | gophertv.AttrBold,
+		Attributes:      gtv.AttrUnderline | gtv.AttrBold,
 		TextColor:       0x00FF00,
 	}
 	assert.True(t, verifier.HasTextWithAttrs(0, 0, 4, 1, "bold", boldMask), "Bold text should have combined attributes")
 
 	// Verify italic portion has both underline (base) and italic (format)
-	italicMask := gophertv.AttributeMask{
+	italicMask := gtv.AttributeMask{
 		CheckAttributes: true,
 		CheckTextColor:  true,
-		Attributes:      gophertv.AttrUnderline | gophertv.AttrItalic,
+		Attributes:      gtv.AttrUnderline | gtv.AttrItalic,
 		TextColor:       0x00FF00,
 	}
 	assert.True(t, verifier.HasTextWithAttrs(9, 0, 6, 1, "italic", italicMask), "Italic text should have combined attributes")
 
 	// Verify strikethrough portion has both underline (base) and strikethrough (format)
-	strikeMask := gophertv.AttributeMask{
+	strikeMask := gtv.AttributeMask{
 		CheckAttributes: true,
 		CheckTextColor:  true,
-		Attributes:      gophertv.AttrUnderline | gophertv.AttrStrikethrough,
+		Attributes:      gtv.AttrUnderline | gtv.AttrStrikethrough,
 		TextColor:       0x00FF00,
 	}
 	assert.True(t, verifier.HasTextWithAttrs(20, 0, 6, 1, "strike", strikeMask), "Strikethrough text should have combined attributes")
@@ -384,7 +385,7 @@ func TestTLabel_EmptyText(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create label with empty text
-	label := NewLabel(nil, "", gophertv.TRect{X: 5, Y: 10, W: 10, H: 1}, gophertv.CellAttributes{})
+	label := NewLabel(nil, "", gtv.TRect{X: 5, Y: 10, W: 10, H: 1}, gtv.CellAttributes{})
 
 	// Draw label (should not panic)
 	label.Draw(screen)
@@ -398,14 +399,14 @@ func TestTLabel_LongText(t *testing.T) {
 
 	// Create label with text longer than screen width
 	longText := "This is a very long text that exceeds the screen width and should be clipped properly"
-	label := NewLabel(nil, longText, gophertv.TRect{X: 0, Y: 0, W: uint16(len(longText)), H: 1}, gophertv.CellAttributes{})
+	label := NewLabel(nil, longText, gtv.TRect{X: 0, Y: 0, W: uint16(len(longText)), H: 1}, gtv.CellAttributes{})
 
 	// Draw label (should not panic)
 	label.Draw(screen)
 
 	// Verify that text is drawn (will be clipped by screen boundary)
 	_, _, content := screen.GetContent()
-	verifier := gophertv.NewScreenVerifier(80, 24, content)
+	verifier := gtv.NewScreenVerifier(80, 24, content)
 
 	// Should have at least the first 80 characters
 	expectedText := longText[:80]

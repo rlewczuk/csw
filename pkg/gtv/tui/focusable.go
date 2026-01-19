@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
 )
 
 // IFocusable is an interface for widgets that can receive focus.
@@ -10,16 +10,16 @@ type IFocusable interface {
 	IWidget
 
 	// GetAttrs returns the text attributes for normal state.
-	GetAttrs() gophertv.CellAttributes
+	GetAttrs() gtv.CellAttributes
 
 	// SetAttrs sets the text attributes for normal state.
-	SetAttrs(attrs gophertv.CellAttributes)
+	SetAttrs(attrs gtv.CellAttributes)
 
 	// GetFocusedAttrs returns the text attributes for focused state.
-	GetFocusedAttrs() gophertv.CellAttributes
+	GetFocusedAttrs() gtv.CellAttributes
 
 	// SetFocusedAttrs sets the text attributes for focused state.
-	SetFocusedAttrs(attrs gophertv.CellAttributes)
+	SetFocusedAttrs(attrs gtv.CellAttributes)
 
 	// Focus sets focus to the widget.
 	Focus()
@@ -45,10 +45,10 @@ type TFocusable struct {
 	TWidget
 
 	// Text attributes for normal state
-	attrs gophertv.CellAttributes
+	attrs gtv.CellAttributes
 
 	// Text attributes for focused state
-	focusedAttrs gophertv.CellAttributes
+	focusedAttrs gtv.CellAttributes
 }
 
 // NewFocusable creates a new focusable widget with the specified position and attributes.
@@ -59,7 +59,7 @@ type TFocusable struct {
 //
 // Note: When creating a derived widget that embeds TFocusable, use newFocusableBase
 // to avoid double registration with the parent. This constructor registers with the parent.
-func NewFocusable(parent IWidget, rect gophertv.TRect, attrs, focusedAttrs gophertv.CellAttributes) *TFocusable {
+func NewFocusable(parent IWidget, rect gtv.TRect, attrs, focusedAttrs gtv.CellAttributes) *TFocusable {
 	focusable := newFocusableBase(parent, rect, attrs, focusedAttrs)
 
 	// Register with parent if provided
@@ -72,7 +72,7 @@ func NewFocusable(parent IWidget, rect gophertv.TRect, attrs, focusedAttrs gophe
 
 // newFocusableBase creates a focusable widget without registering with parent.
 // This is used internally by derived widgets to avoid double registration.
-func newFocusableBase(parent IWidget, rect gophertv.TRect, attrs, focusedAttrs gophertv.CellAttributes) *TFocusable {
+func newFocusableBase(parent IWidget, rect gtv.TRect, attrs, focusedAttrs gtv.CellAttributes) *TFocusable {
 	return &TFocusable{
 		TWidget: TWidget{
 			Position: rect,
@@ -85,22 +85,22 @@ func newFocusableBase(parent IWidget, rect gophertv.TRect, attrs, focusedAttrs g
 }
 
 // GetAttrs returns the text attributes for normal state.
-func (f *TFocusable) GetAttrs() gophertv.CellAttributes {
+func (f *TFocusable) GetAttrs() gtv.CellAttributes {
 	return f.attrs
 }
 
 // SetAttrs sets the text attributes for normal state.
-func (f *TFocusable) SetAttrs(attrs gophertv.CellAttributes) {
+func (f *TFocusable) SetAttrs(attrs gtv.CellAttributes) {
 	f.attrs = attrs
 }
 
 // GetFocusedAttrs returns the text attributes for focused state.
-func (f *TFocusable) GetFocusedAttrs() gophertv.CellAttributes {
+func (f *TFocusable) GetFocusedAttrs() gtv.CellAttributes {
 	return f.focusedAttrs
 }
 
 // SetFocusedAttrs sets the text attributes for focused state.
-func (f *TFocusable) SetFocusedAttrs(attrs gophertv.CellAttributes) {
+func (f *TFocusable) SetFocusedAttrs(attrs gtv.CellAttributes) {
 	f.focusedAttrs = attrs
 }
 
@@ -122,7 +122,7 @@ func (f *TFocusable) IsFocused() bool {
 // Draw draws the focusable widget on the screen.
 // This is a minimal implementation that just draws children.
 // Derived widgets should override this method to provide custom rendering.
-func (f *TFocusable) Draw(screen gophertv.IScreenOutput) {
+func (f *TFocusable) Draw(screen gtv.IScreenOutput) {
 	// Don't draw if hidden
 	if f.Flags&WidgetFlagHidden != 0 {
 		return

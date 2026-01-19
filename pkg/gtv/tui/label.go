@@ -1,8 +1,8 @@
 package tui
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
-	"github.com/codesnort/codesnort-swe/pkg/gophertv/util"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv/util"
 )
 
 // ILabel is an interface for label widgets that display text on the screen.
@@ -17,10 +17,10 @@ type ILabel interface {
 	SetText(text string)
 
 	// GetAttrs returns the text attributes of the label.
-	GetAttrs() gophertv.CellAttributes
+	GetAttrs() gtv.CellAttributes
 
 	// SetAttrs sets the text attributes of the label.
-	SetAttrs(attrs gophertv.CellAttributes)
+	SetAttrs(attrs gtv.CellAttributes)
 }
 
 // TLabel is a struct that implements ILabel interface and extends TWidget.
@@ -32,10 +32,10 @@ type TLabel struct {
 	text string
 
 	// Base attributes (colors and base attribute mask)
-	attrs gophertv.CellAttributes
+	attrs gtv.CellAttributes
 
 	// Formatted cells cache
-	formattedCells []gophertv.Cell
+	formattedCells []gtv.Cell
 
 	// Whether the formatted cells cache is valid
 	cacheValid bool
@@ -44,7 +44,7 @@ type TLabel struct {
 // NewLabel creates a new label widget with the specified text, position, and attributes.
 // If rect width and height are 0, the label is auto-sized to fit the text.
 // The parent parameter is optional (can be nil for root widgets).
-func NewLabel(parent IWidget, text string, rect gophertv.TRect, attrs gophertv.CellAttributes) *TLabel {
+func NewLabel(parent IWidget, text string, rect gtv.TRect, attrs gtv.CellAttributes) *TLabel {
 	label := &TLabel{
 		TWidget: TWidget{
 			Position: rect,
@@ -83,7 +83,7 @@ func (l *TLabel) autoSize() {
 }
 
 // getFormattedCells returns the formatted cells, using cache if valid
-func (l *TLabel) getFormattedCells() []gophertv.Cell {
+func (l *TLabel) getFormattedCells() []gtv.Cell {
 	if l.cacheValid {
 		return l.formattedCells
 	}
@@ -147,18 +147,18 @@ func (l *TLabel) SetText(text string) {
 }
 
 // GetAttrs returns the text attributes of the label.
-func (l *TLabel) GetAttrs() gophertv.CellAttributes {
+func (l *TLabel) GetAttrs() gtv.CellAttributes {
 	return l.attrs
 }
 
 // SetAttrs sets the text attributes of the label and invalidates the cache.
-func (l *TLabel) SetAttrs(attrs gophertv.CellAttributes) {
+func (l *TLabel) SetAttrs(attrs gtv.CellAttributes) {
 	l.attrs = attrs
 	l.invalidateCache()
 }
 
 // Draw draws the label on the screen.
-func (l *TLabel) Draw(screen gophertv.IScreenOutput) {
+func (l *TLabel) Draw(screen gtv.IScreenOutput) {
 	// Don't draw if hidden
 	if l.Flags&WidgetFlagHidden != 0 {
 		return

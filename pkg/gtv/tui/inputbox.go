@@ -3,7 +3,7 @@ package tui
 import (
 	"unicode"
 
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
 )
 
 // IInputBox is an interface for input box widgets that allow text input.
@@ -18,16 +18,16 @@ type IInputBox interface {
 	SetText(text string)
 
 	// GetAttrs returns the text attributes for normal state.
-	GetAttrs() gophertv.CellAttributes
+	GetAttrs() gtv.CellAttributes
 
 	// SetAttrs sets the text attributes for normal state.
-	SetAttrs(attrs gophertv.CellAttributes)
+	SetAttrs(attrs gtv.CellAttributes)
 
 	// GetFocusedAttrs returns the text attributes for focused state.
-	GetFocusedAttrs() gophertv.CellAttributes
+	GetFocusedAttrs() gtv.CellAttributes
 
 	// SetFocusedAttrs sets the text attributes for focused state.
-	SetFocusedAttrs(attrs gophertv.CellAttributes)
+	SetFocusedAttrs(attrs gtv.CellAttributes)
 
 	// Focus sets focus to the input box.
 	Focus()
@@ -94,7 +94,7 @@ type TInputBox struct {
 // The rect parameter specifies the position and size of the input box.
 // The attrs parameter specifies text attributes for normal state.
 // The focusedAttrs parameter specifies text attributes for focused state.
-func NewInputBox(parent IWidget, text string, rect gophertv.TRect, attrs, focusedAttrs gophertv.CellAttributes) *TInputBox {
+func NewInputBox(parent IWidget, text string, rect gtv.TRect, attrs, focusedAttrs gtv.CellAttributes) *TInputBox {
 	inputBox := &TInputBox{
 		TFocusable:     *newFocusableBase(parent, rect, attrs, focusedAttrs),
 		text:           text,
@@ -237,7 +237,7 @@ func (i *TInputBox) updateScrollOffset() {
 }
 
 // Draw draws the input box on the screen.
-func (i *TInputBox) Draw(screen gophertv.IScreenOutput) {
+func (i *TInputBox) Draw(screen gtv.IScreenOutput) {
 	// Don't draw if hidden
 	if i.Flags&WidgetFlagHidden != 0 {
 		return
@@ -263,7 +263,7 @@ func (i *TInputBox) Draw(screen gophertv.IScreenOutput) {
 	}
 
 	// Build visible text with selection highlighting
-	cells := make([]gophertv.Cell, 0, int(absPos.W))
+	cells := make([]gtv.Cell, 0, int(absPos.W))
 	selStart, selEnd := i.GetSelection()
 
 	for idx := visibleStart; idx < visibleEnd; idx++ {
@@ -273,10 +273,10 @@ func (i *TInputBox) Draw(screen gophertv.IScreenOutput) {
 		cellAttrs := currentAttrs
 		if isSelected {
 			// Invert colors for selection
-			cellAttrs.Attributes |= gophertv.AttrReverse
+			cellAttrs.Attributes |= gtv.AttrReverse
 		}
 
-		cells = append(cells, gophertv.Cell{
+		cells = append(cells, gtv.Cell{
 			Rune:  textRunes[idx],
 			Attrs: cellAttrs,
 		})
@@ -284,7 +284,7 @@ func (i *TInputBox) Draw(screen gophertv.IScreenOutput) {
 
 	// Fill remaining width with spaces
 	for len(cells) < int(absPos.W) {
-		cells = append(cells, gophertv.Cell{
+		cells = append(cells, gtv.Cell{
 			Rune:  ' ',
 			Attrs: currentAttrs,
 		})
@@ -298,7 +298,7 @@ func (i *TInputBox) Draw(screen gophertv.IScreenOutput) {
 		visibleCursorX := i.cursorPos - i.scrollOffset
 		if visibleCursorX >= 0 && visibleCursorX <= int(absPos.W) {
 			screen.MoveCursor(int(absPos.X)+visibleCursorX, int(absPos.Y))
-			screen.SetCursorStyle(gophertv.CursorStyleBar | gophertv.CursorStyleBlinking)
+			screen.SetCursorStyle(gtv.CursorStyleBar | gtv.CursorStyleBlinking)
 		}
 	}
 
@@ -323,13 +323,13 @@ func (i *TInputBox) HandleEvent(event *TEvent) {
 		inputEvent := event.InputEvent
 
 		// Handle mouse events for focus and selection
-		if inputEvent.Type == gophertv.InputEventMouse {
+		if inputEvent.Type == gtv.InputEventMouse {
 			i.handleMouseEvent(inputEvent)
 			return
 		}
 
 		// Handle keyboard events only when focused
-		if i.IsFocused() && inputEvent.Type == gophertv.InputEventKey {
+		if i.IsFocused() && inputEvent.Type == gtv.InputEventKey {
 			i.handleKeyEvent(inputEvent)
 			return
 		}
@@ -340,7 +340,7 @@ func (i *TInputBox) HandleEvent(event *TEvent) {
 }
 
 // handleMouseEvent handles mouse events for focus and text selection.
-func (i *TInputBox) handleMouseEvent(event *gophertv.InputEvent) {
+func (i *TInputBox) handleMouseEvent(event *gtv.InputEvent) {
 	absPos := i.GetAbsolutePos()
 
 	// Check if click is within input box
@@ -371,7 +371,7 @@ func (i *TInputBox) handleMouseEvent(event *gophertv.InputEvent) {
 	}
 
 	// Handle mouse press - start selection or move cursor
-	if event.Modifiers&gophertv.ModPress != 0 {
+	if event.Modifiers&gtv.ModPress != 0 {
 		i.isDragging = true
 		i.dragStartPos = charPos
 		i.cursorPos = charPos
@@ -380,7 +380,7 @@ func (i *TInputBox) handleMouseEvent(event *gophertv.InputEvent) {
 	}
 
 	// Handle mouse drag - extend selection
-	if i.isDragging && event.Modifiers&gophertv.ModDrag != 0 {
+	if i.isDragging && event.Modifiers&gtv.ModDrag != 0 {
 		i.cursorPos = charPos
 		i.selectionStart = i.dragStartPos
 		i.selectionEnd = charPos
@@ -389,7 +389,7 @@ func (i *TInputBox) handleMouseEvent(event *gophertv.InputEvent) {
 	}
 
 	// Handle mouse release - end dragging
-	if event.Modifiers&gophertv.ModRelease != 0 {
+	if event.Modifiers&gtv.ModRelease != 0 {
 		if i.isDragging {
 			i.cursorPos = charPos
 			i.selectionStart = i.dragStartPos
@@ -402,12 +402,12 @@ func (i *TInputBox) handleMouseEvent(event *gophertv.InputEvent) {
 }
 
 // handleKeyEvent handles keyboard events for text input and editing.
-func (i *TInputBox) handleKeyEvent(event *gophertv.InputEvent) {
+func (i *TInputBox) handleKeyEvent(event *gtv.InputEvent) {
 	textRunes := []rune(i.text)
-	hasShift := event.Modifiers&gophertv.ModShift != 0
+	hasShift := event.Modifiers&gtv.ModShift != 0
 
 	// Handle navigation keys
-	if event.Modifiers&gophertv.ModFn != 0 {
+	if event.Modifiers&gtv.ModFn != 0 {
 		switch event.Key {
 		case 'D': // Left arrow or Delete key
 			// Left arrow has just ModFn (and possibly ModShift)

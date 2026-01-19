@@ -3,8 +3,9 @@ package tui
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
-	"github.com/codesnort/codesnort-swe/pkg/gophertv/tio"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +17,7 @@ type mockWidget struct {
 	lastEvent         *TEvent
 }
 
-func (m *mockWidget) Draw(screen gophertv.IScreenOutput) {
+func (m *mockWidget) Draw(screen gtv.IScreenOutput) {
 	m.drawCalled = true
 	// Also call the base implementation to test composition
 	m.TWidget.Draw(screen)
@@ -32,7 +33,7 @@ func (m *mockWidget) HandleEvent(event *TEvent) {
 func TestTWidget_Draw_NoChildren(t *testing.T) {
 	// Create a widget with no children
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
+		Position: gtv.TRect{X: 0, Y: 0, W: 10, H: 5},
 	}
 
 	// Create a mock screen
@@ -48,23 +49,23 @@ func TestTWidget_Draw_WithChildren(t *testing.T) {
 	// Create child widgets
 	child1 := &mockWidget{
 		TWidget: TWidget{
-			Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
+			Position: gtv.TRect{X: 0, Y: 0, W: 10, H: 5},
 		},
 	}
 	child2 := &mockWidget{
 		TWidget: TWidget{
-			Position: gophertv.TRect{X: 10, Y: 0, W: 10, H: 5},
+			Position: gtv.TRect{X: 10, Y: 0, W: 10, H: 5},
 		},
 	}
 	child3 := &mockWidget{
 		TWidget: TWidget{
-			Position: gophertv.TRect{X: 20, Y: 0, W: 10, H: 5},
+			Position: gtv.TRect{X: 20, Y: 0, W: 10, H: 5},
 		},
 	}
 
 	// Create parent widget with children
 	parent := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 30, H: 5},
+		Position: gtv.TRect{X: 0, Y: 0, W: 30, H: 5},
 		Children: []IWidget{child1, child2, child3},
 	}
 
@@ -84,25 +85,25 @@ func TestTWidget_Draw_WithNestedChildren(t *testing.T) {
 	// Create nested structure: parent -> child1 -> grandchild
 	grandchild := &mockWidget{
 		TWidget: TWidget{
-			Position: gophertv.TRect{X: 0, Y: 0, W: 5, H: 3},
+			Position: gtv.TRect{X: 0, Y: 0, W: 5, H: 3},
 		},
 	}
 
 	child1 := &mockWidget{
 		TWidget: TWidget{
-			Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
+			Position: gtv.TRect{X: 0, Y: 0, W: 10, H: 5},
 			Children: []IWidget{grandchild},
 		},
 	}
 
 	child2 := &mockWidget{
 		TWidget: TWidget{
-			Position: gophertv.TRect{X: 10, Y: 0, W: 10, H: 5},
+			Position: gtv.TRect{X: 10, Y: 0, W: 10, H: 5},
 		},
 	}
 
 	parent := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 30, H: 5},
+		Position: gtv.TRect{X: 0, Y: 0, W: 30, H: 5},
 		Children: []IWidget{child1, child2},
 	}
 
@@ -121,14 +122,14 @@ func TestTWidget_Draw_WithNestedChildren(t *testing.T) {
 func TestTWidget_HandleEvent_NoActiveChild(t *testing.T) {
 	// Create a widget with no active child
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
+		Position: gtv.TRect{X: 0, Y: 0, W: 10, H: 5},
 	}
 
 	// Create an event
 	event := &TEvent{
 		Type: TEventTypeInput,
-		InputEvent: &gophertv.InputEvent{
-			Type: gophertv.InputEventKey,
+		InputEvent: &gtv.InputEvent{
+			Type: gtv.InputEventKey,
 		},
 	}
 
@@ -142,21 +143,21 @@ func TestTWidget_HandleEvent_WithActiveChild(t *testing.T) {
 	// Create an active child widget
 	activeChild := &mockWidget{
 		TWidget: TWidget{
-			Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
+			Position: gtv.TRect{X: 0, Y: 0, W: 10, H: 5},
 		},
 	}
 
 	// Create parent widget with active child
 	parent := &TWidget{
-		Position:    gophertv.TRect{X: 0, Y: 0, W: 30, H: 5},
+		Position:    gtv.TRect{X: 0, Y: 0, W: 30, H: 5},
 		ActiveChild: activeChild,
 	}
 
 	// Create an event
 	event := &TEvent{
 		Type: TEventTypeInput,
-		InputEvent: &gophertv.InputEvent{
-			Type: gophertv.InputEventKey,
+		InputEvent: &gtv.InputEvent{
+			Type: gtv.InputEventKey,
 		},
 	}
 
@@ -172,13 +173,13 @@ func TestTWidget_HandleEvent_MultipleEvents(t *testing.T) {
 	// Create an active child widget
 	activeChild := &mockWidget{
 		TWidget: TWidget{
-			Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
+			Position: gtv.TRect{X: 0, Y: 0, W: 10, H: 5},
 		},
 	}
 
 	// Create parent widget with active child
 	parent := &TWidget{
-		Position:    gophertv.TRect{X: 0, Y: 0, W: 30, H: 5},
+		Position:    gtv.TRect{X: 0, Y: 0, W: 30, H: 5},
 		ActiveChild: activeChild,
 	}
 
@@ -202,18 +203,18 @@ func TestTWidget_HandleEvent_ChildrenButNoActiveChild(t *testing.T) {
 	// Create child widgets
 	child1 := &mockWidget{
 		TWidget: TWidget{
-			Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 5},
+			Position: gtv.TRect{X: 0, Y: 0, W: 10, H: 5},
 		},
 	}
 	child2 := &mockWidget{
 		TWidget: TWidget{
-			Position: gophertv.TRect{X: 10, Y: 0, W: 10, H: 5},
+			Position: gtv.TRect{X: 10, Y: 0, W: 10, H: 5},
 		},
 	}
 
 	// Create parent with children but no active child
 	parent := &TWidget{
-		Position:    gophertv.TRect{X: 0, Y: 0, W: 30, H: 5},
+		Position:    gtv.TRect{X: 0, Y: 0, W: 30, H: 5},
 		Children:    []IWidget{child1, child2},
 		ActiveChild: nil,
 	}
@@ -232,7 +233,7 @@ func TestTWidget_HandleEvent_ChildrenButNoActiveChild(t *testing.T) {
 func TestTWidget_GetAbsolutePosition_NoParent(t *testing.T) {
 	// Create a widget with no parent
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 10, Y: 20, W: 30, H: 40},
+		Position: gtv.TRect{X: 10, Y: 20, W: 30, H: 40},
 	}
 
 	// Get absolute position
@@ -248,12 +249,12 @@ func TestTWidget_GetAbsolutePosition_NoParent(t *testing.T) {
 func TestTWidget_GetAbsolutePosition_WithParent(t *testing.T) {
 	// Create parent widget
 	parent := &TWidget{
-		Position: gophertv.TRect{X: 10, Y: 20, W: 100, H: 100},
+		Position: gtv.TRect{X: 10, Y: 20, W: 100, H: 100},
 	}
 
 	// Create child widget
 	child := &TWidget{
-		Position: gophertv.TRect{X: 5, Y: 10, W: 30, H: 40},
+		Position: gtv.TRect{X: 5, Y: 10, W: 30, H: 40},
 		Parent:   parent,
 	}
 
@@ -270,18 +271,18 @@ func TestTWidget_GetAbsolutePosition_WithParent(t *testing.T) {
 func TestTWidget_GetAbsolutePosition_NestedParents(t *testing.T) {
 	// Create grandparent widget
 	grandparent := &TWidget{
-		Position: gophertv.TRect{X: 10, Y: 20, W: 200, H: 200},
+		Position: gtv.TRect{X: 10, Y: 20, W: 200, H: 200},
 	}
 
 	// Create parent widget
 	parent := &TWidget{
-		Position: gophertv.TRect{X: 5, Y: 10, W: 100, H: 100},
+		Position: gtv.TRect{X: 5, Y: 10, W: 100, H: 100},
 		Parent:   grandparent,
 	}
 
 	// Create child widget
 	child := &TWidget{
-		Position: gophertv.TRect{X: 3, Y: 7, W: 30, H: 40},
+		Position: gtv.TRect{X: 3, Y: 7, W: 30, H: 40},
 		Parent:   parent,
 	}
 
@@ -298,13 +299,13 @@ func TestTWidget_GetAbsolutePosition_NestedParents(t *testing.T) {
 func TestTWidget_HandleEvent_PositionEvent(t *testing.T) {
 	// Create a widget with initial position
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 10, Y: 20, W: 30, H: 40},
+		Position: gtv.TRect{X: 10, Y: 20, W: 30, H: 40},
 	}
 
 	// Create a position event with new values
 	event := &TEvent{
 		Type: TEventTypeResize,
-		Rect: gophertv.TRect{X: 50, Y: 60, W: 70, H: 80},
+		Rect: gtv.TRect{X: 50, Y: 60, W: 70, H: 80},
 	}
 
 	// Handle the position event
@@ -321,20 +322,20 @@ func TestTWidget_HandleEvent_PositionEvent_NotPropagatedToChildren(t *testing.T)
 	// Create an active child widget
 	activeChild := &mockWidget{
 		TWidget: TWidget{
-			Position: gophertv.TRect{X: 5, Y: 10, W: 15, H: 20},
+			Position: gtv.TRect{X: 5, Y: 10, W: 15, H: 20},
 		},
 	}
 
 	// Create parent widget with active child
 	parent := &TWidget{
-		Position:    gophertv.TRect{X: 10, Y: 20, W: 30, H: 40},
+		Position:    gtv.TRect{X: 10, Y: 20, W: 30, H: 40},
 		ActiveChild: activeChild,
 	}
 
 	// Create a position event
 	event := &TEvent{
 		Type: TEventTypeResize,
-		Rect: gophertv.TRect{X: 50, Y: 60, W: 70, H: 80},
+		Rect: gtv.TRect{X: 50, Y: 60, W: 70, H: 80},
 	}
 
 	// Handle the position event
@@ -360,18 +361,18 @@ func TestTWidget_HandleEvent_PositionEvent_WithMultipleChildren(t *testing.T) {
 	// Create multiple child widgets
 	child1 := &mockWidget{
 		TWidget: TWidget{
-			Position: gophertv.TRect{X: 0, Y: 0, W: 10, H: 10},
+			Position: gtv.TRect{X: 0, Y: 0, W: 10, H: 10},
 		},
 	}
 	child2 := &mockWidget{
 		TWidget: TWidget{
-			Position: gophertv.TRect{X: 10, Y: 0, W: 10, H: 10},
+			Position: gtv.TRect{X: 10, Y: 0, W: 10, H: 10},
 		},
 	}
 
 	// Create parent widget with children and an active child
 	parent := &TWidget{
-		Position:    gophertv.TRect{X: 10, Y: 20, W: 30, H: 40},
+		Position:    gtv.TRect{X: 10, Y: 20, W: 30, H: 40},
 		Children:    []IWidget{child1, child2},
 		ActiveChild: child1,
 	}
@@ -379,7 +380,7 @@ func TestTWidget_HandleEvent_PositionEvent_WithMultipleChildren(t *testing.T) {
 	// Create a position event
 	event := &TEvent{
 		Type: TEventTypeResize,
-		Rect: gophertv.TRect{X: 100, Y: 200, W: 300, H: 400},
+		Rect: gtv.TRect{X: 100, Y: 200, W: 300, H: 400},
 	}
 
 	// Handle the position event

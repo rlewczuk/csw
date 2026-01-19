@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
 )
 
 // WidgetFlag represents flags that can be set on the widget
@@ -19,7 +19,7 @@ const (
 // CursorState represents state of the cursor: style and position
 type CursorState struct {
 	// Cursor style
-	Style gophertv.CursorStyle
+	Style gtv.CursorStyle
 	// Cursor position relative to the widget
 	X, Y int
 }
@@ -42,10 +42,10 @@ const (
 type TEvent struct {
 	Type TEventType
 	// Input event for TEventTypeInput if any
-	InputEvent *gophertv.InputEvent
+	InputEvent *gtv.InputEvent
 
 	// Position data for TEventTypeResize
-	Rect gophertv.TRect
+	Rect gtv.TRect
 }
 
 // IWidget is an interface implemented by all widgets
@@ -53,14 +53,14 @@ type TEvent struct {
 type IWidget interface {
 	// GetPos returns position of the widget relative to its parent.
 	// If widget has no parent, returns position relative to the screen.
-	GetPos() gophertv.TRect
+	GetPos() gtv.TRect
 
 	// GetAbsolutePos returns absolute position of the widget.
 	// If widget has a parent, returns parent position + position to the parent
-	GetAbsolutePos() gophertv.TRect
+	GetAbsolutePos() gtv.TRect
 
 	// Draw draws the widget on the screen
-	Draw(screen gophertv.IScreenOutput)
+	Draw(screen gtv.IScreenOutput)
 
 	// HandleEvent handles an event
 	HandleEvent(event *TEvent)
@@ -70,7 +70,7 @@ type IWidget interface {
 
 type TWidget struct {
 	// Position is relative to parent widget; if parent does not exist, it is relative to the screen
-	Position gophertv.TRect
+	Position gtv.TRect
 	// Parent widget, if any
 	Parent IWidget
 	// Child widgets
@@ -85,18 +85,18 @@ type TWidget struct {
 
 // GetPos returns position of the widget relative to its parent.
 // If widget has no parent, returns position relative to the screen.
-func (w *TWidget) GetPos() gophertv.TRect {
+func (w *TWidget) GetPos() gtv.TRect {
 	return w.Position
 }
 
 // GetAbsolutePos returns absolute position of the widget.
 // If widget has a parent, returns parent position + position to the parent
-func (w *TWidget) GetAbsolutePos() gophertv.TRect {
+func (w *TWidget) GetAbsolutePos() gtv.TRect {
 	if w.Parent == nil {
 		return w.Position
 	}
 	parentPos := w.Parent.GetAbsolutePos()
-	return gophertv.TRect{
+	return gtv.TRect{
 		X: parentPos.X + w.Position.X,
 		Y: parentPos.Y + w.Position.Y,
 		W: w.Position.W,
@@ -105,7 +105,7 @@ func (w *TWidget) GetAbsolutePos() gophertv.TRect {
 }
 
 // Draw draws the widget on the screen by calling Draw() on all children.
-func (w *TWidget) Draw(screen gophertv.IScreenOutput) {
+func (w *TWidget) Draw(screen gtv.IScreenOutput) {
 	for _, child := range w.Children {
 		child.Draw(screen)
 	}

@@ -1,11 +1,11 @@
 package util
 
-import "github.com/codesnort/codesnort-swe/pkg/gophertv"
+import "github.com/codesnort/codesnort-swe/pkg/gtv"
 
 // marker represents an active formatting marker on the stack
 type marker struct {
 	text     string
-	attr     gophertv.TextAttributes
+	attr     gtv.TextAttributes
 	startPos int
 }
 
@@ -65,14 +65,14 @@ type marker struct {
 //
 //	TextToCells("****")                     // Empty result
 //	TextToCells("**   **")                  // Bold spaces: "   "
-func TextToCells(s string) []gophertv.Cell {
+func TextToCells(s string) []gtv.Cell {
 	if len(s) == 0 {
-		return []gophertv.Cell{}
+		return []gtv.Cell{}
 	}
 
 	runes := []rune(s)
-	cells := []gophertv.Cell{}
-	attrs := gophertv.CellAttributes{}
+	cells := []gtv.Cell{}
+	attrs := gtv.CellAttributes{}
 
 	// Stack to track active formatting markers and their attributes
 	stack := []marker{}
@@ -83,12 +83,12 @@ func TextToCells(s string) []gophertv.Cell {
 		if runes[i] == '\\' {
 			if i+1 < len(runes) {
 				// Escape next character
-				cells = append(cells, gophertv.Cell{Rune: runes[i+1], Attrs: attrs})
+				cells = append(cells, gtv.Cell{Rune: runes[i+1], Attrs: attrs})
 				i += 2
 				continue
 			} else {
 				// Backslash at end of string
-				cells = append(cells, gophertv.Cell{Rune: '\\', Attrs: attrs})
+				cells = append(cells, gtv.Cell{Rune: '\\', Attrs: attrs})
 				i++
 				continue
 			}
@@ -107,7 +107,7 @@ func TextToCells(s string) []gophertv.Cell {
 				matched = true
 			} else {
 				// Opening marker - push to stack
-				stack = append(stack, marker{text: "___", attr: gophertv.AttrDoubleUnderline, startPos: i})
+				stack = append(stack, marker{text: "___", attr: gtv.AttrDoubleUnderline, startPos: i})
 				attrs = calculateAttrs(stack)
 				i += 3
 				matched = true
@@ -124,7 +124,7 @@ func TextToCells(s string) []gophertv.Cell {
 				matched = true
 			} else {
 				// Opening marker
-				stack = append(stack, marker{text: "__", attr: gophertv.AttrUnderline, startPos: i})
+				stack = append(stack, marker{text: "__", attr: gtv.AttrUnderline, startPos: i})
 				attrs = calculateAttrs(stack)
 				i += 2
 				matched = true
@@ -139,7 +139,7 @@ func TextToCells(s string) []gophertv.Cell {
 				i += 2
 				matched = true
 			} else {
-				stack = append(stack, marker{text: "~~", attr: gophertv.AttrStrikethrough, startPos: i})
+				stack = append(stack, marker{text: "~~", attr: gtv.AttrStrikethrough, startPos: i})
 				attrs = calculateAttrs(stack)
 				i += 2
 				matched = true
@@ -154,7 +154,7 @@ func TextToCells(s string) []gophertv.Cell {
 				i += 2
 				matched = true
 			} else {
-				stack = append(stack, marker{text: "%%", attr: gophertv.AttrDim, startPos: i})
+				stack = append(stack, marker{text: "%%", attr: gtv.AttrDim, startPos: i})
 				attrs = calculateAttrs(stack)
 				i += 2
 				matched = true
@@ -169,7 +169,7 @@ func TextToCells(s string) []gophertv.Cell {
 				i += 2
 				matched = true
 			} else {
-				stack = append(stack, marker{text: "!!", attr: gophertv.AttrBlink, startPos: i})
+				stack = append(stack, marker{text: "!!", attr: gtv.AttrBlink, startPos: i})
 				attrs = calculateAttrs(stack)
 				i += 2
 				matched = true
@@ -184,7 +184,7 @@ func TextToCells(s string) []gophertv.Cell {
 				i += 2
 				matched = true
 			} else {
-				stack = append(stack, marker{text: "<<", attr: gophertv.AttrReverse, startPos: i})
+				stack = append(stack, marker{text: "<<", attr: gtv.AttrReverse, startPos: i})
 				attrs = calculateAttrs(stack)
 				i += 2
 				matched = true
@@ -199,7 +199,7 @@ func TextToCells(s string) []gophertv.Cell {
 				matched = true
 			} else {
 				// Opening >> without << - treat as literal
-				cells = append(cells, gophertv.Cell{Rune: runes[i], Attrs: attrs})
+				cells = append(cells, gtv.Cell{Rune: runes[i], Attrs: attrs})
 				i++
 				matched = true
 			}
@@ -250,12 +250,12 @@ func TextToCells(s string) []gophertv.Cell {
 			// Prefer ** over *** to allow "****" to be parsed as "**" + "**"
 			if !matched {
 				if asteriskCount >= 2 {
-					stack = append(stack, marker{text: "**", attr: gophertv.AttrBold, startPos: i})
+					stack = append(stack, marker{text: "**", attr: gtv.AttrBold, startPos: i})
 					attrs = calculateAttrs(stack)
 					i += 2
 					matched = true
 				} else if asteriskCount >= 1 {
-					stack = append(stack, marker{text: "*", attr: gophertv.AttrItalic, startPos: i})
+					stack = append(stack, marker{text: "*", attr: gtv.AttrItalic, startPos: i})
 					attrs = calculateAttrs(stack)
 					i++
 					matched = true
@@ -265,7 +265,7 @@ func TextToCells(s string) []gophertv.Cell {
 
 		// If no marker matched, add character to output
 		if !matched {
-			cells = append(cells, gophertv.Cell{Rune: runes[i], Attrs: attrs})
+			cells = append(cells, gtv.Cell{Rune: runes[i], Attrs: attrs})
 			i++
 		}
 	}
@@ -292,19 +292,19 @@ func findInStack(stack []marker, text string) (bool, int) {
 }
 
 // calculateAttrs combines all attributes from the current stack
-func calculateAttrs(stack []marker) gophertv.CellAttributes {
-	var combined gophertv.TextAttributes
+func calculateAttrs(stack []marker) gtv.CellAttributes {
+	var combined gtv.TextAttributes
 	for _, m := range stack {
 		combined |= m.attr
 	}
-	return gophertv.Attrs(combined)
+	return gtv.Attrs(combined)
 }
 
 // reparseWithLiterals reparses the string treating unclosed markers as literal text
-func reparseWithLiterals(s string, unclosed []marker) []gophertv.Cell {
+func reparseWithLiterals(s string, unclosed []marker) []gtv.Cell {
 	runes := []rune(s)
-	cells := []gophertv.Cell{}
-	attrs := gophertv.CellAttributes{}
+	cells := []gtv.Cell{}
+	attrs := gtv.CellAttributes{}
 
 	stack := []marker{}
 
@@ -321,11 +321,11 @@ func reparseWithLiterals(s string, unclosed []marker) []gophertv.Cell {
 		// Handle escape sequences
 		if runes[i] == '\\' {
 			if i+1 < len(runes) {
-				cells = append(cells, gophertv.Cell{Rune: runes[i+1], Attrs: attrs})
+				cells = append(cells, gtv.Cell{Rune: runes[i+1], Attrs: attrs})
 				i += 2
 				continue
 			} else {
-				cells = append(cells, gophertv.Cell{Rune: '\\', Attrs: attrs})
+				cells = append(cells, gtv.Cell{Rune: '\\', Attrs: attrs})
 				i++
 				continue
 			}
@@ -333,7 +333,7 @@ func reparseWithLiterals(s string, unclosed []marker) []gophertv.Cell {
 
 		// If this position is marked as literal, add as-is
 		if literalPositions[i] {
-			cells = append(cells, gophertv.Cell{Rune: runes[i], Attrs: attrs})
+			cells = append(cells, gtv.Cell{Rune: runes[i], Attrs: attrs})
 			i++
 			continue
 		}
@@ -350,7 +350,7 @@ func reparseWithLiterals(s string, unclosed []marker) []gophertv.Cell {
 				i += 3
 				matched = true
 			} else {
-				stack = append(stack, marker{text: "___", attr: gophertv.AttrDoubleUnderline, startPos: i})
+				stack = append(stack, marker{text: "___", attr: gtv.AttrDoubleUnderline, startPos: i})
 				attrs = calculateAttrs(stack)
 				i += 3
 				matched = true
@@ -366,7 +366,7 @@ func reparseWithLiterals(s string, unclosed []marker) []gophertv.Cell {
 				i += 2
 				matched = true
 			} else {
-				stack = append(stack, marker{text: "__", attr: gophertv.AttrUnderline, startPos: i})
+				stack = append(stack, marker{text: "__", attr: gtv.AttrUnderline, startPos: i})
 				attrs = calculateAttrs(stack)
 				i += 2
 				matched = true
@@ -382,7 +382,7 @@ func reparseWithLiterals(s string, unclosed []marker) []gophertv.Cell {
 				i += 2
 				matched = true
 			} else {
-				stack = append(stack, marker{text: "~~", attr: gophertv.AttrStrikethrough, startPos: i})
+				stack = append(stack, marker{text: "~~", attr: gtv.AttrStrikethrough, startPos: i})
 				attrs = calculateAttrs(stack)
 				i += 2
 				matched = true
@@ -398,7 +398,7 @@ func reparseWithLiterals(s string, unclosed []marker) []gophertv.Cell {
 				i += 2
 				matched = true
 			} else {
-				stack = append(stack, marker{text: "%%", attr: gophertv.AttrDim, startPos: i})
+				stack = append(stack, marker{text: "%%", attr: gtv.AttrDim, startPos: i})
 				attrs = calculateAttrs(stack)
 				i += 2
 				matched = true
@@ -414,7 +414,7 @@ func reparseWithLiterals(s string, unclosed []marker) []gophertv.Cell {
 				i += 2
 				matched = true
 			} else {
-				stack = append(stack, marker{text: "!!", attr: gophertv.AttrBlink, startPos: i})
+				stack = append(stack, marker{text: "!!", attr: gtv.AttrBlink, startPos: i})
 				attrs = calculateAttrs(stack)
 				i += 2
 				matched = true
@@ -430,7 +430,7 @@ func reparseWithLiterals(s string, unclosed []marker) []gophertv.Cell {
 				i += 2
 				matched = true
 			} else {
-				stack = append(stack, marker{text: "<<", attr: gophertv.AttrReverse, startPos: i})
+				stack = append(stack, marker{text: "<<", attr: gtv.AttrReverse, startPos: i})
 				attrs = calculateAttrs(stack)
 				i += 2
 				matched = true
@@ -445,7 +445,7 @@ func reparseWithLiterals(s string, unclosed []marker) []gophertv.Cell {
 				i += 2
 				matched = true
 			} else {
-				cells = append(cells, gophertv.Cell{Rune: runes[i], Attrs: attrs})
+				cells = append(cells, gtv.Cell{Rune: runes[i], Attrs: attrs})
 				i++
 				matched = true
 			}
@@ -481,12 +481,12 @@ func reparseWithLiterals(s string, unclosed []marker) []gophertv.Cell {
 			// If no closing match, open new marker
 			if !matched {
 				if asteriskCount >= 2 {
-					stack = append(stack, marker{text: "**", attr: gophertv.AttrBold, startPos: i})
+					stack = append(stack, marker{text: "**", attr: gtv.AttrBold, startPos: i})
 					attrs = calculateAttrs(stack)
 					i += 2
 					matched = true
 				} else if asteriskCount >= 1 {
-					stack = append(stack, marker{text: "*", attr: gophertv.AttrItalic, startPos: i})
+					stack = append(stack, marker{text: "*", attr: gtv.AttrItalic, startPos: i})
 					attrs = calculateAttrs(stack)
 					i++
 					matched = true
@@ -495,7 +495,7 @@ func reparseWithLiterals(s string, unclosed []marker) []gophertv.Cell {
 		}
 
 		if !matched {
-			cells = append(cells, gophertv.Cell{Rune: runes[i], Attrs: attrs})
+			cells = append(cells, gtv.Cell{Rune: runes[i], Attrs: attrs})
 			i++
 		}
 	}

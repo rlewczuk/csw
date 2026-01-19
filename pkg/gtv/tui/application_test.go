@@ -3,8 +3,9 @@ package tui
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
-	"github.com/codesnort/codesnort-swe/pkg/gophertv/tio"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,29 +16,29 @@ func TestNewApplication(t *testing.T) {
 		name       string
 		width      int
 		height     int
-		widgetPos  gophertv.TRect
-		expectSize gophertv.TRect
+		widgetPos  gtv.TRect
+		expectSize gtv.TRect
 	}{
 		{
 			name:       "80x24 screen",
 			width:      80,
 			height:     24,
-			widgetPos:  gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
-			expectSize: gophertv.TRect{X: 0, Y: 0, W: 80, H: 24},
+			widgetPos:  gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
+			expectSize: gtv.TRect{X: 0, Y: 0, W: 80, H: 24},
 		},
 		{
 			name:       "120x30 screen",
 			width:      120,
 			height:     30,
-			widgetPos:  gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
-			expectSize: gophertv.TRect{X: 0, Y: 0, W: 120, H: 30},
+			widgetPos:  gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
+			expectSize: gtv.TRect{X: 0, Y: 0, W: 120, H: 30},
 		},
 		{
 			name:       "small screen 40x10",
 			width:      40,
 			height:     10,
-			widgetPos:  gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
-			expectSize: gophertv.TRect{X: 0, Y: 0, W: 40, H: 10},
+			widgetPos:  gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
+			expectSize: gtv.TRect{X: 0, Y: 0, W: 40, H: 10},
 		},
 	}
 
@@ -72,7 +73,7 @@ func TestNewApplication(t *testing.T) {
 func TestApplicationQuit(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+		Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
 	app := NewApplication(widget, screen)
@@ -93,7 +94,7 @@ func TestApplicationQuit(t *testing.T) {
 func TestApplicationGetScreen(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+		Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
 	app := NewApplication(widget, screen)
@@ -109,14 +110,14 @@ func TestApplicationGetScreen(t *testing.T) {
 func TestApplicationNotify(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+		Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
 	app := NewApplication(widget, screen)
 
 	// Call Notify with an event - it should handle it synchronously without panicking
-	event := gophertv.InputEvent{
-		Type: gophertv.InputEventKey,
+	event := gtv.InputEvent{
+		Type: gtv.InputEventKey,
 		Key:  'a',
 	}
 
@@ -128,7 +129,7 @@ func TestApplicationNotify(t *testing.T) {
 func TestApplicationExecuteOnUiThread(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+		Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
 	app := NewApplication(widget, screen)
@@ -187,7 +188,7 @@ func TestApplicationHandleResize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := tio.NewScreenBuffer(tt.initialW, tt.initialH, 0)
 			widget := &TWidget{
-				Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+				Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 			}
 
 			app := NewApplication(widget, screen)
@@ -213,7 +214,7 @@ func TestApplicationHandleResize(t *testing.T) {
 func TestApplicationHandleCtrlC(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+		Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
 	app := NewApplication(widget, screen)
@@ -235,7 +236,7 @@ func TestApplicationHandleCtrlC(t *testing.T) {
 func TestApplicationHandleMultipleResizes(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+		Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
 	app := NewApplication(widget, screen)
@@ -273,7 +274,7 @@ func TestApplicationHandleMultipleResizes(t *testing.T) {
 func TestApplicationEventOrdering(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+		Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
 	app := NewApplication(widget, screen)
@@ -291,7 +292,7 @@ func TestApplicationEventOrdering(t *testing.T) {
 func TestApplicationExecuteOnUiThreadConcurrent(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+		Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
 	app := NewApplication(widget, screen)
@@ -322,7 +323,7 @@ func TestApplicationExecuteOnUiThreadConcurrent(t *testing.T) {
 func TestApplicationMixedEvents(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+		Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
 	app := NewApplication(widget, screen)
@@ -347,7 +348,7 @@ func TestApplicationMixedEvents(t *testing.T) {
 func TestApplicationMockInputKeysByName(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+		Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
 	app := NewApplication(widget, screen)
@@ -371,7 +372,7 @@ func TestApplicationMockInputKeysByName(t *testing.T) {
 func TestApplicationMockInputMouseEvents(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 	widget := &TWidget{
-		Position: gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+		Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 	}
 
 	app := NewApplication(widget, screen)
@@ -383,7 +384,7 @@ func TestApplicationMockInputMouseEvents(t *testing.T) {
 	mockInput.MouseClick(10, 15, 0)
 
 	// Test mouse wheel
-	mockInput.MouseWheel(20, 25, gophertv.ModScrollUp)
+	mockInput.MouseWheel(20, 25, gtv.ModScrollUp)
 
 	// Test mouse drag
 	mockInput.MouseDrag(5, 5, 15, 15)

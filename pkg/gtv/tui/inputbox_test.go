@@ -3,24 +3,25 @@ package tui_test
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
-	"github.com/codesnort/codesnort-swe/pkg/gophertv/tio"
-	"github.com/codesnort/codesnort-swe/pkg/gophertv/tui"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
+	"github.com/codesnort/codesnort-swe/pkg/gtv/tui"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestInputBox_Creation tests creating an input box widget
 func TestInputBox_Creation(t *testing.T) {
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"Hello",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -35,15 +36,15 @@ func TestInputBox_Creation(t *testing.T) {
 // TestInputBox_BasicRendering tests that the input box renders correctly
 func TestInputBox_BasicRendering(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	_ = tui.NewInputBox(
 		layout,
 		"Test",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -73,13 +74,13 @@ func TestInputBox_BasicRendering(t *testing.T) {
 // TestInputBox_FocusBlur tests focus and blur functionality
 func TestInputBox_FocusBlur(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		nil,
 		"Test",
-		gophertv.TRect{X: 0, Y: 0, W: 20, H: 1},
+		gtv.TRect{X: 0, Y: 0, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -96,7 +97,7 @@ func TestInputBox_FocusBlur(t *testing.T) {
 	cursorX, cursorY := screen.GetCursorPosition()
 	assert.Equal(t, 4, cursorX) // Cursor at end of "Test"
 	assert.Equal(t, 0, cursorY)
-	assert.Equal(t, gophertv.CursorStyleBar|gophertv.CursorStyleBlinking, screen.GetCursorStyle())
+	assert.Equal(t, gtv.CursorStyleBar|gtv.CursorStyleBlinking, screen.GetCursorStyle())
 
 	// Blur
 	inputBox.Blur()
@@ -106,15 +107,15 @@ func TestInputBox_FocusBlur(t *testing.T) {
 // TestInputBox_MouseClick tests mouse click for focus
 func TestInputBox_MouseClick(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"Hello",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -140,15 +141,15 @@ func TestInputBox_MouseClick(t *testing.T) {
 // TestInputBox_TextInput tests typing text into the input box
 func TestInputBox_TextInput(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -171,15 +172,15 @@ func TestInputBox_TextInput(t *testing.T) {
 // TestInputBox_Backspace tests backspace functionality
 func TestInputBox_Backspace(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"Hello",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -209,15 +210,15 @@ func TestInputBox_Backspace(t *testing.T) {
 // TestInputBox_ArrowKeys tests cursor navigation with arrow keys
 func TestInputBox_ArrowKeys(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"Hello",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -254,15 +255,15 @@ func TestInputBox_ArrowKeys(t *testing.T) {
 // TestInputBox_Selection_ShiftArrows tests text selection with Shift+arrow keys
 func TestInputBox_Selection_ShiftArrows(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"Hello",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -298,15 +299,15 @@ func TestInputBox_Selection_ShiftArrows(t *testing.T) {
 // TestInputBox_Selection_ShiftHome tests selecting to beginning with Shift+Home
 func TestInputBox_Selection_ShiftHome(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"Hello",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -330,15 +331,15 @@ func TestInputBox_Selection_ShiftHome(t *testing.T) {
 // TestInputBox_Selection_ShiftEnd tests selecting to end with Shift+End
 func TestInputBox_Selection_ShiftEnd(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"Hello",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -362,15 +363,15 @@ func TestInputBox_Selection_ShiftEnd(t *testing.T) {
 // TestInputBox_DeleteSelection tests deleting selected text with backspace
 func TestInputBox_DeleteSelection(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"Hello World",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -396,15 +397,15 @@ func TestInputBox_DeleteSelection(t *testing.T) {
 // TestInputBox_ReplaceSelection tests replacing selected text when typing
 func TestInputBox_ReplaceSelection(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"Hello World",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -430,15 +431,15 @@ func TestInputBox_ReplaceSelection(t *testing.T) {
 // TestInputBox_MouseSelection tests selecting text with mouse drag
 func TestInputBox_MouseSelection(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"Hello World",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -462,16 +463,16 @@ func TestInputBox_MouseSelection(t *testing.T) {
 // TestInputBox_LongText_Scrolling tests horizontal scrolling with long text
 func TestInputBox_LongText_Scrolling(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	// Create input box with width of 10 characters
 	inputBox := tui.NewInputBox(
 		layout,
 		"This is a very long text that exceeds the width",
-		gophertv.TRect{X: 10, Y: 10, W: 10, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 10, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -500,15 +501,15 @@ func TestInputBox_LongText_Scrolling(t *testing.T) {
 // TestInputBox_InsertInMiddle tests inserting text in the middle
 func TestInputBox_InsertInMiddle(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"HelloWorld",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -531,13 +532,13 @@ func TestInputBox_InsertInMiddle(t *testing.T) {
 
 // TestInputBox_SetText tests programmatically setting text
 func TestInputBox_SetText(t *testing.T) {
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		nil,
 		"Initial",
-		gophertv.TRect{X: 0, Y: 0, W: 20, H: 1},
+		gtv.TRect{X: 0, Y: 0, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -563,15 +564,15 @@ func TestInputBox_SetText(t *testing.T) {
 // TestInputBox_SelectionRendering tests that selection is rendered with reverse attributes
 func TestInputBox_SelectionRendering(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"Hello",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -589,14 +590,14 @@ func TestInputBox_SelectionRendering(t *testing.T) {
 	// Check first 3 characters have reverse attribute
 	for i := 0; i < 3; i++ {
 		idx := 10*width + 10 + i
-		assert.True(t, content[idx].Attrs.Attributes&gophertv.AttrReverse != 0,
+		assert.True(t, content[idx].Attrs.Attributes&gtv.AttrReverse != 0,
 			"Character %d should have reverse attribute", i)
 	}
 
 	// Check remaining characters don't have reverse attribute
 	for i := 3; i < 5; i++ {
 		idx := 10*width + 10 + i
-		assert.False(t, content[idx].Attrs.Attributes&gophertv.AttrReverse != 0,
+		assert.False(t, content[idx].Attrs.Attributes&gtv.AttrReverse != 0,
 			"Character %d should not have reverse attribute", i)
 	}
 }
@@ -604,15 +605,15 @@ func TestInputBox_SelectionRendering(t *testing.T) {
 // TestInputBox_EmptyText tests input box with empty text
 func TestInputBox_EmptyText(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -635,15 +636,15 @@ func TestInputBox_EmptyText(t *testing.T) {
 // TestInputBox_BackspaceAtBeginning tests that backspace at beginning does nothing
 func TestInputBox_BackspaceAtBeginning(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"Hello",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -667,15 +668,15 @@ func TestInputBox_BackspaceAtBeginning(t *testing.T) {
 // TestInputBox_ArrowKeysBoundaries tests arrow keys at boundaries
 func TestInputBox_ArrowKeysBoundaries(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	inputBox := tui.NewInputBox(
 		layout,
 		"Hello",
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)

@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
-	"github.com/codesnort/codesnort-swe/pkg/gophertv/tio"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
 	"golang.org/x/term"
 )
 
@@ -17,7 +17,7 @@ type DemoApp struct {
 	screen       *tio.ScreenBuffer
 	renderer     *tio.ScreenRenderer
 	eventReader  *tio.InputEventReader
-	lastEvent    *gophertv.InputEvent
+	lastEvent    *gtv.InputEvent
 	eventCount   int
 	width        int
 	height       int
@@ -50,34 +50,34 @@ func NewDemoApp(width, height int) *DemoApp {
 }
 
 // Notify handles input events.
-func (app *DemoApp) Notify(event gophertv.InputEvent) {
+func (app *DemoApp) Notify(event gtv.InputEvent) {
 	// Store the event
 	app.lastEvent = &event
 	app.eventCount++
 
 	// Handle specific keys to trigger visual changes
-	if event.Type == gophertv.InputEventKey {
+	if event.Type == gtv.InputEventKey {
 		// Handle function keys (ModFn set)
-		if event.Modifiers&gophertv.ModFn != 0 {
+		if event.Modifiers&gtv.ModFn != 0 {
 			switch event.Key {
 			case 'I':
 				// Insert key - rotate cursor style
 				// First cycle through non-blinking styles, then blinking styles, then all combined
 				app.cursorStyle = (app.cursorStyle + 1) % 13
-				styles := []gophertv.CursorStyle{
-					gophertv.CursorStyleDefault,
-					gophertv.CursorStyleBlock,
-					gophertv.CursorStyleUnderline,
-					gophertv.CursorStyleBar,
-					gophertv.CursorStyleHidden,
-					gophertv.CursorStyleDefault | gophertv.CursorStyleBlinking,
-					gophertv.CursorStyleBlock | gophertv.CursorStyleBlinking,
-					gophertv.CursorStyleUnderline | gophertv.CursorStyleBlinking,
-					gophertv.CursorStyleBar | gophertv.CursorStyleBlinking,
-					gophertv.CursorStyleDefault | gophertv.CursorStyleBlinking,
-					gophertv.CursorStyleBlock | gophertv.CursorStyleBlinking,
-					gophertv.CursorStyleUnderline | gophertv.CursorStyleBlinking,
-					gophertv.CursorStyleBar | gophertv.CursorStyleBlinking,
+				styles := []gtv.CursorStyle{
+					gtv.CursorStyleDefault,
+					gtv.CursorStyleBlock,
+					gtv.CursorStyleUnderline,
+					gtv.CursorStyleBar,
+					gtv.CursorStyleHidden,
+					gtv.CursorStyleDefault | gtv.CursorStyleBlinking,
+					gtv.CursorStyleBlock | gtv.CursorStyleBlinking,
+					gtv.CursorStyleUnderline | gtv.CursorStyleBlinking,
+					gtv.CursorStyleBar | gtv.CursorStyleBlinking,
+					gtv.CursorStyleDefault | gtv.CursorStyleBlinking,
+					gtv.CursorStyleBlock | gtv.CursorStyleBlinking,
+					gtv.CursorStyleUnderline | gtv.CursorStyleBlinking,
+					gtv.CursorStyleBar | gtv.CursorStyleBlinking,
 				}
 				styleNames := []string{
 					"Default",
@@ -133,12 +133,12 @@ func (app *DemoApp) Notify(event gophertv.InputEvent) {
 				app.borderStyle = 0
 				app.flashCount = 0
 				app.cursorStyle = 0
-				app.screen.SetCursorStyle(gophertv.CursorStyleDefault)
+				app.screen.SetCursorStyle(gtv.CursorStyleDefault)
 				app.screen.MoveCursor(0, 0)
 				app.statusText = "Reset complete"
 			}
 		}
-	} else if event.Type == gophertv.InputEventResize {
+	} else if event.Type == gtv.InputEventResize {
 		// Update size
 		app.width = int(event.X)
 		app.height = int(event.Y)
@@ -161,13 +161,13 @@ func (app *DemoApp) render() {
 
 	// Draw header
 	headerColor := app.colors[app.colorIndex]
-	app.screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, centerText("Terminal Input Event Demo", app.width),
-		gophertv.AttrsWithColor(gophertv.AttrBold, headerColor, 0))
+	app.screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, centerText("Terminal Input Event Demo", app.width),
+		gtv.AttrsWithColor(gtv.AttrBold, headerColor, 0))
 
 	// Draw instructions
 	instructionColor := uint32(0xAAAAAA)
-	app.screen.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, centerText("q=quit c=color b=border f=flash r=reset Ins=cursor PgDn=move", app.width),
-		gophertv.AttrsWithColor(0, instructionColor, 0))
+	app.screen.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, centerText("q=quit c=color b=border f=flash r=reset Ins=cursor PgDn=move", app.width),
+		gtv.AttrsWithColor(0, instructionColor, 0))
 
 	// Draw top border
 	app.drawBorder()
@@ -180,14 +180,14 @@ func (app *DemoApp) render() {
 	statusBg := uint32(0x333333)
 	statusLine := fmt.Sprintf(" Status: %s | Events: %d ",
 		app.statusText, app.eventCount)
-	app.screen.PutText(gophertv.TRect{X: 0, Y: uint16(app.height - 1), W: 0, H: 0}, padRight(statusLine, app.width),
-		gophertv.AttrsWithColor(gophertv.AttrBold, statusColor, statusBg))
+	app.screen.PutText(gtv.TRect{X: 0, Y: uint16(app.height - 1), W: 0, H: 0}, padRight(statusLine, app.width),
+		gtv.AttrsWithColor(gtv.AttrBold, statusColor, statusBg))
 
 	// Draw flash indicator if active
 	if app.flashCount > 0 {
 		flashColor := app.colors[(app.flashCount)%len(app.colors)]
-		app.screen.PutText(gophertv.TRect{X: uint16(app.width - 10), Y: 3, W: 0, H: 0}, "* FLASH *",
-			gophertv.AttrsWithColor(gophertv.AttrBold|gophertv.AttrBlink, flashColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(app.width - 10), Y: 3, W: 0, H: 0}, "* FLASH *",
+			gtv.AttrsWithColor(gtv.AttrBold|gtv.AttrBlink, flashColor, 0))
 	}
 
 	// Render to terminal
@@ -209,8 +209,8 @@ func (app *DemoApp) drawBorder() {
 		fullBorder += string([]rune(borderChar)[i%len([]rune(borderChar))])
 	}
 
-	app.screen.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, fullBorder,
-		gophertv.AttrsWithColor(0, borderColor, 0))
+	app.screen.PutText(gtv.TRect{X: 0, Y: 2, W: 0, H: 0}, fullBorder,
+		gtv.AttrsWithColor(0, borderColor, 0))
 }
 
 // drawEventList draws the event details in a centered frame.
@@ -220,8 +220,8 @@ func (app *DemoApp) drawEventList() {
 
 	if app.lastEvent == nil {
 		emptyText := "No events yet. Press some keys!"
-		app.screen.PutText(gophertv.TRect{X: uint16((app.width - len(emptyText)) / 2), Y: uint16((startY + endY) / 2), W: 0, H: 0}, emptyText,
-			gophertv.AttrsWithColor(gophertv.AttrItalic, 0x888888, 0))
+		app.screen.PutText(gtv.TRect{X: uint16((app.width - len(emptyText)) / 2), Y: uint16((startY + endY) / 2), W: 0, H: 0}, emptyText,
+			gtv.AttrsWithColor(gtv.AttrItalic, 0x888888, 0))
 		return
 	}
 
@@ -234,17 +234,17 @@ func (app *DemoApp) drawEventList() {
 	// Draw frame border
 	borderColor := uint32(0x00AAFF)
 	// Top border
-	app.screen.PutText(gophertv.TRect{X: uint16(frameX), Y: uint16(frameY), W: 0, H: 0}, "┌"+padRight("", frameWidth-2)+"┐",
-		gophertv.AttrsWithColor(0, borderColor, 0))
+	app.screen.PutText(gtv.TRect{X: uint16(frameX), Y: uint16(frameY), W: 0, H: 0}, "┌"+padRight("", frameWidth-2)+"┐",
+		gtv.AttrsWithColor(0, borderColor, 0))
 	// Bottom border
-	app.screen.PutText(gophertv.TRect{X: uint16(frameX), Y: uint16(frameY + frameHeight - 1), W: 0, H: 0}, "└"+padRight("", frameWidth-2)+"┘",
-		gophertv.AttrsWithColor(0, borderColor, 0))
+	app.screen.PutText(gtv.TRect{X: uint16(frameX), Y: uint16(frameY + frameHeight - 1), W: 0, H: 0}, "└"+padRight("", frameWidth-2)+"┘",
+		gtv.AttrsWithColor(0, borderColor, 0))
 	// Side borders
 	for i := 1; i < frameHeight-1; i++ {
-		app.screen.PutText(gophertv.TRect{X: uint16(frameX), Y: uint16(frameY + i), W: 0, H: 0}, "│",
-			gophertv.AttrsWithColor(0, borderColor, 0))
-		app.screen.PutText(gophertv.TRect{X: uint16(frameX + frameWidth - 1), Y: uint16(frameY + i), W: 0, H: 0}, "│",
-			gophertv.AttrsWithColor(0, borderColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(frameX), Y: uint16(frameY + i), W: 0, H: 0}, "│",
+			gtv.AttrsWithColor(0, borderColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(frameX + frameWidth - 1), Y: uint16(frameY + i), W: 0, H: 0}, "│",
+			gtv.AttrsWithColor(0, borderColor, 0))
 	}
 
 	// Draw event details
@@ -255,77 +255,77 @@ func (app *DemoApp) drawEventList() {
 
 	// Event string representation
 	if y < frameY+frameHeight-1 {
-		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Event:",
-			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
-		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, event.String(),
-			gophertv.AttrsWithColor(0, valueColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Event:",
+			gtv.AttrsWithColor(gtv.AttrBold, labelColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, event.String(),
+			gtv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
 
 	// Event type
 	if y < frameY+frameHeight-1 {
 		y++
-		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Type:",
-			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
-		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, eventTypeName(event.Type),
-			gophertv.AttrsWithColor(0, valueColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Type:",
+			gtv.AttrsWithColor(gtv.AttrBold, labelColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, eventTypeName(event.Type),
+			gtv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
 
 	// Key value (hex and character)
 	if y < frameY+frameHeight-1 {
 		y++
-		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Key:",
-			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Key:",
+			gtv.AttrsWithColor(gtv.AttrBold, labelColor, 0))
 		keyStr := fmt.Sprintf("0x%04X", event.Key)
 		if event.Key >= 32 && event.Key <= 126 {
 			keyStr += fmt.Sprintf(" ('%c')", event.Key)
 		}
-		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, keyStr,
-			gophertv.AttrsWithColor(0, valueColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, keyStr,
+			gtv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
 
 	// X and Y coordinates
 	if y < frameY+frameHeight-1 {
 		y++
-		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "X, Y:",
-			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
-		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, fmt.Sprintf("%d, %d", event.X, event.Y),
-			gophertv.AttrsWithColor(0, valueColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "X, Y:",
+			gtv.AttrsWithColor(gtv.AttrBold, labelColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, fmt.Sprintf("%d, %d", event.X, event.Y),
+			gtv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
 
 	// Content (for copy/paste events)
 	if event.Content != "" && y < frameY+frameHeight-1 {
 		y++
-		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Content:",
-			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Content:",
+			gtv.AttrsWithColor(gtv.AttrBold, labelColor, 0))
 		content := event.Content
 		maxLen := frameWidth - 14
 		if len(content) > maxLen {
 			content = content[:maxLen-3] + "..."
 		}
-		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, content,
-			gophertv.AttrsWithColor(0, valueColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, content,
+			gtv.AttrsWithColor(0, valueColor, 0))
 		y++
 	}
 
 	// Modifiers
 	if y < frameY+frameHeight-1 {
 		y++
-		app.screen.PutText(gophertv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Modifiers:",
-			gophertv.AttrsWithColor(gophertv.AttrBold, labelColor, 0))
+		app.screen.PutText(gtv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Modifiers:",
+			gtv.AttrsWithColor(gtv.AttrBold, labelColor, 0))
 		modNames := modifierNames(event.Modifiers)
 		if len(modNames) == 0 {
-			app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, "(none)",
-				gophertv.AttrsWithColor(0, 0x888888, 0))
+			app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, "(none)",
+				gtv.AttrsWithColor(0, 0x888888, 0))
 		} else {
 			modY := y
 			for i, name := range modNames {
 				if modY < frameY+frameHeight-1 {
-					app.screen.PutText(gophertv.TRect{X: uint16(frameX + 12), Y: uint16(modY), W: 0, H: 0}, name,
-						gophertv.AttrsWithColor(0, valueColor, 0))
+					app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(modY), W: 0, H: 0}, name,
+						gtv.AttrsWithColor(0, valueColor, 0))
 					modY++
 				}
 				if i == 0 {
@@ -340,21 +340,21 @@ func (app *DemoApp) drawEventList() {
 }
 
 // eventTypeName returns the human-readable name of an event type.
-func eventTypeName(t gophertv.InputEventType) string {
+func eventTypeName(t gtv.InputEventType) string {
 	switch t {
-	case gophertv.InputEventKey:
+	case gtv.InputEventKey:
 		return "Key"
-	case gophertv.InputEventMouse:
+	case gtv.InputEventMouse:
 		return "Mouse"
-	case gophertv.InputEventResize:
+	case gtv.InputEventResize:
 		return "Resize"
-	case gophertv.InputEventCopy:
+	case gtv.InputEventCopy:
 		return "Copy"
-	case gophertv.InputEventPaste:
+	case gtv.InputEventPaste:
 		return "Paste"
-	case gophertv.InputEventFocus:
+	case gtv.InputEventFocus:
 		return "Focus"
-	case gophertv.InputEventBlur:
+	case gtv.InputEventBlur:
 		return "Blur"
 	default:
 		return "Unknown"
@@ -362,45 +362,45 @@ func eventTypeName(t gophertv.InputEventType) string {
 }
 
 // modifierNames returns a list of modifier names from the modifiers bitfield.
-func modifierNames(mods gophertv.EventModifiers) []string {
+func modifierNames(mods gtv.EventModifiers) []string {
 	var names []string
-	if mods&gophertv.ModShift != 0 {
+	if mods&gtv.ModShift != 0 {
 		names = append(names, "Shift")
 	}
-	if mods&gophertv.ModAlt != 0 {
+	if mods&gtv.ModAlt != 0 {
 		names = append(names, "Alt")
 	}
-	if mods&gophertv.ModCtrl != 0 {
+	if mods&gtv.ModCtrl != 0 {
 		names = append(names, "Ctrl")
 	}
-	if mods&gophertv.ModMeta != 0 {
+	if mods&gtv.ModMeta != 0 {
 		names = append(names, "Meta")
 	}
-	if mods&gophertv.ModClick != 0 {
+	if mods&gtv.ModClick != 0 {
 		names = append(names, "Click")
 	}
-	if mods&gophertv.ModDoubleClick != 0 {
+	if mods&gtv.ModDoubleClick != 0 {
 		names = append(names, "DoubleClick")
 	}
-	if mods&gophertv.ModDrag != 0 {
+	if mods&gtv.ModDrag != 0 {
 		names = append(names, "Drag")
 	}
-	if mods&gophertv.ModPress != 0 {
+	if mods&gtv.ModPress != 0 {
 		names = append(names, "Press")
 	}
-	if mods&gophertv.ModRelease != 0 {
+	if mods&gtv.ModRelease != 0 {
 		names = append(names, "Release")
 	}
-	if mods&gophertv.ModMove != 0 {
+	if mods&gtv.ModMove != 0 {
 		names = append(names, "Move")
 	}
-	if mods&gophertv.ModScrollUp != 0 {
+	if mods&gtv.ModScrollUp != 0 {
 		names = append(names, "ScrollUp")
 	}
-	if mods&gophertv.ModScrollDown != 0 {
+	if mods&gtv.ModScrollDown != 0 {
 		names = append(names, "ScrollDown")
 	}
-	if mods&gophertv.ModFn != 0 {
+	if mods&gtv.ModFn != 0 {
 		names = append(names, "Fn")
 	}
 	return names

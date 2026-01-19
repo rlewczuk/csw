@@ -3,13 +3,13 @@ package tio
 import (
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
 )
 
 // listener represents a registered event listener with its event queue
 type listener struct {
-	ch    chan gophertv.InputEvent
-	queue []gophertv.InputEvent
+	ch    chan gtv.InputEvent
+	queue []gtv.InputEvent
 }
 
 // ScreenBuffer is a test double implementation of IScreenOutput interface.
@@ -17,13 +17,13 @@ type listener struct {
 type ScreenBuffer struct {
 	width       int
 	height      int
-	buffer      []gophertv.Cell
-	listeners   map[chan gophertv.InputEvent]*listener
+	buffer      []gtv.Cell
+	listeners   map[chan gtv.InputEvent]*listener
 	mu          sync.Mutex
 	queueSize   int
 	cursorX     int
 	cursorY     int
-	cursorStyle gophertv.CursorStyle
+	cursorStyle gtv.CursorStyle
 }
 
 // NewScreenBuffer creates a new ScreenBuffer with the specified dimensions.
@@ -31,10 +31,10 @@ type ScreenBuffer struct {
 // queued for each listener when the listener's channel is full.
 // If queueSize is 0, a default value of 100 is used.
 func NewScreenBuffer(width, height int, queueSize int) *ScreenBuffer {
-	buffer := make([]gophertv.Cell, width*height)
+	buffer := make([]gtv.Cell, width*height)
 	// Initialize with spaces
 	for i := range buffer {
-		buffer[i] = gophertv.Cell{Rune: ' ', Attrs: gophertv.CellAttributes{}}
+		buffer[i] = gtv.Cell{Rune: ' ', Attrs: gtv.CellAttributes{}}
 	}
 	if queueSize == 0 {
 		queueSize = 100
@@ -43,7 +43,7 @@ func NewScreenBuffer(width, height int, queueSize int) *ScreenBuffer {
 		width:     width,
 		height:    height,
 		buffer:    buffer,
-		listeners: make(map[chan gophertv.InputEvent]*listener),
+		listeners: make(map[chan gtv.InputEvent]*listener),
 		queueSize: queueSize,
 	}
 }
@@ -65,11 +65,11 @@ func (m *ScreenBuffer) SetSize(newWidth int, newHeight int) {
 	}
 
 	// Create new buffer
-	newBuffer := make([]gophertv.Cell, newWidth*newHeight)
+	newBuffer := make([]gtv.Cell, newWidth*newHeight)
 
 	// Initialize all cells with spaces
 	for i := range newBuffer {
-		newBuffer[i] = gophertv.Cell{Rune: ' ', Attrs: gophertv.CellAttributes{}}
+		newBuffer[i] = gtv.Cell{Rune: ' ', Attrs: gtv.CellAttributes{}}
 	}
 
 	// Copy existing content, preserving as much as possible
@@ -101,7 +101,7 @@ func (m *ScreenBuffer) SetSize(newWidth int, newHeight int) {
 // GetContent returns the whole content of the screen.
 // Returns width, height, and the internal buffer array.
 // The content is a single dimensional array where index = y*width + x.
-func (m *ScreenBuffer) GetContent() (width int, height int, content []gophertv.Cell) {
+func (m *ScreenBuffer) GetContent() (width int, height int, content []gtv.Cell) {
 	return m.width, m.height, m.buffer
 }
 
@@ -110,7 +110,7 @@ func (m *ScreenBuffer) GetContent() (width int, height int, content []gophertv.C
 // If W and H are 0, the text is clipped only to screen boundaries.
 // If W and H are non-zero, the text is clipped to both the rectangle and screen boundaries.
 // Text is always rendered on a single line (Y coordinate from rect).
-func (m *ScreenBuffer) PutText(rect gophertv.TRect, text string, attrs gophertv.CellAttributes) {
+func (m *ScreenBuffer) PutText(rect gtv.TRect, text string, attrs gtv.CellAttributes) {
 	x := int(rect.X)
 	y := int(rect.Y)
 
@@ -144,7 +144,7 @@ func (m *ScreenBuffer) PutText(rect gophertv.TRect, text string, attrs gophertv.
 			break
 		}
 		idx := y*m.width + col
-		m.buffer[idx] = gophertv.Cell{
+		m.buffer[idx] = gtv.Cell{
 			Rune:  r,
 			Attrs: attrs,
 		}
@@ -157,7 +157,7 @@ func (m *ScreenBuffer) PutText(rect gophertv.TRect, text string, attrs gophertv.
 // If W and H are 0, the content is clipped only to screen boundaries.
 // If W and H are non-zero, the content is clipped to both the rectangle and screen boundaries.
 // Content is always rendered on a single line (Y coordinate from rect).
-func (m *ScreenBuffer) PutContent(rect gophertv.TRect, content []gophertv.Cell) {
+func (m *ScreenBuffer) PutContent(rect gtv.TRect, content []gtv.Cell) {
 	x := int(rect.X)
 	y := int(rect.Y)
 
@@ -199,7 +199,7 @@ func (m *ScreenBuffer) PutContent(rect gophertv.TRect, content []gophertv.Cell) 
 // Clear resets all cells to spaces with default attributes.
 func (m *ScreenBuffer) Clear() {
 	for i := range m.buffer {
-		m.buffer[i] = gophertv.Cell{Rune: ' ', Attrs: gophertv.CellAttributes{}}
+		m.buffer[i] = gtv.Cell{Rune: ' ', Attrs: gtv.CellAttributes{}}
 	}
 }
 
@@ -210,7 +210,7 @@ func (m *ScreenBuffer) MoveCursor(x int, y int) {
 }
 
 // SetCursorStyle sets the cursor style.
-func (m *ScreenBuffer) SetCursorStyle(style gophertv.CursorStyle) {
+func (m *ScreenBuffer) SetCursorStyle(style gtv.CursorStyle) {
 	m.cursorStyle = style
 }
 
@@ -220,32 +220,32 @@ func (m *ScreenBuffer) GetCursorPosition() (x int, y int) {
 }
 
 // GetCursorStyle returns the current cursor style.
-func (m *ScreenBuffer) GetCursorStyle() gophertv.CursorStyle {
+func (m *ScreenBuffer) GetCursorStyle() gtv.CursorStyle {
 	return m.cursorStyle
 }
 
 // Listen registers a channel to receive input events.
 // The channel will be automatically unregistered when it is closed.
-func (m *ScreenBuffer) Listen(ch chan gophertv.InputEvent) {
+func (m *ScreenBuffer) Listen(ch chan gtv.InputEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	// Register the listener
 	m.listeners[ch] = &listener{
 		ch:    ch,
-		queue: make([]gophertv.InputEvent, 0),
+		queue: make([]gtv.InputEvent, 0),
 	}
 }
 
 // Notify sends an input event to all registered listeners.
 // It does not block if channels are full - instead, events are queued.
 // Events are delivered in order. If queue overflows, oldest events are dropped.
-func (m *ScreenBuffer) Notify(event gophertv.InputEvent) {
+func (m *ScreenBuffer) Notify(event gtv.InputEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	// Collect channels to remove (those that are closed)
-	var toRemove []chan gophertv.InputEvent
+	var toRemove []chan gtv.InputEvent
 
 	// Iterate through all listeners
 	for ch, l := range m.listeners {
@@ -300,7 +300,7 @@ func (m *ScreenBuffer) Notify(event gophertv.InputEvent) {
 // trySend attempts to send an event to a channel without blocking.
 // Returns true if sent successfully, false if channel is full or closed.
 // If channel is closed, it's added to toRemove list.
-func (m *ScreenBuffer) trySend(ch chan gophertv.InputEvent, event gophertv.InputEvent, toRemove *[]chan gophertv.InputEvent) bool {
+func (m *ScreenBuffer) trySend(ch chan gtv.InputEvent, event gtv.InputEvent, toRemove *[]chan gtv.InputEvent) bool {
 	defer func() {
 		if r := recover(); r != nil {
 			// Panic occurred, channel is closed
@@ -317,7 +317,7 @@ func (m *ScreenBuffer) trySend(ch chan gophertv.InputEvent, event gophertv.Input
 }
 
 // isMarkedForRemoval checks if a channel is in the toRemove list
-func (m *ScreenBuffer) isMarkedForRemoval(ch chan gophertv.InputEvent, toRemove []chan gophertv.InputEvent) bool {
+func (m *ScreenBuffer) isMarkedForRemoval(ch chan gtv.InputEvent, toRemove []chan gtv.InputEvent) bool {
 	for _, c := range toRemove {
 		if c == ch {
 			return true

@@ -3,9 +3,10 @@ package tui_test
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
-	"github.com/codesnort/codesnort-swe/pkg/gophertv/tio"
-	"github.com/codesnort/codesnort-swe/pkg/gophertv/tui"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
+	"github.com/codesnort/codesnort-swe/pkg/gtv/tui"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,28 +23,28 @@ func TestApplicationIntegration_BasicRendering(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create main layout widget (fills entire screen)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
 	// Create some label widgets as children
 	label1 := tui.NewLabel(
 		layout,
 		"Hello, World!",
-		gophertv.TRect{X: 5, Y: 5, W: 0, H: 0}, // Auto-sized
-		gophertv.AttrsWithColor(gophertv.AttrBold, 0xFF0000, 0),
+		gtv.TRect{X: 5, Y: 5, W: 0, H: 0}, // Auto-sized
+		gtv.AttrsWithColor(gtv.AttrBold, 0xFF0000, 0),
 	)
 
 	label2 := tui.NewLabel(
 		layout,
 		"Second Label",
-		gophertv.TRect{X: 10, Y: 10, W: 0, H: 0}, // Auto-sized
-		gophertv.AttrsWithColor(0, 0x00FF00, 0),
+		gtv.TRect{X: 10, Y: 10, W: 0, H: 0}, // Auto-sized
+		gtv.AttrsWithColor(0, 0x00FF00, 0),
 	)
 
 	label3 := tui.NewLabel(
 		layout,
 		"Third",
-		gophertv.TRect{X: 70, Y: 20, W: 0, H: 0}, // Auto-sized
-		gophertv.AttrsWithColor(gophertv.AttrItalic, 0x0000FF, 0),
+		gtv.TRect{X: 70, Y: 20, W: 0, H: 0}, // Auto-sized
+		gtv.AttrsWithColor(gtv.AttrItalic, 0x0000FF, 0),
 	)
 
 	// Create application with the layout as main widget
@@ -63,7 +64,7 @@ func TestApplicationIntegration_BasicRendering(t *testing.T) {
 	for i, ch := range expectedText1 {
 		idx := 5*width + 5 + i
 		assert.Equal(t, ch, content[idx].Rune, "Label1 character at position %d", i)
-		assert.Equal(t, gophertv.AttrBold, content[idx].Attrs.Attributes&gophertv.AttrBold)
+		assert.Equal(t, gtv.AttrBold, content[idx].Attrs.Attributes&gtv.AttrBold)
 		assert.Equal(t, uint32(0xFF0000), content[idx].Attrs.TextColor)
 	}
 
@@ -80,7 +81,7 @@ func TestApplicationIntegration_BasicRendering(t *testing.T) {
 	for i, ch := range expectedText3 {
 		idx := 20*width + 70 + i
 		assert.Equal(t, ch, content[idx].Rune, "Label3 character at position %d", i)
-		assert.Equal(t, gophertv.AttrItalic, content[idx].Attrs.Attributes&gophertv.AttrItalic)
+		assert.Equal(t, gtv.AttrItalic, content[idx].Attrs.Attributes&gtv.AttrItalic)
 		assert.Equal(t, uint32(0x0000FF), content[idx].Attrs.TextColor)
 	}
 
@@ -105,14 +106,14 @@ func TestApplicationIntegration_InputHandling(t *testing.T) {
 	// Create a custom widget that tracks events
 	type EventTracker struct {
 		tui.TWidget
-		events []gophertv.InputEvent
+		events []gtv.InputEvent
 	}
 
 	tracker := &EventTracker{
 		TWidget: tui.TWidget{
-			Position: gophertv.TRect{X: 0, Y: 0, W: 80, H: 24},
+			Position: gtv.TRect{X: 0, Y: 0, W: 80, H: 24},
 		},
-		events: make([]gophertv.InputEvent, 0),
+		events: make([]gtv.InputEvent, 0),
 	}
 
 	// Create application
@@ -140,14 +141,14 @@ func TestApplicationIntegration_ResizeHandling(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create main layout widget
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
 	// Create a label at bottom-right corner
 	label := tui.NewLabel(
 		layout,
 		"Corner",
-		gophertv.TRect{X: 74, Y: 23, W: 0, H: 0},
-		gophertv.AttrsWithColor(0, 0xFFFFFF, 0),
+		gtv.TRect{X: 74, Y: 23, W: 0, H: 0},
+		gtv.AttrsWithColor(0, 0xFFFFFF, 0),
 	)
 
 	// Create application
@@ -197,29 +198,29 @@ func TestApplicationIntegration_ComplexLayout(t *testing.T) {
 	// Create main layout (fills screen)
 	mainLayout := tui.NewAbsoluteLayout(
 		nil,
-		gophertv.TRect{X: 0, Y: 0, W: 80, H: 24},
-		&gophertv.CellAttributes{BackColor: 0x000000},
+		gtv.TRect{X: 0, Y: 0, W: 80, H: 24},
+		&gtv.CellAttributes{BackColor: 0x000000},
 	)
 
 	// Create a header layout (top of screen)
 	headerLayout := tui.NewAbsoluteLayout(
 		mainLayout,
-		gophertv.TRect{X: 0, Y: 0, W: 80, H: 3},
-		&gophertv.CellAttributes{BackColor: 0x333333},
+		gtv.TRect{X: 0, Y: 0, W: 80, H: 3},
+		&gtv.CellAttributes{BackColor: 0x333333},
 	)
 
 	// Add title to header
 	tui.NewLabel(
 		headerLayout,
 		"Application Title",
-		gophertv.TRect{X: 2, Y: 1, W: 0, H: 0},
-		gophertv.AttrsWithColor(gophertv.AttrBold, 0xFFFFFF, 0),
+		gtv.TRect{X: 2, Y: 1, W: 0, H: 0},
+		gtv.AttrsWithColor(gtv.AttrBold, 0xFFFFFF, 0),
 	)
 
 	// Create a content layout (middle of screen)
 	contentLayout := tui.NewAbsoluteLayout(
 		mainLayout,
-		gophertv.TRect{X: 0, Y: 3, W: 80, H: 18},
+		gtv.TRect{X: 0, Y: 3, W: 80, H: 18},
 		nil, // Transparent
 	)
 
@@ -227,30 +228,30 @@ func TestApplicationIntegration_ComplexLayout(t *testing.T) {
 	tui.NewLabel(
 		contentLayout,
 		"Line 1",
-		gophertv.TRect{X: 5, Y: 2, W: 0, H: 0},
-		gophertv.AttrsWithColor(0, 0xFFFFFF, 0),
+		gtv.TRect{X: 5, Y: 2, W: 0, H: 0},
+		gtv.AttrsWithColor(0, 0xFFFFFF, 0),
 	)
 
 	tui.NewLabel(
 		contentLayout,
 		"Line 2",
-		gophertv.TRect{X: 5, Y: 3, W: 0, H: 0},
-		gophertv.AttrsWithColor(0, 0xFFFFFF, 0),
+		gtv.TRect{X: 5, Y: 3, W: 0, H: 0},
+		gtv.AttrsWithColor(0, 0xFFFFFF, 0),
 	)
 
 	// Create a footer layout (bottom of screen)
 	footerLayout := tui.NewAbsoluteLayout(
 		mainLayout,
-		gophertv.TRect{X: 0, Y: 21, W: 80, H: 3},
-		&gophertv.CellAttributes{BackColor: 0x333333},
+		gtv.TRect{X: 0, Y: 21, W: 80, H: 3},
+		&gtv.CellAttributes{BackColor: 0x333333},
 	)
 
 	// Add status to footer
 	tui.NewLabel(
 		footerLayout,
 		"Status: Ready",
-		gophertv.TRect{X: 2, Y: 1, W: 0, H: 0},
-		gophertv.AttrsWithColor(0, 0x00FF00, 0),
+		gtv.TRect{X: 2, Y: 1, W: 0, H: 0},
+		gtv.AttrsWithColor(0, 0x00FF00, 0),
 	)
 
 	// Create application
@@ -324,7 +325,7 @@ func TestApplicationIntegration_QuitSignal(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create a simple layout
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
 	// Create application
 	app := tui.NewApplication(layout, screen)
@@ -351,7 +352,7 @@ func TestApplicationIntegration_CtrlC(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create a simple layout
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
 	// Create application
 	app := tui.NewApplication(layout, screen)
