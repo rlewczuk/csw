@@ -3,23 +3,23 @@ package tio
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // Helper function to create a ScreenVerifier from a ScreenBuffer
-func getVerifier(screen *ScreenBuffer) *gophertv.ScreenVerifier {
+func getVerifier(screen *ScreenBuffer) *gtv.ScreenVerifier {
 	width, height, content := screen.GetContent()
-	return gophertv.NewScreenVerifier(width, height, content)
+	return gtv.NewScreenVerifier(width, height, content)
 }
 
 // Helper function to create a ScreenVerifier with cursor info from a ScreenBuffer
-func getVerifierWithCursor(screen *ScreenBuffer) *gophertv.ScreenVerifier {
+func getVerifierWithCursor(screen *ScreenBuffer) *gtv.ScreenVerifier {
 	width, height, content := screen.GetContent()
 	cursorX, cursorY := screen.GetCursorPosition()
 	cursorStyle := screen.GetCursorStyle()
-	return gophertv.NewScreenVerifierWithCursor(width, height, content, cursorX, cursorY, cursorStyle)
+	return gtv.NewScreenVerifierWithCursor(width, height, content, cursorX, cursorY, cursorStyle)
 }
 
 func TestNewMockScreen(t *testing.T) {
@@ -60,7 +60,7 @@ func TestNewMockScreen(t *testing.T) {
 				for x := 0; x < tt.width; x++ {
 					cell := verifier.GetCell(x, y)
 					assert.Equal(t, ' ', cell.Rune)
-					assert.Equal(t, gophertv.CellAttributes{}, cell.Attrs)
+					assert.Equal(t, gtv.CellAttributes{}, cell.Attrs)
 				}
 			}
 		})
@@ -82,9 +82,9 @@ func TestMockScreen_PutText(t *testing.T) {
 		x         int
 		y         int
 		text      string
-		attrs     gophertv.TextAttributes
+		attrs     gtv.TextAttributes
 		wantText  string
-		wantAttrs gophertv.TextAttributes
+		wantAttrs gtv.TextAttributes
 		checkX    int
 		checkY    int
 	}{
@@ -95,9 +95,9 @@ func TestMockScreen_PutText(t *testing.T) {
 			x:         0,
 			y:         0,
 			text:      "Hello",
-			attrs:     gophertv.AttrBold,
+			attrs:     gtv.AttrBold,
 			wantText:  "Hello",
-			wantAttrs: gophertv.AttrBold,
+			wantAttrs: gtv.AttrBold,
 			checkX:    0,
 			checkY:    0,
 		},
@@ -108,9 +108,9 @@ func TestMockScreen_PutText(t *testing.T) {
 			x:         5,
 			y:         3,
 			text:      "World",
-			attrs:     gophertv.AttrItalic | gophertv.AttrUnderline,
+			attrs:     gtv.AttrItalic | gtv.AttrUnderline,
 			wantText:  "World",
-			wantAttrs: gophertv.AttrItalic | gophertv.AttrUnderline,
+			wantAttrs: gtv.AttrItalic | gtv.AttrUnderline,
 			checkX:    5,
 			checkY:    3,
 		},
@@ -134,9 +134,9 @@ func TestMockScreen_PutText(t *testing.T) {
 			x:         0,
 			y:         0,
 			text:      "Hello 世界",
-			attrs:     gophertv.AttrBold,
+			attrs:     gtv.AttrBold,
 			wantText:  "Hello 世界",
-			wantAttrs: gophertv.AttrBold,
+			wantAttrs: gtv.AttrBold,
 			checkX:    0,
 			checkY:    0,
 		},
@@ -145,7 +145,7 @@ func TestMockScreen_PutText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.width, tt.height, 0)
-			screen.PutText(gophertv.TRect{X: uint16(tt.x), Y: uint16(tt.y), W: 0, H: 0}, tt.text, gophertv.Attrs(tt.attrs))
+			screen.PutText(gtv.TRect{X: uint16(tt.x), Y: uint16(tt.y), W: 0, H: 0}, tt.text, gtv.Attrs(tt.attrs))
 
 			// Verify each character
 			verifier := getVerifier(screen)
@@ -201,7 +201,7 @@ func TestMockScreen_PutText_Truncation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.width, tt.height, 0)
-			screen.PutText(gophertv.TRect{X: uint16(tt.x), Y: uint16(tt.y), W: 0, H: 0}, tt.text, gophertv.Attrs(gophertv.AttrBold))
+			screen.PutText(gtv.TRect{X: uint16(tt.x), Y: uint16(tt.y), W: 0, H: 0}, tt.text, gtv.Attrs(gtv.AttrBold))
 
 			// Count non-space characters
 			verifier := getVerifier(screen)
@@ -264,7 +264,7 @@ func TestMockScreen_PutText_OutOfBounds(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.width, tt.height, 0)
 			// Should not panic
-			screen.PutText(gophertv.TRect{X: uint16(tt.x), Y: uint16(tt.y), W: 0, H: 0}, tt.text, gophertv.Attrs(gophertv.AttrBold))
+			screen.PutText(gtv.TRect{X: uint16(tt.x), Y: uint16(tt.y), W: 0, H: 0}, tt.text, gtv.Attrs(gtv.AttrBold))
 
 			// Verify screen is still all spaces
 			verifier := getVerifier(screen)
@@ -280,7 +280,7 @@ func TestMockScreen_PutText_OutOfBounds(t *testing.T) {
 
 func TestMockScreen_GetCell(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 0)
-	screen.PutText(gophertv.TRect{X: 2, Y: 1, W: 0, H: 0}, "Test", gophertv.Attrs(gophertv.AttrBold))
+	screen.PutText(gtv.TRect{X: 2, Y: 1, W: 0, H: 0}, "Test", gtv.Attrs(gtv.AttrBold))
 	verifier := getVerifier(screen)
 
 	tests := []struct {
@@ -288,21 +288,21 @@ func TestMockScreen_GetCell(t *testing.T) {
 		x         int
 		y         int
 		wantRune  rune
-		wantAttrs gophertv.TextAttributes
+		wantAttrs gtv.TextAttributes
 	}{
 		{
 			name:      "first character",
 			x:         2,
 			y:         1,
 			wantRune:  'T',
-			wantAttrs: gophertv.AttrBold,
+			wantAttrs: gtv.AttrBold,
 		},
 		{
 			name:      "middle character",
 			x:         3,
 			y:         1,
 			wantRune:  'e',
-			wantAttrs: gophertv.AttrBold,
+			wantAttrs: gtv.AttrBold,
 		},
 		{
 			name:      "empty cell",
@@ -345,9 +345,9 @@ func TestMockScreen_GetCell(t *testing.T) {
 
 func TestMockScreen_GetText(t *testing.T) {
 	screen := NewScreenBuffer(20, 10, 0)
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gophertv.Attrs(0))
-	screen.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, "World", gophertv.Attrs(0))
-	screen.PutText(gophertv.TRect{X: 5, Y: 2, W: 0, H: 0}, "Test", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gtv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, "World", gtv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 5, Y: 2, W: 0, H: 0}, "Test", gtv.Attrs(0))
 	verifier := getVerifier(screen)
 
 	tests := []struct {
@@ -410,9 +410,9 @@ func TestMockScreen_GetText(t *testing.T) {
 
 func TestMockScreen_HasText(t *testing.T) {
 	screen := NewScreenBuffer(20, 10, 0)
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gophertv.Attrs(0))
-	screen.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, "World", gophertv.Attrs(0))
-	screen.PutText(gophertv.TRect{X: 5, Y: 2, W: 0, H: 0}, "Test", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gtv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, "World", gtv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 5, Y: 2, W: 0, H: 0}, "Test", gtv.Attrs(0))
 	verifier := getVerifier(screen)
 
 	tests := []struct {
@@ -490,9 +490,9 @@ func TestMockScreen_HasText(t *testing.T) {
 
 func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 	screen := NewScreenBuffer(20, 10, 0)
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Bold", gophertv.Attrs(gophertv.AttrBold))
-	screen.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, "Italic", gophertv.Attrs(gophertv.AttrItalic))
-	screen.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Both", gophertv.Attrs(gophertv.AttrBold|gophertv.AttrItalic))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Bold", gtv.Attrs(gtv.AttrBold))
+	screen.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, "Italic", gtv.Attrs(gtv.AttrItalic))
+	screen.PutText(gtv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Both", gtv.Attrs(gtv.AttrBold|gtv.AttrItalic))
 	verifier := getVerifier(screen)
 
 	tests := []struct {
@@ -502,7 +502,7 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 		width  int
 		height int
 		text   string
-		mask   gophertv.AttributeMask
+		mask   gtv.AttributeMask
 		want   bool
 	}{
 		{
@@ -512,9 +512,9 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Bold",
-			mask: gophertv.AttributeMask{
+			mask: gtv.AttributeMask{
 				CheckAttributes: true,
-				Attributes:      gophertv.AttrBold,
+				Attributes:      gtv.AttrBold,
 			},
 			want: true,
 		},
@@ -525,9 +525,9 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 			width:  6,
 			height: 1,
 			text:   "Italic",
-			mask: gophertv.AttributeMask{
+			mask: gtv.AttributeMask{
 				CheckAttributes: true,
-				Attributes:      gophertv.AttrItalic,
+				Attributes:      gtv.AttrItalic,
 			},
 			want: true,
 		},
@@ -538,9 +538,9 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Both",
-			mask: gophertv.AttributeMask{
+			mask: gtv.AttributeMask{
 				CheckAttributes: true,
-				Attributes:      gophertv.AttrBold | gophertv.AttrItalic,
+				Attributes:      gtv.AttrBold | gtv.AttrItalic,
 			},
 			want: true,
 		},
@@ -551,9 +551,9 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Bold",
-			mask: gophertv.AttributeMask{
+			mask: gtv.AttributeMask{
 				CheckAttributes: true,
-				Attributes:      gophertv.AttrItalic,
+				Attributes:      gtv.AttrItalic,
 			},
 			want: false,
 		},
@@ -564,7 +564,7 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Bold",
-			mask: gophertv.AttributeMask{
+			mask: gtv.AttributeMask{
 				CheckAttributes: false,
 			},
 			want: true,
@@ -576,9 +576,9 @@ func TestMockScreen_HasTextWithAttrs(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Test",
-			mask: gophertv.AttributeMask{
+			mask: gtv.AttributeMask{
 				CheckAttributes: true,
-				Attributes:      gophertv.AttrBold,
+				Attributes:      gtv.AttrBold,
 			},
 			want: false,
 		},
@@ -601,14 +601,14 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 	greenBack := uint32(0x00FF00)
 
 	// Put text and then modify colors
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Red", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Red", gtv.Attrs(0))
 	width, _, _ := screen.GetContent()
 	for i := 0; i < 3; i++ {
 		idx := 0*width + i
 		screen.buffer[idx].Attrs.TextColor = redColor
 	}
 
-	screen.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, "Blue", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, "Blue", gtv.Attrs(0))
 	for i := 0; i < 4; i++ {
 		idx := 1*width + i
 		screen.buffer[idx].Attrs.TextColor = blueColor
@@ -622,7 +622,7 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 		width  int
 		height int
 		text   string
-		mask   gophertv.AttributeMask
+		mask   gtv.AttributeMask
 		want   bool
 	}{
 		{
@@ -632,7 +632,7 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 			width:  3,
 			height: 1,
 			text:   "Red",
-			mask: gophertv.AttributeMask{
+			mask: gtv.AttributeMask{
 				CheckTextColor: true,
 				TextColor:      redColor,
 			},
@@ -645,7 +645,7 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Blue",
-			mask: gophertv.AttributeMask{
+			mask: gtv.AttributeMask{
 				CheckTextColor: true,
 				CheckBackColor: true,
 				TextColor:      blueColor,
@@ -660,7 +660,7 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 			width:  3,
 			height: 1,
 			text:   "Red",
-			mask: gophertv.AttributeMask{
+			mask: gtv.AttributeMask{
 				CheckTextColor: true,
 				TextColor:      blueColor,
 			},
@@ -673,7 +673,7 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 			width:  4,
 			height: 1,
 			text:   "Blue",
-			mask: gophertv.AttributeMask{
+			mask: gtv.AttributeMask{
 				CheckBackColor: true,
 				BackColor:      greenBack,
 			},
@@ -692,8 +692,8 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 
 func TestMockScreen_Clear(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 0)
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gophertv.Attrs(gophertv.AttrBold))
-	screen.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, "World", gophertv.Attrs(gophertv.AttrItalic))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gtv.Attrs(gtv.AttrBold))
+	screen.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, "World", gtv.Attrs(gtv.AttrItalic))
 
 	// Verify text is present
 	verifier := getVerifier(screen)
@@ -708,20 +708,20 @@ func TestMockScreen_Clear(t *testing.T) {
 		for x := 0; x < 10; x++ {
 			cell := verifier.GetCell(x, y)
 			assert.Equal(t, ' ', cell.Rune)
-			assert.Equal(t, gophertv.CellAttributes{}, cell.Attrs)
+			assert.Equal(t, gtv.CellAttributes{}, cell.Attrs)
 		}
 	}
 }
 
 func TestMockScreen_InterfaceCompliance(t *testing.T) {
-	var _ gophertv.IScreenOutput = (*ScreenBuffer)(nil)
+	var _ gtv.IScreenOutput = (*ScreenBuffer)(nil)
 }
 
 func TestAttributeMask_Partial(t *testing.T) {
 	screen := NewScreenBuffer(20, 10, 0)
 
 	// Create text with bold and italic
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Text", gophertv.Attrs(gophertv.AttrBold|gophertv.AttrItalic|gophertv.AttrUnderline))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Text", gtv.Attrs(gtv.AttrBold|gtv.AttrItalic|gtv.AttrUnderline))
 	width, _, _ := screen.GetContent()
 	for i := 0; i < 4; i++ {
 		idx := 0*width + i
@@ -731,20 +731,20 @@ func TestAttributeMask_Partial(t *testing.T) {
 	verifier := getVerifier(screen)
 	tests := []struct {
 		name string
-		mask gophertv.AttributeMask
+		mask gtv.AttributeMask
 		want bool
 	}{
 		{
 			name: "check only bold (ignore italic and underline)",
-			mask: gophertv.AttributeMask{
+			mask: gtv.AttributeMask{
 				CheckAttributes: true,
-				Attributes:      gophertv.AttrBold | gophertv.AttrItalic | gophertv.AttrUnderline,
+				Attributes:      gtv.AttrBold | gtv.AttrItalic | gtv.AttrUnderline,
 			},
 			want: true,
 		},
 		{
 			name: "check only text color (ignore attributes)",
-			mask: gophertv.AttributeMask{
+			mask: gtv.AttributeMask{
 				CheckTextColor: true,
 				TextColor:      0xFF0000,
 			},
@@ -752,17 +752,17 @@ func TestAttributeMask_Partial(t *testing.T) {
 		},
 		{
 			name: "check both color and attributes",
-			mask: gophertv.AttributeMask{
+			mask: gtv.AttributeMask{
 				CheckAttributes: true,
 				CheckTextColor:  true,
-				Attributes:      gophertv.AttrBold | gophertv.AttrItalic | gophertv.AttrUnderline,
+				Attributes:      gtv.AttrBold | gtv.AttrItalic | gtv.AttrUnderline,
 				TextColor:       0xFF0000,
 			},
 			want: true,
 		},
 		{
 			name: "check nothing - always matches",
-			mask: gophertv.AttributeMask{},
+			mask: gtv.AttributeMask{},
 			want: true,
 		},
 	}
@@ -809,13 +809,13 @@ func TestScreenBuffer_Listen_Notify(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(10, 5, tt.queueSize)
-			ch := make(chan gophertv.InputEvent, tt.channelSize)
+			ch := make(chan gtv.InputEvent, tt.channelSize)
 			screen.Listen(ch)
 
 			// Send events
 			for i := 0; i < tt.eventCount; i++ {
-				event := gophertv.InputEvent{
-					Type: gophertv.InputEventKey,
+				event := gtv.InputEvent{
+					Type: gtv.InputEventKey,
 					Key:  rune('a' + i),
 				}
 				screen.Notify(event)
@@ -826,7 +826,7 @@ func TestScreenBuffer_Listen_Notify(t *testing.T) {
 			for i := 0; i < tt.wantEvents; i++ {
 				select {
 				case ev := <-ch:
-					assert.Equal(t, gophertv.InputEventKey, ev.Type)
+					assert.Equal(t, gtv.InputEventKey, ev.Type)
 					assert.Equal(t, rune('a'+i), ev.Key)
 					receivedCount++
 				default:
@@ -843,17 +843,17 @@ func TestScreenBuffer_Notify_MultipleListeners(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 10)
 
 	// Create multiple listeners
-	ch1 := make(chan gophertv.InputEvent, 10)
-	ch2 := make(chan gophertv.InputEvent, 10)
-	ch3 := make(chan gophertv.InputEvent, 10)
+	ch1 := make(chan gtv.InputEvent, 10)
+	ch2 := make(chan gtv.InputEvent, 10)
+	ch3 := make(chan gtv.InputEvent, 10)
 
 	screen.Listen(ch1)
 	screen.Listen(ch2)
 	screen.Listen(ch3)
 
 	// Send an event
-	event := gophertv.InputEvent{
-		Type: gophertv.InputEventKey,
+	event := gtv.InputEvent{
+		Type: gtv.InputEventKey,
 		Key:  'x',
 	}
 	screen.Notify(event)
@@ -863,11 +863,11 @@ func TestScreenBuffer_Notify_MultipleListeners(t *testing.T) {
 	ev2 := <-ch2
 	ev3 := <-ch3
 
-	assert.Equal(t, gophertv.InputEventKey, ev1.Type)
+	assert.Equal(t, gtv.InputEventKey, ev1.Type)
 	assert.Equal(t, 'x', ev1.Key)
-	assert.Equal(t, gophertv.InputEventKey, ev2.Type)
+	assert.Equal(t, gtv.InputEventKey, ev2.Type)
 	assert.Equal(t, 'x', ev2.Key)
-	assert.Equal(t, gophertv.InputEventKey, ev3.Type)
+	assert.Equal(t, gtv.InputEventKey, ev3.Type)
 	assert.Equal(t, 'x', ev3.Key)
 }
 
@@ -875,11 +875,11 @@ func TestScreenBuffer_Notify_FullChannel_Queue(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 10)
 
 	// Create a channel with size 1
-	ch := make(chan gophertv.InputEvent, 1)
+	ch := make(chan gtv.InputEvent, 1)
 	screen.Listen(ch)
 
 	// Send first event - should go directly to channel
-	event1 := gophertv.InputEvent{Type: gophertv.InputEventKey, Key: '1'}
+	event1 := gtv.InputEvent{Type: gtv.InputEventKey, Key: '1'}
 	screen.Notify(event1)
 
 	// Verify channel has the first event
@@ -891,20 +891,20 @@ func TestScreenBuffer_Notify_FullChannel_Queue(t *testing.T) {
 	}
 
 	// Now channel is empty, send multiple events to fill channel and queue
-	screen.Notify(gophertv.InputEvent{Type: gophertv.InputEventKey, Key: '2'})
-	screen.Notify(gophertv.InputEvent{Type: gophertv.InputEventKey, Key: '3'})
-	screen.Notify(gophertv.InputEvent{Type: gophertv.InputEventKey, Key: '4'})
+	screen.Notify(gtv.InputEvent{Type: gtv.InputEventKey, Key: '2'})
+	screen.Notify(gtv.InputEvent{Type: gtv.InputEventKey, Key: '3'})
+	screen.Notify(gtv.InputEvent{Type: gtv.InputEventKey, Key: '4'})
 
 	// Receive events - queued events should be delivered when we make space
 	for i := 2; i <= 4; i++ {
 		// Read from channel
-		var ev gophertv.InputEvent
+		var ev gtv.InputEvent
 		select {
 		case ev = <-ch:
 			// Got an event
 		default:
 			// Channel empty, notify to trigger queue delivery
-			screen.Notify(gophertv.InputEvent{Type: gophertv.InputEventKey, Key: 'X'})
+			screen.Notify(gtv.InputEvent{Type: gtv.InputEventKey, Key: 'X'})
 			ev = <-ch
 		}
 		expectedKey := rune('0' + i)
@@ -917,16 +917,16 @@ func TestScreenBuffer_Notify_QueueOverflow(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, queueSize)
 
 	// Create a buffered channel
-	ch := make(chan gophertv.InputEvent, 1)
+	ch := make(chan gtv.InputEvent, 1)
 	screen.Listen(ch)
 
 	// Fill the channel first
-	screen.Notify(gophertv.InputEvent{Type: gophertv.InputEventKey, Key: '0'})
+	screen.Notify(gtv.InputEvent{Type: gtv.InputEventKey, Key: '0'})
 
 	// Now send more events than queue size - they will be queued
 	// Send queueSize + 2 more events (total queueSize + 3)
 	for i := 1; i < queueSize+3; i++ {
-		event := gophertv.InputEvent{Type: gophertv.InputEventKey, Key: rune('0' + i)}
+		event := gtv.InputEvent{Type: gtv.InputEventKey, Key: rune('0' + i)}
 		screen.Notify(event)
 	}
 
@@ -935,7 +935,7 @@ func TestScreenBuffer_Notify_QueueOverflow(t *testing.T) {
 	assert.Equal(t, '0', ev.Key)
 
 	// Notify to trigger delivery of queued events
-	screen.Notify(gophertv.InputEvent{Type: gophertv.InputEventKey, Key: 'X'})
+	screen.Notify(gtv.InputEvent{Type: gtv.InputEventKey, Key: 'X'})
 
 	// Count how many events we can receive
 	// We should get at most queueSize events (oldest ones were dropped)
@@ -960,11 +960,11 @@ func TestScreenBuffer_Notify_ClosedChannel(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 10)
 
 	// Create and register a channel
-	ch := make(chan gophertv.InputEvent, 10)
+	ch := make(chan gtv.InputEvent, 10)
 	screen.Listen(ch)
 
 	// Send an event
-	event1 := gophertv.InputEvent{Type: gophertv.InputEventKey, Key: 'a'}
+	event1 := gtv.InputEvent{Type: gtv.InputEventKey, Key: 'a'}
 	screen.Notify(event1)
 
 	// Receive it
@@ -975,7 +975,7 @@ func TestScreenBuffer_Notify_ClosedChannel(t *testing.T) {
 	close(ch)
 
 	// Send another event - should not panic
-	event2 := gophertv.InputEvent{Type: gophertv.InputEventKey, Key: 'b'}
+	event2 := gtv.InputEvent{Type: gtv.InputEventKey, Key: 'b'}
 	require.NotPanics(t, func() {
 		screen.Notify(event2)
 	})
@@ -984,15 +984,15 @@ func TestScreenBuffer_Notify_ClosedChannel(t *testing.T) {
 func TestScreenBuffer_Notify_EventOrder(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 100)
 
-	ch := make(chan gophertv.InputEvent, 1)
+	ch := make(chan gtv.InputEvent, 1)
 	screen.Listen(ch)
 
 	// Fill the channel
-	screen.Notify(gophertv.InputEvent{Type: gophertv.InputEventKey, Key: '0'})
+	screen.Notify(gtv.InputEvent{Type: gtv.InputEventKey, Key: '0'})
 
 	// Queue multiple events
 	for i := 1; i <= 10; i++ {
-		screen.Notify(gophertv.InputEvent{Type: gophertv.InputEventKey, Key: rune('0' + i)})
+		screen.Notify(gtv.InputEvent{Type: gtv.InputEventKey, Key: rune('0' + i)})
 	}
 
 	// Receive all events and verify order
@@ -1002,7 +1002,7 @@ func TestScreenBuffer_Notify_EventOrder(t *testing.T) {
 
 		// Trigger delivery of queued events
 		if i < 10 {
-			screen.Notify(gophertv.InputEvent{Type: gophertv.InputEventKey, Key: 'X'})
+			screen.Notify(gtv.InputEvent{Type: gtv.InputEventKey, Key: 'X'})
 		}
 
 		expectedKey := rune('0' + i)
@@ -1014,7 +1014,7 @@ func TestScreenBuffer_Notify_NoListeners(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 10)
 
 	// Send event with no listeners - should not panic
-	event := gophertv.InputEvent{Type: gophertv.InputEventKey, Key: 'a'}
+	event := gtv.InputEvent{Type: gtv.InputEventKey, Key: 'a'}
 	require.NotPanics(t, func() {
 		screen.Notify(event)
 	})
@@ -1023,14 +1023,14 @@ func TestScreenBuffer_Notify_NoListeners(t *testing.T) {
 func TestScreenBuffer_Listen_MultipleRegistrations(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 10)
 
-	ch := make(chan gophertv.InputEvent, 10)
+	ch := make(chan gtv.InputEvent, 10)
 
 	// Register the same channel multiple times
 	screen.Listen(ch)
 	screen.Listen(ch)
 
 	// Send an event
-	event := gophertv.InputEvent{Type: gophertv.InputEventKey, Key: 'a'}
+	event := gtv.InputEvent{Type: gtv.InputEventKey, Key: 'a'}
 	screen.Notify(event)
 
 	// Should only receive one event (channel registered once)
@@ -1082,7 +1082,7 @@ func TestScreenBuffer_SetSize_HorizontalExpansion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.oldWidth, tt.oldHeight, 0)
-			screen.PutText(gophertv.TRect{X: uint16(tt.textX), Y: uint16(tt.textY), W: 0, H: 0}, tt.text, gophertv.Attrs(gophertv.AttrBold))
+			screen.PutText(gtv.TRect{X: uint16(tt.textX), Y: uint16(tt.textY), W: 0, H: 0}, tt.text, gtv.Attrs(gtv.AttrBold))
 
 			// Resize
 			screen.SetSize(tt.newWidth, tt.newHeight)
@@ -1101,7 +1101,7 @@ func TestScreenBuffer_SetSize_HorizontalExpansion(t *testing.T) {
 				for x := tt.oldWidth; x < tt.newWidth; x++ {
 					cell := verifier.GetCell(x, y)
 					assert.Equal(t, ' ', cell.Rune, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should be space", x, y)
-					assert.Equal(t, gophertv.CellAttributes{}, cell.Attrs, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should have default attrs", x, y)
+					assert.Equal(t, gtv.CellAttributes{}, cell.Attrs, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should have default attrs", x, y)
 				}
 			}
 		})
@@ -1139,7 +1139,7 @@ func TestScreenBuffer_SetSize_VerticalExpansion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.oldWidth, tt.oldHeight, 0)
 			for i, line := range tt.lines {
-				screen.PutText(gophertv.TRect{X: 0, Y: uint16(i), W: 0, H: 0}, line, gophertv.Attrs(gophertv.AttrBold))
+				screen.PutText(gtv.TRect{X: 0, Y: uint16(i), W: 0, H: 0}, line, gtv.Attrs(gtv.AttrBold))
 			}
 
 			// Resize
@@ -1161,7 +1161,7 @@ func TestScreenBuffer_SetSize_VerticalExpansion(t *testing.T) {
 				for x := 0; x < tt.newWidth; x++ {
 					cell := verifier.GetCell(x, y)
 					assert.Equal(t, ' ', cell.Rune, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should be space", x, y)
-					assert.Equal(t, gophertv.CellAttributes{}, cell.Attrs, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should have default attrs", x, y)
+					assert.Equal(t, gtv.CellAttributes{}, cell.Attrs, "ScreenBuffer.SetSize() at buffer.go: cell at (%d,%d) should have default attrs", x, y)
 				}
 			}
 		})
@@ -1207,7 +1207,7 @@ func TestScreenBuffer_SetSize_HorizontalShrinking(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.oldWidth, tt.oldHeight, 0)
-			screen.PutText(gophertv.TRect{X: uint16(tt.textX), Y: uint16(tt.textY), W: 0, H: 0}, tt.text, gophertv.Attrs(gophertv.AttrBold))
+			screen.PutText(gtv.TRect{X: uint16(tt.textX), Y: uint16(tt.textY), W: 0, H: 0}, tt.text, gtv.Attrs(gtv.AttrBold))
 
 			// Resize
 			screen.SetSize(tt.newWidth, tt.newHeight)
@@ -1259,7 +1259,7 @@ func TestScreenBuffer_SetSize_VerticalShrinking(t *testing.T) {
 			screen := NewScreenBuffer(tt.oldWidth, tt.oldHeight, 0)
 			for i, line := range tt.lines {
 				if i < tt.oldHeight {
-					screen.PutText(gophertv.TRect{X: 0, Y: uint16(i), W: 0, H: 0}, line, gophertv.Attrs(gophertv.AttrBold))
+					screen.PutText(gtv.TRect{X: 0, Y: uint16(i), W: 0, H: 0}, line, gtv.Attrs(gtv.AttrBold))
 				}
 			}
 
@@ -1288,7 +1288,7 @@ func TestScreenBuffer_SetSize_Combined(t *testing.T) {
 		newWidth   int
 		newHeight  int
 		setupFunc  func(*ScreenBuffer)
-		verifyFunc func(*testing.T, *gophertv.ScreenVerifier)
+		verifyFunc func(*testing.T, *gtv.ScreenVerifier)
 	}{
 		{
 			name:      "expand both dimensions",
@@ -1297,10 +1297,10 @@ func TestScreenBuffer_SetSize_Combined(t *testing.T) {
 			newWidth:  10,
 			newHeight: 6,
 			setupFunc: func(s *ScreenBuffer) {
-				s.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gophertv.Attrs(gophertv.AttrBold))
-				s.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, "World", gophertv.Attrs(gophertv.AttrItalic))
+				s.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gtv.Attrs(gtv.AttrBold))
+				s.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, "World", gtv.Attrs(gtv.AttrItalic))
 			},
-			verifyFunc: func(t *testing.T, v *gophertv.ScreenVerifier) {
+			verifyFunc: func(t *testing.T, v *gtv.ScreenVerifier) {
 				assert.True(t, v.HasText(0, 0, 5, 1, "Hello"))
 				assert.True(t, v.HasText(0, 1, 5, 1, "World"))
 				// Check new columns are spaces
@@ -1326,11 +1326,11 @@ func TestScreenBuffer_SetSize_Combined(t *testing.T) {
 			newWidth:  10,
 			newHeight: 5,
 			setupFunc: func(s *ScreenBuffer) {
-				s.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "This is a long line", gophertv.Attrs(0))
-				s.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, "Another long line!!", gophertv.Attrs(0))
-				s.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Third line here!!!!", gophertv.Attrs(0))
+				s.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "This is a long line", gtv.Attrs(0))
+				s.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, "Another long line!!", gtv.Attrs(0))
+				s.PutText(gtv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Third line here!!!!", gtv.Attrs(0))
 			},
-			verifyFunc: func(t *testing.T, v *gophertv.ScreenVerifier) {
+			verifyFunc: func(t *testing.T, v *gtv.ScreenVerifier) {
 				assert.True(t, v.HasText(0, 0, 10, 1, "This is a "))
 				assert.True(t, v.HasText(0, 1, 10, 1, "Another lo"))
 				assert.True(t, v.HasText(0, 2, 10, 1, "Third line"))
@@ -1343,12 +1343,12 @@ func TestScreenBuffer_SetSize_Combined(t *testing.T) {
 			newWidth:  15,
 			newHeight: 3,
 			setupFunc: func(s *ScreenBuffer) {
-				s.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Line1", gophertv.Attrs(0))
-				s.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, "Line2", gophertv.Attrs(0))
-				s.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Line3", gophertv.Attrs(0))
-				s.PutText(gophertv.TRect{X: 0, Y: 5, W: 0, H: 0}, "Line6", gophertv.Attrs(0))
+				s.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Line1", gtv.Attrs(0))
+				s.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, "Line2", gtv.Attrs(0))
+				s.PutText(gtv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Line3", gtv.Attrs(0))
+				s.PutText(gtv.TRect{X: 0, Y: 5, W: 0, H: 0}, "Line6", gtv.Attrs(0))
 			},
-			verifyFunc: func(t *testing.T, v *gophertv.ScreenVerifier) {
+			verifyFunc: func(t *testing.T, v *gtv.ScreenVerifier) {
 				assert.True(t, v.HasText(0, 0, 5, 1, "Line1"))
 				assert.True(t, v.HasText(0, 1, 5, 1, "Line2"))
 				assert.True(t, v.HasText(0, 2, 5, 1, "Line3"))
@@ -1369,10 +1369,10 @@ func TestScreenBuffer_SetSize_Combined(t *testing.T) {
 			newWidth:  8,
 			newHeight: 8,
 			setupFunc: func(s *ScreenBuffer) {
-				s.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "VeryLongLineOfText!!", gophertv.Attrs(0))
-				s.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, "AnotherLongLine!!!!!", gophertv.Attrs(0))
+				s.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "VeryLongLineOfText!!", gtv.Attrs(0))
+				s.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, "AnotherLongLine!!!!!", gtv.Attrs(0))
 			},
-			verifyFunc: func(t *testing.T, v *gophertv.ScreenVerifier) {
+			verifyFunc: func(t *testing.T, v *gtv.ScreenVerifier) {
 				assert.True(t, v.HasText(0, 0, 8, 1, "VeryLong"))
 				assert.True(t, v.HasText(0, 1, 8, 1, "AnotherL"))
 				// Check new rows are spaces
@@ -1408,8 +1408,8 @@ func TestScreenBuffer_SetSize_Combined(t *testing.T) {
 
 func TestScreenBuffer_SetSize_SameDimensions(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 0)
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gophertv.Attrs(gophertv.AttrBold))
-	screen.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, "World", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gtv.Attrs(gtv.AttrBold))
+	screen.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, "World", gtv.Attrs(0))
 
 	// Get buffer reference before resize
 	_, _, originalBuffer := screen.GetContent()
@@ -1436,26 +1436,26 @@ func TestScreenBuffer_SetSize_PreservesAttributes(t *testing.T) {
 	screen := NewScreenBuffer(10, 5, 0)
 
 	// Put text with different attributes
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Bold", gophertv.Attrs(gophertv.AttrBold))
-	screen.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, "Italic", gophertv.Attrs(gophertv.AttrItalic))
-	screen.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Under", gophertv.Attrs(gophertv.AttrUnderline))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Bold", gtv.Attrs(gtv.AttrBold))
+	screen.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, "Italic", gtv.Attrs(gtv.AttrItalic))
+	screen.PutText(gtv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Under", gtv.Attrs(gtv.AttrUnderline))
 
 	// Resize to larger dimensions
 	screen.SetSize(15, 8)
 
 	// Verify attributes are preserved
 	verifier := getVerifier(screen)
-	assert.True(t, verifier.HasTextWithAttrs(0, 0, 4, 1, "Bold", gophertv.AttributeMask{
+	assert.True(t, verifier.HasTextWithAttrs(0, 0, 4, 1, "Bold", gtv.AttributeMask{
 		CheckAttributes: true,
-		Attributes:      gophertv.AttrBold,
+		Attributes:      gtv.AttrBold,
 	}))
-	assert.True(t, verifier.HasTextWithAttrs(0, 1, 6, 1, "Italic", gophertv.AttributeMask{
+	assert.True(t, verifier.HasTextWithAttrs(0, 1, 6, 1, "Italic", gtv.AttributeMask{
 		CheckAttributes: true,
-		Attributes:      gophertv.AttrItalic,
+		Attributes:      gtv.AttrItalic,
 	}))
-	assert.True(t, verifier.HasTextWithAttrs(0, 2, 5, 1, "Under", gophertv.AttributeMask{
+	assert.True(t, verifier.HasTextWithAttrs(0, 2, 5, 1, "Under", gtv.AttributeMask{
 		CheckAttributes: true,
-		Attributes:      gophertv.AttrUnderline,
+		Attributes:      gtv.AttrUnderline,
 	}))
 }
 
@@ -1476,7 +1476,7 @@ func TestScreenBuffer_SetSize_EmptyBuffer(t *testing.T) {
 		for x := 0; x < w; x++ {
 			cell := verifier.GetCell(x, y)
 			assert.Equal(t, ' ', cell.Rune)
-			assert.Equal(t, gophertv.CellAttributes{}, cell.Attrs)
+			assert.Equal(t, gtv.CellAttributes{}, cell.Attrs)
 		}
 	}
 }
@@ -1553,42 +1553,42 @@ func TestScreenBuffer_MoveCursor(t *testing.T) {
 func TestScreenBuffer_SetCursorStyle(t *testing.T) {
 	tests := []struct {
 		name      string
-		styles    []gophertv.CursorStyle
-		wantFinal gophertv.CursorStyle
+		styles    []gtv.CursorStyle
+		wantFinal gtv.CursorStyle
 	}{
 		{
 			name:      "default style",
-			styles:    []gophertv.CursorStyle{gophertv.CursorStyleDefault},
-			wantFinal: gophertv.CursorStyleDefault,
+			styles:    []gtv.CursorStyle{gtv.CursorStyleDefault},
+			wantFinal: gtv.CursorStyleDefault,
 		},
 		{
 			name:      "block style",
-			styles:    []gophertv.CursorStyle{gophertv.CursorStyleBlock},
-			wantFinal: gophertv.CursorStyleBlock,
+			styles:    []gtv.CursorStyle{gtv.CursorStyleBlock},
+			wantFinal: gtv.CursorStyleBlock,
 		},
 		{
 			name:      "underline style",
-			styles:    []gophertv.CursorStyle{gophertv.CursorStyleUnderline},
-			wantFinal: gophertv.CursorStyleUnderline,
+			styles:    []gtv.CursorStyle{gtv.CursorStyleUnderline},
+			wantFinal: gtv.CursorStyleUnderline,
 		},
 		{
 			name:      "bar style",
-			styles:    []gophertv.CursorStyle{gophertv.CursorStyleBar},
-			wantFinal: gophertv.CursorStyleBar,
+			styles:    []gtv.CursorStyle{gtv.CursorStyleBar},
+			wantFinal: gtv.CursorStyleBar,
 		},
 		{
 			name:      "hidden style",
-			styles:    []gophertv.CursorStyle{gophertv.CursorStyleHidden},
-			wantFinal: gophertv.CursorStyleHidden,
+			styles:    []gtv.CursorStyle{gtv.CursorStyleHidden},
+			wantFinal: gtv.CursorStyleHidden,
 		},
 		{
 			name: "multiple style changes",
-			styles: []gophertv.CursorStyle{
-				gophertv.CursorStyleBlock,
-				gophertv.CursorStyleUnderline,
-				gophertv.CursorStyleBar,
+			styles: []gtv.CursorStyle{
+				gtv.CursorStyleBlock,
+				gtv.CursorStyleUnderline,
+				gtv.CursorStyleBar,
 			},
-			wantFinal: gophertv.CursorStyleBar,
+			wantFinal: gtv.CursorStyleBar,
 		},
 	}
 
@@ -1611,7 +1611,7 @@ func TestScreenBuffer_CursorDoesNotAffectContent(t *testing.T) {
 	screen := NewScreenBuffer(80, 24, 0)
 
 	// Put some text
-	screen.PutText(gophertv.TRect{X: 10, Y: 5, W: 0, H: 0}, "Hello, World!", gophertv.Attrs(gophertv.AttrBold))
+	screen.PutText(gtv.TRect{X: 10, Y: 5, W: 0, H: 0}, "Hello, World!", gtv.Attrs(gtv.AttrBold))
 
 	// Move cursor to different positions
 	screen.MoveCursor(0, 0)
@@ -1619,8 +1619,8 @@ func TestScreenBuffer_CursorDoesNotAffectContent(t *testing.T) {
 	screen.MoveCursor(5, 5)
 
 	// Change cursor style
-	screen.SetCursorStyle(gophertv.CursorStyleBlock)
-	screen.SetCursorStyle(gophertv.CursorStyleUnderline)
+	screen.SetCursorStyle(gtv.CursorStyleBlock)
+	screen.SetCursorStyle(gtv.CursorStyleUnderline)
 
 	// Verify text is still there
 	verifier := getVerifier(screen)
@@ -1630,7 +1630,7 @@ func TestScreenBuffer_CursorDoesNotAffectContent(t *testing.T) {
 	for i, r := range "Hello, World!" {
 		cell := verifier.GetCell(10+i, 5)
 		assert.Equal(t, r, cell.Rune)
-		assert.Equal(t, gophertv.AttrBold, cell.Attrs.Attributes)
+		assert.Equal(t, gtv.AttrBold, cell.Attrs.Attributes)
 	}
 }
 
@@ -1639,7 +1639,7 @@ func TestScreenBuffer_PutText_ClippingToScreen(t *testing.T) {
 		name       string
 		width      int
 		height     int
-		rect       gophertv.TRect
+		rect       gtv.TRect
 		text       string
 		wantText   string
 		wantLength int
@@ -1648,7 +1648,7 @@ func TestScreenBuffer_PutText_ClippingToScreen(t *testing.T) {
 			name:       "text clipped at screen right boundary",
 			width:      10,
 			height:     5,
-			rect:       gophertv.TRect{X: 7, Y: 0, W: 0, H: 0},
+			rect:       gtv.TRect{X: 7, Y: 0, W: 0, H: 0},
 			text:       "HelloWorld",
 			wantText:   "Hel",
 			wantLength: 3,
@@ -1657,7 +1657,7 @@ func TestScreenBuffer_PutText_ClippingToScreen(t *testing.T) {
 			name:       "text starting at right edge",
 			width:      10,
 			height:     5,
-			rect:       gophertv.TRect{X: 9, Y: 0, W: 0, H: 0},
+			rect:       gtv.TRect{X: 9, Y: 0, W: 0, H: 0},
 			text:       "Hello",
 			wantText:   "H",
 			wantLength: 1,
@@ -1666,7 +1666,7 @@ func TestScreenBuffer_PutText_ClippingToScreen(t *testing.T) {
 			name:       "text starting beyond right edge - nothing rendered",
 			width:      10,
 			height:     5,
-			rect:       gophertv.TRect{X: 10, Y: 0, W: 0, H: 0},
+			rect:       gtv.TRect{X: 10, Y: 0, W: 0, H: 0},
 			text:       "Hello",
 			wantText:   "",
 			wantLength: 0,
@@ -1675,7 +1675,7 @@ func TestScreenBuffer_PutText_ClippingToScreen(t *testing.T) {
 			name:       "text starting at negative X - nothing rendered",
 			width:      10,
 			height:     5,
-			rect:       gophertv.TRect{X: 65535, Y: 0, W: 0, H: 0}, // uint16 wraparound for -1
+			rect:       gtv.TRect{X: 65535, Y: 0, W: 0, H: 0}, // uint16 wraparound for -1
 			text:       "Hello",
 			wantText:   "",
 			wantLength: 0,
@@ -1684,7 +1684,7 @@ func TestScreenBuffer_PutText_ClippingToScreen(t *testing.T) {
 			name:       "text on row beyond bottom - nothing rendered",
 			width:      10,
 			height:     5,
-			rect:       gophertv.TRect{X: 0, Y: 5, W: 0, H: 0},
+			rect:       gtv.TRect{X: 0, Y: 5, W: 0, H: 0},
 			text:       "Hello",
 			wantText:   "",
 			wantLength: 0,
@@ -1693,7 +1693,7 @@ func TestScreenBuffer_PutText_ClippingToScreen(t *testing.T) {
 			name:       "text on negative Y - nothing rendered",
 			width:      10,
 			height:     5,
-			rect:       gophertv.TRect{X: 0, Y: 65535, W: 0, H: 0}, // uint16 wraparound for -1
+			rect:       gtv.TRect{X: 0, Y: 65535, W: 0, H: 0}, // uint16 wraparound for -1
 			text:       "Hello",
 			wantText:   "",
 			wantLength: 0,
@@ -1703,7 +1703,7 @@ func TestScreenBuffer_PutText_ClippingToScreen(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.width, tt.height, 0)
-			screen.PutText(tt.rect, tt.text, gophertv.Attrs(gophertv.AttrBold))
+			screen.PutText(tt.rect, tt.text, gtv.Attrs(gtv.AttrBold))
 
 			verifier := getVerifier(screen)
 
@@ -1728,7 +1728,7 @@ func TestScreenBuffer_PutText_ClippingToRectangle(t *testing.T) {
 		name       string
 		width      int
 		height     int
-		rect       gophertv.TRect
+		rect       gtv.TRect
 		text       string
 		wantText   string
 		wantLength int
@@ -1737,7 +1737,7 @@ func TestScreenBuffer_PutText_ClippingToRectangle(t *testing.T) {
 			name:       "text clipped to rectangle width",
 			width:      80,
 			height:     24,
-			rect:       gophertv.TRect{X: 10, Y: 5, W: 5, H: 1},
+			rect:       gtv.TRect{X: 10, Y: 5, W: 5, H: 1},
 			text:       "HelloWorld",
 			wantText:   "Hello",
 			wantLength: 5,
@@ -1746,7 +1746,7 @@ func TestScreenBuffer_PutText_ClippingToRectangle(t *testing.T) {
 			name:       "text shorter than rectangle width",
 			width:      80,
 			height:     24,
-			rect:       gophertv.TRect{X: 10, Y: 5, W: 20, H: 1},
+			rect:       gtv.TRect{X: 10, Y: 5, W: 20, H: 1},
 			text:       "Hello",
 			wantText:   "Hello",
 			wantLength: 5,
@@ -1755,7 +1755,7 @@ func TestScreenBuffer_PutText_ClippingToRectangle(t *testing.T) {
 			name:       "rectangle extends beyond screen - clipped to screen",
 			width:      10,
 			height:     5,
-			rect:       gophertv.TRect{X: 7, Y: 0, W: 10, H: 1},
+			rect:       gtv.TRect{X: 7, Y: 0, W: 10, H: 1},
 			text:       "HelloWorld",
 			wantText:   "Hel",
 			wantLength: 3,
@@ -1764,7 +1764,7 @@ func TestScreenBuffer_PutText_ClippingToRectangle(t *testing.T) {
 			name:       "small rectangle in middle of screen",
 			width:      80,
 			height:     24,
-			rect:       gophertv.TRect{X: 20, Y: 10, W: 3, H: 1},
+			rect:       gtv.TRect{X: 20, Y: 10, W: 3, H: 1},
 			text:       "Testing",
 			wantText:   "Tes",
 			wantLength: 3,
@@ -1773,7 +1773,7 @@ func TestScreenBuffer_PutText_ClippingToRectangle(t *testing.T) {
 			name:       "rectangle width 1 - only one character",
 			width:      80,
 			height:     24,
-			rect:       gophertv.TRect{X: 10, Y: 5, W: 1, H: 1},
+			rect:       gtv.TRect{X: 10, Y: 5, W: 1, H: 1},
 			text:       "Hello",
 			wantText:   "H",
 			wantLength: 1,
@@ -1782,7 +1782,7 @@ func TestScreenBuffer_PutText_ClippingToRectangle(t *testing.T) {
 			name:       "rectangle at screen right edge",
 			width:      10,
 			height:     5,
-			rect:       gophertv.TRect{X: 5, Y: 0, W: 5, H: 1},
+			rect:       gtv.TRect{X: 5, Y: 0, W: 5, H: 1},
 			text:       "Hello",
 			wantText:   "Hello",
 			wantLength: 5,
@@ -1791,7 +1791,7 @@ func TestScreenBuffer_PutText_ClippingToRectangle(t *testing.T) {
 			name:       "rectangle partially beyond screen right",
 			width:      10,
 			height:     5,
-			rect:       gophertv.TRect{X: 5, Y: 0, W: 10, H: 1},
+			rect:       gtv.TRect{X: 5, Y: 0, W: 10, H: 1},
 			text:       "HelloWorld",
 			wantText:   "Hello",
 			wantLength: 5,
@@ -1801,7 +1801,7 @@ func TestScreenBuffer_PutText_ClippingToRectangle(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.width, tt.height, 0)
-			screen.PutText(tt.rect, tt.text, gophertv.Attrs(gophertv.AttrBold))
+			screen.PutText(tt.rect, tt.text, gtv.Attrs(gtv.AttrBold))
 
 			verifier := getVerifier(screen)
 
@@ -1817,7 +1817,7 @@ func TestScreenBuffer_PutText_WithZeroWidthHeight(t *testing.T) {
 		name       string
 		width      int
 		height     int
-		rect       gophertv.TRect
+		rect       gtv.TRect
 		text       string
 		wantText   string
 		wantLength int
@@ -1826,7 +1826,7 @@ func TestScreenBuffer_PutText_WithZeroWidthHeight(t *testing.T) {
 			name:       "W=0 H=0 uses full screen width",
 			width:      10,
 			height:     5,
-			rect:       gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+			rect:       gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 			text:       "HelloWorld",
 			wantText:   "HelloWorld",
 			wantLength: 10,
@@ -1835,7 +1835,7 @@ func TestScreenBuffer_PutText_WithZeroWidthHeight(t *testing.T) {
 			name:       "W=0 H=0 from middle of line",
 			width:      10,
 			height:     5,
-			rect:       gophertv.TRect{X: 5, Y: 0, W: 0, H: 0},
+			rect:       gtv.TRect{X: 5, Y: 0, W: 0, H: 0},
 			text:       "Hello",
 			wantText:   "Hello",
 			wantLength: 5,
@@ -1844,7 +1844,7 @@ func TestScreenBuffer_PutText_WithZeroWidthHeight(t *testing.T) {
 			name:       "W=0 H=0 clips at screen boundary",
 			width:      10,
 			height:     5,
-			rect:       gophertv.TRect{X: 7, Y: 0, W: 0, H: 0},
+			rect:       gtv.TRect{X: 7, Y: 0, W: 0, H: 0},
 			text:       "HelloWorld",
 			wantText:   "Hel",
 			wantLength: 3,
@@ -1853,7 +1853,7 @@ func TestScreenBuffer_PutText_WithZeroWidthHeight(t *testing.T) {
 			name:       "W=0 H=0 with long text on wide screen",
 			width:      80,
 			height:     24,
-			rect:       gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+			rect:       gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 			text:       "This is a long line of text that should be clipped at 80 characters if needed",
 			wantText:   "This is a long line of text that should be clipped at 80 characters if needed",
 			wantLength: 77,
@@ -1863,7 +1863,7 @@ func TestScreenBuffer_PutText_WithZeroWidthHeight(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.width, tt.height, 0)
-			screen.PutText(tt.rect, tt.text, gophertv.Attrs(gophertv.AttrBold))
+			screen.PutText(tt.rect, tt.text, gtv.Attrs(gtv.AttrBold))
 
 			verifier := getVerifier(screen)
 
@@ -1879,7 +1879,7 @@ func TestScreenBuffer_PutText_BorderCases(t *testing.T) {
 		name        string
 		width       int
 		height      int
-		rect        gophertv.TRect
+		rect        gtv.TRect
 		text        string
 		wantText    string
 		wantLength  int
@@ -1892,7 +1892,7 @@ func TestScreenBuffer_PutText_BorderCases(t *testing.T) {
 			name:        "empty text",
 			width:       10,
 			height:      5,
-			rect:        gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+			rect:        gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 			text:        "",
 			wantText:    "",
 			wantLength:  0,
@@ -1905,7 +1905,7 @@ func TestScreenBuffer_PutText_BorderCases(t *testing.T) {
 			name:        "single character",
 			width:       10,
 			height:      5,
-			rect:        gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+			rect:        gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 			text:        "X",
 			wantText:    "X",
 			wantLength:  1,
@@ -1918,7 +1918,7 @@ func TestScreenBuffer_PutText_BorderCases(t *testing.T) {
 			name:        "unicode text",
 			width:       20,
 			height:      5,
-			rect:        gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
+			rect:        gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 			text:        "Hello 世界",
 			wantText:    "Hello 世界",
 			wantLength:  8,
@@ -1931,7 +1931,7 @@ func TestScreenBuffer_PutText_BorderCases(t *testing.T) {
 			name:        "unicode text clipped to rectangle",
 			width:       20,
 			height:      5,
-			rect:        gophertv.TRect{X: 0, Y: 0, W: 7, H: 1},
+			rect:        gtv.TRect{X: 0, Y: 0, W: 7, H: 1},
 			text:        "Hello 世界",
 			wantText:    "Hello 世",
 			wantLength:  7,
@@ -1944,7 +1944,7 @@ func TestScreenBuffer_PutText_BorderCases(t *testing.T) {
 			name:        "text at last row of screen",
 			width:       10,
 			height:      5,
-			rect:        gophertv.TRect{X: 0, Y: 4, W: 0, H: 0},
+			rect:        gtv.TRect{X: 0, Y: 4, W: 0, H: 0},
 			text:        "LastRow",
 			wantText:    "LastRow",
 			wantLength:  7,
@@ -1957,7 +1957,7 @@ func TestScreenBuffer_PutText_BorderCases(t *testing.T) {
 			name:        "text at last column of screen",
 			width:       10,
 			height:      5,
-			rect:        gophertv.TRect{X: 9, Y: 0, W: 0, H: 0},
+			rect:        gtv.TRect{X: 9, Y: 0, W: 0, H: 0},
 			text:        "ABC",
 			wantText:    "A",
 			wantLength:  1,
@@ -1971,7 +1971,7 @@ func TestScreenBuffer_PutText_BorderCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			screen := NewScreenBuffer(tt.width, tt.height, 0)
-			screen.PutText(tt.rect, tt.text, gophertv.Attrs(gophertv.AttrBold))
+			screen.PutText(tt.rect, tt.text, gtv.Attrs(gtv.AttrBold))
 
 			verifier := getVerifier(screen)
 
@@ -1989,21 +1989,21 @@ func TestScreenBuffer_PutContent_ClippingToScreen(t *testing.T) {
 		name       string
 		width      int
 		height     int
-		rect       gophertv.TRect
-		content    []gophertv.Cell
+		rect       gtv.TRect
+		content    []gtv.Cell
 		wantLength int
 	}{
 		{
 			name:   "content clipped at screen right boundary",
 			width:  10,
 			height: 5,
-			rect:   gophertv.TRect{X: 7, Y: 0, W: 0, H: 0},
-			content: []gophertv.Cell{
-				{Rune: 'H', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'e', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'l', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'l', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'o', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 7, Y: 0, W: 0, H: 0},
+			content: []gtv.Cell{
+				{Rune: 'H', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'e', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'l', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'l', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'o', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantLength: 3,
 		},
@@ -2011,10 +2011,10 @@ func TestScreenBuffer_PutContent_ClippingToScreen(t *testing.T) {
 			name:   "content starting at right edge",
 			width:  10,
 			height: 5,
-			rect:   gophertv.TRect{X: 9, Y: 0, W: 0, H: 0},
-			content: []gophertv.Cell{
-				{Rune: 'H', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'i', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 9, Y: 0, W: 0, H: 0},
+			content: []gtv.Cell{
+				{Rune: 'H', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'i', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantLength: 1,
 		},
@@ -2022,9 +2022,9 @@ func TestScreenBuffer_PutContent_ClippingToScreen(t *testing.T) {
 			name:   "content starting beyond right edge - nothing rendered",
 			width:  10,
 			height: 5,
-			rect:   gophertv.TRect{X: 10, Y: 0, W: 0, H: 0},
-			content: []gophertv.Cell{
-				{Rune: 'H', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 10, Y: 0, W: 0, H: 0},
+			content: []gtv.Cell{
+				{Rune: 'H', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantLength: 0,
 		},
@@ -2032,9 +2032,9 @@ func TestScreenBuffer_PutContent_ClippingToScreen(t *testing.T) {
 			name:   "content starting at negative X - nothing rendered",
 			width:  10,
 			height: 5,
-			rect:   gophertv.TRect{X: 65535, Y: 0, W: 0, H: 0}, // uint16 wraparound for -1
-			content: []gophertv.Cell{
-				{Rune: 'H', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 65535, Y: 0, W: 0, H: 0}, // uint16 wraparound for -1
+			content: []gtv.Cell{
+				{Rune: 'H', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantLength: 0,
 		},
@@ -2042,9 +2042,9 @@ func TestScreenBuffer_PutContent_ClippingToScreen(t *testing.T) {
 			name:   "content on row beyond bottom - nothing rendered",
 			width:  10,
 			height: 5,
-			rect:   gophertv.TRect{X: 0, Y: 5, W: 0, H: 0},
-			content: []gophertv.Cell{
-				{Rune: 'H', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 0, Y: 5, W: 0, H: 0},
+			content: []gtv.Cell{
+				{Rune: 'H', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantLength: 0,
 		},
@@ -2052,9 +2052,9 @@ func TestScreenBuffer_PutContent_ClippingToScreen(t *testing.T) {
 			name:   "content on negative Y - nothing rendered",
 			width:  10,
 			height: 5,
-			rect:   gophertv.TRect{X: 0, Y: 65535, W: 0, H: 0}, // uint16 wraparound for -1
-			content: []gophertv.Cell{
-				{Rune: 'H', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 0, Y: 65535, W: 0, H: 0}, // uint16 wraparound for -1
+			content: []gtv.Cell{
+				{Rune: 'H', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantLength: 0,
 		},
@@ -2088,8 +2088,8 @@ func TestScreenBuffer_PutContent_ClippingToRectangle(t *testing.T) {
 		name       string
 		width      int
 		height     int
-		rect       gophertv.TRect
-		content    []gophertv.Cell
+		rect       gtv.TRect
+		content    []gtv.Cell
 		wantText   string
 		wantLength int
 	}{
@@ -2097,18 +2097,18 @@ func TestScreenBuffer_PutContent_ClippingToRectangle(t *testing.T) {
 			name:   "content clipped to rectangle width",
 			width:  80,
 			height: 24,
-			rect:   gophertv.TRect{X: 10, Y: 5, W: 5, H: 1},
-			content: []gophertv.Cell{
-				{Rune: 'H', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'e', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'l', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'l', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'o', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'W', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'o', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'r', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'l', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'd', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 10, Y: 5, W: 5, H: 1},
+			content: []gtv.Cell{
+				{Rune: 'H', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'e', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'l', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'l', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'o', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'W', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'o', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'r', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'l', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'd', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantText:   "Hello",
 			wantLength: 5,
@@ -2117,10 +2117,10 @@ func TestScreenBuffer_PutContent_ClippingToRectangle(t *testing.T) {
 			name:   "content shorter than rectangle width",
 			width:  80,
 			height: 24,
-			rect:   gophertv.TRect{X: 10, Y: 5, W: 20, H: 1},
-			content: []gophertv.Cell{
-				{Rune: 'H', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'i', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 10, Y: 5, W: 20, H: 1},
+			content: []gtv.Cell{
+				{Rune: 'H', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'i', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantText:   "Hi",
 			wantLength: 2,
@@ -2129,13 +2129,13 @@ func TestScreenBuffer_PutContent_ClippingToRectangle(t *testing.T) {
 			name:   "rectangle extends beyond screen - clipped to screen",
 			width:  10,
 			height: 5,
-			rect:   gophertv.TRect{X: 7, Y: 0, W: 10, H: 1},
-			content: []gophertv.Cell{
-				{Rune: 'A', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'B', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'C', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'D', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'E', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 7, Y: 0, W: 10, H: 1},
+			content: []gtv.Cell{
+				{Rune: 'A', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'B', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'C', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'D', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'E', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantText:   "ABC",
 			wantLength: 3,
@@ -2144,12 +2144,12 @@ func TestScreenBuffer_PutContent_ClippingToRectangle(t *testing.T) {
 			name:   "small rectangle in middle of screen",
 			width:  80,
 			height: 24,
-			rect:   gophertv.TRect{X: 20, Y: 10, W: 3, H: 1},
-			content: []gophertv.Cell{
-				{Rune: 'T', Attrs: gophertv.Attrs(gophertv.AttrItalic)},
-				{Rune: 'e', Attrs: gophertv.Attrs(gophertv.AttrItalic)},
-				{Rune: 's', Attrs: gophertv.Attrs(gophertv.AttrItalic)},
-				{Rune: 't', Attrs: gophertv.Attrs(gophertv.AttrItalic)},
+			rect:   gtv.TRect{X: 20, Y: 10, W: 3, H: 1},
+			content: []gtv.Cell{
+				{Rune: 'T', Attrs: gtv.Attrs(gtv.AttrItalic)},
+				{Rune: 'e', Attrs: gtv.Attrs(gtv.AttrItalic)},
+				{Rune: 's', Attrs: gtv.Attrs(gtv.AttrItalic)},
+				{Rune: 't', Attrs: gtv.Attrs(gtv.AttrItalic)},
 			},
 			wantText:   "Tes",
 			wantLength: 3,
@@ -2158,10 +2158,10 @@ func TestScreenBuffer_PutContent_ClippingToRectangle(t *testing.T) {
 			name:   "rectangle width 1 - only one cell",
 			width:  80,
 			height: 24,
-			rect:   gophertv.TRect{X: 10, Y: 5, W: 1, H: 1},
-			content: []gophertv.Cell{
-				{Rune: 'X', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'Y', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 10, Y: 5, W: 1, H: 1},
+			content: []gtv.Cell{
+				{Rune: 'X', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'Y', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantText:   "X",
 			wantLength: 1,
@@ -2187,8 +2187,8 @@ func TestScreenBuffer_PutContent_WithZeroWidthHeight(t *testing.T) {
 		name       string
 		width      int
 		height     int
-		rect       gophertv.TRect
-		content    []gophertv.Cell
+		rect       gtv.TRect
+		content    []gtv.Cell
 		wantText   string
 		wantLength int
 	}{
@@ -2196,13 +2196,13 @@ func TestScreenBuffer_PutContent_WithZeroWidthHeight(t *testing.T) {
 			name:   "W=0 H=0 uses full screen width",
 			width:  10,
 			height: 5,
-			rect:   gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
-			content: []gophertv.Cell{
-				{Rune: 'A', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'B', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'C', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'D', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'E', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
+			content: []gtv.Cell{
+				{Rune: 'A', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'B', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'C', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'D', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'E', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantText:   "ABCDE",
 			wantLength: 5,
@@ -2211,11 +2211,11 @@ func TestScreenBuffer_PutContent_WithZeroWidthHeight(t *testing.T) {
 			name:   "W=0 H=0 from middle of line",
 			width:  10,
 			height: 5,
-			rect:   gophertv.TRect{X: 5, Y: 0, W: 0, H: 0},
-			content: []gophertv.Cell{
-				{Rune: 'X', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'Y', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'Z', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 5, Y: 0, W: 0, H: 0},
+			content: []gtv.Cell{
+				{Rune: 'X', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'Y', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'Z', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantText:   "XYZ",
 			wantLength: 3,
@@ -2224,12 +2224,12 @@ func TestScreenBuffer_PutContent_WithZeroWidthHeight(t *testing.T) {
 			name:   "W=0 H=0 clips at screen boundary",
 			width:  10,
 			height: 5,
-			rect:   gophertv.TRect{X: 7, Y: 0, W: 0, H: 0},
-			content: []gophertv.Cell{
-				{Rune: 'L', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'O', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'N', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'G', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 7, Y: 0, W: 0, H: 0},
+			content: []gtv.Cell{
+				{Rune: 'L', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'O', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'N', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'G', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantText:   "LON",
 			wantLength: 3,
@@ -2255,8 +2255,8 @@ func TestScreenBuffer_PutContent_BorderCases(t *testing.T) {
 		name        string
 		width       int
 		height      int
-		rect        gophertv.TRect
-		content     []gophertv.Cell
+		rect        gtv.TRect
+		content     []gtv.Cell
 		wantText    string
 		wantLength  int
 		checkX      int
@@ -2268,8 +2268,8 @@ func TestScreenBuffer_PutContent_BorderCases(t *testing.T) {
 			name:        "empty content",
 			width:       10,
 			height:      5,
-			rect:        gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
-			content:     []gophertv.Cell{},
+			rect:        gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
+			content:     []gtv.Cell{},
 			wantText:    "",
 			wantLength:  0,
 			checkX:      0,
@@ -2281,9 +2281,9 @@ func TestScreenBuffer_PutContent_BorderCases(t *testing.T) {
 			name:   "single cell",
 			width:  10,
 			height: 5,
-			rect:   gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
-			content: []gophertv.Cell{
-				{Rune: 'X', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
+			content: []gtv.Cell{
+				{Rune: 'X', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantText:    "X",
 			wantLength:  1,
@@ -2296,11 +2296,11 @@ func TestScreenBuffer_PutContent_BorderCases(t *testing.T) {
 			name:   "content with different attributes per cell",
 			width:  20,
 			height: 5,
-			rect:   gophertv.TRect{X: 0, Y: 0, W: 0, H: 0},
-			content: []gophertv.Cell{
-				{Rune: 'B', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'I', Attrs: gophertv.Attrs(gophertv.AttrItalic)},
-				{Rune: 'U', Attrs: gophertv.Attrs(gophertv.AttrUnderline)},
+			rect:   gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
+			content: []gtv.Cell{
+				{Rune: 'B', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'I', Attrs: gtv.Attrs(gtv.AttrItalic)},
+				{Rune: 'U', Attrs: gtv.Attrs(gtv.AttrUnderline)},
 			},
 			wantText:    "BIU",
 			wantLength:  3,
@@ -2313,12 +2313,12 @@ func TestScreenBuffer_PutContent_BorderCases(t *testing.T) {
 			name:   "content at last row of screen",
 			width:  10,
 			height: 5,
-			rect:   gophertv.TRect{X: 0, Y: 4, W: 0, H: 0},
-			content: []gophertv.Cell{
-				{Rune: 'L', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'a', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 's', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 't', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 0, Y: 4, W: 0, H: 0},
+			content: []gtv.Cell{
+				{Rune: 'L', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'a', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 's', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 't', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantText:    "Last",
 			wantLength:  4,
@@ -2331,10 +2331,10 @@ func TestScreenBuffer_PutContent_BorderCases(t *testing.T) {
 			name:   "content at last column of screen",
 			width:  10,
 			height: 5,
-			rect:   gophertv.TRect{X: 9, Y: 0, W: 0, H: 0},
-			content: []gophertv.Cell{
-				{Rune: 'A', Attrs: gophertv.Attrs(gophertv.AttrBold)},
-				{Rune: 'B', Attrs: gophertv.Attrs(gophertv.AttrBold)},
+			rect:   gtv.TRect{X: 9, Y: 0, W: 0, H: 0},
+			content: []gtv.Cell{
+				{Rune: 'A', Attrs: gtv.Attrs(gtv.AttrBold)},
+				{Rune: 'B', Attrs: gtv.Attrs(gtv.AttrBold)},
 			},
 			wantText:    "A",
 			wantLength:  1,
@@ -2361,15 +2361,15 @@ func TestScreenBuffer_PutContent_BorderCases(t *testing.T) {
 				if tt.name == "content with different attributes per cell" {
 					cell0 := verifier.GetCell(0, 0)
 					assert.Equal(t, 'B', cell0.Rune)
-					assert.Equal(t, gophertv.AttrBold, cell0.Attrs.Attributes)
+					assert.Equal(t, gtv.AttrBold, cell0.Attrs.Attributes)
 
 					cell1 := verifier.GetCell(1, 0)
 					assert.Equal(t, 'I', cell1.Rune)
-					assert.Equal(t, gophertv.AttrItalic, cell1.Attrs.Attributes)
+					assert.Equal(t, gtv.AttrItalic, cell1.Attrs.Attributes)
 
 					cell2 := verifier.GetCell(2, 0)
 					assert.Equal(t, 'U', cell2.Rune)
-					assert.Equal(t, gophertv.AttrUnderline, cell2.Attrs.Attributes)
+					assert.Equal(t, gtv.AttrUnderline, cell2.Attrs.Attributes)
 				}
 			}
 		})
@@ -2380,34 +2380,34 @@ func TestScreenBuffer_PutContent_PreservesAttributes(t *testing.T) {
 	screen := NewScreenBuffer(80, 24, 0)
 
 	// Create content with different colors and attributes
-	content := []gophertv.Cell{
-		{Rune: 'R', Attrs: gophertv.AttrsWithColor(gophertv.AttrBold, 0xFF0000, 0x000000)},
-		{Rune: 'G', Attrs: gophertv.AttrsWithColor(gophertv.AttrItalic, 0x00FF00, 0x000000)},
-		{Rune: 'B', Attrs: gophertv.AttrsWithColor(gophertv.AttrUnderline, 0x0000FF, 0xFFFFFF)},
+	content := []gtv.Cell{
+		{Rune: 'R', Attrs: gtv.AttrsWithColor(gtv.AttrBold, 0xFF0000, 0x000000)},
+		{Rune: 'G', Attrs: gtv.AttrsWithColor(gtv.AttrItalic, 0x00FF00, 0x000000)},
+		{Rune: 'B', Attrs: gtv.AttrsWithColor(gtv.AttrUnderline, 0x0000FF, 0xFFFFFF)},
 	}
 
-	screen.PutContent(gophertv.TRect{X: 10, Y: 5, W: 0, H: 0}, content)
+	screen.PutContent(gtv.TRect{X: 10, Y: 5, W: 0, H: 0}, content)
 
 	verifier := getVerifier(screen)
 
 	// Verify first cell (Red, Bold)
 	cell0 := verifier.GetCell(10, 5)
 	assert.Equal(t, 'R', cell0.Rune)
-	assert.Equal(t, gophertv.AttrBold, cell0.Attrs.Attributes)
+	assert.Equal(t, gtv.AttrBold, cell0.Attrs.Attributes)
 	assert.Equal(t, uint32(0xFF0000), cell0.Attrs.TextColor)
 	assert.Equal(t, uint32(0x000000), cell0.Attrs.BackColor)
 
 	// Verify second cell (Green, Italic)
 	cell1 := verifier.GetCell(11, 5)
 	assert.Equal(t, 'G', cell1.Rune)
-	assert.Equal(t, gophertv.AttrItalic, cell1.Attrs.Attributes)
+	assert.Equal(t, gtv.AttrItalic, cell1.Attrs.Attributes)
 	assert.Equal(t, uint32(0x00FF00), cell1.Attrs.TextColor)
 	assert.Equal(t, uint32(0x000000), cell1.Attrs.BackColor)
 
 	// Verify third cell (Blue, Underline)
 	cell2 := verifier.GetCell(12, 5)
 	assert.Equal(t, 'B', cell2.Rune)
-	assert.Equal(t, gophertv.AttrUnderline, cell2.Attrs.Attributes)
+	assert.Equal(t, gtv.AttrUnderline, cell2.Attrs.Attributes)
 	assert.Equal(t, uint32(0x0000FF), cell2.Attrs.TextColor)
 	assert.Equal(t, uint32(0xFFFFFF), cell2.Attrs.BackColor)
 }

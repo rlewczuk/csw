@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
 )
 
 // InputEventReader reads input events from terminal and converts them to InputEvent objects.
@@ -18,7 +18,7 @@ import (
 type InputEventReader struct {
 	reader  io.Reader
 	writer  io.Writer
-	handler gophertv.InputEventHandler
+	handler gtv.InputEventHandler
 	stopCh  chan struct{}
 	doneCh  chan struct{}
 	mu      sync.Mutex
@@ -29,7 +29,7 @@ type InputEventReader struct {
 // The reader is used to read input from terminal.
 // The writer is optional and used for terminal control sequences (e.g., querying terminal size).
 // The handler is called for each input event.
-func NewInputEventReader(reader io.Reader, writer io.Writer, handler gophertv.InputEventHandler) *InputEventReader {
+func NewInputEventReader(reader io.Reader, writer io.Writer, handler gtv.InputEventHandler) *InputEventReader {
 	return &InputEventReader{
 		reader:  reader,
 		writer:  writer,
@@ -59,8 +59,8 @@ func (r *InputEventReader) Start() error {
 		width, height = 80, 24
 	}
 
-	r.handler.Notify(gophertv.InputEvent{
-		Type: gophertv.InputEventResize,
+	r.handler.Notify(gtv.InputEvent{
+		Type: gtv.InputEventResize,
 		X:    uint16(width),
 		Y:    uint16(height),
 	})
@@ -88,8 +88,8 @@ func (r *InputEventReader) Stop() {
 // NotifyResize sends a resize event to the handler with the given dimensions.
 // This method should be called when the terminal is resized (e.g., from a SIGWINCH handler).
 func (r *InputEventReader) NotifyResize(width, height int) {
-	r.handler.Notify(gophertv.InputEvent{
-		Type: gophertv.InputEventResize,
+	r.handler.Notify(gtv.InputEvent{
+		Type: gtv.InputEventResize,
 		X:    uint16(width),
 		Y:    uint16(height),
 	})
@@ -174,8 +174,8 @@ func (r *InputEventReader) parseInput(data []byte) {
 			}
 
 			// Single ESC key
-			r.handler.Notify(gophertv.InputEvent{
-				Type: gophertv.InputEventKey,
+			r.handler.Notify(gtv.InputEvent{
+				Type: gtv.InputEventKey,
 				Key:  0x1B,
 			})
 			i++
@@ -200,73 +200,73 @@ func (r *InputEventReader) parseEscO(data []byte) int {
 
 	switch ch {
 	case 'P': // F1
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'P',
-			Modifiers: gophertv.ModFn,
+			Modifiers: gtv.ModFn,
 		})
 		return 3
 	case 'Q': // F2
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'Q',
-			Modifiers: gophertv.ModFn,
+			Modifiers: gtv.ModFn,
 		})
 		return 3
 	case 'R': // F3
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'R',
-			Modifiers: gophertv.ModFn,
+			Modifiers: gtv.ModFn,
 		})
 		return 3
 	case 'S': // F4
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'S',
-			Modifiers: gophertv.ModFn,
+			Modifiers: gtv.ModFn,
 		})
 		return 3
 	case 'A': // Up arrow (alternate mode)
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'A',
-			Modifiers: gophertv.ModFn,
+			Modifiers: gtv.ModFn,
 		})
 		return 3
 	case 'B': // Down arrow (alternate mode)
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'B',
-			Modifiers: gophertv.ModFn,
+			Modifiers: gtv.ModFn,
 		})
 		return 3
 	case 'C': // Right arrow (alternate mode)
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'C',
-			Modifiers: gophertv.ModFn,
+			Modifiers: gtv.ModFn,
 		})
 		return 3
 	case 'D': // Left arrow (alternate mode)
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'D',
-			Modifiers: gophertv.ModFn,
+			Modifiers: gtv.ModFn,
 		})
 		return 3
 	case 'H': // Home (alternate mode)
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'H',
-			Modifiers: gophertv.ModFn,
+			Modifiers: gtv.ModFn,
 		})
 		return 3
 	case 'F': // End (alternate mode)
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'F',
-			Modifiers: gophertv.ModFn,
+			Modifiers: gtv.ModFn,
 		})
 		return 3
 	default:
@@ -341,60 +341,60 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 	// According to doc: "For arrow keys and other special navigation keys, Key is a letter and ModFn modifier set"
 	switch lastChar {
 	case 'A': // Up arrow
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'A',
-			Modifiers: r.getModifiers(params) | gophertv.ModFn,
+			Modifiers: r.getModifiers(params) | gtv.ModFn,
 		})
 		return end
 
 	case 'B': // Down arrow
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'B',
-			Modifiers: r.getModifiers(params) | gophertv.ModFn,
+			Modifiers: r.getModifiers(params) | gtv.ModFn,
 		})
 		return end
 
 	case 'C': // Right arrow
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'C',
-			Modifiers: r.getModifiers(params) | gophertv.ModFn,
+			Modifiers: r.getModifiers(params) | gtv.ModFn,
 		})
 		return end
 
 	case 'D': // Left arrow
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'D',
-			Modifiers: r.getModifiers(params) | gophertv.ModFn,
+			Modifiers: r.getModifiers(params) | gtv.ModFn,
 		})
 		return end
 
 	case 'H': // Home
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'H',
-			Modifiers: r.getModifiers(params) | gophertv.ModFn,
+			Modifiers: r.getModifiers(params) | gtv.ModFn,
 		})
 		return end
 
 	case 'F': // End
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       'F',
-			Modifiers: r.getModifiers(params) | gophertv.ModFn,
+			Modifiers: r.getModifiers(params) | gtv.ModFn,
 		})
 		return end
 
 	case 'P': // F1 with modifiers (CSI format: ESC[1;modP)
 		// Check if this is a modified F1 key (has params like [1;2P] for Shift+F1)
 		if len(params) >= 2 && params[0] == 1 {
-			r.handler.Notify(gophertv.InputEvent{
-				Type:      gophertv.InputEventKey,
+			r.handler.Notify(gtv.InputEvent{
+				Type:      gtv.InputEventKey,
 				Key:       'P',
-				Modifiers: r.getModifiers(params) | gophertv.ModFn,
+				Modifiers: r.getModifiers(params) | gtv.ModFn,
 			})
 			return end
 		}
@@ -403,10 +403,10 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 
 	case 'Q': // F2 with modifiers (CSI format: ESC[1;modQ)
 		if len(params) >= 2 && params[0] == 1 {
-			r.handler.Notify(gophertv.InputEvent{
-				Type:      gophertv.InputEventKey,
+			r.handler.Notify(gtv.InputEvent{
+				Type:      gtv.InputEventKey,
 				Key:       'Q',
-				Modifiers: r.getModifiers(params) | gophertv.ModFn,
+				Modifiers: r.getModifiers(params) | gtv.ModFn,
 			})
 			return end
 		}
@@ -415,10 +415,10 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 	case 'R': // F3 with modifiers (CSI format: ESC[1;modR) or cursor position report
 		if len(params) >= 2 && params[0] == 1 {
 			// Modified F3 key
-			r.handler.Notify(gophertv.InputEvent{
-				Type:      gophertv.InputEventKey,
+			r.handler.Notify(gtv.InputEvent{
+				Type:      gtv.InputEventKey,
 				Key:       'R',
-				Modifiers: r.getModifiers(params) | gophertv.ModFn,
+				Modifiers: r.getModifiers(params) | gtv.ModFn,
 			})
 			return end
 		}
@@ -429,10 +429,10 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 
 	case 'S': // F4 with modifiers (CSI format: ESC[1;modS)
 		if len(params) >= 2 && params[0] == 1 {
-			r.handler.Notify(gophertv.InputEvent{
-				Type:      gophertv.InputEventKey,
+			r.handler.Notify(gtv.InputEvent{
+				Type:      gtv.InputEventKey,
 				Key:       'S',
-				Modifiers: r.getModifiers(params) | gophertv.ModFn,
+				Modifiers: r.getModifiers(params) | gtv.ModFn,
 			})
 			return end
 		}
@@ -481,23 +481,23 @@ func (r *InputEventReader) parseCSIParams(data []byte) []int {
 // The modifier parameter in xterm CSI sequences is encoded as modParam = modifier + 1,
 // where modifier is a bitmask: bit 0 = Shift, bit 1 = Alt, bit 2 = Ctrl, bit 3 = Meta.
 // For example: \x1b[1;2A means Shift+Up (modParam=2, modifier=1=Shift).
-func (r *InputEventReader) getModifiers(params []int) gophertv.EventModifiers {
-	var mods gophertv.EventModifiers
+func (r *InputEventReader) getModifiers(params []int) gtv.EventModifiers {
+	var mods gtv.EventModifiers
 	if len(params) >= 2 {
 		// xterm modifier encoding: modParam = modifier + 1
 		// So we need to subtract 1 to get the actual modifier bits.
 		modParam := params[1] - 1
 		if modParam&1 != 0 {
-			mods |= gophertv.ModShift
+			mods |= gtv.ModShift
 		}
 		if modParam&2 != 0 {
-			mods |= gophertv.ModAlt
+			mods |= gtv.ModAlt
 		}
 		if modParam&4 != 0 {
-			mods |= gophertv.ModCtrl
+			mods |= gtv.ModCtrl
 		}
 		if modParam&8 != 0 {
-			mods |= gophertv.ModMeta
+			mods |= gtv.ModMeta
 		}
 	}
 	return mods
@@ -506,63 +506,63 @@ func (r *InputEventReader) getModifiers(params []int) gophertv.EventModifiers {
 // handleTildeKey handles special keys that end with '~'.
 func (r *InputEventReader) handleTildeKey(keyCode int, params []int) {
 	var key rune
-	var mods gophertv.EventModifiers
+	var mods gtv.EventModifiers
 
 	switch keyCode {
 	case 1, 7: // Home
 		key = 'H'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 2: // Insert
 		key = 'I'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 3: // Delete
 		key = 'D'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 4, 8: // End
 		key = 'F'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 5: // Page Up
 		key = 'G'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 6: // Page Down
 		key = 'N'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 11: // F1
 		key = 'P'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 12: // F2
 		key = 'Q'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 13: // F3
 		key = 'R'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 14: // F4
 		key = 'S'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 15: // F5
 		key = 'T'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 17: // F6
 		key = 'U'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 18: // F7
 		key = 'V'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 19: // F8
 		key = 'W'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 20: // F9
 		key = 'X'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 21: // F10
 		key = 'Y'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 23: // F11
 		key = 'Z'
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	case 24: // F12
 		key = '['
-		mods |= gophertv.ModFn
+		mods |= gtv.ModFn
 	default:
 		// Unknown key code, ignore
 		return
@@ -570,8 +570,8 @@ func (r *InputEventReader) handleTildeKey(keyCode int, params []int) {
 
 	mods |= r.getModifiers(params)
 
-	r.handler.Notify(gophertv.InputEvent{
-		Type:      gophertv.InputEventKey,
+	r.handler.Notify(gtv.InputEvent{
+		Type:      gtv.InputEventKey,
 		Key:       key,
 		Modifiers: mods,
 	})
@@ -587,43 +587,43 @@ func (r *InputEventReader) handleMouseEvent(data []byte, sgr bool) {
 	x := int(data[1]) - 32 - 1 // Convert to 0-based
 	y := int(data[2]) - 32 - 1 // Convert to 0-based
 
-	var mods gophertv.EventModifiers
+	var mods gtv.EventModifiers
 
 	// Parse button and modifiers
 	button := btn & 3
 	if btn&4 != 0 {
-		mods |= gophertv.ModShift
+		mods |= gtv.ModShift
 	}
 	if btn&8 != 0 {
-		mods |= gophertv.ModAlt
+		mods |= gtv.ModAlt
 	}
 	if btn&16 != 0 {
-		mods |= gophertv.ModCtrl
+		mods |= gtv.ModCtrl
 	}
 
 	// Check for mouse movement/drag
 	if btn&32 != 0 {
-		mods |= gophertv.ModMove
+		mods |= gtv.ModMove
 	}
 
 	// Check for scroll events
 	if btn&64 != 0 {
 		if button == 0 {
-			mods |= gophertv.ModScrollUp
+			mods |= gtv.ModScrollUp
 		} else if button == 1 {
-			mods |= gophertv.ModScrollDown
+			mods |= gtv.ModScrollDown
 		}
 	}
 
 	// Determine press/release
 	if btn&3 == 3 {
-		mods |= gophertv.ModRelease
+		mods |= gtv.ModRelease
 	} else {
-		mods |= gophertv.ModPress
+		mods |= gtv.ModPress
 	}
 
-	r.handler.Notify(gophertv.InputEvent{
-		Type:      gophertv.InputEventMouse,
+	r.handler.Notify(gtv.InputEvent{
+		Type:      gtv.InputEventMouse,
 		X:         uint16(x),
 		Y:         uint16(y),
 		Modifiers: mods,
@@ -640,36 +640,36 @@ func (r *InputEventReader) handleSGRMouse(params []int) {
 	x := params[1] - 1 // Convert to 0-based
 	y := params[2] - 1 // Convert to 0-based
 
-	var mods gophertv.EventModifiers
+	var mods gtv.EventModifiers
 
 	// Parse modifiers
 	if btn&4 != 0 {
-		mods |= gophertv.ModShift
+		mods |= gtv.ModShift
 	}
 	if btn&8 != 0 {
-		mods |= gophertv.ModAlt
+		mods |= gtv.ModAlt
 	}
 	if btn&16 != 0 {
-		mods |= gophertv.ModCtrl
+		mods |= gtv.ModCtrl
 	}
 
 	// Check for mouse movement/drag
 	if btn&32 != 0 {
-		mods |= gophertv.ModMove
+		mods |= gtv.ModMove
 	}
 
 	// Check for scroll events
 	if btn&64 != 0 {
 		button := btn & 3
 		if button == 0 {
-			mods |= gophertv.ModScrollUp
+			mods |= gtv.ModScrollUp
 		} else if button == 1 {
-			mods |= gophertv.ModScrollDown
+			mods |= gtv.ModScrollDown
 		}
 	}
 
-	r.handler.Notify(gophertv.InputEvent{
-		Type:      gophertv.InputEventMouse,
+	r.handler.Notify(gtv.InputEvent{
+		Type:      gtv.InputEventMouse,
 		X:         uint16(x),
 		Y:         uint16(y),
 		Modifiers: mods,
@@ -678,32 +678,32 @@ func (r *InputEventReader) handleSGRMouse(params []int) {
 
 // parseRegularKey parses a regular key press.
 func (r *InputEventReader) parseRegularKey(b byte) {
-	var mods gophertv.EventModifiers
+	var mods gtv.EventModifiers
 
 	// Handle Ctrl combinations (0x00-0x1F except special cases)
 	if b < 0x20 {
 		// Special control characters that should not be converted
 		switch b {
 		case 0x09: // Tab
-			mods |= gophertv.ModCtrl
-			r.handler.Notify(gophertv.InputEvent{
-				Type:      gophertv.InputEventKey,
+			mods |= gtv.ModCtrl
+			r.handler.Notify(gtv.InputEvent{
+				Type:      gtv.InputEventKey,
 				Key:       rune(b),
 				Modifiers: mods,
 			})
 			return
 		case 0x0A: // LF (newline)
-			mods |= gophertv.ModCtrl
-			r.handler.Notify(gophertv.InputEvent{
-				Type:      gophertv.InputEventKey,
+			mods |= gtv.ModCtrl
+			r.handler.Notify(gtv.InputEvent{
+				Type:      gtv.InputEventKey,
 				Key:       rune(b),
 				Modifiers: mods,
 			})
 			return
 		case 0x0D: // CR (carriage return)
-			mods |= gophertv.ModCtrl
-			r.handler.Notify(gophertv.InputEvent{
-				Type:      gophertv.InputEventKey,
+			mods |= gtv.ModCtrl
+			r.handler.Notify(gtv.InputEvent{
+				Type:      gtv.InputEventKey,
 				Key:       rune(b),
 				Modifiers: mods,
 			})
@@ -713,9 +713,9 @@ func (r *InputEventReader) parseRegularKey(b byte) {
 		// Convert Ctrl+letter to the corresponding letter
 		if b >= 1 && b <= 26 {
 			// Ctrl+A = 1, Ctrl+B = 2, etc.
-			mods |= gophertv.ModCtrl
-			r.handler.Notify(gophertv.InputEvent{
-				Type:      gophertv.InputEventKey,
+			mods |= gtv.ModCtrl
+			r.handler.Notify(gtv.InputEvent{
+				Type:      gtv.InputEventKey,
 				Key:       rune('a' + b - 1),
 				Modifiers: mods,
 			})
@@ -723,9 +723,9 @@ func (r *InputEventReader) parseRegularKey(b byte) {
 		}
 
 		// Other control characters
-		mods |= gophertv.ModCtrl
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		mods |= gtv.ModCtrl
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       rune(b),
 			Modifiers: mods,
 		})
@@ -735,17 +735,17 @@ func (r *InputEventReader) parseRegularKey(b byte) {
 	// Handle uppercase letters (A-Z) - these indicate Shift was pressed
 	// According to doc: "For letter keys, Key is a Unicode code point of the letter (uppercase if shift is pressed plus shift modifier set)"
 	if b >= 'A' && b <= 'Z' {
-		r.handler.Notify(gophertv.InputEvent{
-			Type:      gophertv.InputEventKey,
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
 			Key:       rune(b), // Keep uppercase
-			Modifiers: gophertv.ModShift,
+			Modifiers: gtv.ModShift,
 		})
 		return
 	}
 
 	// Regular printable character or DEL
-	r.handler.Notify(gophertv.InputEvent{
-		Type: gophertv.InputEventKey,
+	r.handler.Notify(gtv.InputEvent{
+		Type: gtv.InputEventKey,
 		Key:  rune(b),
 	})
 }

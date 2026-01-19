@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,7 +43,7 @@ func TestScreenRenderer_RenderInitialContent(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add some text
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gtv.Attrs(0))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -60,7 +60,7 @@ func TestScreenRenderer_DifferentialRendering(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// First render
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gtv.Attrs(0))
 	err := renderer.Render()
 	assert.NoError(t, err)
 
@@ -74,7 +74,7 @@ func TestScreenRenderer_DifferentialRendering(t *testing.T) {
 
 	// Third render with a change
 	buf.Reset()
-	screen.PutText(gophertv.TRect{X: 6, Y: 0, W: 0, H: 0}, "World", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 6, Y: 0, W: 0, H: 0}, "World", gtv.Attrs(0))
 	err = renderer.Render()
 	assert.NoError(t, err)
 
@@ -90,8 +90,8 @@ func TestScreenRenderer_RegionMerging(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Create two close changes that should be merged
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "A", gophertv.Attrs(0))
-	screen.PutText(gophertv.TRect{X: 5, Y: 0, W: 0, H: 0}, "B", gophertv.Attrs(0)) // Only 4 cells apart
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "A", gtv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 5, Y: 0, W: 0, H: 0}, "B", gtv.Attrs(0)) // Only 4 cells apart
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -109,8 +109,8 @@ func TestScreenRenderer_MultipleRows(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add text on multiple rows
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Row1", gophertv.Attrs(0))
-	screen.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Row3", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Row1", gtv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Row3", gtv.Attrs(0))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -129,7 +129,7 @@ func TestScreenRenderer_Attributes(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add text with bold attribute
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Bold", gophertv.Attrs(gophertv.AttrBold))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Bold", gtv.Attrs(gtv.AttrBold))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -146,7 +146,7 @@ func TestScreenRenderer_MultipleAttributes(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add text with multiple attributes
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Test", gophertv.Attrs(gophertv.AttrBold|gophertv.AttrItalic|gophertv.AttrUnderline))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Test", gtv.Attrs(gtv.AttrBold|gtv.AttrItalic|gtv.AttrUnderline))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -193,7 +193,7 @@ func TestScreenRenderer_Reset(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Render some content
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Test", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Test", gtv.Attrs(0))
 	err := renderer.Render()
 	assert.NoError(t, err)
 
@@ -216,7 +216,7 @@ func TestScreenRenderer_SizeChange(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Initial render
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Test", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Test", gtv.Attrs(0))
 	err := renderer.Render()
 	assert.NoError(t, err)
 
@@ -232,9 +232,9 @@ func TestScreenRenderer_UnicodeCharacters(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Test with Unicode box-drawing characters
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "┌─┐", gophertv.Attrs(0))
-	screen.PutText(gophertv.TRect{X: 0, Y: 1, W: 0, H: 0}, "│X│", gophertv.Attrs(0))
-	screen.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, "└─┘", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "┌─┐", gtv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, "│X│", gtv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 2, W: 0, H: 0}, "└─┘", gtv.Attrs(0))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -251,10 +251,10 @@ func TestScreenRenderer_ComplexScene(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Create a complex scene
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Header", gophertv.Attrs(gophertv.AttrBold))
-	screen.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Normal text", gophertv.Attrs(0))
-	screen.PutText(gophertv.TRect{X: 0, Y: 3, W: 0, H: 0}, "Italic text", gophertv.Attrs(gophertv.AttrItalic))
-	screen.PutText(gophertv.TRect{X: 20, Y: 3, W: 0, H: 0}, "Bold", gophertv.Attrs(gophertv.AttrBold))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Header", gtv.Attrs(gtv.AttrBold))
+	screen.PutText(gtv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Normal text", gtv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 3, W: 0, H: 0}, "Italic text", gtv.Attrs(gtv.AttrItalic))
+	screen.PutText(gtv.TRect{X: 20, Y: 3, W: 0, H: 0}, "Bold", gtv.Attrs(gtv.AttrBold))
 
 	err := renderer.Render()
 	assert.NoError(t, err)
@@ -267,7 +267,7 @@ func TestScreenRenderer_ComplexScene(t *testing.T) {
 
 	// Now modify only one line
 	buf.Reset()
-	screen.PutText(gophertv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Changed text", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 2, W: 0, H: 0}, "Changed text", gtv.Attrs(0))
 
 	err = renderer.Render()
 	assert.NoError(t, err)
@@ -338,7 +338,7 @@ func TestScreenRenderer_FindChangedRegions(t *testing.T) {
 
 			// Apply changes
 			for _, change := range tt.changes {
-				screen.PutText(gophertv.TRect{X: uint16(change.x), Y: uint16(change.y), W: 0, H: 0}, change.text, gophertv.Attrs(0))
+				screen.PutText(gtv.TRect{X: uint16(change.x), Y: uint16(change.y), W: 0, H: 0}, change.text, gtv.Attrs(0))
 			}
 
 			// Get content and find regions
@@ -460,56 +460,56 @@ func TestScreenRenderer_CursorPosition(t *testing.T) {
 func TestScreenRenderer_CursorStyle(t *testing.T) {
 	tests := []struct {
 		name         string
-		initialStyle gophertv.CursorStyle
-		style        gophertv.CursorStyle
+		initialStyle gtv.CursorStyle
+		style        gtv.CursorStyle
 		wantSeq      string
 	}{
 		{
 			name:         "default cursor style",
-			initialStyle: gophertv.CursorStyleBlock,
-			style:        gophertv.CursorStyleDefault,
+			initialStyle: gtv.CursorStyleBlock,
+			style:        gtv.CursorStyleDefault,
 			wantSeq:      "\x1b[0 q",
 		},
 		{
 			name:         "block cursor style",
-			initialStyle: gophertv.CursorStyleDefault,
-			style:        gophertv.CursorStyleBlock,
+			initialStyle: gtv.CursorStyleDefault,
+			style:        gtv.CursorStyleBlock,
 			wantSeq:      "\x1b[2 q",
 		},
 		{
 			name:         "underline cursor style",
-			initialStyle: gophertv.CursorStyleBlock,
-			style:        gophertv.CursorStyleUnderline,
+			initialStyle: gtv.CursorStyleBlock,
+			style:        gtv.CursorStyleUnderline,
 			wantSeq:      "\x1b[4 q",
 		},
 		{
 			name:         "bar cursor style",
-			initialStyle: gophertv.CursorStyleBlock,
-			style:        gophertv.CursorStyleBar,
+			initialStyle: gtv.CursorStyleBlock,
+			style:        gtv.CursorStyleBar,
 			wantSeq:      "\x1b[6 q",
 		},
 		{
 			name:         "hidden cursor style",
-			initialStyle: gophertv.CursorStyleBlock,
-			style:        gophertv.CursorStyleHidden,
+			initialStyle: gtv.CursorStyleBlock,
+			style:        gtv.CursorStyleHidden,
 			wantSeq:      "\x1b[?25l",
 		},
 		{
 			name:         "blinking block cursor style",
-			initialStyle: gophertv.CursorStyleBlock,
-			style:        gophertv.CursorStyleBlock | gophertv.CursorStyleBlinking,
+			initialStyle: gtv.CursorStyleBlock,
+			style:        gtv.CursorStyleBlock | gtv.CursorStyleBlinking,
 			wantSeq:      "\x1b[1 q",
 		},
 		{
 			name:         "blinking underline cursor style",
-			initialStyle: gophertv.CursorStyleBlock,
-			style:        gophertv.CursorStyleUnderline | gophertv.CursorStyleBlinking,
+			initialStyle: gtv.CursorStyleBlock,
+			style:        gtv.CursorStyleUnderline | gtv.CursorStyleBlinking,
 			wantSeq:      "\x1b[3 q",
 		},
 		{
 			name:         "blinking bar cursor style",
-			initialStyle: gophertv.CursorStyleBlock,
-			style:        gophertv.CursorStyleBar | gophertv.CursorStyleBlinking,
+			initialStyle: gtv.CursorStyleBlock,
+			style:        gtv.CursorStyleBar | gtv.CursorStyleBlinking,
 			wantSeq:      "\x1b[5 q",
 		},
 	}
@@ -547,10 +547,10 @@ func TestScreenRenderer_CursorStyleChanges(t *testing.T) {
 	buf.Reset()
 
 	// First cycle through non-blinking styles
-	nonBlinkingStyles := []gophertv.CursorStyle{
-		gophertv.CursorStyleBlock,
-		gophertv.CursorStyleUnderline,
-		gophertv.CursorStyleBar,
+	nonBlinkingStyles := []gtv.CursorStyle{
+		gtv.CursorStyleBlock,
+		gtv.CursorStyleUnderline,
+		gtv.CursorStyleBar,
 	}
 
 	for _, style := range nonBlinkingStyles {
@@ -564,10 +564,10 @@ func TestScreenRenderer_CursorStyleChanges(t *testing.T) {
 	}
 
 	// Then cycle through blinking styles
-	blinkingStyles := []gophertv.CursorStyle{
-		gophertv.CursorStyleBlock | gophertv.CursorStyleBlinking,
-		gophertv.CursorStyleUnderline | gophertv.CursorStyleBlinking,
-		gophertv.CursorStyleBar | gophertv.CursorStyleBlinking,
+	blinkingStyles := []gtv.CursorStyle{
+		gtv.CursorStyleBlock | gtv.CursorStyleBlinking,
+		gtv.CursorStyleUnderline | gtv.CursorStyleBlinking,
+		gtv.CursorStyleBar | gtv.CursorStyleBlinking,
 	}
 
 	for _, style := range blinkingStyles {
@@ -581,11 +581,11 @@ func TestScreenRenderer_CursorStyleChanges(t *testing.T) {
 	}
 
 	// Finally cycle through all styles with blinking (combination test)
-	allStylesWithBlinking := []gophertv.CursorStyle{
-		gophertv.CursorStyleDefault | gophertv.CursorStyleBlinking,
-		gophertv.CursorStyleBlock | gophertv.CursorStyleBlinking,
-		gophertv.CursorStyleUnderline | gophertv.CursorStyleBlinking,
-		gophertv.CursorStyleBar | gophertv.CursorStyleBlinking,
+	allStylesWithBlinking := []gtv.CursorStyle{
+		gtv.CursorStyleDefault | gtv.CursorStyleBlinking,
+		gtv.CursorStyleBlock | gtv.CursorStyleBlinking,
+		gtv.CursorStyleUnderline | gtv.CursorStyleBlinking,
+		gtv.CursorStyleBar | gtv.CursorStyleBlinking,
 	}
 
 	for _, style := range allStylesWithBlinking {
@@ -614,7 +614,7 @@ func TestScreenRenderer_CursorStyleTransitionFromHidden(t *testing.T) {
 	buf.Reset()
 
 	// Hide cursor
-	screen.SetCursorStyle(gophertv.CursorStyleHidden)
+	screen.SetCursorStyle(gtv.CursorStyleHidden)
 	err := renderer.Render()
 	assert.NoError(t, err)
 	output := buf.String()
@@ -622,7 +622,7 @@ func TestScreenRenderer_CursorStyleTransitionFromHidden(t *testing.T) {
 	buf.Reset()
 
 	// Transition from hidden to block - should show cursor
-	screen.SetCursorStyle(gophertv.CursorStyleBlock)
+	screen.SetCursorStyle(gtv.CursorStyleBlock)
 	err = renderer.Render()
 	assert.NoError(t, err)
 	output = buf.String()
@@ -631,10 +631,10 @@ func TestScreenRenderer_CursorStyleTransitionFromHidden(t *testing.T) {
 	buf.Reset()
 
 	// Transition from hidden to underline
-	screen.SetCursorStyle(gophertv.CursorStyleHidden)
+	screen.SetCursorStyle(gtv.CursorStyleHidden)
 	renderer.Render()
 	buf.Reset()
-	screen.SetCursorStyle(gophertv.CursorStyleUnderline)
+	screen.SetCursorStyle(gtv.CursorStyleUnderline)
 	err = renderer.Render()
 	assert.NoError(t, err)
 	output = buf.String()
@@ -643,10 +643,10 @@ func TestScreenRenderer_CursorStyleTransitionFromHidden(t *testing.T) {
 	buf.Reset()
 
 	// Transition from hidden to bar
-	screen.SetCursorStyle(gophertv.CursorStyleHidden)
+	screen.SetCursorStyle(gtv.CursorStyleHidden)
 	renderer.Render()
 	buf.Reset()
-	screen.SetCursorStyle(gophertv.CursorStyleBar)
+	screen.SetCursorStyle(gtv.CursorStyleBar)
 	err = renderer.Render()
 	assert.NoError(t, err)
 	output = buf.String()
@@ -655,10 +655,10 @@ func TestScreenRenderer_CursorStyleTransitionFromHidden(t *testing.T) {
 	buf.Reset()
 
 	// Transition from hidden to default
-	screen.SetCursorStyle(gophertv.CursorStyleHidden)
+	screen.SetCursorStyle(gtv.CursorStyleHidden)
 	renderer.Render()
 	buf.Reset()
-	screen.SetCursorStyle(gophertv.CursorStyleDefault)
+	screen.SetCursorStyle(gtv.CursorStyleDefault)
 	err = renderer.Render()
 	assert.NoError(t, err)
 	output = buf.String()
@@ -667,10 +667,10 @@ func TestScreenRenderer_CursorStyleTransitionFromHidden(t *testing.T) {
 	buf.Reset()
 
 	// Transition from hidden to blinking block
-	screen.SetCursorStyle(gophertv.CursorStyleHidden)
+	screen.SetCursorStyle(gtv.CursorStyleHidden)
 	renderer.Render()
 	buf.Reset()
-	screen.SetCursorStyle(gophertv.CursorStyleBlock | gophertv.CursorStyleBlinking)
+	screen.SetCursorStyle(gtv.CursorStyleBlock | gtv.CursorStyleBlinking)
 	err = renderer.Render()
 	assert.NoError(t, err)
 	output = buf.String()
@@ -679,10 +679,10 @@ func TestScreenRenderer_CursorStyleTransitionFromHidden(t *testing.T) {
 	buf.Reset()
 
 	// Transition from hidden to blinking underline
-	screen.SetCursorStyle(gophertv.CursorStyleHidden)
+	screen.SetCursorStyle(gtv.CursorStyleHidden)
 	renderer.Render()
 	buf.Reset()
-	screen.SetCursorStyle(gophertv.CursorStyleUnderline | gophertv.CursorStyleBlinking)
+	screen.SetCursorStyle(gtv.CursorStyleUnderline | gtv.CursorStyleBlinking)
 	err = renderer.Render()
 	assert.NoError(t, err)
 	output = buf.String()
@@ -691,10 +691,10 @@ func TestScreenRenderer_CursorStyleTransitionFromHidden(t *testing.T) {
 	buf.Reset()
 
 	// Transition from hidden to blinking bar
-	screen.SetCursorStyle(gophertv.CursorStyleHidden)
+	screen.SetCursorStyle(gtv.CursorStyleHidden)
 	renderer.Render()
 	buf.Reset()
-	screen.SetCursorStyle(gophertv.CursorStyleBar | gophertv.CursorStyleBlinking)
+	screen.SetCursorStyle(gtv.CursorStyleBar | gtv.CursorStyleBlinking)
 	err = renderer.Render()
 	assert.NoError(t, err)
 	output = buf.String()
@@ -708,13 +708,13 @@ func TestScreenRenderer_CursorDoesNotAffectContent(t *testing.T) {
 	renderer := NewScreenRenderer(screen, buf)
 
 	// Add text
-	screen.PutText(gophertv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gophertv.Attrs(0))
+	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", gtv.Attrs(0))
 	renderer.Render()
 	buf.Reset()
 
 	// Move cursor and change style
 	screen.MoveCursor(10, 2)
-	screen.SetCursorStyle(gophertv.CursorStyleBlock)
+	screen.SetCursorStyle(gtv.CursorStyleBlock)
 	err := renderer.Render()
 	assert.NoError(t, err)
 

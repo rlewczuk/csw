@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
 )
 
 // IAbsoluteLayout is an interface for absolute layout widgets that position children at absolute positions.
@@ -11,10 +11,10 @@ type IAbsoluteLayout interface {
 
 	// SetBackground sets the background attributes for the layout.
 	// If nil, the layout is transparent and only children are visible.
-	SetBackground(attrs *gophertv.CellAttributes)
+	SetBackground(attrs *gtv.CellAttributes)
 
 	// GetBackground returns the current background attributes.
-	GetBackground() *gophertv.CellAttributes
+	GetBackground() *gtv.CellAttributes
 }
 
 // TAbsoluteLayout is a widget that positions children at absolute positions (relative to itself).
@@ -32,14 +32,14 @@ type TAbsoluteLayout struct {
 	TWidget
 
 	// Background attributes for the layout. If nil, layout is transparent.
-	background *gophertv.CellAttributes
+	background *gtv.CellAttributes
 }
 
 // NewAbsoluteLayout creates a new absolute layout widget.
 // The parent parameter is optional (can be nil for root widgets).
 // The rect parameter specifies the position and size of the layout.
 // The background parameter specifies background attributes. If nil, layout is transparent.
-func NewAbsoluteLayout(parent IWidget, rect gophertv.TRect, background *gophertv.CellAttributes) *TAbsoluteLayout {
+func NewAbsoluteLayout(parent IWidget, rect gtv.TRect, background *gtv.CellAttributes) *TAbsoluteLayout {
 	layout := &TAbsoluteLayout{
 		TWidget: TWidget{
 			Position: rect,
@@ -63,19 +63,19 @@ func AbsoluteLayout(layout *TAbsoluteLayout) IAbsoluteLayout {
 
 // SetBackground sets the background attributes for the layout.
 // If nil, the layout is transparent and only children are visible.
-func (l *TAbsoluteLayout) SetBackground(attrs *gophertv.CellAttributes) {
+func (l *TAbsoluteLayout) SetBackground(attrs *gtv.CellAttributes) {
 	l.background = attrs
 }
 
 // GetBackground returns the current background attributes.
-func (l *TAbsoluteLayout) GetBackground() *gophertv.CellAttributes {
+func (l *TAbsoluteLayout) GetBackground() *gtv.CellAttributes {
 	return l.background
 }
 
 // Draw draws the layout on the screen.
 // If background is set, it fills the layout area with background color first.
 // Then it draws all children at their absolute positions.
-func (l *TAbsoluteLayout) Draw(screen gophertv.IScreenOutput) {
+func (l *TAbsoluteLayout) Draw(screen gtv.IScreenOutput) {
 	// Don't draw if hidden
 	if l.Flags&WidgetFlagHidden != 0 {
 		return
@@ -90,8 +90,8 @@ func (l *TAbsoluteLayout) Draw(screen gophertv.IScreenOutput) {
 		for y := uint16(0); y < absPos.H; y++ {
 			for x := uint16(0); x < absPos.W; x++ {
 				screen.PutContent(
-					gophertv.TRect{X: absPos.X + x, Y: absPos.Y + y, W: 1, H: 1},
-					[]gophertv.Cell{{Rune: ' ', Attrs: *l.background}},
+					gtv.TRect{X: absPos.X + x, Y: absPos.Y + y, W: 1, H: 1},
+					[]gtv.Cell{{Rune: ' ', Attrs: *l.background}},
 				)
 			}
 		}
@@ -139,7 +139,7 @@ func (l *TAbsoluteLayout) HandleEvent(event *TEvent) {
 		inputEvent := event.InputEvent
 
 		// Handle mouse events - route to child under cursor
-		if inputEvent.Type == gophertv.InputEventMouse {
+		if inputEvent.Type == gtv.InputEventMouse {
 			// Get absolute position of layout
 			absPos := l.GetAbsolutePos()
 
@@ -171,7 +171,7 @@ func (l *TAbsoluteLayout) HandleEvent(event *TEvent) {
 		}
 
 		// Handle keyboard events - route to active child
-		if inputEvent.Type == gophertv.InputEventKey {
+		if inputEvent.Type == gtv.InputEventKey {
 			if l.ActiveChild != nil {
 				l.ActiveChild.HandleEvent(event)
 			}

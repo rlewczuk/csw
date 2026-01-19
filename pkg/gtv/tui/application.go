@@ -8,19 +8,19 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
-	"github.com/codesnort/codesnort-swe/pkg/gophertv/tio"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
 	"golang.org/x/term"
 )
 
 // eventChannelAdapter is an adapter that implements InputEventHandler interface
 // and forwards events to a channel. This is used internally in Run() method.
 type eventChannelAdapter struct {
-	eventCh chan gophertv.InputEvent
+	eventCh chan gtv.InputEvent
 }
 
 // Notify implements the InputEventHandler interface.
-func (a *eventChannelAdapter) Notify(event gophertv.InputEvent) {
+func (a *eventChannelAdapter) Notify(event gtv.InputEvent) {
 	a.eventCh <- event
 }
 
@@ -35,7 +35,7 @@ type IApplication interface {
 	Quit()
 
 	// GetScreen returns the screen buffer for testing purposes.
-	GetScreen() gophertv.IScreenOutput
+	GetScreen() gtv.IScreenOutput
 
 	// ExecuteOnUiThread executes the given function with the UI mutex locked.
 	// This ensures that application state is not modified concurrently.
@@ -49,7 +49,7 @@ type TApplication struct {
 	mainWidget IWidget
 
 	// Screen buffer for rendering
-	screen gophertv.IScreenOutput
+	screen gtv.IScreenOutput
 
 	// Renderer for outputting to terminal (nil when not running)
 	renderer *tio.ScreenRenderer
@@ -78,14 +78,14 @@ type TApplication struct {
 // The screen buffer size determines the initial widget size.
 // Call Run() to start the application with real terminal I/O, or use Notify() and ExecuteOnUiThread()
 // for testing without real terminal I/O.
-func NewApplication(mainWidget IWidget, screen gophertv.IScreenOutput) *TApplication {
+func NewApplication(mainWidget IWidget, screen gtv.IScreenOutput) *TApplication {
 	// Get screen size
 	width, height := screen.GetSize()
 
 	// Set main widget size to fill screen
 	mainWidget.HandleEvent(&TEvent{
 		Type: TEventTypeResize,
-		Rect: gophertv.TRect{X: 0, Y: 0, W: uint16(width), H: uint16(height)},
+		Rect: gtv.TRect{X: 0, Y: 0, W: uint16(width), H: uint16(height)},
 	})
 
 	app := &TApplication{
@@ -133,7 +133,7 @@ func (app *TApplication) Run(stdin io.Reader, stdout io.Writer) error {
 	// Notify main widget of resize
 	app.mainWidget.HandleEvent(&TEvent{
 		Type: TEventTypeResize,
-		Rect: gophertv.TRect{X: 0, Y: 0, W: uint16(width), H: uint16(height)},
+		Rect: gtv.TRect{X: 0, Y: 0, W: uint16(width), H: uint16(height)},
 	})
 
 	// Create renderer
@@ -154,7 +154,7 @@ func (app *TApplication) Run(stdin io.Reader, stdout io.Writer) error {
 	app.setupSignalHandlers()
 
 	// Create local event channel for the event reader
-	eventCh := make(chan gophertv.InputEvent, 100)
+	eventCh := make(chan gtv.InputEvent, 100)
 
 	// Create and start input event reader with local channel
 	app.eventReader = tio.NewInputEventReader(app.stdin, app.stdout, &eventChannelAdapter{eventCh: eventCh})
@@ -197,7 +197,7 @@ func (app *TApplication) Quit() {
 }
 
 // GetScreen returns the screen buffer for testing purposes.
-func (app *TApplication) GetScreen() gophertv.IScreenOutput {
+func (app *TApplication) GetScreen() gtv.IScreenOutput {
 	return app.screen
 }
 
@@ -212,17 +212,17 @@ func (app *TApplication) ExecuteOnUiThread(f func()) {
 // Notify handles input events from the InputEventReader.
 // This implements the InputEventHandler interface.
 // It calls handleEvent directly with the mutex locked.
-func (app *TApplication) Notify(event gophertv.InputEvent) {
+func (app *TApplication) Notify(event gtv.InputEvent) {
 	app.mu.Lock()
 	defer app.mu.Unlock()
 	app.handleEvent(event)
 }
 
 // handleEvent processes a single input event.
-func (app *TApplication) handleEvent(event gophertv.InputEvent) {
+func (app *TApplication) handleEvent(event gtv.InputEvent) {
 	// Handle special events
 	switch event.Type {
-	case gophertv.InputEventResize:
+	case gtv.InputEventResize:
 		// Resize screen buffer
 		app.screen.SetSize(int(event.X), int(event.Y))
 
@@ -234,7 +234,7 @@ func (app *TApplication) handleEvent(event gophertv.InputEvent) {
 		// Notify main widget of resize
 		app.mainWidget.HandleEvent(&TEvent{
 			Type: TEventTypeResize,
-			Rect: gophertv.TRect{X: 0, Y: 0, W: event.X, H: event.Y},
+			Rect: gtv.TRect{X: 0, Y: 0, W: event.X, H: event.Y},
 		})
 
 		// Trigger redraw
@@ -247,9 +247,9 @@ func (app *TApplication) handleEvent(event gophertv.InputEvent) {
 		}
 		return
 
-	case gophertv.InputEventKey:
+	case gtv.InputEventKey:
 		// Handle Ctrl+C
-		if event.Modifiers&gophertv.ModCtrl != 0 && event.Key == 'c' {
+		if event.Modifiers&gtv.ModCtrl != 0 && event.Key == 'c' {
 			app.Quit()
 			return
 		}

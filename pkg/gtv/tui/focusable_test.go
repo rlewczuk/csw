@@ -3,23 +3,24 @@ package tui_test
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/gophertv"
-	"github.com/codesnort/codesnort-swe/pkg/gophertv/tio"
-	"github.com/codesnort/codesnort-swe/pkg/gophertv/tui"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
+	"github.com/codesnort/codesnort-swe/pkg/gtv/tui"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestFocusable_Creation tests creating a focusable widget
 func TestFocusable_Creation(t *testing.T) {
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	focusable := tui.NewFocusable(
 		layout,
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -33,12 +34,12 @@ func TestFocusable_Creation(t *testing.T) {
 
 // TestFocusable_CreationWithoutParent tests creating a focusable widget without parent
 func TestFocusable_CreationWithoutParent(t *testing.T) {
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	focusable := tui.NewFocusable(
 		nil,
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -51,12 +52,12 @@ func TestFocusable_CreationWithoutParent(t *testing.T) {
 
 // TestFocusable_GetSetAttrs tests getting and setting normal attributes
 func TestFocusable_GetSetAttrs(t *testing.T) {
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	focusable := tui.NewFocusable(
 		nil,
-		gophertv.TRect{X: 0, Y: 0, W: 10, H: 1},
+		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -65,7 +66,7 @@ func TestFocusable_GetSetAttrs(t *testing.T) {
 	assert.Equal(t, normalAttrs, focusable.GetAttrs())
 
 	// Set new attributes
-	newAttrs := gophertv.AttrsWithColor(gophertv.AttrBold, 0xFF0000, 0x00FF00)
+	newAttrs := gtv.AttrsWithColor(gtv.AttrBold, 0xFF0000, 0x00FF00)
 	focusable.SetAttrs(newAttrs)
 
 	// Verify attributes were updated
@@ -74,12 +75,12 @@ func TestFocusable_GetSetAttrs(t *testing.T) {
 
 // TestFocusable_GetSetFocusedAttrs tests getting and setting focused attributes
 func TestFocusable_GetSetFocusedAttrs(t *testing.T) {
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	focusable := tui.NewFocusable(
 		nil,
-		gophertv.TRect{X: 0, Y: 0, W: 10, H: 1},
+		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -88,7 +89,7 @@ func TestFocusable_GetSetFocusedAttrs(t *testing.T) {
 	assert.Equal(t, focusedAttrs, focusable.GetFocusedAttrs())
 
 	// Set new focused attributes
-	newFocusedAttrs := gophertv.AttrsWithColor(gophertv.AttrItalic, 0x0000FF, 0xFF00FF)
+	newFocusedAttrs := gtv.AttrsWithColor(gtv.AttrItalic, 0x0000FF, 0xFF00FF)
 	focusable.SetFocusedAttrs(newFocusedAttrs)
 
 	// Verify focused attributes were updated
@@ -97,12 +98,12 @@ func TestFocusable_GetSetFocusedAttrs(t *testing.T) {
 
 // TestFocusable_FocusBlur tests focus and blur functionality
 func TestFocusable_FocusBlur(t *testing.T) {
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	focusable := tui.NewFocusable(
 		nil,
-		gophertv.TRect{X: 0, Y: 0, W: 10, H: 1},
+		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -121,12 +122,12 @@ func TestFocusable_FocusBlur(t *testing.T) {
 
 // TestFocusable_FocusSetsCursorFlag tests that Focus() sets the cursor flag
 func TestFocusable_FocusSetsCursorFlag(t *testing.T) {
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	focusable := tui.NewFocusable(
 		nil,
-		gophertv.TRect{X: 0, Y: 0, W: 10, H: 1},
+		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -140,12 +141,12 @@ func TestFocusable_FocusSetsCursorFlag(t *testing.T) {
 
 // TestFocusable_BlurClearsCursorFlag tests that Blur() clears the cursor flag
 func TestFocusable_BlurClearsCursorFlag(t *testing.T) {
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	focusable := tui.NewFocusable(
 		nil,
-		gophertv.TRect{X: 0, Y: 0, W: 10, H: 1},
+		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -160,12 +161,12 @@ func TestFocusable_BlurClearsCursorFlag(t *testing.T) {
 
 // TestFocusable_MultipleFocusCalls tests calling Focus() multiple times
 func TestFocusable_MultipleFocusCalls(t *testing.T) {
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	focusable := tui.NewFocusable(
 		nil,
-		gophertv.TRect{X: 0, Y: 0, W: 10, H: 1},
+		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -183,12 +184,12 @@ func TestFocusable_MultipleFocusCalls(t *testing.T) {
 
 // TestFocusable_MultipleBlurCalls tests calling Blur() multiple times
 func TestFocusable_MultipleBlurCalls(t *testing.T) {
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	focusable := tui.NewFocusable(
 		nil,
-		gophertv.TRect{X: 0, Y: 0, W: 10, H: 1},
+		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -211,12 +212,12 @@ func TestFocusable_MultipleBlurCalls(t *testing.T) {
 func TestFocusable_BasicRendering(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	focusable := tui.NewFocusable(
 		nil,
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -233,14 +234,14 @@ func TestFocusable_BasicRendering(t *testing.T) {
 // TestFocusable_ResizeEvent tests that focusable handles resize events
 func TestFocusable_ResizeEvent(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	focusable := tui.NewFocusable(
 		layout,
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -268,14 +269,14 @@ func TestFocusable_ResizeEvent(t *testing.T) {
 
 // TestFocusable_PositionCalculation tests absolute position calculation
 func TestFocusable_PositionCalculation(t *testing.T) {
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 5, Y: 5, W: 70, H: 20}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 5, Y: 5, W: 70, H: 20}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	focusable := tui.NewFocusable(
 		layout,
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -297,12 +298,12 @@ func TestFocusable_PositionCalculation(t *testing.T) {
 
 // TestFocusable_ChildManagement tests adding children to focusable widget
 func TestFocusable_ChildManagement(t *testing.T) {
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
 
 	parentFocusable := tui.NewFocusable(
 		nil,
-		gophertv.TRect{X: 0, Y: 0, W: 40, H: 10},
+		gtv.TRect{X: 0, Y: 0, W: 40, H: 10},
 		normalAttrs,
 		focusedAttrs,
 	)
@@ -311,7 +312,7 @@ func TestFocusable_ChildManagement(t *testing.T) {
 	childLabel := tui.NewLabel(
 		parentFocusable,
 		"Child",
-		gophertv.TRect{X: 5, Y: 5, W: 0, H: 0},
+		gtv.TRect{X: 5, Y: 5, W: 0, H: 0},
 		normalAttrs,
 	)
 
@@ -323,14 +324,14 @@ func TestFocusable_ChildManagement(t *testing.T) {
 // TestFocusable_Integration tests focusable in application context
 func TestFocusable_Integration(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
-	layout := tui.NewAbsoluteLayout(nil, gophertv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	normalAttrs := gophertv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
-	focusedAttrs := gophertv.AttrsWithColor(gophertv.AttrBold, 0x000000, 0xFFFFFF)
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(gtv.AttrBold, 0x000000, 0xFFFFFF)
 
 	focusable := tui.NewFocusable(
 		layout,
-		gophertv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
 		normalAttrs,
 		focusedAttrs,
 	)
