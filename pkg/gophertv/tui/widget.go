@@ -56,6 +56,8 @@ type IWidget interface {
 
 	// HandleEvent handles an event
 	HandleEvent(event *TEvent)
+
+	AddChild(child IWidget)
 }
 
 type TWidget struct {
@@ -73,7 +75,7 @@ type TWidget struct {
 	Cursor CursorState
 }
 
-// GetAbsolutePosition returns absolute position of the widget.
+// GetAbsolutePos returns absolute position of the widget.
 // If widget has a parent, returns parent position + position to the parent
 func (w *TWidget) GetAbsolutePos() gophertv.TRect {
 	if w.Parent == nil {
@@ -109,4 +111,8 @@ func (w *TWidget) HandleEvent(event *TEvent) {
 	if w.ActiveChild != nil {
 		w.ActiveChild.HandleEvent(event)
 	}
+}
+
+func (w *TWidget) AddChild(child IWidget) {
+	w.Children = append(w.Children, child)
 }
