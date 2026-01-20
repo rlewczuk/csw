@@ -701,3 +701,167 @@ func TestInputBox_ArrowKeysBoundaries(t *testing.T) {
 	mockInput.TypeKeysByName("Left")
 	assert.Equal(t, 0, inputBox.GetCursorPos()) // Should stay at beginning
 }
+
+// TestInputBox_MouseClickFocusTransfer tests that clicking on input box properly transfers focus
+// This is a regression test for the bug where:
+// - clicking on input box shows visual focus but keyboard events go to previously focused widget
+func TestInputBox_MouseClickFocusTransfer(t *testing.T) {
+	screen := tio.NewScreenBuffer(80, 24, 0)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+
+	inputBox1 := tui.NewInputBox(
+		layout,
+		"First",
+		gtv.TRect{X: 10, Y: 5, W: 20, H: 1},
+		normalAttrs,
+		focusedAttrs,
+	)
+
+	inputBox2 := tui.NewInputBox(
+		layout,
+		"Second",
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		normalAttrs,
+		focusedAttrs,
+	)
+
+	app := tui.NewApplication(layout, screen)
+	require.NotNil(t, app)
+
+	// Initially neither should be focused
+	assert.False(t, inputBox1.IsFocused())
+	assert.False(t, inputBox2.IsFocused())
+	assert.Nil(t, layout.ActiveChild)
+
+	// Click on first input box
+	mockInput := tio.NewMockInputEventReader(app)
+	mockInput.MouseClick(15, 5, 0)
+
+	// First input box should be focused
+	require.True(t, inputBox1.IsFocused(), "inputBox1 should be focused after click")
+	require.False(t, inputBox2.IsFocused(), "inputBox2 should not be focused")
+	require.Equal(t, inputBox1, layout.ActiveChild, "layout.ActiveChild should be inputBox1")
+
+	// Type text - should go to first input box
+	mockInput.TypeKeys("X")
+	assert.Equal(t, "FirstX", inputBox1.GetText(), "Text should be added to inputBox1")
+	assert.Equal(t, "Second", inputBox2.GetText(), "inputBox2 text should be unchanged")
+
+	// Click on second input box at the end (click at X=26, after the last character)
+	// The input box starts at X=10 and "Second" is 6 characters, so clicking at X=26 should position cursor at end
+	mockInput.MouseClick(26, 10, 0)
+
+	// Second input box should be focused
+	require.False(t, inputBox1.IsFocused(), "inputBox1 should lose focus")
+	require.True(t, inputBox2.IsFocused(), "inputBox2 should be focused after click")
+	require.Equal(t, inputBox2, layout.ActiveChild, "layout.ActiveChild should be inputBox2")
+
+	// Type text - should go to second input box at the end
+	mockInput.TypeKeys("Y")
+	assert.Equal(t, "FirstX", inputBox1.GetText(), "inputBox1 text should be unchanged")
+	assert.Equal(t, "SecondY", inputBox2.GetText(), "Text should be added to inputBox2")
+}
+
+// TestInputBox_InitialClickFromUnfocused tests clicking on an unfocused input box
+func TestInputBox_InitialClickFromUnfocused(t *testing.T) {
+	screen := tio.NewScreenBuffer(80, 24, 0)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+
+	inputBox := tui.NewInputBox(
+		layout,
+		"Test",
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		normalAttrs,
+		focusedAttrs,
+	)
+
+	app := tui.NewApplication(layout, screen)
+	require.NotNil(t, app)
+
+	// Initially unfocused
+	assert.False(t, inputBox.IsFocused())
+	assert.Nil(t, layout.ActiveChild)
+
+	// Click on the input box at X=15 (relative position 5 in the input box)
+	mockInput := tio.NewMockInputEventReader(app)
+	t.Logf("Before click: focused=%v, cursorPos=%d", inputBox.IsFocused(), inputBox.GetCursorPos())
+	mockInput.MouseClick(15, 10, 0)
+	t.Logf("After click: focused=%v, cursorPos=%d", inputBox.IsFocused(), inputBox.GetCursorPos())
+
+	// Should now be focused
+	require.True(t, inputBox.IsFocused(), "InputBox should be focused after click")
+	require.Equal(t, inputBox, layout.ActiveChild, "layout.ActiveChild should be inputBox")
+
+	// Cursor should be at position 5 (where we clicked)
+	// Note: "Test" has 4 characters, so position 5 would be past the end
+	// The cursor should be clamped to position 4 (end of text)
+	assert.Equal(t, 4, inputBox.GetCursorPos(), "Cursor should be at end of text (position 4)")
+
+	// Now type a character - it should go into THIS input box
+	mockInput.TypeKeys("X")
+	assert.Equal(t, "TestX", inputBox.GetText(), "Character should be added to clicked input box")
+}
+
+// TestInputBox_ClickChangeCursorButKeyboardToWrongWidget is a test that tries to reproduce
+// the exact bug described: cursor moves but keyboard events go to previously focused widget
+func TestInputBox_ClickChangeCursorButKeyboardToWrongWidget(t *testing.T) {
+	screen := tio.NewScreenBuffer(80, 24, 0)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x000000)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFFFF)
+
+	inputBox1 := tui.NewInputBox(
+		layout,
+		"First",
+		gtv.TRect{X: 10, Y: 5, W: 20, H: 1},
+		normalAttrs,
+		focusedAttrs,
+	)
+
+	inputBox2 := tui.NewInputBox(
+		layout,
+		"Second",
+		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
+		normalAttrs,
+		focusedAttrs,
+	)
+
+	app := tui.NewApplication(layout, screen)
+	require.NotNil(t, app)
+	mockInput := tio.NewMockInputEventReader(app)
+
+	// Focus first input box by clicking
+	mockInput.MouseClick(20, 5, 0)
+	require.True(t, inputBox1.IsFocused())
+	require.Equal(t, inputBox1, layout.ActiveChild)
+
+	// Click on second input box to change focus (at the end)
+	mockInput.MouseClick(26, 10, 0) // "Second" is 6 chars, starts at X=10, so click at X=16 for end
+
+	// Check visual focus (widget's IsFocused flag)
+	visuallyFocused1 := inputBox1.IsFocused()
+	visuallyFocused2 := inputBox2.IsFocused()
+
+	// Check where keyboard events will go (layout's ActiveChild)
+	keyboardTarget := layout.ActiveChild
+
+	// The BUG would be: inputBox2 is visually focused but keyboard goes to inputBox1
+	// Visual check:
+	assert.False(t, visuallyFocused1, "inputBox1 should not be visually focused")
+	assert.True(t, visuallyFocused2, "inputBox2 should be visually focused")
+
+	// Keyboard routing check:
+	assert.Equal(t, inputBox2, keyboardTarget, "Keyboard events should route to inputBox2")
+
+	// Actual keyboard test:
+	mockInput.TypeKeys("X")
+	assert.Equal(t, "First", inputBox1.GetText(), "inputBox1 should not receive the character")
+	assert.Equal(t, "SecondX", inputBox2.GetText(), "inputBox2 should receive the character at the end")
+}

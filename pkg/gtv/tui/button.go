@@ -266,10 +266,36 @@ func (b *TButton) HandleEvent(event *TEvent) {
 		return
 	}
 
-	// Handle input events only if enabled and focused
-	if event.Type == TEventTypeInput && b.IsEnabled() && b.IsFocused() {
+	// Handle input events
+	if event.Type == TEventTypeInput && event.InputEvent != nil {
 		inputEvent := event.InputEvent
-		if inputEvent != nil && inputEvent.Type == gtv.InputEventKey {
+
+		// Handle mouse events for button press
+		if inputEvent.Type == gtv.InputEventMouse && b.IsEnabled() {
+			absPos := b.GetAbsolutePos()
+
+			// Check if click is within button bounds
+			if absPos.Contains(inputEvent.X, inputEvent.Y) {
+				// Handle mouse press - trigger button if focused
+				if inputEvent.Modifiers&gtv.ModPress != 0 && b.IsFocused() {
+					// Set pressed state for visual feedback
+					b.pressed = true
+					b.invalidateCache()
+
+					// Trigger the press action
+					b.Press()
+
+					// Reset pressed state
+					b.pressed = false
+					b.invalidateCache()
+
+					return
+				}
+			}
+		}
+
+		// Handle keyboard events when focused
+		if inputEvent.Type == gtv.InputEventKey && b.IsEnabled() && b.IsFocused() {
 			// Check for Enter or Space key
 			if inputEvent.Key == '\r' || inputEvent.Key == '\n' || inputEvent.Key == ' ' {
 				// Set pressed state for visual feedback

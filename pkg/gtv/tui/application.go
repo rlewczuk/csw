@@ -287,6 +287,12 @@ func (app *TApplication) initTerminal() error {
 	// Enable alternative screen buffer
 	fmt.Fprint(app.stdout, "\x1b[?1049h")
 
+	// Enable mouse tracking
+	fmt.Fprint(app.stdout, "\x1b[?1000h") // Enable mouse button tracking
+	fmt.Fprint(app.stdout, "\x1b[?1002h") // Enable mouse motion tracking
+	fmt.Fprint(app.stdout, "\x1b[?1015h") // Enable urxvt mouse mode
+	fmt.Fprint(app.stdout, "\x1b[?1006h") // Enable SGR mouse mode
+
 	// Hide cursor
 	fmt.Fprint(app.stdout, "\x1b[?25l")
 
@@ -305,6 +311,12 @@ func (app *TApplication) restoreTerminal() {
 	if !app.termInitialized {
 		return
 	}
+
+	// Disable mouse tracking
+	fmt.Fprint(app.stdout, "\x1b[?1000l") // Disable mouse button tracking
+	fmt.Fprint(app.stdout, "\x1b[?1002l") // Disable mouse motion tracking
+	fmt.Fprint(app.stdout, "\x1b[?1015l") // Disable urxvt mouse mode
+	fmt.Fprint(app.stdout, "\x1b[?1006l") // Disable SGR mouse mode
 
 	// Show cursor
 	fmt.Fprint(app.stdout, "\x1b[?25h")

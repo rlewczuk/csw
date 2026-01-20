@@ -343,11 +343,6 @@ func (i *TInputBox) handleMouseEvent(event *gtv.InputEvent) {
 		return
 	}
 
-	// Click inside - gain focus if not focused
-	if !i.IsFocused() {
-		i.Focus()
-	}
-
 	// Calculate character position from mouse X coordinate
 	relativeX := int(event.X - absPos.X)
 	charPos := i.scrollOffset + relativeX
