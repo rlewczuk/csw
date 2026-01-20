@@ -9,7 +9,7 @@ import (
 // IInputBox is an interface for input box widgets that allow text input.
 // It extends IWidget with input box-specific methods.
 type IInputBox interface {
-	IWidget
+	IFocusable
 
 	// GetText returns the current text in the input box.
 	GetText() string
@@ -308,16 +308,6 @@ func (i *TInputBox) Draw(screen gtv.IScreenOutput) {
 
 // HandleEvent handles events for the input box.
 func (i *TInputBox) HandleEvent(event *TEvent) {
-	// Handle position events directly
-	if event.Type == TEventTypeResize {
-		i.Position.X = event.Rect.X
-		i.Position.Y = event.Rect.Y
-		i.Position.W = event.Rect.W
-		i.Position.H = event.Rect.H
-		i.updateScrollOffset()
-		return
-	}
-
 	// Handle input events only if focused
 	if event.Type == TEventTypeInput && event.InputEvent != nil {
 		inputEvent := event.InputEvent

@@ -7,7 +7,7 @@ import (
 // IAbsoluteLayout is an interface for absolute layout widgets that position children at absolute positions.
 // It extends IWidget with absolute layout-specific methods.
 type IAbsoluteLayout interface {
-	IWidget
+	IResizable
 
 	// SetBackground sets the background attributes for the layout.
 	// If nil, the layout is transparent and only children are visible.
@@ -18,7 +18,7 @@ type IAbsoluteLayout interface {
 }
 
 // TAbsoluteLayout is a widget that positions children at absolute positions (relative to itself).
-// It extends TWidget and implements IAbsoluteLayout interface.
+// It extends TResizable and implements IAbsoluteLayout interface.
 //
 // The layout:
 // - Uses each child widget's Position field to position children
@@ -29,7 +29,7 @@ type IAbsoluteLayout interface {
 // - Properly handles redraw events (triggering full redraw of itself and affected child widgets)
 // - Routes input events to affected children (keyboard events to active child, mouse events to children under cursor)
 type TAbsoluteLayout struct {
-	TWidget
+	TResizable
 
 	// Background attributes for the layout. If nil, layout is transparent.
 	background *gtv.CellAttributes
@@ -40,11 +40,9 @@ type TAbsoluteLayout struct {
 // The rect parameter specifies the position and size of the layout.
 // The background parameter specifies background attributes. If nil, layout is transparent.
 func NewAbsoluteLayout(parent IWidget, rect gtv.TRect, background *gtv.CellAttributes) *TAbsoluteLayout {
+	resizableBase := newResizableBase(parent, rect)
 	layout := &TAbsoluteLayout{
-		TWidget: TWidget{
-			Position: rect,
-			Parent:   parent,
-		},
+		TResizable: *resizableBase,
 		background: background,
 	}
 
@@ -99,7 +97,7 @@ func (l *TAbsoluteLayout) Draw(screen gtv.IScreenOutput) {
 
 	// Draw children at their absolute positions
 	// Children use their own Position field which is already absolute relative to the layout
-	l.TWidget.Draw(screen)
+	l.TResizable.Draw(screen)
 }
 
 // HandleEvent handles events for the layout.
@@ -186,5 +184,5 @@ func (l *TAbsoluteLayout) HandleEvent(event *TEvent) {
 	}
 
 	// For other event types, delegate to base widget
-	l.TWidget.HandleEvent(event)
+	l.TResizable.HandleEvent(event)
 }

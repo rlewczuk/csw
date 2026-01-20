@@ -131,20 +131,3 @@ func (f *TFocusable) Draw(screen gtv.IScreenOutput) {
 	// Draw children (if any)
 	f.TWidget.Draw(screen)
 }
-
-// HandleEvent handles events for the focusable widget.
-// This is a minimal implementation that handles resize events.
-// Derived widgets should override this method to provide custom event handling.
-func (f *TFocusable) HandleEvent(event *TEvent) {
-	// Handle position events directly
-	if event.Type == TEventTypeResize {
-		f.Position.X = event.Rect.X
-		f.Position.Y = event.Rect.Y
-		f.Position.W = event.Rect.W
-		f.Position.H = event.Rect.H
-		return
-	}
-
-	// Delegate other events to base widget
-	f.TWidget.HandleEvent(event)
-}
