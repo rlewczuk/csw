@@ -7,6 +7,8 @@
 - Test single function: `go test ./test -v -run TestAgentCoreInitialization`
 - Run main: `go run ./cmd/csw`
 
+When you need to generate and run a test script, or generate and use some temporary file, use `./tmp` directory inside project root, not `/tmp` or other locations.
+
 ## Code Style
 - Module: `github.com/codesnort/codesnort-swe`
 - Go version: 1.25.5
