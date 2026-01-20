@@ -119,6 +119,26 @@ func (f *TFocusable) IsFocused() bool {
 	return f.Flags&WidgetFlagFocused != 0
 }
 
+// HandleEvent handles events for the focusable widget.
+// It handles focus and blur events by calling Focus() and Blur() methods.
+// Other events are delegated to the base widget.
+func (f *TFocusable) HandleEvent(event *TEvent) {
+	// Handle focus/blur events
+	if event.Type == TEventTypeInput && event.InputEvent != nil {
+		switch event.InputEvent.Type {
+		case gtv.InputEventFocus:
+			f.Focus()
+			return
+		case gtv.InputEventBlur:
+			f.Blur()
+			return
+		}
+	}
+
+	// Delegate other events to base widget
+	f.TWidget.HandleEvent(event)
+}
+
 // Draw draws the focusable widget on the screen.
 // This is a minimal implementation that just draws children.
 // Derived widgets should override this method to provide custom rendering.

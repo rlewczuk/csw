@@ -291,6 +291,6 @@ func (b *TButton) HandleEvent(event *TEvent) {
 		}
 	}
 
-	// Delegate other events to base widget
-	b.TWidget.HandleEvent(event)
+	// Delegate other events to base focusable widget
+	b.TFocusable.HandleEvent(event)
 }
