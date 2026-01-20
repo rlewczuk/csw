@@ -305,7 +305,9 @@ func (r *InputEventReader) parseCSI(data []byte) int {
 		params := r.parseCSIParams(paramSeq)
 
 		// Handle SGR mouse event
-		r.handleSGRMouse(params)
+		// 'M' indicates press, 'm' indicates release
+		isPress := data[end-1] == 'M'
+		r.handleSGRMouse(params, isPress)
 		return end
 	}
 
@@ -631,7 +633,8 @@ func (r *InputEventReader) handleMouseEvent(data []byte, sgr bool) {
 }
 
 // handleSGRMouse handles SGR mouse events.
-func (r *InputEventReader) handleSGRMouse(params []int) {
+// The isPress parameter indicates whether this is a press (true) or release (false) event.
+func (r *InputEventReader) handleSGRMouse(params []int, isPress bool) {
 	if len(params) < 3 {
 		return
 	}
@@ -665,6 +668,14 @@ func (r *InputEventReader) handleSGRMouse(params []int) {
 			mods |= gtv.ModScrollUp
 		} else if button == 1 {
 			mods |= gtv.ModScrollDown
+		}
+	} else {
+		// Regular button event (not scroll or move)
+		// Set press/release modifier
+		if isPress {
+			mods |= gtv.ModPress
+		} else {
+			mods |= gtv.ModRelease
 		}
 	}
 

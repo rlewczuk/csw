@@ -1098,86 +1098,86 @@ func TestInputEventReader_SGRMouseEvents(t *testing.T) {
 	}{
 		{
 			name:  "SGR left button press",
-			input: []byte("\x1b[<0;10;20;M"),
+			input: []byte("\x1b[<0;10;20M"),
 			expected: []gtv.InputEvent{
-				{Type: gtv.InputEventMouse, X: 9, Y: 19, Modifiers: 0},
+				{Type: gtv.InputEventMouse, X: 9, Y: 19, Modifiers: gtv.ModPress},
 			},
 		},
 		{
 			name:  "SGR left button release",
-			input: []byte("\x1b[<0;10;20;m"),
+			input: []byte("\x1b[<0;10;20m"),
 			expected: []gtv.InputEvent{
-				{Type: gtv.InputEventMouse, X: 9, Y: 19, Modifiers: 0},
+				{Type: gtv.InputEventMouse, X: 9, Y: 19, Modifiers: gtv.ModRelease},
 			},
 		},
 		{
 			name:  "SGR right button press",
-			input: []byte("\x1b[<2;50;10;M"),
+			input: []byte("\x1b[<2;50;10M"),
 			expected: []gtv.InputEvent{
-				{Type: gtv.InputEventMouse, X: 49, Y: 9, Modifiers: 0},
+				{Type: gtv.InputEventMouse, X: 49, Y: 9, Modifiers: gtv.ModPress},
 			},
 		},
 		{
 			name:  "SGR right button release",
-			input: []byte("\x1b[<2;50;10;m"),
+			input: []byte("\x1b[<2;50;10m"),
 			expected: []gtv.InputEvent{
-				{Type: gtv.InputEventMouse, X: 49, Y: 9, Modifiers: 0},
+				{Type: gtv.InputEventMouse, X: 49, Y: 9, Modifiers: gtv.ModRelease},
 			},
 		},
 		{
 			name:  "SGR middle button press",
-			input: []byte("\x1b[<1;25;15;M"),
+			input: []byte("\x1b[<1;25;15M"),
 			expected: []gtv.InputEvent{
-				{Type: gtv.InputEventMouse, X: 24, Y: 14, Modifiers: 0},
+				{Type: gtv.InputEventMouse, X: 24, Y: 14, Modifiers: gtv.ModPress},
 			},
 		},
 		{
 			name:  "SGR mouse drag with right button",
-			input: []byte("\x1b[<34;50;10;M"),
+			input: []byte("\x1b[<34;50;10M"),
 			expected: []gtv.InputEvent{
-				{Type: gtv.InputEventMouse, X: 49, Y: 9, Modifiers: gtv.ModMove},
+				{Type: gtv.InputEventMouse, X: 49, Y: 9, Modifiers: gtv.ModMove | gtv.ModPress},
 			},
 		},
 		{
 			name:  "SGR mouse drag with left button",
-			input: []byte("\x1b[<32;30;20;M"),
+			input: []byte("\x1b[<32;30;20M"),
 			expected: []gtv.InputEvent{
-				{Type: gtv.InputEventMouse, X: 29, Y: 19, Modifiers: gtv.ModMove},
+				{Type: gtv.InputEventMouse, X: 29, Y: 19, Modifiers: gtv.ModMove | gtv.ModPress},
 			},
 		},
 		{
 			name:  "SGR scroll up",
-			input: []byte("\x1b[<64;40;30;M"),
+			input: []byte("\x1b[<64;40;30M"),
 			expected: []gtv.InputEvent{
 				{Type: gtv.InputEventMouse, X: 39, Y: 29, Modifiers: gtv.ModScrollUp},
 			},
 		},
 		{
 			name:  "SGR scroll down",
-			input: []byte("\x1b[<65;40;30;M"),
+			input: []byte("\x1b[<65;40;30M"),
 			expected: []gtv.InputEvent{
 				{Type: gtv.InputEventMouse, X: 39, Y: 29, Modifiers: gtv.ModScrollDown},
 			},
 		},
 		{
 			name:  "SGR mouse with Shift modifier",
-			input: []byte("\x1b[<4;10;10;M"),
+			input: []byte("\x1b[<4;10;10M"),
 			expected: []gtv.InputEvent{
-				{Type: gtv.InputEventMouse, X: 9, Y: 9, Modifiers: gtv.ModShift},
+				{Type: gtv.InputEventMouse, X: 9, Y: 9, Modifiers: gtv.ModShift | gtv.ModPress},
 			},
 		},
 		{
 			name:  "SGR mouse with Alt modifier",
-			input: []byte("\x1b[<8;10;10;M"),
+			input: []byte("\x1b[<8;10;10M"),
 			expected: []gtv.InputEvent{
-				{Type: gtv.InputEventMouse, X: 9, Y: 9, Modifiers: gtv.ModAlt},
+				{Type: gtv.InputEventMouse, X: 9, Y: 9, Modifiers: gtv.ModAlt | gtv.ModPress},
 			},
 		},
 		{
 			name:  "SGR mouse with Ctrl modifier",
-			input: []byte("\x1b[<16;10;10;M"),
+			input: []byte("\x1b[<16;10;10M"),
 			expected: []gtv.InputEvent{
-				{Type: gtv.InputEventMouse, X: 9, Y: 9, Modifiers: gtv.ModCtrl},
+				{Type: gtv.InputEventMouse, X: 9, Y: 9, Modifiers: gtv.ModCtrl | gtv.ModPress},
 			},
 		},
 	}
@@ -1199,6 +1199,115 @@ func TestInputEventReader_SGRMouseEvents(t *testing.T) {
 				assert.Equal(t, expected.Y, events[i].Y, "Event %d: Y coordinate mismatch", i)
 				assert.Equal(t, expected.Modifiers, events[i].Modifiers, "Event %d: modifiers mismatch", i)
 			}
+		})
+	}
+}
+
+// TestInputEventReader_SGRMouseClickEvents tests parsing of SGR mouse click/press/release events.
+// This is a regression test for the bug where mouse click events did not include the ModPress/ModRelease/ModClick modifiers.
+// The issue was that handleSGRMouse() did not receive information about whether the event was a press (M) or release (m).
+func TestInputEventReader_SGRMouseClickEvents(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected gtv.InputEvent
+	}{
+		{
+			name:  "Left button press should have ModPress",
+			input: []byte("\x1b[<0;10;20M"),
+			expected: gtv.InputEvent{
+				Type:      gtv.InputEventMouse,
+				X:         9,
+				Y:         19,
+				Modifiers: gtv.ModPress,
+			},
+		},
+		{
+			name:  "Left button release should have ModRelease",
+			input: []byte("\x1b[<0;10;20m"),
+			expected: gtv.InputEvent{
+				Type:      gtv.InputEventMouse,
+				X:         9,
+				Y:         19,
+				Modifiers: gtv.ModRelease,
+			},
+		},
+		{
+			name:  "Right button press should have ModPress",
+			input: []byte("\x1b[<2;50;10M"),
+			expected: gtv.InputEvent{
+				Type:      gtv.InputEventMouse,
+				X:         49,
+				Y:         9,
+				Modifiers: gtv.ModPress,
+			},
+		},
+		{
+			name:  "Right button release should have ModRelease",
+			input: []byte("\x1b[<2;50;10m"),
+			expected: gtv.InputEvent{
+				Type:      gtv.InputEventMouse,
+				X:         49,
+				Y:         9,
+				Modifiers: gtv.ModRelease,
+			},
+		},
+		{
+			name:  "Middle button press should have ModPress",
+			input: []byte("\x1b[<1;25;15M"),
+			expected: gtv.InputEvent{
+				Type:      gtv.InputEventMouse,
+				X:         24,
+				Y:         14,
+				Modifiers: gtv.ModPress,
+			},
+		},
+		{
+			name:  "Middle button release should have ModRelease",
+			input: []byte("\x1b[<1;25;15m"),
+			expected: gtv.InputEvent{
+				Type:      gtv.InputEventMouse,
+				X:         24,
+				Y:         14,
+				Modifiers: gtv.ModRelease,
+			},
+		},
+		{
+			name:  "Mouse press with Shift should have ModPress and ModShift",
+			input: []byte("\x1b[<4;10;10M"),
+			expected: gtv.InputEvent{
+				Type:      gtv.InputEventMouse,
+				X:         9,
+				Y:         9,
+				Modifiers: gtv.ModPress | gtv.ModShift,
+			},
+		},
+		{
+			name:  "Mouse release with Shift should have ModRelease and ModShift",
+			input: []byte("\x1b[<4;10;10m"),
+			expected: gtv.InputEvent{
+				Type:      gtv.InputEventMouse,
+				X:         9,
+				Y:         9,
+				Modifiers: gtv.ModRelease | gtv.ModShift,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := gtv.NewMockInputEventHandler()
+			reader := bytes.NewReader(tt.input)
+			eventReader := NewInputEventReader(reader, nil, handler)
+
+			eventReader.parseInput(tt.input)
+
+			events := handler.GetEvents()
+			require.Len(t, events, 1, "Expected exactly one event for %s", tt.name)
+			assert.Equal(t, tt.expected.Type, events[0].Type, "Event type mismatch for %s", tt.name)
+			assert.Equal(t, tt.expected.X, events[0].X, "X coordinate mismatch for %s", tt.name)
+			assert.Equal(t, tt.expected.Y, events[0].Y, "Y coordinate mismatch for %s", tt.name)
+			assert.Equal(t, tt.expected.Modifiers, events[0].Modifiers, "Modifiers mismatch for %s", tt.name)
 		})
 	}
 }
