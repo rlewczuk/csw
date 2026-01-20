@@ -365,3 +365,170 @@ func TestApplicationIntegration_CtrlC(t *testing.T) {
 	// The application should have signaled quit
 	// We can verify this without running the event loop
 }
+
+// TestApplicationIntegration_DemoForm tests a data entry form similar to the gtvdemo application.
+//
+// This test demonstrates:
+// - Creating a complete form with labels, input boxes, and buttons
+// - Handling tab navigation between focusable widgets
+// - Handling button press events
+// - Updating label text based on input
+// - Clearing form data
+func TestApplicationIntegration_DemoForm(t *testing.T) {
+	// Create a screen buffer for testing
+	screen := tio.NewScreenBuffer(80, 24, 0)
+
+	// Create main layout
+	mainLayout := tui.NewAbsoluteLayout(
+		nil,
+		gtv.TRect{X: 0, Y: 0, W: 80, H: 24},
+		&gtv.CellAttributes{BackColor: 0x1a1a1a},
+	)
+
+	// Create labels for form fields
+	tui.NewLabel(
+		mainLayout,
+		"Name:",
+		gtv.TRect{X: 5, Y: 3, W: 0, H: 0},
+		gtv.AttrsWithColor(gtv.AttrBold, 0xFFFFFF, 0),
+	)
+
+	tui.NewLabel(
+		mainLayout,
+		"Email:",
+		gtv.TRect{X: 5, Y: 5, W: 0, H: 0},
+		gtv.AttrsWithColor(gtv.AttrBold, 0xFFFFFF, 0),
+	)
+
+	// Create input boxes
+	nameInput := tui.NewInputBox(
+		mainLayout,
+		"",
+		gtv.TRect{X: 15, Y: 3, W: 30, H: 1},
+		gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333),
+		gtv.AttrsWithColor(0, 0x000000, 0x00AAFF),
+	)
+
+	emailInput := tui.NewInputBox(
+		mainLayout,
+		"",
+		gtv.TRect{X: 15, Y: 5, W: 30, H: 1},
+		gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333),
+		gtv.AttrsWithColor(0, 0x000000, 0x00AAFF),
+	)
+
+	// Create result label
+	resultLabel := tui.NewLabel(
+		mainLayout,
+		"",
+		gtv.TRect{X: 5, Y: 10, W: 60, H: 1},
+		gtv.AttrsWithColor(0, 0x00FF00, 0),
+	)
+
+	// Create Submit button
+	submitButton := tui.NewButton(
+		mainLayout,
+		"Submit",
+		gtv.TRect{X: 15, Y: 7, W: 0, H: 0},
+		gtv.AttrsWithColor(0, 0xFFFFFF, 0x006600),
+		gtv.AttrsWithColor(gtv.AttrBold, 0xFFFFFF, 0x00AA00),
+		gtv.AttrsWithColor(0, 0x888888, 0x333333),
+	)
+
+	// Set Submit button action
+	submitButton.SetOnPress(func() {
+		name := nameInput.GetText()
+		email := emailInput.GetText()
+
+		if name == "" && email == "" {
+			resultLabel.SetText("Please enter at least one field!")
+			resultLabel.SetAttrs(gtv.AttrsWithColor(0, 0xFF0000, 0))
+		} else {
+			result := "Submitted - Name: " + name + ", Email: " + email
+			resultLabel.SetText(result)
+			resultLabel.SetAttrs(gtv.AttrsWithColor(0, 0x00FF00, 0))
+		}
+	})
+
+	// Create Clear button
+	clearButton := tui.NewButton(
+		mainLayout,
+		"Clear",
+		gtv.TRect{X: 28, Y: 7, W: 0, H: 0},
+		gtv.AttrsWithColor(0, 0xFFFFFF, 0x660000),
+		gtv.AttrsWithColor(gtv.AttrBold, 0xFFFFFF, 0xAA0000),
+		gtv.AttrsWithColor(0, 0x888888, 0x333333),
+	)
+
+	// Set Clear button action
+	clearButton.SetOnPress(func() {
+		nameInput.SetText("")
+		emailInput.SetText("")
+		resultLabel.SetText("")
+	})
+
+	// Create application
+	app := tui.NewApplication(mainLayout, screen)
+	require.NotNil(t, app)
+
+	// Draw initial state
+	mainLayout.Draw(screen)
+
+	// Verify initial state
+	assert.Equal(t, "", nameInput.GetText())
+	assert.Equal(t, "", emailInput.GetText())
+	assert.Equal(t, "", resultLabel.GetText())
+
+	// Create mock input reader
+	mockInput := tio.NewMockInputEventReader(app)
+
+	// Focus first input box (name) by clicking on it
+	mockInput.MouseClick(20, 3, 0)
+
+	// Type some text into name input
+	mockInput.TypeKeys("John Doe")
+	assert.Equal(t, "John Doe", nameInput.GetText())
+
+	// Tab to email input
+	mockInput.TypeKeysByName("Tab")
+
+	// Type some text into email input
+	mockInput.TypeKeys("john@example.com")
+	assert.Equal(t, "john@example.com", emailInput.GetText())
+
+	// Tab to Submit button
+	mockInput.TypeKeysByName("Tab")
+
+	// Verify Submit button is focused (we can't directly check focus state in this test,
+	// but we can verify behavior)
+
+	// Press Submit button
+	mockInput.TypeKeysByName("Enter")
+
+	// Verify result label was updated
+	expectedResult := "Submitted - Name: John Doe, Email: john@example.com"
+	assert.Equal(t, expectedResult, resultLabel.GetText())
+	assert.Equal(t, uint32(0x00FF00), resultLabel.GetAttrs().TextColor)
+
+	// Tab to Clear button
+	mockInput.TypeKeysByName("Tab")
+
+	// Press Clear button
+	mockInput.TypeKeysByName("Space")
+
+	// Verify all fields were cleared
+	assert.Equal(t, "", nameInput.GetText())
+	assert.Equal(t, "", emailInput.GetText())
+	assert.Equal(t, "", resultLabel.GetText())
+
+	// Test empty form submission
+	// Tab back to submit button (Tab through name, email, submit)
+	mockInput.TypeKeysByName("Tab", "Tab", "Tab")
+
+	// Press Submit button with empty fields
+	mockInput.TypeKeysByName("Enter")
+
+	// Verify error message
+	assert.Equal(t, "Please enter at least one field!", resultLabel.GetText())
+	assert.Equal(t, uint32(0xFF0000), resultLabel.GetAttrs().TextColor)
+}
