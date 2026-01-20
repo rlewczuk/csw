@@ -358,15 +358,23 @@ func (r *ScreenRenderer) renderCursor(buf *bytes.Buffer, hasRenderedContent bool
 
 // setCursorStyle writes ANSI sequences to set cursor style.
 func (r *ScreenRenderer) setCursorStyle(buf *bytes.Buffer, style gtv.CursorStyle) {
-	// If transitioning from hidden to visible, show cursor first
-	if r.lastCursorStyle == gtv.CursorStyleHidden && style != gtv.CursorStyleHidden {
-		buf.WriteString("\x1b[?25h")
-	}
+	// Determine if the last cursor was visible (not hidden and a valid style)
+	lastWasVisible := r.lastCursorStyle != gtv.CursorStyleHidden &&
+		r.lastCursorStyle != 0 &&
+		r.lastCursorStyle != 0xFF
 
 	// Handle hidden cursor separately
 	if style == gtv.CursorStyleHidden {
 		buf.WriteString("\x1b[?25l")
 		return
+	}
+
+	// If transitioning to a visible cursor style, ensure cursor is shown
+	// This is needed when:
+	// - cursor was hidden (CursorStyleHidden)
+	// - cursor was in initial/undefined state (0 or 0xFF)
+	if !lastWasVisible {
+		buf.WriteString("\x1b[?25h")
 	}
 
 	// Extract blinking flag

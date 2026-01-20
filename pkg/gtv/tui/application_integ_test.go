@@ -532,3 +532,99 @@ func TestApplicationIntegration_DemoForm(t *testing.T) {
 	assert.Equal(t, "Please enter at least one field!", resultLabel.GetText())
 	assert.Equal(t, uint32(0xFF0000), resultLabel.GetAttrs().TextColor)
 }
+
+// TestApplicationIntegration_InputBoxCursorVisibility tests that when an InputBox
+// widget is focused, the cursor is visible at the correct position.
+//
+// This test demonstrates:
+// - Creating an InputBox widget
+// - Focusing the InputBox by clicking on it
+// - Verifying that the cursor is visible and positioned correctly
+// - Verifying cursor style is set appropriately
+func TestApplicationIntegration_InputBoxCursorVisibility(t *testing.T) {
+	// Create a screen buffer for testing
+	screen := tio.NewScreenBuffer(80, 24, 0)
+
+	// Create main layout
+	mainLayout := tui.NewAbsoluteLayout(
+		nil,
+		gtv.TRect{X: 0, Y: 0, W: 80, H: 24},
+		&gtv.CellAttributes{BackColor: 0x1a1a1a},
+	)
+
+	// Create an input box at position (10, 5) with width 30
+	inputBox := tui.NewInputBox(
+		mainLayout,
+		"",
+		gtv.TRect{X: 10, Y: 5, W: 30, H: 1},
+		gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333),
+		gtv.AttrsWithColor(0, 0x000000, 0x00AAFF),
+	)
+
+	// Create application
+	app := tui.NewApplication(mainLayout, screen)
+	require.NotNil(t, app)
+
+	// Draw initial state (input box not focused)
+	mainLayout.Draw(screen)
+
+	// Initially, input box is not focused, so cursor should not be set
+	// (or should be at 0,0 with default style)
+	cursorX, cursorY := screen.GetCursorPosition()
+	cursorStyle := screen.GetCursorStyle()
+
+	// The initial cursor position and style depend on initialization
+	// For now, just document the initial state
+	t.Logf("Initial cursor position: (%d, %d), style: %d", cursorX, cursorY, cursorStyle)
+
+	// Create mock input reader
+	mockInput := tio.NewMockInputEventReader(app)
+
+	// Focus the input box by clicking on it
+	mockInput.MouseClick(15, 5, 0)
+
+	// Redraw to update cursor
+	mainLayout.Draw(screen)
+
+	// After focusing, cursor should be visible at the start of the input box
+	cursorX, cursorY = screen.GetCursorPosition()
+	cursorStyle = screen.GetCursorStyle()
+
+	// The cursor should be at position (10, 5) - the start of the input box
+	assert.Equal(t, 10, cursorX, "Cursor X position should be at start of input box")
+	assert.Equal(t, 5, cursorY, "Cursor Y position should be at input box row")
+
+	// The cursor style should be bar and blinking
+	expectedStyle := gtv.CursorStyleBar | gtv.CursorStyleBlinking
+	assert.Equal(t, expectedStyle, cursorStyle, "Cursor style should be bar and blinking when focused")
+
+	// Type some text
+	mockInput.TypeKeys("Hello")
+
+	// Redraw
+	mainLayout.Draw(screen)
+
+	// Verify text was entered
+	assert.Equal(t, "Hello", inputBox.GetText())
+
+	// After typing, cursor should have moved
+	cursorX, cursorY = screen.GetCursorPosition()
+	cursorStyle = screen.GetCursorStyle()
+
+	// Cursor should be at position (15, 5) - after "Hello"
+	assert.Equal(t, 15, cursorX, "Cursor X position should be after typed text")
+	assert.Equal(t, 5, cursorY, "Cursor Y position should still be at input box row")
+	assert.Equal(t, expectedStyle, cursorStyle, "Cursor style should still be bar and blinking")
+
+	// Blur the input box by clicking outside
+	mockInput.MouseClick(0, 0, 0)
+
+	// Redraw
+	mainLayout.Draw(screen)
+
+	// After blurring, the cursor position might change or style might be different
+	// Document the behavior
+	cursorX, cursorY = screen.GetCursorPosition()
+	cursorStyle = screen.GetCursorStyle()
+	t.Logf("After blur cursor position: (%d, %d), style: %d", cursorX, cursorY, cursorStyle)
+}
