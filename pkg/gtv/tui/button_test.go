@@ -533,3 +533,45 @@ func TestButton_AttributeGettersSetters(t *testing.T) {
 	assert.Equal(t, newNormalAttrs, button.GetAttrs())
 	assert.Equal(t, newFocusedAttrs, button.GetFocusedAttrs())
 }
+
+// TestButton_MouseClick tests mouse click to focus and trigger button press
+func TestButton_MouseClick(t *testing.T) {
+	screen := tio.NewScreenBuffer(80, 24, 0)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+
+	normalAttrs := gtv.AttrsWithColor(0, 0xFFFFFF, 0x0000FF)
+	focusedAttrs := gtv.AttrsWithColor(0, 0x000000, 0xFFFF00)
+	disabledAttrs := gtv.AttrsWithColor(0, 0x808080, 0x000000)
+
+	// Track button presses
+	pressed := false
+	button := tui.NewButton(
+		layout,
+		"Click Me",
+		gtv.TRect{X: 10, Y: 10, W: 0, H: 0},
+		normalAttrs,
+		focusedAttrs,
+		disabledAttrs,
+	)
+	button.SetOnPress(func() {
+		pressed = true
+	})
+
+	app := tui.NewApplication(layout, screen)
+	require.NotNil(t, app)
+
+	// Initially unfocused
+	assert.False(t, button.IsFocused())
+	assert.False(t, pressed)
+
+	// Click inside the button
+	mockInput := tio.NewMockInputEventReader(app)
+	mockInput.MouseClick(12, 10, 0)
+
+	// Button should be focused
+	assert.True(t, button.IsFocused(), "Button should be focused after click")
+	assert.Equal(t, button, layout.ActiveChild, "layout.ActiveChild should be button")
+
+	// Button press callback should be called
+	assert.True(t, pressed, "Button press callback should be called on mouse click")
+}

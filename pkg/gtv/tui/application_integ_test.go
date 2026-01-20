@@ -628,3 +628,118 @@ func TestApplicationIntegration_InputBoxCursorVisibility(t *testing.T) {
 	cursorStyle = screen.GetCursorStyle()
 	t.Logf("After blur cursor position: (%d, %d), style: %d", cursorX, cursorY, cursorStyle)
 }
+
+// TestApplicationIntegration_RealMousePress tests that widgets respond to real mouse press events
+// (with ModPress modifier) as would be sent by the actual terminal input reader.
+//
+// This test exposes two critical issues for mouse support:
+//  1. The layout was checking for ModClick instead of ModPress, which causes focus not to be set
+//     when using real mouse input (the real terminal input reader only sends ModPress).
+//  2. The application must enable mouse tracking escape sequences in the terminal
+//     (see TApplication.initTerminal() for the required escape codes).
+//
+// This test demonstrates:
+// - Creating a form with input boxes and buttons
+// - Sending real mouse press events (with only ModPress, not ModClick)
+// - Verifying that widgets receive focus correctly
+// - Verifying that button press callbacks are triggered correctly
+//
+// Note: This test uses mock input, so it doesn't verify that mouse tracking is enabled.
+// To test with a real terminal, mouse tracking escape sequences must be sent:
+//   - \x1b[?1000h - Enable mouse button tracking
+//   - \x1b[?1002h - Enable mouse motion tracking
+//   - \x1b[?1015h - Enable urxvt mouse mode
+//   - \x1b[?1006h - Enable SGR mouse mode
+func TestApplicationIntegration_RealMousePress(t *testing.T) {
+	// Create a screen buffer for testing
+	screen := tio.NewScreenBuffer(80, 24, 0)
+
+	// Create main layout
+	mainLayout := tui.NewAbsoluteLayout(
+		nil,
+		gtv.TRect{X: 0, Y: 0, W: 80, H: 24},
+		&gtv.CellAttributes{BackColor: 0x1a1a1a},
+	)
+
+	// Create an input box at position (10, 5)
+	inputBox := tui.NewInputBox(
+		mainLayout,
+		"",
+		gtv.TRect{X: 10, Y: 5, W: 30, H: 1},
+		gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333),
+		gtv.AttrsWithColor(0, 0x000000, 0x00AAFF),
+	)
+
+	// Create a button at position (10, 7)
+	buttonPressed := false
+	button := tui.NewButton(
+		mainLayout,
+		"Click Me",
+		gtv.TRect{X: 10, Y: 7, W: 0, H: 0},
+		gtv.AttrsWithColor(0, 0xFFFFFF, 0x006600),
+		gtv.AttrsWithColor(gtv.AttrBold, 0xFFFFFF, 0x00AA00),
+		gtv.AttrsWithColor(0, 0x888888, 0x333333),
+	)
+
+	button.SetOnPress(func() {
+		buttonPressed = true
+	})
+
+	// Create application
+	app := tui.NewApplication(mainLayout, screen)
+	require.NotNil(t, app)
+
+	// Create a custom event sender that mimics real terminal input
+	// (sends ModPress but NOT ModClick)
+	sendRealMousePress := func(x, y int) {
+		app.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventMouse,
+			X:         uint16(x),
+			Y:         uint16(y),
+			Modifiers: gtv.ModPress, // Real terminal input only sends ModPress
+		})
+		// Redraw after event
+		mainLayout.Draw(screen)
+	}
+
+	// Initially, input box is not focused
+	assert.False(t, inputBox.IsFocused(), "InputBox should not be focused initially")
+
+	// Send a real mouse press event to the input box
+	sendRealMousePress(15, 5)
+
+	// Verify that the input box received focus
+	assert.True(t, inputBox.IsFocused(), "InputBox should be focused after mouse press")
+
+	// Type some text to verify the input box is working
+	app.Notify(gtv.InputEvent{
+		Type: gtv.InputEventKey,
+		Key:  'H',
+	})
+	app.Notify(gtv.InputEvent{
+		Type: gtv.InputEventKey,
+		Key:  'i',
+	})
+	mainLayout.Draw(screen)
+
+	assert.Equal(t, "Hi", inputBox.GetText(), "InputBox should contain typed text")
+
+	// Now send a real mouse press event to the button
+	sendRealMousePress(15, 7)
+
+	// Verify that the button received focus
+	assert.True(t, button.IsFocused(), "Button should be focused after mouse press")
+
+	// Verify that the input box lost focus
+	assert.False(t, inputBox.IsFocused(), "InputBox should lose focus when button is clicked")
+
+	// Press Enter to activate the button
+	app.Notify(gtv.InputEvent{
+		Type: gtv.InputEventKey,
+		Key:  '\r',
+	})
+	mainLayout.Draw(screen)
+
+	// Verify that the button callback was called
+	assert.True(t, buttonPressed, "Button press callback should have been called")
+}

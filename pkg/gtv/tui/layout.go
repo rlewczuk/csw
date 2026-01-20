@@ -234,8 +234,8 @@ func (l *TLayout) HandleEvent(event *TEvent) {
 			// Get child under cursor (if any)
 			child := l.GetChildAt(inputEvent.X, inputEvent.Y)
 			if child != nil {
-				// On mouse click, set focus to the clicked widget
-				if inputEvent.Modifiers&gtv.ModClick != 0 {
+				// On mouse press, set focus to the clicked widget
+				if inputEvent.Modifiers&gtv.ModPress != 0 {
 					l.setFocus(child)
 				}
 				// Forward the event to the child
@@ -355,11 +355,13 @@ func (l *TLayout) getTabOrder() []IWidget {
 // setFocus changes focus to the specified widget.
 // It sends blur event to the previously focused widget (if any) and focus event to the new widget.
 // If the widget is nil, just removes focus from current widget.
-// Only widgets implementing IFocusable can receive focus.
+// Only widgets implementing IFocusable or ILayout can receive focus.
 func (l *TLayout) setFocus(widget IWidget) {
-	// If widget is not nil and not focusable, do nothing
+	// If widget is not nil, check if it can accept focus
 	if widget != nil {
-		if _, ok := widget.(IFocusable); !ok {
+		_, isFocusable := widget.(IFocusable)
+		_, isLayout := widget.(ILayout)
+		if !isFocusable && !isLayout {
 			return
 		}
 	}
