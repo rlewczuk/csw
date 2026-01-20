@@ -333,17 +333,37 @@ func (l *TLayout) SetTabOrder(widgets []IWidget) {
 
 // getTabOrder returns the effective tab order.
 // If custom tab order is set, returns it; otherwise returns Children slice.
+// Only focusable widgets (those implementing IFocusable) are included in the tab order.
 func (l *TLayout) getTabOrder() []IWidget {
+	var widgets []IWidget
 	if l.tabOrder != nil {
-		return l.tabOrder
+		widgets = l.tabOrder
+	} else {
+		widgets = l.Children
 	}
-	return l.Children
+
+	// Filter to only include focusable widgets
+	focusableWidgets := make([]IWidget, 0, len(widgets))
+	for _, w := range widgets {
+		if _, ok := w.(IFocusable); ok {
+			focusableWidgets = append(focusableWidgets, w)
+		}
+	}
+	return focusableWidgets
 }
 
 // setFocus changes focus to the specified widget.
 // It sends blur event to the previously focused widget (if any) and focus event to the new widget.
 // If the widget is nil, just removes focus from current widget.
+// Only widgets implementing IFocusable can receive focus.
 func (l *TLayout) setFocus(widget IWidget) {
+	// If widget is not nil and not focusable, do nothing
+	if widget != nil {
+		if _, ok := widget.(IFocusable); !ok {
+			return
+		}
+	}
+
 	// If already focused, do nothing
 	if l.ActiveChild == widget {
 		return
