@@ -165,6 +165,7 @@ func (app *TApplication) Run(stdin io.Reader, stdout io.Writer) error {
 
 	// Draw initial frame
 	app.mu.Lock()
+	app.screen.SetCursorStyle(gtv.CursorStyleHidden)
 	app.mainWidget.Draw(app.screen)
 	app.mu.Unlock()
 	if err := app.renderer.Render(); err != nil {
@@ -241,6 +242,7 @@ func (app *TApplication) handleEvent(event gtv.InputEvent) {
 		app.mainWidget.HandleEvent(&TEvent{Type: TEventTypeRedraw})
 
 		// Redraw screen
+		app.screen.SetCursorStyle(gtv.CursorStyleHidden)
 		app.mainWidget.Draw(app.screen)
 		if app.renderer != nil {
 			app.renderer.Render()
@@ -262,6 +264,7 @@ func (app *TApplication) handleEvent(event gtv.InputEvent) {
 	})
 
 	// Redraw screen after handling event
+	app.screen.SetCursorStyle(gtv.CursorStyleHidden)
 	app.mainWidget.Draw(app.screen)
 	if app.renderer != nil {
 		app.renderer.Render()
@@ -305,6 +308,9 @@ func (app *TApplication) restoreTerminal() {
 
 	// Show cursor
 	fmt.Fprint(app.stdout, "\x1b[?25h")
+
+	// Reset cursor style to default (blinking block)
+	fmt.Fprint(app.stdout, "\x1b[0 q")
 
 	// Restore cursor position
 	fmt.Fprint(app.stdout, "\x1b[u")
