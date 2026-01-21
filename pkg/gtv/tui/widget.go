@@ -81,6 +81,8 @@ type TWidget struct {
 	Flags WidgetFlag
 	// Cursor state
 	Cursor CursorState
+	// Cell attributes for rendering (colors and text attributes)
+	cellAttrs gtv.CellAttributes
 }
 
 func WithPosition(X, Y int) gtv.Option {
@@ -116,10 +118,65 @@ func WithFlags(flags WidgetFlag) gtv.Option {
 	}
 }
 
+// NewWidget creates a new base widget with the specified parent and options.
+// The parent parameter is optional (can be nil for root widgets).
+// Options can be used to configure position, attributes, and other properties.
+//
+// Default values:
+// - Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0}
+// - Attrs: gtv.CellAttributes{}
+// - Flags: WidgetFlagNone
+//
+// Available options:
+// - WithRectangle(X, Y, W, H) - sets position and size
+// - WithPosition(X, Y) - sets position only
+// - WithAttrs(attrs) - sets cell attributes
+// - WithFlags(flags) - sets widget flags
+// - WithChild(child) - adds a child widget
+//
+// Note: When creating a derived widget that embeds TWidget, use newWidgetBase
+// to avoid double registration with the parent. This constructor registers with the parent.
+func NewWidget(parent IWidget, opts ...gtv.Option) *TWidget {
+	widget := newWidgetBase(parent, opts...)
+
+	// Register with parent if provided
+	if parent != nil {
+		parent.AddChild(widget)
+	}
+
+	return widget
+}
+
+// newWidgetBase creates a widget without registering with parent.
+// This is used internally by derived widgets to avoid double registration.
+func newWidgetBase(parent IWidget, opts ...gtv.Option) *TWidget {
+	widget := &TWidget{
+		Position:  gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
+		Parent:    parent,
+		Flags:     WidgetFlagNone,
+		cellAttrs: gtv.CellAttributes{},
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(widget)
+	}
+
+	return widget
+}
+
 func WithCursorState(cursor CursorState) gtv.Option {
 	return func(w any) {
 		if w, ok := w.(*TWidget); ok {
 			w.Cursor = cursor
+		}
+	}
+}
+
+func WithAttrs(attrs gtv.CellAttributes) gtv.Option {
+	return func(w any) {
+		if w, ok := w.(*TWidget); ok {
+			w.cellAttrs = attrs
 		}
 	}
 }
@@ -170,4 +227,14 @@ func (w *TWidget) HandleEvent(event *TEvent) {
 
 func (w *TWidget) AddChild(child IWidget) {
 	w.Children = append(w.Children, child)
+}
+
+// GetAttrs returns the cell attributes for rendering.
+func (w *TWidget) GetAttrs() gtv.CellAttributes {
+	return w.cellAttrs
+}
+
+// SetAttrs sets the cell attributes for rendering.
+func (w *TWidget) SetAttrs(attrs gtv.CellAttributes) {
+	w.cellAttrs = attrs
 }

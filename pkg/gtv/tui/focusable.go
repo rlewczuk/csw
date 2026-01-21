@@ -39,24 +39,13 @@ type IFocusable interface {
 //
 // Features:
 // - Focus/blur state management
-// - Normal and focused text attributes
+// - Normal and focused text attributes (normal attrs inherited from TWidget)
 // - Automatic flag management for focus and cursor
 type TFocusable struct {
 	TWidget
 
-	// Text attributes for normal state
-	cellAttrs gtv.CellAttributes
-
 	// Text attributes for focused state
 	focusedAttrs gtv.CellAttributes
-}
-
-func WithAttrs(attrs gtv.CellAttributes) gtv.Option {
-	return func(w any) {
-		if w, ok := w.(*TFocusable); ok {
-			w.cellAttrs = attrs
-		}
-	}
 }
 
 func WithFocusedAttrs(attrs gtv.CellAttributes) gtv.Option {
@@ -103,11 +92,11 @@ func NewFocusable(parent IWidget, opts ...gtv.Option) *TFocusable {
 func newFocusableBase(parent IWidget, opts ...gtv.Option) *TFocusable {
 	focusable := &TFocusable{
 		TWidget: TWidget{
-			Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
-			Parent:   parent,
-			Flags:    WidgetFlagNone,
+			Position:  gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
+			Parent:    parent,
+			Flags:     WidgetFlagNone,
+			cellAttrs: gtv.CellAttributes{},
 		},
-		cellAttrs:    gtv.CellAttributes{},
 		focusedAttrs: gtv.CellAttributes{},
 	}
 
@@ -125,13 +114,15 @@ func newFocusableBase(parent IWidget, opts ...gtv.Option) *TFocusable {
 }
 
 // GetAttrs returns the text attributes for normal state.
+// This method overrides TWidget.GetAttrs() but delegates to it.
 func (f *TFocusable) GetAttrs() gtv.CellAttributes {
-	return f.cellAttrs
+	return f.TWidget.GetAttrs()
 }
 
 // SetAttrs sets the text attributes for normal state.
+// This method overrides TWidget.SetAttrs() but delegates to it.
 func (f *TFocusable) SetAttrs(attrs gtv.CellAttributes) {
-	f.cellAttrs = attrs
+	f.TWidget.SetAttrs(attrs)
 }
 
 // GetFocusedAttrs returns the text attributes for focused state.

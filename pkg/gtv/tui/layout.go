@@ -30,11 +30,14 @@ type ILayout interface {
 // It extends TResizable and implements ILayout interface.
 //
 // The layout provides:
-// - Background rendering (fills area with spaces using background attributes)
+// - Background rendering (fills area with spaces using background attributes from TWidget.cellAttrs)
 // - Child management (adding children, drawing children)
 // - Event routing (resize, redraw, mouse, keyboard, focus events)
 // - Active child tracking for focus management
 // - Tab navigation support with customizable tab order
+//
+// Background transparency: If hasBackground is false, layout is transparent.
+// Otherwise, uses cellAttrs from TWidget for background rendering.
 //
 // Derived layout widgets should:
 // - Override HandleEvent to implement custom event routing logic (e.g., different coordinate systems)
@@ -42,8 +45,9 @@ type ILayout interface {
 type TLayout struct {
 	TResizable
 
-	// Background attributes for the layout. If nil, layout is transparent.
-	background *gtv.CellAttributes
+	// hasBackground indicates whether the layout has a background.
+	// If false, layout is transparent (only children are visible).
+	hasBackground bool
 
 	// TabOrderEnabled specifies whether tab navigation is enabled.
 	// If true, layout handles Tab and Shift+Tab keys to move focus.
@@ -90,24 +94,42 @@ func NewLayout(parent IWidget, rect gtv.TRect, background *gtv.CellAttributes, t
 // The tabOrderEnabled parameter specifies whether tab navigation should be enabled.
 func newLayoutBase(parent IWidget, rect gtv.TRect, background *gtv.CellAttributes, tabOrderEnabled bool) *TLayout {
 	resizableBase := newResizableBase(parent, rect)
-	return &TLayout{
+	layout := &TLayout{
 		TResizable:      *resizableBase,
-		background:      background,
+		hasBackground:   background != nil,
 		TabOrderEnabled: tabOrderEnabled,
 		tabOrder:        nil,
 		focusIndex:      -1,
 	}
+
+	// Set background attributes if provided
+	if background != nil {
+		layout.TResizable.TWidget.cellAttrs = *background
+	}
+
+	return layout
 }
 
 // SetBackground sets the background attributes for the layout.
 // If nil, the layout is transparent and only children are visible.
 func (l *TLayout) SetBackground(attrs *gtv.CellAttributes) {
-	l.background = attrs
+	if attrs == nil {
+		l.hasBackground = false
+		l.TResizable.TWidget.cellAttrs = gtv.CellAttributes{}
+	} else {
+		l.hasBackground = true
+		l.TResizable.TWidget.cellAttrs = *attrs
+	}
 }
 
 // GetBackground returns the current background attributes.
+// Returns nil if the layout is transparent.
 func (l *TLayout) GetBackground() *gtv.CellAttributes {
-	return l.background
+	if !l.hasBackground {
+		return nil
+	}
+	attrs := l.TResizable.TWidget.cellAttrs
+	return &attrs
 }
 
 // Draw draws the layout on the screen.
@@ -123,13 +145,14 @@ func (l *TLayout) Draw(screen gtv.IScreenOutput) {
 	absPos := l.GetAbsolutePos()
 
 	// Draw background if set
-	if l.background != nil {
-		// Fill the background with spaces using the background attributes
+	if l.hasBackground {
+		// Fill the background with spaces using the background attributes from TWidget
+		bgAttrs := l.TResizable.TWidget.cellAttrs
 		for y := uint16(0); y < absPos.H; y++ {
 			for x := uint16(0); x < absPos.W; x++ {
 				screen.PutContent(
 					gtv.TRect{X: absPos.X + x, Y: absPos.Y + y, W: 1, H: 1},
-					[]gtv.Cell{{Rune: ' ', Attrs: *l.background}},
+					[]gtv.Cell{{Rune: ' ', Attrs: bgAttrs}},
 				)
 			}
 		}
