@@ -79,8 +79,24 @@ type TApplication struct {
 // Call Run() to start the application with real terminal I/O, or use Notify() and ExecuteOnUiThread()
 // for testing without real terminal I/O.
 func NewApplication(mainWidget IWidget, screen gtv.IScreenOutput) *TApplication {
+	return NewApplicationWithTheme(mainWidget, screen, nil)
+}
+
+// NewApplicationWithTheme creates a new TApplication with the given main widget, screen buffer, and theme.
+// If theme is not nil, a ThemeInterceptor is inserted into the screen output pipeline.
+// The theme parameter is a map of theme tag strings to CellAttributes.
+// The screen buffer size determines the initial widget size.
+// Call Run() to start the application with real terminal I/O, or use Notify() and ExecuteOnUiThread()
+// for testing without real terminal I/O.
+func NewApplicationWithTheme(mainWidget IWidget, screen gtv.IScreenOutput, theme map[string]gtv.CellAttributes) *TApplication {
+	// Wrap screen with theme interceptor if theme is provided
+	var finalScreen gtv.IScreenOutput = screen
+	if theme != nil {
+		finalScreen = gtv.NewThemeInterceptor(screen, theme)
+	}
+
 	// Get screen size
-	width, height := screen.GetSize()
+	width, height := finalScreen.GetSize()
 
 	// Set main widget size to fill screen
 	mainWidget.HandleEvent(&TEvent{
@@ -90,7 +106,7 @@ func NewApplication(mainWidget IWidget, screen gtv.IScreenOutput) *TApplication 
 
 	app := &TApplication{
 		mainWidget:  mainWidget,
-		screen:      screen,
+		screen:      finalScreen,
 		renderer:    nil,                    // Will be created in Run()
 		eventReader: nil,                    // Will be created in Run()
 		quitCh:      make(chan struct{}, 1), // Buffered to allow non-blocking Quit()
