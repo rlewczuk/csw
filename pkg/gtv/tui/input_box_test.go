@@ -20,10 +20,10 @@ func TestInputBox_Creation(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Hello",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Hello"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	require.NotNil(t, inputBox)
@@ -43,10 +43,10 @@ func TestInputBox_BasicRendering(t *testing.T) {
 
 	_ = tui.NewInputBox(
 		layout,
-		"Test",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Test"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	// Draw the layout
@@ -79,10 +79,10 @@ func TestInputBox_FocusBlur(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		nil,
-		"Test",
-		gtv.TRect{X: 0, Y: 0, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Test"),
+		tui.WithRectangle(0, 0, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	// Initially unfocused
@@ -114,10 +114,10 @@ func TestInputBox_MouseClick(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Hello",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Hello"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -148,10 +148,10 @@ func TestInputBox_TextInput(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText(""),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -179,10 +179,10 @@ func TestInputBox_Backspace(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Hello",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Hello"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -217,10 +217,10 @@ func TestInputBox_ArrowKeys(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Hello",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Hello"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -262,10 +262,10 @@ func TestInputBox_Selection_ShiftArrows(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Hello",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Hello"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -306,10 +306,10 @@ func TestInputBox_Selection_ShiftHome(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Hello",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Hello"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -338,10 +338,10 @@ func TestInputBox_Selection_ShiftEnd(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Hello",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Hello"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -370,10 +370,10 @@ func TestInputBox_DeleteSelection(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Hello World",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Hello World"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -404,10 +404,10 @@ func TestInputBox_ReplaceSelection(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Hello World",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Hello World"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -438,10 +438,10 @@ func TestInputBox_MouseSelection(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Hello World",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Hello World"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -471,10 +471,10 @@ func TestInputBox_LongText_Scrolling(t *testing.T) {
 	// Create input box with width of 10 characters
 	inputBox := tui.NewInputBox(
 		layout,
-		"This is a very long text that exceeds the width",
-		gtv.TRect{X: 10, Y: 10, W: 10, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("This is a very long text that exceeds the width"),
+		tui.WithRectangle(10, 10, 10, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -508,10 +508,10 @@ func TestInputBox_InsertInMiddle(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"HelloWorld",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("HelloWorld"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -537,10 +537,10 @@ func TestInputBox_SetText(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		nil,
-		"Initial",
-		gtv.TRect{X: 0, Y: 0, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Initial"),
+		tui.WithRectangle(0, 0, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	// Set new text
@@ -571,10 +571,10 @@ func TestInputBox_SelectionRendering(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Hello",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Hello"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	// Focus and select first 3 characters
@@ -612,10 +612,10 @@ func TestInputBox_EmptyText(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText(""),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -643,10 +643,10 @@ func TestInputBox_BackspaceAtBeginning(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Hello",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Hello"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -675,10 +675,10 @@ func TestInputBox_ArrowKeysBoundaries(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Hello",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Hello"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -714,18 +714,18 @@ func TestInputBox_MouseClickFocusTransfer(t *testing.T) {
 
 	inputBox1 := tui.NewInputBox(
 		layout,
-		"First",
-		gtv.TRect{X: 10, Y: 5, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("First"),
+		tui.WithRectangle(10, 5, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	inputBox2 := tui.NewInputBox(
 		layout,
-		"Second",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Second"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -775,10 +775,10 @@ func TestInputBox_InitialClickFromUnfocused(t *testing.T) {
 
 	inputBox := tui.NewInputBox(
 		layout,
-		"Test",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Test"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -819,18 +819,18 @@ func TestInputBox_ClickChangeCursorButKeyboardToWrongWidget(t *testing.T) {
 
 	inputBox1 := tui.NewInputBox(
 		layout,
-		"First",
-		gtv.TRect{X: 10, Y: 5, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("First"),
+		tui.WithRectangle(10, 5, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	inputBox2 := tui.NewInputBox(
 		layout,
-		"Second",
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText("Second"),
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)

@@ -20,9 +20,9 @@ func TestFocusable_Creation(t *testing.T) {
 
 	focusable := tui.NewFocusable(
 		layout,
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	require.NotNil(t, focusable)
@@ -39,9 +39,9 @@ func TestFocusable_CreationWithoutParent(t *testing.T) {
 
 	focusable := tui.NewFocusable(
 		nil,
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	require.NotNil(t, focusable)
@@ -57,9 +57,9 @@ func TestFocusable_GetSetAttrs(t *testing.T) {
 
 	focusable := tui.NewFocusable(
 		nil,
-		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(0, 0, 10, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	// Check initial attributes
@@ -80,9 +80,9 @@ func TestFocusable_GetSetFocusedAttrs(t *testing.T) {
 
 	focusable := tui.NewFocusable(
 		nil,
-		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(0, 0, 10, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	// Check initial focused attributes
@@ -103,9 +103,9 @@ func TestFocusable_FocusBlur(t *testing.T) {
 
 	focusable := tui.NewFocusable(
 		nil,
-		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(0, 0, 10, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	// Initially unfocused
@@ -127,9 +127,9 @@ func TestFocusable_FocusSetsCursorFlag(t *testing.T) {
 
 	focusable := tui.NewFocusable(
 		nil,
-		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(0, 0, 10, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	// Focus should set both focused and cursor flags
@@ -146,9 +146,9 @@ func TestFocusable_BlurClearsCursorFlag(t *testing.T) {
 
 	focusable := tui.NewFocusable(
 		nil,
-		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(0, 0, 10, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	// Focus then blur
@@ -166,9 +166,9 @@ func TestFocusable_MultipleFocusCalls(t *testing.T) {
 
 	focusable := tui.NewFocusable(
 		nil,
-		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(0, 0, 10, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	// Multiple focus calls should be idempotent
@@ -189,9 +189,9 @@ func TestFocusable_MultipleBlurCalls(t *testing.T) {
 
 	focusable := tui.NewFocusable(
 		nil,
-		gtv.TRect{X: 0, Y: 0, W: 10, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(0, 0, 10, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	focusable.Focus()
@@ -217,9 +217,9 @@ func TestFocusable_BasicRendering(t *testing.T) {
 
 	focusable := tui.NewFocusable(
 		nil,
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	// Draw should not panic (focusable has minimal draw implementation)
@@ -241,9 +241,9 @@ func TestFocusable_ResizeEvent(t *testing.T) {
 
 	focusable := tui.NewFocusable(
 		layout,
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)
@@ -276,9 +276,9 @@ func TestFocusable_PositionCalculation(t *testing.T) {
 
 	focusable := tui.NewFocusable(
 		layout,
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	// Relative position
@@ -303,9 +303,9 @@ func TestFocusable_ChildManagement(t *testing.T) {
 
 	parentFocusable := tui.NewFocusable(
 		nil,
-		gtv.TRect{X: 0, Y: 0, W: 40, H: 10},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(0, 0, 40, 10),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	// Create a child label
@@ -331,9 +331,9 @@ func TestFocusable_Integration(t *testing.T) {
 
 	focusable := tui.NewFocusable(
 		layout,
-		gtv.TRect{X: 10, Y: 10, W: 20, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithRectangle(10, 10, 20, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	app := tui.NewApplication(layout, screen)

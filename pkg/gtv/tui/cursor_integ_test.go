@@ -16,8 +16,8 @@ func TestCursorHandling(t *testing.T) {
 	// Setup layout with two input boxes
 	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
-	input1 := tui.NewInputBox(layout, "Input 1", gtv.TRect{X: 0, Y: 0, W: 20, H: 1}, gtv.CellAttributes{}, gtv.CellAttributes{})
-	input2 := tui.NewInputBox(layout, "Input 2", gtv.TRect{X: 0, Y: 2, W: 20, H: 1}, gtv.CellAttributes{}, gtv.CellAttributes{})
+	input1 := tui.NewInputBox(layout, tui.WithText("Input 1"), tui.WithRectangle(0, 0, 20, 1), tui.WithAttrs(gtv.CellAttributes{}), tui.WithFocusedAttrs(gtv.CellAttributes{}))
+	input2 := tui.NewInputBox(layout, tui.WithText("Input 2"), tui.WithRectangle(0, 2, 20, 1), tui.WithAttrs(gtv.CellAttributes{}), tui.WithFocusedAttrs(gtv.CellAttributes{}))
 	button := tui.NewButton(layout, "Button", gtv.TRect{X: 0, Y: 4, W: 10, H: 1}, gtv.CellAttributes{}, gtv.CellAttributes{}, gtv.CellAttributes{})
 
 	app := tui.NewApplication(layout, screen)

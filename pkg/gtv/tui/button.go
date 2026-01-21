@@ -77,12 +77,15 @@ type TButton struct {
 // The rect parameter specifies the position and size of the button.
 // If rect width is 0, the button is auto-sized to fit the text plus border.
 // If rect height is 0, the button height is set to 1 (single line).
-// The attrs parameter specifies text attributes for normal state.
+// The cellAttrs parameter specifies text attributes for normal state.
 // The focusedAttrs parameter specifies text attributes for focused state.
 // The disabledAttrs parameter specifies text attributes for disabled state.
 func NewButton(parent IWidget, text string, rect gtv.TRect, attrs, focusedAttrs, disabledAttrs gtv.CellAttributes) *TButton {
 	button := &TButton{
-		TFocusable:    *newFocusableBase(parent, rect, attrs, focusedAttrs),
+		TFocusable: *newFocusableBase(parent,
+			WithRectangle(int(rect.X), int(rect.Y), int(rect.W), int(rect.H)),
+			WithAttrs(attrs),
+			WithFocusedAttrs(focusedAttrs)),
 		text:          text,
 		disabledAttrs: disabledAttrs,
 		cacheValid:    false,

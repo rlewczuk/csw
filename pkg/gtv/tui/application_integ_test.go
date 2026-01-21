@@ -403,18 +403,18 @@ func TestApplicationIntegration_DemoForm(t *testing.T) {
 	// Create input boxes
 	nameInput := tui.NewInputBox(
 		mainLayout,
-		"",
-		gtv.TRect{X: 15, Y: 3, W: 30, H: 1},
-		gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333),
-		gtv.AttrsWithColor(0, 0x000000, 0x00AAFF),
+		tui.WithText(""),
+		tui.WithRectangle(15, 3, 30, 1),
+		tui.WithAttrs(gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333)),
+		tui.WithFocusedAttrs(gtv.AttrsWithColor(0, 0x000000, 0x00AAFF)),
 	)
 
 	emailInput := tui.NewInputBox(
 		mainLayout,
-		"",
-		gtv.TRect{X: 15, Y: 5, W: 30, H: 1},
-		gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333),
-		gtv.AttrsWithColor(0, 0x000000, 0x00AAFF),
+		tui.WithText(""),
+		tui.WithRectangle(15, 5, 30, 1),
+		tui.WithAttrs(gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333)),
+		tui.WithFocusedAttrs(gtv.AttrsWithColor(0, 0x000000, 0x00AAFF)),
 	)
 
 	// Create result label
@@ -555,10 +555,10 @@ func TestApplicationIntegration_InputBoxCursorVisibility(t *testing.T) {
 	// Create an input box at position (10, 5) with width 30
 	inputBox := tui.NewInputBox(
 		mainLayout,
-		"",
-		gtv.TRect{X: 10, Y: 5, W: 30, H: 1},
-		gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333),
-		gtv.AttrsWithColor(0, 0x000000, 0x00AAFF),
+		tui.WithText(""),
+		tui.WithRectangle(10, 5, 30, 1),
+		tui.WithAttrs(gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333)),
+		tui.WithFocusedAttrs(gtv.AttrsWithColor(0, 0x000000, 0x00AAFF)),
 	)
 
 	// Create application
@@ -664,10 +664,10 @@ func TestApplicationIntegration_RealMousePress(t *testing.T) {
 	// Create an input box at position (10, 5)
 	inputBox := tui.NewInputBox(
 		mainLayout,
-		"",
-		gtv.TRect{X: 10, Y: 5, W: 30, H: 1},
-		gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333),
-		gtv.AttrsWithColor(0, 0x000000, 0x00AAFF),
+		tui.WithText(""),
+		tui.WithRectangle(10, 5, 30, 1),
+		tui.WithAttrs(gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333)),
+		tui.WithFocusedAttrs(gtv.AttrsWithColor(0, 0x000000, 0x00AAFF)),
 	)
 
 	// Create a button at position (10, 7)

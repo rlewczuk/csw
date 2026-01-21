@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+// Option is a function that configures an object.
+// It is used mostlyu for widget construction but can be used for other objects as well.
+type Option func(any)
+
+// TextAttributes represents additional text modifiers, eg. underline, bold, etc.
+// This complements TextColor and BackColor which are separate.
 type TextAttributes uint32
 
 const (
@@ -24,8 +30,10 @@ const (
 	Overline
 )
 
+// TextColor represents a 24-bit color in RGB format.
 type TextColor uint32
 
+// CellAttributes represents attributes of a single character cell.
 type CellAttributes struct {
 	// Attrs is a bitfield of attributes. It is a combination of the following:
 	Attributes TextAttributes
