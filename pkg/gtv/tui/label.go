@@ -31,9 +31,6 @@ type TLabel struct {
 	// Text to display
 	text string
 
-	// Base attributes (colors and base attribute mask)
-	attrs gtv.CellAttributes
-
 	// Formatted cells cache
 	formattedCells []gtv.Cell
 
@@ -47,11 +44,11 @@ type TLabel struct {
 func NewLabel(parent IWidget, text string, rect gtv.TRect, attrs gtv.CellAttributes) *TLabel {
 	label := &TLabel{
 		TWidget: TWidget{
-			Position: rect,
-			Parent:   parent,
+			Position:  rect,
+			Parent:    parent,
+			cellAttrs: attrs,
 		},
 		text:       text,
-		attrs:      attrs,
 		cacheValid: false,
 	}
 
@@ -94,8 +91,8 @@ func (l *TLabel) getFormattedCells() []gtv.Cell {
 	// Combine attributes: base attributes provide colors and base mask,
 	// formatted text attributes provide additional attributes (bold, italic, etc.)
 	for i := range cells {
-		// Start with base attributes from constructor
-		combinedAttrs := l.attrs
+		// Start with base attributes from TWidget
+		combinedAttrs := l.TWidget.GetAttrs()
 
 		// OR the formatted text attributes with base attributes
 		combinedAttrs.Attributes |= cells[i].Attrs.Attributes
@@ -148,12 +145,12 @@ func (l *TLabel) SetText(text string) {
 
 // GetAttrs returns the text attributes of the label.
 func (l *TLabel) GetAttrs() gtv.CellAttributes {
-	return l.attrs
+	return l.TWidget.GetAttrs()
 }
 
 // SetAttrs sets the text attributes of the label and invalidates the cache.
 func (l *TLabel) SetAttrs(attrs gtv.CellAttributes) {
-	l.attrs = attrs
+	l.TWidget.SetAttrs(attrs)
 	l.invalidateCache()
 }
 
