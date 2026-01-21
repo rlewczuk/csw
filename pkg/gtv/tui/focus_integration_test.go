@@ -27,18 +27,20 @@ func TestFocusIntegration_MouseClickBetweenInputBoxAndButton(t *testing.T) {
 	// Create two input boxes and one button
 	inputBox1 := tui.NewInputBox(
 		layout,
-		"",
-		gtv.TRect{X: 10, Y: 5, W: 30, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText(""),
+		tui.WithRectangle(10, 5, 30, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs,
+	),
 	)
 
 	inputBox2 := tui.NewInputBox(
 		layout,
-		"",
-		gtv.TRect{X: 10, Y: 10, W: 30, H: 1},
-		normalAttrs,
-		focusedAttrs,
+		tui.WithText(""),
+		tui.WithRectangle(10, 10, 30, 1),
+		tui.WithAttrs(normalAttrs),
+		tui.WithFocusedAttrs(focusedAttrs,
+	),
 	)
 
 	buttonPressed := false

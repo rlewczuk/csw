@@ -89,20 +89,52 @@ type TInputBox struct {
 	dragStartPos int
 }
 
-// NewInputBox creates a new input box widget with the specified text, position, and attributes.
+// WithText sets the initial text for the input box.
+func WithText(text string) gtv.Option {
+	return func(w any) {
+		if w, ok := w.(*TInputBox); ok {
+			w.text = text
+			w.cursorPos = len([]rune(text)) // Start at end of text
+		}
+	}
+}
+
+// NewInputBox creates a new input box widget with the specified parent and options.
 // The parent parameter is optional (can be nil for root widgets).
-// The rect parameter specifies the position and size of the input box.
-// The attrs parameter specifies text attributes for normal state.
-// The focusedAttrs parameter specifies text attributes for focused state.
-func NewInputBox(parent IWidget, text string, rect gtv.TRect, attrs, focusedAttrs gtv.CellAttributes) *TInputBox {
+// Options can be used to configure text, position, attributes, and other properties.
+//
+// Default values:
+// - Text: ""
+// - Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0}
+// - Attrs: gtv.CellAttributes{}
+// - FocusedAttrs: gtv.CellAttributes{}
+// - CursorPos: 0
+// - SelectionStart: 0
+// - SelectionEnd: 0
+// - ScrollOffset: 0
+//
+// Available options:
+// - WithText(text) - sets initial text
+// - WithRectangle(X, Y, W, H) - sets position and size
+// - WithPosition(X, Y) - sets position only
+// - WithAttrs(attrs) - sets normal state attributes
+// - WithFocusedAttrs(attrs) - sets focused state attributes
+// - WithFlags(flags) - sets widget flags
+// - WithChild(child) - adds a child widget
+func NewInputBox(parent IWidget, opts ...gtv.Option) *TInputBox {
 	inputBox := &TInputBox{
-		TFocusable:     *newFocusableBase(parent, rect, attrs, focusedAttrs),
-		text:           text,
-		cursorPos:      len([]rune(text)), // Start at end of text
+		TFocusable:     *newFocusableBase(parent, opts...),
+		text:           "",
+		cursorPos:      0,
 		selectionStart: 0,
 		selectionEnd:   0,
 		scrollOffset:   0,
 		isDragging:     false,
+	}
+
+	// Apply options to TInputBox
+	for _, opt := range opts {
+		opt(inputBox)
 	}
 
 	// Update scroll offset to show cursor

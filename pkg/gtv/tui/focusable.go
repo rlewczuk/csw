@@ -45,22 +45,50 @@ type TFocusable struct {
 	TWidget
 
 	// Text attributes for normal state
-	attrs gtv.CellAttributes
+	cellAttrs gtv.CellAttributes
 
 	// Text attributes for focused state
 	focusedAttrs gtv.CellAttributes
 }
 
-// NewFocusable creates a new focusable widget with the specified position and attributes.
+func WithAttrs(attrs gtv.CellAttributes) gtv.Option {
+	return func(w any) {
+		if w, ok := w.(*TFocusable); ok {
+			w.cellAttrs = attrs
+		}
+	}
+}
+
+func WithFocusedAttrs(attrs gtv.CellAttributes) gtv.Option {
+	return func(w any) {
+		if w, ok := w.(*TFocusable); ok {
+			w.focusedAttrs = attrs
+		}
+	}
+}
+
+// NewFocusable creates a new focusable widget with the specified parent and options.
 // The parent parameter is optional (can be nil for root widgets).
-// The rect parameter specifies the position and size of the widget.
-// The attrs parameter specifies text attributes for normal state.
-// The focusedAttrs parameter specifies text attributes for focused state.
+// Options can be used to configure position, attributes, and other properties.
+//
+// Default values:
+// - Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0}
+// - Attrs: gtv.CellAttributes{}
+// - FocusedAttrs: gtv.CellAttributes{}
+// - Flags: WidgetFlagNone
+//
+// Available options:
+// - WithRectangle(X, Y, W, H) - sets position and size
+// - WithPosition(X, Y) - sets position only
+// - WithAttrs(attrs) - sets normal state attributes
+// - WithFocusedAttrs(attrs) - sets focused state attributes
+// - WithFlags(flags) - sets widget flags
+// - WithChild(child) - adds a child widget
 //
 // Note: When creating a derived widget that embeds TFocusable, use newFocusableBase
 // to avoid double registration with the parent. This constructor registers with the parent.
-func NewFocusable(parent IWidget, rect gtv.TRect, attrs, focusedAttrs gtv.CellAttributes) *TFocusable {
-	focusable := newFocusableBase(parent, rect, attrs, focusedAttrs)
+func NewFocusable(parent IWidget, opts ...gtv.Option) *TFocusable {
+	focusable := newFocusableBase(parent, opts...)
 
 	// Register with parent if provided
 	if parent != nil {
@@ -72,26 +100,38 @@ func NewFocusable(parent IWidget, rect gtv.TRect, attrs, focusedAttrs gtv.CellAt
 
 // newFocusableBase creates a focusable widget without registering with parent.
 // This is used internally by derived widgets to avoid double registration.
-func newFocusableBase(parent IWidget, rect gtv.TRect, attrs, focusedAttrs gtv.CellAttributes) *TFocusable {
-	return &TFocusable{
+func newFocusableBase(parent IWidget, opts ...gtv.Option) *TFocusable {
+	focusable := &TFocusable{
 		TWidget: TWidget{
-			Position: rect,
+			Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0},
 			Parent:   parent,
 			Flags:    WidgetFlagNone,
 		},
-		attrs:        attrs,
-		focusedAttrs: focusedAttrs,
+		cellAttrs:    gtv.CellAttributes{},
+		focusedAttrs: gtv.CellAttributes{},
 	}
+
+	// Apply options to TWidget first
+	for _, opt := range opts {
+		opt(&focusable.TWidget)
+	}
+
+	// Apply options to TFocusable
+	for _, opt := range opts {
+		opt(focusable)
+	}
+
+	return focusable
 }
 
 // GetAttrs returns the text attributes for normal state.
 func (f *TFocusable) GetAttrs() gtv.CellAttributes {
-	return f.attrs
+	return f.cellAttrs
 }
 
 // SetAttrs sets the text attributes for normal state.
 func (f *TFocusable) SetAttrs(attrs gtv.CellAttributes) {
-	f.attrs = attrs
+	f.cellAttrs = attrs
 }
 
 // GetFocusedAttrs returns the text attributes for focused state.

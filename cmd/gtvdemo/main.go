@@ -45,26 +45,26 @@ func main() {
 	// Create input boxes for form fields (right column, aligned)
 	nameInput := tui.NewInputBox(
 		mainLayout,
-		"",
-		gtv.TRect{X: 15, Y: 3, W: 30, H: 1},
-		gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333), // Normal: white on dark gray
-		gtv.AttrsWithColor(0, 0x000000, 0x00AAFF), // Focused: black on light blue
+		tui.WithText(""),
+		tui.WithRectangle(15, 3, 30, 1),
+		tui.WithAttrs(gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333)),        // Normal: white on dark gray
+		tui.WithFocusedAttrs(gtv.AttrsWithColor(0, 0x000000, 0x00AAFF)), // Focused: black on light blue
 	)
 
 	emailInput := tui.NewInputBox(
 		mainLayout,
-		"",
-		gtv.TRect{X: 15, Y: 5, W: 30, H: 1},
-		gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333),
-		gtv.AttrsWithColor(0, 0x000000, 0x00AAFF),
+		tui.WithText(""),
+		tui.WithRectangle(15, 5, 30, 1),
+		tui.WithAttrs(gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333)),
+		tui.WithFocusedAttrs(gtv.AttrsWithColor(0, 0x000000, 0x00AAFF)),
 	)
 
 	phoneInput := tui.NewInputBox(
 		mainLayout,
-		"",
-		gtv.TRect{X: 15, Y: 7, W: 30, H: 1},
-		gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333),
-		gtv.AttrsWithColor(0, 0x000000, 0x00AAFF),
+		tui.WithText(""),
+		tui.WithRectangle(15, 7, 30, 1),
+		tui.WithAttrs(gtv.AttrsWithColor(0, 0xFFFFFF, 0x333333)),
+		tui.WithFocusedAttrs(gtv.AttrsWithColor(0, 0x000000, 0x00AAFF)),
 	)
 
 	// Create result label (below input fields)

@@ -83,6 +83,47 @@ type TWidget struct {
 	Cursor CursorState
 }
 
+func WithPosition(X, Y int) gtv.Option {
+	return func(w any) {
+		if w, ok := w.(*TWidget); ok {
+			w.Position.X = uint16(X)
+			w.Position.Y = uint16(Y)
+		}
+	}
+}
+
+func WithRectangle(X, Y, W, H int) gtv.Option {
+	return func(w any) {
+		if w, ok := w.(*TWidget); ok {
+			w.Position = gtv.TRect{X: uint16(X), Y: uint16(Y), W: uint16(W), H: uint16(H)}
+		}
+	}
+}
+
+func WithChild(child IWidget) gtv.Option {
+	return func(w any) {
+		if w, ok := w.(IWidget); ok {
+			w.AddChild(child)
+		}
+	}
+}
+
+func WithFlags(flags WidgetFlag) gtv.Option {
+	return func(w any) {
+		if w, ok := w.(*TWidget); ok {
+			w.Flags = flags
+		}
+	}
+}
+
+func WithCursorState(cursor CursorState) gtv.Option {
+	return func(w any) {
+		if w, ok := w.(*TWidget); ok {
+			w.Cursor = cursor
+		}
+	}
+}
+
 // GetPos returns position of the widget relative to its parent.
 // If widget has no parent, returns position relative to the screen.
 func (w *TWidget) GetPos() gtv.TRect {
