@@ -111,7 +111,7 @@ func TestTLayout_Draw_WithBackground(t *testing.T) {
 		for y := 10; y < 13; y++ {
 			cell := verifier.GetCell(x, y)
 			assert.Equal(t, ' ', cell.Rune, "Cell should be space")
-			assert.Equal(t, uint32(0xFF0000), cell.Attrs.BackColor, "Cell should have background color")
+			assert.Equal(t, gtv.TextColor(0xFF0000), cell.Attrs.BackColor, "Cell should have background color")
 		}
 	}
 }
@@ -136,7 +136,7 @@ func TestTLayout_Draw_Hidden(t *testing.T) {
 	for x := 0; x < 10; x++ {
 		for y := 0; y < 5; y++ {
 			cell := verifier.GetCell(x, y)
-			assert.NotEqual(t, uint32(0xFF0000), cell.Attrs.BackColor, "Hidden layout should not draw")
+			assert.NotEqual(t, gtv.TextColor(0xFF0000), cell.Attrs.BackColor, "Hidden layout should not draw")
 		}
 	}
 }
@@ -187,7 +187,7 @@ func TestTLayout_Draw_WithBackgroundAndChildren(t *testing.T) {
 
 	// Check background in an area without children
 	cell := verifier.GetCell(7, 7)
-	assert.Equal(t, uint32(0x0000FF), cell.Attrs.BackColor, "Background should be drawn")
+	assert.Equal(t, gtv.TextColor(0x0000FF), cell.Attrs.BackColor, "Background should be drawn")
 
 	// Check that child is drawn on top
 	assert.True(t, verifier.HasText(10, 8, 4, 1, "Test"), "Child should be drawn at correct position")
@@ -451,7 +451,7 @@ func TestTLayout_ComplexScenario(t *testing.T) {
 	// Layout is at (5, 5), so check position (15, 15) which is offset (10, 10) from layout origin
 	// This position is not covered by any of the labels
 	cell := verifier.GetCell(15, 15)
-	assert.Equal(t, uint32(0x111111), cell.Attrs.BackColor, "Background should be drawn")
+	assert.Equal(t, gtv.TextColor(0x111111), cell.Attrs.BackColor, "Background should be drawn")
 
 	// Verify all labels are at correct positions
 	// label1 at (5+2, 5+1) = (7, 6)
@@ -489,7 +489,7 @@ func TestTLayout_NestedLayouts(t *testing.T) {
 	// Check background in nested layout area
 	// Position (15, 15) will be covered by the label, so check position (12, 12) instead
 	cell := verifier.GetCell(12, 12)
-	assert.Equal(t, uint32(0x222222), cell.Attrs.BackColor, "Nested layout background should be drawn")
+	assert.Equal(t, gtv.TextColor(0x222222), cell.Attrs.BackColor, "Nested layout background should be drawn")
 
 	// Verify label in nested layout is at correct absolute position
 	// Nested layout at (10, 10), label at (5, 5) relative to nested layout = (15, 15) absolute

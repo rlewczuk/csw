@@ -76,7 +76,7 @@ func (t *ThemeInterceptor) SetCursorStyle(style CursorStyle) {
 
 // applyTheme applies theme to the given cell attributes.
 // If ThemeTag is non-zero, it looks up the theme and applies colors
-// that are not explicitly set (i.e. zero).
+// that are not explicitly set (i.e. set to NoColor).
 func (t *ThemeInterceptor) applyTheme(attrs CellAttributes) CellAttributes {
 	// If ThemeTag is zero, return original attributes
 	if attrs.ThemeTag == 0 {
@@ -93,7 +93,7 @@ func (t *ThemeInterceptor) applyTheme(attrs CellAttributes) CellAttributes {
 		return attrs
 	}
 
-	// Apply theme: override only zero colors and attributes
+	// Apply theme: override only NoColor values and zero attributes
 	result := attrs
 
 	// Override attributes only if original is zero
@@ -101,18 +101,18 @@ func (t *ThemeInterceptor) applyTheme(attrs CellAttributes) CellAttributes {
 		result.Attributes = themeAttrs.Attributes
 	}
 
-	// Override TextColor only if original is zero
-	if attrs.TextColor == 0 {
+	// Override TextColor only if original is NoColor
+	if attrs.TextColor == NoColor {
 		result.TextColor = themeAttrs.TextColor
 	}
 
-	// Override BackColor only if original is zero
-	if attrs.BackColor == 0 {
+	// Override BackColor only if original is NoColor
+	if attrs.BackColor == NoColor {
 		result.BackColor = themeAttrs.BackColor
 	}
 
-	// Override StrikeColor only if original is zero
-	if attrs.StrikeColor == 0 {
+	// Override StrikeColor only if original is NoColor
+	if attrs.StrikeColor == NoColor {
 		result.StrikeColor = themeAttrs.StrikeColor
 	}
 

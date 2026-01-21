@@ -98,13 +98,13 @@ func (l *TLabel) getFormattedCells() []gtv.Cell {
 		combinedAttrs.Attributes |= cells[i].Attrs.Attributes
 
 		// Use colors from base attributes if they are set, otherwise use formatted colors
-		if combinedAttrs.TextColor == 0 {
+		if combinedAttrs.TextColor == gtv.NoColor {
 			combinedAttrs.TextColor = cells[i].Attrs.TextColor
 		}
-		if combinedAttrs.BackColor == 0 {
+		if combinedAttrs.BackColor == gtv.NoColor {
 			combinedAttrs.BackColor = cells[i].Attrs.BackColor
 		}
-		if combinedAttrs.StrikeColor == 0 {
+		if combinedAttrs.StrikeColor == gtv.NoColor {
 			combinedAttrs.StrikeColor = cells[i].Attrs.StrikeColor
 		}
 		if combinedAttrs.ThemeTag == 0 {

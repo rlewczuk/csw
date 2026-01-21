@@ -53,8 +53,8 @@ func TestButton_BasicRendering(t *testing.T) {
 	for i, ch := range expectedText {
 		idx := 10*width + 10 + i
 		assert.Equal(t, ch, content[idx].Rune, "Character at position %d", i)
-		assert.Equal(t, uint32(0xFFFFFF), content[idx].Attrs.TextColor)
-		assert.Equal(t, uint32(0x0000FF), content[idx].Attrs.BackColor)
+		assert.Equal(t, gtv.TextColor(0xFFFFFF), content[idx].Attrs.TextColor)
+		assert.Equal(t, gtv.TextColor(0x0000FF), content[idx].Attrs.BackColor)
 	}
 }
 
@@ -91,8 +91,8 @@ func TestButton_FocusedRendering(t *testing.T) {
 	for i, ch := range expectedText {
 		idx := 5*width + 5 + i
 		assert.Equal(t, ch, content[idx].Rune, "Character at position %d", i)
-		assert.Equal(t, uint32(0x000000), content[idx].Attrs.TextColor)
-		assert.Equal(t, uint32(0xFFFF00), content[idx].Attrs.BackColor)
+		assert.Equal(t, gtv.TextColor(0x000000), content[idx].Attrs.TextColor)
+		assert.Equal(t, gtv.TextColor(0xFFFF00), content[idx].Attrs.BackColor)
 	}
 }
 
@@ -129,8 +129,8 @@ func TestButton_DisabledRendering(t *testing.T) {
 	for i, ch := range expectedText {
 		idx := 15*width + 15 + i
 		assert.Equal(t, ch, content[idx].Rune, "Character at position %d", i)
-		assert.Equal(t, uint32(0x808080), content[idx].Attrs.TextColor)
-		assert.Equal(t, uint32(0x000000), content[idx].Attrs.BackColor)
+		assert.Equal(t, gtv.TextColor(0x808080), content[idx].Attrs.TextColor)
+		assert.Equal(t, gtv.TextColor(0x000000), content[idx].Attrs.BackColor)
 	}
 }
 
@@ -454,8 +454,8 @@ func TestButton_WithinLayout(t *testing.T) {
 		idx := 10*width + 20 + i
 		assert.Equal(t, ch, content[idx].Rune, "Character at position %d", i)
 		// Should use focused attributes since button is focused
-		assert.Equal(t, uint32(0x000000), content[idx].Attrs.TextColor)
-		assert.Equal(t, uint32(0xFFFF00), content[idx].Attrs.BackColor)
+		assert.Equal(t, gtv.TextColor(0x000000), content[idx].Attrs.TextColor)
+		assert.Equal(t, gtv.TextColor(0xFFFF00), content[idx].Attrs.BackColor)
 	}
 
 	// Test button press through application
