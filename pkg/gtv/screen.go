@@ -1,6 +1,7 @@
 package gtv
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -36,16 +37,103 @@ type TextColor uint32
 // CellAttributes represents attributes of a single character cell.
 type CellAttributes struct {
 	// Attrs is a bitfield of attributes. It is a combination of the following:
-	Attributes TextAttributes
+	Attributes TextAttributes `json:"attributes,omitempty"`
 	// Foreground sets color of the text. It is 24-bit color in RGB format.
-	TextColor uint32
+	TextColor uint32 `json:"text-color,omitempty"`
 	// Background sets color of the background. It is 24-bit color in RGB format.
-	BackColor uint32
+	BackColor uint32 `json:"back-color,omitempty"`
 	// StrikeColor sets color of the strike through line. It is 24-bit color in RGB format.
-	StrikeColor uint32
+	StrikeColor uint32 `json:"strike-color,omitempty"`
 	// ThemeTag is a tag that can be used to apply theme to the text.
 	// If non-zero, it will automatically fill color fields if they are not explicitly set (i.e. zero)
-	ThemeTag uint32
+	ThemeTag uint32 `json:"theme-tag,omitempty"`
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for CellAttributes.
+// It supports both decimal numbers and hex strings for color fields.
+// Hex strings can be in the format "#RRGGBB" or "0xRRGGBB".
+func (c *CellAttributes) UnmarshalJSON(data []byte) error {
+	// Use an auxiliary type to avoid infinite recursion
+	type Alias CellAttributes
+
+	// First, try to unmarshal as a map to handle mixed types
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("CellAttributes.UnmarshalJSON(): %w", err)
+	}
+
+	// Parse each field
+	for key, value := range raw {
+		switch key {
+		case "attributes":
+			if err := json.Unmarshal(value, &c.Attributes); err != nil {
+				return fmt.Errorf("CellAttributes.UnmarshalJSON(): invalid attributes: %w", err)
+			}
+		case "text-color":
+			color, err := parseColorValue(value)
+			if err != nil {
+				return fmt.Errorf("CellAttributes.UnmarshalJSON(): invalid text-color: %w", err)
+			}
+			c.TextColor = color
+		case "back-color":
+			color, err := parseColorValue(value)
+			if err != nil {
+				return fmt.Errorf("CellAttributes.UnmarshalJSON(): invalid back-color: %w", err)
+			}
+			c.BackColor = color
+		case "strike-color":
+			color, err := parseColorValue(value)
+			if err != nil {
+				return fmt.Errorf("CellAttributes.UnmarshalJSON(): invalid strike-color: %w", err)
+			}
+			c.StrikeColor = color
+		case "theme-tag":
+			if err := json.Unmarshal(value, &c.ThemeTag); err != nil {
+				return fmt.Errorf("CellAttributes.UnmarshalJSON(): invalid theme-tag: %w", err)
+			}
+		default:
+			// Ignore unknown fields
+		}
+	}
+
+	return nil
+}
+
+// parseColorValue parses a color value from JSON, supporting both numbers and hex strings.
+func parseColorValue(data []byte) (uint32, error) {
+	// Try to parse as a number first
+	var num uint32
+	if err := json.Unmarshal(data, &num); err == nil {
+		return num, nil
+	}
+
+	// Try to parse as a string (hex color)
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return 0, fmt.Errorf("parseColorValue(): expected number or hex string, got %s", string(data))
+	}
+
+	// Parse hex string
+	return parseHexColor(str)
+}
+
+// parseHexColor parses a hex color string in the format "#RRGGBB" or "0xRRGGBB".
+func parseHexColor(s string) (uint32, error) {
+	// Remove leading # or 0x prefix
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "#") {
+		s = s[1:]
+	} else if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		s = s[2:]
+	}
+
+	// Parse the hex string
+	val, err := strconv.ParseUint(s, 16, 32)
+	if err != nil {
+		return 0, fmt.Errorf("parseHexColor(): invalid hex color %q: %w", s, err)
+	}
+
+	return uint32(val), nil
 }
 
 // Attrs creates CellAttributes with only text attributes (no colors).
