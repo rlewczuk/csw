@@ -596,9 +596,9 @@ func TestMockScreen_HasTextWithAttrs_Colors(t *testing.T) {
 	screen := NewScreenBuffer(20, 10, 0)
 
 	// Create cells with specific colors manually
-	redColor := uint32(0xFF0000)
-	blueColor := uint32(0x0000FF)
-	greenBack := uint32(0x00FF00)
+	redColor := gtv.TextColor(0xFF0000)
+	blueColor := gtv.TextColor(0x0000FF)
+	greenBack := gtv.TextColor(0x00FF00)
 
 	// Put text and then modify colors
 	screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, "Red", gtv.Attrs(0))
@@ -2394,20 +2394,20 @@ func TestScreenBuffer_PutContent_PreservesAttributes(t *testing.T) {
 	cell0 := verifier.GetCell(10, 5)
 	assert.Equal(t, 'R', cell0.Rune)
 	assert.Equal(t, gtv.AttrBold, cell0.Attrs.Attributes)
-	assert.Equal(t, uint32(0xFF0000), cell0.Attrs.TextColor)
-	assert.Equal(t, uint32(0x000000), cell0.Attrs.BackColor)
+	assert.Equal(t, gtv.TextColor(0xFF0000), cell0.Attrs.TextColor)
+	assert.Equal(t, gtv.TextColor(0x000000), cell0.Attrs.BackColor)
 
 	// Verify second cell (Green, Italic)
 	cell1 := verifier.GetCell(11, 5)
 	assert.Equal(t, 'G', cell1.Rune)
 	assert.Equal(t, gtv.AttrItalic, cell1.Attrs.Attributes)
-	assert.Equal(t, uint32(0x00FF00), cell1.Attrs.TextColor)
-	assert.Equal(t, uint32(0x000000), cell1.Attrs.BackColor)
+	assert.Equal(t, gtv.TextColor(0x00FF00), cell1.Attrs.TextColor)
+	assert.Equal(t, gtv.TextColor(0x000000), cell1.Attrs.BackColor)
 
 	// Verify third cell (Blue, Underline)
 	cell2 := verifier.GetCell(12, 5)
 	assert.Equal(t, 'B', cell2.Rune)
 	assert.Equal(t, gtv.AttrUnderline, cell2.Attrs.Attributes)
-	assert.Equal(t, uint32(0x0000FF), cell2.Attrs.TextColor)
-	assert.Equal(t, uint32(0xFFFFFF), cell2.Attrs.BackColor)
+	assert.Equal(t, gtv.TextColor(0x0000FF), cell2.Attrs.TextColor)
+	assert.Equal(t, gtv.TextColor(0xFFFFFF), cell2.Attrs.BackColor)
 }

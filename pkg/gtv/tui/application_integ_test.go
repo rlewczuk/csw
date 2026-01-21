@@ -65,7 +65,7 @@ func TestApplicationIntegration_BasicRendering(t *testing.T) {
 		idx := 5*width + 5 + i
 		assert.Equal(t, ch, content[idx].Rune, "Label1 character at position %d", i)
 		assert.Equal(t, gtv.AttrBold, content[idx].Attrs.Attributes&gtv.AttrBold)
-		assert.Equal(t, uint32(0xFF0000), content[idx].Attrs.TextColor)
+		assert.Equal(t, gtv.TextColor(0xFF0000), content[idx].Attrs.TextColor)
 	}
 
 	// Check that label2 is rendered at position (10, 10)
@@ -73,7 +73,7 @@ func TestApplicationIntegration_BasicRendering(t *testing.T) {
 	for i, ch := range expectedText2 {
 		idx := 10*width + 10 + i
 		assert.Equal(t, ch, content[idx].Rune, "Label2 character at position %d", i)
-		assert.Equal(t, uint32(0x00FF00), content[idx].Attrs.TextColor)
+		assert.Equal(t, gtv.TextColor(0x00FF00), content[idx].Attrs.TextColor)
 	}
 
 	// Check that label3 is rendered at position (70, 20)
@@ -82,7 +82,7 @@ func TestApplicationIntegration_BasicRendering(t *testing.T) {
 		idx := 20*width + 70 + i
 		assert.Equal(t, ch, content[idx].Rune, "Label3 character at position %d", i)
 		assert.Equal(t, gtv.AttrItalic, content[idx].Attrs.Attributes&gtv.AttrItalic)
-		assert.Equal(t, uint32(0x0000FF), content[idx].Attrs.TextColor)
+		assert.Equal(t, gtv.TextColor(0x0000FF), content[idx].Attrs.TextColor)
 	}
 
 	// Verify that unused labels are accessible via layout children
@@ -269,7 +269,7 @@ func TestApplicationIntegration_ComplexLayout(t *testing.T) {
 	// Verify header background (row 0)
 	for x := 0; x < 80; x++ {
 		idx := 0*width + x
-		assert.Equal(t, uint32(0x333333), content[idx].Attrs.BackColor, "Header background at x=%d", x)
+		assert.Equal(t, gtv.TextColor(0x333333), content[idx].Attrs.BackColor, "Header background at x=%d", x)
 	}
 
 	// Verify title in header (row 1, starting at x=2)
@@ -297,7 +297,7 @@ func TestApplicationIntegration_ComplexLayout(t *testing.T) {
 	// Verify footer background (row 21)
 	for x := 0; x < 80; x++ {
 		idx := 21*width + x
-		assert.Equal(t, uint32(0x333333), content[idx].Attrs.BackColor, "Footer background at x=%d", x)
+		assert.Equal(t, gtv.TextColor(0x333333), content[idx].Attrs.BackColor, "Footer background at x=%d", x)
 	}
 
 	// Verify status in footer (row 22, starting at x=2)
@@ -508,7 +508,7 @@ func TestApplicationIntegration_DemoForm(t *testing.T) {
 	// Verify result label was updated
 	expectedResult := "Submitted - Name: John Doe, Email: john@example.com"
 	assert.Equal(t, expectedResult, resultLabel.GetText())
-	assert.Equal(t, uint32(0x00FF00), resultLabel.GetAttrs().TextColor)
+	assert.Equal(t, gtv.TextColor(0x00FF00), resultLabel.GetAttrs().TextColor)
 
 	// Tab to Clear button
 	mockInput.TypeKeysByName("Tab")
@@ -530,7 +530,7 @@ func TestApplicationIntegration_DemoForm(t *testing.T) {
 
 	// Verify error message
 	assert.Equal(t, "Please enter at least one field!", resultLabel.GetText())
-	assert.Equal(t, uint32(0xFF0000), resultLabel.GetAttrs().TextColor)
+	assert.Equal(t, gtv.TextColor(0xFF0000), resultLabel.GetAttrs().TextColor)
 }
 
 // TestApplicationIntegration_InputBoxCursorVisibility tests that when an InputBox

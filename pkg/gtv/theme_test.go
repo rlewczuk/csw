@@ -233,9 +233,12 @@ func TestThemeInterceptor_PutText_WithThemeTag_AppliesColors(t *testing.T) {
 	}
 	interceptor := NewThemeInterceptor(screen, theme)
 
-	// Attributes with theme tag but zero colors
+	// Attributes with theme tag but NoColor for all colors (to use theme colors)
 	attrs := CellAttributes{
-		ThemeTag: 1,
+		ThemeTag:    1,
+		TextColor:   NoColor,
+		BackColor:   NoColor,
+		StrikeColor: NoColor,
 	}
 
 	interceptor.PutText(TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", attrs)
@@ -245,9 +248,9 @@ func TestThemeInterceptor_PutText_WithThemeTag_AppliesColors(t *testing.T) {
 	assert.Equal(t, 'H', content[0].Rune, "ThemeInterceptor.PutText() rune at theme.go")
 	assert.Equal(t, uint32(1), content[0].Attrs.ThemeTag, "ThemeInterceptor.PutText() theme tag at theme.go")
 	assert.Equal(t, AttrItalic, content[0].Attrs.Attributes, "ThemeInterceptor.PutText() attributes at theme.go")
-	assert.Equal(t, uint32(0xFF0000), content[0].Attrs.TextColor, "ThemeInterceptor.PutText() text color at theme.go")
-	assert.Equal(t, uint32(0x00FF00), content[0].Attrs.BackColor, "ThemeInterceptor.PutText() back color at theme.go")
-	assert.Equal(t, uint32(0x0000FF), content[0].Attrs.StrikeColor, "ThemeInterceptor.PutText() strike color at theme.go")
+	assert.Equal(t, TextColor(0xFF0000), content[0].Attrs.TextColor, "ThemeInterceptor.PutText() text color at theme.go")
+	assert.Equal(t, TextColor(0x00FF00), content[0].Attrs.BackColor, "ThemeInterceptor.PutText() back color at theme.go")
+	assert.Equal(t, TextColor(0x0000FF), content[0].Attrs.StrikeColor, "ThemeInterceptor.PutText() strike color at theme.go")
 }
 
 func TestThemeInterceptor_PutText_WithThemeTag_PreservesExplicitColors(t *testing.T) {
@@ -278,9 +281,9 @@ func TestThemeInterceptor_PutText_WithThemeTag_PreservesExplicitColors(t *testin
 	assert.Equal(t, 'H', content[0].Rune, "ThemeInterceptor.PutText() rune at theme.go")
 	assert.Equal(t, uint32(1), content[0].Attrs.ThemeTag, "ThemeInterceptor.PutText() theme tag at theme.go")
 	assert.Equal(t, AttrBold, content[0].Attrs.Attributes, "ThemeInterceptor.PutText() attributes at theme.go")
-	assert.Equal(t, uint32(0xAAAAAA), content[0].Attrs.TextColor, "ThemeInterceptor.PutText() text color at theme.go")
-	assert.Equal(t, uint32(0xBBBBBB), content[0].Attrs.BackColor, "ThemeInterceptor.PutText() back color at theme.go")
-	assert.Equal(t, uint32(0xCCCCCC), content[0].Attrs.StrikeColor, "ThemeInterceptor.PutText() strike color at theme.go")
+	assert.Equal(t, TextColor(0xAAAAAA), content[0].Attrs.TextColor, "ThemeInterceptor.PutText() text color at theme.go")
+	assert.Equal(t, TextColor(0xBBBBBB), content[0].Attrs.BackColor, "ThemeInterceptor.PutText() back color at theme.go")
+	assert.Equal(t, TextColor(0xCCCCCC), content[0].Attrs.StrikeColor, "ThemeInterceptor.PutText() strike color at theme.go")
 }
 
 func TestThemeInterceptor_PutText_WithThemeTag_PartialExplicitColors(t *testing.T) {
@@ -294,10 +297,12 @@ func TestThemeInterceptor_PutText_WithThemeTag_PartialExplicitColors(t *testing.
 	}
 	interceptor := NewThemeInterceptor(screen, theme)
 
-	// Attributes with theme tag and only text color explicit
+	// Attributes with theme tag and only text color explicit (BackColor and StrikeColor use theme)
 	attrs := CellAttributes{
-		ThemeTag:  1,
-		TextColor: 0xAAAAAA,
+		ThemeTag:    1,
+		TextColor:   0xAAAAAA,
+		BackColor:   NoColor,
+		StrikeColor: NoColor,
 	}
 
 	interceptor.PutText(TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", attrs)
@@ -305,9 +310,9 @@ func TestThemeInterceptor_PutText_WithThemeTag_PartialExplicitColors(t *testing.
 	// Verify content - should preserve text color, apply theme back/strike colors
 	_, _, content := screen.GetContent()
 	assert.Equal(t, 'H', content[0].Rune, "ThemeInterceptor.PutText() rune at theme.go")
-	assert.Equal(t, uint32(0xAAAAAA), content[0].Attrs.TextColor, "ThemeInterceptor.PutText() text color at theme.go")
-	assert.Equal(t, uint32(0x00FF00), content[0].Attrs.BackColor, "ThemeInterceptor.PutText() back color at theme.go")
-	assert.Equal(t, uint32(0x0000FF), content[0].Attrs.StrikeColor, "ThemeInterceptor.PutText() strike color at theme.go")
+	assert.Equal(t, TextColor(0xAAAAAA), content[0].Attrs.TextColor, "ThemeInterceptor.PutText() text color at theme.go")
+	assert.Equal(t, TextColor(0x00FF00), content[0].Attrs.BackColor, "ThemeInterceptor.PutText() back color at theme.go")
+	assert.Equal(t, TextColor(0x0000FF), content[0].Attrs.StrikeColor, "ThemeInterceptor.PutText() strike color at theme.go")
 }
 
 func TestThemeInterceptor_PutText_ThemeNotFound(t *testing.T) {
@@ -371,9 +376,9 @@ func TestThemeInterceptor_PutContent_WithThemeTag(t *testing.T) {
 
 	// Content with different theme tags
 	cells := []Cell{
-		{Rune: 'A', Attrs: CellAttributes{ThemeTag: 1}},
-		{Rune: 'B', Attrs: CellAttributes{ThemeTag: 2}},
-		{Rune: 'C', Attrs: CellAttributes{ThemeTag: 1, TextColor: 0x123456}},
+		{Rune: 'A', Attrs: CellAttributes{ThemeTag: 1, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
+		{Rune: 'B', Attrs: CellAttributes{ThemeTag: 2, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
+		{Rune: 'C', Attrs: CellAttributes{ThemeTag: 1, TextColor: 0x123456, BackColor: NoColor, StrikeColor: NoColor}},
 	}
 
 	interceptor.PutContent(TRect{X: 0, Y: 0, W: 0, H: 0}, cells)
@@ -383,21 +388,21 @@ func TestThemeInterceptor_PutContent_WithThemeTag(t *testing.T) {
 
 	// First cell - theme 1
 	assert.Equal(t, 'A', content[0].Rune, "ThemeInterceptor.PutContent() rune at theme.go")
-	assert.Equal(t, uint32(0xFF0000), content[0].Attrs.TextColor, "ThemeInterceptor.PutContent() text color at theme.go")
-	assert.Equal(t, uint32(0x00FF00), content[0].Attrs.BackColor, "ThemeInterceptor.PutContent() back color at theme.go")
-	assert.Equal(t, uint32(0x0000FF), content[0].Attrs.StrikeColor, "ThemeInterceptor.PutContent() strike color at theme.go")
+	assert.Equal(t, TextColor(0xFF0000), content[0].Attrs.TextColor, "ThemeInterceptor.PutContent() text color at theme.go")
+	assert.Equal(t, TextColor(0x00FF00), content[0].Attrs.BackColor, "ThemeInterceptor.PutContent() back color at theme.go")
+	assert.Equal(t, TextColor(0x0000FF), content[0].Attrs.StrikeColor, "ThemeInterceptor.PutContent() strike color at theme.go")
 
 	// Second cell - theme 2
 	assert.Equal(t, 'B', content[1].Rune, "ThemeInterceptor.PutContent() rune at theme.go")
-	assert.Equal(t, uint32(0xAAAAAA), content[1].Attrs.TextColor, "ThemeInterceptor.PutContent() text color at theme.go")
-	assert.Equal(t, uint32(0xBBBBBB), content[1].Attrs.BackColor, "ThemeInterceptor.PutContent() back color at theme.go")
-	assert.Equal(t, uint32(0xCCCCCC), content[1].Attrs.StrikeColor, "ThemeInterceptor.PutContent() strike color at theme.go")
+	assert.Equal(t, TextColor(0xAAAAAA), content[1].Attrs.TextColor, "ThemeInterceptor.PutContent() text color at theme.go")
+	assert.Equal(t, TextColor(0xBBBBBB), content[1].Attrs.BackColor, "ThemeInterceptor.PutContent() back color at theme.go")
+	assert.Equal(t, TextColor(0xCCCCCC), content[1].Attrs.StrikeColor, "ThemeInterceptor.PutContent() strike color at theme.go")
 
 	// Third cell - theme 1 with explicit text color
 	assert.Equal(t, 'C', content[2].Rune, "ThemeInterceptor.PutContent() rune at theme.go")
-	assert.Equal(t, uint32(0x123456), content[2].Attrs.TextColor, "ThemeInterceptor.PutContent() text color at theme.go")
-	assert.Equal(t, uint32(0x00FF00), content[2].Attrs.BackColor, "ThemeInterceptor.PutContent() back color at theme.go")
-	assert.Equal(t, uint32(0x0000FF), content[2].Attrs.StrikeColor, "ThemeInterceptor.PutContent() strike color at theme.go")
+	assert.Equal(t, TextColor(0x123456), content[2].Attrs.TextColor, "ThemeInterceptor.PutContent() text color at theme.go")
+	assert.Equal(t, TextColor(0x00FF00), content[2].Attrs.BackColor, "ThemeInterceptor.PutContent() back color at theme.go")
+	assert.Equal(t, TextColor(0x0000FF), content[2].Attrs.StrikeColor, "ThemeInterceptor.PutContent() strike color at theme.go")
 }
 
 func TestThemeInterceptor_PutContent_EmptyTheme(t *testing.T) {
@@ -406,7 +411,7 @@ func TestThemeInterceptor_PutContent_EmptyTheme(t *testing.T) {
 
 	// Content with theme tag but no theme
 	cells := []Cell{
-		{Rune: 'A', Attrs: CellAttributes{ThemeTag: 1}},
+		{Rune: 'A', Attrs: CellAttributes{ThemeTag: 1, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
 	}
 
 	interceptor.PutContent(TRect{X: 0, Y: 0, W: 0, H: 0}, cells)
@@ -435,7 +440,7 @@ func TestThemeInterceptor_ApplyTheme_MultipleFields(t *testing.T) {
 			},
 		},
 		{
-			name: "theme tag with all zero fields",
+			name: "theme tag with all NoColor fields",
 			theme: map[string]CellAttributes{
 				"1": {
 					Attributes:  AttrBold | AttrItalic,
@@ -445,7 +450,10 @@ func TestThemeInterceptor_ApplyTheme_MultipleFields(t *testing.T) {
 				},
 			},
 			input: CellAttributes{
-				ThemeTag: 1,
+				ThemeTag:    1,
+				TextColor:   NoColor,
+				BackColor:   NoColor,
+				StrikeColor: NoColor,
 			},
 			expected: CellAttributes{
 				ThemeTag:    1,
@@ -466,9 +474,11 @@ func TestThemeInterceptor_ApplyTheme_MultipleFields(t *testing.T) {
 				},
 			},
 			input: CellAttributes{
-				ThemeTag:   1,
-				Attributes: AttrItalic,
-				BackColor:  0xAAAAAA,
+				ThemeTag:    1,
+				Attributes:  AttrItalic,
+				TextColor:   NoColor,
+				BackColor:   0xAAAAAA,
+				StrikeColor: NoColor,
 			},
 			expected: CellAttributes{
 				ThemeTag:    1,
@@ -537,7 +547,7 @@ func TestThemeInterceptor_PutText_Clipping(t *testing.T) {
 	interceptor := NewThemeInterceptor(screen, theme)
 
 	// Test with clipping rectangle
-	attrs := CellAttributes{ThemeTag: 1}
+	attrs := CellAttributes{ThemeTag: 1, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}
 	interceptor.PutText(TRect{X: 0, Y: 0, W: 3, H: 1}, "Hello", attrs)
 
 	// Verify only first 3 characters are written
@@ -568,14 +578,14 @@ func TestThemeInterceptor_Integration(t *testing.T) {
 	interceptor := NewThemeInterceptor(screen, theme)
 
 	// Put text with theme 1
-	interceptor.PutText(TRect{X: 0, Y: 0, W: 0, H: 0}, "Header", CellAttributes{ThemeTag: 1})
+	interceptor.PutText(TRect{X: 0, Y: 0, W: 0, H: 0}, "Header", CellAttributes{ThemeTag: 1, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor})
 
 	// Put content with theme 2
 	cells := []Cell{
-		{Rune: 'B', Attrs: CellAttributes{ThemeTag: 2}},
-		{Rune: 'o', Attrs: CellAttributes{ThemeTag: 2}},
-		{Rune: 'd', Attrs: CellAttributes{ThemeTag: 2}},
-		{Rune: 'y', Attrs: CellAttributes{ThemeTag: 2}},
+		{Rune: 'B', Attrs: CellAttributes{ThemeTag: 2, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
+		{Rune: 'o', Attrs: CellAttributes{ThemeTag: 2, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
+		{Rune: 'd', Attrs: CellAttributes{ThemeTag: 2, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
+		{Rune: 'y', Attrs: CellAttributes{ThemeTag: 2, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
 	}
 	interceptor.PutContent(TRect{X: 0, Y: 1, W: 0, H: 0}, cells)
 
@@ -588,24 +598,24 @@ func TestThemeInterceptor_Integration(t *testing.T) {
 	// Line 0 - Header with theme 1
 	for i := 0; i < 6; i++ {
 		assert.Equal(t, AttrBold, content[i].Attrs.Attributes, "ThemeInterceptor integration attrs at theme.go")
-		assert.Equal(t, uint32(0xFF0000), content[i].Attrs.TextColor, "ThemeInterceptor integration text color at theme.go")
-		assert.Equal(t, uint32(0x000000), content[i].Attrs.BackColor, "ThemeInterceptor integration back color at theme.go")
+		assert.Equal(t, TextColor(0xFF0000), content[i].Attrs.TextColor, "ThemeInterceptor integration text color at theme.go")
+		assert.Equal(t, TextColor(0x000000), content[i].Attrs.BackColor, "ThemeInterceptor integration back color at theme.go")
 	}
 
 	// Line 1 - Body with theme 2
 	for i := 0; i < 4; i++ {
 		idx := 80 + i
 		assert.Equal(t, AttrItalic, content[idx].Attrs.Attributes, "ThemeInterceptor integration attrs at theme.go")
-		assert.Equal(t, uint32(0x00FF00), content[idx].Attrs.TextColor, "ThemeInterceptor integration text color at theme.go")
-		assert.Equal(t, uint32(0x111111), content[idx].Attrs.BackColor, "ThemeInterceptor integration back color at theme.go")
+		assert.Equal(t, TextColor(0x00FF00), content[idx].Attrs.TextColor, "ThemeInterceptor integration text color at theme.go")
+		assert.Equal(t, TextColor(0x111111), content[idx].Attrs.BackColor, "ThemeInterceptor integration back color at theme.go")
 	}
 
 	// Line 2 - Plain without theme
 	for i := 0; i < 5; i++ {
 		idx := 160 + i
 		assert.Equal(t, TextAttributes(0), content[idx].Attrs.Attributes, "ThemeInterceptor integration attrs at theme.go")
-		assert.Equal(t, uint32(0xAAAAAA), content[idx].Attrs.TextColor, "ThemeInterceptor integration text color at theme.go")
-		assert.Equal(t, uint32(0), content[idx].Attrs.BackColor, "ThemeInterceptor integration back color at theme.go")
+		assert.Equal(t, TextColor(0xAAAAAA), content[idx].Attrs.TextColor, "ThemeInterceptor integration text color at theme.go")
+		assert.Equal(t, TextColor(0), content[idx].Attrs.BackColor, "ThemeInterceptor integration back color at theme.go")
 	}
 }
 
@@ -804,12 +814,12 @@ func TestThemeManager_GetTheme(t *testing.T) {
 	require.NoError(t, err, "ThemeManager.GetTheme() at theme.go")
 	assert.Len(t, theme, 2, "ThemeManager.GetTheme() should return correct theme at theme.go")
 
-	assert.Equal(t, uint32(16777215), theme["1"].TextColor, "ThemeManager.GetTheme() text color at theme.go")
-	assert.Equal(t, uint32(0), theme["1"].BackColor, "ThemeManager.GetTheme() back color at theme.go")
+	assert.Equal(t, TextColor(16777215), theme["1"].TextColor, "ThemeManager.GetTheme() text color at theme.go")
+	assert.Equal(t, TextColor(0), theme["1"].BackColor, "ThemeManager.GetTheme() back color at theme.go")
 	assert.Equal(t, TextAttributes(1), theme["1"].Attributes, "ThemeManager.GetTheme() attributes at theme.go")
 
-	assert.Equal(t, uint32(255), theme["2"].TextColor, "ThemeManager.GetTheme() text color at theme.go")
-	assert.Equal(t, uint32(0), theme["2"].BackColor, "ThemeManager.GetTheme() back color at theme.go")
+	assert.Equal(t, TextColor(255), theme["2"].TextColor, "ThemeManager.GetTheme() text color at theme.go")
+	assert.Equal(t, TextColor(0), theme["2"].BackColor, "ThemeManager.GetTheme() back color at theme.go")
 }
 
 func TestThemeManager_GetTheme_NotFound(t *testing.T) {
@@ -988,17 +998,17 @@ func TestThemeManager_ComplexTheme(t *testing.T) {
 
 	// Check header
 	assert.Equal(t, TextAttributes(3), theme["header"].Attributes, "ThemeManager complex theme header attributes at theme.go")
-	assert.Equal(t, uint32(16777215), theme["header"].TextColor, "ThemeManager complex theme header text color at theme.go")
-	assert.Equal(t, uint32(255), theme["header"].BackColor, "ThemeManager complex theme header back color at theme.go")
-	assert.Equal(t, uint32(65280), theme["header"].StrikeColor, "ThemeManager complex theme header strike color at theme.go")
+	assert.Equal(t, TextColor(16777215), theme["header"].TextColor, "ThemeManager complex theme header text color at theme.go")
+	assert.Equal(t, TextColor(255), theme["header"].BackColor, "ThemeManager complex theme header back color at theme.go")
+	assert.Equal(t, TextColor(65280), theme["header"].StrikeColor, "ThemeManager complex theme header strike color at theme.go")
 
 	// Check body
 	assert.Equal(t, TextAttributes(0), theme["body"].Attributes, "ThemeManager complex theme body attributes at theme.go")
-	assert.Equal(t, uint32(13421772), theme["body"].TextColor, "ThemeManager complex theme body text color at theme.go")
+	assert.Equal(t, TextColor(13421772), theme["body"].TextColor, "ThemeManager complex theme body text color at theme.go")
 
 	// Check footer
 	assert.Equal(t, TextAttributes(8), theme["footer"].Attributes, "ThemeManager complex theme footer attributes at theme.go")
-	assert.Equal(t, uint32(8421504), theme["footer"].TextColor, "ThemeManager complex theme footer text color at theme.go")
+	assert.Equal(t, TextColor(8421504), theme["footer"].TextColor, "ThemeManager complex theme footer text color at theme.go")
 }
 
 func TestThemeManager_EmptyTheme(t *testing.T) {
@@ -1054,24 +1064,24 @@ func TestThemeManager_Integration(t *testing.T) {
 	// Get dark theme
 	darkTheme, err := tm.GetTheme("dark")
 	require.NoError(t, err, "ThemeManager.GetTheme(dark) at theme.go")
-	assert.Equal(t, uint32(16777215), darkTheme["1"].TextColor, "ThemeManager dark theme text color at theme.go")
+	assert.Equal(t, TextColor(16777215), darkTheme["1"].TextColor, "ThemeManager dark theme text color at theme.go")
 
 	// Get light theme
 	lightTheme, err := tm.GetTheme("light")
 	require.NoError(t, err, "ThemeManager.GetTheme(light) at theme.go")
-	assert.Equal(t, uint32(16777215), lightTheme["1"].BackColor, "ThemeManager light theme back color at theme.go")
+	assert.Equal(t, TextColor(16777215), lightTheme["1"].BackColor, "ThemeManager light theme back color at theme.go")
 
 	// Create ThemeInterceptor with dark theme
 	screen := newMockScreen(80, 24)
 	interceptor := NewThemeInterceptor(screen, darkTheme)
 
 	// Write text with theme tag
-	interceptor.PutText(TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", CellAttributes{ThemeTag: 1})
+	interceptor.PutText(TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", CellAttributes{ThemeTag: 1, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor})
 
 	// Verify text is rendered with theme colors
 	_, _, content := screen.GetContent()
-	assert.Equal(t, uint32(16777215), content[0].Attrs.TextColor, "ThemeManager integration text color at theme.go")
-	assert.Equal(t, uint32(0), content[0].Attrs.BackColor, "ThemeManager integration back color at theme.go")
+	assert.Equal(t, TextColor(16777215), content[0].Attrs.TextColor, "ThemeManager integration text color at theme.go")
+	assert.Equal(t, TextColor(0), content[0].Attrs.BackColor, "ThemeManager integration back color at theme.go")
 }
 
 func TestThemeManager_MultipleFilesystems(t *testing.T) {
@@ -1155,8 +1165,8 @@ func TestThemeManager_OverridingThemes(t *testing.T) {
 	require.NoError(t, err, "ThemeManager.GetTheme(dark) at theme.go")
 
 	// The second filesystem should override the first
-	assert.Equal(t, uint32(13421772), theme["1"].TextColor, "ThemeManager overriding theme text color at theme.go")
-	assert.Equal(t, uint32(2236962), theme["1"].BackColor, "ThemeManager overriding theme back color at theme.go")
+	assert.Equal(t, TextColor(13421772), theme["1"].TextColor, "ThemeManager overriding theme text color at theme.go")
+	assert.Equal(t, TextColor(2236962), theme["1"].BackColor, "ThemeManager overriding theme back color at theme.go")
 
 	// Check description is from second theme
 	assert.Equal(t, "Second dark theme", themes[0].Description, "ThemeManager overriding theme description at theme.go")
@@ -1286,13 +1296,13 @@ func TestThemeFile_JSONMarshaling(t *testing.T) {
 	// Check header
 	header := unmarshaled.Theme["header"]
 	assert.Equal(t, AttrBold, header.Attributes, "ThemeFile header Attributes at theme.go")
-	assert.Equal(t, uint32(16777215), header.TextColor, "ThemeFile header TextColor at theme.go")
-	assert.Equal(t, uint32(255), header.BackColor, "ThemeFile header BackColor at theme.go")
+	assert.Equal(t, TextColor(16777215), header.TextColor, "ThemeFile header TextColor at theme.go")
+	assert.Equal(t, TextColor(255), header.BackColor, "ThemeFile header BackColor at theme.go")
 
 	// Check body
 	body := unmarshaled.Theme["body"]
-	assert.Equal(t, uint32(13421772), body.TextColor, "ThemeFile body TextColor at theme.go")
-	assert.Equal(t, uint32(0), body.BackColor, "ThemeFile body BackColor at theme.go")
+	assert.Equal(t, TextColor(13421772), body.TextColor, "ThemeFile body TextColor at theme.go")
+	assert.Equal(t, TextColor(0), body.BackColor, "ThemeFile body BackColor at theme.go")
 }
 
 func TestCellAttributes_HexColorSupport(t *testing.T) {
@@ -1459,23 +1469,23 @@ func TestThemeManager_HexColorTheme(t *testing.T) {
 	require.NoError(t, err, "ThemeManager.GetTheme() at theme.go")
 
 	// Verify header
-	assert.Equal(t, uint32(0xFFFFFF), theme["header"].TextColor, "header TextColor at theme.go")
-	assert.Equal(t, uint32(0x0000FF), theme["header"].BackColor, "header BackColor at theme.go")
+	assert.Equal(t, TextColor(0xFFFFFF), theme["header"].TextColor, "header TextColor at theme.go")
+	assert.Equal(t, TextColor(0x0000FF), theme["header"].BackColor, "header BackColor at theme.go")
 	assert.Equal(t, AttrBold, theme["header"].Attributes, "header Attributes at theme.go")
 
 	// Verify body
-	assert.Equal(t, uint32(0xCCCCCC), theme["body"].TextColor, "body TextColor at theme.go")
-	assert.Equal(t, uint32(0x000000), theme["body"].BackColor, "body BackColor at theme.go")
+	assert.Equal(t, TextColor(0xCCCCCC), theme["body"].TextColor, "body TextColor at theme.go")
+	assert.Equal(t, TextColor(0x000000), theme["body"].BackColor, "body BackColor at theme.go")
 
 	// Verify error
-	assert.Equal(t, uint32(0xFF0000), theme["error"].TextColor, "error TextColor at theme.go")
+	assert.Equal(t, TextColor(0xFF0000), theme["error"].TextColor, "error TextColor at theme.go")
 	assert.Equal(t, AttrBold, theme["error"].Attributes, "error Attributes at theme.go")
 
 	// Verify success
-	assert.Equal(t, uint32(0x00FF00), theme["success"].TextColor, "success TextColor at theme.go")
+	assert.Equal(t, TextColor(0x00FF00), theme["success"].TextColor, "success TextColor at theme.go")
 
 	// Verify warning (0x prefix)
-	assert.Equal(t, uint32(0xFFFF00), theme["warning"].TextColor, "warning TextColor at theme.go")
+	assert.Equal(t, TextColor(0xFFFF00), theme["warning"].TextColor, "warning TextColor at theme.go")
 }
 
 func TestThemeManager_MixedColorFormats(t *testing.T) {
@@ -1506,12 +1516,12 @@ func TestThemeManager_MixedColorFormats(t *testing.T) {
 	require.NoError(t, err, "ThemeManager.GetTheme() at theme.go")
 
 	// tag1: hex text, decimal back
-	assert.Equal(t, uint32(0xFFFFFF), theme["tag1"].TextColor, "tag1 TextColor at theme.go")
-	assert.Equal(t, uint32(255), theme["tag1"].BackColor, "tag1 BackColor at theme.go")
+	assert.Equal(t, TextColor(0xFFFFFF), theme["tag1"].TextColor, "tag1 TextColor at theme.go")
+	assert.Equal(t, TextColor(255), theme["tag1"].BackColor, "tag1 BackColor at theme.go")
 
 	// tag2: decimal text, hex back
-	assert.Equal(t, uint32(16777215), theme["tag2"].TextColor, "tag2 TextColor at theme.go")
-	assert.Equal(t, uint32(0x0000FF), theme["tag2"].BackColor, "tag2 BackColor at theme.go")
+	assert.Equal(t, TextColor(16777215), theme["tag2"].TextColor, "tag2 TextColor at theme.go")
+	assert.Equal(t, TextColor(0x0000FF), theme["tag2"].BackColor, "tag2 BackColor at theme.go")
 }
 
 func TestThemeManager_JSONCompatibility(t *testing.T) {
@@ -1544,15 +1554,15 @@ func TestThemeManager_JSONCompatibility(t *testing.T) {
 	require.NoError(t, err, "ThemeManager.GetTheme() at theme.go")
 
 	// Verify tag1 - only TextColor set
-	assert.Equal(t, uint32(16777215), theme["tag1"].TextColor, "tag1 TextColor at theme.go")
-	assert.Equal(t, uint32(0), theme["tag1"].BackColor, "tag1 BackColor should be zero at theme.go")
+	assert.Equal(t, TextColor(16777215), theme["tag1"].TextColor, "tag1 TextColor at theme.go")
+	assert.Equal(t, TextColor(0), theme["tag1"].BackColor, "tag1 BackColor should be zero at theme.go")
 	assert.Equal(t, TextAttributes(0), theme["tag1"].Attributes, "tag1 Attributes should be zero at theme.go")
 
 	// Verify tag2 - only BackColor set
-	assert.Equal(t, uint32(0), theme["tag2"].TextColor, "tag2 TextColor should be zero at theme.go")
-	assert.Equal(t, uint32(255), theme["tag2"].BackColor, "tag2 BackColor at theme.go")
+	assert.Equal(t, TextColor(0), theme["tag2"].TextColor, "tag2 TextColor should be zero at theme.go")
+	assert.Equal(t, TextColor(255), theme["tag2"].BackColor, "tag2 BackColor at theme.go")
 
 	// Verify tag3 - Attributes and TextColor set
 	assert.Equal(t, TextAttributes(1), theme["tag3"].Attributes, "tag3 Attributes at theme.go")
-	assert.Equal(t, uint32(13421772), theme["tag3"].TextColor, "tag3 TextColor at theme.go")
+	assert.Equal(t, TextColor(13421772), theme["tag3"].TextColor, "tag3 TextColor at theme.go")
 }

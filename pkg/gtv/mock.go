@@ -91,9 +91,9 @@ type AttributeMask struct {
 	CheckStrikeColor bool
 	// Expected values (only used if corresponding Check* is true)
 	Attributes  TextAttributes
-	TextColor   uint32
-	BackColor   uint32
-	StrikeColor uint32
+	TextColor   TextColor
+	BackColor   TextColor
+	StrikeColor TextColor
 }
 
 // matchesAttributes checks if a cell's attributes match the mask.

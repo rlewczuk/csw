@@ -32,20 +32,28 @@ const (
 )
 
 // TextColor represents a 24-bit color in RGB format.
+// Valid RGB colors use bits 0-23 (0x00000000 to 0x00FFFFFF).
+// The value 0xFFFFFFFF is reserved as a special sentinel value.
 type TextColor uint32
+
+// NoColor is a special value indicating that color is not set.
+// It uses all bits set (0xFFFFFFFF) which is outside the standard RGB color space.
+// When a color field is set to NoColor, it should be overridden by theme values.
+const NoColor TextColor = 0xFFFFFFFF
 
 // CellAttributes represents attributes of a single character cell.
 type CellAttributes struct {
 	// Attrs is a bitfield of attributes. It is a combination of the following:
 	Attributes TextAttributes `json:"attributes,omitempty"`
 	// Foreground sets color of the text. It is 24-bit color in RGB format.
-	TextColor uint32 `json:"text-color,omitempty"`
+	TextColor TextColor `json:"text-color,omitempty"`
 	// Background sets color of the background. It is 24-bit color in RGB format.
-	BackColor uint32 `json:"back-color,omitempty"`
+	BackColor TextColor `json:"back-color,omitempty"`
 	// StrikeColor sets color of the strike through line. It is 24-bit color in RGB format.
-	StrikeColor uint32 `json:"strike-color,omitempty"`
+	// Also useful for underlines, overlines, etc.
+	StrikeColor TextColor `json:"strike-color,omitempty"`
 	// ThemeTag is a tag that can be used to apply theme to the text.
-	// If non-zero, it will automatically fill color fields if they are not explicitly set (i.e. zero)
+	// If non-zero, it will automatically fill color fields if they are not explicitly set (i.e. NoColor)
 	ThemeTag uint32 `json:"theme-tag,omitempty"`
 }
 
@@ -100,11 +108,11 @@ func (c *CellAttributes) UnmarshalJSON(data []byte) error {
 }
 
 // parseColorValue parses a color value from JSON, supporting both numbers and hex strings.
-func parseColorValue(data []byte) (uint32, error) {
+func parseColorValue(data []byte) (TextColor, error) {
 	// Try to parse as a number first
 	var num uint32
 	if err := json.Unmarshal(data, &num); err == nil {
-		return num, nil
+		return TextColor(num), nil
 	}
 
 	// Try to parse as a string (hex color)
@@ -118,7 +126,7 @@ func parseColorValue(data []byte) (uint32, error) {
 }
 
 // parseHexColor parses a hex color string in the format "#RRGGBB" or "0xRRGGBB".
-func parseHexColor(s string) (uint32, error) {
+func parseHexColor(s string) (TextColor, error) {
 	// Remove leading # or 0x prefix
 	s = strings.TrimSpace(s)
 	if strings.HasPrefix(s, "#") {
@@ -133,7 +141,7 @@ func parseHexColor(s string) (uint32, error) {
 		return 0, fmt.Errorf("parseHexColor(): invalid hex color %q: %w", s, err)
 	}
 
-	return uint32(val), nil
+	return TextColor(val), nil
 }
 
 // Attrs creates CellAttributes with only text attributes (no colors).
@@ -142,7 +150,7 @@ func Attrs(attrs TextAttributes) CellAttributes {
 }
 
 // AttrsWithColor creates CellAttributes with text attributes and colors.
-func AttrsWithColor(attrs TextAttributes, textColor, backColor uint32) CellAttributes {
+func AttrsWithColor(attrs TextAttributes, textColor, backColor TextColor) CellAttributes {
 	return CellAttributes{
 		Attributes: attrs,
 		TextColor:  textColor,
