@@ -53,8 +53,8 @@ type CellAttributes struct {
 	// Also useful for underlines, overlines, etc.
 	StrikeColor TextColor `json:"strike-color,omitempty"`
 	// ThemeTag is a tag that can be used to apply theme to the text.
-	// If non-zero, it will automatically fill color fields if they are not explicitly set (i.e. NoColor)
-	ThemeTag uint32 `json:"theme-tag,omitempty"`
+	// If non-empty, it will automatically fill color fields if they are not explicitly set (i.e. NoColor)
+	ThemeTag string `json:"theme-tag,omitempty"`
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for CellAttributes.
@@ -178,6 +178,23 @@ func CellBackground(backColor TextColor) CellAttributes {
 	}
 }
 
+// CellTag creates CellAttributes with ThemeTag set to tag.
+// All color fields are set to NoColor and text attributes are set to zero.
+func CellTag(tag string) CellAttributes {
+	return CellAttributes{
+		TextColor:   NoColor,
+		BackColor:   NoColor,
+		StrikeColor: NoColor,
+		ThemeTag:    tag,
+	}
+}
+
+// WithTextColor returns a copy of CellAttributes with TextColor set to the given color.
+func (c CellAttributes) WithTextColor(textColor TextColor) CellAttributes {
+	c.TextColor = textColor
+	return c
+}
+
 // WithBackColor returns a copy of CellAttributes with BackColor set to the given color.
 func (c CellAttributes) WithBackColor(backColor TextColor) CellAttributes {
 	c.BackColor = backColor
@@ -193,6 +210,12 @@ func (c CellAttributes) WithStrikeColor(strikeColor TextColor) CellAttributes {
 // WithAttributes returns a copy of CellAttributes with Attributes set to the given attributes.
 func (c CellAttributes) WithAttributes(attrs TextAttributes) CellAttributes {
 	c.Attributes = attrs
+	return c
+}
+
+// WithThemeTag returns a copy of CellAttributes with ThemeTag set to the given tag.
+func (c CellAttributes) WithThemeTag(tag string) CellAttributes {
+	c.ThemeTag = tag
 	return c
 }
 

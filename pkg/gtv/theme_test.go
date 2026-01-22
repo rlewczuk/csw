@@ -234,19 +234,14 @@ func TestThemeInterceptor_PutText_WithThemeTag_AppliesColors(t *testing.T) {
 	interceptor := NewThemeInterceptor(screen, theme)
 
 	// Attributes with theme tag but NoColor for all colors (to use theme colors)
-	attrs := CellAttributes{
-		ThemeTag:    1,
-		TextColor:   NoColor,
-		BackColor:   NoColor,
-		StrikeColor: NoColor,
-	}
+	attrs := CellTag("1")
 
 	interceptor.PutText(TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", attrs)
 
 	// Verify content - should have theme colors
 	_, _, content := screen.GetContent()
 	assert.Equal(t, 'H', content[0].Rune, "ThemeInterceptor.PutText() rune at theme.go")
-	assert.Equal(t, uint32(1), content[0].Attrs.ThemeTag, "ThemeInterceptor.PutText() theme tag at theme.go")
+	assert.Equal(t, "1", content[0].Attrs.ThemeTag, "ThemeInterceptor.PutText() theme tag at theme.go")
 	assert.Equal(t, AttrItalic, content[0].Attrs.Attributes, "ThemeInterceptor.PutText() attributes at theme.go")
 	assert.Equal(t, TextColor(0xFF0000), content[0].Attrs.TextColor, "ThemeInterceptor.PutText() text color at theme.go")
 	assert.Equal(t, TextColor(0x00FF00), content[0].Attrs.BackColor, "ThemeInterceptor.PutText() back color at theme.go")
@@ -267,7 +262,7 @@ func TestThemeInterceptor_PutText_WithThemeTag_PreservesExplicitColors(t *testin
 
 	// Attributes with theme tag and explicit colors
 	attrs := CellAttributes{
-		ThemeTag:    1,
+		ThemeTag:    "1",
 		Attributes:  AttrBold,
 		TextColor:   0xAAAAAA,
 		BackColor:   0xBBBBBB,
@@ -279,7 +274,7 @@ func TestThemeInterceptor_PutText_WithThemeTag_PreservesExplicitColors(t *testin
 	// Verify content - should preserve explicit colors
 	_, _, content := screen.GetContent()
 	assert.Equal(t, 'H', content[0].Rune, "ThemeInterceptor.PutText() rune at theme.go")
-	assert.Equal(t, uint32(1), content[0].Attrs.ThemeTag, "ThemeInterceptor.PutText() theme tag at theme.go")
+	assert.Equal(t, "1", content[0].Attrs.ThemeTag, "ThemeInterceptor.PutText() theme tag at theme.go")
 	assert.Equal(t, AttrBold, content[0].Attrs.Attributes, "ThemeInterceptor.PutText() attributes at theme.go")
 	assert.Equal(t, TextColor(0xAAAAAA), content[0].Attrs.TextColor, "ThemeInterceptor.PutText() text color at theme.go")
 	assert.Equal(t, TextColor(0xBBBBBB), content[0].Attrs.BackColor, "ThemeInterceptor.PutText() back color at theme.go")
@@ -299,7 +294,7 @@ func TestThemeInterceptor_PutText_WithThemeTag_PartialExplicitColors(t *testing.
 
 	// Attributes with theme tag and only text color explicit (BackColor and StrikeColor use theme)
 	attrs := CellAttributes{
-		ThemeTag:    1,
+		ThemeTag:    "1",
 		TextColor:   0xAAAAAA,
 		BackColor:   NoColor,
 		StrikeColor: NoColor,
@@ -324,7 +319,7 @@ func TestThemeInterceptor_PutText_ThemeNotFound(t *testing.T) {
 
 	// Attributes with non-existent theme tag
 	attrs := CellAttributes{
-		ThemeTag: 999,
+		ThemeTag: "999",
 	}
 
 	interceptor.PutText(TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", attrs)
@@ -376,9 +371,9 @@ func TestThemeInterceptor_PutContent_WithThemeTag(t *testing.T) {
 
 	// Content with different theme tags
 	cells := []Cell{
-		{Rune: 'A', Attrs: CellAttributes{ThemeTag: 1, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
-		{Rune: 'B', Attrs: CellAttributes{ThemeTag: 2, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
-		{Rune: 'C', Attrs: CellAttributes{ThemeTag: 1, TextColor: 0x123456, BackColor: NoColor, StrikeColor: NoColor}},
+		{Rune: 'A', Attrs: CellTag("1")},
+		{Rune: 'B', Attrs: CellTag("2")},
+		{Rune: 'C', Attrs: CellTag("1").WithTextColor(0x123456)},
 	}
 
 	interceptor.PutContent(TRect{X: 0, Y: 0, W: 0, H: 0}, cells)
@@ -411,7 +406,7 @@ func TestThemeInterceptor_PutContent_EmptyTheme(t *testing.T) {
 
 	// Content with theme tag but no theme
 	cells := []Cell{
-		{Rune: 'A', Attrs: CellAttributes{ThemeTag: 1, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
+		{Rune: 'A', Attrs: CellTag("1")},
 	}
 
 	interceptor.PutContent(TRect{X: 0, Y: 0, W: 0, H: 0}, cells)
@@ -449,14 +444,9 @@ func TestThemeInterceptor_ApplyTheme_MultipleFields(t *testing.T) {
 					StrikeColor: 0x0000FF,
 				},
 			},
-			input: CellAttributes{
-				ThemeTag:    1,
-				TextColor:   NoColor,
-				BackColor:   NoColor,
-				StrikeColor: NoColor,
-			},
+			input: CellTag("1"),
 			expected: CellAttributes{
-				ThemeTag:    1,
+				ThemeTag:    "1",
 				Attributes:  AttrBold | AttrItalic,
 				TextColor:   0xFF0000,
 				BackColor:   0x00FF00,
@@ -474,14 +464,14 @@ func TestThemeInterceptor_ApplyTheme_MultipleFields(t *testing.T) {
 				},
 			},
 			input: CellAttributes{
-				ThemeTag:    1,
+				ThemeTag:    "1",
 				Attributes:  AttrItalic,
 				TextColor:   NoColor,
 				BackColor:   0xAAAAAA,
 				StrikeColor: NoColor,
 			},
 			expected: CellAttributes{
-				ThemeTag:    1,
+				ThemeTag:    "1",
 				Attributes:  AttrItalic,
 				TextColor:   0xFF0000,
 				BackColor:   0xAAAAAA,
@@ -499,14 +489,14 @@ func TestThemeInterceptor_ApplyTheme_MultipleFields(t *testing.T) {
 				},
 			},
 			input: CellAttributes{
-				ThemeTag:    1,
+				ThemeTag:    "1",
 				Attributes:  AttrItalic,
 				TextColor:   0x111111,
 				BackColor:   0x222222,
 				StrikeColor: 0x333333,
 			},
 			expected: CellAttributes{
-				ThemeTag:    1,
+				ThemeTag:    "1",
 				Attributes:  AttrItalic,
 				TextColor:   0x111111,
 				BackColor:   0x222222,
@@ -517,11 +507,11 @@ func TestThemeInterceptor_ApplyTheme_MultipleFields(t *testing.T) {
 			name:  "theme not found",
 			theme: map[string]CellAttributes{"1": {TextColor: 0xFF0000}},
 			input: CellAttributes{
-				ThemeTag:  999,
+				ThemeTag:  "999",
 				TextColor: 0x0000FF,
 			},
 			expected: CellAttributes{
-				ThemeTag:  999,
+				ThemeTag:  "999",
 				TextColor: 0x0000FF,
 			},
 		},
@@ -547,7 +537,7 @@ func TestThemeInterceptor_PutText_Clipping(t *testing.T) {
 	interceptor := NewThemeInterceptor(screen, theme)
 
 	// Test with clipping rectangle
-	attrs := CellAttributes{ThemeTag: 1, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}
+	attrs := CellTag("1")
 	interceptor.PutText(TRect{X: 0, Y: 0, W: 3, H: 1}, "Hello", attrs)
 
 	// Verify only first 3 characters are written
@@ -578,14 +568,14 @@ func TestThemeInterceptor_Integration(t *testing.T) {
 	interceptor := NewThemeInterceptor(screen, theme)
 
 	// Put text with theme 1
-	interceptor.PutText(TRect{X: 0, Y: 0, W: 0, H: 0}, "Header", CellAttributes{ThemeTag: 1, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor})
+	interceptor.PutText(TRect{X: 0, Y: 0, W: 0, H: 0}, "Header", CellTag("1"))
 
 	// Put content with theme 2
 	cells := []Cell{
-		{Rune: 'B', Attrs: CellAttributes{ThemeTag: 2, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
-		{Rune: 'o', Attrs: CellAttributes{ThemeTag: 2, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
-		{Rune: 'd', Attrs: CellAttributes{ThemeTag: 2, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
-		{Rune: 'y', Attrs: CellAttributes{ThemeTag: 2, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor}},
+		{Rune: 'B', Attrs: CellTag("2")},
+		{Rune: 'o', Attrs: CellTag("2")},
+		{Rune: 'd', Attrs: CellTag("2")},
+		{Rune: 'y', Attrs: CellTag("2")},
 	}
 	interceptor.PutContent(TRect{X: 0, Y: 1, W: 0, H: 0}, cells)
 
@@ -1076,7 +1066,7 @@ func TestThemeManager_Integration(t *testing.T) {
 	interceptor := NewThemeInterceptor(screen, darkTheme)
 
 	// Write text with theme tag
-	interceptor.PutText(TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", CellAttributes{ThemeTag: 1, TextColor: NoColor, BackColor: NoColor, StrikeColor: NoColor})
+	interceptor.PutText(TRect{X: 0, Y: 0, W: 0, H: 0}, "Hello", CellTag("1"))
 
 	// Verify text is rendered with theme colors
 	_, _, content := screen.GetContent()
@@ -1213,9 +1203,9 @@ func TestCellAttributes_JSONMarshaling(t *testing.T) {
 				TextColor:   16777215,
 				BackColor:   255,
 				StrikeColor: 65280,
-				ThemeTag:    1,
+				ThemeTag:    "1",
 			},
-			expected: `{"attributes":5,"text-color":16777215,"back-color":255,"strike-color":65280,"theme-tag":1}`,
+			expected: `{"attributes":5,"text-color":16777215,"back-color":255,"strike-color":65280,"theme-tag":"1"}`,
 		},
 		{
 			name: "only text color",

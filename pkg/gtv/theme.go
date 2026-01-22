@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/fs"
 	"path/filepath"
-	"strconv"
 	"strings"
 )
 
@@ -75,19 +74,16 @@ func (t *ThemeInterceptor) SetCursorStyle(style CursorStyle) {
 }
 
 // applyTheme applies theme to the given cell attributes.
-// If ThemeTag is non-zero, it looks up the theme and applies colors
+// If ThemeTag is non-empty, it looks up the theme and applies colors
 // that are not explicitly set (i.e. set to NoColor).
 func (t *ThemeInterceptor) applyTheme(attrs CellAttributes) CellAttributes {
-	// If ThemeTag is zero, return original attributes
-	if attrs.ThemeTag == 0 {
+	// If ThemeTag is empty, return original attributes
+	if attrs.ThemeTag == "" {
 		return attrs
 	}
 
-	// Convert ThemeTag to string
-	tag := strconv.FormatUint(uint64(attrs.ThemeTag), 10)
-
 	// Look up theme
-	themeAttrs, ok := t.theme[tag]
+	themeAttrs, ok := t.theme[attrs.ThemeTag]
 	if !ok {
 		// Theme not found, return original attributes
 		return attrs
