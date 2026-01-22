@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"embed"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,9 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
 	"golang.org/x/term"
 )
+
+//go:embed themes/*.theme.json
+var themesFS embed.FS
 
 // eventChannelAdapter is an adapter that implements InputEventHandler interface
 // and forwards events to a channel. This is used internally in Run() method.
@@ -76,10 +80,24 @@ type TApplication struct {
 
 // NewApplication creates a new TApplication with the given main widget and screen buffer.
 // The screen buffer size determines the initial widget size.
+// This function loads the default theme automatically. Use NewApplicationWithTheme for custom themes.
 // Call Run() to start the application with real terminal I/O, or use Notify() and ExecuteOnUiThread()
 // for testing without real terminal I/O.
 func NewApplication(mainWidget IWidget, screen gtv.IScreenOutput) *TApplication {
-	return NewApplicationWithTheme(mainWidget, screen, nil)
+	// Load default theme
+	themeManager, err := gtv.NewThemeManager(themesFS)
+	if err != nil {
+		// If theme loading fails, fall back to no theme
+		return NewApplicationWithTheme(mainWidget, screen, nil)
+	}
+
+	defaultTheme, err := themeManager.GetTheme("default")
+	if err != nil {
+		// If default theme not found, fall back to no theme
+		return NewApplicationWithTheme(mainWidget, screen, nil)
+	}
+
+	return NewApplicationWithTheme(mainWidget, screen, defaultTheme)
 }
 
 // NewApplicationWithTheme creates a new TApplication with the given main widget, screen buffer, and theme.

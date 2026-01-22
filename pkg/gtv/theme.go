@@ -73,6 +73,36 @@ func (t *ThemeInterceptor) SetCursorStyle(style CursorStyle) {
 	t.output.SetCursorStyle(style)
 }
 
+// GetCursorPosition returns the current cursor position.
+// This method allows ThemeInterceptor to be used with ScreenRenderer.
+func (t *ThemeInterceptor) GetCursorPosition() (x int, y int) {
+	// Try to get cursor position from the underlying output
+	// This requires the output to support cursor position tracking
+	type CursorPositionGetter interface {
+		GetCursorPosition() (x int, y int)
+	}
+	if cpg, ok := t.output.(CursorPositionGetter); ok {
+		return cpg.GetCursorPosition()
+	}
+	// Default to (0, 0) if not supported
+	return 0, 0
+}
+
+// GetCursorStyle returns the current cursor style.
+// This method allows ThemeInterceptor to be used with ScreenRenderer.
+func (t *ThemeInterceptor) GetCursorStyle() CursorStyle {
+	// Try to get cursor style from the underlying output
+	// This requires the output to support cursor style tracking
+	type CursorStyleGetter interface {
+		GetCursorStyle() CursorStyle
+	}
+	if csg, ok := t.output.(CursorStyleGetter); ok {
+		return csg.GetCursorStyle()
+	}
+	// Default to hidden if not supported
+	return CursorStyleHidden
+}
+
 // applyTheme applies theme to the given cell attributes.
 // If ThemeTag is non-empty, it looks up the theme and applies colors
 // that are not explicitly set (i.e. set to NoColor).

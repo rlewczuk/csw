@@ -106,8 +106,8 @@ func WithText(text string) gtv.Option {
 // Default values:
 // - Text: ""
 // - Position: gtv.TRect{X: 0, Y: 0, W: 0, H: 0}
-// - Attrs: gtv.CellAttributes{}
-// - FocusedAttrs: gtv.CellAttributes{}
+// - Attrs: gtv.CellTag("input")
+// - FocusedAttrs: gtv.CellTag("input-focused")
 // - CursorPos: 0
 // - SelectionStart: 0
 // - SelectionEnd: 0
@@ -117,8 +117,8 @@ func WithText(text string) gtv.Option {
 // - WithText(text) - sets initial text
 // - WithRectangle(X, Y, W, H) - sets position and size
 // - WithPosition(X, Y) - sets position only
-// - WithAttrs(attrs) - sets normal state attributes
-// - WithFocusedAttrs(attrs) - sets focused state attributes
+// - WithAttrs(attrs) - sets normal state attributes (use gtv.CellTag("input"))
+// - WithFocusedAttrs(attrs) - sets focused state attributes (use gtv.CellTag("input-focused"))
 // - WithFlags(flags) - sets widget flags
 // - WithChild(child) - adds a child widget
 func NewInputBox(parent IWidget, opts ...gtv.Option) *TInputBox {
@@ -135,6 +135,15 @@ func NewInputBox(parent IWidget, opts ...gtv.Option) *TInputBox {
 	// Apply options to TInputBox
 	for _, opt := range opts {
 		opt(inputBox)
+	}
+
+	// Apply default theme tags if no theme tag or colors are specified
+	// Note: Check for 0 (zero-value) instead of NoColor because zero-value CellAttributes has 0, not NoColor
+	if inputBox.TWidget.cellAttrs.ThemeTag == "" && inputBox.TWidget.cellAttrs.TextColor == 0 && inputBox.TWidget.cellAttrs.BackColor == 0 {
+		inputBox.TWidget.cellAttrs = gtv.CellTag("input")
+	}
+	if inputBox.focusedAttrs.ThemeTag == "" && inputBox.focusedAttrs.TextColor == 0 && inputBox.focusedAttrs.BackColor == 0 {
+		inputBox.focusedAttrs = gtv.CellTag("input-focused")
 	}
 
 	// Update scroll offset to show cursor

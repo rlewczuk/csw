@@ -329,16 +329,34 @@ func (r *ScreenRenderer) Reset() {
 	r.lastCursorStyle = gtv.CursorStyle(0xFF)
 }
 
+// ICursorSupport is an interface for screens that support cursor position and style tracking.
+// Both ScreenBuffer and ThemeInterceptor (which wraps ScreenBuffer) should implement this.
+type ICursorSupport interface {
+	GetCursorPosition() (x int, y int)
+	GetCursorStyle() gtv.CursorStyle
+}
+
 // renderCursor renders cursor position and style changes.
 // If hasRenderedContent is true, the cursor will always be repositioned because
 // rendering content leaves the cursor at an arbitrary position.
 func (r *ScreenRenderer) renderCursor(buf *bytes.Buffer, hasRenderedContent bool) {
 	// Try to get cursor position and style from the screen
-	// This requires the screen to be a *ScreenBuffer or compatible type
-	if screenBuffer, ok := r.screen.(*ScreenBuffer); ok {
-		cursorX, cursorY := screenBuffer.GetCursorPosition()
-		cursorStyle := screenBuffer.GetCursorStyle()
+	// First try direct ScreenBuffer access, then try through ICursorSupport interface
+	var cursorX, cursorY int
+	var cursorStyle gtv.CursorStyle
+	var haveCursor bool
 
+	if screenBuffer, ok := r.screen.(*ScreenBuffer); ok {
+		cursorX, cursorY = screenBuffer.GetCursorPosition()
+		cursorStyle = screenBuffer.GetCursorStyle()
+		haveCursor = true
+	} else if cursorSupport, ok := r.screen.(ICursorSupport); ok {
+		cursorX, cursorY = cursorSupport.GetCursorPosition()
+		cursorStyle = cursorSupport.GetCursorStyle()
+		haveCursor = true
+	}
+
+	if haveCursor {
 		// Always move cursor to the desired position after rendering content
 		// because rendering leaves the cursor at the end of the last rendered character
 		// Also move if cursor position changed from last render

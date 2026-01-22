@@ -41,7 +41,13 @@ type TLabel struct {
 // NewLabel creates a new label widget with the specified text, position, and attributes.
 // If rect width and height are 0, the label is auto-sized to fit the text.
 // The parent parameter is optional (can be nil for root widgets).
+// The attrs parameter can use CellTag() to specify a theme tag (e.g., gtv.CellTag("label")).
 func NewLabel(parent IWidget, text string, rect gtv.TRect, attrs gtv.CellAttributes) *TLabel {
+	// Default to "label" theme tag if no theme tag or colors are specified
+	if attrs.ThemeTag == "" && attrs.TextColor == gtv.NoColor && attrs.BackColor == gtv.NoColor {
+		attrs = gtv.CellTag("label")
+	}
+
 	label := &TLabel{
 		TWidget: TWidget{
 			Position:  rect,

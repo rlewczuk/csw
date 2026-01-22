@@ -1,0 +1,66 @@
+{
+  "name": "default",
+  "description": "Default theme for GTV TUI widgets",
+  "theme": {
+    "label": {
+      "text-color": "#FFFFFF",
+      "back-color": "#000000"
+    },
+    "label-bold": {
+      "attributes": 1,
+      "text-color": "#FFFFFF",
+      "back-color": "#000000"
+    },
+    "label-disabled": {
+      "text-color": "#888888",
+      "back-color": "#000000"
+    },
+    "button": {
+      "text-color": "#FFFFFF",
+      "back-color": "#006600"
+    },
+    "button-focused": {
+      "attributes": 1,
+      "text-color": "#FFFFFF",
+      "back-color": "#00AA00"
+    },
+    "button-disabled": {
+      "text-color": "#888888",
+      "back-color": "#333333"
+    },
+    "input": {
+      "text-color": "#FFFFFF",
+      "back-color": "#333333"
+    },
+    "input-focused": {
+      "text-color": "#000000",
+      "back-color": "#00AAFF"
+    },
+    "layout-background": {
+      "back-color": "#1A1A1A"
+    },
+    "title": {
+      "attributes": 17,
+      "text-color": "#00AAFF",
+      "back-color": "#000000"
+    },
+    "subtitle": {
+      "attributes": 1,
+      "text-color": "#FFFFFF",
+      "back-color": "#000000"
+    },
+    "error": {
+      "text-color": "#FF0000",
+      "back-color": "#000000"
+    },
+    "success": {
+      "text-color": "#00FF00",
+      "back-color": "#000000"
+    },
+    "hint": {
+      "attributes": 4,
+      "text-color": "#888888",
+      "back-color": "#000000"
+    }
+  }
+}
