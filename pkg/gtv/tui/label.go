@@ -107,7 +107,7 @@ func (l *TLabel) getFormattedCells() []gtv.Cell {
 		if combinedAttrs.StrikeColor == gtv.NoColor {
 			combinedAttrs.StrikeColor = cells[i].Attrs.StrikeColor
 		}
-		if combinedAttrs.ThemeTag == 0 {
+		if combinedAttrs.ThemeTag == "" {
 			combinedAttrs.ThemeTag = cells[i].Attrs.ThemeTag
 		}
 
