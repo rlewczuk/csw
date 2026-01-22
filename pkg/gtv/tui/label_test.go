@@ -105,29 +105,22 @@ func TestTLabel_SetText_SameText_NoInvalidation(t *testing.T) {
 }
 
 func TestTLabel_GetAttrs(t *testing.T) {
-	attrs := gtv.CellAttributes{
-		TextColor: 0xFF0000,
-		BackColor: 0x00FF00,
-	}
+	attrs := gtv.CellColor(0xFF0000).WithBackColor(0x00FF00)
 	label := NewLabel(nil, "Test", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, attrs)
 	assert.Equal(t, attrs, label.GetAttrs(), "GetAttrs should return the current attributes")
 }
 
 func TestTLabel_SetAttrs(t *testing.T) {
-	initialAttrs := gtv.CellAttributes{
-		TextColor: 0xFF0000,
-	}
+	initialAttrs := gtv.CellColor(0xFF0000)
 	label := NewLabel(nil, "Test", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, initialAttrs)
 
-	newAttrs := gtv.CellAttributes{
-		TextColor: 0x00FF00,
-	}
+	newAttrs := gtv.CellColor(0x00FF00)
 	label.SetAttrs(newAttrs)
 	assert.Equal(t, newAttrs, label.GetAttrs(), "Attributes should be updated")
 }
 
 func TestTLabel_SetAttrs_InvalidatesCache(t *testing.T) {
-	attrs := gtv.CellAttributes{TextColor: 0xFF0000}
+	attrs := gtv.CellColor(0xFF0000).WithBackColor(0x00FF00)
 	label := NewLabel(nil, "Test", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, attrs)
 
 	// Force cache to be populated
@@ -135,7 +128,7 @@ func TestTLabel_SetAttrs_InvalidatesCache(t *testing.T) {
 	assert.True(t, label.cacheValid, "Cache should be valid after first call")
 
 	// Set new attributes
-	newAttrs := gtv.CellAttributes{TextColor: 0x00FF00}
+	newAttrs := gtv.CellColor(0x00FF00)
 	label.SetAttrs(newAttrs)
 	assert.False(t, label.cacheValid, "Cache should be invalid after SetAttrs")
 }
@@ -145,9 +138,7 @@ func TestTLabel_Draw_PlainText(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create label
-	attrs := gtv.CellAttributes{
-		TextColor: 0xFF0000,
-	}
+	attrs := gtv.CellColor(0xFF0000)
 	label := NewLabel(nil, "Hello", gtv.TRect{X: 5, Y: 10, W: 10, H: 1}, attrs)
 
 	// Draw label
@@ -209,10 +200,7 @@ func TestTLabel_Draw_AttributeCombination(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create label with base attributes
-	attrs := gtv.CellAttributes{
-		Attributes: gtv.AttrDim,
-		TextColor:  0xFF0000,
-	}
+	attrs := gtv.CellColor(0xFF0000).WithAttributes(gtv.AttrDim)
 	label := NewLabel(nil, "*italic*", gtv.TRect{X: 0, Y: 0, W: 10, H: 1}, attrs)
 
 	// Draw label
@@ -335,10 +323,7 @@ func TestTLabel_ComplexFormatting(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create label with complex formatted text
-	attrs := gtv.CellAttributes{
-		Attributes: gtv.AttrUnderline,
-		TextColor:  0x00FF00,
-	}
+	attrs := gtv.CellColor(0x00FF00).WithAttributes(gtv.AttrUnderline)
 	label := NewLabel(nil, "**bold** and *italic* and ~~strike~~", gtv.TRect{X: 0, Y: 0, W: 50, H: 1}, attrs)
 
 	// Draw label

@@ -590,7 +590,7 @@ func TestThemeInterceptor_Integration(t *testing.T) {
 	interceptor.PutContent(TRect{X: 0, Y: 1, W: 0, H: 0}, cells)
 
 	// Put text without theme
-	interceptor.PutText(TRect{X: 0, Y: 2, W: 0, H: 0}, "Plain", CellAttributes{TextColor: 0xAAAAAA})
+	interceptor.PutText(TRect{X: 0, Y: 2, W: 0, H: 0}, "Plain", CellColor(0xAAAAAA))
 
 	// Verify all content
 	_, _, content := screen.GetContent()
@@ -615,7 +615,7 @@ func TestThemeInterceptor_Integration(t *testing.T) {
 		idx := 160 + i
 		assert.Equal(t, TextAttributes(0), content[idx].Attrs.Attributes, "ThemeInterceptor integration attrs at theme.go")
 		assert.Equal(t, TextColor(0xAAAAAA), content[idx].Attrs.TextColor, "ThemeInterceptor integration text color at theme.go")
-		assert.Equal(t, TextColor(0), content[idx].Attrs.BackColor, "ThemeInterceptor integration back color at theme.go")
+		assert.Equal(t, NoColor, content[idx].Attrs.BackColor, "ThemeInterceptor integration back color at theme.go")
 	}
 }
 

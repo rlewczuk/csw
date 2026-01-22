@@ -162,12 +162,12 @@ func (app *DemoApp) render() {
 	// Draw header
 	headerColor := app.colors[app.colorIndex]
 	app.screen.PutText(gtv.TRect{X: 0, Y: 0, W: 0, H: 0}, centerText("Terminal Input Event Demo", app.width),
-		gtv.AttrsWithColor(gtv.AttrBold, headerColor, 0))
+		gtv.AttrsWithColor(gtv.AttrBold, gtv.TextColor(headerColor), 0))
 
 	// Draw instructions
 	instructionColor := uint32(0xAAAAAA)
 	app.screen.PutText(gtv.TRect{X: 0, Y: 1, W: 0, H: 0}, centerText("q=quit c=color b=border f=flash r=reset Ins=cursor PgDn=move", app.width),
-		gtv.AttrsWithColor(0, instructionColor, 0))
+		gtv.AttrsWithColor(0, gtv.TextColor(instructionColor), 0))
 
 	// Draw top border
 	app.drawBorder()
@@ -181,13 +181,13 @@ func (app *DemoApp) render() {
 	statusLine := fmt.Sprintf(" Status: %s | Events: %d ",
 		app.statusText, app.eventCount)
 	app.screen.PutText(gtv.TRect{X: 0, Y: uint16(app.height - 1), W: 0, H: 0}, padRight(statusLine, app.width),
-		gtv.AttrsWithColor(gtv.AttrBold, statusColor, statusBg))
+		gtv.AttrsWithColor(gtv.AttrBold, gtv.TextColor(statusColor), gtv.TextColor(statusBg)))
 
 	// Draw flash indicator if active
 	if app.flashCount > 0 {
 		flashColor := app.colors[(app.flashCount)%len(app.colors)]
 		app.screen.PutText(gtv.TRect{X: uint16(app.width - 10), Y: 3, W: 0, H: 0}, "* FLASH *",
-			gtv.AttrsWithColor(gtv.AttrBold|gtv.AttrBlink, flashColor, 0))
+			gtv.AttrsWithColor(gtv.AttrBold|gtv.AttrBlink, gtv.TextColor(flashColor), 0))
 	}
 
 	// Render to terminal
@@ -210,7 +210,7 @@ func (app *DemoApp) drawBorder() {
 	}
 
 	app.screen.PutText(gtv.TRect{X: 0, Y: 2, W: 0, H: 0}, fullBorder,
-		gtv.AttrsWithColor(0, borderColor, 0))
+		gtv.AttrsWithColor(0, gtv.TextColor(borderColor), 0))
 }
 
 // drawEventList draws the event details in a centered frame.
@@ -235,16 +235,16 @@ func (app *DemoApp) drawEventList() {
 	borderColor := uint32(0x00AAFF)
 	// Top border
 	app.screen.PutText(gtv.TRect{X: uint16(frameX), Y: uint16(frameY), W: 0, H: 0}, "┌"+padRight("", frameWidth-2)+"┐",
-		gtv.AttrsWithColor(0, borderColor, 0))
+		gtv.AttrsWithColor(0, gtv.TextColor(borderColor), 0))
 	// Bottom border
 	app.screen.PutText(gtv.TRect{X: uint16(frameX), Y: uint16(frameY + frameHeight - 1), W: 0, H: 0}, "└"+padRight("", frameWidth-2)+"┘",
-		gtv.AttrsWithColor(0, borderColor, 0))
+		gtv.AttrsWithColor(0, gtv.TextColor(borderColor), 0))
 	// Side borders
 	for i := 1; i < frameHeight-1; i++ {
 		app.screen.PutText(gtv.TRect{X: uint16(frameX), Y: uint16(frameY + i), W: 0, H: 0}, "│",
-			gtv.AttrsWithColor(0, borderColor, 0))
+			gtv.AttrsWithColor(0, gtv.TextColor(borderColor), 0))
 		app.screen.PutText(gtv.TRect{X: uint16(frameX + frameWidth - 1), Y: uint16(frameY + i), W: 0, H: 0}, "│",
-			gtv.AttrsWithColor(0, borderColor, 0))
+			gtv.AttrsWithColor(0, gtv.TextColor(borderColor), 0))
 	}
 
 	// Draw event details
@@ -256,9 +256,9 @@ func (app *DemoApp) drawEventList() {
 	// Event string representation
 	if y < frameY+frameHeight-1 {
 		app.screen.PutText(gtv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Event:",
-			gtv.AttrsWithColor(gtv.AttrBold, labelColor, 0))
+			gtv.AttrsWithColor(gtv.AttrBold, gtv.TextColor(labelColor), 0))
 		app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, event.String(),
-			gtv.AttrsWithColor(0, valueColor, 0))
+			gtv.AttrsWithColor(0, gtv.TextColor(valueColor), 0))
 		y++
 	}
 
@@ -266,9 +266,9 @@ func (app *DemoApp) drawEventList() {
 	if y < frameY+frameHeight-1 {
 		y++
 		app.screen.PutText(gtv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Type:",
-			gtv.AttrsWithColor(gtv.AttrBold, labelColor, 0))
+			gtv.AttrsWithColor(gtv.AttrBold, gtv.TextColor(labelColor), 0))
 		app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, eventTypeName(event.Type),
-			gtv.AttrsWithColor(0, valueColor, 0))
+			gtv.AttrsWithColor(0, gtv.TextColor(valueColor), 0))
 		y++
 	}
 
@@ -276,13 +276,13 @@ func (app *DemoApp) drawEventList() {
 	if y < frameY+frameHeight-1 {
 		y++
 		app.screen.PutText(gtv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Key:",
-			gtv.AttrsWithColor(gtv.AttrBold, labelColor, 0))
+			gtv.AttrsWithColor(gtv.AttrBold, gtv.TextColor(labelColor), 0))
 		keyStr := fmt.Sprintf("0x%04X", event.Key)
 		if event.Key >= 32 && event.Key <= 126 {
 			keyStr += fmt.Sprintf(" ('%c')", event.Key)
 		}
 		app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, keyStr,
-			gtv.AttrsWithColor(0, valueColor, 0))
+			gtv.AttrsWithColor(0, gtv.TextColor(valueColor), 0))
 		y++
 	}
 
@@ -290,9 +290,9 @@ func (app *DemoApp) drawEventList() {
 	if y < frameY+frameHeight-1 {
 		y++
 		app.screen.PutText(gtv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "X, Y:",
-			gtv.AttrsWithColor(gtv.AttrBold, labelColor, 0))
+			gtv.AttrsWithColor(gtv.AttrBold, gtv.TextColor(labelColor), 0))
 		app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, fmt.Sprintf("%d, %d", event.X, event.Y),
-			gtv.AttrsWithColor(0, valueColor, 0))
+			gtv.AttrsWithColor(0, gtv.TextColor(valueColor), 0))
 		y++
 	}
 
@@ -300,14 +300,14 @@ func (app *DemoApp) drawEventList() {
 	if event.Content != "" && y < frameY+frameHeight-1 {
 		y++
 		app.screen.PutText(gtv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Content:",
-			gtv.AttrsWithColor(gtv.AttrBold, labelColor, 0))
+			gtv.AttrsWithColor(gtv.AttrBold, gtv.TextColor(labelColor), 0))
 		content := event.Content
 		maxLen := frameWidth - 14
 		if len(content) > maxLen {
 			content = content[:maxLen-3] + "..."
 		}
 		app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, content,
-			gtv.AttrsWithColor(0, valueColor, 0))
+			gtv.AttrsWithColor(0, gtv.TextColor(valueColor), 0))
 		y++
 	}
 
@@ -315,7 +315,7 @@ func (app *DemoApp) drawEventList() {
 	if y < frameY+frameHeight-1 {
 		y++
 		app.screen.PutText(gtv.TRect{X: uint16(frameX + 2), Y: uint16(y), W: 0, H: 0}, "Modifiers:",
-			gtv.AttrsWithColor(gtv.AttrBold, labelColor, 0))
+			gtv.AttrsWithColor(gtv.AttrBold, gtv.TextColor(labelColor), 0))
 		modNames := modifierNames(event.Modifiers)
 		if len(modNames) == 0 {
 			app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(y), W: 0, H: 0}, "(none)",
@@ -325,7 +325,7 @@ func (app *DemoApp) drawEventList() {
 			for i, name := range modNames {
 				if modY < frameY+frameHeight-1 {
 					app.screen.PutText(gtv.TRect{X: uint16(frameX + 12), Y: uint16(modY), W: 0, H: 0}, name,
-						gtv.AttrsWithColor(0, valueColor, 0))
+						gtv.AttrsWithColor(0, gtv.TextColor(valueColor), 0))
 					modY++
 				}
 				if i == 0 {
