@@ -117,6 +117,16 @@ func main() {
 		resultLabel.SetText("")
 	})
 
+	// Create Quit button
+	quitButton := tui.NewButton(
+		mainLayout,
+		"Quit",
+		gtv.TRect{X: 38, Y: 9, W: 0, H: 0},
+		gtv.CellTag("button"),
+		gtv.CellTag("button-focused"),
+		gtv.CellTag("button-disabled"),
+	)
+
 	// Add a title label at the top
 	titleLabel := tui.NewLabel(
 		mainLayout,
@@ -142,6 +152,11 @@ func main() {
 
 	// Create the application
 	app := tui.NewApplication(mainLayout, screen)
+
+	// Set Quit button action (after app is created)
+	quitButton.SetOnPress(func() {
+		app.Quit()
+	})
 
 	// Run the application
 	if err := app.Run(os.Stdin, os.Stdout); err != nil {
