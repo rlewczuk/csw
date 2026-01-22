@@ -77,10 +77,21 @@ type TButton struct {
 // The rect parameter specifies the position and size of the button.
 // If rect width is 0, the button is auto-sized to fit the text plus border.
 // If rect height is 0, the button height is set to 1 (single line).
-// The cellAttrs parameter specifies text attributes for normal state.
-// The focusedAttrs parameter specifies text attributes for focused state.
-// The disabledAttrs parameter specifies text attributes for disabled state.
+// The cellAttrs parameter specifies text attributes for normal state (use gtv.CellTag("button")).
+// The focusedAttrs parameter specifies text attributes for focused state (use gtv.CellTag("button-focused")).
+// The disabledAttrs parameter specifies text attributes for disabled state (use gtv.CellTag("button-disabled")).
 func NewButton(parent IWidget, text string, rect gtv.TRect, attrs, focusedAttrs, disabledAttrs gtv.CellAttributes) *TButton {
+	// Default to theme tags if no theme tag or colors are specified
+	if attrs.ThemeTag == "" && attrs.TextColor == gtv.NoColor && attrs.BackColor == gtv.NoColor {
+		attrs = gtv.CellTag("button")
+	}
+	if focusedAttrs.ThemeTag == "" && focusedAttrs.TextColor == gtv.NoColor && focusedAttrs.BackColor == gtv.NoColor {
+		focusedAttrs = gtv.CellTag("button-focused")
+	}
+	if disabledAttrs.ThemeTag == "" && disabledAttrs.TextColor == gtv.NoColor && disabledAttrs.BackColor == gtv.NoColor {
+		disabledAttrs = gtv.CellTag("button-disabled")
+	}
+
 	button := &TButton{
 		TFocusable: *newFocusableBase(parent,
 			WithRectangle(int(rect.X), int(rect.Y), int(rect.W), int(rect.H)),

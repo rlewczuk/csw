@@ -102,8 +102,13 @@ func TestApplicationGetScreen(t *testing.T) {
 	// Get screen
 	retrievedScreen := app.GetScreen()
 
-	// Verify it's the same screen
-	assert.Equal(t, screen, retrievedScreen)
+	// Verify it's not nil (it may be wrapped with ThemeInterceptor)
+	assert.NotNil(t, retrievedScreen)
+
+	// Verify the screen size matches
+	width, height := retrievedScreen.GetSize()
+	assert.Equal(t, 80, width)
+	assert.Equal(t, 24, height)
 }
 
 // TestApplicationNotify tests the Notify method (InputEventHandler interface).

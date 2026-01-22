@@ -104,7 +104,12 @@ func newLayoutBase(parent IWidget, rect gtv.TRect, background *gtv.CellAttribute
 
 	// Set background attributes if provided
 	if background != nil {
-		layout.TResizable.TWidget.cellAttrs = *background
+		// Default to layout-background theme tag if no theme tag or colors are specified
+		attrs := *background
+		if attrs.ThemeTag == "" && attrs.TextColor == gtv.NoColor && attrs.BackColor == gtv.NoColor {
+			attrs = gtv.CellTag("layout-background")
+		}
+		layout.TResizable.TWidget.cellAttrs = attrs
 	}
 
 	return layout
