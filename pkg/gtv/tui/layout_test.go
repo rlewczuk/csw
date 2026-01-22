@@ -11,10 +11,7 @@ import (
 
 func TestNewLayout_BasicCreation(t *testing.T) {
 	// Create layout with background
-	bgAttrs := gtv.CellAttributes{
-		TextColor: 0xFF0000,
-		BackColor: 0x00FF00,
-	}
+	bgAttrs := gtv.CellColor(0xFF0000).WithBackColor(0x00FF00)
 	rect := gtv.TRect{X: 10, Y: 5, W: 20, H: 10}
 	layout := NewLayout(nil, rect, &bgAttrs)
 
@@ -57,7 +54,7 @@ func TestTLayout_SetBackground(t *testing.T) {
 	layout := NewLayout(nil, gtv.TRect{X: 0, Y: 0, W: 10, H: 5}, nil)
 	assert.Nil(t, layout.GetBackground(), "Initial background should be nil")
 
-	newBg := gtv.CellAttributes{BackColor: 0xFF0000}
+	newBg := gtv.CellBackground(0xFF0000)
 	layout.SetBackground(&newBg)
 	assert.NotNil(t, layout.GetBackground(), "Background should be set")
 	assert.Equal(t, newBg, *layout.GetBackground(), "Background should match")
@@ -94,9 +91,7 @@ func TestTLayout_Draw_WithBackground(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create layout with background
-	bgAttrs := gtv.CellAttributes{
-		BackColor: 0xFF0000,
-	}
+	bgAttrs := gtv.CellBackground(0xFF0000)
 	layout := NewLayout(nil, gtv.TRect{X: 5, Y: 10, W: 10, H: 3}, &bgAttrs)
 
 	// Draw layout
@@ -121,7 +116,7 @@ func TestTLayout_Draw_Hidden(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create layout with background
-	bgAttrs := gtv.CellAttributes{BackColor: 0xFF0000}
+	bgAttrs := gtv.CellBackground(0xFF0000)
 	layout := NewLayout(nil, gtv.TRect{X: 0, Y: 0, W: 10, H: 5}, &bgAttrs)
 	layout.Flags = WidgetFlagHidden
 
@@ -171,11 +166,11 @@ func TestTLayout_Draw_WithBackgroundAndChildren(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create layout with background
-	bgAttrs := gtv.CellAttributes{BackColor: 0x0000FF}
+	bgAttrs := gtv.CellBackground(0x0000FF)
 	layout := NewLayout(nil, gtv.TRect{X: 5, Y: 5, W: 20, H: 10}, &bgAttrs)
 
 	// Create child label
-	attrs := gtv.CellAttributes{TextColor: 0xFF0000}
+	attrs := gtv.CellColor(0xFF0000)
 	_ = NewLabel(layout, "Test", gtv.TRect{X: 5, Y: 3, W: 4, H: 1}, attrs)
 
 	// Draw layout
@@ -427,17 +422,17 @@ func TestTLayout_ComplexScenario(t *testing.T) {
 	screen := tio.NewScreenBuffer(80, 24, 0)
 
 	// Create main layout with background
-	bgAttrs := gtv.CellAttributes{BackColor: 0x111111}
+	bgAttrs := gtv.CellBackground(0x111111)
 	mainLayout := NewLayout(nil, gtv.TRect{X: 5, Y: 5, W: 40, H: 15}, &bgAttrs)
 
 	// Create multiple labels at different positions
-	label1Attrs := gtv.CellAttributes{TextColor: 0xFF0000}
+	label1Attrs := gtv.CellColor(0xFF0000)
 	_ = NewLabel(mainLayout, "Header", gtv.TRect{X: 2, Y: 1, W: 6, H: 1}, label1Attrs)
 
-	label2Attrs := gtv.CellAttributes{TextColor: 0x00FF00}
+	label2Attrs := gtv.CellColor(0x00FF00)
 	_ = NewLabel(mainLayout, "Content", gtv.TRect{X: 2, Y: 5, W: 7, H: 1}, label2Attrs)
 
-	label3Attrs := gtv.CellAttributes{TextColor: 0x0000FF}
+	label3Attrs := gtv.CellColor(0x0000FF)
 	_ = NewLabel(mainLayout, "Footer", gtv.TRect{X: 2, Y: 13, W: 6, H: 1}, label3Attrs)
 
 	// Draw everything
@@ -472,11 +467,11 @@ func TestTLayout_NestedLayouts(t *testing.T) {
 	mainLayout := NewLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
 
 	// Create nested layout with background
-	bgAttrs := gtv.CellAttributes{BackColor: 0x222222}
+	bgAttrs := gtv.CellBackground(0x222222)
 	nestedLayout := NewLayout(mainLayout, gtv.TRect{X: 10, Y: 10, W: 20, H: 10}, &bgAttrs)
 
 	// Create label in nested layout
-	labelAttrs := gtv.CellAttributes{TextColor: 0xFFFFFF}
+	labelAttrs := gtv.CellColor(0xFFFFFF)
 	_ = NewLabel(nestedLayout, "Nested", gtv.TRect{X: 5, Y: 5, W: 6, H: 1}, labelAttrs)
 
 	// Draw everything

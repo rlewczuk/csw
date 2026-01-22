@@ -158,6 +158,44 @@ func AttrsWithColor(attrs TextAttributes, textColor, backColor TextColor) CellAt
 	}
 }
 
+// CellColor creates CellAttributes with only text color set.
+// All other color fields are set to NoColor and text attributes are set to zero.
+func CellColor(textColor TextColor) CellAttributes {
+	return CellAttributes{
+		TextColor:   textColor,
+		BackColor:   NoColor,
+		StrikeColor: NoColor,
+	}
+}
+
+// CellBackground creates CellAttributes with only background color set.
+// All other color fields are set to NoColor and text attributes are set to zero.
+func CellBackground(backColor TextColor) CellAttributes {
+	return CellAttributes{
+		TextColor:   NoColor,
+		BackColor:   backColor,
+		StrikeColor: NoColor,
+	}
+}
+
+// WithBackColor returns a copy of CellAttributes with BackColor set to the given color.
+func (c CellAttributes) WithBackColor(backColor TextColor) CellAttributes {
+	c.BackColor = backColor
+	return c
+}
+
+// WithStrikeColor returns a copy of CellAttributes with StrikeColor set to the given color.
+func (c CellAttributes) WithStrikeColor(strikeColor TextColor) CellAttributes {
+	c.StrikeColor = strikeColor
+	return c
+}
+
+// WithAttributes returns a copy of CellAttributes with Attributes set to the given attributes.
+func (c CellAttributes) WithAttributes(attrs TextAttributes) CellAttributes {
+	c.Attributes = attrs
+	return c
+}
+
 // Cell represents a single character cell in the screen buffer.
 type Cell struct {
 	Rune  rune
