@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"syscall"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/core"
+	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
+	gtvtui "github.com/codesnort/codesnort-swe/pkg/gtv/tui"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/presenter"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
@@ -154,14 +156,14 @@ func run(cmd *cobra.Command, args []string) error {
 	// Create AppPresenter with the system, default model, and role
 	appPresenter := presenter.NewAppPresenter(sweSystem, modelName, roleName)
 
-	// Create TuiAppView with the presenter
-	tuiAppView, err := tui.NewTuiAppView(appPresenter)
-	if err != nil {
-		return fmt.Errorf("failed to create app view: %w", err)
-	}
+	// Create screen buffer (80x24 is initial size, will be resized to terminal size)
+	screen := tio.NewScreenBuffer(80, 24, 0)
+
+	// Create TAppView with the presenter
+	appView := tui.NewAppView(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, appPresenter)
 
 	// Set the view on the presenter
-	if err := appPresenter.SetView(tuiAppView); err != nil {
+	if err := appPresenter.SetView(appView); err != nil {
 		return fmt.Errorf("failed to set app view: %w", err)
 	}
 
@@ -170,27 +172,27 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create initial session: %w", err)
 	}
 
-	// Create the bubbletea program with the app view's model
-	p := tea.NewProgram(tuiAppView.Model(), tea.WithAltScreen())
+	// Create the gtv application
+	app := gtvtui.NewApplication(appView, screen)
 
-	// Run the program in a goroutine
+	// Run the application in a goroutine
 	done := make(chan error, 1)
 	go func() {
-		if _, err := p.Run(); err != nil {
+		if err := app.Run(os.Stdin, os.Stdout); err != nil {
 			done <- err
 		} else {
 			done <- nil
 		}
 	}()
 
-	// Wait for either the program to finish or context cancellation
+	// Wait for either the application to finish or context cancellation
 	select {
 	case err := <-done:
 		if err != nil {
 			return fmt.Errorf("TUI error: %w", err)
 		}
 	case <-ctx.Done():
-		p.Quit()
+		app.Quit()
 		return nil
 	}
 
