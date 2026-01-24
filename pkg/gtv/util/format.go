@@ -72,7 +72,13 @@ func TextToCells(s string) []gtv.Cell {
 
 	runes := []rune(s)
 	cells := []gtv.Cell{}
-	attrs := gtv.CellAttributes{}
+	// Initialize attrs with NoColor for all color fields
+	// This ensures that theme colors can be applied later
+	attrs := gtv.CellAttributes{
+		TextColor:   gtv.NoColor,
+		BackColor:   gtv.NoColor,
+		StrikeColor: gtv.NoColor,
+	}
 
 	// Stack to track active formatting markers and their attributes
 	stack := []marker{}
@@ -297,14 +303,26 @@ func calculateAttrs(stack []marker) gtv.CellAttributes {
 	for _, m := range stack {
 		combined |= m.attr
 	}
-	return gtv.Attrs(combined)
+	// Create CellAttributes with NoColor to allow theme colors to be applied
+	return gtv.CellAttributes{
+		Attributes:  combined,
+		TextColor:   gtv.NoColor,
+		BackColor:   gtv.NoColor,
+		StrikeColor: gtv.NoColor,
+	}
 }
 
 // reparseWithLiterals reparses the string treating unclosed markers as literal text
 func reparseWithLiterals(s string, unclosed []marker) []gtv.Cell {
 	runes := []rune(s)
 	cells := []gtv.Cell{}
-	attrs := gtv.CellAttributes{}
+	// Initialize attrs with NoColor for all color fields
+	// This ensures that theme colors can be applied later
+	attrs := gtv.CellAttributes{
+		TextColor:   gtv.NoColor,
+		BackColor:   gtv.NoColor,
+		StrikeColor: gtv.NoColor,
+	}
 
 	stack := []marker{}
 
