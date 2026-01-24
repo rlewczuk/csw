@@ -186,6 +186,7 @@ func NewChatView(parent tui.IWidget, rect gtv.TRect, presenter ui.IChatPresenter
 
 	// Focus the text area by default
 	view.textArea.Focus()
+	view.layout.ActiveChild = view.textArea
 
 	// Register with parent if provided
 	if parent != nil {
@@ -340,6 +341,7 @@ func (v *TChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 
 	// Focus the menu
 	v.permissionMenu.Focus()
+	v.layout.ActiveChild = v.permissionMenu
 
 	return nil
 }
@@ -396,6 +398,7 @@ func (v *TChatView) hidePermissionMenuUnsafe() {
 
 	// Focus the text area
 	v.textArea.Focus()
+	v.layout.ActiveChild = v.textArea
 
 	// Clear permission menu reference
 	v.permissionMenu = nil
