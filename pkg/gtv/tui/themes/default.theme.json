@@ -124,6 +124,14 @@
     "mdv-hr": {
       "text-color": "#444444",
       "back-color": "#000000"
+    },
+    "frame": {
+      "text-color": "#888888",
+      "back-color": "#000000"
+    },
+    "frame-focused": {
+      "text-color": "#00AAFF",
+      "back-color": "#000000"
     }
   }
 }
