@@ -348,6 +348,78 @@ func (fl *TFlexLayout) AddChild(child IWidget) {
 	fl.performLayout()
 }
 
+// RemoveChild removes a child widget from the flex layout and performs layout.
+func (fl *TFlexLayout) RemoveChild(child IWidget) {
+	// Remove from children list
+	for i, c := range fl.Children {
+		if c == child {
+			fl.Children = append(fl.Children[:i], fl.Children[i+1:]...)
+			break
+		}
+	}
+	// Remove from item properties
+	delete(fl.itemProperties, child)
+	// Clear active child if it was the removed child
+	if fl.ActiveChild == child {
+		fl.ActiveChild = nil
+	}
+	fl.performLayout()
+}
+
+// ReplaceChild replaces an old child widget with a new one, preserving position and flex properties.
+// If preserveProperties is true, the new child will inherit the old child's flex properties.
+// Returns true if the replacement was successful, false if oldChild was not found.
+func (fl *TFlexLayout) ReplaceChild(oldChild, newChild IWidget, preserveProperties bool) bool {
+	// Find the old child's index
+	index := -1
+	for i, c := range fl.Children {
+		if c == oldChild {
+			index = i
+			break
+		}
+	}
+
+	if index == -1 {
+		return false
+	}
+
+	// Preserve properties if requested
+	var props FlexItemProperties
+	if preserveProperties {
+		if oldProps, ok := fl.itemProperties[oldChild]; ok {
+			props = oldProps
+		} else {
+			props = fl.defaultItemPadding
+		}
+	} else {
+		// Capture initial size as FlexBasis for new child
+		childPos := newChild.GetPos()
+		props = fl.defaultItemPadding
+		if props.FlexBasis == 0 {
+			if fl.direction == FlexDirectionRow {
+				props.FlexBasis = childPos.W
+			} else {
+				props.FlexBasis = childPos.H
+			}
+		}
+	}
+
+	// Replace in children list
+	fl.Children[index] = newChild
+
+	// Update item properties
+	delete(fl.itemProperties, oldChild)
+	fl.itemProperties[newChild] = props
+
+	// Update active child if it was the old child
+	if fl.ActiveChild == oldChild {
+		fl.ActiveChild = newChild
+	}
+
+	fl.performLayout()
+	return true
+}
+
 // performLayout calculates and applies positions and sizes to all children.
 func (fl *TFlexLayout) performLayout() {
 	if len(fl.Children) == 0 {
