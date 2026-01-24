@@ -518,7 +518,7 @@ func (r *InputEventReader) handleTildeKey(keyCode int, params []int) {
 		key = 'I'
 		mods |= gtv.ModFn
 	case 3: // Delete
-		key = 'D'
+		key = 'E'
 		mods |= gtv.ModFn
 	case 4, 8: // End
 		key = 'F'

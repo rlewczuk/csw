@@ -43,6 +43,13 @@ func main() {
 		gtv.CellTag("subtitle"),
 	)
 
+	commentLabel := tui.NewLabel(
+		mainLayout,
+		"Comment:",
+		gtv.TRect{X: 5, Y: 9, W: 0, H: 0},
+		gtv.CellTag("subtitle"),
+	)
+
 	// Create input boxes for form fields (right column, aligned)
 	// The default theme tags are applied automatically
 	nameInput := tui.NewInputBox(
@@ -63,11 +70,18 @@ func main() {
 		tui.WithRectangle(15, 7, 30, 1),
 	)
 
+	// Create text area for comments
+	commentTextArea := tui.NewTextArea(
+		mainLayout,
+		tui.WithTextAreaText(""),
+		tui.WithRectangle(15, 9, 30, 3),
+	)
+
 	// Create result label (below input fields)
 	resultLabel := tui.NewLabel(
 		mainLayout,
 		"",
-		gtv.TRect{X: 5, Y: 12, W: 60, H: 1},
+		gtv.TRect{X: 5, Y: 14, W: 60, H: 1},
 		gtv.CellTag("success"),
 	)
 
@@ -76,7 +90,7 @@ func main() {
 	submitButton := tui.NewButton(
 		mainLayout,
 		"Submit",
-		gtv.TRect{X: 15, Y: 9, W: 0, H: 0},
+		gtv.TRect{X: 15, Y: 12, W: 0, H: 0},
 		gtv.CellTag("button"),
 		gtv.CellTag("button-focused"),
 		gtv.CellTag("button-disabled"),
@@ -87,12 +101,13 @@ func main() {
 		name := nameInput.GetText()
 		email := emailInput.GetText()
 		phone := phoneInput.GetText()
+		comment := commentTextArea.GetText()
 
-		if name == "" && email == "" && phone == "" {
+		if name == "" && email == "" && phone == "" && comment == "" {
 			resultLabel.SetText("Please enter at least one field!")
 			resultLabel.SetAttrs(gtv.CellTag("error"))
 		} else {
-			result := fmt.Sprintf("Submitted - Name: %s, Email: %s, Phone: %s", name, email, phone)
+			result := fmt.Sprintf("Submitted - Name: %s, Email: %s, Phone: %s, Comment: %s", name, email, phone, comment)
 			resultLabel.SetText(result)
 			resultLabel.SetAttrs(gtv.CellTag("success"))
 		}
@@ -103,7 +118,7 @@ func main() {
 	clearButton := tui.NewButton(
 		mainLayout,
 		"Clear",
-		gtv.TRect{X: 28, Y: 9, W: 0, H: 0},
+		gtv.TRect{X: 28, Y: 12, W: 0, H: 0},
 		gtv.AttrsWithColor(0, 0xFFFFFF, 0x660000),            // Normal: white on dark red
 		gtv.AttrsWithColor(gtv.AttrBold, 0xFFFFFF, 0xAA0000), // Focused: bold white on red
 		gtv.CellTag("button-disabled"),
@@ -114,6 +129,7 @@ func main() {
 		nameInput.SetText("")
 		emailInput.SetText("")
 		phoneInput.SetText("")
+		commentTextArea.SetText("")
 		resultLabel.SetText("")
 	})
 
@@ -121,7 +137,7 @@ func main() {
 	quitButton := tui.NewButton(
 		mainLayout,
 		"Quit",
-		gtv.TRect{X: 38, Y: 9, W: 0, H: 0},
+		gtv.TRect{X: 38, Y: 12, W: 0, H: 0},
 		gtv.CellTag("button"),
 		gtv.CellTag("button-focused"),
 		gtv.CellTag("button-disabled"),
@@ -139,7 +155,7 @@ func main() {
 	instructionsLabel := tui.NewLabel(
 		mainLayout,
 		"Press Tab to move between fields. Press Enter/Space on buttons. Press Ctrl+C to quit.",
-		gtv.TRect{X: 5, Y: 14, W: 0, H: 0},
+		gtv.TRect{X: 5, Y: 16, W: 0, H: 0},
 		gtv.CellTag("hint"),
 	)
 
@@ -147,6 +163,7 @@ func main() {
 	_ = nameLabel
 	_ = emailLabel
 	_ = phoneLabel
+	_ = commentLabel
 	_ = titleLabel
 	_ = instructionsLabel
 
