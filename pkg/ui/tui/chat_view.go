@@ -81,6 +81,12 @@ type TChatView struct {
 	// Text area for user input
 	textArea *tui.TTextArea
 
+	// Menu widget for permission queries (replaces text area temporarily)
+	permissionMenu *tui.TMenuWidget
+
+	// Current permission query (nil if none active)
+	currentPermissionQuery *ui.PermissionQueryUI
+
 	// Presenter for handling user input
 	presenter ui.IChatPresenter
 
@@ -269,14 +275,133 @@ func (v *TChatView) MoveToBottom() error {
 
 // QueryPermission queries user for permission to use a tool
 func (v *TChatView) QueryPermission(query *ui.PermissionQueryUI) error {
-	// TODO: Implement permission query UI
-	// For now, just auto-approve (this will be implemented later)
-	if v.presenter != nil {
-		if len(query.Options) > 0 {
-			return v.presenter.PermissionResponse(query.Options[0])
-		}
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	// Store the current permission query
+	v.currentPermissionQuery = query
+
+	// Calculate menu height based on number of options
+	menuHeight := uint16(len(query.Options) + 3) // +3 for border and title
+	if query.AllowCustomResponse != "" {
+		menuHeight++ // Extra line for custom input option
 	}
+	if menuHeight > 15 {
+		menuHeight = 15 // Cap at reasonable height
+	}
+
+	// Create menu widget with nil parent first (we'll add it via replace)
+	v.permissionMenu = tui.NewMenuWidget(
+		nil,
+		tui.WithRectangle(0, 0, int(v.layout.Position.W), int(menuHeight)),
+	)
+
+	// Set menu title and items
+	v.permissionMenu.SetTitle(query.Title)
+
+	// Clear existing items
+	v.permissionMenu.SetItems(nil)
+
+	// Add menu items for each option
+	for _, option := range query.Options {
+		optionText := option // Capture for closure
+		v.permissionMenu.AddItem(optionText, func(text string) {
+			v.handlePermissionResponse(optionText)
+		})
+	}
+
+	// Enable custom input if allowed
+	if query.AllowCustomResponse != "" {
+		v.permissionMenu.EnableCustomInput(true, query.AllowCustomResponse)
+		v.permissionMenu.SetOnCustomInput(func(text string) {
+			v.handlePermissionResponse(text)
+		})
+	} else {
+		v.permissionMenu.EnableCustomInput(false, "")
+	}
+
+	// Set cancel handler (ESC key)
+	v.permissionMenu.SetOnCancel(func() {
+		v.hidePermissionMenu()
+	})
+
+	// First, remove the text area from the layout
+	v.layout.RemoveChild(v.textArea)
+
+	// Then, add the menu to the layout
+	v.layout.AddChild(v.permissionMenu)
+
+	// Update menu size to match fixed height
+	v.layout.SetItemProperties(v.permissionMenu, tui.FlexItemProperties{
+		FlexGrow:    0.0,
+		FlexShrink:  0.0,
+		FixedHeight: menuHeight,
+	})
+
+	// Focus the menu
+	v.permissionMenu.Focus()
+
 	return nil
+}
+
+// handlePermissionResponse handles the user's response to a permission query
+func (v *TChatView) handlePermissionResponse(response string) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	// Hide the permission menu
+	v.hidePermissionMenuUnsafe()
+
+	// Send response to presenter
+	if v.presenter != nil && response != "" {
+		// Run in goroutine to avoid blocking UI
+		go func() {
+			if err := v.presenter.PermissionResponse(response); err != nil {
+				// TODO: Show error to user
+				_ = err
+			}
+		}()
+	}
+
+	// Clear current permission query
+	v.currentPermissionQuery = nil
+}
+
+// hidePermissionMenu hides the permission menu and restores the text area (with locking)
+func (v *TChatView) hidePermissionMenu() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.hidePermissionMenuUnsafe()
+}
+
+// hidePermissionMenuUnsafe hides the permission menu and restores the text area (caller must lock)
+func (v *TChatView) hidePermissionMenuUnsafe() {
+	if v.permissionMenu == nil {
+		return
+	}
+
+	// Remove menu from layout
+	v.layout.RemoveChild(v.permissionMenu)
+
+	// Add text area back to layout
+	v.layout.AddChild(v.textArea)
+
+	// Restore text area properties
+	inputHeight := uint16(5)
+	v.layout.SetItemProperties(v.textArea, tui.FlexItemProperties{
+		FlexGrow:    0.0,
+		FlexShrink:  0.0,
+		FixedHeight: inputHeight,
+	})
+
+	// Focus the text area
+	v.textArea.Focus()
+
+	// Clear permission menu reference
+	v.permissionMenu = nil
+
+	// Clear current permission query
+	v.currentPermissionQuery = nil
 }
 
 // addMessageUnsafe adds a message without locking (caller must lock)
