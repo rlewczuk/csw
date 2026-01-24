@@ -25,6 +25,11 @@ Analyze user requirements and create new TUI widget in `pkg/gtv/tui/<widget-name
   - use testify assertions instead of manual `if` statements
   - always run all tests in whole project at the end and verify if they work correctly, fix any issues occuring
 - ignore old bubbletea code in `pkg/ui/tui` and `pkg/gtv/tui` - it is legacy code that will be removed soon
+- make sure theme cell attributes are used, instead of hardcoded:
+  - widget shoud use `CellTag()` to set theme tag on widget creation
+  - theme tag names should start with `<widget-name>-` prefix, for example `label-`, `button-`, `layout-`
+  - update default theme in `pkg/gtv/tui/themes/default.theme.json` to include new theme tag names and colors
+  
 
 ## When to use me
 
