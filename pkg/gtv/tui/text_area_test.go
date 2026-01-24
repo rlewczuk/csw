@@ -791,3 +791,108 @@ func TestTextArea_DeleteKeyWithSelection(t *testing.T) {
 	assert.Equal(t, 0, line)
 	assert.Equal(t, 6, col)
 }
+
+// TestTextArea_SetKeyHandler tests setting and using custom key handler
+func TestTextArea_SetKeyHandler(t *testing.T) {
+	screen := tio.NewScreenBuffer(80, 24, 0)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+
+	textArea := tui.NewTextArea(
+		layout,
+		tui.WithTextAreaText(""),
+		tui.WithRectangle(10, 10, 20, 5),
+	)
+
+	app := tui.NewApplication(layout, screen)
+	mockInput := tio.NewMockInputEventReader(app)
+
+	// Focus and set as active
+	textArea.Focus()
+	layout.ActiveChild = textArea
+
+	// Track if handler was called
+	handlerCalled := false
+	handlerEvent := (*gtv.InputEvent)(nil)
+
+	// Set custom key handler for Alt+Enter
+	textArea.SetKeyHandler(func(event *gtv.InputEvent) bool {
+		handlerCalled = true
+		handlerEvent = event
+		// Check for Alt+Enter (Enter key is \r or \n with ModAlt)
+		if (event.Key == '\r' || event.Key == '\n') && event.Modifiers&gtv.ModAlt != 0 {
+			return true // Handled, don't process further
+		}
+		return false // Not handled, continue with default handling
+	})
+
+	// Type some text first
+	mockInput.TypeKeys("Test")
+	assert.Equal(t, "Test", textArea.GetText())
+
+	// Send Alt+Enter key
+	handlerCalled = false
+	mockInput.PressKey('\r', gtv.ModAlt)
+
+	// Verify handler was called and event was handled
+	assert.True(t, handlerCalled, "Custom key handler should be called")
+	assert.NotNil(t, handlerEvent, "Handler should receive event")
+	assert.Equal(t, rune('\r'), handlerEvent.Key)
+	assert.True(t, handlerEvent.Modifiers&gtv.ModAlt != 0, "Event should have ModAlt")
+
+	// Verify text was NOT modified (handler returned true, so default handling was skipped)
+	assert.Equal(t, "Test", textArea.GetText(), "Text should not change when handler returns true")
+
+	// Now send normal Enter key (without Alt)
+	handlerCalled = false
+	mockInput.TypeKeysByName("Enter")
+
+	// Verify handler was called but didn't handle it
+	assert.True(t, handlerCalled, "Handler should be called for all key events")
+
+	// Verify new line was added (default handling)
+	assert.Equal(t, "Test\n", textArea.GetText(), "Normal Enter should still work when handler returns false")
+}
+
+// TestTextArea_KeyHandlerAltEnter tests Alt+Enter handler that prevents newline
+func TestTextArea_KeyHandlerAltEnter(t *testing.T) {
+	screen := tio.NewScreenBuffer(80, 24, 0)
+	layout := tui.NewAbsoluteLayout(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 24}, nil)
+
+	textArea := tui.NewTextArea(
+		layout,
+		tui.WithTextAreaText("Line 1"),
+		tui.WithRectangle(10, 10, 20, 5),
+	)
+
+	app := tui.NewApplication(layout, screen)
+	mockInput := tio.NewMockInputEventReader(app)
+
+	// Focus and set as active
+	textArea.Focus()
+	layout.ActiveChild = textArea
+
+	submittedText := ""
+
+	// Set handler that captures text on Alt+Enter
+	textArea.SetKeyHandler(func(event *gtv.InputEvent) bool {
+		if (event.Key == '\r' || event.Key == '\n') && event.Modifiers&gtv.ModAlt != 0 {
+			submittedText = textArea.GetText()
+			return true // Prevent default newline insertion
+		}
+		return false
+	})
+
+	// Send Alt+Enter
+	mockInput.PressKey('\r', gtv.ModAlt)
+
+	// Verify text was captured
+	assert.Equal(t, "Line 1", submittedText, "Handler should capture text on Alt+Enter")
+	// Verify no newline was added
+	assert.Equal(t, "Line 1", textArea.GetText(), "Alt+Enter should not add newline when handler returns true")
+
+	// Send normal Enter
+	mockInput.TypeKeysByName("Enter")
+
+	// Verify newline was added
+	assert.Equal(t, "Line 1\n", textArea.GetText(), "Normal Enter should add newline")
+}

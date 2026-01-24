@@ -54,6 +54,10 @@ type ITextArea interface {
 
 	// ClearSelection clears the selection.
 	ClearSelection()
+
+	// SetKeyHandler sets a custom key handler that is called before default handling.
+	// The handler should return true if the event was handled and should not be processed further.
+	SetKeyHandler(handler func(event *gtv.InputEvent) bool)
 }
 
 // TTextArea is a widget that allows multi-line text input with cursor, selection, and editing capabilities.
@@ -94,6 +98,10 @@ type TTextArea struct {
 	isDragging    bool
 	dragStartLine int
 	dragStartCol  int
+
+	// Custom key handler (optional) - called before default key handling
+	// Return true if the event was handled and should not be processed further
+	keyHandler func(event *gtv.InputEvent) bool
 }
 
 // WithTextAreaText sets the initial text for the text area.
@@ -275,6 +283,11 @@ func (t *TTextArea) ClearSelection() {
 	t.selectionStartCol = t.cursorCol
 	t.selectionEndLine = t.cursorLine
 	t.selectionEndCol = t.cursorCol
+}
+
+// SetKeyHandler sets a custom key handler that is called before default handling.
+func (t *TTextArea) SetKeyHandler(handler func(event *gtv.InputEvent) bool) {
+	t.keyHandler = handler
 }
 
 // hasSelection returns true if there is an active selection.
@@ -545,6 +558,11 @@ func (t *TTextArea) handleMouseEvent(event *gtv.InputEvent) {
 
 // handleKeyEvent handles keyboard events for text input and editing.
 func (t *TTextArea) handleKeyEvent(event *gtv.InputEvent) {
+	// Call custom key handler first if set
+	if t.keyHandler != nil && t.keyHandler(event) {
+		return
+	}
+
 	hasShift := event.Modifiers&gtv.ModShift != 0
 
 	// Handle navigation keys
