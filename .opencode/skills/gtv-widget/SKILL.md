@@ -1,6 +1,6 @@
 ---
-name: new-tui-widget
-description: Create new TUI widget
+name: gtv-widget
+description: Create new TUI widget for gtv
 license: MIT
 compatibility: opencode
 ---
