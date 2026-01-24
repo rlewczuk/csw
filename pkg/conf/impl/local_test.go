@@ -411,7 +411,7 @@ func TestLocalConfigStore_FileWatching_GlobalConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait a bit to ensure timestamp difference
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	// Modify global.json
 	globalConfig.ModelTags = append(globalConfig.ModelTags, conf.ModelTagMapping{
@@ -423,7 +423,7 @@ func TestLocalConfigStore_FileWatching_GlobalConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for file watcher to process the event
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
 	// Verify config was reloaded
 	config, err := store.GetGlobalConfig()
@@ -466,7 +466,7 @@ func TestLocalConfigStore_FileWatching_ModelProvider(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait a bit to ensure timestamp difference
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	// Add a new model provider
 	openaiConfig := conf.ModelProviderConfig{
@@ -480,7 +480,7 @@ func TestLocalConfigStore_FileWatching_ModelProvider(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for file watcher to process the event
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
 	// Verify config was reloaded
 	configs, err := store.GetModelProviderConfigs()
@@ -526,7 +526,7 @@ func TestLocalConfigStore_FileWatching_AgentRole(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait a bit to ensure timestamp difference
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	// Modify existing role
 	test1Config.Description = "Modified description"
@@ -536,7 +536,7 @@ func TestLocalConfigStore_FileWatching_AgentRole(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for file watcher to process the event
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
 	// Verify config was reloaded
 	configs, err := store.GetAgentRoleConfigs()
@@ -567,14 +567,14 @@ func TestLocalConfigStore_FileWatching_NewRole(t *testing.T) {
 	assert.Empty(t, configs)
 
 	// Wait a bit
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	// Add a new role directory
 	test1Dir := filepath.Join(rolesDir, "test1")
 	require.NoError(t, os.Mkdir(test1Dir, 0755))
 
 	// Wait for directory creation to be detected
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	// Add config.json to the new role
 	test1Config := conf.AgentRoleConfig{
@@ -587,7 +587,7 @@ func TestLocalConfigStore_FileWatching_NewRole(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for file watcher to process the event
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	// Verify config was loaded
 	configs, err = store.GetAgentRoleConfigs()
@@ -842,14 +842,14 @@ func TestLocalConfigStore_FileWatching_PromptFragments(t *testing.T) {
 	assert.Equal(t, "Initial prompt.", test1.PromptFragments["10-system"])
 
 	// Wait a bit to ensure timestamp difference
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	// Modify the prompt fragment
 	err = os.WriteFile(filepath.Join(test1Dir, "10-system.md"), []byte("Updated prompt."), 0644)
 	require.NoError(t, err)
 
 	// Wait for file watcher to process the event
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
 	// Verify prompt fragment was reloaded
 	configs, err = store.GetAgentRoleConfigs()
@@ -900,14 +900,14 @@ func TestLocalConfigStore_FileWatching_NewPromptFragment(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait a bit
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	// Add a new prompt fragment
 	err = os.WriteFile(filepath.Join(test1Dir, "10-system.md"), []byte("New prompt fragment."), 0644)
 	require.NoError(t, err)
 
 	// Wait for file watcher to process the event
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
 	// Verify prompt fragment was loaded
 	configs, err = store.GetAgentRoleConfigs()

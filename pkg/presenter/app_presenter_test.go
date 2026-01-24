@@ -288,7 +288,7 @@ func TestAppPresenter_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for processing
-		time.Sleep(150 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 
 		// Verify file was created
 		content, err := vfsInstance.ReadFile("test.txt")
@@ -323,7 +323,7 @@ func TestAppPresenter_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for processing
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 
 		// Get session ID
 		sessions := system.ListSessions()
@@ -357,7 +357,7 @@ func TestAppPresenter_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for processing
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 
 		// Verify the session has both messages in history
 		session, err := system.GetSession(sessionID)
