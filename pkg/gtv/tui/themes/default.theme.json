@@ -36,7 +36,18 @@
       "text-color": "#000000",
       "back-color": "#00AAFF"
     },
+    "textarea": {
+      "text-color": "#FFFFFF",
+      "back-color": "#2A2A2A"
+    },
+    "textarea-focused": {
+      "text-color": "#000000",
+      "back-color": "#00AAFF"
+    },
     "layout-background": {
+      "back-color": "#1A1A1A"
+    },
+    "flex-layout-background": {
       "back-color": "#1A1A1A"
     },
     "title": {

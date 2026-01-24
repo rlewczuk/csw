@@ -594,7 +594,7 @@ func ParseKey(name string) (InputEvent, error) {
 	case "space":
 		key = ' '
 	case "delete":
-		key = 'D'
+		key = 'E'
 		mods |= ModFn
 	case "insert":
 		key = 'I'

@@ -77,7 +77,7 @@ func TestParseKey_NavigationKeys(t *testing.T) {
 		{"PageUp", "PageUp", 'G', ModFn},
 		{"PageDown", "PageDown", 'N', ModFn},
 		{"Insert", "Insert", 'I', ModFn},
-		{"Delete", "Delete", 'D', ModFn},
+		{"Delete", "Delete", 'E', ModFn},
 	}
 
 	for _, tt := range tests {
@@ -125,7 +125,7 @@ func TestParseKey_ModifiedKeys(t *testing.T) {
 		{"Ctrl+A", "Ctrl+A", 'a', ModCtrl},
 		{"Alt+Enter", "Alt+Enter", '\r', ModAlt},
 		{"Shift+F1", "Shift+F1", 'P', ModShift | ModFn},
-		{"Ctrl+Alt+Delete", "Ctrl+Alt+Delete", 'D', ModCtrl | ModAlt | ModFn},
+		{"Ctrl+Alt+Delete", "Ctrl+Alt+Delete", 'E', ModCtrl | ModAlt | ModFn},
 		{"Meta+A", "Meta+A", 'A', ModMeta | ModShift},             // Uppercase A gets Shift modifier
 		{"Ctrl+Shift+A", "Ctrl+Shift+A", 'a', ModCtrl | ModShift}, // Ctrl normalizes to lowercase
 	}

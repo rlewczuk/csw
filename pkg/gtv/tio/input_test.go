@@ -201,7 +201,7 @@ func TestInputEventReader_SpecialKeys(t *testing.T) {
 		{
 			name:     "Delete key",
 			input:    []byte("\x1b[3~"),
-			expected: gtv.InputEvent{Type: gtv.InputEventKey, Key: 'D', Modifiers: gtv.ModFn},
+			expected: gtv.InputEvent{Type: gtv.InputEventKey, Key: 'E', Modifiers: gtv.ModFn},
 		},
 		{
 			name:     "Page Up",
