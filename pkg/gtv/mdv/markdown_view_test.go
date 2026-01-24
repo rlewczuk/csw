@@ -532,3 +532,349 @@ Another paragraph.`
 	assert.True(t, hasQuote, "Should have blockquote blocks")
 	assert.True(t, hasHR, "Should have horizontal rule blocks")
 }
+
+func TestMarkdownView_ScrollingClearsOldContent(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	_ = ctx
+
+	// Create content with lines of different lengths
+	// This will expose the bug where old content is not cleared
+	content := `Line 1: Short
+Line 2: This is a much longer line that will be visible initially
+Line 3: Medium length line here
+Line 4: X
+Line 5: Another very long line that extends quite far to the right
+Line 6: Tiny`
+
+	screen := tio.NewScreenBuffer(80, 5, 0)
+	view := NewMarkdownView(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 5}, content)
+
+	// Draw initial view
+	view.Draw(screen)
+
+	// Scroll down by 1 line
+	view.ScrollDown(1)
+
+	// Redraw WITHOUT clearing the screen - this exposes the bug
+	// where old content is not cleared
+	view.Draw(screen)
+
+	// Get content after scrolling
+	_, _, cells2 := screen.GetContent()
+	line1AfterScroll := extractLine(cells2, 80, 1)
+
+	// After scrolling, line 1 should now show "Line 3: Medium length line here"
+	// If the bug exists, we might see remnants of the longer "Line 2" text
+	assert.Contains(t, line1AfterScroll, "Line 3", "Line 1 should show Line 3 after scrolling")
+	assert.NotContains(t, line1AfterScroll, "This is a much longer line", "Should not contain remnants of Line 2")
+
+	// Verify that no old content remains after the actual text ends
+	// Find where "Line 3: Medium length line here" ends
+	line3Text := "Line 3: Medium length line here"
+	line3Len := len(line3Text)
+
+	// Check that positions after the line end are spaces, not old content
+	for i := line3Len; i < len(line1AfterScroll); i++ {
+		if line1AfterScroll[i] != ' ' && line1AfterScroll[i] != 0 {
+			t.Errorf("MarkdownView_ScrollingClearsOldContent: Found non-space character '%c' at position %d after line end (expected space or null)", line1AfterScroll[i], i)
+		}
+	}
+}
+
+func TestMarkdownView_ThemeColorsApplied(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	_ = ctx
+
+	content := `# Header 1
+## Header 2
+
+A paragraph.
+
+` + "```go\ncode\n```"
+
+	// Create a theme with specific colors
+	theme := map[string]gtv.CellAttributes{
+		"mdv-h1": {
+			TextColor: gtv.TextColor(0xFF0000), // Red
+			BackColor: gtv.NoColor,
+		},
+		"mdv-h2": {
+			TextColor: gtv.TextColor(0x00FF00), // Green
+			BackColor: gtv.NoColor,
+		},
+		"mdv-paragraph": {
+			TextColor: gtv.TextColor(0x0000FF), // Blue
+			BackColor: gtv.NoColor,
+		},
+		"mdv-code-block": {
+			TextColor: gtv.TextColor(0xFFFF00), // Yellow
+			BackColor: gtv.TextColor(0x333333), // Dark gray
+		},
+	}
+
+	screen := tio.NewScreenBuffer(80, 20, 0)
+	themedScreen := gtv.NewThemeInterceptor(screen, theme)
+
+	view := NewMarkdownView(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 20}, content)
+
+	// Draw the view with themed screen
+	view.Draw(themedScreen)
+
+	// Get screen content
+	_, _, cells := screen.GetContent()
+
+	// Find the H1 header text "Header 1" and verify it has red color
+	h1Found := false
+	for i := 0; i < len(cells); i++ {
+		if cells[i].Rune == 'H' && i+6 < len(cells) {
+			// Check if this is "Header"
+			text := string([]rune{cells[i].Rune, cells[i+1].Rune, cells[i+2].Rune, cells[i+3].Rune, cells[i+4].Rune, cells[i+5].Rune})
+			if text == "Header" {
+				// This should be H1 (first occurrence)
+				if !h1Found {
+					h1Found = true
+					// Verify the color is red (0xFF0000)
+					assert.Equal(t, gtv.TextColor(0xFF0000), cells[i].Attrs.TextColor, "H1 header should have red text color from theme at markdown_view_test.go:TestMarkdownView_ThemeColorsApplied()")
+					break
+				}
+			}
+		}
+	}
+
+	assert.True(t, h1Found, "Should find H1 header text")
+
+	// Find the paragraph text "A paragraph" and verify it has blue color
+	paraFound := false
+	for i := 0; i < len(cells); i++ {
+		if cells[i].Rune == 'A' && i+11 < len(cells) {
+			// Check if this is "A paragraph"
+			text := string([]rune{cells[i].Rune, cells[i+1].Rune})
+			if text == "A " {
+				paraFound = true
+				// Verify the color is blue (0x0000FF)
+				assert.Equal(t, gtv.TextColor(0x0000FF), cells[i].Attrs.TextColor, "Paragraph should have blue text color from theme at markdown_view_test.go:TestMarkdownView_ThemeColorsApplied()")
+				break
+			}
+		}
+	}
+
+	assert.True(t, paraFound, "Should find paragraph text")
+}
+
+func TestMarkdownView_ScrollingClearsAttributes(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	_ = ctx
+
+	// Create content where H1 header with underline will be scrolled away
+	// and replaced by plain paragraph text
+	// The bug occurs when a longer underlined text is replaced by shorter plain text
+	content := `# This Is A Very Long Header With Underline And Bold
+
+Short text
+
+More content here
+
+Even more content
+
+Final line of text`
+
+	screen := tio.NewScreenBuffer(80, 3, 0)
+	view := NewMarkdownView(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 3}, content)
+
+	// Draw initial view - H1 header with underline should be visible
+	view.Draw(screen)
+
+	// Get initial content
+	_, _, cells1 := screen.GetContent()
+
+	// Verify that first line has underline attribute (from H1 header)
+	hasUnderlineInitially := false
+	headerTextLen := 0
+	for x := 0; x < 80; x++ {
+		if cells1[x].Attrs.Attributes&gtv.AttrUnderline != 0 {
+			hasUnderlineInitially = true
+			headerTextLen++
+		}
+	}
+	assert.True(t, hasUnderlineInitially, "Initial view should have underline attribute on first line")
+	assert.Greater(t, headerTextLen, 20, "Header should be reasonably long")
+
+	// Scroll down by 2 lines - now "Short text" should be at top
+	view.ScrollDown(2)
+
+	// DON'T clear the screen buffer - this simulates the real scenario
+	// where the markdown view is responsible for clearing old content
+	view.Draw(screen)
+
+	// Get content after scrolling
+	_, _, cells2 := screen.GetContent()
+
+	// Verify that first line NO LONGER has underline attribute after "Short text" ends
+	// Find where "Short text" ends
+	line1Text := extractLine(cells2, 80, 0)
+	shortTextEnd := strings.Index(line1Text, "Short text") + len("Short text")
+
+	if shortTextEnd > len("Short text") { // Found the text
+		// Check cells after "Short text" ends - they should NOT have underline
+		for x := shortTextEnd; x < 80; x++ {
+			if cells2[x].Attrs.Attributes&gtv.AttrUnderline != 0 {
+				t.Errorf("TestMarkdownView_ScrollingClearsAttributes: Cell at position %d has underline attribute but shouldn't (rune='%c', attrs=%+v). This is beyond the end of 'Short text'.", x, cells2[x].Rune, cells2[x].Attrs)
+			}
+			if cells2[x].Attrs.Attributes&gtv.AttrBold != 0 {
+				t.Errorf("TestMarkdownView_ScrollingClearsAttributes: Cell at position %d has bold attribute but shouldn't (rune='%c', attrs=%+v). This is beyond the end of 'Short text'.", x, cells2[x].Rune, cells2[x].Attrs)
+			}
+		}
+	}
+
+	// Also check that "Short text" itself doesn't have underline
+	for x := 0; x < shortTextEnd && x < 80; x++ {
+		if cells2[x].Rune != ' ' && cells2[x].Rune != 0 {
+			if cells2[x].Attrs.Attributes&gtv.AttrUnderline != 0 {
+				t.Errorf("TestMarkdownView_ScrollingClearsAttributes: Cell at position %d in 'Short text' has underline attribute but shouldn't (rune='%c', attrs=%+v)", x, cells2[x].Rune, cells2[x].Attrs)
+			}
+		}
+	}
+
+	// Verify text content is correct
+	assert.Contains(t, line1Text, "Short text", "First line should contain 'Short text' after scrolling")
+	assert.NotContains(t, line1Text, "Header", "First line should not contain header text after scrolling")
+}
+
+// TestMarkdownView_AttributeBleedingBug reproduces the bug where:
+// - line with text attributes (eg. underline), then empty line, then line with more characters
+// - when scrolling up, empty line receives attributes from previous line to the length of line below it
+func TestMarkdownView_AttributeBleedingBug(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	_ = ctx
+
+	// The bug: empty spacing lines retain background color or attributes from adjacent content
+	// This is most visible with code blocks (which have background color) or headers (bold+underline)
+	content := `## Lists
+
+### Unordered List
+
+- First item
+- Second item`
+
+	screen := tio.NewScreenBuffer(80, 10, 0)
+	view := NewMarkdownView(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 10}, content)
+
+	// Draw initial view
+	view.Draw(screen)
+
+	// Get the screen content
+	_, _, cells := screen.GetContent()
+
+	// The layout should be:
+	// Line 0 (Y=0): "Lists" header with bold+underline
+	// Line 1 (Y=1): Empty spacing after "Lists" header
+	// Line 2 (Y=2): "Unordered List" header with bold
+	// Line 3 (Y=3): Empty spacing after "Unordered List" header
+	// Line 4 (Y=4): "• First item"
+	// etc.
+
+	// Check Line 1 (empty spacing after "Lists" header)
+	// It should NOT have any attributes
+	for x := 0; x < 80; x++ {
+		cell := cells[1*80+x]
+		if cell.Rune != ' ' && cell.Rune != 0 {
+			t.Errorf("TestMarkdownView_AttributeBleedingBug: Empty spacing line 1, col %d has non-space character '%c'", x, cell.Rune)
+		}
+		if cell.Attrs.Attributes != 0 {
+			t.Errorf("TestMarkdownView_AttributeBleedingBug: Empty spacing line 1, col %d has attributes %v but should have none", x, cell.Attrs.Attributes)
+		}
+		if cell.Attrs.BackColor != gtv.NoColor {
+			t.Errorf("TestMarkdownView_AttributeBleedingBug: Empty spacing line 1, col %d has background color but shouldn't", x)
+		}
+	}
+
+	// Check Line 3 (empty spacing after "Unordered List" header)
+	for x := 0; x < 80; x++ {
+		cell := cells[3*80+x]
+		if cell.Rune != ' ' && cell.Rune != 0 {
+			t.Errorf("TestMarkdownView_AttributeBleedingBug: Empty spacing line 3, col %d has non-space character '%c'", x, cell.Rune)
+		}
+		if cell.Attrs.Attributes != 0 {
+			t.Errorf("TestMarkdownView_AttributeBleedingBug: Empty spacing line 3, col %d has attributes %v but should have none", x, cell.Attrs.Attributes)
+		}
+		if cell.Attrs.BackColor != gtv.NoColor {
+			t.Errorf("TestMarkdownView_AttributeBleedingBug: Empty spacing line 3, col %d has background color but shouldn't", x)
+		}
+	}
+}
+
+// TestMarkdownView_EmptySpaceUsesDefaultTheme tests that empty space after rendered content
+// uses the mdv-paragraph theme tag for background color, not NoColor or some bright background
+func TestMarkdownView_EmptySpaceUsesDefaultTheme(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	_ = ctx
+
+	// Create content with short lines to ensure there's empty space
+	content := `Short
+Line two`
+
+	// Create a theme with a BRIGHT/distinctive background color for mdv-paragraph
+	// so we can clearly see if it's being applied
+	theme := map[string]gtv.CellAttributes{
+		"mdv-paragraph": {
+			TextColor: gtv.TextColor(0xFFFFFF), // White
+			BackColor: gtv.TextColor(0xFF00FF), // Bright magenta background (very visible)
+		},
+	}
+
+	screen := tio.NewScreenBuffer(80, 10, 0)
+	themedScreen := gtv.NewThemeInterceptor(screen, theme)
+
+	view := NewMarkdownView(nil, gtv.TRect{X: 0, Y: 0, W: 80, H: 10}, content)
+
+	// Draw the view with themed screen
+	view.Draw(themedScreen)
+
+	// Get screen content
+	_, _, cells := screen.GetContent()
+
+	// Check the first line - after "Short" text ends, the remaining cells should have
+	// the paragraph theme background color (bright magenta, 0xFF00FF)
+	// Find where "Short" ends (it's 5 characters)
+	shortTextEnd := 5
+
+	// Check cells after "Short" text - they should have paragraph background color
+	// If the bug exists, they will have NoColor (0xFFFFFFFF) instead of the theme color
+	for x := shortTextEnd; x < 80; x++ {
+		cell := cells[x] // First line, cells 0-79
+		// The cell should be a space
+		if cell.Rune != ' ' && cell.Rune != 0 {
+			t.Errorf("TestMarkdownView_EmptySpaceUsesDefaultTheme: Cell at position %d has non-space character '%c'", x, cell.Rune)
+		}
+		// After theme interceptor, cells with mdv-paragraph theme tag should have bright magenta background
+		// If the bug exists, they will have NoColor (0xFFFFFFFF)
+		if cell.Attrs.BackColor == gtv.NoColor {
+			t.Errorf("TestMarkdownView_EmptySpaceUsesDefaultTheme: Cell at position %d has NoColor background (bug detected - empty space not using theme), attrs=%+v", x, cell.Attrs)
+		}
+		// Also check that the background is actually the theme color (magenta)
+		if cell.Attrs.BackColor != gtv.TextColor(0xFF00FF) {
+			t.Errorf("TestMarkdownView_EmptySpaceUsesDefaultTheme: Cell at position %d has unexpected background color %v (expected magenta 0xFF00FF from theme), attrs=%+v", x, cell.Attrs.BackColor, cell.Attrs)
+		}
+	}
+}
+
+// extractLine extracts a line from the screen buffer as a string
+func extractLine(cells []gtv.Cell, width, lineNum int) string {
+	start := lineNum * width
+	end := start + width
+	if end > len(cells) {
+		end = len(cells)
+	}
+
+	runes := make([]rune, 0, width)
+	for i := start; i < end; i++ {
+		runes = append(runes, cells[i].Rune)
+	}
+
+	return string(runes)
+}

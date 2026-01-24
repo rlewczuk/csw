@@ -91,6 +91,10 @@ func newMarkdownViewWithFactory(parent tui.IWidget, rect gtv.TRect, content stri
 		renderedWidgets: []tui.IWidget{},
 	}
 
+	// Set default cell attributes to use mdv-paragraph theme tag
+	// This ensures empty space uses the correct theme colors
+	view.SetAttrs(gtv.CellTag("mdv-paragraph"))
+
 	// Register with parent if provided
 	if parent != nil {
 		parent.AddChild(view)
@@ -188,6 +192,34 @@ func (m *TMarkdownView) Draw(screen gtv.IScreenOutput) {
 	}
 
 	absPos := m.GetAbsolutePos()
+
+	// Clear the viewport area before drawing to remove old content and attributes
+	// Use PutContent with explicit empty cells using the widget's cellAttrs
+	// This ensures empty space uses the correct theme (mdv-paragraph)
+	width := int(absPos.W)
+	if width > 0 {
+		// Get the widget's cell attributes (should have mdv-paragraph theme tag)
+		attrs := m.GetAttrs()
+
+		// Create a line of empty cells (spaces with the widget's attributes)
+		emptyLine := make([]gtv.Cell, width)
+		for i := range emptyLine {
+			emptyLine[i] = gtv.Cell{
+				Rune:  ' ',
+				Attrs: attrs,
+			}
+		}
+
+		// Clear each line in the viewport
+		for y := 0; y < m.viewportHeight; y++ {
+			screen.PutContent(gtv.TRect{
+				X: absPos.X,
+				Y: absPos.Y + uint16(y),
+				W: absPos.W,
+				H: 1,
+			}, emptyLine)
+		}
+	}
 
 	// Draw only visible children based on scroll offset
 	for _, child := range m.Children {
