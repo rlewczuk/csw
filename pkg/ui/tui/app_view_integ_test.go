@@ -90,7 +90,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 		mockInput.TypeKeysByName("Alt+Enter")
 
 		// Wait a bit for async processing
-		time.Sleep(200 * time.Millisecond)
+		//time.Sleep(200 * time.Millisecond)
 
 		// Verify user message appeared
 		app.ExecuteOnUiThread(func() {
@@ -106,7 +106,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 
 		// Wait for assistant response WITHOUT any user interaction
 		timeout := time.After(5 * time.Second)
-		ticker := time.NewTicker(100 * time.Millisecond)
+		ticker := time.NewTicker(10 * time.Millisecond)
 		defer ticker.Stop()
 
 		assistantResponseFound := false
@@ -198,7 +198,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 
 		// Wait for complete streaming response without user interaction
 		timeout := time.After(5 * time.Second)
-		ticker := time.NewTicker(100 * time.Millisecond)
+		ticker := time.NewTicker(10 * time.Millisecond)
 		defer ticker.Stop()
 
 		completeResponseFound := false
@@ -287,7 +287,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 		mockInput.TypeKeysByName("Alt+Enter")
 
 		// Wait for assistant response
-		time.Sleep(200 * time.Millisecond)
+		//time.Sleep(200 * time.Millisecond)
 
 		// Redraw and check for duplication
 		app.ExecuteOnUiThread(func() {

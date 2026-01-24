@@ -114,7 +114,7 @@ func TestChatPresenter_SendUserMessage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Wait for processing to complete
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 
 		// Verify user message was added to view
 		assert.GreaterOrEqual(t, len(mockView.AddMessageCalls), 1)
@@ -160,7 +160,7 @@ func TestChatPresenter_SaveUserMessage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Wait a bit to ensure no processing started
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 
 		// Verify user message was added to view
 		require.Len(t, mockView.AddMessageCalls, 1)
@@ -210,7 +210,7 @@ func TestChatPresenter_PauseResume(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Wait for processing to complete
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 
 		// Verify assistant message was added
 		found := false
@@ -262,7 +262,7 @@ func TestChatPresenter_ToolCallHandling(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Wait for processing to complete
-		time.Sleep(150 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 
 		// Verify tool updates were sent to view
 		assert.NotEmpty(t, mockView.UpdateToolCalls, "should have tool update calls")
@@ -306,7 +306,7 @@ func TestChatPresenter_SessionPersistence(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for processing
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 
 		// Get the session
 		session := thread1.GetSession()
@@ -376,7 +376,7 @@ func TestChatPresenter_MoveToBottom(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for processing
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 
 		// Verify MoveToBottom was called
 		assert.Greater(t, mockView.MoveToBottomCalls, 0, "should have called MoveToBottom")
@@ -433,7 +433,7 @@ func TestChatPresenter_PermissionFlow(t *testing.T) {
 	// Wait for permission query to appear in view
 	require.Eventually(t, func() bool {
 		return len(mockView.QueryPermissionCalls) > 0
-	}, 2*time.Second, 50*time.Millisecond, "should receive permission query")
+	}, 2*time.Second, 5*time.Millisecond, "should receive permission query")
 
 	// Verify query details
 	query := mockView.QueryPermissionCalls[0]
@@ -450,7 +450,7 @@ func TestChatPresenter_PermissionFlow(t *testing.T) {
 	// Wait for processing to complete
 	require.Eventually(t, func() bool {
 		return !thread.IsPaused() && !thread.IsRunning()
-	}, 2*time.Second, 50*time.Millisecond, "session should resume and finish")
+	}, 2*time.Second, 5*time.Millisecond, "session should resume and finish")
 
 	// Verify file was created
 	bytes, err := vfsInstance.ReadFile("protected.txt")
