@@ -132,6 +132,27 @@
     "frame-focused": {
       "text-color": "#00AAFF",
       "back-color": "#000000"
+    },
+    "menu-item": {
+      "text-color": "#FFFFFF",
+      "back-color": "#1A1A1A"
+    },
+    "menu-item-selected": {
+      "text-color": "#000000",
+      "back-color": "#00AAFF"
+    },
+    "menu-input-prompt": {
+      "attributes": 4,
+      "text-color": "#00AAFF",
+      "back-color": "#1A1A1A"
+    },
+    "menu-frame": {
+      "text-color": "#888888",
+      "back-color": "#000000"
+    },
+    "menu-frame-focused": {
+      "text-color": "#00AAFF",
+      "back-color": "#000000"
     }
   }
 }
