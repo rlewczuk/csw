@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
@@ -38,10 +39,11 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 
 	t.Run("basic initialization", func(t *testing.T) {
 		system := &SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-			PromptGenerator: newMockPromptGenerator("You are skilled software developer."),
-			Tools:           tools,
-			VFS:             vfs,
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator:      newMockPromptGenerator("You are skilled software developer."),
+			Tools:                tools,
+			VFS:                  vfs,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -77,10 +79,11 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
 
 		system := &SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-			PromptGenerator: newMockPromptGenerator("You are skilled software developer."),
-			Tools:           tools,
-			VFS:             vfs,
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator:      newMockPromptGenerator("You are skilled software developer."),
+			Tools:                tools,
+			VFS:                  vfs,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
@@ -135,6 +138,7 @@ func TestSweSystemSessionManagement(t *testing.T) {
 		PromptGenerator: newMockPromptGenerator("You are a test assistant."),
 		Tools:           tools,
 		VFS:             vfs,
+		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 	}
 
 	mockHandler := testutil.NewMockSessionOutputHandler()
@@ -242,6 +246,7 @@ func TestSweSystemGetSessionThread(t *testing.T) {
 		PromptGenerator: newMockPromptGenerator("You are a test assistant."),
 		Tools:           tools,
 		VFS:             vfs,
+		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 	}
 
 	mockHandler := testutil.NewMockSessionOutputHandler()
@@ -321,6 +326,7 @@ func TestSweSystemShutdown(t *testing.T) {
 			PromptGenerator: newMockPromptGenerator("You are a test assistant."),
 			Tools:           tools,
 			VFS:             vfs,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		// Should not panic
@@ -336,6 +342,7 @@ func TestSweSystemShutdown(t *testing.T) {
 			PromptGenerator: newMockPromptGenerator("You are a test assistant."),
 			Tools:           tools,
 			VFS:             vfs,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -368,6 +375,7 @@ func TestSweSystemShutdown(t *testing.T) {
 			PromptGenerator: newMockPromptGenerator("You are a test assistant."),
 			Tools:           tools,
 			VFS:             vfs,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -410,6 +418,7 @@ func TestSweSystemShutdown(t *testing.T) {
 			PromptGenerator: newMockPromptGenerator("You are a test assistant."),
 			Tools:           tools,
 			VFS:             vfs,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -454,6 +463,7 @@ func TestSweSystemShutdown(t *testing.T) {
 			PromptGenerator: newMockPromptGenerator("You are a test assistant."),
 			Tools:           tools,
 			VFS:             vfs,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()

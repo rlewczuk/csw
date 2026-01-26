@@ -7,6 +7,7 @@ import (
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
+	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
@@ -201,10 +202,11 @@ func TestAgentRoleIntegration(t *testing.T) {
 		registry := NewAgentRoleRegistry(mockStore)
 
 		system := &SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
-			Tools:          tools,
-			VFS:            mockVFS,
-			Roles:          registry,
+			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+			Tools:                tools,
+			VFS:                  mockVFS,
+			Roles:                registry,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -225,11 +227,12 @@ func TestAgentRoleIntegration(t *testing.T) {
 		registry := NewAgentRoleRegistry(mockStore)
 
 		system := &SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"mock": mockProvider},
-			PromptGenerator: newMockPromptGenerator("You are an experienced software developer."),
-			Tools:           tools,
-			VFS:             mockVFS,
-			Roles:           registry,
+			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+			PromptGenerator:      newMockPromptGenerator("You are an experienced software developer."),
+			Tools:                tools,
+			VFS:                  mockVFS,
+			Roles:                registry,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -257,10 +260,11 @@ func TestAgentRoleIntegration(t *testing.T) {
 		registry := NewAgentRoleRegistry(mockStore)
 
 		system := &SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
-			Tools:          tools,
-			VFS:            mockVFS,
-			Roles:          registry,
+			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+			Tools:                tools,
+			VFS:                  mockVFS,
+			Roles:                registry,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -297,10 +301,11 @@ func TestAgentRoleIntegration(t *testing.T) {
 		registry := NewAgentRoleRegistry(mockStore)
 
 		system := &SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
-			Tools:          tools,
-			VFS:            mockVFS,
-			Roles:          registry,
+			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+			Tools:                tools,
+			VFS:                  mockVFS,
+			Roles:                registry,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -340,10 +345,11 @@ func TestAgentRoleIntegration(t *testing.T) {
 		registry := NewAgentRoleRegistry(mockStore)
 
 		system := &SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
-			Tools:          tools,
-			VFS:            mockVFS,
-			Roles:          registry,
+			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+			Tools:                tools,
+			VFS:                  mockVFS,
+			Roles:                registry,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -363,10 +369,11 @@ func TestAgentRoleIntegration(t *testing.T) {
 		registry := NewAgentRoleRegistry(mockStore)
 
 		system := &SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
-			Tools:          tools,
-			VFS:            mockVFS,
-			Roles:          registry,
+			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+			Tools:                tools,
+			VFS:                  mockVFS,
+			Roles:                registry,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -418,10 +425,11 @@ func TestSweSessionGetState(t *testing.T) {
 
 	t.Run("GetState returns current work directory", func(t *testing.T) {
 		system := &SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
-			Tools:          tools,
-			VFS:            mockVFS,
-			Roles:          registry,
+			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+			Tools:                tools,
+			VFS:                  mockVFS,
+			Roles:                registry,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -433,10 +441,11 @@ func TestSweSessionGetState(t *testing.T) {
 
 	t.Run("SetWorkDir updates work directory in state", func(t *testing.T) {
 		system := &SweSystem{
-			ModelProviders: map[string]models.ModelProvider{"mock": mockProvider},
-			Tools:          tools,
-			VFS:            mockVFS,
-			Roles:          registry,
+			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+			Tools:                tools,
+			VFS:                  mockVFS,
+			Roles:                registry,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -464,11 +473,12 @@ func TestSweSessionGetState(t *testing.T) {
 		mockGen := &stateAwarePromptGenerator{}
 
 		system := &SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"mock": mockProvider},
-			PromptGenerator: mockGen,
-			Tools:           tools,
-			VFS:             mockVFS,
-			Roles:           registry,
+			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+			PromptGenerator:      mockGen,
+			Tools:                tools,
+			VFS:                  mockVFS,
+			Roles:                registry,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)

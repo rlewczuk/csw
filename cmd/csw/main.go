@@ -13,6 +13,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/gtv"
 	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
 	gtvtui "github.com/codesnort/codesnort-swe/pkg/gtv/tui"
+	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/presenter"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
@@ -64,6 +65,16 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 		workDir = wd
 	}
+
+	// Initialize logging infrastructure
+	// Logs directory is placed in project dir at .cswdata/logs
+	// Logging is set to debug level by default
+	// Logging is synchronous by default (sync=true)
+	logsDir := filepath.Join(workDir, ".cswdata", "logs")
+	if err := logging.SetLogsDirectory(logsDir, true); err != nil {
+		return fmt.Errorf("failed to initialize logging: %w", err)
+	}
+	defer logging.FlushLogs()
 
 	// Build config path hierarchy:
 	// 1. @DEFAULTS (embedded)

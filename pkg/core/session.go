@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 
@@ -118,6 +119,10 @@ func (c *SessionThread) UserPrompt(input string) error {
 	// Add to input queue
 	c.inputQueue = append(c.inputQueue, input)
 
+	if c.session.logger != nil {
+		c.session.logger.Debug("session_thread_user_prompt", "queue_length", len(c.inputQueue))
+	}
+
 	// If session is not running, start it
 	if !c.sessionRunning {
 		c.startSessionLocked()
@@ -134,6 +139,10 @@ func (c *SessionThread) Interrupt() error {
 
 	if !c.sessionRunning {
 		return fmt.Errorf("SessionThread.Interrupt() [session.go]: no session running to interrupt")
+	}
+
+	if c.session.logger != nil {
+		c.session.logger.Info("session_thread_interrupt")
 	}
 
 	c.interruptPending = true
@@ -430,17 +439,25 @@ type SweSession struct {
 	workDir       string
 	todoList      []tool.TodoItem
 	todoMu        sync.Mutex
+	logger        *slog.Logger
 }
 
 // Prompt adds user prompt to the conversation and starts processing if processing is not already in progress.
 // If processing is already in progress, if will be added at the end of conversation after current LLM request is completed,
 // its tool calls are executed etc. Returns immediately.
 func (s *SweSession) UserPrompt(prompt string) error {
+	if s.logger != nil {
+		s.logger.Info("user_input", "input", prompt)
+	}
 	s.messages = append(s.messages, models.NewTextMessage(models.ChatRoleUser, prompt))
 	return nil
 }
 
 func (s *SweSession) Run(ctx context.Context) error {
+	if s.logger != nil {
+		s.logger.Debug("session_run_start", "session_id", s.id, "model", s.model)
+	}
+
 	chatModel := s.provider.ChatModel(s.model, nil)
 	tools := s.system.Tools.ListInfo()
 
@@ -481,12 +498,23 @@ func (s *SweSession) Run(ctx context.Context) error {
 				if s.outputHandler != nil {
 					if part.Text != "" {
 						s.outputHandler.AddMarkdownChunk(part.Text)
+						// Log assistant output
+						if s.logger != nil {
+							s.logger.Debug("assistant_output_chunk", "chunk", part.Text)
+						}
 					}
 					if part.ToolCall != nil {
 						// Send start event if this is the first time we see this tool call
 						if !seenToolCalls[part.ToolCall.ID] {
 							s.outputHandler.AddToolCallStart(part.ToolCall)
 							seenToolCalls[part.ToolCall.ID] = true
+							// Log tool call start
+							if s.logger != nil {
+								s.logger.Info("tool_call_start",
+									"tool_id", part.ToolCall.ID,
+									"function", part.ToolCall.Function,
+								)
+							}
 						}
 						// Always send details event as chunks arrive
 						s.outputHandler.AddToolCallDetails(part.ToolCall)
@@ -516,17 +544,45 @@ func (s *SweSession) Run(ctx context.Context) error {
 
 // executeToolCalls executes the given tool calls and appends the results to the conversation.
 func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
+	if s.logger != nil {
+		s.logger.Debug("execute_tool_calls_start", "count", len(toolCalls))
+	}
+
 	toolResponses := make([]*tool.ToolResponse, 0, len(toolCalls))
 	for _, toolCall := range toolCalls {
 		// Use s.Tools which might have access control wrappers
 		response := s.Tools.Execute(*toolCall)
 
 		// Check for permission query
-		if _, ok := response.Error.(*tool.ToolPermissionsQuery); ok {
+		if permQuery, ok := response.Error.(*tool.ToolPermissionsQuery); ok {
+			if s.logger != nil {
+				toolFunc := ""
+				if permQuery.Tool != nil {
+					toolFunc = permQuery.Tool.Function
+				}
+				s.logger.Info("permission_query",
+					"query_id", permQuery.Id,
+					"tool", toolFunc,
+					"title", permQuery.Title,
+					"details", permQuery.Details,
+				)
+			}
 			return response.Error
 		}
 
 		toolResponses = append(toolResponses, &response)
+
+		// Log tool result
+		if s.logger != nil {
+			toolID := ""
+			if response.Call != nil {
+				toolID = response.Call.ID
+			}
+			s.logger.Info("tool_result",
+				"tool_id", toolID,
+				"success", response.Error == nil,
+			)
+		}
 
 		// Notify UI handler about tool result
 		if s.outputHandler != nil {
@@ -546,6 +602,12 @@ func (s *SweSession) ChatMessages() []*models.ChatMessage {
 // ID returns the unique identifier for this session.
 func (s *SweSession) ID() string {
 	return s.id
+}
+
+// SetLogger sets a custom logger for this session.
+// This is useful for testing or when you want to use a different logger implementation.
+func (s *SweSession) SetLogger(logger *slog.Logger) {
+	s.logger = logger
 }
 
 // Model returns the model name (without provider prefix) used for this session.
@@ -590,8 +652,15 @@ func (s *SweSession) GetModelTags() []string {
 // SetModel sets the model used for the session.
 // model string should be formatted as `provider/model-name`.
 func (s *SweSession) SetModel(modelStr string) error {
+	if s.logger != nil {
+		s.logger.Info("set_model", "model", modelStr)
+	}
+
 	parts := strings.SplitN(modelStr, "/", 2)
 	if len(parts) != 2 {
+		if s.logger != nil {
+			s.logger.Error("set_model_failed", "model", modelStr, "error", "invalid format")
+		}
 		return fmt.Errorf("SweSession.SetModel() [session.go]: invalid model format: %s, expected provider/model-name", modelStr)
 	}
 	providerName := parts[0]
@@ -599,6 +668,9 @@ func (s *SweSession) SetModel(modelStr string) error {
 
 	provider, ok := s.system.ModelProviders[providerName]
 	if !ok {
+		if s.logger != nil {
+			s.logger.Error("set_model_failed", "model", modelStr, "error", "provider not found")
+		}
 		return fmt.Errorf("SweSession.SetModel() [session.go]: provider not found: %s", providerName)
 	}
 
@@ -612,8 +684,15 @@ func (s *SweSession) SetModel(modelStr string) error {
 // It updates the VFS and Tools with access controls based on the new role,
 // and adds or updates the system prompt at the beginning of the conversation.
 func (s *SweSession) SetRole(roleName string) error {
+	if s.logger != nil {
+		s.logger.Info("set_role", "role", roleName)
+	}
+
 	role, ok := s.system.Roles.Get(roleName)
 	if !ok {
+		if s.logger != nil {
+			s.logger.Error("set_role_failed", "role", roleName, "error", "role not found")
+		}
 		return fmt.Errorf("SweSession.SetRole() [session.go]: role not found: %s", roleName)
 	}
 
@@ -684,6 +763,13 @@ func (s *SweSession) SetRole(roleName string) error {
 
 // UpdatePermission updates the permission for a tool or VFS operation based on user response.
 func (s *SweSession) UpdatePermission(query *tool.ToolPermissionsQuery, response string) error {
+	if s.logger != nil {
+		s.logger.Info("permission_response",
+			"tool", query.Tool.Function,
+			"response", response,
+		)
+	}
+
 	allow := strings.ToLower(response) == "allow"
 	flag := conf.AccessDeny
 	if allow {
