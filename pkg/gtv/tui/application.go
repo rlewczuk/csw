@@ -53,9 +53,9 @@ type IApplication interface {
 
 // TApplication is the main application struct that manages the TUI event loop.
 // It handles screen rendering, input events, signal handling, and screen state management.
+// TApplication extends TFlexLayout, allowing it to manage multiple children using flex layout.
 type TApplication struct {
-	// Main widget of the application
-	mainWidget IWidget
+	TFlexLayout
 
 	// Screen buffer for rendering
 	screen gtv.IScreenOutput
@@ -91,6 +91,8 @@ type TApplication struct {
 // This function loads the default theme automatically. Use NewApplicationWithTheme for custom themes.
 // Call Run() to start the application with real terminal I/O, or use Notify() and ExecuteOnUiThread()
 // for testing without real terminal I/O.
+//
+// The main widget is added as a child to the application's flex layout with flex-grow=1 to fill the screen.
 func NewApplication(mainWidget IWidget, screen gtv.IScreenOutput) *TApplication {
 	// Load default theme
 	themeManager, err := gtv.NewThemeManager(themesFS)
@@ -108,13 +110,53 @@ func NewApplication(mainWidget IWidget, screen gtv.IScreenOutput) *TApplication 
 	return NewApplicationWithTheme(mainWidget, screen, defaultTheme)
 }
 
+// NewApplicationEmpty creates a new TApplication without any children.
+// Use AddChild() to add widgets to the application.
+// This function loads the default theme automatically. Use NewApplicationEmptyWithTheme for custom themes.
+func NewApplicationEmpty(screen gtv.IScreenOutput) *TApplication {
+	// Load default theme
+	themeManager, err := gtv.NewThemeManager(themesFS)
+	if err != nil {
+		// If theme loading fails, fall back to no theme
+		return NewApplicationEmptyWithTheme(screen, nil)
+	}
+
+	defaultTheme, err := themeManager.GetTheme("default")
+	if err != nil {
+		// If default theme not found, fall back to no theme
+		return NewApplicationEmptyWithTheme(screen, nil)
+	}
+
+	return NewApplicationEmptyWithTheme(screen, defaultTheme)
+}
+
 // NewApplicationWithTheme creates a new TApplication with the given main widget, screen buffer, and theme.
 // If theme is not nil, a ThemeInterceptor is inserted into the screen output pipeline.
 // The theme parameter is a map of theme tag strings to CellAttributes.
 // The screen buffer size determines the initial widget size.
 // Call Run() to start the application with real terminal I/O, or use Notify() and ExecuteOnUiThread()
 // for testing without real terminal I/O.
+//
+// The main widget is added as a child to the application's flex layout with flex-grow=1 to fill the screen.
 func NewApplicationWithTheme(mainWidget IWidget, screen gtv.IScreenOutput, theme map[string]gtv.CellAttributes) *TApplication {
+	app := NewApplicationEmptyWithTheme(screen, theme)
+
+	// Add main widget as a child with flex-grow to fill screen
+	app.AddChild(mainWidget)
+	app.SetItemProperties(mainWidget, FlexItemProperties{
+		FlexGrow:   1.0,
+		FlexShrink: 1.0,
+	})
+
+	// Set main widget as active child so it receives keyboard events
+	app.ActiveChild = mainWidget
+
+	return app
+}
+
+// NewApplicationEmptyWithTheme creates a new TApplication without any children, using the specified theme.
+// Use AddChild() to add widgets to the application.
+func NewApplicationEmptyWithTheme(screen gtv.IScreenOutput, theme map[string]gtv.CellAttributes) *TApplication {
 	// Wrap screen with theme interceptor if theme is provided
 	var finalScreen gtv.IScreenOutput = screen
 	if theme != nil {
@@ -124,14 +166,15 @@ func NewApplicationWithTheme(mainWidget IWidget, screen gtv.IScreenOutput, theme
 	// Get screen size
 	width, height := finalScreen.GetSize()
 
-	// Set main widget size to fill screen
-	mainWidget.HandleEvent(&TEvent{
-		Type: TEventTypeResize,
-		Rect: gtv.TRect{X: 0, Y: 0, W: uint16(width), H: uint16(height)},
-	})
+	// Create flex layout base for the application
+	// Use column direction by default, no parent (it's the root)
+	flexLayout := newFlexLayoutBase(nil, gtv.TRect{X: 0, Y: 0, W: uint16(width), H: uint16(height)}, FlexDirectionColumn)
+
+	// Disable tab navigation at the application level since child layouts handle it
+	flexLayout.TabOrderEnabled = false
 
 	app := &TApplication{
-		mainWidget:  mainWidget,
+		TFlexLayout: *flexLayout,
 		screen:      finalScreen,
 		renderer:    nil,                    // Will be created in Run()
 		eventReader: nil,                    // Will be created in Run()
@@ -173,8 +216,8 @@ func (app *TApplication) Run(stdin io.Reader, stdout io.Writer) error {
 	// Resize screen buffer to match terminal
 	app.screen.SetSize(width, height)
 
-	// Notify main widget of resize
-	app.mainWidget.HandleEvent(&TEvent{
+	// Notify application (and its children) of resize
+	app.HandleEvent(&TEvent{
 		Type: TEventTypeResize,
 		Rect: gtv.TRect{X: 0, Y: 0, W: uint16(width), H: uint16(height)},
 	})
@@ -209,7 +252,7 @@ func (app *TApplication) Run(stdin io.Reader, stdout io.Writer) error {
 	// Draw initial frame
 	app.mu.Lock()
 	app.screen.SetCursorStyle(gtv.CursorStyleHidden)
-	app.mainWidget.Draw(app.screen)
+	app.TFlexLayout.Draw(app.screen)
 	app.mu.Unlock()
 	if err := app.renderer.Render(); err != nil {
 		return fmt.Errorf("TApplication.Run(): failed to render initial frame: %w", err)
@@ -230,7 +273,7 @@ func (app *TApplication) Run(stdin io.Reader, stdout io.Writer) error {
 			// Redraw requested from background thread
 			app.mu.Lock()
 			app.screen.SetCursorStyle(gtv.CursorStyleHidden)
-			app.mainWidget.Draw(app.screen)
+			app.TFlexLayout.Draw(app.screen)
 			app.mu.Unlock()
 			if app.renderer != nil {
 				app.renderer.Render()
@@ -301,18 +344,18 @@ func (app *TApplication) handleEvent(event gtv.InputEvent) {
 			app.renderer.Reset()
 		}
 
-		// Notify main widget of resize
-		app.mainWidget.HandleEvent(&TEvent{
+		// Notify application (and its children through TFlexLayout) of resize
+		app.TFlexLayout.HandleEvent(&TEvent{
 			Type: TEventTypeResize,
 			Rect: gtv.TRect{X: 0, Y: 0, W: event.X, H: event.Y},
 		})
 
 		// Trigger redraw
-		app.mainWidget.HandleEvent(&TEvent{Type: TEventTypeRedraw})
+		app.TFlexLayout.HandleEvent(&TEvent{Type: TEventTypeRedraw})
 
 		// Redraw screen
 		app.screen.SetCursorStyle(gtv.CursorStyleHidden)
-		app.mainWidget.Draw(app.screen)
+		app.TFlexLayout.Draw(app.screen)
 		if app.renderer != nil {
 			app.renderer.Render()
 		}
@@ -326,15 +369,15 @@ func (app *TApplication) handleEvent(event gtv.InputEvent) {
 		}
 	}
 
-	// Pass event to main widget
-	app.mainWidget.HandleEvent(&TEvent{
+	// Pass event to application (which will route to children through TFlexLayout)
+	app.TFlexLayout.HandleEvent(&TEvent{
 		Type:       TEventTypeInput,
 		InputEvent: &event,
 	})
 
 	// Redraw screen after handling event
 	app.screen.SetCursorStyle(gtv.CursorStyleHidden)
-	app.mainWidget.Draw(app.screen)
+	app.TFlexLayout.Draw(app.screen)
 	if app.renderer != nil {
 		app.renderer.Render()
 	}

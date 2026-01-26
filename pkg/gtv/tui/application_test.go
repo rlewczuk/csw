@@ -57,7 +57,8 @@ func TestNewApplication(t *testing.T) {
 
 			// Verify application was created
 			require.NotNil(t, app)
-			assert.NotNil(t, app.mainWidget)
+			// Verify widget was added as a child
+			assert.Len(t, app.TFlexLayout.TLayout.TResizable.TWidget.Children, 1)
 			assert.NotNil(t, app.screen)
 			assert.Nil(t, app.renderer)    // No renderer until Run() is called
 			assert.Nil(t, app.eventReader) // No event reader until Run() is called
