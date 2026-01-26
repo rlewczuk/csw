@@ -1312,6 +1312,62 @@ func TestInputEventReader_SGRMouseClickEvents(t *testing.T) {
 	}
 }
 
+// TestInputEventReader_AltRegularKeys tests parsing of Alt+regular key combinations.
+// This is a regression test for the bug where Alt+Enter was parsed as two separate events
+// (ESC and Enter) instead of a single Alt+Enter event, causing the main menu to briefly appear.
+func TestInputEventReader_AltRegularKeys(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected gtv.InputEvent
+	}{
+		{
+			name:     "Alt+Enter (ESC followed by CR)",
+			input:    []byte{0x1B, '\r'},
+			expected: gtv.InputEvent{Type: gtv.InputEventKey, Key: '\r', Modifiers: gtv.ModAlt | gtv.ModCtrl},
+		},
+		{
+			name:     "Alt+Enter (ESC followed by LF)",
+			input:    []byte{0x1B, '\n'},
+			expected: gtv.InputEvent{Type: gtv.InputEventKey, Key: '\n', Modifiers: gtv.ModAlt | gtv.ModCtrl},
+		},
+		{
+			name:     "Alt+a",
+			input:    []byte{0x1B, 'a'},
+			expected: gtv.InputEvent{Type: gtv.InputEventKey, Key: 'a', Modifiers: gtv.ModAlt},
+		},
+		{
+			name:     "Alt+z",
+			input:    []byte{0x1B, 'z'},
+			expected: gtv.InputEvent{Type: gtv.InputEventKey, Key: 'z', Modifiers: gtv.ModAlt},
+		},
+		{
+			name:     "Alt+1",
+			input:    []byte{0x1B, '1'},
+			expected: gtv.InputEvent{Type: gtv.InputEventKey, Key: '1', Modifiers: gtv.ModAlt},
+		},
+		{
+			name:     "Alt+Space",
+			input:    []byte{0x1B, ' '},
+			expected: gtv.InputEvent{Type: gtv.InputEventKey, Key: ' ', Modifiers: gtv.ModAlt},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := gtv.NewMockInputEventHandler()
+			reader := bytes.NewReader(tt.input)
+			eventReader := NewInputEventReader(reader, nil, handler)
+
+			eventReader.parseInput(tt.input)
+
+			events := handler.GetEvents()
+			require.Len(t, events, 1, "Alt+key should produce exactly one event, not two separate ESC and key events")
+			assert.Equal(t, tt.expected, events[0])
+		})
+	}
+}
+
 // TestInputEvent_String tests the String() method of InputEvent.
 func TestInputEvent_String(t *testing.T) {
 	tests := []struct {
@@ -1433,6 +1489,16 @@ func TestInputEvent_String(t *testing.T) {
 			name:     "Esc",
 			event:    gtv.InputEvent{Type: gtv.InputEventKey, Key: 0x1B},
 			expected: "Esc",
+		},
+		{
+			name:     "Alt+Enter",
+			event:    gtv.InputEvent{Type: gtv.InputEventKey, Key: '\r', Modifiers: gtv.ModAlt | gtv.ModCtrl},
+			expected: "Ctrl-Alt-Enter",
+		},
+		{
+			name:     "Alt+a",
+			event:    gtv.InputEvent{Type: gtv.InputEventKey, Key: 'a', Modifiers: gtv.ModAlt},
+			expected: "Alt-a",
 		},
 		{
 			name:     "Mouse event",

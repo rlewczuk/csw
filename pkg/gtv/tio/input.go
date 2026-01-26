@@ -170,10 +170,25 @@ func (r *InputEventReader) parseInput(data []byte) {
 						continue
 					}
 				}
+				// ESC followed by a regular key means Alt+key
+				// Check if the next byte is a regular key (not part of another escape sequence)
+				nextByte := data[i+1]
+				if nextByte >= 0x20 && nextByte <= 0x7F {
+					// Regular printable character or DEL - this is Alt+key
+					r.parseAltKey(nextByte)
+					i += 2 // Consume both ESC and the key
+					continue
+				}
+				// Control character after ESC (e.g., Alt+Enter, Alt+Tab)
+				if nextByte < 0x20 || nextByte == 0x7F {
+					r.parseAltKey(nextByte)
+					i += 2 // Consume both ESC and the key
+					continue
+				}
 				// Other escape sequences can be added here
 			}
 
-			// Single ESC key
+			// Single ESC key (only if no following byte or unrecognized sequence)
 			r.handler.Notify(gtv.InputEvent{
 				Type: gtv.InputEventKey,
 				Key:  0x1B,
@@ -758,5 +773,80 @@ func (r *InputEventReader) parseRegularKey(b byte) {
 	r.handler.Notify(gtv.InputEvent{
 		Type: gtv.InputEventKey,
 		Key:  rune(b),
+	})
+}
+
+// parseAltKey parses an Alt+key combination (ESC followed by a regular key).
+// This handles Alt+letter, Alt+number, Alt+Enter, etc.
+func (r *InputEventReader) parseAltKey(b byte) {
+	var mods gtv.EventModifiers = gtv.ModAlt
+
+	// Handle Ctrl combinations (0x00-0x1F except special cases)
+	if b < 0x20 {
+		// Special control characters
+		switch b {
+		case 0x09: // Alt+Tab
+			mods |= gtv.ModCtrl
+			r.handler.Notify(gtv.InputEvent{
+				Type:      gtv.InputEventKey,
+				Key:       rune(b),
+				Modifiers: mods,
+			})
+			return
+		case 0x0A: // Alt+LF (newline)
+			mods |= gtv.ModCtrl
+			r.handler.Notify(gtv.InputEvent{
+				Type:      gtv.InputEventKey,
+				Key:       rune(b),
+				Modifiers: mods,
+			})
+			return
+		case 0x0D: // Alt+CR (carriage return / Enter)
+			mods |= gtv.ModCtrl
+			r.handler.Notify(gtv.InputEvent{
+				Type:      gtv.InputEventKey,
+				Key:       rune(b),
+				Modifiers: mods,
+			})
+			return
+		}
+
+		// Convert Alt+Ctrl+letter to the corresponding letter
+		if b >= 1 && b <= 26 {
+			// Alt+Ctrl+A = 1, Alt+Ctrl+B = 2, etc.
+			mods |= gtv.ModCtrl
+			r.handler.Notify(gtv.InputEvent{
+				Type:      gtv.InputEventKey,
+				Key:       rune('a' + b - 1),
+				Modifiers: mods,
+			})
+			return
+		}
+
+		// Other control characters with Alt
+		mods |= gtv.ModCtrl
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
+			Key:       rune(b),
+			Modifiers: mods,
+		})
+		return
+	}
+
+	// Handle uppercase letters (A-Z) - these indicate Shift was pressed
+	if b >= 'A' && b <= 'Z' {
+		r.handler.Notify(gtv.InputEvent{
+			Type:      gtv.InputEventKey,
+			Key:       rune(b), // Keep uppercase
+			Modifiers: mods | gtv.ModShift,
+		})
+		return
+	}
+
+	// Regular printable character or DEL with Alt
+	r.handler.Notify(gtv.InputEvent{
+		Type:      gtv.InputEventKey,
+		Key:       rune(b),
+		Modifiers: mods,
 	})
 }
