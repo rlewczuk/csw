@@ -23,8 +23,11 @@ type TAppView struct {
 	menu        *tui.TMenuWidget
 	showingMenu bool
 
-	// Layout for organizing status bar and chat view
-	layout *tui.TZAxisLayout
+	// Main layout for organizing content and status bar vertically
+	mainLayout *tui.TFlexLayout
+
+	// Z-axis layout for stacking chat view and menu
+	contentLayout *tui.TZAxisLayout
 
 	// Status bar label
 	statusBar *tui.TLabel
@@ -47,21 +50,42 @@ func NewAppView(parent tui.IWidget, rect gtv.TRect, presenter ui.IAppPresenter) 
 		height:      int(rect.H),
 	}
 
-	// Create Z-axis layout to stack chat view and menu
-	view.layout = tui.NewZAxisLayout(
+	// Create main flex layout (vertical) to hold content and status bar
+	view.mainLayout = tui.NewFlexLayout(
 		view,
-		gtv.TRect{X: 0, Y: 0, W: rect.W, H: rect.H - 1}, // Reserve last row for status bar
+		gtv.TRect{X: 0, Y: 0, W: rect.W, H: rect.H},
+		tui.FlexDirectionColumn,
+	)
+
+	// Create Z-axis layout for content (chat view and menu)
+	view.contentLayout = tui.NewZAxisLayout(
+		view.mainLayout,
+		gtv.TRect{X: 0, Y: 0, W: rect.W, H: rect.H - 1}, // Initial size, will be managed by flex
 		nil, // No background (transparent)
 	)
+
+	// Set content layout to grow and fill available space
+	view.mainLayout.SetItemProperties(view.contentLayout, tui.FlexItemProperties{
+		FlexGrow:   1.0,
+		FlexShrink: 1.0,
+		MinSize:    1,
+	})
 
 	// Create status bar
 	statusBarAttrs := gtv.CellTag("app-view-status-bar")
 	view.statusBar = tui.NewLabel(
-		view,
+		view.mainLayout,
 		view.renderStatusBarText(),
-		gtv.TRect{X: 0, Y: rect.H - 1, W: rect.W, H: 1},
+		gtv.TRect{X: 0, Y: 0, W: rect.W, H: 1},
 		statusBarAttrs,
 	)
+
+	// Set status bar to fixed height of 1
+	view.mainLayout.SetItemProperties(view.statusBar, tui.FlexItemProperties{
+		FlexGrow:    0.0,
+		FlexShrink:  0.0,
+		FixedHeight: 1,
+	})
 
 	// Register with parent if provided
 	if parent != nil {
@@ -75,13 +99,15 @@ func NewAppView(parent tui.IWidget, rect gtv.TRect, presenter ui.IAppPresenter) 
 func (v *TAppView) ShowChat(presenter ui.IChatPresenter) ui.IChatView {
 	// Create or reuse chat view
 	if v.chatView == nil {
-		chatRect := gtv.TRect{X: 0, Y: 0, W: uint16(v.width), H: uint16(v.height - 1)}
+		// Get the content layout size for initial chat view size
+		contentRect := v.contentLayout.GetPos()
+		chatRect := gtv.TRect{X: 0, Y: 0, W: contentRect.W, H: contentRect.H}
 		// Create chat view without parent (we'll add it manually to Z-axis layout)
 		v.chatView = NewChatView(nil, chatRect, presenter)
 		// Add to Z-axis layout with z-index 0 (bottom layer)
-		v.layout.AddZWidget(v.chatView, 0)
+		v.contentLayout.AddZWidget(v.chatView, 0)
 		// Set chat view as the active child to receive keyboard events
-		v.layout.ActiveChild = v.chatView
+		v.contentLayout.ActiveChild = v.chatView
 	}
 	return v.chatView
 }
@@ -98,11 +124,8 @@ func (v *TAppView) Draw(screen gtv.IScreenOutput) {
 		return
 	}
 
-	// Draw layout (contains chat view and menu if showing)
-	v.layout.Draw(screen)
-
-	// Draw status bar
-	v.statusBar.Draw(screen)
+	// Draw main layout (contains content layout and status bar)
+	v.mainLayout.Draw(screen)
 }
 
 // HandleEvent handles events for the app view.
@@ -113,15 +136,14 @@ func (v *TAppView) HandleEvent(event *tui.TEvent) {
 		v.width = int(event.Rect.W)
 		v.height = int(event.Rect.H)
 
-		// Resize layout (minus status bar)
+		// Propagate resize to main layout - it will automatically handle resizing children
 		layoutEvent := &tui.TEvent{
 			Type: tui.TEventTypeResize,
-			Rect: gtv.TRect{X: 0, Y: 0, W: event.Rect.W, H: event.Rect.H - 1},
+			Rect: gtv.TRect{X: 0, Y: 0, W: event.Rect.W, H: event.Rect.H},
 		}
-		v.layout.HandleEvent(layoutEvent)
+		v.mainLayout.HandleEvent(layoutEvent)
 
-		// Resize status bar
-		v.statusBar.Position = gtv.TRect{X: 0, Y: event.Rect.H - 1, W: event.Rect.W, H: 1}
+		// Update status bar text to match new width
 		v.statusBar.SetText(v.renderStatusBarText())
 
 		return
@@ -147,13 +169,13 @@ func (v *TAppView) HandleEvent(event *tui.TEvent) {
 			}
 		}
 
-		// Pass through to layout (which contains chat view)
-		v.layout.HandleEvent(event)
+		// Pass through to content layout (which contains chat view)
+		v.contentLayout.HandleEvent(event)
 		return
 	}
 
-	// Delegate other events to layout
-	v.layout.HandleEvent(event)
+	// Delegate other events to content layout
+	v.contentLayout.HandleEvent(event)
 }
 
 // renderStatusBarText renders the status bar text.
@@ -219,11 +241,11 @@ func (v *TAppView) showMenu() {
 		v.hideMenu()
 	})
 
-	// Add menu to Z-axis layout with z-index 100 (top layer)
-	v.layout.AddZWidget(v.menu, 100, tui.WithZBehavior(tui.ZWidgetBehaviorDim))
+	// Add menu to content Z-axis layout with z-index 100 (top layer)
+	v.contentLayout.AddZWidget(v.menu, 100, tui.WithZBehavior(tui.ZWidgetBehaviorDim))
 
 	// Set menu as active child to receive keyboard events
-	v.layout.ActiveChild = v.menu
+	v.contentLayout.ActiveChild = v.menu
 
 	// Focus the menu
 	v.menu.Focus()
@@ -235,7 +257,7 @@ func (v *TAppView) showMenu() {
 func (v *TAppView) hideMenu() {
 	if v.menu != nil {
 		// Remove menu from Z-axis layout
-		v.layout.RemoveZWidget(v.menu)
+		v.contentLayout.RemoveZWidget(v.menu)
 		v.menu = nil
 	}
 
@@ -243,7 +265,7 @@ func (v *TAppView) hideMenu() {
 
 	// Restore chat view as active child
 	if v.chatView != nil {
-		v.layout.ActiveChild = v.chatView
+		v.contentLayout.ActiveChild = v.chatView
 		// Restore focus to text area
 		if v.chatView.textArea != nil {
 			v.chatView.textArea.Focus()

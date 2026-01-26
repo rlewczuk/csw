@@ -23,7 +23,8 @@ func TestNewAppView(t *testing.T) {
 		assert.False(t, view.showingMenu)
 		assert.Nil(t, view.chatView)
 		assert.Nil(t, view.menu)
-		assert.NotNil(t, view.layout)
+		assert.NotNil(t, view.mainLayout)
+		assert.NotNil(t, view.contentLayout)
 		assert.NotNil(t, view.statusBar)
 	})
 
@@ -145,6 +146,70 @@ func TestAppViewHandleEvent(t *testing.T) {
 		assert.Equal(t, 50, view.height)
 		assert.Equal(t, uint16(100), view.Position.W)
 		assert.Equal(t, uint16(50), view.Position.H)
+	})
+
+	t.Run("resizes layout and status bar on resize event", func(t *testing.T) {
+		presenter := mock.NewMockAppPresenter()
+		rect := gtv.TRect{X: 0, Y: 0, W: 80, H: 24}
+		view := NewAppView(nil, rect, presenter)
+
+		// Verify initial sizes
+		assert.Equal(t, uint16(80), view.mainLayout.Position.W)
+		assert.Equal(t, uint16(24), view.mainLayout.Position.H)
+		assert.Equal(t, uint16(80), view.contentLayout.Position.W)
+		// Content layout height should be H-1 (managed by flex layout)
+		assert.Greater(t, int(view.contentLayout.Position.H), 0)
+		assert.Equal(t, uint16(80), view.statusBar.Position.W)
+		assert.Equal(t, uint16(1), view.statusBar.Position.H)
+
+		// Send resize event to simulate terminal resize
+		resizeEvent := &tui.TEvent{
+			Type: tui.TEventTypeResize,
+			Rect: gtv.TRect{X: 0, Y: 0, W: 120, H: 40},
+		}
+		view.HandleEvent(resizeEvent)
+
+		// Verify view was resized
+		assert.Equal(t, 120, view.width)
+		assert.Equal(t, 40, view.height)
+		assert.Equal(t, uint16(120), view.Position.W)
+		assert.Equal(t, uint16(40), view.Position.H)
+
+		// Verify main layout was resized
+		assert.Equal(t, uint16(120), view.mainLayout.Position.W)
+		assert.Equal(t, uint16(40), view.mainLayout.Position.H)
+
+		// Verify content layout was resized (should be H-1 for status bar, managed by flex)
+		assert.Equal(t, uint16(120), view.contentLayout.Position.W)
+		assert.Equal(t, uint16(39), view.contentLayout.Position.H)
+
+		// Verify status bar dimensions
+		assert.Equal(t, uint16(120), view.statusBar.Position.W)
+		assert.Equal(t, uint16(1), view.statusBar.Position.H)
+	})
+
+	t.Run("propagates resize event to chat view", func(t *testing.T) {
+		appPresenter := mock.NewMockAppPresenter()
+		rect := gtv.TRect{X: 0, Y: 0, W: 80, H: 24}
+		view := NewAppView(nil, rect, appPresenter)
+
+		chatPresenter := mock.NewMockChatPresenter()
+		chatView := view.ShowChat(chatPresenter)
+
+		// Verify initial chat view size
+		assert.Equal(t, 80, chatView.(*TChatView).width)
+		assert.Equal(t, 23, chatView.(*TChatView).height) // H-1 for status bar
+
+		// Send resize event
+		resizeEvent := &tui.TEvent{
+			Type: tui.TEventTypeResize,
+			Rect: gtv.TRect{X: 0, Y: 0, W: 120, H: 40},
+		}
+		view.HandleEvent(resizeEvent)
+
+		// Verify chat view was resized (should match layout size)
+		assert.Equal(t, 120, chatView.(*TChatView).width)
+		assert.Equal(t, 39, chatView.(*TChatView).height) // H-1 for status bar
 	})
 
 	t.Run("handles Ctrl+P to show menu", func(t *testing.T) {

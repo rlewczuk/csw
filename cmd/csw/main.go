@@ -23,10 +23,10 @@ import (
 )
 
 var (
-	workDir   string
-	modelName string
-	configDir string
-	roleName  string
+	workDir    string
+	modelName  string
+	configPath string
+	roleName   string
 )
 
 func main() {
@@ -40,13 +40,13 @@ func main() {
 	// Define flags
 	rootCmd.Flags().StringVar(&workDir, "work-dir", "", "Working directory (default: current directory)")
 	rootCmd.Flags().StringVar(&modelName, "model", "ollama/devstral-small-2:latest", "Model name in provider/model format")
-	rootCmd.Flags().StringVar(&configDir, "config-dir", "", "Config directory (default: ~/.config/codesnort-swe)")
+	rootCmd.Flags().StringVar(&configPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
 	rootCmd.Flags().StringVar(&roleName, "role", "developer", "Agent role name")
 
 	// Bind flags to viper
 	viper.BindPFlag("work-dir", rootCmd.Flags().Lookup("work-dir"))
 	viper.BindPFlag("model", rootCmd.Flags().Lookup("model"))
-	viper.BindPFlag("config-dir", rootCmd.Flags().Lookup("config-dir"))
+	viper.BindPFlag("config-path", rootCmd.Flags().Lookup("config-path"))
 	viper.BindPFlag("role", rootCmd.Flags().Lookup("role"))
 
 	if err := rootCmd.Execute(); err != nil {
@@ -65,22 +65,52 @@ func run(cmd *cobra.Command, args []string) error {
 		workDir = wd
 	}
 
-	// Resolve config directory
-	if configDir == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("failed to get user home directory: %w", err)
+	// Build config path hierarchy:
+	// 1. @DEFAULTS (embedded)
+	// 2. ./.csw/config (local project config)
+	// 3. ~/.config/csw (user config)
+	// 4. --config-path components (if provided)
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	// Start with default hierarchy
+	configPathStr := "@DEFAULTS:./.csw/config:" + filepath.Join(homeDir, ".config", "csw")
+
+	// If --config-path is provided, validate and append it
+	if configPath != "" {
+		// Split by colon to get individual paths
+		pathComponents := filepath.SplitList(configPath)
+
+		// Validate each path component
+		for _, pathComponent := range pathComponents {
+			if pathComponent == "" {
+				continue
+			}
+
+			// Check if path exists
+			info, err := os.Stat(pathComponent)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return fmt.Errorf("config path does not exist: %s", pathComponent)
+				}
+				return fmt.Errorf("failed to access config path %s: %w", pathComponent, err)
+			}
+
+			// Check if it's a directory
+			if !info.IsDir() {
+				return fmt.Errorf("config path is not a directory: %s", pathComponent)
+			}
 		}
-		configDir = filepath.Join(homeDir, ".config", "codesnort-swe")
+
+		// Append validated path to hierarchy
+		configPathStr = configPathStr + ":" + configPath
 	}
 
-	// Check if config directory exists
-	if _, err := os.Stat(configDir); os.IsNotExist(err) {
-		return fmt.Errorf("config directory does not exist: %s", configDir)
-	}
-
-	// Create config store
-	configStore, err := impl.NewLocalConfigStore(configDir)
+	// Create composite config store
+	configStore, err := impl.NewCompositeConfigStore(workDir, configPathStr)
 	if err != nil {
 		return fmt.Errorf("failed to create config store: %w", err)
 	}

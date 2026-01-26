@@ -266,6 +266,20 @@ func (z *TZAxisLayout) HandleEvent(event *TEvent) {
 	// Handle resize events directly
 	if event.Type == TEventTypeResize {
 		z.handleResizeEvent(event)
+
+		// Propagate resize event to all Z-widgets that should fill the layout
+		// Only resize widgets that were originally positioned at (0,0) with full size
+		for _, entry := range z.zWidgets {
+			widgetPos := entry.Widget.GetPos()
+			// If widget was positioned at (0,0) and sized to fill parent, resize it
+			if widgetPos.X == 0 && widgetPos.Y == 0 {
+				childResizeEvent := &TEvent{
+					Type: TEventTypeResize,
+					Rect: gtv.TRect{X: 0, Y: 0, W: z.Position.W, H: z.Position.H},
+				}
+				entry.Widget.HandleEvent(childResizeEvent)
+			}
+		}
 		return
 	}
 
