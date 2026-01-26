@@ -32,6 +32,9 @@ type TAppView struct {
 	// Status bar label
 	statusBar *tui.TLabel
 
+	// App for requesting redraws from background threads
+	app tui.IRedrawRequester
+
 	// Dimensions
 	width  int
 	height int
@@ -95,6 +98,16 @@ func NewAppView(parent tui.IWidget, rect gtv.TRect, presenter ui.IAppPresenter) 
 	return view
 }
 
+// SetApp sets the application for the app view.
+// This allows the view to propagate the app to child views for redraw requests.
+func (v *TAppView) SetApp(app tui.IRedrawRequester) {
+	v.app = app
+	// Propagate to existing chat view if any
+	if v.chatView != nil {
+		v.chatView.SetApp(app)
+	}
+}
+
 // ShowChat switches to the chat view with the given presenter.
 func (v *TAppView) ShowChat(presenter ui.IChatPresenter) ui.IChatView {
 	// Create or reuse chat view
@@ -104,6 +117,10 @@ func (v *TAppView) ShowChat(presenter ui.IChatPresenter) ui.IChatView {
 		chatRect := gtv.TRect{X: 0, Y: 0, W: contentRect.W, H: contentRect.H}
 		// Create chat view without parent (we'll add it manually to Z-axis layout)
 		v.chatView = NewChatView(nil, chatRect, presenter)
+		// Set app for redraw requests if available
+		if v.app != nil {
+			v.chatView.SetApp(v.app)
+		}
 		// Add to Z-axis layout with z-index 0 (bottom layer)
 		v.contentLayout.AddZWidget(v.chatView, 0)
 		// Set chat view as the active child to receive keyboard events

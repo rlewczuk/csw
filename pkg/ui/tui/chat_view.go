@@ -90,6 +90,9 @@ type TChatView struct {
 	// Presenter for handling user input
 	presenter ui.IChatPresenter
 
+	// App for requesting redraws from background threads
+	app tui.IRedrawRequester
+
 	// Messages
 	messages []*chatMessage
 	mu       sync.Mutex
@@ -110,6 +113,7 @@ func NewChatView(parent tui.IWidget, rect gtv.TRect, presenter ui.IChatPresenter
 		messages:  make([]*chatMessage, 0),
 		width:     int(rect.W),
 		height:    int(rect.H),
+		app:       nil, // Will be set by SetApp
 	}
 
 	// Create flex layout (vertical) to hold markdown view and text area
@@ -196,6 +200,12 @@ func NewChatView(parent tui.IWidget, rect gtv.TRect, presenter ui.IChatPresenter
 	return view
 }
 
+// SetApp sets the application for the chat view.
+// This allows the view to request redraws when state changes from background threads.
+func (v *TChatView) SetApp(app tui.IRedrawRequester) {
+	v.app = app
+}
+
 // Init initializes the view with all messages from the session
 func (v *TChatView) Init(session *ui.ChatSessionUI) error {
 	v.mu.Lock()
@@ -276,9 +286,23 @@ func (v *TChatView) MoveToBottom() error {
 
 // QueryPermission queries user for permission to use a tool
 func (v *TChatView) QueryPermission(query *ui.PermissionQueryUI) error {
+	// If app is available, use ExecuteOnUiThread to ensure proper redraw
+	if v.app != nil {
+		v.app.ExecuteOnUiThread(func() {
+			v.queryPermissionUnsafe(query)
+		})
+		return nil
+	}
+
+	// Fallback: execute directly (for tests or if app not set)
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	v.queryPermissionUnsafe(query)
+	return nil
+}
 
+// queryPermissionUnsafe queries user for permission (caller must hold lock or be on UI thread)
+func (v *TChatView) queryPermissionUnsafe(query *ui.PermissionQueryUI) {
 	// Store the current permission query
 	v.currentPermissionQuery = query
 
@@ -291,7 +315,7 @@ func (v *TChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 		menuHeight = 15 // Cap at reasonable height
 	}
 
-	// Create menu widget with nil parent first (we'll add it via replace)
+	// Create menu widget with nil parent (we'll set it manually)
 	v.permissionMenu = tui.NewMenuWidget(
 		nil,
 		tui.WithRectangle(0, 0, int(v.layout.Position.W), int(menuHeight)),
@@ -329,6 +353,9 @@ func (v *TChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 	// First, remove the text area from the layout
 	v.layout.RemoveChild(v.textArea)
 
+	// Set parent for the menu widget before adding it
+	v.permissionMenu.Parent = v.layout
+
 	// Then, add the menu to the layout
 	v.layout.AddChild(v.permissionMenu)
 
@@ -342,8 +369,6 @@ func (v *TChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 	// Focus the menu
 	v.permissionMenu.Focus()
 	v.layout.ActiveChild = v.permissionMenu
-
-	return nil
 }
 
 // handlePermissionResponse handles the user's response to a permission query
@@ -384,6 +409,9 @@ func (v *TChatView) hidePermissionMenuUnsafe() {
 
 	// Remove menu from layout
 	v.layout.RemoveChild(v.permissionMenu)
+
+	// Ensure text area parent is set
+	v.textArea.Parent = v.layout
 
 	// Add text area back to layout
 	v.layout.AddChild(v.textArea)
