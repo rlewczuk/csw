@@ -10,6 +10,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/gtv"
 	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
 	"github.com/codesnort/codesnort-swe/pkg/gtv/tui"
+	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/presenter"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
@@ -44,6 +45,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 			PromptGenerator: &appViewMockPromptGen{},
 			Tools:           tools,
 			VFS:             vfsInstance,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		// Create session thread
@@ -149,6 +151,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 			PromptGenerator: &appViewMockPromptGen{},
 			Tools:           tools,
 			VFS:             vfsInstance,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		// Create session thread
@@ -241,6 +244,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 			PromptGenerator: &appViewMockPromptGen{},
 			Tools:           tools,
 			VFS:             vfsInstance,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		// Create session thread
@@ -324,6 +328,7 @@ func TestAppViewMenuInteraction(t *testing.T) {
 			PromptGenerator: &appViewMockPromptGen{},
 			Tools:           tools,
 			VFS:             vfsInstance,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		// Create session thread
@@ -394,6 +399,7 @@ func TestAppViewMenuInteraction(t *testing.T) {
 			PromptGenerator: &appViewMockPromptGen{},
 			Tools:           tools,
 			VFS:             vfsInstance,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		// Create session thread

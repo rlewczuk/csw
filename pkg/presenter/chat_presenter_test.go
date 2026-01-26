@@ -7,6 +7,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/core"
+	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
@@ -37,10 +38,11 @@ func setupTestSystem(t *testing.T) (*core.SweSystem, *testutil.MockHTTPServer, v
 	tool.RegisterVFSTools(tools, vfsInstance)
 
 	system := &core.SweSystem{
-		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-		PromptGenerator: &mockPromptGen{},
-		Tools:           tools,
-		VFS:             vfsInstance,
+		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		PromptGenerator:      &mockPromptGen{},
+		Tools:                tools,
+		VFS:                  vfsInstance,
+		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 	}
 
 	return system, mockServer, vfsInstance

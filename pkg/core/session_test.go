@@ -5,6 +5,7 @@ import (
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
+	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
@@ -42,6 +43,7 @@ func TestSessionThread(t *testing.T) {
 		PromptGenerator: newMockSessionPromptGenerator("You are skilled software developer."),
 		Tools:           tools,
 		VFS:             vfsInstance,
+		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 	}
 
 	t.Run("basic initialization and session management", func(t *testing.T) {
@@ -256,6 +258,7 @@ func TestSessionThreadSafety(t *testing.T) {
 		PromptGenerator: newMockSessionPromptGenerator("You are skilled software developer."),
 		Tools:           tools,
 		VFS:             vfsInstance,
+		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 	}
 
 	t.Run("concurrent GetSession calls", func(t *testing.T) {

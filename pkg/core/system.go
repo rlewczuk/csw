@@ -2,13 +2,20 @@ package core
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 
+	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
+
+// SessionLoggerFactory is a function that creates a session logger.
+// This allows tests to provide in-memory loggers instead of file-based ones.
+// Returns a *slog.Logger that will be used for session logging.
+type SessionLoggerFactory func(sessionID string, logBaseDir string) (*slog.Logger, error)
 
 // SweSystem represents the core system for managing conversations, tools, and models.
 type SweSystem struct {
@@ -39,6 +46,13 @@ type SweSystem struct {
 
 	// Mutex for thread-safe session access
 	sessionsMu sync.RWMutex
+
+	// Base directory for log files
+	LogBaseDir string
+
+	// SessionLoggerFactory is used to create session loggers.
+	// If nil, defaults to file-based logging.
+	SessionLoggerFactory SessionLoggerFactory
 }
 
 func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) (*SweSession, error) {
@@ -68,8 +82,27 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		sessionTools.Register(name, t)
 	}
 
+	sessionID := shared.GenerateUUIDv7()
+
+	// Create session logger
+	var sessionLogger *slog.Logger
+
+	// Use custom logger factory if provided, otherwise use default file-based logger
+	if s.SessionLoggerFactory != nil {
+		var err error
+		sessionLogger, err = s.SessionLoggerFactory(sessionID, s.LogBaseDir)
+		if err != nil {
+			// Log error but don't fail session creation
+			logger := logging.GetGlobalLogger()
+			logger.Error("failed to create session logger", "session_id", sessionID, "error", err)
+		}
+	} else {
+		// Use the new GetSessionLogger function
+		sessionLogger = logging.GetSessionLogger(sessionID, logging.LogTypeSession)
+	}
+
 	session := &SweSession{
-		id:            shared.GenerateUUIDv7(),
+		id:            sessionID,
 		system:        s,
 		provider:      provider,
 		providerName:  providerName,
@@ -81,6 +114,12 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		outputHandler: outputHandler,
 		workDir:       ".",
 		todoList:      make([]tool.TodoItem, 0),
+		logger:        sessionLogger,
+	}
+
+	// Log session creation
+	if sessionLogger != nil {
+		sessionLogger.Info("session_created", "session_id", sessionID, "provider", providerName, "model", modelName)
 	}
 
 	// Register session-specific tools (like todo tools)
@@ -163,6 +202,9 @@ func (s *SweSystem) DeleteSession(id string) error {
 		return fmt.Errorf("SweSystem.DeleteSession() [system.go]: session not found: %s", id)
 	}
 
+	// Close session loggers
+	logging.CloseSessionLogger(id)
+
 	delete(s.sessions, id)
 	return nil
 }
@@ -178,6 +220,10 @@ func (s *SweSystem) Shutdown() {
 		// Ignore errors since thread might not be running
 		_ = thread.Interrupt()
 	}
+
+	// Flush and close all loggers
+	logging.FlushLogs()
+	logging.CloseSessionLoggers()
 
 	// Clear all threads
 	s.threads = make(map[string]*SessionThread)
