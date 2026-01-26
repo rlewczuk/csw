@@ -4,6 +4,18 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/gtv"
 )
 
+// IRedrawRequester is an interface for requesting UI redraws.
+// This allows widgets to request redraws when their state changes from background threads.
+type IRedrawRequester interface {
+	// RequestRedraw requests a redraw of the UI.
+	// This is safe to call from any thread.
+	RequestRedraw()
+
+	// ExecuteOnUiThread executes the given function on the UI thread.
+	// This is safe to call from any thread.
+	ExecuteOnUiThread(f func())
+}
+
 // WidgetFlag represents flags that can be set on the widget
 type WidgetFlag uint32
 

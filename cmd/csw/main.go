@@ -216,6 +216,9 @@ func run(cmd *cobra.Command, args []string) error {
 	// Create the gtv application
 	app := gtvtui.NewApplication(appView, screen)
 
+	// Set the app on the app view so it can propagate to child views
+	appView.SetApp(app)
+
 	// Run the application in a goroutine
 	done := make(chan error, 1)
 	go func() {

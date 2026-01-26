@@ -43,7 +43,12 @@ type IApplication interface {
 
 	// ExecuteOnUiThread executes the given function with the UI mutex locked.
 	// This ensures that application state is not modified concurrently.
+	// After the function completes, a redraw is automatically requested.
 	ExecuteOnUiThread(f func())
+
+	// RequestRedraw requests a redraw of the UI from any thread.
+	// This is safe to call from background threads.
+	RequestRedraw()
 }
 
 // TApplication is the main application struct that manages the TUI event loop.
@@ -63,6 +68,9 @@ type TApplication struct {
 
 	// Quit channel signals the application to exit
 	quitCh chan struct{}
+
+	// Redraw request channel signals that UI needs to be redrawn
+	redrawCh chan struct{}
 
 	// Mutex for synchronizing access to application and widget state
 	mu sync.Mutex
@@ -128,6 +136,7 @@ func NewApplicationWithTheme(mainWidget IWidget, screen gtv.IScreenOutput, theme
 		renderer:    nil,                    // Will be created in Run()
 		eventReader: nil,                    // Will be created in Run()
 		quitCh:      make(chan struct{}, 1), // Buffered to allow non-blocking Quit()
+		redrawCh:    make(chan struct{}, 1), // Buffered to coalesce multiple redraw requests
 	}
 
 	return app
@@ -216,6 +225,16 @@ func (app *TApplication) Run(stdin io.Reader, stdout io.Writer) error {
 			app.mu.Lock()
 			app.handleEvent(event)
 			app.mu.Unlock()
+
+		case <-app.redrawCh:
+			// Redraw requested from background thread
+			app.mu.Lock()
+			app.screen.SetCursorStyle(gtv.CursorStyleHidden)
+			app.mainWidget.Draw(app.screen)
+			app.mu.Unlock()
+			if app.renderer != nil {
+				app.renderer.Render()
+			}
 		}
 	}
 }
@@ -238,10 +257,26 @@ func (app *TApplication) GetScreen() gtv.IScreenOutput {
 
 // ExecuteOnUiThread executes the given function with the UI mutex locked.
 // This ensures that application state is not modified concurrently.
+// After the function completes, a redraw is automatically requested.
 func (app *TApplication) ExecuteOnUiThread(f func()) {
 	app.mu.Lock()
-	defer app.mu.Unlock()
 	f()
+	app.mu.Unlock()
+
+	// Automatically request redraw after UI state change
+	app.RequestRedraw()
+}
+
+// RequestRedraw requests a redraw of the UI from any thread.
+// This is safe to call from background threads.
+// Multiple calls are coalesced - only one redraw will happen.
+func (app *TApplication) RequestRedraw() {
+	// Non-blocking send - if channel is full, a redraw is already pending
+	select {
+	case app.redrawCh <- struct{}{}:
+	default:
+		// Redraw already pending, no need to queue another
+	}
 }
 
 // Notify handles input events from the InputEventReader.
