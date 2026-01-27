@@ -41,10 +41,10 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-			PromptGenerator: &appViewMockPromptGen{},
-			Tools:           tools,
-			VFS:             vfsInstance,
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator:      &appViewMockPromptGen{},
+			Tools:                tools,
+			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
@@ -83,9 +83,10 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 		mockInput := tio.NewMockInputEventReader(app)
 
 		// Draw initial frame
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			appView.Draw(screen)
-		})
+			return nil
+		}, false, false)
 
 		// Type a message and submit
 		mockInput.TypeKeys("Hello, assistant!")
@@ -95,9 +96,10 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 		//time.Sleep(200 * time.Millisecond)
 
 		// Verify user message appeared
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			appView.Draw(screen)
-		})
+			return nil
+		}, false, false)
 
 		width, height, content := screen.GetContent()
 		verifier := gtv.NewScreenVerifier(width, height, content)
@@ -117,9 +119,10 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 			case <-timeout:
 				t.Fatal("Timeout waiting for assistant response")
 			case <-ticker.C:
-				app.ExecuteOnUiThread(func() {
+				app.ExecuteOnUiThread(func() any {
 					appView.Draw(screen)
-				})
+					return nil
+				}, false, false)
 
 				width, height, content := screen.GetContent()
 				verifier := gtv.NewScreenVerifier(width, height, content)
@@ -147,10 +150,10 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-			PromptGenerator: &appViewMockPromptGen{},
-			Tools:           tools,
-			VFS:             vfsInstance,
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator:      &appViewMockPromptGen{},
+			Tools:                tools,
+			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
@@ -191,9 +194,10 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 		mockInput := tio.NewMockInputEventReader(app)
 
 		// Draw initial frame
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			appView.Draw(screen)
-		})
+			return nil
+		}, false, false)
 
 		// Type a message and submit
 		mockInput.TypeKeys("Tell me something")
@@ -210,9 +214,10 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 			case <-timeout:
 				t.Fatal("Timeout waiting for complete streamed response")
 			case <-ticker.C:
-				app.ExecuteOnUiThread(func() {
+				app.ExecuteOnUiThread(func() any {
 					appView.Draw(screen)
-				})
+					return nil
+				}, false, false)
 
 				width, height, content := screen.GetContent()
 				verifier := gtv.NewScreenVerifier(width, height, content)
@@ -240,10 +245,10 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-			PromptGenerator: &appViewMockPromptGen{},
-			Tools:           tools,
-			VFS:             vfsInstance,
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator:      &appViewMockPromptGen{},
+			Tools:                tools,
+			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
@@ -281,9 +286,10 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 		mockInput := tio.NewMockInputEventReader(app)
 
 		// Draw initial frame
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			appView.Draw(screen)
-		})
+			return nil
+		}, false, false)
 
 		// Type a unique message
 		uniqueUserMessage := "This is my unique app view test message"
@@ -294,9 +300,10 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 		//time.Sleep(200 * time.Millisecond)
 
 		// Redraw and check for duplication
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			appView.Draw(screen)
-		})
+			return nil
+		}, false, false)
 
 		width, height, content := screen.GetContent()
 		verifier := gtv.NewScreenVerifier(width, height, content)
@@ -324,10 +331,10 @@ func TestAppViewMenuInteraction(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-			PromptGenerator: &appViewMockPromptGen{},
-			Tools:           tools,
-			VFS:             vfsInstance,
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator:      &appViewMockPromptGen{},
+			Tools:                tools,
+			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
@@ -360,17 +367,19 @@ func TestAppViewMenuInteraction(t *testing.T) {
 		mockInput := tio.NewMockInputEventReader(app)
 
 		// Draw initial frame
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			appView.Draw(screen)
-		})
+			return nil
+		}, false, false)
 
 		// Press Ctrl+P to show menu
 		mockInput.TypeKeysByName("Ctrl+P")
 
 		// Redraw
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			appView.Draw(screen)
-		})
+			return nil
+		}, false, false)
 
 		width, height, content := screen.GetContent()
 		verifier := gtv.NewScreenVerifier(width, height, content)
@@ -395,10 +404,10 @@ func TestAppViewMenuInteraction(t *testing.T) {
 		tool.RegisterVFSTools(tools, vfsInstance)
 
 		system := &core.SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-			PromptGenerator: &appViewMockPromptGen{},
-			Tools:           tools,
-			VFS:             vfsInstance,
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			PromptGenerator:      &appViewMockPromptGen{},
+			Tools:                tools,
+			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
@@ -431,17 +440,19 @@ func TestAppViewMenuInteraction(t *testing.T) {
 		mockInput := tio.NewMockInputEventReader(app)
 
 		// Draw initial frame
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			appView.Draw(screen)
-		})
+			return nil
+		}, false, false)
 
 		// Press Esc to show menu
 		mockInput.TypeKeysByName("Escape")
 
 		// Redraw
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			appView.Draw(screen)
-		})
+			return nil
+		}, false, false)
 
 		width, height, content := screen.GetContent()
 		verifier := gtv.NewScreenVerifier(width, height, content)

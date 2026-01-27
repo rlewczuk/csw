@@ -142,9 +142,10 @@ func TestApplicationExecuteOnUiThread(t *testing.T) {
 
 	// Execute a function on the UI thread
 	executed := false
-	app.ExecuteOnUiThread(func() {
+	app.ExecuteOnUiThread(func() any {
 		executed = true
-	})
+		return nil
+	}, false, false)
 
 	// Verify function was executed
 	assert.True(t, executed)
@@ -309,9 +310,10 @@ func TestApplicationExecuteOnUiThreadConcurrent(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		go func() {
-			app.ExecuteOnUiThread(func() {
+			app.ExecuteOnUiThread(func() any {
 				counter++
-			})
+				return nil
+			}, false, false)
 			done <- true
 		}()
 	}

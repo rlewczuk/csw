@@ -281,9 +281,10 @@ func (v *TChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 
 	// If app is available, use ExecuteOnUiThread to ensure proper redraw
 	if app != nil {
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			v.queryPermissionUnsafe(query)
-		})
+			return nil
+		}, true, false)
 		return nil
 	}
 
