@@ -66,6 +66,10 @@ type IWidget interface {
 	HandleEvent(event *TEvent)
 
 	AddChild(child IWidget)
+
+	GetParent() IWidget
+
+	SetParent(parent IWidget)
 }
 
 type TWidget struct {
@@ -227,6 +231,11 @@ func (w *TWidget) HandleEvent(event *TEvent) {
 
 func (w *TWidget) AddChild(child IWidget) {
 	w.Children = append(w.Children, child)
+	child.SetParent(w)
+}
+
+func (w *TWidget) SetParent(parent IWidget) {
+	w.Parent = parent
 }
 
 // GetAttrs returns the cell attributes for rendering.
