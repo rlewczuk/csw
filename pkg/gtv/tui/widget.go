@@ -140,7 +140,7 @@ func WithFlags(flags WidgetFlag) gtv.Option {
 //
 // Note: When creating a derived widget that embeds TWidget, use newWidgetBase
 // to avoid double registration with the parent. This constructor registers with the parent.
-func NewWidget(parent IWidget, opts ...gtv.Option) *TWidget {
+func NewWidget(parent IWidget, opts ...gtv.Option) IWidget {
 	widget := newWidgetBase(parent, opts...)
 
 	// Register with parent if provided
@@ -250,23 +250,18 @@ func (w *TWidget) SetAttrs(attrs gtv.CellAttributes) {
 
 // GetApplication walks up the widget tree to find the TApplication.
 // Returns nil if no TApplication is found (e.g., widget is not attached to app yet).
+//
+// This method uses recursive dispatch through the parent chain. Each parent's
+// GetApplication() method is called through the interface, which ensures proper
+// dynamic dispatch. TApplication overrides this method to return itself.
 func (w *TWidget) GetApplication() *TApplication {
-	// Walk up the parent chain starting from this widget's parent
-	current := w.Parent
-	for current != nil {
-		// Check if this is TApplication
-		if app, ok := current.(*TApplication); ok {
-			return app
-		}
-
-		// Get the parent of the current widget
-		// All widgets have a GetParent method via the interface we define
-		if parentGetter, ok := current.(interface{ GetParent() IWidget }); ok {
-			current = parentGetter.GetParent()
-		} else {
-			// No way to traverse further
-			break
-		}
+	if w.Parent == nil {
+		return nil
+	}
+	// Call GetApplication() on parent through interface - this dispatches dynamically
+	// to the correct implementation, eventually reaching TApplication.GetApplication()
+	if appGetter, ok := w.Parent.(interface{ GetApplication() *TApplication }); ok {
+		return appGetter.GetApplication()
 	}
 	return nil
 }

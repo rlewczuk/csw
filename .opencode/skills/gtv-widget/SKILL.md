@@ -30,7 +30,7 @@ Analyze user requirements and create new TUI widget in `pkg/gtv/tui/<widget-name
   - theme tag names should start with `<widget-name>-` prefix, for example `label-`, `button-`, `layout-`
   - update default theme in `pkg/gtv/tui/themes/default.theme.json` to include new theme tag names and colors
   - if widget has no visible parts (i.e. it is just a container for other widgets), there is no need to use theme tags
-  
+- constructor function should always return interface, not struct pointer 
 
 ## When to use me
 

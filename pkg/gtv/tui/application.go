@@ -450,6 +450,39 @@ func (app *TApplication) restoreTerminal() {
 	app.termInitialized = false
 }
 
+// GetApplication returns this application instance.
+// This is the base case for the recursive GetApplication() chain defined in TWidget.
+// When a widget calls GetApplication(), it recursively calls GetApplication() on its
+// parent until reaching TApplication, which returns itself.
+func (app *TApplication) GetApplication() *TApplication {
+	return app
+}
+
+// AddChild overrides TFlexLayout.AddChild to ensure children have their Parent
+// field set to *TApplication (not *TWidget). This is necessary because Go's
+// struct embedding means that the embedded TWidget.AddChild() method would
+// store *TWidget as the parent type in the interface, losing the concrete
+// TApplication type information needed for GetApplication() to work correctly.
+func (app *TApplication) AddChild(child IWidget) {
+	app.TFlexLayout.Children = append(app.TFlexLayout.Children, child)
+	child.SetParent(app) // Pass app as *TApplication, not embedded *TWidget
+
+	// Initialize flex item properties (copied from TFlexLayout.AddChild)
+	if _, ok := app.itemProperties[child]; !ok {
+		childPos := child.GetPos()
+		props := app.defaultItemPadding
+		if props.FlexBasis == 0 {
+			if app.direction == FlexDirectionRow {
+				props.FlexBasis = childPos.W
+			} else {
+				props.FlexBasis = childPos.H
+			}
+		}
+		app.itemProperties[child] = props
+	}
+	app.performLayout()
+}
+
 // setupSignalHandlers sets up signal handlers for SIGWINCH, SIGINT, and SIGTERM.
 func (app *TApplication) setupSignalHandlers() {
 	// Set up SIGWINCH handling for terminal resize

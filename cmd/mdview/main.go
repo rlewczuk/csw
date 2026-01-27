@@ -95,3 +95,13 @@ func (w *markdownViewWrapper) GetAbsolutePos() gtv.TRect {
 func (w *markdownViewWrapper) AddChild(child tui.IWidget) {
 	w.mdView.AddChild(child)
 }
+
+// GetParent delegates to the markdown view
+func (w *markdownViewWrapper) GetParent() tui.IWidget {
+	return w.mdView.GetParent()
+}
+
+// SetParent delegates to the markdown view
+func (w *markdownViewWrapper) SetParent(parent tui.IWidget) {
+	w.mdView.SetParent(parent)
+}
