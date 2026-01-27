@@ -120,6 +120,7 @@ func (z *TZAxisLayout) AddZWidget(widget IWidget, zIndex int, opts ...ZWidgetOpt
 
 	// Also add to Children slice (required by base widget)
 	z.Children = append(z.Children, widget)
+	widget.SetParent(z)
 
 	// Sort zWidgets by z-index (lower z-index first)
 	z.sortZWidgets()
