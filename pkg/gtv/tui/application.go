@@ -41,14 +41,26 @@ type IApplication interface {
 	// GetScreen returns the screen buffer for testing purposes.
 	GetScreen() gtv.IScreenOutput
 
-	// ExecuteOnUiThread executes the given function with the UI mutex locked.
-	// This ensures that application state is not modified concurrently.
-	// After the function completes, a redraw is automatically requested.
-	ExecuteOnUiThread(f func())
+	// ExecuteOnUiThread executes the given function on the UI thread.
+	// If the main loop is running, the function is sent to the main loop thread for execution.
+	// If the main loop is not running, the function is executed immediately with the mutex locked.
+	// Parameters:
+	//   f: Function to execute, should return any value
+	//   redraw: If true, triggers a redraw after function completes
+	//   wait: If true, blocks until function completes and returns the result
+	// Returns: The value returned by f() if wait=true, nil otherwise
+	ExecuteOnUiThread(f func() any, redraw bool, wait bool) any
 
 	// RequestRedraw requests a redraw of the UI from any thread.
 	// This is safe to call from background threads.
 	RequestRedraw()
+}
+
+// uiTask represents a function to execute on the UI thread
+type uiTask struct {
+	f      func() any
+	redraw bool
+	done   chan any
 }
 
 // TApplication is the main application struct that manages the TUI event loop.
@@ -72,8 +84,14 @@ type TApplication struct {
 	// Redraw request channel signals that UI needs to be redrawn
 	redrawCh chan struct{}
 
+	// UI task channel for executing functions on the main loop thread
+	uiTaskCh chan uiTask
+
 	// Mutex for synchronizing access to application and widget state
 	mu sync.Mutex
+
+	// Running flag indicates whether the main loop is running
+	running bool
 
 	// Terminal state management
 	stdin           io.Reader
@@ -180,6 +198,8 @@ func NewApplicationEmptyWithTheme(screen gtv.IScreenOutput, theme map[string]gtv
 		eventReader: nil,                    // Will be created in Run()
 		quitCh:      make(chan struct{}, 1), // Buffered to allow non-blocking Quit()
 		redrawCh:    make(chan struct{}, 1), // Buffered to coalesce multiple redraw requests
+		uiTaskCh:    make(chan uiTask, 100), // Buffered to allow async task submission
+		running:     false,                  // Main loop not running yet
 	}
 
 	return app
@@ -253,6 +273,7 @@ func (app *TApplication) Run(stdin io.Reader, stdout io.Writer) error {
 	app.mu.Lock()
 	app.screen.SetCursorStyle(gtv.CursorStyleHidden)
 	app.TFlexLayout.Draw(app.screen)
+	app.running = true
 	app.mu.Unlock()
 	if err := app.renderer.Render(); err != nil {
 		return fmt.Errorf("TApplication.Run(): failed to render initial frame: %w", err)
@@ -262,6 +283,9 @@ func (app *TApplication) Run(stdin io.Reader, stdout io.Writer) error {
 	for {
 		select {
 		case <-app.quitCh:
+			app.mu.Lock()
+			app.running = false
+			app.mu.Unlock()
 			return nil
 
 		case event := <-eventCh:
@@ -277,6 +301,25 @@ func (app *TApplication) Run(stdin io.Reader, stdout io.Writer) error {
 			app.mu.Unlock()
 			if app.renderer != nil {
 				app.renderer.Render()
+			}
+
+		case task := <-app.uiTaskCh:
+			// Execute UI task on main loop thread
+			app.mu.Lock()
+			result := task.f()
+			if task.redraw {
+				app.screen.SetCursorStyle(gtv.CursorStyleHidden)
+				app.TFlexLayout.Draw(app.screen)
+			}
+			app.mu.Unlock()
+
+			if app.renderer != nil && task.redraw {
+				app.renderer.Render()
+			}
+
+			// Signal completion if task is waiting
+			if task.done != nil {
+				task.done <- result
 			}
 		}
 	}
@@ -298,16 +341,56 @@ func (app *TApplication) GetScreen() gtv.IScreenOutput {
 	return app.screen
 }
 
-// ExecuteOnUiThread executes the given function with the UI mutex locked.
-// This ensures that application state is not modified concurrently.
-// After the function completes, a redraw is automatically requested.
-func (app *TApplication) ExecuteOnUiThread(f func()) {
+// ExecuteOnUiThread executes the given function on the UI thread.
+// If the main loop is running, the function is sent to the main loop thread for execution.
+// If the main loop is not running, the function is executed immediately with the mutex locked.
+// Parameters:
+//
+//	f: Function to execute, should return any value
+//	redraw: If true, triggers a redraw after function completes
+//	wait: If true, blocks until function completes and returns the result
+//
+// Returns: The value returned by f() if wait=true, nil otherwise
+func (app *TApplication) ExecuteOnUiThread(f func() any, redraw bool, wait bool) any {
 	app.mu.Lock()
-	f()
+	isRunning := app.running
 	app.mu.Unlock()
 
-	// Automatically request redraw after UI state change
-	app.RequestRedraw()
+	if isRunning {
+		// Main loop is running - send task to main loop thread
+		var done chan any
+		if wait {
+			done = make(chan any, 1)
+		}
+
+		task := uiTask{
+			f:      f,
+			redraw: redraw,
+			done:   done,
+		}
+
+		app.uiTaskCh <- task
+
+		if wait {
+			return <-done
+		}
+		return nil
+	} else {
+		// Main loop is not running - execute immediately with mutex locked
+		app.mu.Lock()
+		result := f()
+		if redraw {
+			app.screen.SetCursorStyle(gtv.CursorStyleHidden)
+			app.TFlexLayout.Draw(app.screen)
+		}
+		app.mu.Unlock()
+
+		if app.renderer != nil && redraw {
+			app.renderer.Render()
+		}
+
+		return result
+	}
 }
 
 // RequestRedraw requests a redraw of the UI from any thread.

@@ -44,10 +44,11 @@ func TestCursorHandling(t *testing.T) {
 
 	t.Run("Cursor should be hidden initially when no widget is focused", func(t *testing.T) {
 		// Ensure nothing is focused
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			input1.Blur()
 			input2.Blur()
-		})
+			return nil
+		}, false, false)
 
 		redraw()
 
@@ -58,9 +59,10 @@ func TestCursorHandling(t *testing.T) {
 
 	t.Run("Cursor should be visible and positioned when widget is focused", func(t *testing.T) {
 		// Focus input 1
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			input1.Focus()
-		})
+			return nil
+		}, false, false)
 
 		redraw()
 
@@ -77,10 +79,11 @@ func TestCursorHandling(t *testing.T) {
 
 	t.Run("Cursor should move when focus changes", func(t *testing.T) {
 		// Focus input 2, blur input 1
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			input1.Blur()
 			input2.Focus()
-		})
+			return nil
+		}, false, false)
 
 		redraw()
 
@@ -96,10 +99,11 @@ func TestCursorHandling(t *testing.T) {
 
 	t.Run("Cursor should be hidden when focus moves to non-input widget (Ghosting fix)", func(t *testing.T) {
 		// Blur input 2, focus button
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			input2.Blur()
 			button.Focus()
-		})
+			return nil
+		}, false, false)
 
 		redraw()
 
@@ -110,11 +114,12 @@ func TestCursorHandling(t *testing.T) {
 
 	t.Run("Cursor should be hidden when focus is lost", func(t *testing.T) {
 		// Blur button (and ensure inputs are blurred)
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			input1.Blur()
 			input2.Blur()
 			button.Blur()
-		})
+			return nil
+		}, false, false)
 
 		redraw()
 

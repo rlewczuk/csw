@@ -104,10 +104,11 @@ func TestApplicationRedrawFromBackgroundThread(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 
 			// FIX: Use ExecuteOnUiThread to modify state and trigger redraw
-			app.ExecuteOnUiThread(func() {
+			app.ExecuteOnUiThread(func() any {
 				testWidget.label = "Modified from background thread"
-				testWidget.Draw(screen)
-			})
+				// Don't manually call Draw - ExecuteOnUiThread with redraw=true will do it
+				return nil
+			}, true, false)
 
 			// Signal that modification is done
 			done <- true
@@ -116,8 +117,8 @@ func TestApplicationRedrawFromBackgroundThread(t *testing.T) {
 		// Wait for background thread to modify the widget
 		<-done
 
-		// After ExecuteOnUiThread, draw should have been called
-		assert.Equal(t, 1, drawCount, "Draw should be called after ExecuteOnUiThread")
+		// After ExecuteOnUiThread with redraw=true, draw should have been called once
+		assert.Equal(t, 1, drawCount, "Draw should be called once after ExecuteOnUiThread with redraw=true")
 	})
 
 	t.Run("permission menu from background thread should trigger automatic redraw", func(t *testing.T) {
@@ -167,20 +168,13 @@ func TestApplicationRedrawFromBackgroundThread(t *testing.T) {
 		assert.False(t, widget.menuDrawn, "BUG: Menu is not drawn after ShowMenu from background thread")
 
 		// FIX: Use ExecuteOnUiThread which should trigger automatic redraw
-		app.ExecuteOnUiThread(func() {
+		app.ExecuteOnUiThread(func() any {
 			// No manual Draw() call here - the fix should auto-redraw after ExecuteOnUiThread
-		})
+			return nil
+		}, true, false)
 
-		// Check that redraw was requested
-		select {
-		case <-app.redrawCh:
-			// Redraw was requested - now process it manually (simulating event loop)
-			app.mu.Lock()
-			widget.Draw(screen)
-			app.mu.Unlock()
-		case <-time.After(100 * time.Millisecond):
-			t.Fatal("Redraw was not requested after ExecuteOnUiThread")
-		}
+		// With the new implementation, the redraw happens inline, so just verify the menu was drawn
+		// The task is executed immediately since the loop is not running
 
 		// After processing the redraw request, menu should be drawn
 		assert.True(t, widget.menuDrawn, "Menu should be auto-drawn after ExecuteOnUiThread triggers redraw")
