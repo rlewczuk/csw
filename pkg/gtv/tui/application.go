@@ -341,16 +341,6 @@ func (app *TApplication) GetScreen() gtv.IScreenOutput {
 	return app.screen
 }
 
-// ExecuteOnUiThread executes the given function on the UI thread.
-// If the main loop is running, the function is sent to the main loop thread for execution.
-// If the main loop is not running, the function is executed immediately with the mutex locked.
-// Parameters:
-//
-//	f: Function to execute, should return any value
-//	redraw: If true, triggers a redraw after function completes
-//	wait: If true, blocks until function completes and returns the result
-//
-// Returns: The value returned by f() if wait=true, nil otherwise
 func (app *TApplication) ExecuteOnUiThread(f func() any, redraw bool, wait bool) any {
 	app.mu.Lock()
 	isRunning := app.running
