@@ -4,18 +4,6 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/gtv"
 )
 
-// IRedrawRequester is an interface for requesting UI redraws.
-// This allows widgets to request redraws when their state changes from background threads.
-type IRedrawRequester interface {
-	// RequestRedraw requests a redraw of the UI.
-	// This is safe to call from any thread.
-	RequestRedraw()
-
-	// ExecuteOnUiThread executes the given function on the UI thread.
-	// This is safe to call from any thread.
-	ExecuteOnUiThread(f func())
-}
-
 // WidgetFlag represents flags that can be set on the widget
 type WidgetFlag uint32
 
@@ -249,4 +237,33 @@ func (w *TWidget) GetAttrs() gtv.CellAttributes {
 // SetAttrs sets the cell attributes for rendering.
 func (w *TWidget) SetAttrs(attrs gtv.CellAttributes) {
 	w.cellAttrs = attrs
+}
+
+// GetApplication walks up the widget tree to find the TApplication.
+// Returns nil if no TApplication is found (e.g., widget is not attached to app yet).
+func (w *TWidget) GetApplication() *TApplication {
+	// Walk up the parent chain starting from this widget's parent
+	current := w.Parent
+	for current != nil {
+		// Check if this is TApplication
+		if app, ok := current.(*TApplication); ok {
+			return app
+		}
+
+		// Get the parent of the current widget
+		// All widgets have a GetParent method via the interface we define
+		if parentGetter, ok := current.(interface{ GetParent() IWidget }); ok {
+			current = parentGetter.GetParent()
+		} else {
+			// No way to traverse further
+			break
+		}
+	}
+	return nil
+}
+
+// GetParent returns the parent widget.
+// This is used by GetApplication to walk up the widget tree.
+func (w *TWidget) GetParent() IWidget {
+	return w.Parent
 }

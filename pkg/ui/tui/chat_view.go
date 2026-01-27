@@ -90,9 +90,6 @@ type TChatView struct {
 	// Presenter for handling user input
 	presenter ui.IChatPresenter
 
-	// App for requesting redraws from background threads
-	app tui.IRedrawRequester
-
 	// Messages
 	messages []*chatMessage
 	mu       sync.Mutex
@@ -113,7 +110,6 @@ func NewChatView(parent tui.IWidget, rect gtv.TRect, presenter ui.IChatPresenter
 		messages:  make([]*chatMessage, 0),
 		width:     int(rect.W),
 		height:    int(rect.H),
-		app:       nil, // Will be set by SetApp
 	}
 
 	// Create flex layout (vertical) to hold markdown view and text area
@@ -200,12 +196,6 @@ func NewChatView(parent tui.IWidget, rect gtv.TRect, presenter ui.IChatPresenter
 	return view
 }
 
-// SetApp sets the application for the chat view.
-// This allows the view to request redraws when state changes from background threads.
-func (v *TChatView) SetApp(app tui.IRedrawRequester) {
-	v.app = app
-}
-
 // Init initializes the view with all messages from the session
 func (v *TChatView) Init(session *ui.ChatSessionUI) error {
 	v.mu.Lock()
@@ -286,9 +276,12 @@ func (v *TChatView) MoveToBottom() error {
 
 // QueryPermission queries user for permission to use a tool
 func (v *TChatView) QueryPermission(query *ui.PermissionQueryUI) error {
+	// Try to get the application from the widget tree
+	app := v.TWidget.GetApplication()
+
 	// If app is available, use ExecuteOnUiThread to ensure proper redraw
-	if v.app != nil {
-		v.app.ExecuteOnUiThread(func() {
+	if app != nil {
+		app.ExecuteOnUiThread(func() {
 			v.queryPermissionUnsafe(query)
 		})
 		return nil
