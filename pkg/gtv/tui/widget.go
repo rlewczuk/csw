@@ -70,6 +70,18 @@ type IWidget interface {
 	GetParent() IWidget
 
 	SetParent(parent IWidget)
+
+	// ExecuteOnUiThread executes the given function on the UI thread.
+	// If the main loop is running, the function is sent to the main loop thread for execution.
+	// If the main loop is not running, the function is executed immediately with the mutex locked.
+	// Parameters:
+	//
+	//	f: Function to execute, should return any value
+	//	redraw: If true, triggers a redraw after function completes
+	//	wait: If true, blocks until function completes and returns the result
+	//
+	// Returns: The value returned by f() if wait=true, nil otherwise
+	ExecuteOnUiThread(f func() any, redraw bool, wait bool) any
 }
 
 type TWidget struct {
@@ -270,4 +282,11 @@ func (w *TWidget) GetApplication() *TApplication {
 // This is used by GetApplication to walk up the widget tree.
 func (w *TWidget) GetParent() IWidget {
 	return w.Parent
+}
+
+func (w *TWidget) ExecuteOnUiThread(f func() any, redraw bool, wait bool) any {
+	if w.Parent == nil {
+		return nil
+	}
+	return w.Parent.ExecuteOnUiThread(f, redraw, wait)
 }
