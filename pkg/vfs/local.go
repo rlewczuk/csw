@@ -11,6 +11,19 @@ import (
 // It provides sandboxed access to files within a root directory.
 type LocalVFS struct {
 	root string
+	repo Repo
+}
+
+func (l *LocalVFS) GetBranch() string {
+	return l.root
+}
+
+func (l *LocalVFS) WorktreePath() string {
+	return l.root
+}
+
+func (l *LocalVFS) GetRepo() Repo {
+	return l.repo
 }
 
 // NewLocalVFS creates a new LocalVFS instance rooted at the given directory.

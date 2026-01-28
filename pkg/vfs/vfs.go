@@ -13,6 +13,32 @@ var (
 	ErrAskPermission    = errors.New("ask permission")
 )
 
+// Repo represents a repository for VFS. It can be a local filesystem, a remote filesystem, a git repository etc.
+// This interface is responsible only for repository operations (cloning, pulling, pushing, status, extracting worktree etc.)
+type Repo interface {
+	// GetWorktree extracts the worktree for the given branch and returns a VFS instance for it.
+	// if worktree is already extracted, it returns the existing VFS instance.
+	GetWorktree(branch string) (VFS, error)
+
+	// DropWorktree closes and removes the worktree for the given branch.
+	DropWorktree(branch string) error
+
+	// CommitWorktree commits the changes in the worktree for the given branch.
+	CommitWorktree(branch string, message string) error
+
+	// NewBranch creates a new branch from the given branch.
+	NewBranch(name string, from string) error
+
+	// DeleteBranch deletes the given branch.
+	DeleteBranch(name string) error
+
+	// ListBranches returns a list of all branches.
+	ListBranches(prefix string) ([]string, error)
+
+	// MergeBranches merges the given branch into the current branch.
+	MergeBranches(into string, from string) error
+}
+
 // VFS represents virtual filesystem. It encapsulates access to local and remote files and directories,
 // git worktree, in-memory files etc., may implement access control for agent etc.
 // Version control, snapshotting etc. is not part of VFS, it is implemented in another layer.
@@ -37,4 +63,13 @@ type VFS interface {
 	// It works for both files and directories.
 	// Can be used for renaming by providing a different name in dst within the same directory.
 	MoveFile(src, dst string) error
+
+	// GetRepo returns the repository this VFS is working on (if any, nil otherwise).
+	GetRepo() Repo
+
+	// GetBranch returns the name of the worktree (eg. branch name in case of git repositories, directory name in case of local VFS).
+	GetBranch() string
+
+	// WorktreePath returns the path to the worktree root.
+	WorktreePath() string
 }

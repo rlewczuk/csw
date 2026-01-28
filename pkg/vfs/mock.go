@@ -24,6 +24,18 @@ type MockVFS struct {
 	mutex sync.RWMutex
 }
 
+func (m *MockVFS) GetBranch() string {
+	return "worktree"
+}
+
+func (m *MockVFS) WorktreePath() string {
+	return "/path/to/worktree"
+}
+
+func (m *MockVFS) GetRepo() Repo {
+	return nil // TODO to be implemented
+}
+
 // NewMockVFS creates a new MockVFS instance with an empty in-memory filesystem.
 func NewMockVFS() *MockVFS {
 	return &MockVFS{
@@ -502,6 +514,254 @@ func (m *MockVFS) MoveFile(src, dst string) error {
 	// Move the entry
 	dstParent.children[dstName] = srcEntry
 	delete(srcParent.children, srcName)
+
+	return nil
+}
+
+// branchState represents the state of a branch in the mock repository
+type branchState struct {
+	vfs     *MockVFS
+	commits []commitInfo
+}
+
+// commitInfo represents a commit in the mock repository
+type commitInfo struct {
+	message string
+	files   map[string][]byte
+}
+
+// MockRepo implements the Repo interface with an in-memory git-like repository.
+// It emulates git behavior using branches and worktrees stored in memory.
+type MockRepo struct {
+	branches  map[string]*branchState
+	worktrees map[string]*MockVFS
+	mutex     sync.RWMutex
+}
+
+// NewMockRepo creates a new MockRepo instance with a default "main" branch.
+func NewMockRepo() *MockRepo {
+	mainVFS := NewMockVFS()
+	return &MockRepo{
+		branches: map[string]*branchState{
+			"main": {
+				vfs:     mainVFS,
+				commits: []commitInfo{},
+			},
+		},
+		worktrees: make(map[string]*MockVFS),
+	}
+}
+
+// GetWorktree extracts the worktree for the given branch and returns a VFS instance for it.
+// If worktree is already extracted, it returns the existing VFS instance.
+func (m *MockRepo) GetWorktree(branch string) (VFS, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// Check if worktree already exists
+	if vfs, exists := m.worktrees[branch]; exists {
+		return vfs, nil
+	}
+
+	// Check if branch exists
+	branchState, exists := m.branches[branch]
+	if !exists {
+		return nil, fmt.Errorf("MockRepo.GetWorktree() [mock.go]: branch %q not found: %w", branch, ErrFileNotFound)
+	}
+
+	// Create a copy of the branch's VFS for the worktree
+	worktreeVFS := m.copyVFS(branchState.vfs)
+	m.worktrees[branch] = worktreeVFS
+
+	return worktreeVFS, nil
+}
+
+// copyVFS creates a deep copy of a MockVFS
+func (m *MockRepo) copyVFS(source *MockVFS) *MockVFS {
+	dest := NewMockVFS()
+
+	source.mutex.RLock()
+	defer source.mutex.RUnlock()
+
+	var copyEntry func(src *fileEntry, dst *fileEntry)
+	copyEntry = func(src *fileEntry, dst *fileEntry) {
+		dst.isDir = src.isDir
+		if src.content != nil {
+			dst.content = make([]byte, len(src.content))
+			copy(dst.content, src.content)
+		}
+		if src.children != nil {
+			dst.children = make(map[string]*fileEntry)
+			for name, child := range src.children {
+				dst.children[name] = &fileEntry{}
+				copyEntry(child, dst.children[name])
+			}
+		}
+	}
+
+	copyEntry(source.root, dest.root)
+	return dest
+}
+
+// DropWorktree closes and removes the worktree for the given branch.
+func (m *MockRepo) DropWorktree(branch string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if _, exists := m.worktrees[branch]; !exists {
+		return fmt.Errorf("MockRepo.DropWorktree() [mock.go]: worktree for branch %q not found: %w", branch, ErrFileNotFound)
+	}
+
+	delete(m.worktrees, branch)
+	return nil
+}
+
+// CommitWorktree commits the changes in the worktree for the given branch.
+func (m *MockRepo) CommitWorktree(branch string, message string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	worktreeVFS, exists := m.worktrees[branch]
+	if !exists {
+		return fmt.Errorf("MockRepo.CommitWorktree() [mock.go]: worktree for branch %q not found: %w", branch, ErrFileNotFound)
+	}
+
+	branchState, exists := m.branches[branch]
+	if !exists {
+		return fmt.Errorf("MockRepo.CommitWorktree() [mock.go]: branch %q not found: %w", branch, ErrFileNotFound)
+	}
+
+	// Get all files from the worktree
+	files, err := worktreeVFS.ListFiles(".", true)
+	if err != nil {
+		return fmt.Errorf("MockRepo.CommitWorktree() [mock.go]: %w", err)
+	}
+
+	// Create a snapshot of all files
+	fileSnapshot := make(map[string][]byte)
+	for _, file := range files {
+		content, err := worktreeVFS.ReadFile(file)
+		if err != nil {
+			continue // Skip directories
+		}
+		fileSnapshot[file] = content
+	}
+
+	// Add the commit
+	commit := commitInfo{
+		message: message,
+		files:   fileSnapshot,
+	}
+	branchState.commits = append(branchState.commits, commit)
+
+	// Update the branch's VFS with the committed state
+	branchState.vfs = m.copyVFS(worktreeVFS)
+
+	return nil
+}
+
+// NewBranch creates a new branch from the given branch.
+func (m *MockRepo) NewBranch(name string, from string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// Check if source branch exists
+	sourceBranch, exists := m.branches[from]
+	if !exists {
+		return fmt.Errorf("MockRepo.NewBranch() [mock.go]: source branch %q not found: %w", from, ErrFileNotFound)
+	}
+
+	// Check if target branch already exists
+	if _, exists := m.branches[name]; exists {
+		return fmt.Errorf("MockRepo.NewBranch() [mock.go]: branch %q already exists: %w", name, ErrFileExists)
+	}
+
+	// Create new branch as a copy of the source branch
+	m.branches[name] = &branchState{
+		vfs:     m.copyVFS(sourceBranch.vfs),
+		commits: append([]commitInfo{}, sourceBranch.commits...),
+	}
+
+	return nil
+}
+
+// DeleteBranch deletes the given branch.
+func (m *MockRepo) DeleteBranch(name string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// Check if branch exists first
+	if _, exists := m.branches[name]; !exists {
+		return fmt.Errorf("MockRepo.DeleteBranch() [mock.go]: branch %q not found: %w", name, ErrFileNotFound)
+	}
+
+	// Cannot delete if it's the only branch
+	if len(m.branches) == 1 {
+		return fmt.Errorf("MockRepo.DeleteBranch() [mock.go]: cannot delete the only branch: %w", ErrPermissionDenied)
+	}
+
+	// Remove worktree if it exists
+	delete(m.worktrees, name)
+
+	// Delete the branch
+	delete(m.branches, name)
+
+	return nil
+}
+
+// ListBranches returns a list of all branches.
+func (m *MockRepo) ListBranches(prefix string) ([]string, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	var result []string
+	for name := range m.branches {
+		if prefix == "" || strings.HasPrefix(name, prefix) {
+			result = append(result, name)
+		}
+	}
+
+	return result, nil
+}
+
+// MergeBranches merges the given branch into the current branch.
+func (m *MockRepo) MergeBranches(into string, from string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// Check if both branches exist
+	intoBranch, exists := m.branches[into]
+	if !exists {
+		return fmt.Errorf("MockRepo.MergeBranches() [mock.go]: target branch %q not found: %w", into, ErrFileNotFound)
+	}
+
+	fromBranch, exists := m.branches[from]
+	if !exists {
+		return fmt.Errorf("MockRepo.MergeBranches() [mock.go]: source branch %q not found: %w", from, ErrFileNotFound)
+	}
+
+	// Merge files from source branch into target branch
+	// Get all files from the source branch
+	files, err := fromBranch.vfs.ListFiles(".", true)
+	if err != nil {
+		return fmt.Errorf("MockRepo.MergeBranches() [mock.go]: %w", err)
+	}
+
+	for _, file := range files {
+		content, err := fromBranch.vfs.ReadFile(file)
+		if err != nil {
+			continue // Skip directories
+		}
+		if err := intoBranch.vfs.WriteFile(file, content); err != nil {
+			return fmt.Errorf("MockRepo.MergeBranches() [mock.go]: %w", err)
+		}
+	}
+
+	// Add a merge commit
+	intoBranch.commits = append(intoBranch.commits, commitInfo{
+		message: fmt.Sprintf("Merge branch '%s' into %s", from, into),
+		files:   make(map[string][]byte),
+	})
 
 	return nil
 }

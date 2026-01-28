@@ -41,6 +41,18 @@ type AccessControlVFS struct {
 	privileges map[string]conf.FileAccess
 }
 
+func (ac *AccessControlVFS) GetBranch() string {
+	return ac.vfs.GetBranch()
+}
+
+func (ac *AccessControlVFS) WorktreePath() string {
+	return ac.vfs.WorktreePath()
+}
+
+func (ac *AccessControlVFS) GetRepo() Repo {
+	return ac.vfs.GetRepo()
+}
+
 // NewAccessControlVFS creates a new AccessControlVFS with the given underlying VFS and privileges map.
 func NewAccessControlVFS(vfs VFS, privileges map[string]conf.FileAccess) *AccessControlVFS {
 	return &AccessControlVFS{
