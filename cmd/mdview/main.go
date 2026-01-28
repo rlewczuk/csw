@@ -105,3 +105,8 @@ func (w *markdownViewWrapper) GetParent() tui.IWidget {
 func (w *markdownViewWrapper) SetParent(parent tui.IWidget) {
 	w.mdView.SetParent(parent)
 }
+
+// ExecuteOnUiThread delegates to the markdown view
+func (w *markdownViewWrapper) ExecuteOnUiThread(f func() any, redraw bool, wait bool) any {
+	return w.mdView.ExecuteOnUiThread(f, redraw, wait)
+}
