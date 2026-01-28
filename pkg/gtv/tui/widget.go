@@ -286,7 +286,8 @@ func (w *TWidget) GetParent() IWidget {
 
 func (w *TWidget) ExecuteOnUiThread(f func() any, redraw bool, wait bool) any {
 	if w.Parent == nil {
-		return nil
+		// No parent - execute directly (for unit tests or unattached widgets)
+		return f()
 	}
 	return w.Parent.ExecuteOnUiThread(f, redraw, wait)
 }

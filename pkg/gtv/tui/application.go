@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 
 	"github.com/codesnort/codesnort-swe/pkg/gtv"
@@ -43,7 +42,7 @@ type IApplication interface {
 
 	// ExecuteOnUiThread executes the given function on the UI thread.
 	// If the main loop is running, the function is sent to the main loop thread for execution.
-	// If the main loop is not running, the function is executed immediately with the mutex locked.
+	// If the main loop is not running, the function is executed immediately.
 	// Parameters:
 	//   f: Function to execute, should return any value
 	//   redraw: If true, triggers a redraw after function completes
@@ -86,9 +85,6 @@ type TApplication struct {
 
 	// UI task channel for executing functions on the main loop thread
 	uiTaskCh chan uiTask
-
-	// Mutex for synchronizing access to application and widget state
-	mu sync.Mutex
 
 	// Running flag indicates whether the main loop is running
 	running bool
@@ -270,11 +266,9 @@ func (app *TApplication) Run(stdin io.Reader, stdout io.Writer) error {
 	defer app.eventReader.Stop()
 
 	// Draw initial frame
-	app.mu.Lock()
 	app.screen.SetCursorStyle(gtv.CursorStyleHidden)
 	app.TFlexLayout.Draw(app.screen)
 	app.running = true
-	app.mu.Unlock()
 	if err := app.renderer.Render(); err != nil {
 		return fmt.Errorf("TApplication.Run(): failed to render initial frame: %w", err)
 	}
@@ -283,35 +277,27 @@ func (app *TApplication) Run(stdin io.Reader, stdout io.Writer) error {
 	for {
 		select {
 		case <-app.quitCh:
-			app.mu.Lock()
 			app.running = false
-			app.mu.Unlock()
 			return nil
 
 		case event := <-eventCh:
-			app.mu.Lock()
 			app.handleEvent(event)
-			app.mu.Unlock()
 
 		case <-app.redrawCh:
 			// Redraw requested from background thread
-			app.mu.Lock()
 			app.screen.SetCursorStyle(gtv.CursorStyleHidden)
 			app.TFlexLayout.Draw(app.screen)
-			app.mu.Unlock()
 			if app.renderer != nil {
 				app.renderer.Render()
 			}
 
 		case task := <-app.uiTaskCh:
 			// Execute UI task on main loop thread
-			app.mu.Lock()
 			result := task.f()
 			if task.redraw {
 				app.screen.SetCursorStyle(gtv.CursorStyleHidden)
 				app.TFlexLayout.Draw(app.screen)
 			}
-			app.mu.Unlock()
 
 			if app.renderer != nil && task.redraw {
 				app.renderer.Render()
@@ -342,9 +328,7 @@ func (app *TApplication) GetScreen() gtv.IScreenOutput {
 }
 
 func (app *TApplication) ExecuteOnUiThread(f func() any, redraw bool, wait bool) any {
-	app.mu.Lock()
 	isRunning := app.running
-	app.mu.Unlock()
 
 	if isRunning {
 		// Main loop is running - send task to main loop thread
@@ -366,14 +350,11 @@ func (app *TApplication) ExecuteOnUiThread(f func() any, redraw bool, wait bool)
 		}
 		return nil
 	} else {
-		// Main loop is not running - execute immediately with mutex locked
-		app.mu.Lock()
 		result := f()
 		if redraw {
 			app.screen.SetCursorStyle(gtv.CursorStyleHidden)
 			app.TFlexLayout.Draw(app.screen)
 		}
-		app.mu.Unlock()
 
 		if app.renderer != nil && redraw {
 			app.renderer.Render()
@@ -397,10 +378,7 @@ func (app *TApplication) RequestRedraw() {
 
 // Notify handles input events from the InputEventReader.
 // This implements the InputEventHandler interface.
-// It calls handleEvent directly with the mutex locked.
 func (app *TApplication) Notify(event gtv.InputEvent) {
-	app.mu.Lock()
-	defer app.mu.Unlock()
 	app.handleEvent(event)
 }
 

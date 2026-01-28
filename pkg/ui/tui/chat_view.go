@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/codesnort/codesnort-swe/pkg/gtv"
 	"github.com/codesnort/codesnort-swe/pkg/gtv/mdv"
@@ -92,7 +91,6 @@ type TChatView struct {
 
 	// Messages
 	messages []*chatMessage
-	mu       sync.Mutex
 
 	// Dimensions
 	width  int
@@ -198,105 +196,98 @@ func NewChatView(parent tui.IWidget, rect gtv.TRect, presenter ui.IChatPresenter
 
 // Init initializes the view with all messages from the session
 func (v *TChatView) Init(session *ui.ChatSessionUI) error {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.ExecuteOnUiThread(func() any {
+		v.messages = make([]*chatMessage, 0)
+		for _, msg := range session.Messages {
+			v.addMessageInternal(msg)
+		}
 
-	v.messages = make([]*chatMessage, 0)
-	for _, msg := range session.Messages {
-		v.addMessageUnsafe(msg)
-	}
-
-	v.updateMarkdownContentUnsafe()
-	v.scrollToBottom()
+		v.updateMarkdownContentInternal()
+		v.scrollToBottomInternal()
+		return nil
+	}, true, false)
 
 	return nil
 }
 
 // AddMessage adds a new message to the view
 func (v *TChatView) AddMessage(msg *ui.ChatMessageUI) error {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	v.addMessageUnsafe(msg)
-	v.updateMarkdownContentUnsafe()
-	v.scrollToBottom()
+	v.ExecuteOnUiThread(func() any {
+		v.addMessageInternal(msg)
+		v.updateMarkdownContentInternal()
+		v.scrollToBottomInternal()
+		return nil
+	}, true, false)
 
 	return nil
 }
 
 // UpdateMessage updates an existing message in the view
 func (v *TChatView) UpdateMessage(msg *ui.ChatMessageUI) error {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.ExecuteOnUiThread(func() any {
+		// Find message by ID or by role if ID is empty (backwards compatibility)
+		for _, m := range v.messages {
+			if (msg.Id != "" && m.id == msg.Id) || (msg.Id == "" && m.role == string(msg.Role) && len(m.content) == 0) {
+				// Update content (replace, not append - presenter sends accumulated text)
+				m.content = msg.Text
 
-	// Find message by ID or by role if ID is empty (backwards compatibility)
-	for _, m := range v.messages {
-		if (msg.Id != "" && m.id == msg.Id) || (msg.Id == "" && m.role == string(msg.Role) && len(m.content) == 0) {
-			// Update content (replace, not append - presenter sends accumulated text)
-			m.content = msg.Text
-
-			// Update tool calls
-			m.toolCalls = make([]*toolCallWidget, 0, len(msg.Tools))
-			for _, tool := range msg.Tools {
-				m.toolCalls = append(m.toolCalls, newToolCallWidget(tool))
+				// Update tool calls
+				m.toolCalls = make([]*toolCallWidget, 0, len(msg.Tools))
+				for _, tool := range msg.Tools {
+					m.toolCalls = append(m.toolCalls, newToolCallWidget(tool))
+				}
+				break
 			}
-			break
 		}
-	}
 
-	v.updateMarkdownContentUnsafe()
-	v.scrollToBottom()
+		v.updateMarkdownContentInternal()
+		v.scrollToBottomInternal()
+		return nil
+	}, true, false)
 
 	return nil
 }
 
 // UpdateTool updates an existing tool in the view
 func (v *TChatView) UpdateTool(tool *ui.ToolUI) error {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	for _, msg := range v.messages {
-		for _, tc := range msg.toolCalls {
-			if tc.tool.Id == tool.Id {
-				tc.tool = tool
+	v.ExecuteOnUiThread(func() any {
+		for _, msg := range v.messages {
+			for _, tc := range msg.toolCalls {
+				if tc.tool.Id == tool.Id {
+					tc.tool = tool
+				}
 			}
 		}
-	}
 
-	v.updateMarkdownContentUnsafe()
+		v.updateMarkdownContentInternal()
+		return nil
+	}, true, false)
 
 	return nil
 }
 
 // MoveToBottom scrolls the view to the bottom
 func (v *TChatView) MoveToBottom() error {
-	v.scrollToBottom()
+	v.ExecuteOnUiThread(func() any {
+		v.scrollToBottomInternal()
+		return nil
+	}, true, false)
+
 	return nil
 }
 
 // QueryPermission queries user for permission to use a tool
 func (v *TChatView) QueryPermission(query *ui.PermissionQueryUI) error {
-	// Try to get the application from the widget tree
-	app := v.TWidget.GetApplication()
-
-	// If app is available, use ExecuteOnUiThread to ensure proper redraw
-	if app != nil {
-		app.ExecuteOnUiThread(func() any {
-			v.queryPermissionUnsafe(query)
-			return nil
-		}, true, false)
+	v.ExecuteOnUiThread(func() any {
+		v.queryPermissionInternal(query)
 		return nil
-	}
+	}, true, false)
 
-	// Fallback: execute directly (for tests or if app not set)
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	v.queryPermissionUnsafe(query)
 	return nil
 }
 
-// queryPermissionUnsafe queries user for permission (caller must hold lock or be on UI thread)
-func (v *TChatView) queryPermissionUnsafe(query *ui.PermissionQueryUI) {
+// queryPermissionInternal queries user for permission (executed on UI thread)
+func (v *TChatView) queryPermissionInternal(query *ui.PermissionQueryUI) {
 	// Store the current permission query
 	v.currentPermissionQuery = query
 
@@ -367,36 +358,37 @@ func (v *TChatView) queryPermissionUnsafe(query *ui.PermissionQueryUI) {
 
 // handlePermissionResponse handles the user's response to a permission query
 func (v *TChatView) handlePermissionResponse(response string) {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.ExecuteOnUiThread(func() any {
+		// Hide the permission menu
+		v.hidePermissionMenuInternal()
 
-	// Hide the permission menu
-	v.hidePermissionMenuUnsafe()
+		// Send response to presenter
+		if v.presenter != nil && response != "" {
+			// Run in goroutine to avoid blocking UI
+			go func() {
+				if err := v.presenter.PermissionResponse(response); err != nil {
+					// TODO: Show error to user
+					_ = err
+				}
+			}()
+		}
 
-	// Send response to presenter
-	if v.presenter != nil && response != "" {
-		// Run in goroutine to avoid blocking UI
-		go func() {
-			if err := v.presenter.PermissionResponse(response); err != nil {
-				// TODO: Show error to user
-				_ = err
-			}
-		}()
-	}
-
-	// Clear current permission query
-	v.currentPermissionQuery = nil
+		// Clear current permission query
+		v.currentPermissionQuery = nil
+		return nil
+	}, true, false)
 }
 
-// hidePermissionMenu hides the permission menu and restores the text area (with locking)
+// hidePermissionMenu hides the permission menu and restores the text area
 func (v *TChatView) hidePermissionMenu() {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	v.hidePermissionMenuUnsafe()
+	v.ExecuteOnUiThread(func() any {
+		v.hidePermissionMenuInternal()
+		return nil
+	}, true, false)
 }
 
-// hidePermissionMenuUnsafe hides the permission menu and restores the text area (caller must lock)
-func (v *TChatView) hidePermissionMenuUnsafe() {
+// hidePermissionMenuInternal hides the permission menu and restores the text area (executed on UI thread)
+func (v *TChatView) hidePermissionMenuInternal() {
 	if v.permissionMenu == nil {
 		return
 	}
@@ -429,8 +421,8 @@ func (v *TChatView) hidePermissionMenuUnsafe() {
 	v.currentPermissionQuery = nil
 }
 
-// addMessageUnsafe adds a message without locking (caller must lock)
-func (v *TChatView) addMessageUnsafe(msg *ui.ChatMessageUI) {
+// addMessageInternal adds a message (executed on UI thread)
+func (v *TChatView) addMessageInternal(msg *ui.ChatMessageUI) {
 	chatMsg := &chatMessage{
 		id:        msg.Id,
 		role:      string(msg.Role),
@@ -445,8 +437,8 @@ func (v *TChatView) addMessageUnsafe(msg *ui.ChatMessageUI) {
 	v.messages = append(v.messages, chatMsg)
 }
 
-// updateMarkdownContentUnsafe updates the markdown view content (caller must lock)
-func (v *TChatView) updateMarkdownContentUnsafe() {
+// updateMarkdownContentInternal updates the markdown view content (executed on UI thread)
+func (v *TChatView) updateMarkdownContentInternal() {
 	if len(v.messages) == 0 {
 		v.markdownView.SetContent("Welcome! Type a message and press Alt+Enter to send.\n")
 		return
@@ -479,8 +471,8 @@ func (v *TChatView) updateMarkdownContentUnsafe() {
 	v.markdownView.SetContent(sb.String())
 }
 
-// scrollToBottom scrolls markdown view to bottom
-func (v *TChatView) scrollToBottom() {
+// scrollToBottomInternal scrolls markdown view to bottom (executed on UI thread)
+func (v *TChatView) scrollToBottomInternal() {
 	// Set to a large value to ensure we're at the bottom
 	// The markdown view will clamp this to the maximum valid offset
 	v.markdownView.SetScrollOffset(999999)
