@@ -20,11 +20,9 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/ui/tui"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
-	workDir    string
 	modelName  string
 	configPath string
 	roleName   string
@@ -32,23 +30,20 @@ var (
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "csw",
+		Use:   "csw [directory]",
 		Short: "Codesnort SWE - AI-powered software engineering assistant",
 		Long:  `Codesnort SWE is an AI-powered software engineering assistant that helps you write, review, and maintain code.`,
-		RunE:  run,
+		Args:  cobra.MaximumNArgs(1),
+		RunE:  runTUI,
 	}
 
 	// Define flags
-	rootCmd.Flags().StringVar(&workDir, "work-dir", "", "Working directory (default: current directory)")
-	rootCmd.Flags().StringVar(&modelName, "model", "ollama/devstral-small-2:latest", "Model name in provider/model format")
+	rootCmd.Flags().StringVar(&modelName, "model", "", "Model name in provider/model format (if not set, uses default provider)")
 	rootCmd.Flags().StringVar(&configPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
 	rootCmd.Flags().StringVar(&roleName, "role", "developer", "Agent role name")
 
-	// Bind flags to viper
-	viper.BindPFlag("work-dir", rootCmd.Flags().Lookup("work-dir"))
-	viper.BindPFlag("model", rootCmd.Flags().Lookup("model"))
-	viper.BindPFlag("config-path", rootCmd.Flags().Lookup("config-path"))
-	viper.BindPFlag("role", rootCmd.Flags().Lookup("role"))
+	// Add subcommands
+	rootCmd.AddCommand(ProviderCommand())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -56,12 +51,29 @@ func main() {
 	}
 }
 
-func run(cmd *cobra.Command, args []string) error {
-	// Resolve working directory
-	if workDir == "" {
+func runTUI(cmd *cobra.Command, args []string) error {
+	// Resolve working directory from argument or use current directory
+	var workDir string
+	if len(args) > 0 {
+		// Directory provided as argument
+		dirPath := args[0]
+		absPath, err := filepath.Abs(dirPath)
+		if err != nil {
+			return fmt.Errorf("runTUI() [main.go]: failed to resolve directory path: %w", err)
+		}
+		info, err := os.Stat(absPath)
+		if err != nil {
+			return fmt.Errorf("runTUI() [main.go]: failed to access directory: %w", err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("runTUI() [main.go]: path is not a directory: %s", dirPath)
+		}
+		workDir = absPath
+	} else {
+		// Use current directory
 		wd, err := os.Getwd()
 		if err != nil {
-			return fmt.Errorf("failed to get current working directory: %w", err)
+			return fmt.Errorf("runTUI() [main.go]: failed to get current working directory: %w", err)
 		}
 		workDir = wd
 	}
@@ -72,7 +84,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// Logging is synchronous by default (sync=true)
 	logsDir := filepath.Join(workDir, ".cswdata", "logs")
 	if err := logging.SetLogsDirectory(logsDir, true); err != nil {
-		return fmt.Errorf("failed to initialize logging: %w", err)
+		return fmt.Errorf("runTUI() [main.go]: failed to initialize logging: %w", err)
 	}
 	defer logging.FlushLogs()
 
@@ -84,7 +96,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return fmt.Errorf("failed to get user home directory: %w", err)
+		return fmt.Errorf("runTUI() [main.go]: failed to get user home directory: %w", err)
 	}
 
 	// Start with default hierarchy
@@ -105,14 +117,14 @@ func run(cmd *cobra.Command, args []string) error {
 			info, err := os.Stat(pathComponent)
 			if err != nil {
 				if os.IsNotExist(err) {
-					return fmt.Errorf("config path does not exist: %s", pathComponent)
+					return fmt.Errorf("runTUI() [main.go]: config path does not exist: %s", pathComponent)
 				}
-				return fmt.Errorf("failed to access config path %s: %w", pathComponent, err)
+				return fmt.Errorf("runTUI() [main.go]: failed to access config path %s: %w", pathComponent, err)
 			}
 
 			// Check if it's a directory
 			if !info.IsDir() {
-				return fmt.Errorf("config path is not a directory: %s", pathComponent)
+				return fmt.Errorf("runTUI() [main.go]: config path is not a directory: %s", pathComponent)
 			}
 		}
 
@@ -123,7 +135,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// Create composite config store
 	configStore, err := impl.NewCompositeConfigStore(workDir, configPathStr)
 	if err != nil {
-		return fmt.Errorf("failed to create config store: %w", err)
+		return fmt.Errorf("runTUI() [main.go]: failed to create config store: %w", err)
 	}
 
 	// Create provider registry using config store
@@ -131,7 +143,27 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Check if any providers were loaded
 	if len(providerRegistry.List()) == 0 {
-		return fmt.Errorf("no model providers found in config")
+		return fmt.Errorf("runTUI() [main.go]: no model providers found in config")
+	}
+
+	// If no model specified, try to use default provider from global config
+	if modelName == "" {
+		globalConfig, err := configStore.GetGlobalConfig()
+		if err != nil {
+			return fmt.Errorf("runTUI() [main.go]: failed to get global config: %w", err)
+		}
+		if globalConfig.DefaultProvider != "" {
+			// Use default provider with a default model
+			modelName = globalConfig.DefaultProvider + "/default"
+		} else {
+			// Fallback to first available provider
+			providers := providerRegistry.List()
+			if len(providers) > 0 {
+				modelName = providers[0] + "/default"
+			} else {
+				return fmt.Errorf("runTUI() [main.go]: no default provider configured and no providers available")
+			}
+		}
 	}
 
 	// Create model provider map for SweSystem
@@ -139,7 +171,7 @@ func run(cmd *cobra.Command, args []string) error {
 	for _, name := range providerRegistry.List() {
 		provider, err := providerRegistry.Get(name)
 		if err != nil {
-			return fmt.Errorf("failed to get provider %s: %w", name, err)
+			return fmt.Errorf("runTUI() [main.go]: failed to get provider %s: %w", name, err)
 		}
 		modelProviders[name] = provider
 	}
@@ -149,18 +181,18 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Check if any roles were loaded
 	if len(roleRegistry.List()) == 0 {
-		return fmt.Errorf("no roles found in config")
+		return fmt.Errorf("runTUI() [main.go]: no roles found in config")
 	}
 
 	// Check if the requested role exists
 	if _, ok := roleRegistry.Get(roleName); !ok {
-		return fmt.Errorf("role not found: %s (available: %v)", roleName, roleRegistry.List())
+		return fmt.Errorf("runTUI() [main.go]: role not found: %s (available: %v)", roleName, roleRegistry.List())
 	}
 
 	// Create VFS for the working directory
 	localVFS, err := vfs.NewLocalVFS(workDir)
 	if err != nil {
-		return fmt.Errorf("failed to create VFS: %w", err)
+		return fmt.Errorf("runTUI() [main.go]: failed to create VFS: %w", err)
 	}
 
 	// Create tool registry and register VFS tools
@@ -170,7 +202,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// Create prompt generator
 	promptGenerator, err := core.NewConfPromptGenerator(configStore)
 	if err != nil {
-		return fmt.Errorf("failed to create prompt generator: %w", err)
+		return fmt.Errorf("runTUI() [main.go]: failed to create prompt generator: %w", err)
 	}
 
 	// Create SweSystem
@@ -205,12 +237,12 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Set the view on the presenter
 	if err := appPresenter.SetView(appView); err != nil {
-		return fmt.Errorf("failed to set app view: %w", err)
+		return fmt.Errorf("runTUI() [main.go]: failed to set app view: %w", err)
 	}
 
 	// Create a new session to start with
 	if err := appPresenter.NewSession(); err != nil {
-		return fmt.Errorf("failed to create initial session: %w", err)
+		return fmt.Errorf("runTUI() [main.go]: failed to create initial session: %w", err)
 	}
 
 	// Create the gtv application
@@ -230,7 +262,7 @@ func run(cmd *cobra.Command, args []string) error {
 	select {
 	case err := <-done:
 		if err != nil {
-			return fmt.Errorf("TUI error: %w", err)
+			return fmt.Errorf("runTUI() [main.go]: TUI error: %w", err)
 		}
 	case <-ctx.Done():
 		app.Quit()

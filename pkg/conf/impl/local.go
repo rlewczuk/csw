@@ -112,7 +112,8 @@ func (s *LocalConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 
 	// Return a copy to prevent external modification
 	config := &conf.GlobalConfig{
-		ModelTags: make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
+		DefaultProvider: s.globalConfig.DefaultProvider,
+		ModelTags:       make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
 	}
 	copy(config.ModelTags, s.globalConfig.ModelTags)
 
@@ -489,6 +490,90 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 		}
 		return
 	}
+}
+
+// SaveModelProviderConfig saves or updates a model provider configuration.
+func (s *LocalConfigStore) SaveModelProviderConfig(config *conf.ModelProviderConfig) error {
+	if config == nil {
+		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: config cannot be nil")
+	}
+	if config.Name == "" {
+		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: config name cannot be empty")
+	}
+
+	modelsDir := filepath.Join(s.configDir, "models")
+	if err := os.MkdirAll(modelsDir, 0755); err != nil {
+		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to create models directory: %w", err)
+	}
+
+	providerPath := filepath.Join(modelsDir, config.Name+".json")
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(providerPath, data, 0644); err != nil {
+		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to write config file: %w", err)
+	}
+
+	// Reload configuration to update cache
+	if err := s.loadModelProviderConfigs(); err != nil {
+		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to reload configs: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteModelProviderConfig deletes a model provider configuration.
+func (s *LocalConfigStore) DeleteModelProviderConfig(name string) error {
+	if name == "" {
+		return fmt.Errorf("LocalConfigStore.DeleteModelProviderConfig() [local.go]: name cannot be empty")
+	}
+
+	modelsDir := filepath.Join(s.configDir, "models")
+	providerPath := filepath.Join(modelsDir, name+".json")
+
+	if err := os.Remove(providerPath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("LocalConfigStore.DeleteModelProviderConfig() [local.go]: provider not found: %s", name)
+		}
+		return fmt.Errorf("LocalConfigStore.DeleteModelProviderConfig() [local.go]: failed to delete config file: %w", err)
+	}
+
+	// Reload configuration to update cache
+	if err := s.loadModelProviderConfigs(); err != nil {
+		return fmt.Errorf("LocalConfigStore.DeleteModelProviderConfig() [local.go]: failed to reload configs: %w", err)
+	}
+
+	return nil
+}
+
+// SaveGlobalConfig saves global configuration.
+func (s *LocalConfigStore) SaveGlobalConfig(config *conf.GlobalConfig) error {
+	if config == nil {
+		return fmt.Errorf("LocalConfigStore.SaveGlobalConfig() [local.go]: config cannot be nil")
+	}
+
+	if err := os.MkdirAll(s.configDir, 0755); err != nil {
+		return fmt.Errorf("LocalConfigStore.SaveGlobalConfig() [local.go]: failed to create config directory: %w", err)
+	}
+
+	globalPath := filepath.Join(s.configDir, "global.json")
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("LocalConfigStore.SaveGlobalConfig() [local.go]: failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(globalPath, data, 0644); err != nil {
+		return fmt.Errorf("LocalConfigStore.SaveGlobalConfig() [local.go]: failed to write config file: %w", err)
+	}
+
+	// Reload configuration to update cache
+	if err := s.loadGlobalConfig(); err != nil {
+		return fmt.Errorf("LocalConfigStore.SaveGlobalConfig() [local.go]: failed to reload config: %w", err)
+	}
+
+	return nil
 }
 
 // validateConfigDir checks if the configuration directory exists and is readable.

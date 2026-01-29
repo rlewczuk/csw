@@ -130,7 +130,8 @@ func (c *CompositeConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 
 	// Return a copy to prevent external modification
 	config := &conf.GlobalConfig{
-		ModelTags: make([]conf.ModelTagMapping, len(c.globalConfig.ModelTags)),
+		DefaultProvider: c.globalConfig.DefaultProvider,
+		ModelTags:       make([]conf.ModelTagMapping, len(c.globalConfig.ModelTags)),
 	}
 	copy(config.ModelTags, c.globalConfig.ModelTags)
 
@@ -296,8 +297,12 @@ func (c *CompositeConfigStore) refreshGlobalConfig() error {
 		}
 
 		// Merge: later sources override earlier ones
-		// For GlobalConfig, we just append ModelTags (they're additive)
+		// For GlobalConfig, we append ModelTags (they're additive)
 		merged.ModelTags = append(merged.ModelTags, config.ModelTags...)
+		// DefaultProvider from later sources overrides earlier ones
+		if config.DefaultProvider != "" {
+			merged.DefaultProvider = config.DefaultProvider
+		}
 
 		// Track update time
 		lastUpdate, err := store.LastGlobalConfigUpdate()

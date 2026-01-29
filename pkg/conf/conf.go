@@ -128,6 +128,8 @@ func (c *ModelProviderConfig) UnmarshalJSON(data []byte) error {
 type GlobalConfig struct {
 	// ModelTags contains global model-to-tag mappings
 	ModelTags []ModelTagMapping `json:"model_tags,omitempty"`
+	// DefaultProvider is the name of the default model provider to use
+	DefaultProvider string `json:"default_provider,omitempty"`
 }
 
 // ConfigStore is an interface for accessing configuration data.
@@ -154,4 +156,18 @@ type ConfigStore interface {
 
 	// LastGlobalConfigUpdate returns timestamp of last update of global config
 	LastGlobalConfigUpdate() (time.Time, error)
+}
+
+// WritableConfigStore extends ConfigStore with write operations.
+type WritableConfigStore interface {
+	ConfigStore
+
+	// SaveModelProviderConfig saves or updates a model provider configuration.
+	SaveModelProviderConfig(config *ModelProviderConfig) error
+
+	// DeleteModelProviderConfig deletes a model provider configuration.
+	DeleteModelProviderConfig(name string) error
+
+	// SaveGlobalConfig saves global configuration.
+	SaveGlobalConfig(config *GlobalConfig) error
 }
