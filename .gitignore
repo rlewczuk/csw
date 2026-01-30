@@ -2,7 +2,8 @@
 .idea/
 _*.sh
 .DS_Store
-csw
+/csw
+/mdw
 _local/
 _integ/
 /testterm
