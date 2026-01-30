@@ -1,7 +1,9 @@
 package core
 
 type AgentStateCommonInfo struct {
-	WorkDir string
+	AgentName   string
+	WorkDir     string
+	CurrentTime string
 }
 
 // TODO decide if this is still needed
