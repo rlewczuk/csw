@@ -5,6 +5,8 @@
 //   - global.json - global configuration
 //   - models/*.json - model provider configurations (one file per provider)
 //   - roles/*/config.json - agent role configurations (one directory per role)
+//   - roles/all/ - special meta-role directory containing prompt fragments that are
+//     merged into all other roles (config.json is optional for this role)
 //
 // The store caches configuration in memory and watches for file changes
 // to automatically reload when configuration files are modified.
@@ -290,6 +292,8 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 }
 
 // loadAgentRoleConfigs loads all agent role configurations from the roles directory.
+// The special "all" meta-role is loaded without requiring config.json, as it only contains
+// prompt fragments that are merged into other roles.
 func (s *LocalConfigStore) loadAgentRoleConfigs() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -319,7 +323,21 @@ func (s *LocalConfigStore) loadAgentRoleConfigs() error {
 		data, err := os.ReadFile(configPath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				// config.json is required for each role
+				// Special case: "all" is a meta-role that only contains prompt fragments
+				// to be merged into other roles. It doesn't require a config.json file.
+				if roleName == "all" {
+					// Load only prompt fragments for the "all" meta-role
+					promptFragments, err := s.loadPromptFragments(filepath.Join(rolesDir, roleName))
+					if err != nil {
+						return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, err)
+					}
+					configs["all"] = &conf.AgentRoleConfig{
+						Name:            "all",
+						PromptFragments: promptFragments,
+					}
+					continue
+				}
+				// config.json is required for all other roles
 				return fmt.Errorf("loadAgentRoleConfigs(): role %s missing config.json", roleName)
 			}
 			return fmt.Errorf("loadAgentRoleConfigs(): failed to read %s: %w", configPath, err)

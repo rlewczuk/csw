@@ -10,6 +10,8 @@
 //   - global.json - global configuration (optional)
 //   - models/*.json - model provider configurations (one file per provider)
 //   - roles/*/config.json - agent role configurations (one directory per role)
+//   - roles/all/ - special meta-role directory containing prompt fragments that are
+//     merged into all other roles (config.json is optional for this role)
 //
 // Since the configuration is embedded at build time, it is immutable and all
 // LastUpdate() methods return a constant timestamp.
@@ -25,6 +27,7 @@ package impl
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"path/filepath"
@@ -246,6 +249,8 @@ func (s *EmbeddedConfigStore) loadModelProviderConfigs() error {
 }
 
 // loadAgentRoleConfigs loads all agent role configurations from the embedded roles directory.
+// The special "all" meta-role is loaded without requiring config.json, as it only contains
+// prompt fragments that are merged into other roles.
 func (s *EmbeddedConfigStore) loadAgentRoleConfigs() error {
 	rolesDir := "conf/roles"
 
@@ -271,7 +276,21 @@ func (s *EmbeddedConfigStore) loadAgentRoleConfigs() error {
 		data, err := embeddedConfigFS.ReadFile(configPath)
 		if err != nil {
 			if isNotExist(err) {
-				// config.json is required for each role
+				// Special case: "all" is a meta-role that only contains prompt fragments
+				// to be merged into other roles. It doesn't require a config.json file.
+				if roleName == "all" {
+					// Load only prompt fragments for the "all" meta-role
+					promptFragments, err := s.loadPromptFragments(filepath.Join(rolesDir, roleName))
+					if err != nil {
+						return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, err)
+					}
+					configs["all"] = &conf.AgentRoleConfig{
+						Name:            "all",
+						PromptFragments: promptFragments,
+					}
+					continue
+				}
+				// config.json is required for all other roles
 				return fmt.Errorf("loadAgentRoleConfigs(): role %s missing config.json", roleName)
 			}
 			return fmt.Errorf("loadAgentRoleConfigs(): failed to read %s: %w", configPath, err)
@@ -334,6 +353,6 @@ func isNotExist(err error) bool {
 	if err == nil {
 		return false
 	}
-	// For embed.FS, both fs.ErrNotExist and path errors are possible
-	return err == fs.ErrNotExist || err.Error() == "file does not exist"
+	// For embed.FS, use errors.Is to properly check wrapped errors
+	return errors.Is(err, fs.ErrNotExist)
 }
