@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/models"
@@ -619,7 +620,9 @@ func (s *SweSession) Model() string {
 func (s *SweSession) GetState() AgentState {
 	return AgentState{
 		Info: AgentStateCommonInfo{
-			WorkDir: s.workDir,
+			WorkDir:     s.workDir,
+			CurrentTime: time.Now().Format(time.RFC3339),
+			AgentName:   "CSW Coding Agent",
 		},
 	}
 }
