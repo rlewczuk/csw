@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -19,6 +20,11 @@ type PromptScanner interface {
 	// returns map where keys are filenames (dir/file_prefix with role name or 'all' as dir and no extension)
 	// and values are unprocessed contents of those files
 	GetFragments(tags []string, role *conf.AgentRoleConfig) (map[string]string, error)
+
+	// GetToolFragments returns tool description fragments from the tools directory.
+	// Returns a map where keys are "<tool-name>/<file-name>" (e.g., "vfs.read/schema.json", "vfs.read/tool.md")
+	// and values are file contents. Supports tag-specific overrides (e.g., "tool-kimi.md" instead of "tool.md").
+	GetToolFragments(tags []string, role *conf.AgentRoleConfig) (map[string]string, error)
 
 	// HasChanged returns true if any of the fragments has changed since last scan.
 	HasChanged() bool
@@ -452,7 +458,7 @@ func contains(slice []string, item string) bool {
 }
 
 // GetToolInfo returns information about a tool including its description and parameter schema.
-// It looks up tool descriptions from the role's PromptFragments with filename pattern matching tools fragments.
+// It looks up tool descriptions from the role's ToolFragments with tag-specific overrides.
 // Returns error if tool description is not found.
 func (g *ConfPromptGenerator) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *AgentState) (tool.ToolInfo, error) {
 	if role == nil {
@@ -465,90 +471,76 @@ func (g *ConfPromptGenerator) GetToolInfo(tags []string, toolName string, role *
 		return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: failed to get role configs: %w", err)
 	}
 
-	// Try to find tool description in role-specific fragments first, then in "all" role
-	var toolContent string
-	var found bool
+	// Collect tool fragments from "all" role and role-specific
+	var toolFragments map[string]string
 
 	// Check role-specific fragments first
-	if role.PromptFragments != nil {
-		for filename, content := range role.PromptFragments {
-			fragment := parseFragmentFromKey(filename, content, false)
-			if fragment == nil {
-				continue
-			}
+	if role.ToolFragments != nil {
+		toolFragments = role.ToolFragments
+	} else if allRole, ok := roleConfigs["all"]; ok && allRole.ToolFragments != nil {
+		toolFragments = allRole.ToolFragments
+	}
 
-			// Check if this is a tools fragment for the requested tool
-			if fragment.kind == "tools" && fragment.toolName == toolName {
-				// Check if tag matches
-				if fragment.tag == "all" || contains(tags, fragment.tag) {
-					toolContent = content
-					found = true
-					break
-				}
-			}
+	if toolFragments == nil {
+		return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: no tool fragments available")
+	}
+
+	// Look for schema.json
+	schemaKey := fmt.Sprintf("%s/schema.json", toolName)
+	schemaContent, hasSchema := toolFragments[schemaKey]
+	if !hasSchema {
+		return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: schema.json not found for tool: %s", toolName)
+	}
+
+	// Look for tool.md, with tag-specific overrides
+	var descriptionContent string
+	var foundDescription bool
+
+	// Try tag-specific descriptions first
+	for _, tag := range tags {
+		tagSpecificKey := fmt.Sprintf("%s/tool-%s.md", toolName, tag)
+		if content, ok := toolFragments[tagSpecificKey]; ok {
+			descriptionContent = content
+			foundDescription = true
+			break
 		}
 	}
 
-	// If not found, check "all" role fragments
-	if !found {
-		if allRole, ok := roleConfigs["all"]; ok && allRole.PromptFragments != nil {
-			for filename, content := range allRole.PromptFragments {
-				fragment := parseFragmentFromKey(filename, content, true)
-				if fragment == nil {
-					continue
-				}
-
-				// Check if this is a tools fragment for the requested tool
-				if fragment.kind == "tools" && fragment.toolName == toolName {
-					// Check if tag matches
-					if fragment.tag == "all" || contains(tags, fragment.tag) {
-						toolContent = content
-						found = true
-						break
-					}
-				}
-			}
+	// Fall back to generic tool.md
+	if !foundDescription {
+		defaultKey := fmt.Sprintf("%s/tool.md", toolName)
+		if content, ok := toolFragments[defaultKey]; ok {
+			descriptionContent = content
+			foundDescription = true
 		}
 	}
 
-	if !found {
-		return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: tool description not found: %s", toolName)
+	if !foundDescription {
+		return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: tool.md not found for tool: %s", toolName)
 	}
 
-	// Parse the tool content to extract schema and description
-	return parseToolDescription(toolName, toolContent)
+	// Parse the schema and description
+	return parseToolDescription(toolName, schemaContent, descriptionContent)
 }
 
-// parseToolDescription parses a tool description file content and returns ToolInfo.
-// Expected format:
-// YAML header with property definitions
-// ---
-// Markdown description
-func parseToolDescription(toolName string, content string) (tool.ToolInfo, error) {
-	// Split content by "---" separator
-	parts := strings.SplitN(content, "---", 2)
-	if len(parts) != 2 {
-		return tool.ToolInfo{}, fmt.Errorf("parseToolDescription() [prompt.go]: invalid tool description format for %s: missing --- separator", toolName)
+// parseToolDescription parses a tool description from JSON Schema and markdown files.
+// schemaContent is the JSON Schema for tool parameters.
+// descriptionContent is the markdown description of the tool.
+func parseToolDescription(toolName string, schemaContent string, descriptionContent string) (tool.ToolInfo, error) {
+	// Parse JSON Schema
+	var schemaData map[string]any
+	if err := json.Unmarshal([]byte(schemaContent), &schemaData); err != nil {
+		return tool.ToolInfo{}, fmt.Errorf("parseToolDescription() [prompt.go]: failed to parse JSON schema for %s: %w", toolName, err)
 	}
 
-	yamlHeader := strings.TrimSpace(parts[0])
-	description := strings.TrimSpace(parts[1])
-
-	// Parse YAML header to extract property schema
-	schema := tool.NewToolSchema()
-
-	if yamlHeader != "" {
-		// Simple YAML parser for property definitions
-		// Format: property_name:\n  type: <type>\n  description: <desc>\n  required: <bool>
-		properties, err := parseYAMLProperties(yamlHeader)
-		if err != nil {
-			return tool.ToolInfo{}, fmt.Errorf("parseToolDescription() [prompt.go]: failed to parse YAML header for %s: %w", toolName, err)
-		}
-
-		for propName, prop := range properties {
-			schema.AddProperty(propName, prop.Schema, prop.Required)
-		}
+	// Convert JSON schema to ToolSchema
+	schema, err := convertJSONSchemaToToolSchema(schemaData)
+	if err != nil {
+		return tool.ToolInfo{}, fmt.Errorf("parseToolDescription() [prompt.go]: failed to convert schema for %s: %w", toolName, err)
 	}
+
+	// Trim whitespace from description
+	description := strings.TrimSpace(descriptionContent)
 
 	return tool.ToolInfo{
 		Name:        toolName,
@@ -557,183 +549,108 @@ func parseToolDescription(toolName string, content string) (tool.ToolInfo, error
 	}, nil
 }
 
-// propertyDef represents a property definition from YAML header
-type propertyDef struct {
-	Schema   tool.PropertySchema
-	Required bool
-}
+// convertJSONSchemaToToolSchema converts a JSON schema object to ToolSchema.
+func convertJSONSchemaToToolSchema(schemaData map[string]any) (tool.ToolSchema, error) {
+	schema := tool.NewToolSchema()
 
-// parseYAMLProperties parses YAML property definitions into PropertySchema map
-func parseYAMLProperties(yamlContent string) (map[string]propertyDef, error) {
-	properties := make(map[string]propertyDef)
-	lines := strings.Split(yamlContent, "\n")
+	// Get properties
+	properties, ok := schemaData["properties"].(map[string]any)
+	if !ok {
+		return schema, nil
+	}
 
-	var currentProp string
-	var currentDef propertyDef
-	var inItems bool
-	var itemsDef tool.PropertySchema
+	// Get required fields
+	var requiredFields []string
+	if required, ok := schemaData["required"].([]any); ok {
+		for _, r := range required {
+			if rStr, ok := r.(string); ok {
+				requiredFields = append(requiredFields, rStr)
+			}
+		}
+	}
 
-	for i := 0; i < len(lines); i++ {
-		line := lines[i]
-		trimmedLine := strings.TrimSpace(line)
-
-		if trimmedLine == "" || strings.HasPrefix(trimmedLine, "#") {
+	// Process each property
+	for propName, propData := range properties {
+		propMap, ok := propData.(map[string]any)
+		if !ok {
 			continue
 		}
 
-		// Check indentation level
-		indent := len(line) - len(strings.TrimLeft(line, " "))
+		propSchema, err := convertPropertySchema(propMap)
+		if err != nil {
+			return schema, fmt.Errorf("convertJSONSchemaToToolSchema() [prompt.go]: failed to convert property %s: %w", propName, err)
+		}
 
-		if indent == 0 {
-			// Save previous property if exists
-			if currentProp != "" {
-				if inItems {
-					currentDef.Schema.Items = &itemsDef
-					inItems = false
-				}
-				properties[currentProp] = currentDef
+		isRequired := false
+		for _, reqField := range requiredFields {
+			if reqField == propName {
+				isRequired = true
+				break
 			}
+		}
 
-			// New top-level property
-			parts := strings.SplitN(trimmedLine, ":", 2)
-			if len(parts) == 2 {
-				currentProp = strings.TrimSpace(parts[0])
-				currentDef = propertyDef{
-					Schema: tool.PropertySchema{},
-				}
-			}
-		} else if indent == 2 {
-			// Property attribute
-			parts := strings.SplitN(trimmedLine, ":", 2)
-			if len(parts) == 2 {
-				key := strings.TrimSpace(parts[0])
-				value := strings.TrimSpace(parts[1])
+		schema.AddProperty(propName, propSchema, isRequired)
+	}
 
-				switch key {
-				case "type":
-					if inItems {
-						itemsDef.Type = tool.SchemaType(value)
-					} else {
-						currentDef.Schema.Type = tool.SchemaType(value)
-					}
-				case "description":
-					if inItems {
-						itemsDef.Description = value
-					} else {
-						currentDef.Schema.Description = value
-					}
-				case "required":
-					currentDef.Required = value == "true"
-				case "enum":
-					// Start of enum array - next lines will be array items
-					currentDef.Schema.Enum = []string{}
-				case "items":
-					inItems = true
-					itemsDef = tool.PropertySchema{}
-				}
-			}
-		} else if indent == 4 {
-			// Nested property (for items or enum values)
-			if strings.HasPrefix(trimmedLine, "-") {
-				// Enum value
-				value := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "-"))
-				value = strings.Trim(value, "[]")
-				enumValues := strings.Split(value, ",")
-				for _, ev := range enumValues {
-					currentDef.Schema.Enum = append(currentDef.Schema.Enum, strings.TrimSpace(ev))
-				}
-			} else {
-				// Items properties
-				parts := strings.SplitN(trimmedLine, ":", 2)
-				if len(parts) == 2 {
-					key := strings.TrimSpace(parts[0])
-					value := strings.TrimSpace(parts[1])
+	return schema, nil
+}
 
-					switch key {
-					case "type":
-						itemsDef.Type = tool.SchemaType(value)
-					case "description":
-						itemsDef.Description = value
-					case "properties":
-						// Start of nested properties object
-						itemsDef.Properties = make(map[string]tool.PropertySchema)
-					case "required":
-						// Start of required array for items
-						itemsDef.Required = []string{}
-					}
-				}
-			}
-		} else if indent >= 6 {
-			// Nested object properties or required array items
-			if inItems && itemsDef.Properties != nil {
-				// Parse nested property
-				if strings.HasPrefix(trimmedLine, "-") {
-					// Required field
-					value := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "-"))
-					itemsDef.Required = append(itemsDef.Required, value)
-				} else if strings.Contains(trimmedLine, ":") {
-					// This is a nested property name
-					parts := strings.SplitN(trimmedLine, ":", 2)
-					if len(parts) >= 1 {
-						nestedPropName := strings.TrimSpace(parts[0])
-						// Look ahead to parse nested property attributes
-						nestedProp := tool.PropertySchema{}
-						j := i + 1
-						for j < len(lines) {
-							nextLine := lines[j]
-							nextIndent := len(nextLine) - len(strings.TrimLeft(nextLine, " "))
-							if nextIndent <= indent {
-								break
-							}
-							nextTrimmed := strings.TrimSpace(nextLine)
-							nextParts := strings.SplitN(nextTrimmed, ":", 2)
-							if len(nextParts) == 2 {
-								attrKey := strings.TrimSpace(nextParts[0])
-								attrValue := strings.TrimSpace(nextParts[1])
-								switch attrKey {
-								case "type":
-									nestedProp.Type = tool.SchemaType(attrValue)
-								case "description":
-									nestedProp.Description = attrValue
-								case "required":
-									// Handle required boolean
-									// This will be handled separately in the required array
-								case "enum":
-									// Parse enum array
-									k := j + 1
-									for k < len(lines) {
-										enumLine := lines[k]
-										enumIndent := len(enumLine) - len(strings.TrimLeft(enumLine, " "))
-										if enumIndent <= nextIndent {
-											break
-										}
-										enumTrimmed := strings.TrimSpace(enumLine)
-										if strings.HasPrefix(enumTrimmed, "-") {
-											enumValue := strings.TrimSpace(strings.TrimPrefix(enumTrimmed, "-"))
-											nestedProp.Enum = append(nestedProp.Enum, enumValue)
-										}
-										k++
-									}
-									j = k - 1
-								}
-							}
-							j++
-						}
-						itemsDef.Properties[nestedPropName] = nestedProp
-						i = j - 1
-					}
-				}
+// convertPropertySchema converts a JSON schema property to PropertySchema.
+func convertPropertySchema(propData map[string]any) (tool.PropertySchema, error) {
+	propSchema := tool.PropertySchema{}
+
+	// Type
+	if typeVal, ok := propData["type"].(string); ok {
+		propSchema.Type = tool.SchemaType(typeVal)
+	}
+
+	// Description
+	if desc, ok := propData["description"].(string); ok {
+		propSchema.Description = desc
+	}
+
+	// Enum
+	if enumVal, ok := propData["enum"].([]any); ok {
+		for _, e := range enumVal {
+			if eStr, ok := e.(string); ok {
+				propSchema.Enum = append(propSchema.Enum, eStr)
 			}
 		}
 	}
 
-	// Save last property
-	if currentProp != "" {
-		if inItems {
-			currentDef.Schema.Items = &itemsDef
+	// Items (for array type)
+	if itemsVal, ok := propData["items"].(map[string]any); ok {
+		itemsSchema, err := convertPropertySchema(itemsVal)
+		if err != nil {
+			return propSchema, fmt.Errorf("convertPropertySchema() [prompt.go]: failed to convert items: %w", err)
 		}
-		properties[currentProp] = currentDef
+		propSchema.Items = &itemsSchema
 	}
 
-	return properties, nil
+	// Properties (for object type)
+	if propsVal, ok := propData["properties"].(map[string]any); ok {
+		propSchema.Properties = make(map[string]tool.PropertySchema)
+		for nestedPropName, nestedPropData := range propsVal {
+			nestedPropMap, ok := nestedPropData.(map[string]any)
+			if !ok {
+				continue
+			}
+			nestedSchema, err := convertPropertySchema(nestedPropMap)
+			if err != nil {
+				return propSchema, fmt.Errorf("convertPropertySchema() [prompt.go]: failed to convert nested property %s: %w", nestedPropName, err)
+			}
+			propSchema.Properties[nestedPropName] = nestedSchema
+		}
+	}
+
+	// Required (for object type)
+	if reqVal, ok := propData["required"].([]any); ok {
+		for _, r := range reqVal {
+			if rStr, ok := r.(string); ok {
+				propSchema.Required = append(propSchema.Required, rStr)
+			}
+		}
+	}
+
+	return propSchema, nil
 }

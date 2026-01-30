@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "properties": {
+    "from": {
+      "type": "string",
+      "description": "The absolute path to the source file or directory."
+    },
+    "to": {
+      "type": "string",
+      "description": "The absolute path to the destination."
+    }
+  },
+  "required": ["from", "to"]
+}

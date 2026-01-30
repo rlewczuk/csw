@@ -1,13 +1,3 @@
-path:
-  type: string
-  description: The absolute path to the file to write.
-  required: true
-content:
-  type: string
-  description: The content to write to the file.
-  required: true
----
-
 ## `vfs.write` tool
 
 Writes content to a file at the specified path. Creates the file if it doesn't exist, or overwrites it if it does.

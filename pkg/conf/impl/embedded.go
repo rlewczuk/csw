@@ -149,6 +149,12 @@ func (s *EmbeddedConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleC
 				configCopy.PromptFragments[fk] = fv
 			}
 		}
+		if v.ToolFragments != nil {
+			configCopy.ToolFragments = make(map[string]string, len(v.ToolFragments))
+			for fk, fv := range v.ToolFragments {
+				configCopy.ToolFragments[fk] = fv
+			}
+		}
 		configs[k] = &configCopy
 	}
 
@@ -286,9 +292,15 @@ func (s *EmbeddedConfigStore) loadAgentRoleConfigs() error {
 					if err != nil {
 						return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, err)
 					}
+					// Load tool fragments from conf/tools directory (shared by all roles)
+					toolFragments, err := s.loadToolFragments()
+					if err != nil {
+						return fmt.Errorf("loadAgentRoleConfigs(): failed to load tool fragments: %w", err)
+					}
 					configs["all"] = &conf.AgentRoleConfig{
 						Name:            "all",
 						PromptFragments: promptFragments,
+						ToolFragments:   toolFragments,
 					}
 					continue
 				}
@@ -314,6 +326,13 @@ func (s *EmbeddedConfigStore) loadAgentRoleConfigs() error {
 			return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, err)
 		}
 		config.PromptFragments = promptFragments
+
+		// Load tool fragments from conf/tools directory (shared by all roles)
+		toolFragments, err := s.loadToolFragments()
+		if err != nil {
+			return fmt.Errorf("loadAgentRoleConfigs(): failed to load tool fragments: %w", err)
+		}
+		config.ToolFragments = toolFragments
 
 		configs[config.Name] = &config
 	}
@@ -345,6 +364,56 @@ func (s *EmbeddedConfigStore) loadPromptFragments(roleDir string) (map[string]st
 		// Use filename without extension as the key
 		fragmentName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
 		fragments[fragmentName] = string(data)
+	}
+
+	return fragments, nil
+}
+
+// loadToolFragments loads all tool description files from the conf/tools directory.
+// Returns a map where keys are "<tool-name>/<file-name>" and values are file contents.
+func (s *EmbeddedConfigStore) loadToolFragments() (map[string]string, error) {
+	fragments := make(map[string]string)
+	toolsDir := "conf/tools"
+
+	entries, err := embeddedConfigFS.ReadDir(toolsDir)
+	if err != nil {
+		if isNotExist(err) {
+			// Tools directory is optional
+			return fragments, nil
+		}
+		return nil, fmt.Errorf("loadToolFragments(): failed to read tools directory: %w", err)
+	}
+
+	// Iterate through each tool directory
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		toolName := entry.Name()
+		toolDir := filepath.Join(toolsDir, toolName)
+
+		// Read all files in the tool directory
+		toolEntries, err := embeddedConfigFS.ReadDir(toolDir)
+		if err != nil {
+			return nil, fmt.Errorf("loadToolFragments(): failed to read tool directory %s: %w", toolDir, err)
+		}
+
+		for _, toolEntry := range toolEntries {
+			if toolEntry.IsDir() {
+				continue
+			}
+
+			filePath := filepath.Join(toolDir, toolEntry.Name())
+			data, err := embeddedConfigFS.ReadFile(filePath)
+			if err != nil {
+				return nil, fmt.Errorf("loadToolFragments(): failed to read %s: %w", filePath, err)
+			}
+
+			// Key format: "<tool-name>/<file-name>"
+			key := fmt.Sprintf("%s/%s", toolName, toolEntry.Name())
+			fragments[key] = string(data)
+		}
 	}
 
 	return fragments, nil
