@@ -1,0 +1,34 @@
+{
+  "type": "object",
+  "properties": {
+    "todos": {
+      "type": "array",
+      "description": "Array of todo items to set as the complete todo list.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the todo item (UUIDv7 string)."
+          },
+          "content": {
+            "type": "string",
+            "description": "Brief description of the task."
+          },
+          "status": {
+            "type": "string",
+            "description": "Status of the task.",
+            "enum": ["pending", "in_progress", "completed", "cancelled"]
+          },
+          "priority": {
+            "type": "string",
+            "description": "Priority level of the task.",
+            "enum": ["low", "medium", "high"]
+          }
+        },
+        "required": ["id", "content", "status", "priority"]
+      }
+    }
+  },
+  "required": ["todos"]
+}

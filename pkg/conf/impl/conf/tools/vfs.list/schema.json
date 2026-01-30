@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "The absolute path to the directory to list."
+    }
+  },
+  "required": ["path"]
+}

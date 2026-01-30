@@ -1,9 +1,3 @@
-path:
-  type: string
-  description: The absolute path to the file to read.
-  required: true
----
-
 ## `vfs.read` tool
 
 Reads a file from the local filesystem. You can access any file directly by using this tool.

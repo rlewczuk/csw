@@ -1,9 +1,3 @@
-command:
-  type: string
-  description: The bash command to execute.
-  required: true
----
-
 ## `run.bash` tool
 
 Executes a bash command in the project directory and returns the output.

@@ -1,9 +1,3 @@
-path:
-  type: string
-  description: The absolute path to the file or directory to delete.
-  required: true
----
-
 ## `vfs.delete` tool
 
 Deletes a file or directory at the specified path.

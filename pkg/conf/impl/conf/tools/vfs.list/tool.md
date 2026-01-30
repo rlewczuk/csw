@@ -1,9 +1,3 @@
-path:
-  type: string
-  description: The absolute path to the directory to list.
-  required: true
----
-
 ## `vfs.list` tool
 
 Lists files and directories in the specified directory.

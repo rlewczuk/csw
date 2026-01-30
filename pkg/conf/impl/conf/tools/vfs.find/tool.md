@@ -1,13 +1,3 @@
-path:
-  type: string
-  description: The absolute path to the directory to search in.
-  required: true
-pattern:
-  type: string
-  description: The glob pattern to match files against (e.g., "*.go", "test_*.py").
-  required: true
----
-
 ## `vfs.find` tool
 
 Searches for files matching a glob pattern within a directory tree.
