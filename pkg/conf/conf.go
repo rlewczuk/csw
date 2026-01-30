@@ -44,7 +44,7 @@ type AgentRoleConfig struct {
 	PromptFragments map[string]string `json:"-"`
 
 	// Tool fragments for this role (as a map of "<tool-name>/<file-name>" -> content), this is transient field, not serialized to JSON
-	// Example keys: "vfs.read/schema.json", "vfs.read/tool.md", "vfs.read/tool-kimi.md"
+	// Example keys: "vfs.read/vfs.read.schema.json", "vfs.read/vfs.read.md", "vfs.read/vfs.read-kimi.md"
 	ToolFragments map[string]string `json:"-"`
 }
 

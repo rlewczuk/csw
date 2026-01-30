@@ -1,4 +1,5 @@
 {
+  "description": "Lists files and directories in the specified directory.",
   "type": "object",
   "properties": {
     "path": {

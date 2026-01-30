@@ -1,4 +1,5 @@
 {
+  "description": "Searches for files matching a glob pattern within a directory tree.",
   "type": "object",
   "properties": {
     "path": {

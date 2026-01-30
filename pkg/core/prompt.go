@@ -22,8 +22,8 @@ type PromptScanner interface {
 	GetFragments(tags []string, role *conf.AgentRoleConfig) (map[string]string, error)
 
 	// GetToolFragments returns tool description fragments from the tools directory.
-	// Returns a map where keys are "<tool-name>/<file-name>" (e.g., "vfs.read/schema.json", "vfs.read/tool.md")
-	// and values are file contents. Supports tag-specific overrides (e.g., "tool-kimi.md" instead of "tool.md").
+	// Returns a map where keys are "<tool-name>/<file-name>" (e.g., "vfs.read/vfs.read.schema.json", "vfs.read/vfs.read.md")
+	// and values are file contents. Supports tag-specific overrides (e.g., "vfs.read-kimi.md" instead of "vfs.read.md").
 	GetToolFragments(tags []string, role *conf.AgentRoleConfig) (map[string]string, error)
 
 	// HasChanged returns true if any of the fragments has changed since last scan.
@@ -485,52 +485,30 @@ func (g *ConfPromptGenerator) GetToolInfo(tags []string, toolName string, role *
 		return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: no tool fragments available")
 	}
 
-	// Look for schema.json
-	schemaKey := fmt.Sprintf("%s/schema.json", toolName)
+	// Look for <toolname>.schema.json
+	schemaKey := fmt.Sprintf("%s/%s.schema.json", toolName, toolName)
 	schemaContent, hasSchema := toolFragments[schemaKey]
 	if !hasSchema {
-		return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: schema.json not found for tool: %s", toolName)
+		return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: %s.schema.json not found for tool: %s", toolName, toolName)
 	}
 
-	// Look for tool.md, with tag-specific overrides
-	var descriptionContent string
-	var foundDescription bool
-
-	// Try tag-specific descriptions first
-	for _, tag := range tags {
-		tagSpecificKey := fmt.Sprintf("%s/tool-%s.md", toolName, tag)
-		if content, ok := toolFragments[tagSpecificKey]; ok {
-			descriptionContent = content
-			foundDescription = true
-			break
-		}
-	}
-
-	// Fall back to generic tool.md
-	if !foundDescription {
-		defaultKey := fmt.Sprintf("%s/tool.md", toolName)
-		if content, ok := toolFragments[defaultKey]; ok {
-			descriptionContent = content
-			foundDescription = true
-		}
-	}
-
-	if !foundDescription {
-		return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: tool.md not found for tool: %s", toolName)
-	}
-
-	// Parse the schema and description
-	return parseToolDescription(toolName, schemaContent, descriptionContent)
+	// Parse the schema (description is now in the schema file)
+	return parseToolDescription(toolName, schemaContent)
 }
 
-// parseToolDescription parses a tool description from JSON Schema and markdown files.
-// schemaContent is the JSON Schema for tool parameters.
-// descriptionContent is the markdown description of the tool.
-func parseToolDescription(toolName string, schemaContent string, descriptionContent string) (tool.ToolInfo, error) {
+// parseToolDescription parses a tool description from JSON Schema file.
+// schemaContent is the JSON Schema for tool parameters, including the description field.
+func parseToolDescription(toolName string, schemaContent string) (tool.ToolInfo, error) {
 	// Parse JSON Schema
 	var schemaData map[string]any
 	if err := json.Unmarshal([]byte(schemaContent), &schemaData); err != nil {
 		return tool.ToolInfo{}, fmt.Errorf("parseToolDescription() [prompt.go]: failed to parse JSON schema for %s: %w", toolName, err)
+	}
+
+	// Extract description from schema
+	description := ""
+	if desc, ok := schemaData["description"].(string); ok {
+		description = strings.TrimSpace(desc)
 	}
 
 	// Convert JSON schema to ToolSchema
@@ -538,9 +516,6 @@ func parseToolDescription(toolName string, schemaContent string, descriptionCont
 	if err != nil {
 		return tool.ToolInfo{}, fmt.Errorf("parseToolDescription() [prompt.go]: failed to convert schema for %s: %w", toolName, err)
 	}
-
-	// Trim whitespace from description
-	description := strings.TrimSpace(descriptionContent)
 
 	return tool.ToolInfo{
 		Name:        toolName,

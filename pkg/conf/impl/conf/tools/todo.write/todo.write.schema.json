@@ -1,4 +1,5 @@
 {
+  "description": "Updates the todo list with the provided array of todo items. This replaces the entire list.",
   "type": "object",
   "properties": {
     "todos": {

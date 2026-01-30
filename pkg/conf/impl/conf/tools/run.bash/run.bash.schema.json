@@ -1,4 +1,5 @@
 {
+  "description": "Executes a bash command in the project directory and returns the output.",
   "type": "object",
   "properties": {
     "command": {
