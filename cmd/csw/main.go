@@ -43,7 +43,7 @@ func main() {
 	rootCmd.Flags().StringVar(&roleName, "role", "developer", "Agent role name")
 
 	// Add subcommands
-	rootCmd.AddCommand(ProviderCommand())
+	rootCmd.AddCommand(ConfCommand())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
