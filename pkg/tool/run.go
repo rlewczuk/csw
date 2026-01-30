@@ -2,7 +2,9 @@ package tool
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
+	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/runner"
@@ -22,8 +24,9 @@ func (e *RunCommandError) Error() string {
 
 // RunBashTool implements the run.bash tool for executing bash commands.
 type RunBashTool struct {
-	runner     runner.CommandRunner
-	privileges map[string]conf.AccessFlag
+	runner      runner.CommandRunner
+	privileges  map[string]conf.AccessFlag
+	projectRoot string
 }
 
 // NewRunBashTool creates a new RunBashTool instance.
@@ -33,6 +36,18 @@ func NewRunBashTool(r runner.CommandRunner, privileges map[string]conf.AccessFla
 	return &RunBashTool{
 		runner:     r,
 		privileges: privileges,
+	}
+}
+
+// NewRunBashToolWithRoot creates a new RunBashTool instance with a project root.
+// runner is the CommandRunner to use for executing commands.
+// privileges is a map of command regex patterns to access flags.
+// projectRoot is the project root directory for resolving relative paths and checking absolute paths.
+func NewRunBashToolWithRoot(r runner.CommandRunner, privileges map[string]conf.AccessFlag, projectRoot string) *RunBashTool {
+	return &RunBashTool{
+		runner:      r,
+		privileges:  privileges,
+		projectRoot: projectRoot,
 	}
 }
 
@@ -47,7 +62,44 @@ func (t *RunBashTool) Execute(args ToolCall) ToolResponse {
 		}
 	}
 
-	// Check permissions
+	// Parse optional workdir argument
+	workdir := args.Arguments.String("workdir")
+	var resolvedWorkdir string
+	needsPermission := false
+
+	if workdir != "" {
+		if filepath.IsAbs(workdir) {
+			// Absolute path requires permission
+			resolvedWorkdir = workdir
+			needsPermission = true
+		} else if t.projectRoot != "" {
+			// Relative path - resolve against project root
+			resolvedWorkdir = filepath.Join(t.projectRoot, workdir)
+		} else {
+			// No project root set, use the provided relative path
+			resolvedWorkdir = workdir
+		}
+	}
+
+	// Parse optional timeout argument
+	timeout := time.Duration(0)
+	if timeoutSecs, ok := args.Arguments.IntOK("timeout"); ok {
+		if timeoutSecs <= 0 {
+			return ToolResponse{
+				Call:  &args,
+				Error: fmt.Errorf("RunBashTool.Execute() [run.go]: timeout must be positive, got %d", timeoutSecs),
+				Done:  true,
+			}
+		}
+		timeout = time.Duration(timeoutSecs) * time.Second
+	}
+
+	// Check permissions for absolute workdir
+	if needsPermission {
+		return t.createWorkdirPermissionQuery(args, command, resolvedWorkdir, timeout)
+	}
+
+	// Check permissions for command
 	access := t.checkPermission(command)
 
 	switch access {
@@ -61,13 +113,13 @@ func (t *RunBashTool) Execute(args ToolCall) ToolResponse {
 			Done: true,
 		}
 	case conf.AccessAsk:
-		return t.createPermissionQuery(args, command)
+		return t.createPermissionQuery(args, command, resolvedWorkdir, timeout)
 	case conf.AccessAllow:
 		// Execute the command
-		return t.executeCommand(args, command)
+		return t.executeCommand(args, command, resolvedWorkdir, timeout)
 	default:
 		// Default to Ask if not specified
-		return t.createPermissionQuery(args, command)
+		return t.createPermissionQuery(args, command, resolvedWorkdir, timeout)
 	}
 }
 
@@ -123,12 +175,20 @@ func countWildcards(pattern string) int {
 }
 
 // createPermissionQuery creates a permission query for the user.
-func (t *RunBashTool) createPermissionQuery(args ToolCall, command string) ToolResponse {
+func (t *RunBashTool) createPermissionQuery(args ToolCall, command string, workdir string, timeout time.Duration) ToolResponse {
+	details := fmt.Sprintf("Allow running command: %s", command)
+	if workdir != "" {
+		details += fmt.Sprintf("\nWorkdir: %s", workdir)
+	}
+	if timeout > 0 {
+		details += fmt.Sprintf("\nTimeout: %v", timeout)
+	}
+
 	query := &ToolPermissionsQuery{
 		Id:      shared.GenerateUUIDv7(),
 		Tool:    &args,
 		Title:   "Permission Required",
-		Details: fmt.Sprintf("Allow running command: %s", command),
+		Details: details,
 		Options: []string{
 			"Allow",
 			"Deny",
@@ -147,9 +207,53 @@ func (t *RunBashTool) createPermissionQuery(args ToolCall, command string) ToolR
 	}
 }
 
+// createWorkdirPermissionQuery creates a permission query for absolute workdir.
+func (t *RunBashTool) createWorkdirPermissionQuery(args ToolCall, command string, workdir string, timeout time.Duration) ToolResponse {
+	details := fmt.Sprintf("Allow running command with absolute path:\nCommand: %s\nWorkdir: %s", command, workdir)
+	if timeout > 0 {
+		details += fmt.Sprintf("\nTimeout: %v", timeout)
+	}
+
+	query := &ToolPermissionsQuery{
+		Id:      shared.GenerateUUIDv7(),
+		Tool:    &args,
+		Title:   "Permission Required for Absolute Path",
+		Details: details,
+		Options: []string{
+			"Allow",
+			"Deny",
+		},
+		AllowCustomResponse: true,
+		Meta: map[string]string{
+			"type":    "run_absolute_workdir",
+			"command": command,
+			"workdir": workdir,
+		},
+	}
+	return ToolResponse{
+		Call:  &args,
+		Error: query,
+		Done:  true,
+	}
+}
+
 // executeCommand executes the command using the runner.
-func (t *RunBashTool) executeCommand(args ToolCall, command string) ToolResponse {
-	output, exitCode, err := t.runner.RunCommand(command)
+func (t *RunBashTool) executeCommand(args ToolCall, command string, workdir string, timeout time.Duration) ToolResponse {
+	var output string
+	var exitCode int
+	var err error
+
+	if workdir == "" && timeout == 0 {
+		// Use default method if no options
+		output, exitCode, err = t.runner.RunCommand(command)
+	} else {
+		// Use options method
+		options := runner.CommandOptions{
+			Workdir: workdir,
+			Timeout: timeout,
+		}
+		output, exitCode, err = t.runner.RunCommandWithOptions(command, options)
+	}
 
 	if err != nil {
 		// If there's an error from the runner itself (timeout, etc.), return it

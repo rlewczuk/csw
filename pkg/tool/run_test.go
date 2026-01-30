@@ -294,3 +294,169 @@ func TestRunBashTool_PermissionQuery_Options(t *testing.T) {
 	assert.Equal(t, "run", query.Meta["type"])
 	assert.Equal(t, "test command", query.Meta["command"])
 }
+
+func TestRunBashTool_Execute_WithRelativeWorkdir(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetResponse("pwd", "/project/root/subdir\n", 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashToolWithRoot(mockRunner, privileges, "/project/root")
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "run.bash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "pwd",
+			"workdir": "subdir",
+		}),
+	}
+
+	response := tool.Execute(args)
+
+	assert.NoError(t, response.Error)
+	assert.True(t, response.Done)
+	assert.Equal(t, 1, mockRunner.ExecutionCount())
+
+	// Verify that RunCommandWithOptions was called
+	exec := mockRunner.GetLastExecution()
+	assert.NotNil(t, exec)
+	assert.Equal(t, "pwd", exec.Command)
+}
+
+func TestRunBashTool_Execute_WithAbsoluteWorkdir(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashToolWithRoot(mockRunner, privileges, "/project/root")
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "run.bash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "ls",
+			"workdir": "/absolute/path",
+		}),
+	}
+
+	response := tool.Execute(args)
+
+	// Should ask for permission due to absolute path
+	assert.Error(t, response.Error)
+	query, ok := response.Error.(*ToolPermissionsQuery)
+	assert.True(t, ok, "Error should be ToolPermissionsQuery")
+	assert.Equal(t, "Permission Required for Absolute Path", query.Title)
+	assert.Contains(t, query.Details, "/absolute/path")
+	assert.Contains(t, query.Details, "ls")
+	assert.Equal(t, "run_absolute_workdir", query.Meta["type"])
+	assert.Equal(t, "/absolute/path", query.Meta["workdir"])
+	assert.True(t, response.Done)
+	assert.Equal(t, 0, mockRunner.ExecutionCount())
+}
+
+func TestRunBashTool_Execute_WithTimeout(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetResponse("echo test", "test\n", 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashTool(mockRunner, privileges)
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "run.bash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "echo test",
+			"timeout": int64(30),
+		}),
+	}
+
+	response := tool.Execute(args)
+
+	assert.NoError(t, response.Error)
+	assert.True(t, response.Done)
+	assert.Equal(t, "test\n", response.Result.String("output"))
+	assert.Equal(t, int64(0), response.Result.Int("exit_code"))
+	assert.Equal(t, 1, mockRunner.ExecutionCount())
+}
+
+func TestRunBashTool_Execute_WithInvalidTimeout(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashTool(mockRunner, privileges)
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "run.bash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "echo test",
+			"timeout": int64(-5),
+		}),
+	}
+
+	response := tool.Execute(args)
+
+	assert.Error(t, response.Error)
+	assert.Contains(t, response.Error.Error(), "timeout must be positive")
+	assert.True(t, response.Done)
+	assert.Equal(t, 0, mockRunner.ExecutionCount())
+}
+
+func TestRunBashTool_Execute_WithWorkdirAndTimeout(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetResponse("ls", "file1.txt\nfile2.txt\n", 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashToolWithRoot(mockRunner, privileges, "/project/root")
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "run.bash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "ls",
+			"workdir": "test-dir",
+			"timeout": int64(10),
+		}),
+	}
+
+	response := tool.Execute(args)
+
+	assert.NoError(t, response.Error)
+	assert.True(t, response.Done)
+	assert.Equal(t, "file1.txt\nfile2.txt\n", response.Result.String("output"))
+	assert.Equal(t, 1, mockRunner.ExecutionCount())
+}
+
+func TestRunBashTool_Execute_WithoutProjectRoot(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetResponse("pwd", "subdir\n", 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashTool(mockRunner, privileges)
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "run.bash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "pwd",
+			"workdir": "subdir",
+		}),
+	}
+
+	response := tool.Execute(args)
+
+	assert.NoError(t, response.Error)
+	assert.True(t, response.Done)
+	assert.Equal(t, 1, mockRunner.ExecutionCount())
+}

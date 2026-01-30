@@ -61,11 +61,16 @@ func (m *MockRunner) SetDefaultResponse(output string, exitCode int, err error) 
 
 // RunCommand runs the given command and returns the output and exit code.
 func (m *MockRunner) RunCommand(command string) (string, int, error) {
+	return m.RunCommandWithOptions(command, CommandOptions{})
+}
+
+// RunCommandWithOptions runs the given command with options and returns the output and exit code.
+func (m *MockRunner) RunCommandWithOptions(command string, options CommandOptions) (string, int, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if command == "" {
-		return "", 1, fmt.Errorf("MockRunner.RunCommand() [mock.go]: command cannot be empty")
+		return "", 1, fmt.Errorf("MockRunner.RunCommandWithOptions() [mock.go]: command cannot be empty")
 	}
 
 	// Check if we have a specific response for this command
