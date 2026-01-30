@@ -3,6 +3,7 @@ package tool
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // ToolValue represents a value that can be passed as an argument to a tool or returned as a result.
@@ -518,6 +519,19 @@ type ToolInfo struct {
 
 	// Schema defines the JSON Schema for the tool's arguments.
 	Schema ToolSchema `json:"parameters"`
+}
+
+// ShortDescription returns the first line of the markdown description
+// trimmed of leading and trailing spaces.
+func (t *ToolInfo) ShortDescription() string {
+	lines := strings.Split(t.Description, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			return line
+		}
+	}
+	return ""
 }
 
 // Tool represents a tool that can be executed by the agent.

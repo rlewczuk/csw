@@ -817,3 +817,69 @@ func TestLLMAPICompatibility(t *testing.T) {
 		assert.Equal(t, "new line", edits[0].Get("text").AsString())
 	})
 }
+
+func TestToolInfo_ShortDescription(t *testing.T) {
+	tests := []struct {
+		name        string
+		description string
+		expected    string
+	}{
+		{
+			name:        "single line",
+			description: "This is a short description",
+			expected:    "This is a short description",
+		},
+		{
+			name:        "multiple lines",
+			description: "First line description\nSecond line\nThird line",
+			expected:    "First line description",
+		},
+		{
+			name:        "with leading whitespace",
+			description: "   Leading spaces should be trimmed",
+			expected:    "Leading spaces should be trimmed",
+		},
+		{
+			name:        "with trailing whitespace",
+			description: "Trailing spaces should be trimmed   ",
+			expected:    "Trailing spaces should be trimmed",
+		},
+		{
+			name:        "with empty lines before content",
+			description: "\n\n  \nFirst non-empty line\nSecond line",
+			expected:    "First non-empty line",
+		},
+		{
+			name:        "markdown with multiple paragraphs",
+			description: "This is the first paragraph.\n\nThis is the second paragraph.",
+			expected:    "This is the first paragraph.",
+		},
+		{
+			name:        "empty description",
+			description: "",
+			expected:    "",
+		},
+		{
+			name:        "only whitespace",
+			description: "   \n  \n   ",
+			expected:    "",
+		},
+		{
+			name: "complex markdown",
+			description: `Read file contents from the filesystem.
+
+This tool allows reading files with various options including line ranges and encoding.`,
+			expected: "Read file contents from the filesystem.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			toolInfo := ToolInfo{
+				Description: tt.description,
+			}
+			result := toolInfo.ShortDescription()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
