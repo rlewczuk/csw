@@ -130,6 +130,8 @@ type GlobalConfig struct {
 	ModelTags []ModelTagMapping `json:"model_tags,omitempty"`
 	// DefaultProvider is the name of the default model provider to use
 	DefaultProvider string `json:"default_provider,omitempty"`
+	// DefaultRole is the name of the default agent role to use
+	DefaultRole string `json:"default_role,omitempty"`
 }
 
 // ConfigStore is an interface for accessing configuration data.

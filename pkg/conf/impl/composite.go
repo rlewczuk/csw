@@ -131,6 +131,7 @@ func (c *CompositeConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 	// Return a copy to prevent external modification
 	config := &conf.GlobalConfig{
 		DefaultProvider: c.globalConfig.DefaultProvider,
+		DefaultRole:     c.globalConfig.DefaultRole,
 		ModelTags:       make([]conf.ModelTagMapping, len(c.globalConfig.ModelTags)),
 	}
 	copy(config.ModelTags, c.globalConfig.ModelTags)
@@ -302,6 +303,10 @@ func (c *CompositeConfigStore) refreshGlobalConfig() error {
 		// DefaultProvider from later sources overrides earlier ones
 		if config.DefaultProvider != "" {
 			merged.DefaultProvider = config.DefaultProvider
+		}
+		// DefaultRole from later sources overrides earlier ones
+		if config.DefaultRole != "" {
+			merged.DefaultRole = config.DefaultRole
 		}
 
 		// Track update time

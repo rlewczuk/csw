@@ -115,6 +115,7 @@ func (s *LocalConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 	// Return a copy to prevent external modification
 	config := &conf.GlobalConfig{
 		DefaultProvider: s.globalConfig.DefaultProvider,
+		DefaultRole:     s.globalConfig.DefaultRole,
 		ModelTags:       make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
 	}
 	copy(config.ModelTags, s.globalConfig.ModelTags)
