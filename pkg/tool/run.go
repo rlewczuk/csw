@@ -36,21 +36,6 @@ func NewRunBashTool(r runner.CommandRunner, privileges map[string]conf.AccessFla
 	}
 }
 
-// Info returns information about the tool including its name, description, and argument schema.
-func (t *RunBashTool) Info() ToolInfo {
-	schema := NewToolSchema()
-	schema.AddProperty("command", PropertySchema{
-		Type:        SchemaTypeString,
-		Description: "The bash command to execute.",
-	}, true)
-
-	return ToolInfo{
-		Name:        "run.bash",
-		Description: "Executes a bash command in the project directory and returns the output.",
-		Schema:      schema,
-	}
-}
-
 // Execute executes the tool with the given arguments and returns the response.
 func (t *RunBashTool) Execute(args ToolCall) ToolResponse {
 	command, ok := args.Arguments.StringOK("command")

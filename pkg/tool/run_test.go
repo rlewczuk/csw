@@ -10,19 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRunBashTool_Info(t *testing.T) {
-	mockRunner := runner.NewMockRunner()
-	tool := NewRunBashTool(mockRunner, nil)
-
-	info := tool.Info()
-
-	assert.Equal(t, "run.bash", info.Name)
-	assert.NotEmpty(t, info.Description)
-	assert.Equal(t, SchemaTypeObject, info.Schema.Type)
-	assert.Contains(t, info.Schema.Properties, "command")
-	assert.Contains(t, info.Schema.Required, "command")
-}
-
 func TestRunBashTool_Execute_MissingCommand(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 	tool := NewRunBashTool(mockRunner, nil)

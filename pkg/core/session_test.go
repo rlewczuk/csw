@@ -27,6 +27,16 @@ func (m *mockSessionPromptGenerator) GetPrompt(tags []string, role *conf.AgentRo
 	return m.prompt, nil
 }
 
+func (m *mockSessionPromptGenerator) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *AgentState) (tool.ToolInfo, error) {
+	// Return a simple tool info for testing
+	schema := tool.NewToolSchema()
+	return tool.ToolInfo{
+		Name:        toolName,
+		Description: "Mock tool for testing",
+		Schema:      schema,
+	}, nil
+}
+
 func TestSessionThread(t *testing.T) {
 	mockServer := testutil.NewMockHTTPServer()
 	defer mockServer.Close()
@@ -39,6 +49,7 @@ func TestSessionThread(t *testing.T) {
 
 	system := &SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
 		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
 		Tools:                tools,
 		VFS:                  vfsInstance,
@@ -103,35 +114,18 @@ func TestSessionToolSelection(t *testing.T) {
 		session := controller.GetSession()
 
 		// Verify the session has session-specific tools
-		sessionToolInfo := session.Tools.ListInfo()
-		sessionToolNames := make([]string, 0, len(sessionToolInfo))
-		for _, info := range sessionToolInfo {
-			sessionToolNames = append(sessionToolNames, info.Name)
-		}
+		sessionToolNames := session.Tools.List()
 		assert.Contains(t, sessionToolNames, "todo.read", "session should have todo.read tool")
 		assert.Contains(t, sessionToolNames, "todo.write", "session should have todo.write tool")
 
 		// Verify the system does NOT have session-specific tools
-		systemToolInfo := system.Tools.ListInfo()
-		systemToolNames := make([]string, 0, len(systemToolInfo))
-		for _, info := range systemToolInfo {
-			systemToolNames = append(systemToolNames, info.Name)
-		}
+		systemToolNames := system.Tools.List()
 		assert.NotContains(t, systemToolNames, "todo.read", "system should not have todo.read")
 		assert.NotContains(t, systemToolNames, "todo.write", "system should not have todo.write")
 
 		// The counts should be different
-		assert.NotEqual(t, len(systemToolInfo), len(sessionToolInfo),
+		assert.NotEqual(t, len(systemToolNames), len(sessionToolNames),
 			"session and system should have different number of tools")
-
-		// BUG: When we call Run(), it will use s.system.Tools.ListInfo() on line 463
-		// instead of s.Tools.ListInfo(). We can't directly observe what tools are sent
-		// to the model in this test, but we document the expected fix here.
-		//
-		// To fix: change line 463 in session.go from:
-		//     tools := s.system.Tools.ListInfo()
-		// to:
-		//     tools := s.Tools.ListInfo()
 	})
 
 	t.Run("session without role uses system tools correctly", func(t *testing.T) {
@@ -145,11 +139,7 @@ func TestSessionToolSelection(t *testing.T) {
 
 		// Without SetRole, session tools should be a copy of system tools
 		// plus session-specific tools like todo.read/todo.write
-		sessionToolInfo := session.Tools.ListInfo()
-		sessionToolNames := make([]string, 0, len(sessionToolInfo))
-		for _, info := range sessionToolInfo {
-			sessionToolNames = append(sessionToolNames, info.Name)
-		}
+		sessionToolNames := session.Tools.List()
 
 		// Should have session-specific tools
 		assert.Contains(t, sessionToolNames, "todo.read")
@@ -173,6 +163,7 @@ func TestSessionThreadSafety(t *testing.T) {
 
 	system := &SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
 		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
 		Tools:                tools,
 		VFS:                  vfsInstance,

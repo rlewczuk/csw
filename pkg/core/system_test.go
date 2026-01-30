@@ -27,6 +27,15 @@ func (m *mockPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfi
 	return m.prompt, nil
 }
 
+func (m *mockPromptGenerator) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *AgentState) (tool.ToolInfo, error) {
+	schema := tool.NewToolSchema()
+	return tool.ToolInfo{
+		Name:        toolName,
+		Description: "Mock tool for testing",
+		Schema:      schema,
+	}, nil
+}
+
 func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 	mockServer := testutil.NewMockHTTPServer()
 	defer mockServer.Close()
@@ -40,6 +49,7 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 	t.Run("basic initialization", func(t *testing.T) {
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      newMockPromptGenerator("You are skilled software developer."),
 			Tools:                tools,
 			VFS:                  vfs,
@@ -80,6 +90,7 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      newMockPromptGenerator("You are skilled software developer."),
 			Tools:                tools,
 			VFS:                  vfs,
@@ -134,10 +145,11 @@ func TestSweSystemSessionManagement(t *testing.T) {
 	tool.RegisterVFSTools(tools, vfs)
 
 	system := &SweSystem{
-		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-		PromptGenerator: newMockPromptGenerator("You are a test assistant."),
-		Tools:           tools,
-		VFS:             vfs,
+		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+		PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
+		Tools:                tools,
+		VFS:                  vfs,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 	}
 
@@ -242,10 +254,11 @@ func TestSweSystemGetSessionThread(t *testing.T) {
 	tool.RegisterVFSTools(tools, vfs)
 
 	system := &SweSystem{
-		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-		PromptGenerator: newMockPromptGenerator("You are a test assistant."),
-		Tools:           tools,
-		VFS:             vfs,
+		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+		PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
+		Tools:                tools,
+		VFS:                  vfs,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 	}
 
@@ -322,10 +335,11 @@ func TestSweSystemShutdown(t *testing.T) {
 
 	t.Run("Shutdown with no sessions or threads", func(t *testing.T) {
 		system := &SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-			PromptGenerator: newMockPromptGenerator("You are a test assistant."),
-			Tools:           tools,
-			VFS:             vfs,
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
@@ -338,10 +352,11 @@ func TestSweSystemShutdown(t *testing.T) {
 
 	t.Run("Shutdown with sessions but no threads", func(t *testing.T) {
 		system := &SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-			PromptGenerator: newMockPromptGenerator("You are a test assistant."),
-			Tools:           tools,
-			VFS:             vfs,
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
@@ -371,10 +386,11 @@ func TestSweSystemShutdown(t *testing.T) {
 
 	t.Run("Shutdown with sessions and threads", func(t *testing.T) {
 		system := &SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-			PromptGenerator: newMockPromptGenerator("You are a test assistant."),
-			Tools:           tools,
-			VFS:             vfs,
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
@@ -414,10 +430,11 @@ func TestSweSystemShutdown(t *testing.T) {
 
 	t.Run("Shutdown interrupts running threads", func(t *testing.T) {
 		system := &SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-			PromptGenerator: newMockPromptGenerator("You are a test assistant."),
-			Tools:           tools,
-			VFS:             vfs,
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
@@ -459,10 +476,11 @@ func TestSweSystemShutdown(t *testing.T) {
 
 	t.Run("Shutdown is idempotent", func(t *testing.T) {
 		system := &SweSystem{
-			ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-			PromptGenerator: newMockPromptGenerator("You are a test assistant."),
-			Tools:           tools,
-			VFS:             vfs,
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 

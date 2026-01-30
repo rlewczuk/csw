@@ -33,11 +33,6 @@ func NewAccessControlTool(tool Tool, privileges map[string]conf.AccessFlag) *Acc
 	}
 }
 
-// Info returns the tool information from the underlying tool.
-func (a *AccessControlTool) Info() ToolInfo {
-	return a.tool.Info()
-}
-
 // Execute checks access permissions before executing the underlying tool.
 // Returns an error if access is denied.
 func (a *AccessControlTool) Execute(call ToolCall) ToolResponse {

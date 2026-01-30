@@ -17,14 +17,6 @@ type mockTool struct {
 	err         error
 }
 
-func (m *mockTool) Info() ToolInfo {
-	return ToolInfo{
-		Name:        m.name,
-		Description: m.description,
-		Schema:      NewToolSchema(),
-	}
-}
-
 func (m *mockTool) Execute(call ToolCall) ToolResponse {
 	m.executed = true
 	return ToolResponse{
@@ -521,23 +513,6 @@ func TestAccessControlTool_Execute_ToolError(t *testing.T) {
 	assert.True(t, mock.executed, "tool should be executed")
 	assert.Error(t, response.Error, "should propagate tool error")
 	assert.Equal(t, "file not found", response.Error.Error())
-}
-
-func TestAccessControlTool_Info(t *testing.T) {
-	mock := &mockTool{
-		name:        "test.tool",
-		description: "A test tool",
-	}
-
-	privileges := map[string]conf.AccessFlag{
-		"**": conf.AccessAllow,
-	}
-
-	ac := NewAccessControlTool(mock, privileges)
-	info := ac.Info()
-
-	assert.Equal(t, "test.tool", info.Name, "should return tool info from underlying tool")
-	assert.Equal(t, "A test tool", info.Description)
 }
 
 func TestAccessControlTool_MultipleMatchingPatterns(t *testing.T) {

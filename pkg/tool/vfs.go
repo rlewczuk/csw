@@ -18,21 +18,6 @@ func NewVFSReadTool(v vfs.VFS) *VFSReadTool {
 	return &VFSReadTool{vfs: v}
 }
 
-// Info returns information about the tool including its name, description, and argument schema.
-func (t *VFSReadTool) Info() ToolInfo {
-	schema := NewToolSchema()
-	schema.AddProperty("path", PropertySchema{
-		Type:        SchemaTypeString,
-		Description: "The path to the file to read.",
-	}, true)
-
-	return ToolInfo{
-		Name:        "vfs.read",
-		Description: "Reads the content of a file at the specified path.",
-		Schema:      schema,
-	}
-}
-
 // Execute executes the tool with the given arguments and returns the response.
 func (t *VFSReadTool) Execute(args ToolCall) ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
@@ -104,25 +89,6 @@ func NewVFSWriteTool(v vfs.VFS) *VFSWriteTool {
 	return &VFSWriteTool{vfs: v}
 }
 
-// Info returns information about the tool including its name, description, and argument schema.
-func (t *VFSWriteTool) Info() ToolInfo {
-	schema := NewToolSchema()
-	schema.AddProperty("path", PropertySchema{
-		Type:        SchemaTypeString,
-		Description: "The path to the file to write.",
-	}, true)
-	schema.AddProperty("content", PropertySchema{
-		Type:        SchemaTypeString,
-		Description: "The content to write to the file.",
-	}, true)
-
-	return ToolInfo{
-		Name:        "vfs.write",
-		Description: "Writes content to a file at the specified path. Creates the file if it doesn't exist.",
-		Schema:      schema,
-	}
-}
-
 // Execute executes the tool with the given arguments and returns the response.
 func (t *VFSWriteTool) Execute(args ToolCall) ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
@@ -174,21 +140,6 @@ func NewVFSDeleteTool(v vfs.VFS) *VFSDeleteTool {
 	return &VFSDeleteTool{vfs: v}
 }
 
-// Info returns information about the tool including its name, description, and argument schema.
-func (t *VFSDeleteTool) Info() ToolInfo {
-	schema := NewToolSchema()
-	schema.AddProperty("path", PropertySchema{
-		Type:        SchemaTypeString,
-		Description: "The path to the file to delete.",
-	}, true)
-
-	return ToolInfo{
-		Name:        "vfs.delete",
-		Description: "Deletes a file at the specified path.",
-		Schema:      schema,
-	}
-}
-
 // Execute executes the tool with the given arguments and returns the response.
 func (t *VFSDeleteTool) Execute(args ToolCall) ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
@@ -229,21 +180,6 @@ type VFSListTool struct {
 // NewVFSListTool creates a new VFSListTool instance.
 func NewVFSListTool(v vfs.VFS) *VFSListTool {
 	return &VFSListTool{vfs: v}
-}
-
-// Info returns information about the tool including its name, description, and argument schema.
-func (t *VFSListTool) Info() ToolInfo {
-	schema := NewToolSchema()
-	schema.AddProperty("path", PropertySchema{
-		Type:        SchemaTypeString,
-		Description: "The directory path to list files from.",
-	}, true)
-
-	return ToolInfo{
-		Name:        "vfs.list",
-		Description: "Lists files in the specified directory.",
-		Schema:      schema,
-	}
 }
 
 // Execute executes the tool with the given arguments and returns the response.
@@ -298,25 +234,6 @@ func NewVFSMoveTool(v vfs.VFS) *VFSMoveTool {
 	return &VFSMoveTool{vfs: v}
 }
 
-// Info returns information about the tool including its name, description, and argument schema.
-func (t *VFSMoveTool) Info() ToolInfo {
-	schema := NewToolSchema()
-	schema.AddProperty("path", PropertySchema{
-		Type:        SchemaTypeString,
-		Description: "The source path of the file to move.",
-	}, true)
-	schema.AddProperty("destination", PropertySchema{
-		Type:        SchemaTypeString,
-		Description: "The destination path where the file should be moved to.",
-	}, true)
-
-	return ToolInfo{
-		Name:        "vfs.move",
-		Description: "Moves or renames a file from the source path to the destination path.",
-		Schema:      schema,
-	}
-}
-
 // Execute executes the tool with the given arguments and returns the response.
 func (t *VFSMoveTool) Execute(args ToolCall) ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
@@ -366,25 +283,6 @@ type VFSFindTool struct {
 // NewVFSFindTool creates a new VFSFindTool instance.
 func NewVFSFindTool(v vfs.VFS) *VFSFindTool {
 	return &VFSFindTool{vfs: v}
-}
-
-// Info returns information about the tool including its name, description, and argument schema.
-func (t *VFSFindTool) Info() ToolInfo {
-	schema := NewToolSchema()
-	schema.AddProperty("query", PropertySchema{
-		Type:        SchemaTypeString,
-		Description: "The search pattern to match files and directories (supports glob patterns like *.txt, file*).",
-	}, true)
-	schema.AddProperty("recursive", PropertySchema{
-		Type:        SchemaTypeBoolean,
-		Description: "Whether to search recursively in subdirectories.",
-	}, false)
-
-	return ToolInfo{
-		Name:        "vfs.find",
-		Description: "Searches for files and directories matching the given pattern. Supports glob patterns.",
-		Schema:      schema,
-	}
 }
 
 // Execute executes the tool with the given arguments and returns the response.
@@ -439,33 +337,6 @@ type VFSEditTool struct {
 // NewVFSEditTool creates a new VFSEditTool instance.
 func NewVFSEditTool(v vfs.VFS) *VFSEditTool {
 	return &VFSEditTool{vfs: v}
-}
-
-// Info returns information about the tool including its name, description, and argument schema.
-func (t *VFSEditTool) Info() ToolInfo {
-	schema := NewToolSchema()
-	schema.AddProperty("filePath", PropertySchema{
-		Type:        SchemaTypeString,
-		Description: "The path to the file to edit.",
-	}, true)
-	schema.AddProperty("oldString", PropertySchema{
-		Type:        SchemaTypeString,
-		Description: "The string to replace.",
-	}, true)
-	schema.AddProperty("newString", PropertySchema{
-		Type:        SchemaTypeString,
-		Description: "The new string to replace with.",
-	}, true)
-	schema.AddProperty("replaceAll", PropertySchema{
-		Type:        SchemaTypeBoolean,
-		Description: "If true, replaces all occurrences of oldString. If false, replaces only the first occurrence. Default is false.",
-	}, false)
-
-	return ToolInfo{
-		Name:        "vfs.edit",
-		Description: "Edits a file in place by replacing oldString with newString. Replaces only the first occurrence unless replaceAll is true.",
-		Schema:      schema,
-	}
 }
 
 // Execute executes the tool with the given arguments and returns the response.

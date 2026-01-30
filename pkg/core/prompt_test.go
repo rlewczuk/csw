@@ -302,14 +302,11 @@ func TestConfPromptGenerator_GetPrompt(t *testing.T) {
 			name: "anthropic tags",
 			tags: []string{"anthropic", "all"},
 			wantContains: []string{
-				"/test/dir",                           // from template substitution
-				"Test1 Core Instructions",             // from test1/10-system.md
-				"Anthropic-Specific Instructions",     // from all/20-system-anthropic.md
-				"General Guidelines",                  // from all/30-system.md
-				"Read Tool Instructions",              // from all/40-tools-read.md
-				"Write Tool Instructions (Anthropic)", // from all/50-tools-write-anthropic.md
-				"Test1-Specific Guidelines",           // from test1/60-system.md
-				"Bash Tool Instructions (Test1)",      // from test1/70-tools-bash.md
+				"/test/dir",                       // from template expansion
+				"Test1 Core Instructions",         // from test1/10-system.md
+				"Anthropic-Specific Instructions", // from all/20-system-anthropic.md
+				"General Guidelines",              // from all/30-system.md
+				"Test1-Specific Guidelines",       // from test1/60-system.md
 			},
 		},
 		{
@@ -320,10 +317,18 @@ func TestConfPromptGenerator_GetPrompt(t *testing.T) {
 				"Test1 Core Instructions",
 				"OpenAI-Specific Instructions", // from all/20-system-openai.md instead of anthropic
 				"General Guidelines",
-				"Read Tool Instructions",
-				// Note: no write-anthropic fragment
 				"Test1-Specific Guidelines",
-				"Bash Tool Instructions (Test1)",
+			},
+		},
+		{
+			name: "openai tags",
+			tags: []string{"openai", "all"},
+			wantContains: []string{
+				"/test/dir",
+				"Test1 Core Instructions",
+				"OpenAI-Specific Instructions", // from all/20-system-openai.md instead of anthropic
+				"General Guidelines",
+				"Test1-Specific Guidelines",
 			},
 		},
 	}
@@ -374,15 +379,12 @@ func TestConfPromptGenerator_GetPrompt_Ordering(t *testing.T) {
 	prompt, err := gen.GetPrompt([]string{"anthropic", "all"}, &role, state)
 	require.NoError(t, err)
 
-	// Check ordering by finding positions
+	// Check ordering by finding positions (tools fragments are now excluded)
 	markers := []string{
-		"Test1 Core Instructions",             // 10
-		"Anthropic-Specific Instructions",     // 20
-		"General Guidelines",                  // 30
-		"Read Tool Instructions",              // 40
-		"Write Tool Instructions (Anthropic)", // 50
-		"Test1-Specific Guidelines",           // 60
-		"Bash Tool Instructions (Test1)",      // 70
+		"Test1 Core Instructions",         // 10
+		"Anthropic-Specific Instructions", // 20
+		"General Guidelines",              // 30
+		"Test1-Specific Guidelines",       // 60
 	}
 
 	lastPos := -1
@@ -392,10 +394,15 @@ func TestConfPromptGenerator_GetPrompt_Ordering(t *testing.T) {
 		assert.Greater(t, pos, lastPos, "marker %s should come after previous marker", marker)
 		lastPos = pos
 	}
+
+	// Tool instructions should NOT be in the prompt anymore
+	assert.NotContains(t, prompt, "Read Tool Instructions")
+	assert.NotContains(t, prompt, "Write Tool Instructions")
+	assert.NotContains(t, prompt, "Bash Tool Instructions")
 }
 
 func TestConfPromptGenerator_GetPrompt_ToolsFiltering(t *testing.T) {
-	// Import the mock config store
+	// Create mock store with fragments
 	mockStore := newMockConfigStoreWithFragments()
 
 	// Create generator
@@ -421,12 +428,14 @@ func TestConfPromptGenerator_GetPrompt_ToolsFiltering(t *testing.T) {
 	prompt, err := gen.GetPrompt([]string{"all"}, &role, state)
 	require.NoError(t, err)
 
-	// Should have read tool instructions
-	assert.Contains(t, prompt, "Read Tool Instructions")
-
-	// Should NOT have write or bash tool instructions
+	// System prompt should NOT have tool instructions (they're now separate)
+	assert.NotContains(t, prompt, "Read Tool Instructions")
 	assert.NotContains(t, prompt, "Write Tool Instructions")
 	assert.NotContains(t, prompt, "Bash Tool Instructions")
+
+	// Should have core instructions
+	assert.Contains(t, prompt, "All Core Instructions")
+	assert.Contains(t, prompt, "General Guidelines")
 }
 
 // newMockConfigStoreWithFragments creates a mock config store with test fragment data.

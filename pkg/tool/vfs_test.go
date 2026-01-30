@@ -74,17 +74,6 @@ func TestVFSReadTool(t *testing.T) {
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
 	})
-
-	t.Run("should have correct tool info", func(t *testing.T) {
-		mockVFS := vfs.NewMockVFS()
-		tool := NewVFSReadTool(mockVFS)
-		info := tool.Info()
-		assert.Equal(t, "vfs.read", info.Name)
-		assert.NotEmpty(t, info.Description)
-		assert.Equal(t, SchemaTypeObject, info.Schema.Type)
-		assert.Contains(t, info.Schema.Properties, "path")
-		assert.Equal(t, []string{"path"}, info.Schema.Required)
-	})
 }
 
 func TestVFSWriteTool(t *testing.T) {
@@ -155,19 +144,6 @@ func TestVFSWriteTool(t *testing.T) {
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
 	})
-
-	t.Run("should have correct tool info", func(t *testing.T) {
-		mockVFS := vfs.NewMockVFS()
-		tool := NewVFSWriteTool(mockVFS)
-		info := tool.Info()
-		assert.Equal(t, "vfs.write", info.Name)
-		assert.NotEmpty(t, info.Description)
-		assert.Equal(t, SchemaTypeObject, info.Schema.Type)
-		assert.Contains(t, info.Schema.Properties, "path")
-		assert.Contains(t, info.Schema.Properties, "content")
-		assert.Contains(t, info.Schema.Required, "path")
-		assert.Contains(t, info.Schema.Required, "content")
-	})
 }
 
 func TestVFSDeleteTool(t *testing.T) {
@@ -237,17 +213,6 @@ func TestVFSDeleteTool(t *testing.T) {
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
-	})
-
-	t.Run("should have correct tool info", func(t *testing.T) {
-		mockVFS := vfs.NewMockVFS()
-		tool := NewVFSDeleteTool(mockVFS)
-		info := tool.Info()
-		assert.Equal(t, "vfs.delete", info.Name)
-		assert.NotEmpty(t, info.Description)
-		assert.Equal(t, SchemaTypeObject, info.Schema.Type)
-		assert.Contains(t, info.Schema.Properties, "path")
-		assert.Equal(t, []string{"path"}, info.Schema.Required)
 	})
 }
 
@@ -349,17 +314,6 @@ func TestVFSListTool(t *testing.T) {
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
 	})
-
-	t.Run("should have correct tool info", func(t *testing.T) {
-		mockVFS := vfs.NewMockVFS()
-		tool := NewVFSListTool(mockVFS)
-		info := tool.Info()
-		assert.Equal(t, "vfs.list", info.Name)
-		assert.NotEmpty(t, info.Description)
-		assert.Equal(t, SchemaTypeObject, info.Schema.Type)
-		assert.Contains(t, info.Schema.Properties, "path")
-		assert.Equal(t, []string{"path"}, info.Schema.Required)
-	})
 }
 
 func TestVFSMoveTool(t *testing.T) {
@@ -458,19 +412,6 @@ func TestVFSMoveTool(t *testing.T) {
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
-	})
-
-	t.Run("should have correct tool info", func(t *testing.T) {
-		mockVFS := vfs.NewMockVFS()
-		tool := NewVFSMoveTool(mockVFS)
-		info := tool.Info()
-		assert.Equal(t, "vfs.move", info.Name)
-		assert.NotEmpty(t, info.Description)
-		assert.Equal(t, SchemaTypeObject, info.Schema.Type)
-		assert.Contains(t, info.Schema.Properties, "path")
-		assert.Contains(t, info.Schema.Properties, "destination")
-		assert.Contains(t, info.Schema.Required, "path")
-		assert.Contains(t, info.Schema.Required, "destination")
 	})
 }
 
@@ -1164,20 +1105,6 @@ func TestVFSFindTool(t *testing.T) {
 		assert.Contains(t, files, "test_dir")
 		assert.Contains(t, files, "test_other")
 	})
-
-	t.Run("should have correct tool info", func(t *testing.T) {
-		mockVFS := vfs.NewMockVFS()
-		tool := NewVFSFindTool(mockVFS)
-		info := tool.Info()
-		assert.Equal(t, "vfs.find", info.Name)
-		assert.NotEmpty(t, info.Description)
-		assert.Equal(t, SchemaTypeObject, info.Schema.Type)
-		assert.Contains(t, info.Schema.Properties, "query")
-		assert.Contains(t, info.Schema.Properties, "recursive")
-		assert.Equal(t, []string{"query"}, info.Schema.Required)
-		assert.Equal(t, SchemaTypeString, info.Schema.Properties["query"].Type)
-		assert.Equal(t, SchemaTypeBoolean, info.Schema.Properties["recursive"].Type)
-	})
 }
 
 func TestVFSFindToolPermissionQuery(t *testing.T) {
@@ -1554,23 +1481,6 @@ func TestVFSEditTool(t *testing.T) {
 		result, err := mockVFS.ReadFile("test.txt")
 		require.NoError(t, err)
 		assert.Equal(t, "first\nline2\nline3\nfirst\nline4", string(result))
-	})
-
-	t.Run("should have correct tool info", func(t *testing.T) {
-		mockVFS := vfs.NewMockVFS()
-		tool := NewVFSEditTool(mockVFS)
-		info := tool.Info()
-		assert.Equal(t, "vfs.edit", info.Name)
-		assert.NotEmpty(t, info.Description)
-		assert.Equal(t, SchemaTypeObject, info.Schema.Type)
-		assert.Contains(t, info.Schema.Properties, "filePath")
-		assert.Contains(t, info.Schema.Properties, "oldString")
-		assert.Contains(t, info.Schema.Properties, "newString")
-		assert.Contains(t, info.Schema.Properties, "replaceAll")
-		assert.Contains(t, info.Schema.Required, "filePath")
-		assert.Contains(t, info.Schema.Required, "oldString")
-		assert.Contains(t, info.Schema.Required, "newString")
-		assert.NotContains(t, info.Schema.Required, "replaceAll")
 	})
 }
 
