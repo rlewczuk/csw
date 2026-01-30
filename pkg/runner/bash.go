@@ -26,22 +26,39 @@ func NewBashRunner(workdir string, timeout time.Duration) *BashRunner {
 
 // RunCommand runs the given command and returns the output and exit code.
 func (r *BashRunner) RunCommand(command string) (string, int, error) {
+	return r.RunCommandWithOptions(command, CommandOptions{})
+}
+
+// RunCommandWithOptions runs the given command with options and returns the output and exit code.
+func (r *BashRunner) RunCommandWithOptions(command string, options CommandOptions) (string, int, error) {
 	if command == "" {
-		return "", 1, fmt.Errorf("BashRunner.RunCommand() [bash.go]: command cannot be empty")
+		return "", 1, fmt.Errorf("BashRunner.RunCommandWithOptions() [bash.go]: command cannot be empty")
+	}
+
+	// Determine the working directory to use
+	workdir := r.workdir
+	if options.Workdir != "" {
+		workdir = options.Workdir
+	}
+
+	// Determine the timeout to use
+	timeout := r.timeout
+	if options.Timeout > 0 {
+		timeout = options.Timeout
 	}
 
 	var ctx context.Context
 	var cancel context.CancelFunc
 
-	if r.timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), r.timeout)
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 	} else {
 		ctx = context.Background()
 	}
 
 	cmd := exec.CommandContext(ctx, "bash", "-c", command)
-	cmd.Dir = r.workdir
+	cmd.Dir = workdir
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -63,13 +80,13 @@ func (r *BashRunner) RunCommand(command string) (string, int, error) {
 	exitCode := 0
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return output, 124, fmt.Errorf("BashRunner.RunCommand() [bash.go]: command timed out after %v", r.timeout)
+			return output, 124, fmt.Errorf("BashRunner.RunCommandWithOptions() [bash.go]: command timed out after %v", timeout)
 		}
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
 			// Other errors (e.g., command not found)
-			return output, 127, fmt.Errorf("BashRunner.RunCommand() [bash.go]: %w", err)
+			return output, 127, fmt.Errorf("BashRunner.RunCommandWithOptions() [bash.go]: %w", err)
 		}
 	}
 

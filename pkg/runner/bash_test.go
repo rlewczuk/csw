@@ -289,3 +289,138 @@ func TestBashRunner_ConcurrentExecution(t *testing.T) {
 		}
 	}
 }
+
+func TestBashRunner_RunCommandWithOptions_Workdir(t *testing.T) {
+	// Create a temporary directory structure
+	tmpDir, err := os.MkdirTemp("", "bash-runner-options-workdir-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Create a subdirectory
+	subDir := filepath.Join(tmpDir, "subdir")
+	err = os.Mkdir(subDir, 0755)
+	require.NoError(t, err)
+
+	// Create a test file in the subdirectory
+	testFile := filepath.Join(subDir, "test.txt")
+	err = os.WriteFile(testFile, []byte("test content"), 0644)
+	require.NoError(t, err)
+
+	runner := NewBashRunner(tmpDir, 5*time.Second)
+
+	// Test running command in subdirectory
+	options := CommandOptions{
+		Workdir: subDir,
+	}
+
+	output, exitCode, err := runner.RunCommandWithOptions("pwd", options)
+	require.NoError(t, err)
+	assert.Equal(t, 0, exitCode)
+	assert.Contains(t, strings.TrimSpace(output), "subdir")
+
+	// Test reading file from subdirectory
+	output, exitCode, err = runner.RunCommandWithOptions("cat test.txt", options)
+	require.NoError(t, err)
+	assert.Equal(t, 0, exitCode)
+	assert.Contains(t, output, "test content")
+}
+
+func TestBashRunner_RunCommandWithOptions_Timeout(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "bash-runner-options-timeout-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	runner := NewBashRunner(tmpDir, 5*time.Second)
+
+	// Test with custom timeout that should succeed
+	options := CommandOptions{
+		Timeout: 2 * time.Second,
+	}
+
+	output, exitCode, err := runner.RunCommandWithOptions("sleep 0.1 && echo 'done'", options)
+	require.NoError(t, err)
+	assert.Equal(t, 0, exitCode)
+	assert.Contains(t, output, "done")
+
+	// Test with custom timeout that should fail
+	options.Timeout = 100 * time.Millisecond
+	output, exitCode, err = runner.RunCommandWithOptions("sleep 5", options)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "timed out")
+	assert.Equal(t, 124, exitCode)
+}
+
+func TestBashRunner_RunCommandWithOptions_WorkdirAndTimeout(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "bash-runner-options-both-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Create a subdirectory
+	subDir := filepath.Join(tmpDir, "subdir")
+	err = os.Mkdir(subDir, 0755)
+	require.NoError(t, err)
+
+	runner := NewBashRunner(tmpDir, 10*time.Second)
+
+	// Test with both workdir and timeout
+	options := CommandOptions{
+		Workdir: subDir,
+		Timeout: 2 * time.Second,
+	}
+
+	output, exitCode, err := runner.RunCommandWithOptions("pwd", options)
+	require.NoError(t, err)
+	assert.Equal(t, 0, exitCode)
+	assert.Contains(t, strings.TrimSpace(output), "subdir")
+}
+
+func TestBashRunner_RunCommandWithOptions_EmptyOptions(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "bash-runner-options-empty-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	runner := NewBashRunner(tmpDir, 5*time.Second)
+
+	// Test with empty options - should use defaults
+	options := CommandOptions{}
+
+	output, exitCode, err := runner.RunCommandWithOptions("echo 'test'", options)
+	require.NoError(t, err)
+	assert.Equal(t, 0, exitCode)
+	assert.Contains(t, output, "test")
+}
+
+func TestBashRunner_RunCommandWithOptions_OverrideDefaults(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "bash-runner-options-override-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Create a subdirectory
+	subDir := filepath.Join(tmpDir, "subdir")
+	err = os.Mkdir(subDir, 0755)
+	require.NoError(t, err)
+
+	// Create runner with default workdir and timeout
+	runner := NewBashRunner(tmpDir, 10*time.Second)
+
+	// Override both with options
+	options := CommandOptions{
+		Workdir: subDir,
+		Timeout: 1 * time.Second,
+	}
+
+	// This should use the subdirectory, not tmpDir
+	output, exitCode, err := runner.RunCommandWithOptions("pwd", options)
+	require.NoError(t, err)
+	assert.Equal(t, 0, exitCode)
+	assert.Contains(t, strings.TrimSpace(output), "subdir")
+
+	// This should timeout in 1 second, not 10
+	start := time.Now()
+	_, exitCode, err = runner.RunCommandWithOptions("sleep 5", options)
+	duration := time.Since(start)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "timed out")
+	assert.Equal(t, 124, exitCode)
+	assert.Less(t, duration, 2*time.Second)
+}

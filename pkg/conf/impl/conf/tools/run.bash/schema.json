@@ -4,6 +4,14 @@
     "command": {
       "type": "string",
       "description": "The bash command to execute."
+    },
+    "workdir": {
+      "type": "string",
+      "description": "Working directory to run the command in. If not specified, project root is used. If relative, it is relative to project root. If absolute, it is used as is but command will require permission from user."
+    },
+    "timeout": {
+      "type": "integer",
+      "description": "Timeout in seconds. If not specified, default timeout is used."
     }
   },
   "required": ["command"]
