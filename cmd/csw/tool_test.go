@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -83,8 +84,16 @@ func TestToolCommand_ListJSON(t *testing.T) {
 	// Extract tool names (just verify we can process them)
 	toolCount := 0
 	for key := range allRole.ToolFragments {
-		if len(key) > len("/schema.json") && key[len(key)-len("/schema.json"):] == "/schema.json" {
-			toolCount++
+		if strings.HasSuffix(key, ".schema.json") {
+			// Check if it's a <toolname>/<toolname>.schema.json pattern
+			parts := strings.Split(key, "/")
+			if len(parts) == 2 {
+				toolName := parts[0]
+				expectedFileName := toolName + ".schema.json"
+				if parts[1] == expectedFileName {
+					toolCount++
+				}
+			}
 		}
 	}
 	assert.Greater(t, toolCount, 0, "should have at least one tool")
@@ -125,12 +134,12 @@ func TestToolCommand_Info(t *testing.T) {
 	require.NotNil(t, allRole.ToolFragments)
 
 	// Check if vfs.read tool exists
-	_, hasSchema := allRole.ToolFragments["vfs.read/schema.json"]
-	_, hasDesc := allRole.ToolFragments["vfs.read/tool.md"]
+	_, hasSchema := allRole.ToolFragments["vfs.read/vfs.read.schema.json"]
+	_, hasDesc := allRole.ToolFragments["vfs.read/vfs.read.md"]
 	if hasSchema && hasDesc {
 		// If vfs.read exists, verify the fragments exist
-		assert.True(t, hasSchema, "vfs.read should have schema.json")
-		assert.True(t, hasDesc, "vfs.read should have tool.md")
+		assert.True(t, hasSchema, "vfs.read should have vfs.read.schema.json")
+		assert.True(t, hasDesc, "vfs.read should have vfs.read.md")
 	}
 }
 
@@ -167,9 +176,9 @@ func TestToolCommand_Desc(t *testing.T) {
 	require.NotNil(t, allRole.ToolFragments)
 
 	// Verify tool description exists
-	_, hasDesc := allRole.ToolFragments["vfs.read/tool.md"]
+	_, hasDesc := allRole.ToolFragments["vfs.read/vfs.read.md"]
 	if hasDesc {
-		desc := allRole.ToolFragments["vfs.read/tool.md"]
+		desc := allRole.ToolFragments["vfs.read/vfs.read.md"]
 		assert.NotEmpty(t, desc, "tool description should not be empty")
 	}
 }
@@ -328,6 +337,6 @@ func TestToolCommand_InfoNotFound(t *testing.T) {
 	require.True(t, exists)
 
 	// Verify that a non-existent tool is not in fragments
-	_, hasSchema := allRole.ToolFragments["nonexistent.tool/schema.json"]
+	_, hasSchema := allRole.ToolFragments["nonexistent.tool/nonexistent.tool.schema.json"]
 	assert.False(t, hasSchema, "nonexistent tool should not have schema")
 }

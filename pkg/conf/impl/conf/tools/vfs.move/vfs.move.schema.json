@@ -1,4 +1,5 @@
 {
+  "description": "Moves or renames a file or directory from one path to another.",
   "type": "object",
   "properties": {
     "from": {

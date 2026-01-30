@@ -91,9 +91,18 @@ func toolListCommand() *cobra.Command {
 			// Extract tool names and descriptions from tool fragments
 			tools := make(map[string]string)
 			for key := range toolFragments {
-				// Look for schema.json files to identify tools
-				if strings.HasSuffix(key, "/schema.json") {
-					toolName := strings.TrimSuffix(key, "/schema.json")
+				// Look for <toolname>.schema.json files to identify tools
+				if strings.HasSuffix(key, ".schema.json") {
+					// Extract tool name from key (e.g., "vfs.read/vfs.read.schema.json" -> "vfs.read")
+					parts := strings.Split(key, "/")
+					if len(parts) != 2 {
+						continue
+					}
+					toolName := parts[0]
+					expectedFileName := toolName + ".schema.json"
+					if parts[1] != expectedFileName {
+						continue
+					}
 
 					// Check if tool is accessible for this role
 					if roleConfig != nil {
@@ -109,8 +118,8 @@ func toolListCommand() *cobra.Command {
 						}
 					}
 
-					// Look for tool.md to get description
-					descKey := toolName + "/tool.md"
+					// Look for <toolname>.md to get description
+					descKey := toolName + "/" + toolName + ".md"
 					if desc, ok := toolFragments[descKey]; ok {
 						// Use ToolInfo.ShortDescription() to extract first line
 						toolInfo := tool.ToolInfo{
@@ -171,7 +180,7 @@ func toolInfoCommand() *cobra.Command {
 				return fmt.Errorf("toolInfoCommand() [tool.go]: 'all' role not found")
 			}
 
-			// Get tool info with empty tags (will use default tool.md)
+			// Get tool info with empty tags (will use default <toolname>.md)
 			toolInfo, err := promptGenerator.GetToolInfo([]string{}, toolName, allRole, &core.AgentState{})
 			if err != nil {
 				return fmt.Errorf("toolInfoCommand() [tool.go]: failed to get tool info: %w", err)
@@ -224,7 +233,7 @@ func toolDescCommand() *cobra.Command {
 				return fmt.Errorf("toolDescCommand() [tool.go]: 'all' role not found")
 			}
 
-			// Get tool info with empty tags (will use default tool.md)
+			// Get tool info with empty tags (will use default <toolname>.md)
 			toolInfo, err := promptGenerator.GetToolInfo([]string{}, toolName, allRole, &core.AgentState{})
 			if err != nil {
 				return fmt.Errorf("toolDescCommand() [tool.go]: failed to get tool info: %w", err)
