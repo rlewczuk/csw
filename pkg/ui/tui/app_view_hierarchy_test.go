@@ -26,6 +26,15 @@ func (m *hierarchyMockPromptGen) GetPrompt(tags []string, role *conf.AgentRoleCo
 	return "You are a helpful assistant.", nil
 }
 
+func (m *hierarchyMockPromptGen) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *core.AgentState) (tool.ToolInfo, error) {
+	schema := tool.NewToolSchema()
+	return tool.ToolInfo{
+		Name:        toolName,
+		Description: "Mock tool for testing",
+		Schema:      schema,
+	}, nil
+}
+
 // TestAppViewWidgetHierarchy verifies that all widgets in the TAppView hierarchy
 // have their Parent fields set correctly.
 func TestAppViewWidgetHierarchy(t *testing.T) {
@@ -42,6 +51,7 @@ func TestAppViewWidgetHierarchy(t *testing.T) {
 
 	system := &core.SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
 		PromptGenerator:      &hierarchyMockPromptGen{},
 		Tools:                tools,
 		VFS:                  vfsInstance,

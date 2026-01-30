@@ -27,6 +27,15 @@ func (m *appViewMockPromptGen) GetPrompt(tags []string, role *conf.AgentRoleConf
 	return "You are a helpful assistant.", nil
 }
 
+func (m *appViewMockPromptGen) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *core.AgentState) (tool.ToolInfo, error) {
+	schema := tool.NewToolSchema()
+	return tool.ToolInfo{
+		Name:        toolName,
+		Description: "Mock tool for testing",
+		Schema:      schema,
+	}, nil
+}
+
 func TestAppViewWithChatIntegration(t *testing.T) {
 	t.Run("chat response appears in app view without user interaction", func(t *testing.T) {
 		// Setup mock LLM server
@@ -42,6 +51,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      &appViewMockPromptGen{},
 			Tools:                tools,
 			VFS:                  vfsInstance,
@@ -151,6 +161,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      &appViewMockPromptGen{},
 			Tools:                tools,
 			VFS:                  vfsInstance,
@@ -246,6 +257,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      &appViewMockPromptGen{},
 			Tools:                tools,
 			VFS:                  vfsInstance,
@@ -332,6 +344,7 @@ func TestAppViewMenuInteraction(t *testing.T) {
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      &appViewMockPromptGen{},
 			Tools:                tools,
 			VFS:                  vfsInstance,
@@ -405,6 +418,7 @@ func TestAppViewMenuInteraction(t *testing.T) {
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      &appViewMockPromptGen{},
 			Tools:                tools,
 			VFS:                  vfsInstance,

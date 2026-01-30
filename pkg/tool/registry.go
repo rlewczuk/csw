@@ -21,15 +21,6 @@ func NewToolRegistry() *ToolRegistry {
 	}
 }
 
-// Info returns information about the tool registry.
-func (r *ToolRegistry) Info() ToolInfo {
-	return ToolInfo{
-		Name:        "registry",
-		Description: "A registry of tools that can be executed by name.",
-		Schema:      NewToolSchema(),
-	}
-}
-
 // Register registers a tool under the given name(s).
 // A tool can be registered under multiple names.
 func (r *ToolRegistry) Register(name string, tool Tool) {
@@ -53,15 +44,6 @@ func (r *ToolRegistry) List() []string {
 		names = append(names, name)
 	}
 	return names
-}
-
-// ListInfo returns ToolInfo for all registered tools.
-func (r *ToolRegistry) ListInfo() []ToolInfo {
-	infos := make([]ToolInfo, 0, len(r.tools))
-	for _, tool := range r.tools {
-		infos = append(infos, tool.Info())
-	}
-	return infos
 }
 
 // Execute executes the tool with the given function name and arguments.

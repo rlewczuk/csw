@@ -460,7 +460,31 @@ func (s *SweSession) Run(ctx context.Context) error {
 	}
 
 	chatModel := s.provider.ChatModel(s.model, nil)
-	tools := s.Tools.ListInfo()
+
+	// Build tools list using PromptGenerator.GetToolInfo()
+	tools := []tool.ToolInfo{}
+	toolNames := s.Tools.List()
+
+	// Get model tags for this model
+	tags := s.system.ModelTags.GetTagsForModel(s.providerName, s.model)
+
+	// Get agent state for template processing
+	state := s.GetState()
+
+	for _, toolName := range toolNames {
+		toolInfo, err := s.system.PromptGenerator.GetToolInfo(tags, toolName, s.role, &state)
+		if err != nil {
+			// Log warning and skip this tool if description not found
+			if s.logger != nil {
+				s.logger.Warn("failed to get tool info, skipping tool",
+					"tool_name", toolName,
+					"error", err,
+				)
+			}
+			continue
+		}
+		tools = append(tools, toolInfo)
+	}
 
 	// Keep processing until the assistant doesn't make any tool calls
 	for {

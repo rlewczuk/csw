@@ -524,8 +524,6 @@ type ToolInfo struct {
 // It is responsible for executing the tool and returning the response.
 // It can also represent a group of tools, delegating execution to other tools.
 type Tool interface {
-	// Info returns information about the tool including its name, description, and argument schema.
-	Info() ToolInfo
 	// Execute executes the tool with the given arguments and returns the response.
 	Execute(args ToolCall) ToolResponse
 }

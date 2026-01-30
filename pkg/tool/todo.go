@@ -30,45 +30,6 @@ func NewTodoWriteTool(session TodoSession) *TodoWriteTool {
 	return &TodoWriteTool{session: session}
 }
 
-// Info returns information about the tool including its name, description, and argument schema.
-func (t *TodoWriteTool) Info() ToolInfo {
-	schema := NewToolSchema()
-	schema.AddProperty("todos", PropertySchema{
-		Type:        SchemaTypeArray,
-		Description: "Array of todo items to set as the complete todo list.",
-		Items: &PropertySchema{
-			Type: SchemaTypeObject,
-			Properties: map[string]PropertySchema{
-				"id": {
-					Type:        SchemaTypeString,
-					Description: "Unique identifier for the todo item (UUIDv7 string).",
-				},
-				"content": {
-					Type:        SchemaTypeString,
-					Description: "Brief description of the task.",
-				},
-				"status": {
-					Type:        SchemaTypeString,
-					Description: "Status of the task.",
-					Enum:        []string{"pending", "in_progress", "completed", "cancelled"},
-				},
-				"priority": {
-					Type:        SchemaTypeString,
-					Description: "Priority level of the task.",
-					Enum:        []string{"low", "medium", "high"},
-				},
-			},
-			Required: []string{"id", "content", "status", "priority"},
-		},
-	}, true)
-
-	return ToolInfo{
-		Name:        "todo.write",
-		Description: "Updates the todo list with the provided array of todo items. This replaces the entire list.",
-		Schema:      schema,
-	}
-}
-
 // Execute executes the tool with the given arguments and returns the response.
 func (t *TodoWriteTool) Execute(args ToolCall) ToolResponse {
 	todosValue, ok := args.Arguments.GetOK("todos")
@@ -186,17 +147,6 @@ type TodoReadTool struct {
 // NewTodoReadTool creates a new TodoReadTool instance.
 func NewTodoReadTool(session TodoSession) *TodoReadTool {
 	return &TodoReadTool{session: session}
-}
-
-// Info returns information about the tool including its name, description, and argument schema.
-func (t *TodoReadTool) Info() ToolInfo {
-	schema := NewToolSchema()
-
-	return ToolInfo{
-		Name:        "todo.read",
-		Description: "Retrieves the current todo list with all items and a count of pending/in_progress tasks.",
-		Schema:      schema,
-	}
 }
 
 // Execute executes the tool with the given arguments and returns the response.

@@ -22,6 +22,15 @@ func (s *stateAwarePromptGenerator) GetPrompt(tags []string, role *conf.AgentRol
 	return fmt.Sprintf("You are a developer. Work dir: %s", state.Info.WorkDir), nil
 }
 
+func (s *stateAwarePromptGenerator) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *AgentState) (tool.ToolInfo, error) {
+	schema := tool.NewToolSchema()
+	return tool.ToolInfo{
+		Name:        toolName,
+		Description: "Mock tool for testing",
+		Schema:      schema,
+	}, nil
+}
+
 func TestAgentRoleRegistry(t *testing.T) {
 	t.Run("Get retrieves role from config store", func(t *testing.T) {
 		mockStore := impl.NewMockConfigStore()
@@ -203,6 +212,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+		ModelTags:            models.NewModelTagRegistry(),
 			Tools:                tools,
 			VFS:                  mockVFS,
 			Roles:                registry,
@@ -228,6 +238,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+		ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      newMockPromptGenerator("You are an experienced software developer."),
 			Tools:                tools,
 			VFS:                  mockVFS,
@@ -261,6 +272,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+		ModelTags:            models.NewModelTagRegistry(),
 			Tools:                tools,
 			VFS:                  mockVFS,
 			Roles:                registry,
@@ -302,6 +314,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+		ModelTags:            models.NewModelTagRegistry(),
 			Tools:                tools,
 			VFS:                  mockVFS,
 			Roles:                registry,
@@ -346,6 +359,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+		ModelTags:            models.NewModelTagRegistry(),
 			Tools:                tools,
 			VFS:                  mockVFS,
 			Roles:                registry,
@@ -370,6 +384,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+		ModelTags:            models.NewModelTagRegistry(),
 			Tools:                tools,
 			VFS:                  mockVFS,
 			Roles:                registry,
@@ -426,6 +441,7 @@ func TestSweSessionGetState(t *testing.T) {
 	t.Run("GetState returns current work directory", func(t *testing.T) {
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+		ModelTags:            models.NewModelTagRegistry(),
 			Tools:                tools,
 			VFS:                  mockVFS,
 			Roles:                registry,
@@ -442,6 +458,7 @@ func TestSweSessionGetState(t *testing.T) {
 	t.Run("SetWorkDir updates work directory in state", func(t *testing.T) {
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+		ModelTags:            models.NewModelTagRegistry(),
 			Tools:                tools,
 			VFS:                  mockVFS,
 			Roles:                registry,
@@ -474,6 +491,7 @@ func TestSweSessionGetState(t *testing.T) {
 
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+		ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      mockGen,
 			Tools:                tools,
 			VFS:                  mockVFS,

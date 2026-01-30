@@ -25,6 +25,15 @@ func (m *mockPromptGen) GetPrompt(tags []string, role *conf.AgentRoleConfig, sta
 	return "You are skilled software developer.", nil
 }
 
+func (m *mockPromptGen) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *core.AgentState) (tool.ToolInfo, error) {
+	schema := tool.NewToolSchema()
+	return tool.ToolInfo{
+		Name:        toolName,
+		Description: "Mock tool for testing",
+		Schema:      schema,
+	}, nil
+}
+
 func setupTestSystem(t *testing.T) (*core.SweSystem, *testutil.MockHTTPServer, vfs.VFS) {
 	mockServer := testutil.NewMockHTTPServer()
 	t.Cleanup(func() { mockServer.Close() })
@@ -39,6 +48,7 @@ func setupTestSystem(t *testing.T) (*core.SweSystem, *testutil.MockHTTPServer, v
 
 	system := &core.SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
 		PromptGenerator:      &mockPromptGen{},
 		Tools:                tools,
 		VFS:                  vfsInstance,

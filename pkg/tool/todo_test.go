@@ -234,18 +234,6 @@ func TestTodoWriteTool(t *testing.T) {
 		assert.True(t, response.Done)
 		assert.Contains(t, response.Error.Error(), "invalid priority")
 	})
-
-	t.Run("should have correct tool info", func(t *testing.T) {
-		mockSession := NewMockTodoSession()
-		tool := NewTodoWriteTool(mockSession)
-		info := tool.Info()
-		assert.Equal(t, "todo.write", info.Name)
-		assert.NotEmpty(t, info.Description)
-		assert.Equal(t, SchemaTypeObject, info.Schema.Type)
-		assert.Contains(t, info.Schema.Properties, "todos")
-		assert.Equal(t, []string{"todos"}, info.Schema.Required)
-		assert.Equal(t, SchemaTypeArray, info.Schema.Properties["todos"].Type)
-	})
 }
 
 func TestTodoReadTool(t *testing.T) {
@@ -320,15 +308,6 @@ func TestTodoReadTool(t *testing.T) {
 
 		// Check pending count (2 items: pending + in_progress)
 		assert.Equal(t, int64(2), response.Result.Get("pending").AsInt())
-	})
-
-	t.Run("should have correct tool info", func(t *testing.T) {
-		mockSession := NewMockTodoSession()
-		tool := NewTodoReadTool(mockSession)
-		info := tool.Info()
-		assert.Equal(t, "todo.read", info.Name)
-		assert.NotEmpty(t, info.Description)
-		assert.Equal(t, SchemaTypeObject, info.Schema.Type)
 	})
 }
 
