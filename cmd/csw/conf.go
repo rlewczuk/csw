@@ -14,6 +14,7 @@ func ConfCommand() *cobra.Command {
 
 	// Add subcommands
 	cmd.AddCommand(ProviderCommand())
+	cmd.AddCommand(RoleCommand())
 
 	return cmd
 }

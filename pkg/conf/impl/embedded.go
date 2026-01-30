@@ -78,7 +78,9 @@ func (s *EmbeddedConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 
 	// Return a copy to prevent external modification
 	config := &conf.GlobalConfig{
-		ModelTags: make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
+		ModelTags:       make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
+		DefaultProvider: s.globalConfig.DefaultProvider,
+		DefaultRole:     s.globalConfig.DefaultRole,
 	}
 	copy(config.ModelTags, s.globalConfig.ModelTags)
 
