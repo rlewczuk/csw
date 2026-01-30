@@ -460,7 +460,7 @@ func (s *SweSession) Run(ctx context.Context) error {
 	}
 
 	chatModel := s.provider.ChatModel(s.model, nil)
-	tools := s.system.Tools.ListInfo()
+	tools := s.Tools.ListInfo()
 
 	// Keep processing until the assistant doesn't make any tool calls
 	for {
