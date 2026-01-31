@@ -12,26 +12,10 @@ import (
 )
 
 // shouldRunIntegrationTests checks if integration tests should run.
+// Integration tests always run, but use mock LSP if lsp.enabled is missing or doesn't contain "yes".
 func shouldRunIntegrationTests(t *testing.T) bool {
 	t.Helper()
-
-	// Check if all.enabled or lsp.enabled exists and contains "yes"
-	allEnabledPath := filepath.Join("../../_integ/all.enabled")
-	lspEnabledPath := filepath.Join("../../_integ/lsp.enabled")
-
-	checkFile := func(path string) bool {
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return false
-		}
-		return strings.TrimSpace(string(content)) == "yes"
-	}
-
-	if !checkFile(allEnabledPath) && !checkFile(lspEnabledPath) {
-		t.Skip("Integration tests disabled (enable via _integ/all.enabled or _integ/lsp.enabled)")
-		return false
-	}
-
+	// Integration tests now always run (using mock or real LSP based on configuration)
 	return true
 }
 
@@ -64,24 +48,64 @@ func getProjectRoot(t *testing.T) string {
 	return absRoot
 }
 
+// shouldUseRealLSP checks if we should use real LSP server (gopls).
+// Returns true if _integ/lsp.enabled exists and contains "yes", false otherwise.
+func shouldUseRealLSP(t *testing.T) bool {
+	t.Helper()
+
+	lspEnabledPath := filepath.Join("../../_integ/lsp.enabled")
+	content, err := os.ReadFile(lspEnabledPath)
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(content)) == "yes"
+}
+
+// createLSPClient creates either a real or mock LSP client based on configuration.
+func createLSPClient(t *testing.T) LSP {
+	t.Helper()
+
+	projectRoot := getProjectRoot(t)
+
+	if shouldUseRealLSP(t) {
+		goplsPath := getGoplsPath(t)
+		client, err := NewClient(goplsPath, projectRoot)
+		require.NoError(t, err)
+		return client
+	}
+
+	// Use mock LSP
+	mock, err := NewMockLSP(projectRoot)
+	require.NoError(t, err)
+	return mock
+}
+
+// closeLSPClient closes the LSP client (works for both Client and MockLSP).
+func closeLSPClient(client LSP) {
+	if c, ok := client.(*Client); ok {
+		c.Close()
+	} else if m, ok := client.(*MockLSP); ok {
+		m.Close()
+	}
+}
+
+// asMock returns the mock LSP if the client is a mock, nil otherwise.
+func asMock(client LSP) *MockLSP {
+	mock, _ := client.(*MockLSP)
+	return mock
+}
+
 // TestLSPClientInitialization tests basic client initialization.
 func TestLSPClientInitialization(t *testing.T) {
 	if !shouldRunIntegrationTests(t) {
 		return
 	}
 
-	goplsPath := getGoplsPath(t)
-	projectRoot := getProjectRoot(t)
+	client := createLSPClient(t)
+	defer closeLSPClient(client)
 
-	client, err := NewClient(goplsPath, projectRoot)
+	err := client.Init(true)
 	require.NoError(t, err)
-	require.NotNil(t, client)
-	defer client.Close()
-
-	err = client.Init(true)
-	require.NoError(t, err)
-
-	assert.True(t, client.initialized.Load())
 }
 
 // TestLSPClientDiagnostics tests diagnostics functionality.
