@@ -746,6 +746,7 @@ func (s *SweSession) SetRole(roleName string) error {
 	// Line numbers are enabled by default for vfs.read
 	s.Tools.Register("vfs.read", tool.NewVFSReadTool(s.VFS, true))
 	s.Tools.Register("vfs.write", tool.NewVFSWriteTool(s.VFS))
+	s.Tools.Register("vfs.edit", tool.NewVFSEditTool(s.VFS))
 	s.Tools.Register("vfs.delete", tool.NewVFSDeleteTool(s.VFS))
 	s.Tools.Register("vfs.ls", tool.NewVFSListTool(s.VFS))
 	s.Tools.Register("vfs.move", tool.NewVFSMoveTool(s.VFS))

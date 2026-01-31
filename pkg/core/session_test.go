@@ -417,3 +417,220 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 		assert.Contains(t, content, "(Results are truncated. Consider using a more specific path or pattern.)")
 	})
 }
+
+func TestSessionEditToolIntegration(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+	require.NoError(t, err)
+	vfsInstance := vfs.NewMockVFS()
+
+	// Setup test file in VFS
+	err = vfsInstance.WriteFile("test.txt", []byte("hello world\ngoodbye world"))
+	require.NoError(t, err)
+
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfsInstance)
+
+	system := &SweSystem{
+		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
+		Tools:                tools,
+		VFS:                  vfsInstance,
+		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+	}
+
+	t.Run("edit tool replaces unique occurrence and returns diff", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		controller := NewSessionThread(system, mockHandler)
+
+		err := controller.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := controller.GetSession()
+
+		// Verify edit tool is registered
+		editTool, err := session.Tools.Get("vfs.edit")
+		require.NoError(t, err)
+		require.NotNil(t, editTool)
+
+		// Execute edit tool to replace "hello"
+		response := editTool.Execute(tool.ToolCall{
+			ID:       "test-edit-1",
+			Function: "vfs.edit",
+			Arguments: tool.NewToolValue(map[string]any{
+				"path":      "test.txt",
+				"oldString": "hello",
+				"newString": "hi",
+			}),
+		})
+
+		// Verify response
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Verify diff was returned
+		content := response.Result.Get("content").AsString()
+		assert.Contains(t, content, "```diff")
+		assert.Contains(t, content, "-hello world")
+		assert.Contains(t, content, "+hi world")
+
+		// Verify file was modified
+		fileContent, err := vfsInstance.ReadFile("test.txt")
+		require.NoError(t, err)
+		assert.Equal(t, "hi world\ngoodbye world", string(fileContent))
+	})
+
+	t.Run("edit tool replaces all occurrences when replaceAll is true", func(t *testing.T) {
+		// Reset the file
+		err := vfsInstance.WriteFile("test2.txt", []byte("foo bar foo baz"))
+		require.NoError(t, err)
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		controller := NewSessionThread(system, mockHandler)
+
+		err = controller.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := controller.GetSession()
+
+		// Verify edit tool is registered
+		editTool, err := session.Tools.Get("vfs.edit")
+		require.NoError(t, err)
+		require.NotNil(t, editTool)
+
+		// Execute edit tool to replace all "foo"
+		response := editTool.Execute(tool.ToolCall{
+			ID:       "test-edit-2",
+			Function: "vfs.edit",
+			Arguments: tool.NewToolValue(map[string]any{
+				"path":       "test2.txt",
+				"oldString":  "foo",
+				"newString":  "qux",
+				"replaceAll": true,
+			}),
+		})
+
+		// Verify response
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Verify diff was returned
+		content := response.Result.Get("content").AsString()
+		assert.Contains(t, content, "```diff")
+
+		// Verify file was modified
+		fileContent, err := vfsInstance.ReadFile("test2.txt")
+		require.NoError(t, err)
+		assert.Equal(t, "qux bar qux baz", string(fileContent))
+	})
+
+	t.Run("edit tool returns error when oldString not found", func(t *testing.T) {
+		// Reset the file
+		err := vfsInstance.WriteFile("test3.txt", []byte("hello world"))
+		require.NoError(t, err)
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		controller := NewSessionThread(system, mockHandler)
+
+		err = controller.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := controller.GetSession()
+
+		// Execute edit tool with non-existent string
+		editTool, err := session.Tools.Get("vfs.edit")
+		require.NoError(t, err)
+
+		response := editTool.Execute(tool.ToolCall{
+			ID:       "test-edit-3",
+			Function: "vfs.edit",
+			Arguments: tool.NewToolValue(map[string]any{
+				"path":      "test3.txt",
+				"oldString": "goodbye",
+				"newString": "hi",
+			}),
+		})
+
+		// Verify error
+		assert.Error(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Contains(t, response.Error.Error(), "oldString not found")
+	})
+
+	t.Run("edit tool returns error when multiple matches without replaceAll", func(t *testing.T) {
+		// Reset the file
+		err := vfsInstance.WriteFile("test4.txt", []byte("hello world\nhello again"))
+		require.NoError(t, err)
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		controller := NewSessionThread(system, mockHandler)
+
+		err = controller.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := controller.GetSession()
+
+		// Execute edit tool without replaceAll
+		editTool, err := session.Tools.Get("vfs.edit")
+		require.NoError(t, err)
+
+		response := editTool.Execute(tool.ToolCall{
+			ID:       "test-edit-4",
+			Function: "vfs.edit",
+			Arguments: tool.NewToolValue(map[string]any{
+				"path":      "test4.txt",
+				"oldString": "hello",
+				"newString": "hi",
+			}),
+		})
+
+		// Verify error
+		assert.Error(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Contains(t, response.Error.Error(), "oldString found multiple times")
+	})
+
+	t.Run("edit tool handles multiline content correctly", func(t *testing.T) {
+		// Setup multiline file
+		multilineContent := "func main() {\n\tfmt.Println(\"hello\")\n}"
+		err := vfsInstance.WriteFile("test5.go", []byte(multilineContent))
+		require.NoError(t, err)
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		controller := NewSessionThread(system, mockHandler)
+
+		err = controller.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := controller.GetSession()
+
+		// Execute edit tool with multiline replacement
+		editTool, err := session.Tools.Get("vfs.edit")
+		require.NoError(t, err)
+
+		response := editTool.Execute(tool.ToolCall{
+			ID:       "test-edit-5",
+			Function: "vfs.edit",
+			Arguments: tool.NewToolValue(map[string]any{
+				"path":      "test5.go",
+				"oldString": "func main() {\n\tfmt.Println(\"hello\")\n}",
+				"newString": "func main() {\n\tfmt.Println(\"hi\")\n}",
+			}),
+		})
+
+		// Verify response
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Verify diff was returned
+		content := response.Result.Get("content").AsString()
+		assert.Contains(t, content, "```diff")
+
+		// Verify file was modified
+		fileContent, err := vfsInstance.ReadFile("test5.go")
+		require.NoError(t, err)
+		assert.Equal(t, "func main() {\n\tfmt.Println(\"hi\")\n}", string(fileContent))
+	})
+}

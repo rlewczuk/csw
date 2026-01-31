@@ -66,6 +66,7 @@ func (r *ToolRegistry) Execute(args ToolCall) ToolResponse {
 func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS) {
 	registry.Register("vfs.read", NewVFSReadTool(vfsImpl, true))
 	registry.Register("vfs.write", NewVFSWriteTool(vfsImpl))
+	registry.Register("vfs.edit", NewVFSEditTool(vfsImpl))
 	registry.Register("vfs.delete", NewVFSDeleteTool(vfsImpl))
 	registry.Register("vfs.ls", NewVFSListTool(vfsImpl))
 	registry.Register("vfs.move", NewVFSMoveTool(vfsImpl))

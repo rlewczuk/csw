@@ -1495,7 +1495,7 @@ func TestVFSFindToolPermissionQuery(t *testing.T) {
 }
 
 func TestVFSEditTool(t *testing.T) {
-	t.Run("should replace first occurrence by default", func(t *testing.T) {
+	t.Run("should replace first occurrence by default and return error for multiple matches", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
 		err := mockVFS.WriteFile("test.txt", []byte("hello world hello"))
@@ -1503,26 +1503,22 @@ func TestVFSEditTool(t *testing.T) {
 
 		tool := NewVFSEditTool(mockVFS)
 
-		// Execute
+		// Execute - should fail because multiple occurrences without replaceAll
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
 			Function: "vfs.edit",
 			Arguments: NewToolValue(map[string]any{
-				"filePath":  "test.txt",
+				"path":      "test.txt",
 				"oldString": "hello",
 				"newString": "hi",
 			}),
 		})
 
-		// Assert
+		// Assert - should return error for multiple matches
 		assert.Equal(t, "test-id", response.Call.ID)
-		assert.NoError(t, response.Error)
+		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-
-		// Verify only first occurrence was replaced
-		content, err := mockVFS.ReadFile("test.txt")
-		require.NoError(t, err)
-		assert.Equal(t, "hi world hello", string(content))
+		assert.Contains(t, response.Error.Error(), "oldString found multiple times")
 	})
 
 	t.Run("should replace all occurrences when replaceAll is true", func(t *testing.T) {
@@ -1538,7 +1534,7 @@ func TestVFSEditTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfs.edit",
 			Arguments: NewToolValue(map[string]any{
-				"filePath":   "test.txt",
+				"path":       "test.txt",
 				"oldString":  "hello",
 				"newString":  "hi",
 				"replaceAll": true,
@@ -1554,9 +1550,15 @@ func TestVFSEditTool(t *testing.T) {
 		content, err := mockVFS.ReadFile("test.txt")
 		require.NoError(t, err)
 		assert.Equal(t, "hi world hi", string(content))
+
+		// Verify diff was returned
+		diff := response.Result.Get("content").AsString()
+		assert.Contains(t, diff, "```diff")
+		assert.Contains(t, diff, "-hello world hello")
+		assert.Contains(t, diff, "+hi world hi")
 	})
 
-	t.Run("should return error for missing filePath argument", func(t *testing.T) {
+	t.Run("should return error for missing path argument", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
 		tool := NewVFSEditTool(mockVFS)
@@ -1575,7 +1577,7 @@ func TestVFSEditTool(t *testing.T) {
 		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Equal(t, 0, response.Result.Len())
+		assert.Contains(t, response.Error.Error(), "missing required argument: path")
 	})
 
 	t.Run("should return error for missing oldString argument", func(t *testing.T) {
@@ -1588,7 +1590,7 @@ func TestVFSEditTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfs.edit",
 			Arguments: NewToolValue(map[string]any{
-				"filePath":  "test.txt",
+				"path":      "test.txt",
 				"newString": "hi",
 			}),
 		})
@@ -1597,7 +1599,7 @@ func TestVFSEditTool(t *testing.T) {
 		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Equal(t, 0, response.Result.Len())
+		assert.Contains(t, response.Error.Error(), "missing required argument: oldString")
 	})
 
 	t.Run("should return error for missing newString argument", func(t *testing.T) {
@@ -1610,7 +1612,7 @@ func TestVFSEditTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfs.edit",
 			Arguments: NewToolValue(map[string]any{
-				"filePath":  "test.txt",
+				"path":      "test.txt",
 				"oldString": "hello",
 			}),
 		})
@@ -1619,7 +1621,7 @@ func TestVFSEditTool(t *testing.T) {
 		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Equal(t, 0, response.Result.Len())
+		assert.Contains(t, response.Error.Error(), "missing required argument: newString")
 	})
 
 	t.Run("should return error for non-existent file", func(t *testing.T) {
@@ -1632,7 +1634,7 @@ func TestVFSEditTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfs.edit",
 			Arguments: NewToolValue(map[string]any{
-				"filePath":  "non-existent.txt",
+				"path":      "non-existent.txt",
 				"oldString": "hello",
 				"newString": "hi",
 			}),
@@ -1642,10 +1644,9 @@ func TestVFSEditTool(t *testing.T) {
 		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Equal(t, 0, response.Result.Len())
 	})
 
-	t.Run("should handle empty oldString", func(t *testing.T) {
+	t.Run("should return error when oldString not found", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
 		err := mockVFS.WriteFile("test.txt", []byte("hello world"))
@@ -1658,37 +1659,7 @@ func TestVFSEditTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfs.edit",
 			Arguments: NewToolValue(map[string]any{
-				"filePath":  "test.txt",
-				"oldString": "",
-				"newString": "hi",
-			}),
-		})
-
-		// Assert
-		assert.Equal(t, "test-id", response.Call.ID)
-		assert.NoError(t, response.Error)
-		assert.True(t, response.Done)
-
-		// Verify content unchanged
-		content, err := mockVFS.ReadFile("test.txt")
-		require.NoError(t, err)
-		assert.Equal(t, "hello world", string(content))
-	})
-
-	t.Run("should handle oldString not found", func(t *testing.T) {
-		// Setup
-		mockVFS := vfs.NewMockVFS()
-		err := mockVFS.WriteFile("test.txt", []byte("hello world"))
-		require.NoError(t, err)
-
-		tool := NewVFSEditTool(mockVFS)
-
-		// Execute
-		response := tool.Execute(ToolCall{
-			ID:       "test-id",
-			Function: "vfs.edit",
-			Arguments: NewToolValue(map[string]any{
-				"filePath":  "test.txt",
+				"path":      "test.txt",
 				"oldString": "goodbye",
 				"newString": "hi",
 			}),
@@ -1696,16 +1667,12 @@ func TestVFSEditTool(t *testing.T) {
 
 		// Assert
 		assert.Equal(t, "test-id", response.Call.ID)
-		assert.NoError(t, response.Error)
+		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
-
-		// Verify content unchanged
-		content, err := mockVFS.ReadFile("test.txt")
-		require.NoError(t, err)
-		assert.Equal(t, "hello world", string(content))
+		assert.Contains(t, response.Error.Error(), "oldString not found")
 	})
 
-	t.Run("should replace with empty string", func(t *testing.T) {
+	t.Run("should replace unique occurrence with empty string", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
 		err := mockVFS.WriteFile("test.txt", []byte("hello world"))
@@ -1718,7 +1685,7 @@ func TestVFSEditTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfs.edit",
 			Arguments: NewToolValue(map[string]any{
-				"filePath":  "test.txt",
+				"path":      "test.txt",
 				"oldString": "hello ",
 				"newString": "",
 			}),
@@ -1733,9 +1700,13 @@ func TestVFSEditTool(t *testing.T) {
 		content, err := mockVFS.ReadFile("test.txt")
 		require.NoError(t, err)
 		assert.Equal(t, "world", string(content))
+
+		// Verify diff was returned
+		diff := response.Result.Get("content").AsString()
+		assert.Contains(t, diff, "```diff")
 	})
 
-	t.Run("should handle multiline content", func(t *testing.T) {
+	t.Run("should handle multiline content with replaceAll", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
 		content := "line1\nline2\nline3\nline1\nline4"
@@ -1749,7 +1720,7 @@ func TestVFSEditTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfs.edit",
 			Arguments: NewToolValue(map[string]any{
-				"filePath":   "test.txt",
+				"path":       "test.txt",
 				"oldString":  "line1",
 				"newString":  "first",
 				"replaceAll": true,
@@ -1765,6 +1736,10 @@ func TestVFSEditTool(t *testing.T) {
 		result, err := mockVFS.ReadFile("test.txt")
 		require.NoError(t, err)
 		assert.Equal(t, "first\nline2\nline3\nfirst\nline4", string(result))
+
+		// Verify diff was returned
+		diff := response.Result.Get("content").AsString()
+		assert.Contains(t, diff, "```diff")
 	})
 }
 
@@ -1787,7 +1762,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfs.edit",
 			Arguments: NewToolValue(map[string]any{
-				"filePath":  "test.txt",
+				"path":      "test.txt",
 				"oldString": "hello",
 				"newString": "hi",
 			}),
@@ -1828,7 +1803,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfs.edit",
 			Arguments: NewToolValue(map[string]any{
-				"filePath":  "test.txt",
+				"path":      "test.txt",
 				"oldString": "hello",
 				"newString": "hi",
 			}),
@@ -1854,7 +1829,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 	t.Run("should succeed when read and write access are allow", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
-		err := mockVFS.WriteFile("test.txt", []byte("hello world hello"))
+		err := mockVFS.WriteFile("test.txt", []byte("hello world"))
 		require.NoError(t, err)
 
 		privileges := map[string]conf.FileAccess{
@@ -1869,10 +1844,9 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfs.edit",
 			Arguments: NewToolValue(map[string]any{
-				"filePath":   "test.txt",
-				"oldString":  "hello",
-				"newString":  "hi",
-				"replaceAll": true,
+				"path":      "test.txt",
+				"oldString": "hello",
+				"newString": "hi",
 			}),
 		})
 
@@ -1881,10 +1855,14 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
 
-		// Verify all occurrences were replaced
+		// Verify file was modified
 		content, err := mockVFS.ReadFile("test.txt")
 		require.NoError(t, err)
-		assert.Equal(t, "hi world hi", string(content))
+		assert.Equal(t, "hi world", string(content))
+
+		// Verify diff was returned
+		diff := response.Result.Get("content").AsString()
+		assert.Contains(t, diff, "```diff")
 	})
 
 	t.Run("should fail when read access is deny", func(t *testing.T) {
@@ -1902,7 +1880,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfs.edit",
 			Arguments: NewToolValue(map[string]any{
-				"filePath":  "test.txt",
+				"path":      "test.txt",
 				"oldString": "hello",
 				"newString": "hi",
 			}),
@@ -1933,7 +1911,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfs.edit",
 			Arguments: NewToolValue(map[string]any{
-				"filePath":  "test.txt",
+				"path":      "test.txt",
 				"oldString": "hello",
 				"newString": "hi",
 			}),

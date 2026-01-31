@@ -367,11 +367,11 @@ func NewVFSEditTool(v vfs.VFS) *VFSEditTool {
 
 // Execute executes the tool with the given arguments and returns the response.
 func (t *VFSEditTool) Execute(args ToolCall) ToolResponse {
-	filePath, ok := args.Arguments.StringOK("filePath")
+	path, ok := args.Arguments.StringOK("path")
 	if !ok {
 		return ToolResponse{
 			Call:  &args,
-			Error: fmt.Errorf("VFSEditTool.Execute() [vfs.go]: missing required argument: filePath"),
+			Error: fmt.Errorf("VFSEditTool.Execute() [vfs.go]: missing required argument: path"),
 			Done:  true,
 		}
 	}
@@ -397,35 +397,11 @@ func (t *VFSEditTool) Execute(args ToolCall) ToolResponse {
 	// Get replaceAll flag, default to false if not provided
 	replaceAll := args.Arguments.Bool("replaceAll")
 
-	// Read file content
-	content, err := t.vfs.ReadFile(filePath)
+	// Create patcher and apply edits
+	patcher := vfs.NewFilePatcher(t.vfs)
+	diff, err := patcher.ApplyEdits(path, oldString, newString, replaceAll)
 	if err == vfs.ErrAskPermission {
-		return createPermissionQuery(args, filePath, "reading file", "read")
-	}
-	if perr, ok := err.(*vfs.PermissionError); ok {
-		return createPermissionQuery(args, perr.Path, "reading file", "read")
-	}
-	if err != nil {
-		return ToolResponse{
-			Call:  &args,
-			Error: err,
-			Done:  true,
-		}
-	}
-
-	// Perform the replacement
-	contentStr := string(content)
-	var newContent string
-	if replaceAll {
-		newContent = replaceAllOccurrences(contentStr, oldString, newString)
-	} else {
-		newContent = replaceFirstOccurrence(contentStr, oldString, newString)
-	}
-
-	// Write back the modified content
-	err = t.vfs.WriteFile(filePath, []byte(newContent))
-	if err == vfs.ErrAskPermission {
-		return createPermissionQuery(args, filePath, "editing file", "write")
+		return createPermissionQuery(args, path, "editing file", "write")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
 		return createPermissionQuery(args, perr.Path, "editing file", "write")
@@ -438,52 +414,14 @@ func (t *VFSEditTool) Execute(args ToolCall) ToolResponse {
 		}
 	}
 
+	// Return the diff wrapped in a code block
+	var result ToolValue
+	result.Set("content", "```diff\n"+diff+"```")
 	return ToolResponse{
-		Call: &args,
-		Done: true,
+		Call:   &args,
+		Result: result,
+		Done:   true,
 	}
-}
-
-// replaceFirstOccurrence replaces only the first occurrence of oldString with newString in content.
-func replaceFirstOccurrence(content, oldString, newString string) string {
-	return replaceContent(content, oldString, newString, 1)
-}
-
-// replaceAllOccurrences replaces all occurrences of oldString with newString in content.
-func replaceAllOccurrences(content, oldString, newString string) string {
-	return replaceContent(content, oldString, newString, -1)
-}
-
-// replaceContent replaces up to n occurrences of oldString with newString in content.
-// If n is -1, replaces all occurrences.
-func replaceContent(content, oldString, newString string, n int) string {
-	if oldString == "" {
-		return content
-	}
-	count := 0
-	result := ""
-	for {
-		index := findSubstring(content, oldString)
-		if index == -1 || (n != -1 && count >= n) {
-			result += content
-			break
-		}
-		result += content[:index] + newString
-		content = content[index+len(oldString):]
-		count++
-	}
-	return result
-}
-
-// findSubstring finds the index of the first occurrence of substring in s.
-// Returns -1 if not found.
-func findSubstring(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
 }
 
 // applyOffsetAndLimit applies offset and limit to content by lines.
