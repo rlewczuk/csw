@@ -29,6 +29,22 @@ func (t *VFSReadTool) Execute(args ToolCall) ToolResponse {
 		}
 	}
 
+	// Get limit parameter, default to 2000 if not provided
+	limit := int64(2000)
+	if args.Arguments.Has("limit") {
+		if l, ok := args.Arguments.IntOK("limit"); ok {
+			limit = l
+		}
+	}
+
+	// Get offset parameter, default to 0 if not provided
+	offset := int64(0)
+	if args.Arguments.Has("offset") {
+		if o, ok := args.Arguments.IntOK("offset"); ok {
+			offset = o
+		}
+	}
+
 	content, err := t.vfs.ReadFile(path)
 	if err == vfs.ErrAskPermission {
 		return createPermissionQuery(args, path, "reading file", "read")
@@ -44,8 +60,11 @@ func (t *VFSReadTool) Execute(args ToolCall) ToolResponse {
 		}
 	}
 
+	// Apply offset and limit to content
+	contentStr := applyOffsetAndLimit(string(content), offset, limit)
+
 	var result ToolValue
-	result.Set("content", string(content))
+	result.Set("content", contentStr)
 	return ToolResponse{
 		Call:   &args,
 		Result: result,
@@ -458,4 +477,67 @@ func findSubstring(s, substr string) int {
 		}
 	}
 	return -1
+}
+
+// applyOffsetAndLimit applies offset and limit to content by lines.
+// offset is the number of lines to skip, limit is the maximum number of lines to return.
+func applyOffsetAndLimit(content string, offset, limit int64) string {
+	if content == "" {
+		return ""
+	}
+
+	// Split content into lines
+	lines := splitLines(content)
+
+	// Apply offset
+	if offset >= int64(len(lines)) {
+		return ""
+	}
+	if offset > 0 {
+		lines = lines[offset:]
+	}
+
+	// Apply limit
+	if limit > 0 && int64(len(lines)) > limit {
+		lines = lines[:limit]
+	}
+
+	// Join lines back together
+	return joinLines(lines)
+}
+
+// splitLines splits content into lines, preserving line endings.
+func splitLines(content string) []string {
+	if content == "" {
+		return nil
+	}
+
+	var lines []string
+	start := 0
+	for i := 0; i < len(content); i++ {
+		if content[i] == '\n' {
+			lines = append(lines, content[start:i+1])
+			start = i + 1
+		}
+	}
+
+	// Add remaining content if any (file doesn't end with newline)
+	if start < len(content) {
+		lines = append(lines, content[start:])
+	}
+
+	return lines
+}
+
+// joinLines joins lines back together.
+func joinLines(lines []string) string {
+	if len(lines) == 0 {
+		return ""
+	}
+
+	result := ""
+	for _, line := range lines {
+		result += line
+	}
+	return result
 }
