@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/codesnort/codesnort-swe/pkg/logging"
+	"github.com/codesnort/codesnort-swe/pkg/lsp"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
@@ -37,6 +38,9 @@ type SweSystem struct {
 
 	// Roles
 	Roles *AgentRoleRegistry
+
+	// LSP client for code validation and analysis (optional, can be nil)
+	LSP lsp.LSP
 
 	// Map of sessions by ID
 	sessions map[string]*SweSession
@@ -110,6 +114,7 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		messages:      []*models.ChatMessage{},
 		role:          nil,
 		VFS:           s.VFS,
+		LSP:           s.LSP,
 		Tools:         sessionTools,
 		outputHandler: outputHandler,
 		workDir:       ".",

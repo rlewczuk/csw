@@ -65,8 +65,8 @@ func (r *ToolRegistry) Execute(args ToolCall) ToolResponse {
 // Line numbers are enabled by default for the vfs.read tool.
 func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS) {
 	registry.Register("vfs.read", NewVFSReadTool(vfsImpl, true))
-	registry.Register("vfs.write", NewVFSWriteTool(vfsImpl))
-	registry.Register("vfs.edit", NewVFSEditTool(vfsImpl))
+	registry.Register("vfs.write", NewVFSWriteTool(vfsImpl, nil))
+	registry.Register("vfs.edit", NewVFSEditTool(vfsImpl, nil))
 	registry.Register("vfs.delete", NewVFSDeleteTool(vfsImpl))
 	registry.Register("vfs.ls", NewVFSListTool(vfsImpl))
 	registry.Register("vfs.move", NewVFSMoveTool(vfsImpl))

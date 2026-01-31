@@ -3,7 +3,9 @@ package tool
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
+	"github.com/codesnort/codesnort-swe/pkg/lsp"
 	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
@@ -108,11 +110,13 @@ func createPermissionQuery(args ToolCall, path, action, op string) ToolResponse 
 // VFSWriteTool implements the vfs.write tool.
 type VFSWriteTool struct {
 	vfs vfs.VFS
+	lsp lsp.LSP
 }
 
 // NewVFSWriteTool creates a new VFSWriteTool instance.
-func NewVFSWriteTool(v vfs.VFS) *VFSWriteTool {
-	return &VFSWriteTool{vfs: v}
+// lsp parameter is optional and can be nil.
+func NewVFSWriteTool(v vfs.VFS, l lsp.LSP) *VFSWriteTool {
+	return &VFSWriteTool{vfs: v, lsp: l}
 }
 
 // Execute executes the tool with the given arguments and returns the response.
@@ -150,9 +154,35 @@ func (t *VFSWriteTool) Execute(args ToolCall) ToolResponse {
 		}
 	}
 
+	// Validate with LSP if available
+	var validationMsg string
+	if t.lsp != nil {
+		fileDiags, lspErr := t.lsp.TouchAndValidate(path, true)
+		if lspErr != nil {
+			// LSP validation error - log but don't fail the operation
+			validationMsg = fmt.Sprintf("\n\nWarning: LSP validation failed: %v", lspErr)
+		} else if len(fileDiags) > 0 {
+			// Format diagnostics for the edited file
+			diagsWithURI := make([]DiagnosticWithURI, len(fileDiags))
+			for i, d := range fileDiags {
+				diagsWithURI[i] = DiagnosticWithURI{
+					URI:        pathToURI(path),
+					Diagnostic: d,
+				}
+			}
+			validationMsg = formatDiagnostics(diagsWithURI, path)
+		}
+	}
+
+	var result ToolValue
+	if validationMsg != "" {
+		result.Set("validation", validationMsg)
+	}
+
 	return ToolResponse{
-		Call: &args,
-		Done: true,
+		Call:   &args,
+		Result: result,
+		Done:   true,
 	}
 }
 
@@ -358,11 +388,13 @@ func (t *VFSFindTool) Execute(args ToolCall) ToolResponse {
 // VFSEditTool implements the vfs.edit tool.
 type VFSEditTool struct {
 	vfs vfs.VFS
+	lsp lsp.LSP
 }
 
 // NewVFSEditTool creates a new VFSEditTool instance.
-func NewVFSEditTool(v vfs.VFS) *VFSEditTool {
-	return &VFSEditTool{vfs: v}
+// lsp parameter is optional and can be nil.
+func NewVFSEditTool(v vfs.VFS, l lsp.LSP) *VFSEditTool {
+	return &VFSEditTool{vfs: v, lsp: l}
 }
 
 // Execute executes the tool with the given arguments and returns the response.
@@ -414,9 +446,33 @@ func (t *VFSEditTool) Execute(args ToolCall) ToolResponse {
 		}
 	}
 
-	// Return the diff wrapped in a code block
+	// Validate with LSP if available
+	var validationMsg string
+	if t.lsp != nil {
+		fileDiags, lspErr := t.lsp.TouchAndValidate(path, true)
+		if lspErr != nil {
+			// LSP validation error - log but don't fail the operation
+			validationMsg = fmt.Sprintf("\n\nWarning: LSP validation failed: %v", lspErr)
+		} else if len(fileDiags) > 0 {
+			// Format diagnostics for the edited file
+			diagsWithURI := make([]DiagnosticWithURI, len(fileDiags))
+			for i, d := range fileDiags {
+				diagsWithURI[i] = DiagnosticWithURI{
+					URI:        pathToURI(path),
+					Diagnostic: d,
+				}
+			}
+			validationMsg = formatDiagnostics(diagsWithURI, path)
+		}
+	}
+
+	// Return the diff wrapped in a code block, plus validation results
 	var result ToolValue
-	result.Set("content", "```diff\n"+diff+"```")
+	resultContent := "```diff\n" + diff + "```"
+	if validationMsg != "" {
+		resultContent += validationMsg
+	}
+	result.Set("content", resultContent)
 	return ToolResponse{
 		Call:   &args,
 		Result: result,
@@ -529,4 +585,82 @@ func formatLineNumber(num int64) string {
 	}
 
 	return str
+}
+
+// DiagnosticWithURI wraps a diagnostic with its file URI for proper grouping.
+type DiagnosticWithURI struct {
+	URI        string
+	Diagnostic lsp.Diagnostic
+}
+
+// formatDiagnostics formats diagnostics from LSP validation into a human-readable error message.
+// The format matches the example: "Error [line:col] message"
+func formatDiagnostics(diags []DiagnosticWithURI, editedPath string) string {
+	if len(diags) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\n\nLSP validation found issues:\n")
+
+	// Group diagnostics by file
+	diagsByFile := make(map[string][]lsp.Diagnostic)
+	for _, d := range diags {
+		diagsByFile[d.URI] = append(diagsByFile[d.URI], d.Diagnostic)
+	}
+
+	// Convert edited path to URI for comparison
+	editedURI := pathToURI(editedPath)
+
+	for uri, fileDiags := range diagsByFile {
+		for _, diag := range fileDiags {
+			// Only report errors (severity 1)
+			if diag.Severity != lsp.SeverityError {
+				continue
+			}
+
+			// Format: Error [line:col] message
+			// LSP uses 0-based line/column numbers, so we add 1 for human-readable output
+			line := diag.Range.Start.Line + 1
+			col := diag.Range.Start.Character + 1
+
+			// Add file path if it's different from the edited file
+			if uri != editedURI {
+				// Extract path from URI for display
+				displayPath := uriToPath(uri)
+				sb.WriteString(fmt.Sprintf("Error in %s [%d:%d] %s\n", displayPath, line, col, diag.Message))
+			} else {
+				sb.WriteString(fmt.Sprintf("Error [%d:%d] %s\n", line, col, diag.Message))
+			}
+		}
+	}
+
+	return sb.String()
+}
+
+// pathToURI converts a file path to a URI.
+func pathToURI(path string) string {
+	// Ensure path is absolute
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		absPath = path
+	}
+
+	// Convert to URI format
+	absPath = filepath.ToSlash(absPath)
+
+	// If path doesn't start with /, add it (Windows case)
+	if !strings.HasPrefix(absPath, "/") {
+		absPath = "/" + absPath
+	}
+
+	return "file://" + absPath
+}
+
+// uriToPath converts a URI to a file path.
+func uriToPath(uri string) string {
+	// Remove file:// prefix
+	path := strings.TrimPrefix(uri, "file://")
+	// Convert to platform-specific path
+	return filepath.FromSlash(path)
 }

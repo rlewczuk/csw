@@ -292,8 +292,8 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 			}
 			// Re-register VFS tools with the all-access VFS
 			session.Tools.Register("vfs.read", tool.NewVFSReadTool(allAccessVFS, true))
-			session.Tools.Register("vfs.write", tool.NewVFSWriteTool(allAccessVFS))
-			session.Tools.Register("vfs.edit", tool.NewVFSEditTool(allAccessVFS))
+			session.Tools.Register("vfs.write", tool.NewVFSWriteTool(allAccessVFS, nil))
+			session.Tools.Register("vfs.edit", tool.NewVFSEditTool(allAccessVFS, nil))
 			session.Tools.Register("vfs.delete", tool.NewVFSDeleteTool(allAccessVFS))
 			session.Tools.Register("vfs.ls", tool.NewVFSListTool(allAccessVFS))
 			session.Tools.Register("vfs.move", tool.NewVFSMoveTool(allAccessVFS))
