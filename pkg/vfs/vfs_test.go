@@ -22,7 +22,7 @@ func setupFixture(t *testing.T) *TestFixture {
 	tempDir, err := os.MkdirTemp("", "vfs-test-*")
 	require.NoError(t, err, "Failed to create temp directory")
 
-	localVFS, err := NewLocalVFS(tempDir)
+	localVFS, err := NewLocalVFS(tempDir, nil)
 	if err != nil {
 		os.RemoveAll(tempDir)
 	}
@@ -75,7 +75,7 @@ func TestNewLocalVFS(t *testing.T) {
 	})
 
 	t.Run("NonExistentDirectory", func(t *testing.T) {
-		_, err := NewLocalVFS("/path/that/does/not/exist")
+		_, err := NewLocalVFS("/path/that/does/not/exist", nil)
 		assert.ErrorIs(t, err, ErrFileNotFound)
 	})
 
@@ -85,7 +85,7 @@ func TestNewLocalVFS(t *testing.T) {
 		defer os.Remove(tempFile.Name())
 		tempFile.Close()
 
-		_, err = NewLocalVFS(tempFile.Name())
+		_, err = NewLocalVFS(tempFile.Name(), nil)
 		assert.ErrorIs(t, err, ErrNotADir)
 	})
 
@@ -101,7 +101,7 @@ func TestNewLocalVFS(t *testing.T) {
 		relPath, err := filepath.Rel(cwd, tempDir)
 		require.NoError(t, err, "Failed to get relative path")
 
-		localVFS, err := NewLocalVFS(relPath)
+		localVFS, err := NewLocalVFS(relPath, nil)
 		require.NoError(t, err, "Expected success with relative path")
 
 		assert.True(t, filepath.IsAbs(localVFS.root), "Expected absolute root path")

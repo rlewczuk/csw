@@ -13,7 +13,8 @@ type GlobFilter interface {
 
 // globFilter implements GlobFilter with .gitignore compatible syntax.
 type globFilter struct {
-	patterns []globPattern
+	patterns     []globPattern
+	defaultMatch bool // value returned when no patterns exist or path doesn't match any pattern
 }
 
 // globPattern represents a single glob pattern with inclusion/exclusion flag.
@@ -28,14 +29,15 @@ type globPattern struct {
 //   - Lines starting with # are comments (ignored)
 //   - Empty lines are ignored
 //   - Patterns can use *, ?, [abc], [a-z], and ** wildcards
-//   - If patterns is nil or empty, all paths match
 //
 // Parameters:
+//   - defaultMatch: value returned when no patterns exist or path doesn't match any pattern
 //   - patterns: slice of glob patterns
 //   - gitignoreContents: optional contents of .gitignore-like files (variadic)
-func NewGlobFilter(patterns []string, gitignoreContents ...string) GlobFilter {
+func NewGlobFilter(defaultMatch bool, patterns []string, gitignoreContents ...string) GlobFilter {
 	f := &globFilter{
-		patterns: make([]globPattern, 0),
+		patterns:     make([]globPattern, 0),
+		defaultMatch: defaultMatch,
 	}
 
 	// Parse user-provided patterns
@@ -89,15 +91,16 @@ func parseGlobPattern(line string) *globPattern {
 }
 
 // Matches returns true if the path matches the filter rules.
-// If no patterns are defined, all paths match.
+// If no patterns are defined, returns the defaultMatch value.
+// If path doesn't match any pattern, returns the defaultMatch value.
 // Patterns are evaluated in order following .gitignore semantics:
 //   - Normal patterns are inclusion rules (paths matching are included)
 //   - Negation patterns (!) are exclusion rules (paths matching are excluded)
 //   - Later patterns override earlier ones
 func (f *globFilter) Matches(path string) bool {
-	// If no patterns, match everything
+	// If no patterns, return default
 	if len(f.patterns) == 0 {
-		return true
+		return f.defaultMatch
 	}
 
 	// Normalize path to use forward slashes
@@ -105,9 +108,9 @@ func (f *globFilter) Matches(path string) bool {
 	// Remove leading slash for consistent matching
 	path = strings.TrimPrefix(path, "/")
 
-	// Start with no match by default when patterns exist
-	matched := false
+	// Track if any pattern matched
 	hasAnyMatch := false
+	matched := false
 
 	// Process patterns in order
 	for _, p := range f.patterns {
@@ -120,9 +123,13 @@ func (f *globFilter) Matches(path string) bool {
 		}
 	}
 
-	// If no patterns matched at all, return false
-	// If patterns matched, return the final state
-	return hasAnyMatch && matched
+	// If no patterns matched, return default
+	if !hasAnyMatch {
+		return f.defaultMatch
+	}
+
+	// Return the final matched state
+	return matched
 }
 
 // matchGitignorePattern matches a path against a gitignore-style pattern.

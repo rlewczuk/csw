@@ -115,7 +115,7 @@ func (g *GitRepo) GetWorktree(branch string) (VFS, error) {
 
 	if branch == "master" || branch == "main" {
 		// For main/master branch, use the repository root directly
-		localVFS, err := NewLocalVFS(g.path)
+		localVFS, err := NewLocalVFS(g.path, nil)
 		if err != nil {
 			os.RemoveAll(worktreePath)
 			return nil, fmt.Errorf("GitRepo.GetWorktree() [git.go]: %w", err)
@@ -162,7 +162,7 @@ func (g *GitRepo) GetWorktree(branch string) (VFS, error) {
 			}
 		}
 
-		localVFS, err := NewLocalVFS(worktreePath)
+		localVFS, err := NewLocalVFS(worktreePath, nil)
 		if err != nil {
 			os.RemoveAll(worktreePath)
 			return nil, fmt.Errorf("GitRepo.GetWorktree() [git.go]: %w", err)
@@ -245,7 +245,7 @@ func (g *GitRepo) CommitWorktree(branch string, message string) error {
 
 	// Update the worktree reference
 	wt.vfs = nil
-	localVFS, err := NewLocalVFS(g.path)
+	localVFS, err := NewLocalVFS(g.path, nil)
 	if err != nil {
 		return fmt.Errorf("GitRepo.CommitWorktree() [git.go]: %w", err)
 	}
