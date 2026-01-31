@@ -49,16 +49,16 @@ func getProjectRoot(t *testing.T) string {
 }
 
 // shouldUseRealLSP checks if we should use real LSP server (gopls).
-// Returns true if _integ/lsp.enabled exists and contains "yes", false otherwise.
+// Returns true if _integ/lsp.enabled does NOT exist or does NOT contain "yes", false otherwise.
 func shouldUseRealLSP(t *testing.T) bool {
 	t.Helper()
 
 	lspEnabledPath := filepath.Join("../../_integ/lsp.enabled")
 	content, err := os.ReadFile(lspEnabledPath)
 	if err != nil {
-		return false
+		return true
 	}
-	return strings.TrimSpace(string(content)) == "yes"
+	return strings.TrimSpace(string(content)) != "yes"
 }
 
 // createLSPClient creates either a real or mock LSP client based on configuration.
