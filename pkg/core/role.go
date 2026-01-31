@@ -47,11 +47,31 @@ func (r *AgentRoleRegistry) refreshCacheIfNeeded() error {
 		return fmt.Errorf("AgentRoleRegistry.refreshCacheIfNeeded() [role.go]: failed to get agent role configs: %w", err)
 	}
 
-	// Update cache
+	// Update cache, merging "all" role into other roles
 	r.cache = make(map[string]conf.AgentRoleConfig, len(configs))
+
+	// Get the "all" role config if it exists
+	var allConfig *conf.AgentRoleConfig
+	if all, ok := configs["all"]; ok {
+		allConfig = all
+	}
+
 	for name, config := range configs {
 		if config != nil {
-			r.cache[name] = *config
+			configCopy := *config
+
+			// Merge "all" role's HiddenPatterns into this role (unless it's the "all" role itself)
+			if name != "all" && allConfig != nil {
+				// Prepend "all" role's HiddenPatterns
+				if allConfig.HiddenPatterns != nil {
+					merged := make([]string, 0, len(allConfig.HiddenPatterns)+len(configCopy.HiddenPatterns))
+					merged = append(merged, allConfig.HiddenPatterns...)
+					merged = append(merged, configCopy.HiddenPatterns...)
+					configCopy.HiddenPatterns = merged
+				}
+			}
+
+			r.cache[name] = configCopy
 		}
 	}
 

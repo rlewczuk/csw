@@ -54,7 +54,7 @@ func setupGitRepoFixture(t *testing.T) *GitTestFixture {
 	require.NoError(t, err, "Failed to create initial commit")
 
 	// Create the GitRepo with worktrees directory
-	gitRepo, err := NewGitRepo(tempDir, worktreesDir)
+	gitRepo, err := NewGitRepo(tempDir, worktreesDir, nil)
 	require.NoError(t, err, "Failed to create GitRepo")
 
 	return &GitTestFixture{
@@ -109,7 +109,7 @@ func TestNewGitRepo(t *testing.T) {
 	})
 
 	t.Run("NonExistentDirectory", func(t *testing.T) {
-		_, err := NewGitRepo("/path/that/does/not/exist", "../../tmp/worktrees")
+		_, err := NewGitRepo("/path/that/does/not/exist", "../../tmp/worktrees", nil)
 		assert.ErrorIs(t, err, ErrFileNotFound)
 	})
 
@@ -118,7 +118,7 @@ func TestNewGitRepo(t *testing.T) {
 		require.NoError(t, err, "Failed to create temp directory")
 		defer os.RemoveAll(tempDir)
 
-		_, err = NewGitRepo(tempDir, "../../tmp/worktrees")
+		_, err = NewGitRepo(tempDir, "../../tmp/worktrees", nil)
 		assert.ErrorIs(t, err, ErrFileNotFound)
 	})
 
@@ -128,7 +128,7 @@ func TestNewGitRepo(t *testing.T) {
 		defer os.Remove(tempFile.Name())
 		tempFile.Close()
 
-		_, err = NewGitRepo(tempFile.Name(), "../../tmp/worktrees")
+		_, err = NewGitRepo(tempFile.Name(), "../../tmp/worktrees", nil)
 		assert.ErrorIs(t, err, ErrNotADir)
 	})
 }

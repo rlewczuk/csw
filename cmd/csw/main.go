@@ -184,13 +184,20 @@ func runTUI(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("runTUI() [main.go]: no roles found in config")
 	}
 
-	// Check if the requested role exists
-	if _, ok := roleRegistry.Get(roleName); !ok {
+	// Check if the requested role exists and get its configuration
+	roleConfig, ok := roleRegistry.Get(roleName)
+	if !ok {
 		return fmt.Errorf("runTUI() [main.go]: role not found: %s (available: %v)", roleName, roleRegistry.List())
 	}
 
+	// Build hide patterns from role configuration and .cswignore/.gitignore
+	hidePatterns, err := vfs.BuildHidePatterns(workDir, roleConfig.HiddenPatterns)
+	if err != nil {
+		return fmt.Errorf("runTUI() [main.go]: failed to build hide patterns: %w", err)
+	}
+
 	// Create VFS for the working directory
-	localVFS, err := vfs.NewLocalVFS(workDir, nil)
+	localVFS, err := vfs.NewLocalVFS(workDir, hidePatterns)
 	if err != nil {
 		return fmt.Errorf("runTUI() [main.go]: failed to create VFS: %w", err)
 	}
