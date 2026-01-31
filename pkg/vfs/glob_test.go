@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewGlobFilter_EmptyPatterns(t *testing.T) {
-	filter := NewGlobFilter(nil)
+	filter := NewGlobFilter(true, nil)
 
 	testCases := []struct {
 		path     string
@@ -68,7 +68,7 @@ func TestGlobFilter_SimplePatterns(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			filter := NewGlobFilter(tc.patterns)
+			filter := NewGlobFilter(false, tc.patterns)
 			result := filter.Matches(tc.path)
 			assert.Equal(t, tc.expected, result, "patterns: %v, path: %s", tc.patterns, tc.path)
 		})
@@ -104,7 +104,7 @@ func TestGlobFilter_MultiplePatterns(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			filter := NewGlobFilter(tc.patterns)
+			filter := NewGlobFilter(false, tc.patterns)
 			for path, expected := range tc.tests {
 				result := filter.Matches(path)
 				assert.Equal(t, expected, result, "path: %s", path)
@@ -140,7 +140,7 @@ func TestGlobFilter_NegationPatterns(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			filter := NewGlobFilter(tc.patterns)
+			filter := NewGlobFilter(false, tc.patterns)
 			result := filter.Matches(tc.path)
 			assert.Equal(t, tc.expected, result, "patterns: %v, path: %s", tc.patterns, tc.path)
 		})
@@ -165,7 +165,7 @@ dist/
 !README.txt
 `
 
-	filter := NewGlobFilter(nil, gitignoreContent)
+	filter := NewGlobFilter(false, nil, gitignoreContent)
 
 	testCases := []struct {
 		path     string
@@ -211,7 +211,7 @@ build/`
 
 	patterns := []string{"*.go", "*.txt"}
 
-	filter := NewGlobFilter(patterns, gitignoreContent)
+	filter := NewGlobFilter(false, patterns, gitignoreContent)
 
 	testCases := []struct {
 		path     string
@@ -250,7 +250,7 @@ func TestGlobFilter_EmptyLinesAndComments(t *testing.T) {
 *.tmp
 `
 
-	filter := NewGlobFilter(nil, gitignoreContent)
+	filter := NewGlobFilter(false, nil, gitignoreContent)
 
 	assert.True(t, filter.Matches("debug.log"))
 	assert.True(t, filter.Matches("cache.tmp"))
@@ -258,7 +258,7 @@ func TestGlobFilter_EmptyLinesAndComments(t *testing.T) {
 }
 
 func TestGlobFilter_PathNormalization(t *testing.T) {
-	filter := NewGlobFilter([]string{"dir/file.txt"})
+	filter := NewGlobFilter(false, []string{"dir/file.txt"})
 
 	testCases := []struct {
 		path     string
@@ -308,7 +308,7 @@ dist/
 **/tmp/
 `
 
-	filter := NewGlobFilter(nil, gitignoreContent)
+	filter := NewGlobFilter(false, nil, gitignoreContent)
 
 	testCases := []struct {
 		path     string
@@ -416,9 +416,89 @@ func TestGlobFilter_PatternOrdering(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			filter := NewGlobFilter(tc.patterns)
+			filter := NewGlobFilter(false, tc.patterns)
 			result := filter.Matches(tc.path)
 			assert.Equal(t, tc.expected, result, "patterns: %v, path: %s", tc.patterns, tc.path)
+		})
+	}
+}
+
+func TestGlobFilter_DefaultMatch(t *testing.T) {
+	testCases := []struct {
+		name         string
+		defaultMatch bool
+		patterns     []string
+		tests        map[string]bool
+	}{
+		{
+			name:         "empty patterns with defaultMatch true",
+			defaultMatch: true,
+			patterns:     nil,
+			tests: map[string]bool{
+				"any/file.txt": true,
+				"another.go":   true,
+				"path/to/file": true,
+			},
+		},
+		{
+			name:         "empty patterns with defaultMatch false",
+			defaultMatch: false,
+			patterns:     nil,
+			tests: map[string]bool{
+				"any/file.txt": false,
+				"another.go":   false,
+				"path/to/file": false,
+			},
+		},
+		{
+			name:         "non-matching paths with defaultMatch true",
+			defaultMatch: true,
+			patterns:     []string{"*.txt"},
+			tests: map[string]bool{
+				"file.txt":    true, // matches pattern
+				"file.go":     true, // doesn't match, returns defaultMatch=true
+				"dir/file.md": true, // doesn't match, returns defaultMatch=true
+			},
+		},
+		{
+			name:         "non-matching paths with defaultMatch false",
+			defaultMatch: false,
+			patterns:     []string{"*.txt"},
+			tests: map[string]bool{
+				"file.txt":    true,  // matches pattern
+				"file.go":     false, // doesn't match, returns defaultMatch=false
+				"dir/file.md": false, // doesn't match, returns defaultMatch=false
+			},
+		},
+		{
+			name:         "mixed patterns with defaultMatch true",
+			defaultMatch: true,
+			patterns:     []string{"*.go", "!test.go"},
+			tests: map[string]bool{
+				"main.go":  true,  // matches *.go
+				"test.go":  false, // matches *.go but negated by !test.go
+				"file.txt": true,  // doesn't match any pattern, returns defaultMatch=true
+			},
+		},
+		{
+			name:         "mixed patterns with defaultMatch false",
+			defaultMatch: false,
+			patterns:     []string{"*.go", "!test.go"},
+			tests: map[string]bool{
+				"main.go":  true,  // matches *.go
+				"test.go":  false, // matches *.go but negated by !test.go
+				"file.txt": false, // doesn't match any pattern, returns defaultMatch=false
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			filter := NewGlobFilter(tc.defaultMatch, tc.patterns)
+			for path, expected := range tc.tests {
+				result := filter.Matches(path)
+				assert.Equal(t, expected, result, "path: %s, defaultMatch: %v", path, tc.defaultMatch)
+			}
 		})
 	}
 }

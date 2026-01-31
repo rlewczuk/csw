@@ -10,8 +10,9 @@ import (
 // LocalVFS implements VFS interface for local filesystem operations.
 // It provides sandboxed access to files within a root directory.
 type LocalVFS struct {
-	root string
-	repo Repo
+	root   string
+	repo   Repo
+	filter GlobFilter
 }
 
 func (l *LocalVFS) GetBranch() string {
@@ -28,7 +29,9 @@ func (l *LocalVFS) GetRepo() Repo {
 
 // NewLocalVFS creates a new LocalVFS instance rooted at the given directory.
 // The root path is converted to an absolute path and all operations are sandboxed within this directory.
-func NewLocalVFS(root string) (*LocalVFS, error) {
+// The hidePatterns parameter specifies glob patterns for files and directories that should be ignored
+// by all operations (ListFiles, FindFiles). By default, it should be empty (no files are hidden).
+func NewLocalVFS(root string, hidePatterns []string) (*LocalVFS, error) {
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
@@ -47,7 +50,11 @@ func NewLocalVFS(root string) (*LocalVFS, error) {
 		return nil, fmt.Errorf("NewLocalVFS() [local.go]: %w", ErrNotADir)
 	}
 
-	return &LocalVFS{root: absRoot}, nil
+	// Create filter with defaultMatch=false (don't hide anything by default)
+	// and patterns that should be hidden (match=true means hide)
+	filter := NewGlobFilter(false, hidePatterns)
+
+	return &LocalVFS{root: absRoot, filter: filter}, nil
 }
 
 // validatePath ensures the path is valid and within the sandbox.
@@ -224,6 +231,15 @@ func (l *LocalVFS) ListFiles(path string, recursive bool) ([]string, error) {
 				return err
 			}
 
+			// Skip if path matches the filter (is hidden)
+			if l.filter.Matches(relPath) {
+				// If it's a directory, skip the entire subtree
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+
 			result = append(result, relPath)
 			return nil
 		})
@@ -249,6 +265,12 @@ func (l *LocalVFS) ListFiles(path string, recursive bool) ([]string, error) {
 			if err != nil {
 				return nil, err
 			}
+
+			// Skip if path matches the filter (is hidden)
+			if l.filter.Matches(relPath) {
+				continue
+			}
+
 			result = append(result, relPath)
 		}
 	}
@@ -296,6 +318,15 @@ func (l *LocalVFS) FindFiles(query string, recursive bool) ([]string, error) {
 				return nil
 			}
 
+			// Skip if path matches the filter (is hidden)
+			if l.filter.Matches(relPath) {
+				// If it's a directory, skip the entire subtree
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+
 			// Match against the relative path using glob pattern
 			matched, err := matchGlob(query, relPath)
 			if err != nil {
@@ -322,6 +353,11 @@ func (l *LocalVFS) FindFiles(query string, recursive bool) ([]string, error) {
 		}
 
 		for _, entry := range entries {
+			// Skip if path matches the filter (is hidden)
+			if l.filter.Matches(entry.Name()) {
+				continue
+			}
+
 			matched, err := matchGlob(query, entry.Name())
 			if err != nil {
 				return nil, err

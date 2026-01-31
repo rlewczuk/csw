@@ -190,7 +190,7 @@ func runTUI(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create VFS for the working directory
-	localVFS, err := vfs.NewLocalVFS(workDir)
+	localVFS, err := vfs.NewLocalVFS(workDir, nil)
 	if err != nil {
 		return fmt.Errorf("runTUI() [main.go]: failed to create VFS: %w", err)
 	}
