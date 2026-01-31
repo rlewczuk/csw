@@ -36,13 +36,9 @@ type CliChatView struct {
 }
 
 // NewCliChatView creates a new CLI chat view.
-// If acceptAllPermissions is true, interactive is set to false automatically.
+// interactive controls whether to read user input.
+// acceptAllPermissions controls whether to automatically accept all permissions.
 func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Reader, interactive bool, acceptAllPermissions bool) *CliChatView {
-	// If acceptAllPermissions is true, force interactive to false
-	if acceptAllPermissions {
-		interactive = false
-	}
-
 	view := &CliChatView{
 		presenter:            presenter,
 		output:               output,
@@ -53,7 +49,8 @@ func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Read
 		stopCh:               make(chan struct{}),
 	}
 
-	if interactive && input != nil {
+	// Setup scanner for both interactive mode and permission queries
+	if (interactive || !acceptAllPermissions) && input != nil {
 		view.scanner = bufio.NewScanner(input)
 	}
 
@@ -161,6 +158,13 @@ func (v *CliChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 
 	// If not interactive, deny permission
 	if !v.interactive {
+		// Send deny response if available in options
+		if len(query.Options) > 1 {
+			// Typically second option is "Deny"
+			if v.presenter != nil {
+				return v.presenter.PermissionResponse(query.Options[1])
+			}
+		}
 		return nil
 	}
 
