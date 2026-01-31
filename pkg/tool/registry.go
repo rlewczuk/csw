@@ -62,8 +62,9 @@ func (r *ToolRegistry) Execute(args ToolCall) ToolResponse {
 }
 
 // RegisterVFSTools registers all VFS tools with the given VFS implementation.
+// Line numbers are enabled by default for the vfs.read tool.
 func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS) {
-	registry.Register("vfs.read", NewVFSReadTool(vfsImpl))
+	registry.Register("vfs.read", NewVFSReadTool(vfsImpl, true))
 	registry.Register("vfs.write", NewVFSWriteTool(vfsImpl))
 	registry.Register("vfs.delete", NewVFSDeleteTool(vfsImpl))
 	registry.Register("vfs.ls", NewVFSListTool(vfsImpl))

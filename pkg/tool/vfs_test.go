@@ -18,7 +18,7 @@ func TestVFSReadTool(t *testing.T) {
 		err := mockVFS.WriteFile("test.txt", []byte("hello world"))
 		require.NoError(t, err)
 
-		tool := NewVFSReadTool(mockVFS)
+		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
 		response := tool.Execute(ToolCall{
@@ -39,7 +39,7 @@ func TestVFSReadTool(t *testing.T) {
 	t.Run("should return error for missing path argument", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
-		tool := NewVFSReadTool(mockVFS)
+		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
 		response := tool.Execute(ToolCall{
@@ -58,7 +58,7 @@ func TestVFSReadTool(t *testing.T) {
 	t.Run("should return error for non-existent file", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
-		tool := NewVFSReadTool(mockVFS)
+		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
 		response := tool.Execute(ToolCall{
@@ -83,7 +83,7 @@ func TestVFSReadTool(t *testing.T) {
 		err := mockVFS.WriteFile("test.txt", []byte(content))
 		require.NoError(t, err)
 
-		tool := NewVFSReadTool(mockVFS)
+		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
 		response := tool.Execute(ToolCall{
@@ -109,7 +109,7 @@ func TestVFSReadTool(t *testing.T) {
 		err := mockVFS.WriteFile("test.txt", []byte(content))
 		require.NoError(t, err)
 
-		tool := NewVFSReadTool(mockVFS)
+		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
 		response := tool.Execute(ToolCall{
@@ -135,7 +135,7 @@ func TestVFSReadTool(t *testing.T) {
 		err := mockVFS.WriteFile("test.txt", []byte(content))
 		require.NoError(t, err)
 
-		tool := NewVFSReadTool(mockVFS)
+		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
 		response := tool.Execute(ToolCall{
@@ -162,7 +162,7 @@ func TestVFSReadTool(t *testing.T) {
 		err := mockVFS.WriteFile("test.txt", []byte(content))
 		require.NoError(t, err)
 
-		tool := NewVFSReadTool(mockVFS)
+		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
 		response := tool.Execute(ToolCall{
@@ -188,7 +188,7 @@ func TestVFSReadTool(t *testing.T) {
 		err := mockVFS.WriteFile("test.txt", []byte(content))
 		require.NoError(t, err)
 
-		tool := NewVFSReadTool(mockVFS)
+		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
 		response := tool.Execute(ToolCall{
@@ -222,7 +222,7 @@ func TestVFSReadTool(t *testing.T) {
 		err := mockVFS.WriteFile("test.txt", []byte(content))
 		require.NoError(t, err)
 
-		tool := NewVFSReadTool(mockVFS)
+		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
 		response := tool.Execute(ToolCall{
@@ -255,7 +255,7 @@ func TestVFSReadTool(t *testing.T) {
 		err := mockVFS.WriteFile("test.txt", []byte(""))
 		require.NoError(t, err)
 
-		tool := NewVFSReadTool(mockVFS)
+		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
 		response := tool.Execute(ToolCall{
@@ -273,6 +273,90 @@ func TestVFSReadTool(t *testing.T) {
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, "", response.Result.Get("content").AsString())
+	})
+
+	t.Run("should format content with line numbers when enabled", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		content := "line1\nline2\nline3"
+		err := mockVFS.WriteFile("test.txt", []byte(content))
+		require.NoError(t, err)
+
+		tool := NewVFSReadTool(mockVFS, true)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.read",
+			Arguments: NewToolValue(map[string]any{
+				"path": "test.txt",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Expected format: "    1  line1\n    2  line2\n    3  line3"
+		expected := "    1  line1\n    2  line2\n    3  line3"
+		assert.Equal(t, expected, response.Result.Get("content").AsString())
+	})
+
+	t.Run("should format content with line numbers and offset", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		content := "line1\nline2\nline3\nline4\nline5"
+		err := mockVFS.WriteFile("test.txt", []byte(content))
+		require.NoError(t, err)
+
+		tool := NewVFSReadTool(mockVFS, true)
+
+		// Execute with offset
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.read",
+			Arguments: NewToolValue(map[string]any{
+				"path":   "test.txt",
+				"offset": 2,
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// With offset=2, line numbers should start at 3 (offset + 1)
+		expected := "    3  line3\n    4  line4\n    5  line5"
+		assert.Equal(t, expected, response.Result.Get("content").AsString())
+	})
+
+	t.Run("should not format content with line numbers when disabled", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		content := "line1\nline2\nline3"
+		err := mockVFS.WriteFile("test.txt", []byte(content))
+		require.NoError(t, err)
+
+		tool := NewVFSReadTool(mockVFS, false)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.read",
+			Arguments: NewToolValue(map[string]any{
+				"path": "test.txt",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Without line numbers, content should be unchanged
+		assert.Equal(t, content, response.Result.Get("content").AsString())
 	})
 }
 
@@ -624,7 +708,7 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
-		tool := NewVFSReadTool(accessVFS)
+		tool := NewVFSReadTool(accessVFS, false)
 
 		// Execute
 		response := tool.Execute(ToolCall{
@@ -663,7 +747,7 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
-		tool := NewVFSReadTool(accessVFS)
+		tool := NewVFSReadTool(accessVFS, false)
 
 		// Execute
 		response := tool.Execute(ToolCall{
@@ -689,7 +773,7 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 		}
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
 
-		tool := NewVFSReadTool(accessVFS)
+		tool := NewVFSReadTool(accessVFS, false)
 
 		// Execute
 		response := tool.Execute(ToolCall{
