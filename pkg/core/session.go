@@ -743,7 +743,8 @@ func (s *SweSession) SetRole(roleName string) error {
 
 	// Re-register VFS tools to use the session's VFS
 	// This ensures that VFS access controls are respected
-	s.Tools.Register("vfs.read", tool.NewVFSReadTool(s.VFS))
+	// Line numbers are enabled by default for vfs.read
+	s.Tools.Register("vfs.read", tool.NewVFSReadTool(s.VFS, true))
 	s.Tools.Register("vfs.write", tool.NewVFSWriteTool(s.VFS))
 	s.Tools.Register("vfs.delete", tool.NewVFSDeleteTool(s.VFS))
 	s.Tools.Register("vfs.ls", tool.NewVFSListTool(s.VFS))

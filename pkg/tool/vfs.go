@@ -10,12 +10,14 @@ import (
 
 // VFSReadTool implements the vfs.read tool.
 type VFSReadTool struct {
-	vfs vfs.VFS
+	vfs         vfs.VFS
+	lineNumbers bool
 }
 
 // NewVFSReadTool creates a new VFSReadTool instance.
-func NewVFSReadTool(v vfs.VFS) *VFSReadTool {
-	return &VFSReadTool{vfs: v}
+// If lineNumbers is true, the tool will format content with line numbers (cat -n style).
+func NewVFSReadTool(v vfs.VFS, lineNumbers bool) *VFSReadTool {
+	return &VFSReadTool{vfs: v, lineNumbers: lineNumbers}
 }
 
 // Execute executes the tool with the given arguments and returns the response.
@@ -62,6 +64,11 @@ func (t *VFSReadTool) Execute(args ToolCall) ToolResponse {
 
 	// Apply offset and limit to content
 	contentStr := applyOffsetAndLimit(string(content), offset, limit)
+
+	// Apply line numbers if enabled
+	if t.lineNumbers {
+		contentStr = formatWithLineNumbers(contentStr, offset)
+	}
 
 	var result ToolValue
 	result.Set("content", contentStr)
@@ -540,4 +547,48 @@ func joinLines(lines []string) string {
 		result += line
 	}
 	return result
+}
+
+// formatWithLineNumbers formats content with line numbers in cat -n style.
+// Format: 5 columns for line number (right-aligned), two spaces, then content.
+// Example: "    1  first line\n    2  second line\n"
+func formatWithLineNumbers(content string, startLine int64) string {
+	if content == "" {
+		return ""
+	}
+
+	lines := splitLines(content)
+	result := ""
+
+	for i, line := range lines {
+		lineNum := startLine + int64(i) + 1
+		// Format: %5d (5 columns, right-aligned) + "  " (two spaces) + line content
+		result += formatLineNumber(lineNum) + "  " + line
+	}
+
+	return result
+}
+
+// formatLineNumber formats a line number with 5 columns, right-aligned.
+func formatLineNumber(num int64) string {
+	str := ""
+	// Convert number to string manually
+	if num == 0 {
+		str = "0"
+	} else {
+		digits := []byte{}
+		n := num
+		for n > 0 {
+			digits = append([]byte{byte('0' + n%10)}, digits...)
+			n /= 10
+		}
+		str = string(digits)
+	}
+
+	// Pad with spaces to 5 columns (right-aligned)
+	for len(str) < 5 {
+		str = " " + str
+	}
+
+	return str
 }

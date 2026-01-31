@@ -163,7 +163,8 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	assert.Equal(t, "read-id", readResponse.Call.ID)
 	assert.NoError(t, readResponse.Error)
 	assert.True(t, readResponse.Done)
-	assert.Equal(t, "Hello, World!", readResponse.Result.Get("content").AsString())
+	// Line numbers are enabled by default, so expect formatted output
+	assert.Equal(t, "    1  Hello, World!", readResponse.Result.Get("content").AsString())
 
 	// Test listing files
 	listArgs := ToolCall{
