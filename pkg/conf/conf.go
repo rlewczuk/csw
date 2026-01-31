@@ -46,6 +46,10 @@ type AgentRoleConfig struct {
 	// Tool fragments for this role (as a map of "<tool-name>/<file-name>" -> content), this is transient field, not serialized to JSON
 	// Example keys: "vfs.read/vfs.read.schema.json", "vfs.read/vfs.read.md", "vfs.read/vfs.read-kimi.md"
 	ToolFragments map[string]string `json:"-"`
+
+	// HiddenPatterns contains glob patterns for files and directories that should be hidden from VFS operations
+	// Supports .gitignore-compatible syntax
+	HiddenPatterns []string `json:"hidden-patterns,omitempty"`
 }
 
 // ModelTagMapping represents a single model-to-tag mapping rule.

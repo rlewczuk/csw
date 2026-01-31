@@ -217,6 +217,10 @@ func (c *CompositeConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRole
 				configCopy.PromptFragments[fk] = fv
 			}
 		}
+		if v.HiddenPatterns != nil {
+			configCopy.HiddenPatterns = make([]string, len(v.HiddenPatterns))
+			copy(configCopy.HiddenPatterns, v.HiddenPatterns)
+		}
 		configs[k] = &configCopy
 	}
 
@@ -420,6 +424,20 @@ func (c *CompositeConfigStore) refreshAgentRoleConfigs() error {
 						configCopy.PromptFragments[filename] = content
 					}
 				}
+			}
+
+			// Merge HiddenPatterns: append from all sources
+			if exists && existingConfig.HiddenPatterns != nil {
+				// Start with existing patterns
+				configCopy.HiddenPatterns = make([]string, len(existingConfig.HiddenPatterns))
+				copy(configCopy.HiddenPatterns, existingConfig.HiddenPatterns)
+			} else {
+				configCopy.HiddenPatterns = make([]string, 0)
+			}
+
+			// Append new patterns from current source
+			if config.HiddenPatterns != nil {
+				configCopy.HiddenPatterns = append(configCopy.HiddenPatterns, config.HiddenPatterns...)
 			}
 
 			merged[name] = &configCopy

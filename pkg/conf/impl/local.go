@@ -187,6 +187,10 @@ func (s *LocalConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConf
 				configCopy.PromptFragments[fk] = fv
 			}
 		}
+		if v.HiddenPatterns != nil {
+			configCopy.HiddenPatterns = make([]string, len(v.HiddenPatterns))
+			copy(configCopy.HiddenPatterns, v.HiddenPatterns)
+		}
 		configs[k] = &configCopy
 	}
 

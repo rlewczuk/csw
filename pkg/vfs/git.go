@@ -21,6 +21,7 @@ type GitRepo struct {
 	repo          *git.Repository
 	worktrees     map[string]*gitWorktree
 	mutex         sync.RWMutex
+	hidePatterns  []string
 }
 
 // gitWorktree represents a worktree for a specific branch
@@ -32,7 +33,8 @@ type gitWorktree struct {
 
 // NewGitRepo creates a new GitRepo instance from an existing git repository path.
 // The worktreesPath parameter specifies the directory where worktrees will be created.
-func NewGitRepo(path string, worktreesPath string) (*GitRepo, error) {
+// The hidePatterns parameter specifies glob patterns for files and directories that should be hidden.
+func NewGitRepo(path string, worktreesPath string, hidePatterns []string) (*GitRepo, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", err)
@@ -71,6 +73,7 @@ func NewGitRepo(path string, worktreesPath string) (*GitRepo, error) {
 		worktreesPath: absWorktreesPath,
 		repo:          repo,
 		worktrees:     make(map[string]*gitWorktree),
+		hidePatterns:  hidePatterns,
 	}, nil
 }
 
@@ -115,7 +118,7 @@ func (g *GitRepo) GetWorktree(branch string) (VFS, error) {
 
 	if branch == "master" || branch == "main" {
 		// For main/master branch, use the repository root directly
-		localVFS, err := NewLocalVFS(g.path, nil)
+		localVFS, err := NewLocalVFS(g.path, g.hidePatterns)
 		if err != nil {
 			os.RemoveAll(worktreePath)
 			return nil, fmt.Errorf("GitRepo.GetWorktree() [git.go]: %w", err)
@@ -162,7 +165,7 @@ func (g *GitRepo) GetWorktree(branch string) (VFS, error) {
 			}
 		}
 
-		localVFS, err := NewLocalVFS(worktreePath, nil)
+		localVFS, err := NewLocalVFS(worktreePath, g.hidePatterns)
 		if err != nil {
 			os.RemoveAll(worktreePath)
 			return nil, fmt.Errorf("GitRepo.GetWorktree() [git.go]: %w", err)
@@ -245,7 +248,7 @@ func (g *GitRepo) CommitWorktree(branch string, message string) error {
 
 	// Update the worktree reference
 	wt.vfs = nil
-	localVFS, err := NewLocalVFS(g.path, nil)
+	localVFS, err := NewLocalVFS(g.path, g.hidePatterns)
 	if err != nil {
 		return fmt.Errorf("GitRepo.CommitWorktree() [git.go]: %w", err)
 	}
