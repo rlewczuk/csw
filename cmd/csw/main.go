@@ -14,6 +14,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
 	gtvtui "github.com/codesnort/codesnort-swe/pkg/gtv/tui"
 	"github.com/codesnort/codesnort-swe/pkg/logging"
+	"github.com/codesnort/codesnort-swe/pkg/lsp"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/presenter"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
@@ -26,6 +27,7 @@ var (
 	modelName  string
 	configPath string
 	roleName   string
+	lspServer  string
 )
 
 func main() {
@@ -41,6 +43,7 @@ func main() {
 	rootCmd.Flags().StringVar(&modelName, "model", "", "Model name in provider/model format (if not set, uses default provider)")
 	rootCmd.Flags().StringVar(&configPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
 	rootCmd.Flags().StringVar(&roleName, "role", "developer", "Agent role name")
+	rootCmd.Flags().StringVar(&lspServer, "lsp-server", "gopls", "Path to LSP server binary (empty to disable LSP)")
 
 	// Add subcommands
 	rootCmd.AddCommand(ConfCommand())
@@ -213,6 +216,27 @@ func runTUI(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("runTUI() [main.go]: failed to create prompt generator: %w", err)
 	}
 
+	// Create LSP client if lsp-server is specified
+	var lspClient lsp.LSP
+	logger := logging.GetGlobalLogger()
+	if lspServer != "" {
+		logger.Debug("lsp_initialization", "enabled", true, "server", lspServer)
+		client, err := lsp.NewClient(lspServer, workDir)
+		if err != nil {
+			logger.Warn("failed to create LSP client, continuing without LSP", "error", err)
+		} else {
+			// Initialize LSP client asynchronously
+			if err := client.Init(false); err != nil {
+				logger.Warn("failed to initialize LSP client, continuing without LSP", "error", err)
+			} else {
+				lspClient = client
+				logger.Debug("lsp_initialized", "server", lspServer)
+			}
+		}
+	} else {
+		logger.Debug("lsp_initialization", "enabled", false)
+	}
+
 	// Create SweSystem
 	sweSystem := &core.SweSystem{
 		ModelProviders:  modelProviders,
@@ -220,6 +244,7 @@ func runTUI(cmd *cobra.Command, args []string) error {
 		Tools:           toolRegistry,
 		VFS:             localVFS,
 		Roles:           roleRegistry,
+		LSP:             lspClient,
 	}
 
 	// Create a context that can be cancelled on interrupt

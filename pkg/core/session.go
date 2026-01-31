@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/codesnort/codesnort-swe/pkg/lsp"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
@@ -435,6 +436,7 @@ type SweSession struct {
 	messages      []*models.ChatMessage
 	role          *conf.AgentRoleConfig
 	VFS           vfs.VFS
+	LSP           lsp.LSP
 	Tools         *tool.ToolRegistry
 	outputHandler SessionThreadOutput
 	workDir       string
@@ -745,8 +747,8 @@ func (s *SweSession) SetRole(roleName string) error {
 	// This ensures that VFS access controls are respected
 	// Line numbers are enabled by default for vfs.read
 	s.Tools.Register("vfs.read", tool.NewVFSReadTool(s.VFS, true))
-	s.Tools.Register("vfs.write", tool.NewVFSWriteTool(s.VFS))
-	s.Tools.Register("vfs.edit", tool.NewVFSEditTool(s.VFS))
+	s.Tools.Register("vfs.write", tool.NewVFSWriteTool(s.VFS, s.LSP))
+	s.Tools.Register("vfs.edit", tool.NewVFSEditTool(s.VFS, s.LSP))
 	s.Tools.Register("vfs.delete", tool.NewVFSDeleteTool(s.VFS))
 	s.Tools.Register("vfs.ls", tool.NewVFSListTool(s.VFS))
 	s.Tools.Register("vfs.move", tool.NewVFSMoveTool(s.VFS))
