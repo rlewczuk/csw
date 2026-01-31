@@ -398,6 +398,20 @@ func (m *MockLSP) Close() error {
 	return nil
 }
 
+// getDiagnosticsForURI returns diagnostics for a specific URI.
+// This method is for test compatibility with Client.getDiagnosticsForURI.
+func (m *MockLSP) getDiagnosticsForURI(uri string) []Diagnostic {
+	m.responsesMu.RLock()
+	defer m.responsesMu.RUnlock()
+
+	diags, ok := m.diagnosticsResponses[uri]
+	if !ok {
+		return nil
+	}
+
+	return diags
+}
+
 // formatLocationKey formats a cursor location into a key for lookups.
 func formatLocationKey(loc CursorLocation) string {
 	return fmt.Sprintf("%s:%d:%d", loc.Path, loc.Line, loc.Col)

@@ -1,5 +1,25 @@
 package lsp
 
+// Integration tests for LSP client.
+//
+// These tests can run in two modes:
+// 1. Real LSP mode (when _integ/lsp.enabled contains "yes"):
+//    - Uses real gopls server from _integ/lsp.gopls
+//    - Runs slowly due to LSP server initialization and indexing
+//    - Tests actual LSP integration
+//
+// 2. Mock LSP mode (when _integ/lsp.enabled is "no" or missing):
+//    - Uses MockLSP test double
+//    - Runs very fast (no sleep needed, immediate responses)
+//    - Some tests require mock response setup to pass
+//
+// To add mock support to a test:
+//   - Use createLSPClient(t) instead of NewClient()
+//   - Use sleepForLSP(client, duration) instead of time.Sleep()
+//   - Set up mock responses with: if mock := asMock(client); mock != nil { ... }
+//
+// See TestLSPClientDiagnostics and TestLSPClientDefinition for examples.
+
 import (
 	"os"
 	"path/filepath"
@@ -87,6 +107,25 @@ func asMock(client LSP) *MockLSP {
 	return mock
 }
 
+// getDiagnosticsForURI returns diagnostics for a specific URI from either Client or MockLSP.
+func getDiagnosticsForURI(client LSP, uri string) []Diagnostic {
+	if c, ok := client.(*Client); ok {
+		return c.getDiagnosticsForURI(uri)
+	} else if m, ok := client.(*MockLSP); ok {
+		return m.getDiagnosticsForURI(uri)
+	}
+	return nil
+}
+
+// sleepForLSP sleeps only if using real LSP server (for indexing/processing time).
+// Mock LSP doesn't need sleep as responses are immediate.
+func sleepForLSP(client LSP, duration time.Duration) {
+	if _, ok := client.(*Client); ok {
+		time.Sleep(duration)
+	}
+	// No sleep for MockLSP - responses are immediate
+}
+
 // findTextPosition finds the position of a substring in the file content.
 // It returns the line (0-based) and column (0-based) of the first occurrence.
 // If the text is not found, it fails the test.
@@ -124,14 +163,12 @@ func TestLSPClientDiagnostics(t *testing.T) {
 		return
 	}
 
-	goplsPath := getGoplsPath(t)
 	projectRoot := getProjectRoot(t)
 
-	client, err := NewClient(goplsPath, projectRoot)
-	require.NoError(t, err)
-	defer client.Close()
+	client := createLSPClient(t)
+	defer closeLSPClient(client)
 
-	err = client.Init(true)
+	err := client.Init(true)
 	require.NoError(t, err)
 
 	// Create a temporary file with syntax error in tmp directory
@@ -152,12 +189,27 @@ func main() {
 	require.NoError(t, err)
 	defer os.Remove(testFile)
 
+	// Set up mock response if using mock LSP
+	if mock := asMock(client); mock != nil {
+		uri := pathToURI(testFile)
+		mock.SetDiagnostics(uri, []Diagnostic{
+			{
+				Range: Range{
+					Start: Position{Line: 4, Character: 0},
+					End:   Position{Line: 4, Character: 0},
+				},
+				Severity: SeverityError,
+				Message:  "expected '}', found 'EOF'",
+			},
+		})
+	}
+
 	// Touch and validate the file
 	_, err = client.TouchAndValidate(testFile, false)
 	require.NoError(t, err)
 
-	// Wait a bit for diagnostics to arrive
-	time.Sleep(2 * time.Second)
+	// Wait a bit for diagnostics to arrive (only for real LSP)
+	sleepForLSP(client, 2*time.Second)
 
 	// Get diagnostics
 	diags, err := client.Diagnostics()
@@ -183,14 +235,12 @@ func TestLSPClientDefinition(t *testing.T) {
 		return
 	}
 
-	goplsPath := getGoplsPath(t)
 	projectRoot := getProjectRoot(t)
 
-	client, err := NewClient(goplsPath, projectRoot)
-	require.NoError(t, err)
-	defer client.Close()
+	client := createLSPClient(t)
+	defer closeLSPClient(client)
 
-	err = client.Init(true)
+	err := client.Init(true)
 	require.NoError(t, err)
 
 	// Create a temporary file in tmp directory
@@ -220,16 +270,33 @@ func main() {
 	_, err = client.TouchAndValidate(testFile, false)
 	require.NoError(t, err)
 
-	// Wait for indexing
-	time.Sleep(1 * time.Second)
+	// Wait for indexing (only for real LSP)
+	sleepForLSP(client, 1*time.Second)
 
 	// Find definition of myFunc (search for the call to myFunc in main)
 	line, col := findTextPosition(t, testContent, "myFunc()")
-	locations, err := client.FindDefinition(CursorLocation{
+	cursorLoc := CursorLocation{
 		Path: testFile,
 		Line: line,
 		Col:  col,
-	})
+	}
+
+	// Set up mock response if using mock LSP
+	if mock := asMock(client); mock != nil {
+		defLine, defCol := findTextPosition(t, testContent, "func myFunc()")
+		defCol += len("func ")
+		mock.SetDefinition(cursorLoc, []Location{
+			{
+				URI: pathToURI(testFile),
+				Range: Range{
+					Start: Position{Line: defLine, Character: defCol},
+					End:   Position{Line: defLine, Character: defCol + len("myFunc")},
+				},
+			},
+		})
+	}
+
+	locations, err := client.FindDefinition(cursorLoc)
 	require.NoError(t, err)
 	require.NotEmpty(t, locations, "Expected to find definition")
 
@@ -254,14 +321,12 @@ func TestLSPClientReferences(t *testing.T) {
 		return
 	}
 
-	goplsPath := getGoplsPath(t)
 	projectRoot := getProjectRoot(t)
 
-	client, err := NewClient(goplsPath, projectRoot)
-	require.NoError(t, err)
-	defer client.Close()
+	client := createLSPClient(t)
+	defer closeLSPClient(client)
 
-	err = client.Init(true)
+	err := client.Init(true)
 	require.NoError(t, err)
 
 	// Create a temporary file in tmp directory
@@ -288,16 +353,52 @@ func myFunc() {
 	_, err = client.TouchAndValidate(testFile, false)
 	require.NoError(t, err)
 
-	// Wait for indexing
-	time.Sleep(1 * time.Second)
+	// Wait for indexing (only for real LSP)
+	sleepForLSP(client, 1*time.Second)
 
 	// Find references to x (search for the declaration of x)
 	line, col := findTextPosition(t, testContent, "x := 1")
-	locations, err := client.FindReferences(CursorLocation{
+	cursorLoc := CursorLocation{
 		Path: testFile,
 		Line: line,
 		Col:  col,
-	})
+	}
+
+	// Set up mock response if using mock LSP
+	if mock := asMock(client); mock != nil {
+		// x is declared on line 3, used on lines 4 and 5
+		declLine, declCol := findTextPosition(t, testContent, "x := 1")
+		useLine1, useCol1 := findTextPosition(t, testContent, "_ = x")
+		useCol1 += len("_ = ")
+		useLine2, useCol2 := findTextPosition(t, testContent, "y := x + 1")
+		useCol2 += len("y := ")
+
+		mock.SetReferences(cursorLoc, []Location{
+			{
+				URI: pathToURI(testFile),
+				Range: Range{
+					Start: Position{Line: declLine, Character: declCol},
+					End:   Position{Line: declLine, Character: declCol + 1},
+				},
+			},
+			{
+				URI: pathToURI(testFile),
+				Range: Range{
+					Start: Position{Line: useLine1, Character: useCol1},
+					End:   Position{Line: useLine1, Character: useCol1 + 1},
+				},
+			},
+			{
+				URI: pathToURI(testFile),
+				Range: Range{
+					Start: Position{Line: useLine2, Character: useCol2},
+					End:   Position{Line: useLine2, Character: useCol2 + 1},
+				},
+			},
+		})
+	}
+
+	locations, err := client.FindReferences(cursorLoc)
 	require.NoError(t, err)
 
 	// We should find at least 2 references (declaration, uses in subsequent lines)
@@ -318,10 +419,11 @@ func TestLSPClientMultipleFiles(t *testing.T) {
 	err := client.Init(true)
 	require.NoError(t, err)
 
-	// Create temporary files in tmp directory
-	tmpDir := filepath.Join(projectRoot, "tmp")
+	// Create a unique temporary subdirectory for this test to avoid package conflicts
+	tmpDir := filepath.Join(projectRoot, "tmp", "test_multiple_files")
 	err = os.MkdirAll(tmpDir, 0755)
 	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
 
 	file1 := filepath.Join(tmpDir, "test_multi_1.go")
 	file1Content := `package main
@@ -342,11 +444,9 @@ func main() {
 
 	err = os.WriteFile(file1, []byte(file1Content), 0644)
 	require.NoError(t, err)
-	defer os.Remove(file1)
 
 	err = os.WriteFile(file2, []byte(file2Content), 0644)
 	require.NoError(t, err)
-	defer os.Remove(file2)
 
 	// Open both files
 	_, err = client.TouchAndValidate(file1, false)
@@ -355,8 +455,8 @@ func main() {
 	_, err = client.TouchAndValidate(file2, false)
 	require.NoError(t, err)
 
-	// Wait for indexing
-	time.Sleep(1 * time.Second)
+	// Wait for indexing (only for real LSP)
+	sleepForLSP(client, 1*time.Second)
 
 	// Find definition of Helper from file2 (search for Helper call)
 	line, col := findTextPosition(t, file2Content, "Helper")
@@ -403,14 +503,12 @@ func TestLSPClientDocumentUpdate(t *testing.T) {
 		return
 	}
 
-	goplsPath := getGoplsPath(t)
 	projectRoot := getProjectRoot(t)
 
-	client, err := NewClient(goplsPath, projectRoot)
-	require.NoError(t, err)
-	defer client.Close()
+	client := createLSPClient(t)
+	defer closeLSPClient(client)
 
-	err = client.Init(true)
+	err := client.Init(true)
 	require.NoError(t, err)
 
 	// Create a unique temporary subdirectory for this test to avoid package conflicts
@@ -436,7 +534,7 @@ func main() {
 	_, err = client.TouchAndValidate(testFile, false)
 	require.NoError(t, err)
 
-	time.Sleep(1 * time.Second)
+	sleepForLSP(client, 1*time.Second)
 
 	// Get diagnostics - should be clean
 	_, err = client.Diagnostics()
@@ -444,7 +542,7 @@ func main() {
 
 	// Filter diagnostics for our test file
 	uri := pathToURI(testFile)
-	testFileDiags := client.getDiagnosticsForURI(uri)
+	testFileDiags := getDiagnosticsForURI(client, uri)
 
 	// Should have no errors for valid code
 	errorCount := 0
@@ -465,14 +563,28 @@ func main() {
 	err = os.WriteFile(testFile, []byte(invalidContent), 0644)
 	require.NoError(t, err)
 
+	// Set up mock response for invalid code if using mock LSP
+	if mock := asMock(client); mock != nil {
+		mock.SetDiagnostics(uri, []Diagnostic{
+			{
+				Range: Range{
+					Start: Position{Line: 4, Character: 0},
+					End:   Position{Line: 4, Character: 0},
+				},
+				Severity: SeverityError,
+				Message:  "expected '}', found 'EOF'",
+			},
+		})
+	}
+
 	// Touch and validate again
 	_, err = client.TouchAndValidate(testFile, false)
 	require.NoError(t, err)
 
-	time.Sleep(2 * time.Second)
+	sleepForLSP(client, 2*time.Second)
 
 	// Get diagnostics - should have errors now
-	testFileDiags = client.getDiagnosticsForURI(uri)
+	testFileDiags = getDiagnosticsForURI(client, uri)
 
 	errorCount = 0
 	for _, diag := range testFileDiags {
@@ -489,14 +601,12 @@ func TestLSPClientHover(t *testing.T) {
 		return
 	}
 
-	goplsPath := getGoplsPath(t)
 	projectRoot := getProjectRoot(t)
 
-	client, err := NewClient(goplsPath, projectRoot)
-	require.NoError(t, err)
-	defer client.Close()
+	client := createLSPClient(t)
+	defer closeLSPClient(client)
 
-	err = client.Init(true)
+	err := client.Init(true)
 	require.NoError(t, err)
 
 	// Create a temporary file in tmp directory
@@ -528,12 +638,22 @@ func main() {
 	require.NoError(t, err)
 
 	// Wait for indexing
-	time.Sleep(1 * time.Second)
+	sleepForLSP(client, 1*time.Second)
 
 	// Test hovering over Helper function call (search for the line with Helper call)
 	line, col := findTextPosition(t, testContent, "fmt.Println(Helper())")
 	// Position cursor on "Helper" - after "fmt.Println("
 	col += len("fmt.Println(")
+
+	// Set up mock response if using mock LSP
+	if mock := asMock(client); mock != nil {
+		mock.SetHover(CursorLocation{
+			Path: testFile,
+			Line: line,
+			Col:  col,
+		}, "func Helper() string\n\nHelper is a helper function that returns a greeting message.", "markdown")
+	}
+
 	text, format, err := client.Hover(CursorLocation{
 		Path: testFile,
 		Line: line,
@@ -548,6 +668,16 @@ func main() {
 	line, col = findTextPosition(t, testContent, "fmt.Println")
 	// Position cursor on "Println" - after "fmt."
 	col += len("fmt.")
+
+	// Set up mock response if using mock LSP
+	if mock := asMock(client); mock != nil {
+		mock.SetHover(CursorLocation{
+			Path: testFile,
+			Line: line,
+			Col:  col,
+		}, "func Println(a ...any) (n int, err error)\n\nPrintln formats using the default formats for its operands and writes to standard output.", "markdown")
+	}
+
 	text, format, err = client.Hover(CursorLocation{
 		Path: testFile,
 		Line: line,
@@ -578,14 +708,12 @@ func TestLSPClientHoverMarkdownFormat(t *testing.T) {
 		return
 	}
 
-	goplsPath := getGoplsPath(t)
 	projectRoot := getProjectRoot(t)
 
-	client, err := NewClient(goplsPath, projectRoot)
-	require.NoError(t, err)
-	defer client.Close()
+	client := createLSPClient(t)
+	defer closeLSPClient(client)
 
-	err = client.Init(true)
+	err := client.Init(true)
 	require.NoError(t, err)
 
 	// Create a temporary file in tmp directory
@@ -617,12 +745,22 @@ func main() {
 	require.NoError(t, err)
 
 	// Wait for indexing
-	time.Sleep(1 * time.Second)
+	sleepForLSP(client, 1*time.Second)
 
 	// Test hovering over MyStruct (search for MyStruct in variable declaration)
 	line, col := findTextPosition(t, testContent, "var s MyStruct")
 	// Position cursor on MyStruct identifier
 	col += len("var s ")
+
+	// Set up mock response if using mock LSP
+	if mock := asMock(client); mock != nil {
+		mock.SetHover(CursorLocation{
+			Path: testFile,
+			Line: line,
+			Col:  col,
+		}, "type MyStruct struct {\n\tField int\n}\n\nMyStruct is a sample struct with documentation.\nIt has multiple lines of documentation.", "markdown")
+	}
+
 	text, format, err := client.Hover(CursorLocation{
 		Path: testFile,
 		Line: line,
@@ -644,14 +782,12 @@ func TestLSPClientDocumentSymbols(t *testing.T) {
 		return
 	}
 
-	goplsPath := getGoplsPath(t)
 	projectRoot := getProjectRoot(t)
 
-	client, err := NewClient(goplsPath, projectRoot)
-	require.NoError(t, err)
-	defer client.Close()
+	client := createLSPClient(t)
+	defer closeLSPClient(client)
 
-	err = client.Init(true)
+	err := client.Init(true)
 	require.NoError(t, err)
 
 	// Create a temporary file in tmp directory
@@ -700,7 +836,111 @@ func main() {
 	require.NoError(t, err)
 
 	// Wait for indexing
-	time.Sleep(1 * time.Second)
+	sleepForLSP(client, 1*time.Second)
+
+	// Set up mock response if using mock LSP
+	if mock := asMock(client); mock != nil {
+		mock.SetDocumentSymbols(testFile, []DocumentSymbol{
+			{
+				Name: "MyStruct",
+				Kind: SymbolKindStruct,
+				Range: Range{
+					Start: Position{Line: 5, Character: 0},
+					End:   Position{Line: 8, Character: 1},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 5, Character: 5},
+					End:   Position{Line: 5, Character: 13},
+				},
+				Children: []DocumentSymbol{
+					{
+						Name: "Field1",
+						Kind: SymbolKindField,
+						Range: Range{
+							Start: Position{Line: 6, Character: 1},
+							End:   Position{Line: 6, Character: 14},
+						},
+						SelectionRange: Range{
+							Start: Position{Line: 6, Character: 1},
+							End:   Position{Line: 6, Character: 7},
+						},
+					},
+					{
+						Name: "Field2",
+						Kind: SymbolKindField,
+						Range: Range{
+							Start: Position{Line: 7, Character: 1},
+							End:   Position{Line: 7, Character: 17},
+						},
+						SelectionRange: Range{
+							Start: Position{Line: 7, Character: 1},
+							End:   Position{Line: 7, Character: 7},
+						},
+					},
+				},
+			},
+			{
+				Name: "MyMethod",
+				Kind: SymbolKindMethod,
+				Range: Range{
+					Start: Position{Line: 11, Character: 0},
+					End:   Position{Line: 13, Character: 1},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 11, Character: 19},
+					End:   Position{Line: 11, Character: 27},
+				},
+			},
+			{
+				Name: "MyFunction",
+				Kind: SymbolKindFunction,
+				Range: Range{
+					Start: Position{Line: 16, Character: 0},
+					End:   Position{Line: 18, Character: 1},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 16, Character: 5},
+					End:   Position{Line: 16, Character: 15},
+				},
+			},
+			{
+				Name: "MyConstant",
+				Kind: SymbolKindConstant,
+				Range: Range{
+					Start: Position{Line: 20, Character: 0},
+					End:   Position{Line: 20, Character: 22},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 20, Character: 6},
+					End:   Position{Line: 20, Character: 16},
+				},
+			},
+			{
+				Name: "MyVariable",
+				Kind: SymbolKindVariable,
+				Range: Range{
+					Start: Position{Line: 22, Character: 0},
+					End:   Position{Line: 22, Character: 23},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 22, Character: 4},
+					End:   Position{Line: 22, Character: 14},
+				},
+			},
+			{
+				Name: "main",
+				Kind: SymbolKindFunction,
+				Range: Range{
+					Start: Position{Line: 24, Character: 0},
+					End:   Position{Line: 28, Character: 1},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 24, Character: 5},
+					End:   Position{Line: 24, Character: 9},
+				},
+			},
+		})
+	}
 
 	// Get document symbols
 	symbols, err := client.DocumentSymbols(testFile)
@@ -782,14 +1022,12 @@ func TestLSPClientWorkspaceSymbols(t *testing.T) {
 		return
 	}
 
-	goplsPath := getGoplsPath(t)
 	projectRoot := getProjectRoot(t)
 
-	client, err := NewClient(goplsPath, projectRoot)
-	require.NoError(t, err)
-	defer client.Close()
+	client := createLSPClient(t)
+	defer closeLSPClient(client)
 
-	err = client.Init(true)
+	err := client.Init(true)
 	require.NoError(t, err)
 
 	// Create test files in tmp directory
@@ -842,7 +1080,60 @@ func helper() {
 	require.NoError(t, err)
 
 	// Wait for indexing
-	time.Sleep(2 * time.Second)
+	sleepForLSP(client, 2*time.Second)
+
+	// Set up mock responses if using mock LSP
+	if mock := asMock(client); mock != nil {
+		mock.SetWorkspaceSymbols("UniqueTest", []WorkspaceSymbol{
+			{
+				Name: "UniqueTestStruct",
+				Kind: SymbolKindStruct,
+				Location: Location{
+					URI: pathToURI(testFile1),
+					Range: Range{
+						Start: Position{Line: 2, Character: 5},
+						End:   Position{Line: 2, Character: 21},
+					},
+				},
+			},
+			{
+				Name: "UniqueTestFunction",
+				Kind: SymbolKindFunction,
+				Location: Location{
+					URI: pathToURI(testFile1),
+					Range: Range{
+						Start: Position{Line: 7, Character: 5},
+						End:   Position{Line: 7, Character: 23},
+					},
+				},
+			},
+			{
+				Name: "UniqueTestConstant",
+				Kind: SymbolKindConstant,
+				Location: Location{
+					URI: pathToURI(testFile1),
+					Range: Range{
+						Start: Position{Line: 10, Character: 6},
+						End:   Position{Line: 10, Character: 24},
+					},
+				},
+			},
+		})
+
+		mock.SetWorkspaceSymbols("AnotherUnique", []WorkspaceSymbol{
+			{
+				Name: "AnotherUniqueType",
+				Kind: SymbolKindStruct,
+				Location: Location{
+					URI: pathToURI(testFile2),
+					Range: Range{
+						Start: Position{Line: 2, Character: 5},
+						End:   Position{Line: 2, Character: 22},
+					},
+				},
+			},
+		})
+	}
 
 	// Test 1: Search for UniqueTest* symbols
 	symbols, err := client.WorkspaceSymbols("UniqueTest")
@@ -909,14 +1200,12 @@ func TestLSPClientCallHierarchy(t *testing.T) {
 		return
 	}
 
-	goplsPath := getGoplsPath(t)
 	projectRoot := getProjectRoot(t)
 
-	client, err := NewClient(goplsPath, projectRoot)
-	require.NoError(t, err)
-	defer client.Close()
+	client := createLSPClient(t)
+	defer closeLSPClient(client)
 
-	err = client.Init(true)
+	err := client.Init(true)
 	require.NoError(t, err)
 
 	// Create temporary files in tmp directory
@@ -964,11 +1253,171 @@ func main() {
 	require.NoError(t, err)
 
 	// Wait for indexing
-	time.Sleep(2 * time.Second)
+	sleepForLSP(client, 2*time.Second)
 
 	// Test 1: Prepare call hierarchy for Helper function (search for Helper function definition)
 	line, col := findTextPosition(t, testContent, "func Helper()")
 	col += len("func ")
+
+	// Set up mock responses if using mock LSP
+	if mock := asMock(client); mock != nil {
+		helperItem := CallHierarchyItem{
+			Name: "Helper",
+			Kind: SymbolKindFunction,
+			URI:  pathToURI(testFile),
+			Range: Range{
+				Start: Position{Line: 4, Character: 0},
+				End:   Position{Line: 6, Character: 1},
+			},
+			SelectionRange: Range{
+				Start: Position{Line: 4, Character: 5},
+				End:   Position{Line: 4, Character: 11},
+			},
+		}
+
+		mock.SetCallHierarchy(CursorLocation{
+			Path: testFile,
+			Line: line,
+			Col:  col,
+		}, []CallHierarchyItem{helperItem})
+
+		mock.SetIncomingCalls("Helper", []CallHierarchyIncomingCall{
+			{
+				From: CallHierarchyItem{
+					Name: "Caller",
+					Kind: SymbolKindFunction,
+					URI:  pathToURI(testFile),
+					Range: Range{
+						Start: Position{Line: 9, Character: 0},
+						End:   Position{Line: 11, Character: 1},
+					},
+					SelectionRange: Range{
+						Start: Position{Line: 9, Character: 5},
+						End:   Position{Line: 9, Character: 11},
+					},
+				},
+				FromRanges: []Range{
+					{
+						Start: Position{Line: 10, Character: 1},
+						End:   Position{Line: 10, Character: 7},
+					},
+				},
+			},
+			{
+				From: CallHierarchyItem{
+					Name: "AnotherCaller",
+					Kind: SymbolKindFunction,
+					URI:  pathToURI(testFile),
+					Range: Range{
+						Start: Position{Line: 14, Character: 0},
+						End:   Position{Line: 16, Character: 1},
+					},
+					SelectionRange: Range{
+						Start: Position{Line: 14, Character: 5},
+						End:   Position{Line: 14, Character: 18},
+					},
+				},
+				FromRanges: []Range{
+					{
+						Start: Position{Line: 15, Character: 1},
+						End:   Position{Line: 15, Character: 7},
+					},
+				},
+			},
+		})
+
+		// Set up for Caller function
+		callerLine, callerCol := findTextPosition(t, testContent, "func Caller()")
+		callerCol += len("func ")
+		callerItem := CallHierarchyItem{
+			Name: "Caller",
+			Kind: SymbolKindFunction,
+			URI:  pathToURI(testFile),
+			Range: Range{
+				Start: Position{Line: 9, Character: 0},
+				End:   Position{Line: 11, Character: 1},
+			},
+			SelectionRange: Range{
+				Start: Position{Line: 9, Character: 5},
+				End:   Position{Line: 9, Character: 11},
+			},
+		}
+
+		mock.SetCallHierarchy(CursorLocation{
+			Path: testFile,
+			Line: callerLine,
+			Col:  callerCol,
+		}, []CallHierarchyItem{callerItem})
+
+		mock.SetOutgoingCalls("Caller", []CallHierarchyOutgoingCall{
+			{
+				To: helperItem,
+				FromRanges: []Range{
+					{
+						Start: Position{Line: 10, Character: 1},
+						End:   Position{Line: 10, Character: 7},
+					},
+				},
+			},
+		})
+
+		// Set up for ThirdCaller function
+		thirdLine, thirdCol := findTextPosition(t, testContent, "func ThirdCaller()")
+		thirdCol += len("func ")
+		thirdCallerItem := CallHierarchyItem{
+			Name: "ThirdCaller",
+			Kind: SymbolKindFunction,
+			URI:  pathToURI(testFile),
+			Range: Range{
+				Start: Position{Line: 19, Character: 0},
+				End:   Position{Line: 22, Character: 1},
+			},
+			SelectionRange: Range{
+				Start: Position{Line: 19, Character: 5},
+				End:   Position{Line: 19, Character: 16},
+			},
+		}
+
+		mock.SetCallHierarchy(CursorLocation{
+			Path: testFile,
+			Line: thirdLine,
+			Col:  thirdCol,
+		}, []CallHierarchyItem{thirdCallerItem})
+
+		mock.SetOutgoingCalls("ThirdCaller", []CallHierarchyOutgoingCall{
+			{
+				To: callerItem,
+				FromRanges: []Range{
+					{
+						Start: Position{Line: 20, Character: 1},
+						End:   Position{Line: 20, Character: 7},
+					},
+				},
+			},
+			{
+				To: CallHierarchyItem{
+					Name: "AnotherCaller",
+					Kind: SymbolKindFunction,
+					URI:  pathToURI(testFile),
+					Range: Range{
+						Start: Position{Line: 14, Character: 0},
+						End:   Position{Line: 16, Character: 1},
+					},
+					SelectionRange: Range{
+						Start: Position{Line: 14, Character: 5},
+						End:   Position{Line: 14, Character: 18},
+					},
+				},
+				FromRanges: []Range{
+					{
+						Start: Position{Line: 21, Character: 1},
+						End:   Position{Line: 21, Character: 14},
+					},
+				},
+			},
+		})
+	}
+
 	items, err := client.CallHierarchy(CursorLocation{
 		Path: testFile,
 		Line: line,
@@ -1071,14 +1520,12 @@ func TestLSPClientCallHierarchyMultipleFiles(t *testing.T) {
 		return
 	}
 
-	goplsPath := getGoplsPath(t)
 	projectRoot := getProjectRoot(t)
 
-	client, err := NewClient(goplsPath, projectRoot)
-	require.NoError(t, err)
-	defer client.Close()
+	client := createLSPClient(t)
+	defer closeLSPClient(client)
 
-	err = client.Init(true)
+	err := client.Init(true)
 	require.NoError(t, err)
 
 	// Create temporary files in tmp directory
@@ -1139,11 +1586,80 @@ func CallerInFile3() {
 	require.NoError(t, err)
 
 	// Wait for indexing
-	time.Sleep(2 * time.Second)
+	sleepForLSP(client, 2*time.Second)
 
 	// Prepare call hierarchy for SharedFunction (search for SharedFunction definition)
 	line, col := findTextPosition(t, file1Content, "func SharedFunction()")
 	col += len("func ")
+
+	// Set up mock responses if using mock LSP
+	if mock := asMock(client); mock != nil {
+		sharedItem := CallHierarchyItem{
+			Name: "SharedFunction",
+			Kind: SymbolKindFunction,
+			URI:  pathToURI(file1),
+			Range: Range{
+				Start: Position{Line: 2, Character: 0},
+				End:   Position{Line: 4, Character: 1},
+			},
+			SelectionRange: Range{
+				Start: Position{Line: 2, Character: 5},
+				End:   Position{Line: 2, Character: 19},
+			},
+		}
+
+		mock.SetCallHierarchy(CursorLocation{
+			Path: file1,
+			Line: line,
+			Col:  col,
+		}, []CallHierarchyItem{sharedItem})
+
+		mock.SetIncomingCalls("SharedFunction", []CallHierarchyIncomingCall{
+			{
+				From: CallHierarchyItem{
+					Name: "CallerInFile2",
+					Kind: SymbolKindFunction,
+					URI:  pathToURI(file2),
+					Range: Range{
+						Start: Position{Line: 2, Character: 0},
+						End:   Position{Line: 5, Character: 1},
+					},
+					SelectionRange: Range{
+						Start: Position{Line: 2, Character: 5},
+						End:   Position{Line: 2, Character: 18},
+					},
+				},
+				FromRanges: []Range{
+					{
+						Start: Position{Line: 3, Character: 10},
+						End:   Position{Line: 3, Character: 24},
+					},
+				},
+			},
+			{
+				From: CallHierarchyItem{
+					Name: "CallerInFile3",
+					Kind: SymbolKindFunction,
+					URI:  pathToURI(file3),
+					Range: Range{
+						Start: Position{Line: 2, Character: 0},
+						End:   Position{Line: 5, Character: 1},
+					},
+					SelectionRange: Range{
+						Start: Position{Line: 2, Character: 5},
+						End:   Position{Line: 2, Character: 18},
+					},
+				},
+				FromRanges: []Range{
+					{
+						Start: Position{Line: 3, Character: 8},
+						End:   Position{Line: 3, Character: 22},
+					},
+				},
+			},
+		})
+	}
+
 	items, err := client.CallHierarchy(CursorLocation{
 		Path: file1,
 		Line: line,
@@ -1181,14 +1697,12 @@ func TestLSPClientCallHierarchyNoResults(t *testing.T) {
 		return
 	}
 
-	goplsPath := getGoplsPath(t)
 	projectRoot := getProjectRoot(t)
 
-	client, err := NewClient(goplsPath, projectRoot)
-	require.NoError(t, err)
-	defer client.Close()
+	client := createLSPClient(t)
+	defer closeLSPClient(client)
 
-	err = client.Init(true)
+	err := client.Init(true)
 	require.NoError(t, err)
 
 	// Create a temporary file in tmp directory
@@ -1218,11 +1732,41 @@ func main() {
 	require.NoError(t, err)
 
 	// Wait for indexing
-	time.Sleep(1 * time.Second)
+	sleepForLSP(client, 1*time.Second)
 
 	// Prepare call hierarchy for UnusedFunction (search for UnusedFunction definition)
 	line, col := findTextPosition(t, testContent, "func UnusedFunction()")
 	col += len("func ")
+
+	// Set up mock responses if using mock LSP
+	if mock := asMock(client); mock != nil {
+		unusedItem := CallHierarchyItem{
+			Name: "UnusedFunction",
+			Kind: SymbolKindFunction,
+			URI:  pathToURI(testFile),
+			Range: Range{
+				Start: Position{Line: 2, Character: 0},
+				End:   Position{Line: 4, Character: 1},
+			},
+			SelectionRange: Range{
+				Start: Position{Line: 2, Character: 5},
+				End:   Position{Line: 2, Character: 19},
+			},
+		}
+
+		mock.SetCallHierarchy(CursorLocation{
+			Path: testFile,
+			Line: line,
+			Col:  col,
+		}, []CallHierarchyItem{unusedItem})
+
+		// No incoming calls for unused function
+		mock.SetIncomingCalls("UnusedFunction", []CallHierarchyIncomingCall{})
+
+		// No outgoing calls for unused function (it doesn't call anything)
+		mock.SetOutgoingCalls("UnusedFunction", []CallHierarchyOutgoingCall{})
+	}
+
 	items, err := client.CallHierarchy(CursorLocation{
 		Path: testFile,
 		Line: line,
