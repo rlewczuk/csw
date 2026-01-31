@@ -44,6 +44,7 @@ func main() {
 
 	// Add subcommands
 	rootCmd.AddCommand(ConfCommand())
+	rootCmd.AddCommand(CliCommand())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
