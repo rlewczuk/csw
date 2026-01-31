@@ -1,11 +1,49 @@
-## `run.bash` tool
+Executes a given bash command in a shell session with optional timeout, ensuring proper handling and security measures.
 
-Executes a bash command in the project directory and returns the output.
+All commands run in `{{.Info.WorkDir}}` by default. Use the `workdir` parameter if you need to run a command in a different directory. AVOID using `cd <directory> && <command>` patterns - use `workdir` instead.
 
-Usage:
-- The command parameter contains the complete bash command to execute
-- Commands are executed in the project's working directory
-- Both stdout and stderr are captured and returned
-- The exit code is included in the response
-- Use this for running tests, builds, git commands, and other shell operations
-- Command execution is subject to privilege restrictions configured for the role
+IMPORTANT: This tool is for terminal operations like git, npm, docker, etc. DO NOT use it for file operations (reading, writing, editing, searching, finding files) - use the specialized tools for this instead.
+
+Before executing the command, please follow these steps:
+
+1. Directory Verification:
+    - If the command will create new directories or files, first use `ls` to verify the parent directory exists and is the correct location
+    - For example, before running "mkdir foo/bar", first use `ls foo` to check that "foo" exists and is the intended parent directory
+
+2. Command Execution:
+    - Always quote file paths that contain spaces with double quotes (e.g., rm "path with spaces/file.txt")
+    - Examples of proper quoting:
+        - mkdir "/Users/name/My Documents" (correct)
+        - mkdir /Users/name/My Documents (incorrect - will fail)
+        - python "/path/with spaces/script.py" (correct)
+        - python /path/with spaces/script.py (incorrect - will fail)
+    - After ensuring proper quoting, execute the command.
+    - Capture the output of the command.
+
+Usage notes:
+- The command argument is required.
+- You can specify an optional timeout in seconds. If not specified, commands will time out after 120 seconds (2 minutes).
+- It is very helpful if you write a clear, concise description of what this command does in 5-10 words.
+- If the output exceeds ${maxLines} lines or ${maxBytes} bytes, it will be truncated and the full output will be written to a file. You can use Read with offset/limit to read specific sections or Grep to search the full content. Because of this, you do NOT need to use `head`, `tail`, or other truncation commands to limit output - just run the command directly.
+
+- Avoid using Bash with the `find`, `grep`, `cat`, `head`, `tail`, `sed`, `awk`, or `echo` commands, unless explicitly instructed or when these commands are truly necessary for the task. Instead, always prefer using the dedicated tools for these commands:
+    - File search: Use `vfs.find` tool (NOT find or ls)
+    - Content search: Use `vfs.grep` (NOT grep or rg)
+    - Read files: Use `vfs.read` tool (NOT cat/head/tail)
+    - Edit files: Use `vfs.patch` (NOT sed/awk)
+    - Write files: Use `vfs.write` (NOT echo >/cat <<EOF)
+    - Communication: Output text directly (NOT echo/printf)
+- When issuing multiple commands:
+    - If the commands are independent and can run in parallel, make multiple `run.bash` tool calls in a single message. For example, if you need to run "git status" and "git diff", send a single message with two `vfs.bash` tool calls in parallel.
+    - If the commands depend on each other and must run sequentially, use a single Bash call with '&&' to chain them together (e.g., `git add . && git commit -m "message" && git push`). For instance, if one operation must complete before another starts (like mkdir before cp, Write before Bash for git operations, or git add before git commit), run these operations sequentially instead.
+    - Use ';' only when you need to run commands sequentially but don't care if earlier commands fail
+    - DO NOT use newlines to separate commands (newlines are ok in quoted strings)
+- AVOID using `cd <directory> && <command>`. Use the `workdir` parameter to change directories instead.
+  <good-example>
+  Use workdir="/foo/bar" with command: pytest tests
+  </good-example>
+  <bad-example>
+  cd /foo/bar && pytest tests
+  </bad-example>
+
+- The user manages version control. DO NOT commit changes nor use any other git commands that change the repository.
