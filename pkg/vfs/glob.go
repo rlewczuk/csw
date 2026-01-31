@@ -57,7 +57,31 @@ func NewGlobFilter(defaultMatch bool, patterns []string, gitignoreContents ...st
 		}
 	}
 
+	// Optimization: if !** appears in the list, all patterns before it (and including it) are irrelevant
+	// because !** excludes everything, making all previous patterns ineffective
+	f.patterns = optimizeExcludeAll(f.patterns)
+
 	return f
+}
+
+// optimizeExcludeAll removes all patterns up to and including the last occurrence of !**
+// since !** excludes everything and makes all previous patterns irrelevant.
+func optimizeExcludeAll(patterns []globPattern) []globPattern {
+	// Find the last occurrence of !** (negate=true, pattern="**")
+	lastExcludeAllIdx := -1
+	for i, p := range patterns {
+		if p.negate && p.pattern == "**" {
+			lastExcludeAllIdx = i
+		}
+	}
+
+	// If !** was found, discard all patterns up to and including it
+	if lastExcludeAllIdx >= 0 {
+		// Keep only patterns after the last !**
+		return patterns[lastExcludeAllIdx+1:]
+	}
+
+	return patterns
 }
 
 // parseGlobPattern parses a single glob pattern line, handling comments and negation.
