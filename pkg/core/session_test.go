@@ -229,3 +229,191 @@ func TestSessionThreadSafety(t *testing.T) {
 		assert.NoError(t, mockHandler.RunFinishedError)
 	})
 }
+
+func TestSessionGrepToolIntegration(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+	require.NoError(t, err)
+	vfsInstance := vfs.NewMockVFS()
+
+	// Setup test files in VFS
+	err = vfsInstance.WriteFile("src/main.go", []byte("package main\n\nfunc main() {\n\tfmt.Println(\"hello\")\n}"))
+	require.NoError(t, err)
+	err = vfsInstance.WriteFile("src/utils.go", []byte("package main\n\nfunc helper() {\n\tfmt.Println(\"help\")\n}"))
+	require.NoError(t, err)
+	err = vfsInstance.WriteFile("README.md", []byte("# Project\n\nThis is a test project with main content."))
+	require.NoError(t, err)
+
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfsInstance)
+
+	system := &SweSystem{
+		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
+		Tools:                tools,
+		VFS:                  vfsInstance,
+		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+	}
+
+	t.Run("grep tool finds matches across files", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		controller := NewSessionThread(system, mockHandler)
+
+		err := controller.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := controller.GetSession()
+
+		// Verify grep tool is registered
+		grepTool, err := session.Tools.Get("vfs.grep")
+		require.NoError(t, err)
+		require.NotNil(t, grepTool)
+
+		// Execute grep tool to find "main"
+		response := grepTool.Execute(tool.ToolCall{
+			ID:       "test-grep-1",
+			Function: "vfs.grep",
+			Arguments: tool.NewToolValue(map[string]any{
+				"pattern": "main",
+			}),
+		})
+
+		// Verify response
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		content := response.Result.Get("content").AsString()
+		assert.Contains(t, content, "src/main.go:1")
+		assert.Contains(t, content, "src/main.go:3")
+		assert.Contains(t, content, "src/utils.go:1")
+		assert.Contains(t, content, "README.md:3")
+	})
+
+	t.Run("grep tool filters by include pattern", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		controller := NewSessionThread(system, mockHandler)
+
+		err := controller.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := controller.GetSession()
+
+		grepTool, err := session.Tools.Get("vfs.grep")
+		require.NoError(t, err)
+
+		// Execute grep tool with include filter for .go files only
+		response := grepTool.Execute(tool.ToolCall{
+			ID:       "test-grep-2",
+			Function: "vfs.grep",
+			Arguments: tool.NewToolValue(map[string]any{
+				"pattern": "main",
+				"include": "*.go",
+			}),
+		})
+
+		// Verify response
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		content := response.Result.Get("content").AsString()
+		assert.Contains(t, content, "src/main.go:1")
+		assert.Contains(t, content, "src/main.go:3")
+		assert.Contains(t, content, "src/utils.go:1")
+		assert.NotContains(t, content, "README.md")
+	})
+
+	t.Run("grep tool filters by path", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		controller := NewSessionThread(system, mockHandler)
+
+		err := controller.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := controller.GetSession()
+
+		grepTool, err := session.Tools.Get("vfs.grep")
+		require.NoError(t, err)
+
+		// Execute grep tool with path filter for src/ directory
+		response := grepTool.Execute(tool.ToolCall{
+			ID:       "test-grep-3",
+			Function: "vfs.grep",
+			Arguments: tool.NewToolValue(map[string]any{
+				"pattern": "main",
+				"path":    "src",
+			}),
+		})
+
+		// Verify response
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		content := response.Result.Get("content").AsString()
+		assert.Contains(t, content, "src/main.go:1")
+		assert.Contains(t, content, "src/main.go:3")
+		assert.Contains(t, content, "src/utils.go:1")
+		assert.NotContains(t, content, "README.md")
+	})
+
+	t.Run("grep tool returns no files found when no matches", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		controller := NewSessionThread(system, mockHandler)
+
+		err := controller.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := controller.GetSession()
+
+		grepTool, err := session.Tools.Get("vfs.grep")
+		require.NoError(t, err)
+
+		// Execute grep tool with pattern that doesn't match
+		response := grepTool.Execute(tool.ToolCall{
+			ID:       "test-grep-4",
+			Function: "vfs.grep",
+			Arguments: tool.NewToolValue(map[string]any{
+				"pattern": "nonexistent_pattern_xyz",
+			}),
+		})
+
+		// Verify response
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		content := response.Result.Get("content").AsString()
+		assert.Equal(t, "No files found", content)
+	})
+
+	t.Run("grep tool respects limit parameter", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		controller := NewSessionThread(system, mockHandler)
+
+		err := controller.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := controller.GetSession()
+
+		grepTool, err := session.Tools.Get("vfs.grep")
+		require.NoError(t, err)
+
+		// Execute grep tool with low limit
+		response := grepTool.Execute(tool.ToolCall{
+			ID:       "test-grep-5",
+			Function: "vfs.grep",
+			Arguments: tool.NewToolValue(map[string]any{
+				"pattern": "main",
+				"limit":   2,
+			}),
+		})
+
+		// Verify response
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		content := response.Result.Get("content").AsString()
+		// Should contain truncation message
+		assert.Contains(t, content, "(Results are truncated. Consider using a more specific path or pattern.)")
+	})
+}
