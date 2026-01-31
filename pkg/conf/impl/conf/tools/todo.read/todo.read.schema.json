@@ -1,0 +1,6 @@
+{
+  "description": "Retrieves the current todo list with all items and their statuses.",
+  "type": "object",
+  "properties": {},
+  "required": []
+}
