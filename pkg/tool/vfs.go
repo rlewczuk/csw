@@ -191,7 +191,7 @@ func (t *VFSDeleteTool) Execute(args ToolCall) ToolResponse {
 	}
 }
 
-// VFSListTool implements the vfs.list tool.
+// VFSListTool implements the vfs.ls tool.
 type VFSListTool struct {
 	vfs vfs.VFS
 }

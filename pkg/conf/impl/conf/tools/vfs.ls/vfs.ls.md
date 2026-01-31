@@ -1,4 +1,4 @@
-## `vfs.list` tool
+## `vfs.ls` tool
 
 Lists files and directories in the specified directory.
 
