@@ -37,8 +37,14 @@ func (p *filePatcher) ApplyEdits(path string, oldString string, newString string
 	// Read the file content
 	content, err := p.vfs.ReadFile(path)
 	if err != nil {
-		if errors.Is(err, ErrFileNotFound) {
-			return "", fmt.Errorf("filePatcher.ApplyEdits: %w", err)
+		// Propagate permission errors and file not found errors without wrapping
+		if errors.Is(err, ErrFileNotFound) || errors.Is(err, ErrAskPermission) || errors.Is(err, ErrPermissionDenied) {
+			return "", err
+		}
+		// Check for PermissionError type
+		var permErr *PermissionError
+		if errors.As(err, &permErr) {
+			return "", err
 		}
 		return "", fmt.Errorf("filePatcher.ApplyEdits: failed to read file: %w", err)
 	}
@@ -72,6 +78,15 @@ func (p *filePatcher) ApplyEdits(path string, oldString string, newString string
 	// Write the new content back to the file
 	err = p.vfs.WriteFile(path, []byte(newContent))
 	if err != nil {
+		// Propagate permission errors without wrapping
+		if errors.Is(err, ErrAskPermission) || errors.Is(err, ErrPermissionDenied) {
+			return "", err
+		}
+		// Check for PermissionError type
+		var permErr *PermissionError
+		if errors.As(err, &permErr) {
+			return "", err
+		}
 		return "", fmt.Errorf("filePatcher.ApplyEdits: failed to write file: %w", err)
 	}
 

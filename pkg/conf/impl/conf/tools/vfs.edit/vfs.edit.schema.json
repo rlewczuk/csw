@@ -1,0 +1,23 @@
+{
+  "description": "Performs exact string replacements in files.",
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "The absolute path to the file to edit."
+    },
+    "oldString": {
+      "type": "string",
+      "description": "The text to replace."
+    },
+    "newString": {
+      "type": "string",
+      "description": "The text to replace it with (must be different from oldString)."
+    },
+    "replaceAll": {
+      "type": "boolean",
+      "description": "Replace all occurrences of oldString (default false)."
+    }
+  },
+  "required": ["path", "oldString", "newString"]
+}
