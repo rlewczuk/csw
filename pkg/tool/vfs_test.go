@@ -1,6 +1,7 @@
 package tool
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -73,6 +74,205 @@ func TestVFSReadTool(t *testing.T) {
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, 0, response.Result.Len())
+	})
+
+	t.Run("should apply limit parameter", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		content := "line1\nline2\nline3\nline4\nline5"
+		err := mockVFS.WriteFile("test.txt", []byte(content))
+		require.NoError(t, err)
+
+		tool := NewVFSReadTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.read",
+			Arguments: NewToolValue(map[string]any{
+				"path":  "test.txt",
+				"limit": 3,
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Equal(t, "line1\nline2\nline3\n", response.Result.Get("content").AsString())
+	})
+
+	t.Run("should apply offset parameter", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		content := "line1\nline2\nline3\nline4\nline5"
+		err := mockVFS.WriteFile("test.txt", []byte(content))
+		require.NoError(t, err)
+
+		tool := NewVFSReadTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.read",
+			Arguments: NewToolValue(map[string]any{
+				"path":   "test.txt",
+				"offset": 2,
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Equal(t, "line3\nline4\nline5", response.Result.Get("content").AsString())
+	})
+
+	t.Run("should apply both offset and limit parameters", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		content := "line1\nline2\nline3\nline4\nline5\nline6"
+		err := mockVFS.WriteFile("test.txt", []byte(content))
+		require.NoError(t, err)
+
+		tool := NewVFSReadTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.read",
+			Arguments: NewToolValue(map[string]any{
+				"path":   "test.txt",
+				"offset": 1,
+				"limit":  3,
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Equal(t, "line2\nline3\nline4\n", response.Result.Get("content").AsString())
+	})
+
+	t.Run("should return empty string when offset exceeds line count", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		content := "line1\nline2\nline3"
+		err := mockVFS.WriteFile("test.txt", []byte(content))
+		require.NoError(t, err)
+
+		tool := NewVFSReadTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.read",
+			Arguments: NewToolValue(map[string]any{
+				"path":   "test.txt",
+				"offset": 10,
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Equal(t, "", response.Result.Get("content").AsString())
+	})
+
+	t.Run("should handle file without trailing newline", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		content := "line1\nline2\nline3"
+		err := mockVFS.WriteFile("test.txt", []byte(content))
+		require.NoError(t, err)
+
+		tool := NewVFSReadTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.read",
+			Arguments: NewToolValue(map[string]any{
+				"path":  "test.txt",
+				"limit": 2,
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Equal(t, "line1\nline2\n", response.Result.Get("content").AsString())
+	})
+
+	t.Run("should use default limit of 2000 when not provided", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		// Create content with more than 2000 lines
+		var lines []string
+		for i := 1; i <= 2500; i++ {
+			lines = append(lines, fmt.Sprintf("line%d", i))
+		}
+		content := ""
+		for _, line := range lines {
+			content += line + "\n"
+		}
+		err := mockVFS.WriteFile("test.txt", []byte(content))
+		require.NoError(t, err)
+
+		tool := NewVFSReadTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.read",
+			Arguments: NewToolValue(map[string]any{
+				"path": "test.txt",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+
+		// Count lines in result
+		resultContent := response.Result.Get("content").AsString()
+		resultLines := 0
+		for i := 0; i < len(resultContent); i++ {
+			if resultContent[i] == '\n' {
+				resultLines++
+			}
+		}
+		assert.Equal(t, 2000, resultLines)
+	})
+
+	t.Run("should handle empty file", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		err := mockVFS.WriteFile("test.txt", []byte(""))
+		require.NoError(t, err)
+
+		tool := NewVFSReadTool(mockVFS)
+
+		// Execute
+		response := tool.Execute(ToolCall{
+			ID:       "test-id",
+			Function: "vfs.read",
+			Arguments: NewToolValue(map[string]any{
+				"path":   "test.txt",
+				"offset": 0,
+				"limit":  10,
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Equal(t, "", response.Result.Get("content").AsString())
 	})
 }
 

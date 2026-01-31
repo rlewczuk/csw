@@ -5,6 +5,14 @@
     "path": {
       "type": "string",
       "description": "The absolute path to the file to read."
+    },
+    "limit": {
+      "type": "integer",
+      "description": "The maximum number of lines to read. Defaults to 2000 if not provided."
+    },
+    "offset": {
+      "type": "integer",
+      "description": "The number of lines to skip before reading. Defaults to 0 if not provided."
     }
   },
   "required": ["path"]
