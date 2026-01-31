@@ -1,9 +1,3 @@
-## `vfs.ls` tool
-
-Lists files and directories in the specified directory.
-
-Usage:
-- The path parameter must be an absolute path to a directory
-- Returns a list of files and directories with their metadata (name, type, size, modification time)
-- Does not recursively list subdirectories - only lists direct children
-- Returns an error if the path doesn't exist or is not a directory
+Lists files and directories in a given path. The path parameter must be either relative to project root or absolute. 
+You can optionally provide an array of glob patterns to ignore with the ignore parameter. 
+You should generally prefer the `vfs.find` and `vfs.frep` tools, if you know which directories to search.
