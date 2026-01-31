@@ -187,7 +187,7 @@ func TestOutputToolListTable(t *testing.T) {
 	tools := map[string]string{
 		"vfs.read":  "Reads a file from the local filesystem",
 		"vfs.write": "Writes content to a file",
-		"vfs.list":  "Lists files in a directory",
+		"vfs.ls":    "Lists files in a directory",
 	}
 
 	// Capture output
@@ -208,7 +208,7 @@ func TestOutputToolListTable(t *testing.T) {
 	assert.Contains(t, output, "DESCRIPTION")
 	assert.Contains(t, output, "vfs.read")
 	assert.Contains(t, output, "vfs.write")
-	assert.Contains(t, output, "vfs.list")
+	assert.Contains(t, output, "vfs.ls")
 }
 
 func TestOutputToolListJSON(t *testing.T) {

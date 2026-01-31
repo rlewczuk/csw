@@ -746,7 +746,7 @@ func (s *SweSession) SetRole(roleName string) error {
 	s.Tools.Register("vfs.read", tool.NewVFSReadTool(s.VFS))
 	s.Tools.Register("vfs.write", tool.NewVFSWriteTool(s.VFS))
 	s.Tools.Register("vfs.delete", tool.NewVFSDeleteTool(s.VFS))
-	s.Tools.Register("vfs.list", tool.NewVFSListTool(s.VFS))
+	s.Tools.Register("vfs.ls", tool.NewVFSListTool(s.VFS))
 	s.Tools.Register("vfs.move", tool.NewVFSMoveTool(s.VFS))
 	s.Tools.Register("vfs.find", tool.NewVFSFindTool(s.VFS))
 

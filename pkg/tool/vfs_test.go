@@ -63,9 +63,9 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfs.ls",
 			Arguments: NewToolValue(map[string]any{
-				"path": "non-existent.txt",
+				"path": ".",
 			}),
 		})
 
@@ -483,7 +483,7 @@ func TestVFSListTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
-			Function:  "vfs.list",
+			Function:  "vfs.ls",
 			Arguments: NewToolValue(nil),
 		})
 
@@ -502,7 +502,7 @@ func TestVFSListTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.list",
+			Function: "vfs.ls",
 			Arguments: NewToolValue(map[string]any{
 				"path": "non-existent",
 			}),
@@ -924,7 +924,7 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.list",
+			Function: "vfs.ls",
 			Arguments: NewToolValue(map[string]any{
 				"path": "dir",
 			}),
@@ -939,7 +939,7 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		query, ok := response.Error.(*ToolPermissionsQuery)
 		require.True(t, ok, "Error should be ToolPermissionsQuery")
 		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfs.list", query.Tool.Function)
+		assert.Equal(t, "vfs.ls", query.Tool.Function)
 		assert.Equal(t, "Permission Required", query.Title)
 		assert.Contains(t, query.Details, "dir")
 		assert.True(t, query.AllowCustomResponse)
@@ -965,7 +965,7 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.list",
+			Function: "vfs.ls",
 			Arguments: NewToolValue(map[string]any{
 				"path": ".",
 			}),
@@ -993,7 +993,7 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.list",
+			Function: "vfs.ls",
 			Arguments: NewToolValue(map[string]any{
 				"path": ".",
 			}),
