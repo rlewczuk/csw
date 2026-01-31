@@ -502,3 +502,90 @@ func TestGlobFilter_DefaultMatch(t *testing.T) {
 		})
 	}
 }
+
+func TestGlobFilter_ExcludeAllOptimization(t *testing.T) {
+	testCases := []struct {
+		name     string
+		patterns []string
+		tests    map[string]bool
+		comment  string
+	}{
+		{
+			name:     "!** alone excludes everything",
+			patterns: []string{"!**"},
+			tests: map[string]bool{
+				"file.txt":         false,
+				"dir/file.go":      false,
+				"any/path/here.md": false,
+			},
+			comment: "!** should exclude all files",
+		},
+		{
+			name:     "!** discards all previous patterns",
+			patterns: []string{"*.txt", "*.go", "!**"},
+			tests: map[string]bool{
+				"file.txt":    false,
+				"file.go":     false,
+				"file.md":     false,
+				"dir/test.go": false,
+			},
+			comment: "All patterns before !** should be discarded",
+		},
+		{
+			name:     "patterns after !** are still effective",
+			patterns: []string{"*.txt", "!**", "*.go"},
+			tests: map[string]bool{
+				"file.txt":    false, // excluded by !**
+				"file.go":     true,  // included by *.go after !**
+				"file.md":     false, // not matched
+				"dir/test.go": true,  // included by *.go after !**
+			},
+			comment: "Patterns after !** should still work",
+		},
+		{
+			name:     "multiple !** - last one wins",
+			patterns: []string{"*.txt", "!**", "*.go", "!**"},
+			tests: map[string]bool{
+				"file.txt": false,
+				"file.go":  false,
+				"file.md":  false,
+			},
+			comment: "Second !** should discard all previous patterns including first !** and *.go",
+		},
+		{
+			name:     "!** followed by negation patterns",
+			patterns: []string{"*.txt", "!**", "**", "!test.go"},
+			tests: map[string]bool{
+				"file.txt":    true,  // matched by **
+				"file.go":     true,  // matched by **
+				"test.go":     false, // matched by ** but excluded by !test.go
+				"dir/test.go": false, // matched by ** but excluded by !test.go
+			},
+			comment: "!** followed by ** and negation should work correctly",
+		},
+		{
+			name:     "complex scenario with !**",
+			patterns: []string{"**/*.go", "!vendor/**", "!**", "*.txt", "!secret.txt"},
+			tests: map[string]bool{
+				"file.go":        false, // *.go excluded by !**
+				"vendor/lib.go":  false, // excluded by !**
+				"file.txt":       true,  // matched by *.txt
+				"secret.txt":     false, // matched by *.txt but excluded by !secret.txt
+				"dir/readme.txt": true,  // matched by *.txt
+				"dir/secret.txt": false, // matched by *.txt but excluded by !secret.txt
+				"file.md":        false, // not matched
+			},
+			comment: "All patterns before !** should be discarded, only *.txt and !secret.txt apply",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			filter := NewGlobFilter(false, tc.patterns)
+			for path, expected := range tc.tests {
+				result := filter.Matches(path)
+				assert.Equal(t, expected, result, "%s - path: %s", tc.comment, path)
+			}
+		})
+	}
+}
