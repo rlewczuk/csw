@@ -23,6 +23,7 @@ When you need to generate and run a test script, or generate and use some tempor
 - Use standard library as long as possible, avoid adding dependencies if it is not really necessary;
 - DO NOT use scripts to edit files, always edit files manually; if there are too many changes, just edit bigger chunks manually;
 - When returning errors, always add function name and file name to error message; if function is a receiver, add 'Type.Method()' as a function name;
+- Before implementing any algorithm or utility function, always check if golang standard library already provides it;
 
 Packages implemented:
 - `pkg/core`: Core agent logic
