@@ -750,6 +750,7 @@ func (s *SweSession) SetRole(roleName string) error {
 	s.Tools.Register("vfs.ls", tool.NewVFSListTool(s.VFS))
 	s.Tools.Register("vfs.move", tool.NewVFSMoveTool(s.VFS))
 	s.Tools.Register("vfs.find", tool.NewVFSFindTool(s.VFS))
+	s.Tools.Register("vfs.grep", tool.NewVFSGrepTool(s.VFS))
 
 	// Re-register session-specific tools
 	s.registerSessionTools()

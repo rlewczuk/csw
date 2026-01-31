@@ -70,6 +70,7 @@ func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS) {
 	registry.Register("vfs.ls", NewVFSListTool(vfsImpl))
 	registry.Register("vfs.move", NewVFSMoveTool(vfsImpl))
 	registry.Register("vfs.find", NewVFSFindTool(vfsImpl))
+	registry.Register("vfs.grep", NewVFSGrepTool(vfsImpl))
 }
 
 // RegisterRunBashTool registers the run.bash tool with the given CommandRunner and privileges.
