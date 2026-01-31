@@ -6,6 +6,7 @@
 - Test single package: `go test ./test -v`
 - Test single function: `go test ./test -v -run TestAgentCoreInitialization`
 - Run main: `go run ./cmd/csw`
+- Before running tests, execute `tmpclean.sh` file in project root.
 
 When you need to generate and run a test script, or generate and use some temporary file, use `./tmp` directory inside project root, not `/tmp` or other locations.
 
