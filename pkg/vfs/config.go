@@ -3,6 +3,7 @@ package vfs
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // BuildHidePatterns builds a list of hide patterns by merging:
@@ -52,11 +53,11 @@ func BuildHidePatterns(projectRoot string, basePatterns []string) ([]string, err
 func parseIgnoreFile(content string) []string {
 	// Split content into lines and parse each line
 	var patterns []string
-	lines := splitLines(content)
+	lines := strings.Split(content, "\n")
 
 	for _, line := range lines {
-		// Trim whitespace
-		line = trimSpace(line)
+		// Trim whitespace (including \r for Windows line endings)
+		line = strings.TrimSpace(line)
 
 		// Skip empty lines and comments
 		if line == "" || line[0] == '#' {
@@ -67,43 +68,4 @@ func parseIgnoreFile(content string) []string {
 	}
 
 	return patterns
-}
-
-// splitLines splits a string by newlines
-func splitLines(s string) []string {
-	var lines []string
-	var current []byte
-
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\n' {
-			lines = append(lines, string(current))
-			current = current[:0]
-		} else if s[i] != '\r' {
-			current = append(current, s[i])
-		}
-	}
-
-	if len(current) > 0 {
-		lines = append(lines, string(current))
-	}
-
-	return lines
-}
-
-// trimSpace removes leading and trailing whitespace
-func trimSpace(s string) string {
-	start := 0
-	end := len(s)
-
-	// Trim leading whitespace
-	for start < end && (s[start] == ' ' || s[start] == '\t') {
-		start++
-	}
-
-	// Trim trailing whitespace
-	for end > start && (s[end-1] == ' ' || s[end-1] == '\t') {
-		end--
-	}
-
-	return s[start:end]
 }
