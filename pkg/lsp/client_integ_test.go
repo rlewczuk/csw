@@ -46,11 +46,11 @@ func getProjectRoot(t *testing.T) string {
 }
 
 // shouldUseRealLSP checks if we should use real LSP server (gopls).
-// Returns true if _integ/lsp.enabled does NOT exist or does NOT contain "yes", false otherwise.
+// Returns true if _integ/lsp.enabled exists and contains "yes", false otherwise.
 func shouldUseRealLSP(t *testing.T) bool {
 	t.Helper()
 
-	return !integcfg.TestEnabled("lsp")
+	return integcfg.TestEnabled("lsp")
 }
 
 // createLSPClient creates either a real or mock LSP client based on configuration.
@@ -85,6 +85,24 @@ func closeLSPClient(client LSP) {
 func asMock(client LSP) *MockLSP {
 	mock, _ := client.(*MockLSP)
 	return mock
+}
+
+// findTextPosition finds the position of a substring in the file content.
+// It returns the line (0-based) and column (0-based) of the first occurrence.
+// If the text is not found, it fails the test.
+func findTextPosition(t *testing.T, content, searchText string) (line int, col int) {
+	t.Helper()
+
+	lines := strings.Split(content, "\n")
+	for lineNum, lineText := range lines {
+		colPos := strings.Index(lineText, searchText)
+		if colPos >= 0 {
+			return lineNum, colPos
+		}
+	}
+
+	require.Fail(t, "Text not found in content", "searchText=%q", searchText)
+	return 0, 0
 }
 
 // TestLSPClientInitialization tests basic client initialization.
@@ -205,27 +223,29 @@ func main() {
 	// Wait for indexing
 	time.Sleep(1 * time.Second)
 
-	// Find definition of myFunc (cursor on line 9, col 1 - the call to myFunc)
+	// Find definition of myFunc (search for the call to myFunc in main)
+	line, col := findTextPosition(t, testContent, "myFunc()")
 	locations, err := client.FindDefinition(CursorLocation{
 		Path: testFile,
-		Line: 9,
-		Col:  1,
+		Line: line,
+		Col:  col,
 	})
 	require.NoError(t, err)
 	require.NotEmpty(t, locations, "Expected to find definition")
 
-	// The definition should point to line 4 (where myFunc is defined)
+	// The definition should point to where myFunc is defined
+	defLine, _ := findTextPosition(t, testContent, "func myFunc()")
 	found := false
 	for _, loc := range locations {
 		if strings.Contains(loc.URI, "test_definition.go") {
 			// gopls uses 0-based line numbers
-			if loc.Range.Start.Line == 4 {
+			if loc.Range.Start.Line == defLine {
 				found = true
 				break
 			}
 		}
 	}
-	assert.True(t, found, "Expected definition to point to line 4")
+	assert.True(t, found, "Expected definition to point to function definition line")
 }
 
 // TestLSPClientReferences tests find-references functionality.
@@ -271,15 +291,16 @@ func myFunc() {
 	// Wait for indexing
 	time.Sleep(1 * time.Second)
 
-	// Find references to x (cursor on line 3, col 1 - the declaration of x)
+	// Find references to x (search for the declaration of x)
+	line, col := findTextPosition(t, testContent, "x := 1")
 	locations, err := client.FindReferences(CursorLocation{
 		Path: testFile,
-		Line: 3,
-		Col:  1,
+		Line: line,
+		Col:  col,
 	})
 	require.NoError(t, err)
 
-	// We should find at least 3 references (declaration, use in line 4, use in line 5)
+	// We should find at least 2 references (declaration, uses in subsequent lines)
 	assert.GreaterOrEqual(t, len(locations), 2, "Expected to find at least 2 references to x")
 }
 
@@ -289,14 +310,12 @@ func TestLSPClientMultipleFiles(t *testing.T) {
 		return
 	}
 
-	goplsPath := getGoplsPath(t)
 	projectRoot := getProjectRoot(t)
 
-	client, err := NewClient(goplsPath, projectRoot)
-	require.NoError(t, err)
-	defer client.Close()
+	client := createLSPClient(t)
+	defer closeLSPClient(client)
 
-	err = client.Init(true)
+	err := client.Init(true)
 	require.NoError(t, err)
 
 	// Create temporary files in tmp directory
@@ -339,12 +358,31 @@ func main() {
 	// Wait for indexing
 	time.Sleep(1 * time.Second)
 
-	// Find definition of Helper from file2
-	locations, err := client.FindDefinition(CursorLocation{
+	// Find definition of Helper from file2 (search for Helper call)
+	line, col := findTextPosition(t, file2Content, "Helper")
+	cursorLoc := CursorLocation{
 		Path: file2,
-		Line: 3,
-		Col:  7, // Position of Helper call
-	})
+		Line: line,
+		Col:  col,
+	}
+
+	// If using mock LSP, set up the expected response
+	if mock := asMock(client); mock != nil {
+		// The definition should point to Helper function in file1
+		defLine, defCol := findTextPosition(t, file1Content, "func Helper()")
+		defCol += len("func ")
+		mock.SetDefinition(cursorLoc, []Location{
+			{
+				URI: pathToURI(file1),
+				Range: Range{
+					Start: Position{Line: defLine, Character: defCol},
+					End:   Position{Line: defLine, Character: defCol + len("Helper")},
+				},
+			},
+		})
+	}
+
+	locations, err := client.FindDefinition(cursorLoc)
 	require.NoError(t, err)
 	require.NotEmpty(t, locations, "Expected to find definition")
 
@@ -375,10 +413,11 @@ func TestLSPClientDocumentUpdate(t *testing.T) {
 	err = client.Init(true)
 	require.NoError(t, err)
 
-	// Create a temporary file in tmp directory
-	tmpDir := filepath.Join(projectRoot, "tmp")
+	// Create a unique temporary subdirectory for this test to avoid package conflicts
+	tmpDir := filepath.Join(projectRoot, "tmp", "test_update")
 	err = os.MkdirAll(tmpDir, 0755)
 	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test_update.go")
 
@@ -392,7 +431,6 @@ func main() {
 `
 	err = os.WriteFile(testFile, []byte(validContent), 0644)
 	require.NoError(t, err)
-	defer os.Remove(testFile)
 
 	// Open the file
 	_, err = client.TouchAndValidate(testFile, false)
@@ -492,22 +530,28 @@ func main() {
 	// Wait for indexing
 	time.Sleep(1 * time.Second)
 
-	// Test hovering over Helper function call (line 10, col 14)
+	// Test hovering over Helper function call (search for the line with Helper call)
+	line, col := findTextPosition(t, testContent, "fmt.Println(Helper())")
+	// Position cursor on "Helper" - after "fmt.Println("
+	col += len("fmt.Println(")
 	text, format, err := client.Hover(CursorLocation{
 		Path: testFile,
-		Line: 10,
-		Col:  14,
+		Line: line,
+		Col:  col,
 	})
 	require.NoError(t, err)
 	assert.NotEmpty(t, text, "Expected hover text for Helper function")
 	assert.NotEmpty(t, format, "Expected hover format")
 	assert.Contains(t, text, "Helper", "Expected hover text to contain function name")
 
-	// Test hovering over fmt.Println (line 10, col 5)
+	// Test hovering over fmt.Println (search for Println in the same line)
+	line, col = findTextPosition(t, testContent, "fmt.Println")
+	// Position cursor on "Println" - after "fmt."
+	col += len("fmt.")
 	text, format, err = client.Hover(CursorLocation{
 		Path: testFile,
-		Line: 10,
-		Col:  5,
+		Line: line,
+		Col:  col,
 	})
 	require.NoError(t, err)
 	assert.NotEmpty(t, text, "Expected hover text for fmt.Println")
@@ -515,9 +559,11 @@ func main() {
 	assert.Contains(t, text, "Println", "Expected hover text to contain Println")
 
 	// Test hovering over empty space (should return no hover information)
+	// Search for empty line after package declaration
+	line, col = findTextPosition(t, testContent, "package main")
 	text, format, err = client.Hover(CursorLocation{
 		Path: testFile,
-		Line: 1,
+		Line: line + 1, // Empty line after package
 		Col:  0,
 	})
 	require.NoError(t, err)
@@ -573,11 +619,14 @@ func main() {
 	// Wait for indexing
 	time.Sleep(1 * time.Second)
 
-	// Test hovering over MyStruct (line 9, col 6)
+	// Test hovering over MyStruct (search for MyStruct in variable declaration)
+	line, col := findTextPosition(t, testContent, "var s MyStruct")
+	// Position cursor on MyStruct identifier
+	col += len("var s ")
 	text, format, err := client.Hover(CursorLocation{
 		Path: testFile,
-		Line: 9,
-		Col:  6,
+		Line: line,
+		Col:  col,
 	})
 	require.NoError(t, err)
 	assert.NotEmpty(t, text, "Expected hover text for MyStruct")
@@ -895,9 +944,14 @@ func AnotherCaller() {
 	Helper()
 }
 
-func main() {
+// ThirdCaller also calls other functions.
+func ThirdCaller() {
 	Caller()
 	AnotherCaller()
+}
+
+func main() {
+	ThirdCaller()
 }
 `
 
@@ -912,11 +966,13 @@ func main() {
 	// Wait for indexing
 	time.Sleep(2 * time.Second)
 
-	// Test 1: Prepare call hierarchy for Helper function (line 5, col 5)
+	// Test 1: Prepare call hierarchy for Helper function (search for Helper function definition)
+	line, col := findTextPosition(t, testContent, "func Helper()")
+	col += len("func ")
 	items, err := client.CallHierarchy(CursorLocation{
 		Path: testFile,
-		Line: 5,
-		Col:  5,
+		Line: line,
+		Col:  col,
 	})
 	require.NoError(t, err)
 	require.NotEmpty(t, items, "Expected to get call hierarchy items for Helper")
@@ -948,11 +1004,13 @@ func main() {
 		"Expected to find at least one of Caller or AnotherCaller")
 
 	// Test 3: Get outgoing calls for Caller function
-	// First prepare call hierarchy for Caller (line 10, col 5)
+	// First prepare call hierarchy for Caller (search for Caller function definition)
+	line, col = findTextPosition(t, testContent, "func Caller()")
+	col += len("func ")
 	callerItems, err := client.CallHierarchy(CursorLocation{
 		Path: testFile,
-		Line: 10,
-		Col:  5,
+		Line: line,
+		Col:  col,
 	})
 	require.NoError(t, err)
 	require.NotEmpty(t, callerItems, "Expected to get call hierarchy items for Caller")
@@ -979,30 +1037,32 @@ func main() {
 	}
 	assert.True(t, foundHelper, "Expected to find Helper in outgoing calls from Caller")
 
-	// Test 4: Get outgoing calls for main function
-	mainItems, err := client.CallHierarchy(CursorLocation{
+	// Test 4: Get outgoing calls for ThirdCaller function (testing multi-level call chains)
+	line, col = findTextPosition(t, testContent, "func ThirdCaller()")
+	col += len("func ")
+	thirdCallerItems, err := client.CallHierarchy(CursorLocation{
 		Path: testFile,
-		Line: 19,
-		Col:  5,
+		Line: line,
+		Col:  col,
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, mainItems, "Expected to get call hierarchy items for main")
+	require.NotEmpty(t, thirdCallerItems, "Expected to get call hierarchy items for ThirdCaller")
 
-	mainItem := mainItems[0]
-	assert.Equal(t, "main", mainItem.Name, "Expected item name to be 'main'")
+	thirdCallerItem := thirdCallerItems[0]
+	assert.Equal(t, "ThirdCaller", thirdCallerItem.Name, "Expected item name to be 'ThirdCaller'")
 
-	mainOutgoingCalls, err := client.OutgoingCalls(mainItem)
+	thirdCallerOutgoingCalls, err := client.OutgoingCalls(thirdCallerItem)
 	require.NoError(t, err)
-	require.NotEmpty(t, mainOutgoingCalls, "Expected to find outgoing calls from main")
+	require.NotEmpty(t, thirdCallerOutgoingCalls, "Expected to find outgoing calls from ThirdCaller")
 
 	// We should find Caller and AnotherCaller
 	calleeNames := make(map[string]bool)
-	for _, call := range mainOutgoingCalls {
+	for _, call := range thirdCallerOutgoingCalls {
 		calleeNames[call.To.Name] = true
 	}
 
 	assert.True(t, calleeNames["Caller"] || calleeNames["AnotherCaller"],
-		"Expected to find at least one of Caller or AnotherCaller in main's outgoing calls")
+		"Expected to find at least one of Caller or AnotherCaller in ThirdCaller's outgoing calls")
 }
 
 // TestLSPClientCallHierarchyMultipleFiles tests call hierarchy across multiple files.
@@ -1081,11 +1141,13 @@ func CallerInFile3() {
 	// Wait for indexing
 	time.Sleep(2 * time.Second)
 
-	// Prepare call hierarchy for SharedFunction (file1, line 3, col 5)
+	// Prepare call hierarchy for SharedFunction (search for SharedFunction definition)
+	line, col := findTextPosition(t, file1Content, "func SharedFunction()")
+	col += len("func ")
 	items, err := client.CallHierarchy(CursorLocation{
 		Path: file1,
-		Line: 3,
-		Col:  5,
+		Line: line,
+		Col:  col,
 	})
 	require.NoError(t, err)
 	require.NotEmpty(t, items, "Expected to get call hierarchy items for SharedFunction")
@@ -1158,11 +1220,13 @@ func main() {
 	// Wait for indexing
 	time.Sleep(1 * time.Second)
 
-	// Prepare call hierarchy for UnusedFunction (line 3, col 5)
+	// Prepare call hierarchy for UnusedFunction (search for UnusedFunction definition)
+	line, col := findTextPosition(t, testContent, "func UnusedFunction()")
+	col += len("func ")
 	items, err := client.CallHierarchy(CursorLocation{
 		Path: testFile,
-		Line: 3,
-		Col:  5,
+		Line: line,
+		Col:  col,
 	})
 	require.NoError(t, err)
 	require.NotEmpty(t, items, "Expected to get call hierarchy items for UnusedFunction")
