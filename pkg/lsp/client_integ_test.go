@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/integcfg"
+	"github.com/codesnort/codesnort-swe/pkg/testutil/cfg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +44,7 @@ func shouldRunIntegrationTests(t *testing.T) bool {
 func getGoplsPath(t *testing.T) string {
 	t.Helper()
 
-	path := integcfg.ReadFile("lsp.gopls")
+	path := cfg.ReadFile("lsp.gopls")
 	require.NotEmpty(t, path, "_integ/lsp.gopls is empty")
 
 	return path
@@ -70,7 +70,7 @@ func getProjectRoot(t *testing.T) string {
 func shouldUseRealLSP(t *testing.T) bool {
 	t.Helper()
 
-	return integcfg.TestEnabled("lsp")
+	return cfg.TestEnabled("lsp")
 }
 
 // createLSPClient creates either a real or mock LSP client based on configuration.

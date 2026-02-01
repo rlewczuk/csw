@@ -1,5 +1,5 @@
 // Package integcfg provides integration test configuration helpers.
-package integcfg
+package cfg
 
 import (
 	"os"
