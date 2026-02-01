@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
 // PromptGenerator generates a prompt for the given tags, role and state.
@@ -24,12 +26,17 @@ type PromptGenerator interface {
 	// GetToolInfo returns information about a tool including its description and parameter schema.
 	// Returns error if tool description is not found.
 	GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *AgentState) (tool.ToolInfo, error)
+
+	// GetAgentFiles returns a map of additional agent instruction files from the given directory relative to project root.
+	// Returns a map with file paths as keys and content as values.
+	GetAgentFiles(dir string) (map[string]string, error)
 }
 
 // ConfPromptGenerator implements PromptGenerator interface.
 // It uses conf.ConfigStore to get prompt fragments from AgentRoleConfig.PromptFragments.
 type ConfPromptGenerator struct {
 	store conf.ConfigStore
+	vfs   vfs.VFS
 }
 
 // promptFragment represents a single prompt fragment file.
@@ -43,14 +50,16 @@ type promptFragment struct {
 	isAll    bool // true if from "all" directory
 }
 
-// NewConfPromptGenerator creates a new ConfPromptGenerator with the given ConfigStore.
-func NewConfPromptGenerator(store conf.ConfigStore) (*ConfPromptGenerator, error) {
+// NewConfPromptGenerator creates a new ConfPromptGenerator with the given ConfigStore and VFS.
+// If vfs is nil, GetAgentFiles() will return an error.
+func NewConfPromptGenerator(store conf.ConfigStore, filesystem vfs.VFS) (*ConfPromptGenerator, error) {
 	if store == nil {
 		return nil, fmt.Errorf("NewConfPromptGenerator() [prompt.go]: store cannot be nil")
 	}
 
 	return &ConfPromptGenerator{
 		store: store,
+		vfs:   filesystem,
 	}, nil
 }
 
@@ -260,6 +269,22 @@ func (g *ConfPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfi
 			combined.WriteString("\n\n")
 		}
 		combined.WriteString(fragments[ko.key])
+	}
+
+	// Add top-level AGENTS.md if it exists
+	if g.vfs != nil {
+		agentsContent, err := g.vfs.ReadFile("AGENTS.md")
+		if err == nil {
+			// File exists, append it
+			if combined.Len() > 0 {
+				combined.WriteString("\n\n")
+			}
+			combined.WriteString(string(agentsContent))
+		} else if !errors.Is(err, vfs.ErrFileNotFound) {
+			// Error other than file not found
+			return "", fmt.Errorf("GetPrompt() [prompt.go]: failed to read AGENTS.md: %w", err)
+		}
+		// If file doesn't exist (ErrFileNotFound), just continue without it
 	}
 
 	// Process template
@@ -517,4 +542,33 @@ func convertPropertySchema(propData map[string]any) (tool.PropertySchema, error)
 	}
 
 	return propSchema, nil
+}
+
+// GetAgentFiles returns a map of additional agent instruction files from the given directory relative to project root.
+// It reads AGENTS.md file from the given directory and returns it.
+// Returns a map with file paths as keys and content as values.
+func (g *ConfPromptGenerator) GetAgentFiles(dir string) (map[string]string, error) {
+	if g.vfs == nil {
+		return nil, fmt.Errorf("GetAgentFiles() [prompt.go]: vfs is not initialized")
+	}
+
+	result := make(map[string]string)
+
+	// Construct path to AGENTS.md in the given directory
+	agentsPath := filepath.Join(dir, "AGENTS.md")
+
+	// Try to read the file
+	content, err := g.vfs.ReadFile(agentsPath)
+	if err != nil {
+		// If file doesn't exist, that's okay - just return empty map
+		if errors.Is(err, vfs.ErrFileNotFound) {
+			return result, nil
+		}
+		return nil, fmt.Errorf("GetAgentFiles() [prompt.go]: failed to read %s: %w", agentsPath, err)
+	}
+
+	// Add the content to result
+	result[agentsPath] = string(content)
+
+	return result, nil
 }

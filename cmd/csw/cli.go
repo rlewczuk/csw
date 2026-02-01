@@ -157,7 +157,7 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 	tool.RegisterVFSTools(toolRegistry, localVFS)
 
 	// Create prompt generator
-	promptGenerator, err := core.NewConfPromptGenerator(configStore)
+	promptGenerator, err := core.NewConfPromptGenerator(configStore, localVFS)
 	if err != nil {
 		return fmt.Errorf("runCLI() [cli.go]: failed to create prompt generator: %w", err)
 	}

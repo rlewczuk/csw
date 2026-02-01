@@ -163,7 +163,7 @@ func toolInfoCommand() *cobra.Command {
 			}
 
 			// Create prompt generator to access GetToolInfo
-			promptGenerator, err := core.NewConfPromptGenerator(store)
+			promptGenerator, err := core.NewConfPromptGenerator(store, nil)
 			if err != nil {
 				return fmt.Errorf("toolInfoCommand() [tool.go]: failed to create prompt generator: %w", err)
 			}
@@ -216,7 +216,7 @@ func toolDescCommand() *cobra.Command {
 			}
 
 			// Create prompt generator to access GetToolInfo
-			promptGenerator, err := core.NewConfPromptGenerator(store)
+			promptGenerator, err := core.NewConfPromptGenerator(store, nil)
 			if err != nil {
 				return fmt.Errorf("toolDescCommand() [tool.go]: failed to create prompt generator: %w", err)
 			}

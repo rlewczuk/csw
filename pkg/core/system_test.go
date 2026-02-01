@@ -36,6 +36,10 @@ func (m *mockPromptGenerator) GetToolInfo(tags []string, toolName string, role *
 	}, nil
 }
 
+func (m *mockPromptGenerator) GetAgentFiles(dir string) (map[string]string, error) {
+	return make(map[string]string), nil
+}
+
 func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 	mockServer := testutil.NewMockHTTPServer()
 	defer mockServer.Close()
@@ -49,7 +53,7 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 	t.Run("basic initialization", func(t *testing.T) {
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
+			ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      newMockPromptGenerator("You are skilled software developer."),
 			Tools:                tools,
 			VFS:                  vfs,
@@ -90,7 +94,7 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
+			ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      newMockPromptGenerator("You are skilled software developer."),
 			Tools:                tools,
 			VFS:                  vfs,
@@ -336,7 +340,7 @@ func TestSweSystemShutdown(t *testing.T) {
 	t.Run("Shutdown with no sessions or threads", func(t *testing.T) {
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
+			ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
 			Tools:                tools,
 			VFS:                  vfs,
@@ -353,7 +357,7 @@ func TestSweSystemShutdown(t *testing.T) {
 	t.Run("Shutdown with sessions but no threads", func(t *testing.T) {
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
+			ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
 			Tools:                tools,
 			VFS:                  vfs,
@@ -387,7 +391,7 @@ func TestSweSystemShutdown(t *testing.T) {
 	t.Run("Shutdown with sessions and threads", func(t *testing.T) {
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
+			ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
 			Tools:                tools,
 			VFS:                  vfs,
@@ -431,7 +435,7 @@ func TestSweSystemShutdown(t *testing.T) {
 	t.Run("Shutdown interrupts running threads", func(t *testing.T) {
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
+			ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
 			Tools:                tools,
 			VFS:                  vfs,
@@ -477,7 +481,7 @@ func TestSweSystemShutdown(t *testing.T) {
 	t.Run("Shutdown is idempotent", func(t *testing.T) {
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
+			ModelTags:            models.NewModelTagRegistry(),
 			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
 			Tools:                tools,
 			VFS:                  vfs,

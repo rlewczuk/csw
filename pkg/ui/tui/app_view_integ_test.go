@@ -36,6 +36,10 @@ func (m *appViewMockPromptGen) GetToolInfo(tags []string, toolName string, role 
 	}, nil
 }
 
+func (m *appViewMockPromptGen) GetAgentFiles(dir string) (map[string]string, error) {
+	return make(map[string]string), nil
+}
+
 func TestAppViewWithChatIntegration(t *testing.T) {
 	t.Run("chat response appears in app view without user interaction", func(t *testing.T) {
 		// Setup mock LLM server

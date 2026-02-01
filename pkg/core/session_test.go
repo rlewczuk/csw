@@ -42,6 +42,10 @@ func (m *mockSessionPromptGenerator) GetToolInfo(tags []string, toolName string,
 	}, nil
 }
 
+func (m *mockSessionPromptGenerator) GetAgentFiles(dir string) (map[string]string, error) {
+	return make(map[string]string), nil
+}
+
 func TestSessionThread(t *testing.T) {
 	mockServer := testutil.NewMockHTTPServer()
 	defer mockServer.Close()
