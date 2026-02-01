@@ -30,10 +30,12 @@ func CliCommand() *cobra.Command {
 		cliAllowAllPerms bool
 		cliInteractive   bool
 		cliConfigPath    string
+		cliSaveSessionTo string
+		cliSaveSession   bool
 	)
 
 	cmd := &cobra.Command{
-		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--allow-all-permissions] [--interactive] \"prompt\"",
+		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] \"prompt\"",
 		Short: "Start a CLI chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.ExactArgs(1),
@@ -63,7 +65,7 @@ func CliCommand() *cobra.Command {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
 			}
 
-			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliConfigPath, cliAllowAllPerms, cliInteractive)
+			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession)
 		},
 	}
 
@@ -74,11 +76,13 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliAllowAllPerms, "allow-all-permissions", false, "Allow all permissions without asking")
 	cmd.Flags().BoolVar(&cliInteractive, "interactive", false, "Enable interactive mode (allows user to respond to agent questions)")
 	cmd.Flags().StringVar(&cliConfigPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
+	cmd.Flags().StringVar(&cliSaveSessionTo, "save-session-to", "", "Save session conversation to specified markdown file")
+	cmd.Flags().BoolVar(&cliSaveSession, "save-session", false, "Save session conversation to session.md in session log directory")
 
 	return cmd
 }
 
-func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPerms, interactive bool) error {
+func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession bool) error {
 	ctx := context.Background()
 
 	// Resolve working directory
@@ -251,12 +255,64 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 		LogBaseDir:      logsDir,
 	}
 
-	// Create session thread
-	thread := core.NewSessionThread(sweSystem, nil)
+	// Determine session file path if session saving is enabled
+	var sessionFilePath string
+	if saveSessionTo != "" {
+		sessionFilePath = saveSessionTo
+	} else if saveSession {
+		// Will be set after starting the session to get session ID
+		// For now, leave it empty
+	}
+
+	// Create session thread (possibly with writer)
+	var thread *core.SessionThread
+	var sessionWriter *core.SessionThreadWithWriter
+	if sessionFilePath != "" {
+		// Create thread with session writer
+		writer, err := core.NewSessionThreadWithWriter(sweSystem, nil, sessionFilePath)
+		if err != nil {
+			return fmt.Errorf("runCLI() [cli.go]: failed to create session writer: %w", err)
+		}
+		sessionWriter = writer
+		thread = writer.SessionThread
+		defer writer.Close()
+	} else {
+		// Create regular thread
+		thread = core.NewSessionThread(sweSystem, nil)
+	}
 
 	// Start session
 	if err := thread.StartSession(modelName); err != nil {
 		return fmt.Errorf("runCLI() [cli.go]: failed to start session: %w", err)
+	}
+
+	// If --save-session is set and we don't have a file path yet, create it now
+	if saveSession && saveSessionTo == "" {
+		// Get session ID
+		session := thread.GetSession()
+		if session != nil {
+			sessionID := session.ID()
+			sessionLogDir := filepath.Join(logsDir, "sessions", sessionID)
+			sessionFilePath = filepath.Join(sessionLogDir, "session.md")
+
+			// Create new thread with writer
+			if sessionWriter != nil {
+				// Close existing writer
+				sessionWriter.Close()
+			}
+			writer, err := core.NewSessionThreadWithWriter(sweSystem, nil, sessionFilePath)
+			if err != nil {
+				return fmt.Errorf("runCLI() [cli.go]: failed to create session writer: %w", err)
+			}
+			sessionWriter = writer
+			thread = writer.SessionThread
+			defer writer.Close()
+
+			// Restart session with new thread
+			if err := thread.StartSession(modelName); err != nil {
+				return fmt.Errorf("runCLI() [cli.go]: failed to restart session: %w", err)
+			}
+		}
 	}
 
 	// Set role

@@ -1,6 +1,8 @@
 package core
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -903,5 +905,221 @@ func TestSessionLSPIntegration(t *testing.T) {
 		content := response.Result.Get("content").AsString()
 		// Should not contain LSP validation messages
 		assert.NotContains(t, content, "LSP validation")
+	})
+}
+
+// TestSessionWriter tests the SessionWriter functionality.
+func TestSessionWriter(t *testing.T) {
+	// Create a temporary file for session output
+	tmpDir := t.TempDir()
+	sessionFile := filepath.Join(tmpDir, "session.md")
+
+	t.Run("basic session writer", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		writer, err := NewSessionWriter(sessionFile, mockHandler)
+		require.NoError(t, err)
+		defer writer.Close()
+
+		// Write user message
+		writer.WriteUserMessage("Hello, please help me")
+
+		// Simulate assistant response
+		writer.AddMarkdownChunk("Sure, I can help you with that.")
+
+		// Simulate tool call
+		toolCall := &tool.ToolCall{
+			ID:       "test-tool-1",
+			Function: "vfs.read",
+			Arguments: tool.NewToolValue(map[string]any{
+				"path": "test.txt",
+			}),
+		}
+		writer.AddToolCallStart(toolCall)
+		writer.AddToolCallDetails(toolCall)
+
+		// Simulate tool result
+		toolResult := &tool.ToolResponse{
+			Call: toolCall,
+			Result: tool.NewToolValue(map[string]any{
+				"content": "file content",
+			}),
+			Done: true,
+		}
+		writer.AddToolCallResult(toolResult)
+
+		// Mark run as finished
+		writer.RunFinished(nil)
+
+		// Read the file and verify content
+		content, err := os.ReadFile(sessionFile)
+		require.NoError(t, err)
+
+		contentStr := string(content)
+		assert.Contains(t, contentStr, "# User (#1)")
+		assert.Contains(t, contentStr, "Hello, please help me")
+		assert.Contains(t, contentStr, "# Assistant (#2)")
+		assert.Contains(t, contentStr, "Sure, I can help you with that.")
+		assert.Contains(t, contentStr, "# Tool call: vfs.read (#1)")
+		assert.Contains(t, contentStr, "# Tool response: vfs.read (#1)")
+		assert.Contains(t, contentStr, "file content")
+
+		// Verify delegate was called
+		assert.Equal(t, 1, len(mockHandler.MarkdownChunks))
+		assert.Equal(t, "Sure, I can help you with that.", mockHandler.MarkdownChunks[0])
+	})
+
+	t.Run("multiple messages", func(t *testing.T) {
+		sessionFile2 := filepath.Join(tmpDir, "session2.md")
+
+		// First turn - separate handler to avoid channel closure issues
+		mockHandler1 := testutil.NewMockSessionOutputHandler()
+		writer, err := NewSessionWriter(sessionFile2, mockHandler1)
+		require.NoError(t, err)
+
+		// First user message
+		writer.WriteUserMessage("First message")
+		writer.AddMarkdownChunk("First response")
+		writer.RunFinished(nil)
+		writer.Close()
+
+		// Second turn - new writer instance
+		mockHandler2 := testutil.NewMockSessionOutputHandler()
+		writer2, err := NewSessionWriter(sessionFile2, mockHandler2)
+		require.NoError(t, err)
+
+		// Second user message
+		writer2.WriteUserMessage("Second message")
+		writer2.AddMarkdownChunk("Second response")
+		writer2.RunFinished(nil)
+		writer2.Close()
+
+		// Read and verify
+		content, err := os.ReadFile(sessionFile2)
+		require.NoError(t, err)
+
+		contentStr := string(content)
+		assert.Contains(t, contentStr, "# User (#1)")
+		assert.Contains(t, contentStr, "First message")
+		assert.Contains(t, contentStr, "# Assistant (#2)")
+		assert.Contains(t, contentStr, "First response")
+		assert.Contains(t, contentStr, "# User (#1)")
+		assert.Contains(t, contentStr, "Second message")
+		assert.Contains(t, contentStr, "# Assistant (#2)")
+		assert.Contains(t, contentStr, "Second response")
+	})
+
+	t.Run("append to existing file", func(t *testing.T) {
+		sessionFile3 := filepath.Join(tmpDir, "session3.md")
+
+		// Create initial writer
+		mockHandler1 := testutil.NewMockSessionOutputHandler()
+		writer1, err := NewSessionWriter(sessionFile3, mockHandler1)
+		require.NoError(t, err)
+		writer1.WriteUserMessage("Message 1")
+		writer1.AddMarkdownChunk("Response 1")
+		writer1.RunFinished(nil)
+		writer1.Close()
+
+		// Create new writer (should append)
+		mockHandler2 := testutil.NewMockSessionOutputHandler()
+		writer2, err := NewSessionWriter(sessionFile3, mockHandler2)
+		require.NoError(t, err)
+		writer2.WriteUserMessage("Message 2")
+		writer2.AddMarkdownChunk("Response 2")
+		writer2.RunFinished(nil)
+		writer2.Close()
+
+		// Read and verify both messages are present
+		content, err := os.ReadFile(sessionFile3)
+		require.NoError(t, err)
+
+		contentStr := string(content)
+		assert.Contains(t, contentStr, "Message 1")
+		assert.Contains(t, contentStr, "Response 1")
+		assert.Contains(t, contentStr, "Message 2")
+		assert.Contains(t, contentStr, "Response 2")
+	})
+
+	t.Run("tool call error", func(t *testing.T) {
+		sessionFile4 := filepath.Join(tmpDir, "session4.md")
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		writer, err := NewSessionWriter(sessionFile4, mockHandler)
+		require.NoError(t, err)
+		defer writer.Close()
+
+		toolCall := &tool.ToolCall{
+			ID:       "test-tool-error",
+			Function: "vfs.read",
+			Arguments: tool.NewToolValue(map[string]any{
+				"path": "missing.txt",
+			}),
+		}
+		writer.AddToolCallStart(toolCall)
+		writer.AddToolCallDetails(toolCall)
+
+		// Tool result with error
+		toolResult := &tool.ToolResponse{
+			Call:  toolCall,
+			Error: fmt.Errorf("file not found"),
+			Done:  true,
+		}
+		writer.AddToolCallResult(toolResult)
+
+		// Read and verify error is recorded
+		content, err := os.ReadFile(sessionFile4)
+		require.NoError(t, err)
+
+		contentStr := string(content)
+		assert.Contains(t, contentStr, "**Error:** file not found")
+	})
+}
+
+// TestSessionThreadWithWriter tests the SessionThreadWithWriter functionality.
+func TestSessionThreadWithWriter(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+	require.NoError(t, err)
+	vfsInstance := vfs.NewMockVFS()
+
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfsInstance)
+
+	system := &SweSystem{
+		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
+		Tools:                tools,
+		VFS:                  vfsInstance,
+		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+	}
+
+	tmpDir := t.TempDir()
+	sessionFile := filepath.Join(tmpDir, "session-thread.md")
+
+	t.Run("basic thread with writer", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		thread, err := NewSessionThreadWithWriter(system, mockHandler, sessionFile)
+		require.NoError(t, err)
+		defer thread.Close()
+
+		// Start session
+		err = thread.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		// Send user prompt
+		err = thread.UserPrompt("Test prompt")
+		require.NoError(t, err)
+
+		// Wait for completion
+		mockHandler.WaitForRunFinished()
+
+		// Verify file was written
+		content, err := os.ReadFile(sessionFile)
+		require.NoError(t, err)
+
+		contentStr := string(content)
+		assert.Contains(t, contentStr, "# User (#1)")
+		assert.Contains(t, contentStr, "Test prompt")
 	})
 }

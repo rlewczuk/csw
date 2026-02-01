@@ -22,7 +22,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
-func runTUI(workDir, configPath, modelName, roleName, lspServer string) error {
+func runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo string, saveSession bool) error {
 	// Initialize logging infrastructure
 	// Logs directory is placed in project dir at .cswdata/logs
 	// Logging is set to debug level by default
@@ -186,6 +186,7 @@ func runTUI(workDir, configPath, modelName, roleName, lspServer string) error {
 		VFS:             localVFS,
 		Roles:           roleRegistry,
 		LSP:             lspClient,
+		LogBaseDir:      logsDir,
 	}
 
 	// Create a context that can be cancelled on interrupt
@@ -217,6 +218,13 @@ func runTUI(workDir, configPath, modelName, roleName, lspServer string) error {
 	// Create a new session to start with
 	if err := appPresenter.NewSession(); err != nil {
 		return fmt.Errorf("runTUI() [tui.go]: failed to create initial session: %w", err)
+	}
+
+	// Note: Session saving for TUI is not yet implemented
+	// The flags are accepted for compatibility but session saving only works in CLI mode
+	if saveSessionTo != "" || saveSession {
+		logger := logging.GetGlobalLogger()
+		logger.Warn("session saving is not yet implemented for TUI mode, use 'csw cli' command for session saving")
 	}
 
 	// Create the gtv application
