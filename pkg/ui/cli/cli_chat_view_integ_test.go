@@ -46,6 +46,10 @@ func (m *cliViewMockPromptGen) GetToolInfo(tags []string, toolName string, role 
 	}, nil
 }
 
+func (m *cliViewMockPromptGen) GetAgentFiles(dir string) (map[string]string, error) {
+	return make(map[string]string), nil
+}
+
 func TestCliChatView_IntegrationWithSession(t *testing.T) {
 	t.Run("chat response appears in non-interactive mode", func(t *testing.T) {
 		// Setup mock LLM server

@@ -100,7 +100,7 @@ func runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo s
 	tool.RegisterVFSTools(toolRegistry, localVFS)
 
 	// Create prompt generator
-	promptGenerator, err := core.NewConfPromptGenerator(configStore)
+	promptGenerator, err := core.NewConfPromptGenerator(configStore, localVFS)
 	if err != nil {
 		return fmt.Errorf("runTUI() [tui.go]: failed to create prompt generator: %w", err)
 	}

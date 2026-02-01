@@ -34,6 +34,10 @@ func (m *mockPromptGen) GetToolInfo(tags []string, toolName string, role *conf.A
 	}, nil
 }
 
+func (m *mockPromptGen) GetAgentFiles(dir string) (map[string]string, error) {
+	return make(map[string]string), nil
+}
+
 func setupTestSystem(t *testing.T) (*core.SweSystem, *testutil.MockHTTPServer, vfs.VFS) {
 	mockServer := testutil.NewMockHTTPServer()
 	t.Cleanup(func() { mockServer.Close() })

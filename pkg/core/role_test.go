@@ -31,6 +31,10 @@ func (s *stateAwarePromptGenerator) GetToolInfo(tags []string, toolName string, 
 	}, nil
 }
 
+func (s *stateAwarePromptGenerator) GetAgentFiles(dir string) (map[string]string, error) {
+	return make(map[string]string), nil
+}
+
 func TestAgentRoleRegistry(t *testing.T) {
 	t.Run("Get retrieves role from config store", func(t *testing.T) {
 		mockStore := impl.NewMockConfigStore()

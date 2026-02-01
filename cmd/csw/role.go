@@ -348,7 +348,7 @@ func formatAccessFlag(flag conf.AccessFlag) string {
 
 func outputSystemPrompt(store conf.ConfigStore, roleConfig *conf.AgentRoleConfig, modelName string, useJSON bool) error {
 	// Create prompt generator
-	promptGenerator, err := core.NewConfPromptGenerator(store)
+	promptGenerator, err := core.NewConfPromptGenerator(store, nil)
 	if err != nil {
 		return fmt.Errorf("outputSystemPrompt() [role.go]: failed to create prompt generator: %w", err)
 	}
