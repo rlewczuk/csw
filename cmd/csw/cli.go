@@ -86,25 +86,9 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 	ctx := context.Background()
 
 	// Resolve working directory
-	if workDir == "" {
-		wd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("runCLI() [cli.go]: failed to get current working directory: %w", err)
-		}
-		workDir = wd
-	} else {
-		absPath, err := filepath.Abs(workDir)
-		if err != nil {
-			return fmt.Errorf("runCLI() [cli.go]: failed to resolve directory path: %w", err)
-		}
-		info, err := os.Stat(absPath)
-		if err != nil {
-			return fmt.Errorf("runCLI() [cli.go]: failed to access directory: %w", err)
-		}
-		if !info.IsDir() {
-			return fmt.Errorf("runCLI() [cli.go]: path is not a directory: %s", workDir)
-		}
-		workDir = absPath
+	workDir, err := ResolveWorkDir(workDir)
+	if err != nil {
+		return err
 	}
 
 	// Initialize logging infrastructure
@@ -115,32 +99,9 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 	defer logging.FlushLogs()
 
 	// Build config path hierarchy
-	homeDir, err := os.UserHomeDir()
+	configPathStr, err := BuildConfigPath(configPath)
 	if err != nil {
-		return fmt.Errorf("runCLI() [cli.go]: failed to get user home directory: %w", err)
-	}
-
-	configPathStr := "@DEFAULTS:./.csw/config:" + filepath.Join(homeDir, ".config", "csw")
-
-	// Validate and append custom config paths if provided
-	if configPath != "" {
-		pathComponents := filepath.SplitList(configPath)
-		for _, pathComponent := range pathComponents {
-			if pathComponent == "" {
-				continue
-			}
-			info, err := os.Stat(pathComponent)
-			if err != nil {
-				if os.IsNotExist(err) {
-					return fmt.Errorf("runCLI() [cli.go]: config path does not exist: %s", pathComponent)
-				}
-				return fmt.Errorf("runCLI() [cli.go]: failed to access config path %s: %w", pathComponent, err)
-			}
-			if !info.IsDir() {
-				return fmt.Errorf("runCLI() [cli.go]: config path is not a directory: %s", pathComponent)
-			}
-		}
-		configPathStr = configPathStr + ":" + configPath
+		return err
 	}
 
 	// Create composite config store
@@ -156,31 +117,15 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 	}
 
 	// Determine model to use
-	if modelName == "" {
-		globalConfig, err := configStore.GetGlobalConfig()
-		if err != nil {
-			return fmt.Errorf("runCLI() [cli.go]: failed to get global config: %w", err)
-		}
-		if globalConfig.DefaultProvider != "" {
-			modelName = globalConfig.DefaultProvider + "/default"
-		} else {
-			providers := providerRegistry.List()
-			if len(providers) > 0 {
-				modelName = providers[0] + "/default"
-			} else {
-				return fmt.Errorf("runCLI() [cli.go]: no default provider configured and no providers available")
-			}
-		}
+	modelName, err = ResolveModelName(modelName, configStore, providerRegistry)
+	if err != nil {
+		return err
 	}
 
 	// Create model provider map
-	modelProviders := make(map[string]models.ModelProvider)
-	for _, name := range providerRegistry.List() {
-		provider, err := providerRegistry.Get(name)
-		if err != nil {
-			return fmt.Errorf("runCLI() [cli.go]: failed to get provider %s: %w", name, err)
-		}
-		modelProviders[name] = provider
+	modelProviders, err := CreateProviderMap(providerRegistry)
+	if err != nil {
+		return err
 	}
 
 	// Create role registry
@@ -218,30 +163,9 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 	}
 
 	// Create model tag registry and populate from config
-	modelTagRegistry := models.NewModelTagRegistry()
-
-	// Load global config model tags
-	globalConfig, err := configStore.GetGlobalConfig()
-	if err == nil && globalConfig != nil && len(globalConfig.ModelTags) > 0 {
-		if err := modelTagRegistry.SetGlobalMappings(globalConfig.ModelTags); err != nil {
-			return fmt.Errorf("runCLI() [cli.go]: failed to set global model tags: %w", err)
-		}
-	}
-
-	// Load provider-specific model tags
-	for _, providerName := range providerRegistry.List() {
-		provider, err := providerRegistry.Get(providerName)
-		if err != nil {
-			continue
-		}
-		if chatProvider, ok := provider.(interface{ GetConfig() interface{} }); ok {
-			config := chatProvider.GetConfig()
-			if providerConfig, ok := config.(*conf.ModelProviderConfig); ok && len(providerConfig.ModelTags) > 0 {
-				if err := modelTagRegistry.SetProviderMappings(providerName, providerConfig.ModelTags); err != nil {
-					return fmt.Errorf("runCLI() [cli.go]: failed to set provider model tags: %w", err)
-				}
-			}
-		}
+	modelTagRegistry, err := CreateModelTagRegistry(configStore, providerRegistry)
+	if err != nil {
+		return err
 	}
 
 	// Create SweSystem

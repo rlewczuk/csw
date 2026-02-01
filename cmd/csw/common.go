@@ -7,6 +7,7 @@ import (
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
+	"github.com/codesnort/codesnort-swe/pkg/models"
 )
 
 // ConfigScope represents the scope of configuration (global or local).
@@ -77,4 +78,143 @@ func GetCompositeConfigStore() (conf.ConfigStore, error) {
 	}
 
 	return store, nil
+}
+
+// BuildConfigPath builds a config path hierarchy string from the base path and optional custom paths.
+// Returns a string in the format: "@DEFAULTS:./.csw/config:~/.config/csw[:custom-paths]"
+func BuildConfigPath(customConfigPath string) (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("BuildConfigPath() [common.go]: failed to get user home directory: %w", err)
+	}
+
+	// Start with default hierarchy
+	configPathStr := "@DEFAULTS:./.csw/config:" + filepath.Join(homeDir, ".config", "csw")
+
+	// Validate and append custom config paths if provided
+	if customConfigPath != "" {
+		if err := ValidateConfigPaths(customConfigPath); err != nil {
+			return "", err
+		}
+		configPathStr = configPathStr + ":" + customConfigPath
+	}
+
+	return configPathStr, nil
+}
+
+// ValidateConfigPaths validates that all paths in a colon-separated string exist and are directories.
+func ValidateConfigPaths(configPath string) error {
+	pathComponents := filepath.SplitList(configPath)
+	for _, pathComponent := range pathComponents {
+		if pathComponent == "" {
+			continue
+		}
+		info, err := os.Stat(pathComponent)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("ValidateConfigPaths() [common.go]: config path does not exist: %s", pathComponent)
+			}
+			return fmt.Errorf("ValidateConfigPaths() [common.go]: failed to access config path %s: %w", pathComponent, err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("ValidateConfigPaths() [common.go]: config path is not a directory: %s", pathComponent)
+		}
+	}
+	return nil
+}
+
+// ResolveWorkDir resolves the working directory from an optional path argument.
+// If dirPath is empty, returns current working directory.
+// If dirPath is provided, resolves to absolute path and validates it exists and is a directory.
+func ResolveWorkDir(dirPath string) (string, error) {
+	if dirPath == "" {
+		// Use current directory
+		wd, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("ResolveWorkDir() [common.go]: failed to get current working directory: %w", err)
+		}
+		return wd, nil
+	}
+
+	// Directory provided as argument
+	absPath, err := filepath.Abs(dirPath)
+	if err != nil {
+		return "", fmt.Errorf("ResolveWorkDir() [common.go]: failed to resolve directory path: %w", err)
+	}
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return "", fmt.Errorf("ResolveWorkDir() [common.go]: failed to access directory: %w", err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("ResolveWorkDir() [common.go]: path is not a directory: %s", dirPath)
+	}
+	return absPath, nil
+}
+
+// ResolveModelName determines the model name to use.
+// If modelName is empty, uses default provider from global config or first available provider.
+func ResolveModelName(modelName string, configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (string, error) {
+	if modelName != "" {
+		return modelName, nil
+	}
+
+	globalConfig, err := configStore.GetGlobalConfig()
+	if err != nil {
+		return "", fmt.Errorf("ResolveModelName() [common.go]: failed to get global config: %w", err)
+	}
+
+	if globalConfig.DefaultProvider != "" {
+		return globalConfig.DefaultProvider + "/default", nil
+	}
+
+	providers := providerRegistry.List()
+	if len(providers) > 0 {
+		return providers[0] + "/default", nil
+	}
+
+	return "", fmt.Errorf("ResolveModelName() [common.go]: no default provider configured and no providers available")
+}
+
+// CreateProviderMap creates a map of provider names to ModelProvider instances from a registry.
+func CreateProviderMap(providerRegistry *models.ProviderRegistry) (map[string]models.ModelProvider, error) {
+	modelProviders := make(map[string]models.ModelProvider)
+	for _, name := range providerRegistry.List() {
+		provider, err := providerRegistry.Get(name)
+		if err != nil {
+			return nil, fmt.Errorf("CreateProviderMap() [common.go]: failed to get provider %s: %w", name, err)
+		}
+		modelProviders[name] = provider
+	}
+	return modelProviders, nil
+}
+
+// CreateModelTagRegistry creates and populates a model tag registry from config store.
+func CreateModelTagRegistry(configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (*models.ModelTagRegistry, error) {
+	modelTagRegistry := models.NewModelTagRegistry()
+
+	// Load global config model tags
+	globalConfig, err := configStore.GetGlobalConfig()
+	if err == nil && globalConfig != nil && len(globalConfig.ModelTags) > 0 {
+		if err := modelTagRegistry.SetGlobalMappings(globalConfig.ModelTags); err != nil {
+			return nil, fmt.Errorf("CreateModelTagRegistry() [common.go]: failed to set global model tags: %w", err)
+		}
+	}
+
+	// Load provider-specific model tags
+	for _, providerName := range providerRegistry.List() {
+		provider, err := providerRegistry.Get(providerName)
+		if err != nil {
+			continue
+		}
+		if chatProvider, ok := provider.(interface{ GetConfig() interface{} }); ok {
+			config := chatProvider.GetConfig()
+			if providerConfig, ok := config.(*conf.ModelProviderConfig); ok && len(providerConfig.ModelTags) > 0 {
+				if err := modelTagRegistry.SetProviderMappings(providerName, providerConfig.ModelTags); err != nil {
+					return nil, fmt.Errorf("CreateModelTagRegistry() [common.go]: failed to set provider model tags: %w", err)
+				}
+			}
+		}
+	}
+
+	return modelTagRegistry, nil
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
@@ -25,29 +24,13 @@ func main() {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve working directory from argument or use current directory
-			var workDir string
+			var dirPath string
 			if len(args) > 0 {
-				// Directory provided as argument
-				dirPath := args[0]
-				absPath, err := filepath.Abs(dirPath)
-				if err != nil {
-					return fmt.Errorf("main() [main.go]: failed to resolve directory path: %w", err)
-				}
-				info, err := os.Stat(absPath)
-				if err != nil {
-					return fmt.Errorf("main() [main.go]: failed to access directory: %w", err)
-				}
-				if !info.IsDir() {
-					return fmt.Errorf("main() [main.go]: path is not a directory: %s", dirPath)
-				}
-				workDir = absPath
-			} else {
-				// Use current directory
-				wd, err := os.Getwd()
-				if err != nil {
-					return fmt.Errorf("main() [main.go]: failed to get current working directory: %w", err)
-				}
-				workDir = wd
+				dirPath = args[0]
+			}
+			workDir, err := ResolveWorkDir(dirPath)
+			if err != nil {
+				return err
 			}
 
 			return runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo, saveSession)

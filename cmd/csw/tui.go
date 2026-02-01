@@ -38,43 +38,9 @@ func runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo s
 	// 2. ./.csw/config (local project config)
 	// 3. ~/.config/csw (user config)
 	// 4. --config-path components (if provided)
-
-	homeDir, err := os.UserHomeDir()
+	configPathStr, err := BuildConfigPath(configPath)
 	if err != nil {
-		return fmt.Errorf("runTUI() [tui.go]: failed to get user home directory: %w", err)
-	}
-
-	// Start with default hierarchy
-	configPathStr := "@DEFAULTS:./.csw/config:" + filepath.Join(homeDir, ".config", "csw")
-
-	// If --config-path is provided, validate and append it
-	if configPath != "" {
-		// Split by colon to get individual paths
-		pathComponents := filepath.SplitList(configPath)
-
-		// Validate each path component
-		for _, pathComponent := range pathComponents {
-			if pathComponent == "" {
-				continue
-			}
-
-			// Check if path exists
-			info, err := os.Stat(pathComponent)
-			if err != nil {
-				if os.IsNotExist(err) {
-					return fmt.Errorf("runTUI() [tui.go]: config path does not exist: %s", pathComponent)
-				}
-				return fmt.Errorf("runTUI() [tui.go]: failed to access config path %s: %w", pathComponent, err)
-			}
-
-			// Check if it's a directory
-			if !info.IsDir() {
-				return fmt.Errorf("runTUI() [tui.go]: config path is not a directory: %s", pathComponent)
-			}
-		}
-
-		// Append validated path to hierarchy
-		configPathStr = configPathStr + ":" + configPath
+		return err
 	}
 
 	// Create composite config store
@@ -91,34 +57,16 @@ func runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo s
 		return fmt.Errorf("runTUI() [tui.go]: no model providers found in config")
 	}
 
-	// If no model specified, try to use default provider from global config
-	if modelName == "" {
-		globalConfig, err := configStore.GetGlobalConfig()
-		if err != nil {
-			return fmt.Errorf("runTUI() [tui.go]: failed to get global config: %w", err)
-		}
-		if globalConfig.DefaultProvider != "" {
-			// Use default provider with a default model
-			modelName = globalConfig.DefaultProvider + "/default"
-		} else {
-			// Fallback to first available provider
-			providers := providerRegistry.List()
-			if len(providers) > 0 {
-				modelName = providers[0] + "/default"
-			} else {
-				return fmt.Errorf("runTUI() [tui.go]: no default provider configured and no providers available")
-			}
-		}
+	// Determine model to use
+	modelName, err = ResolveModelName(modelName, configStore, providerRegistry)
+	if err != nil {
+		return err
 	}
 
 	// Create model provider map for SweSystem
-	modelProviders := make(map[string]models.ModelProvider)
-	for _, name := range providerRegistry.List() {
-		provider, err := providerRegistry.Get(name)
-		if err != nil {
-			return fmt.Errorf("runTUI() [tui.go]: failed to get provider %s: %w", name, err)
-		}
-		modelProviders[name] = provider
+	modelProviders, err := CreateProviderMap(providerRegistry)
+	if err != nil {
+		return err
 	}
 
 	// Create role registry using config store
