@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"testing"
 )
 
 // Dir returns the absolute path to the _integ directory at project root.
@@ -45,4 +46,33 @@ func ReadFile(filename string) string {
 // Returns true if the file exists and contains "yes" (case insensitive).
 func TestEnabled(name string) bool {
 	return strings.EqualFold(ReadFile(name+".enabled"), "yes") || strings.EqualFold(ReadFile("all.enabled"), "yes")
+}
+
+// MkTempDir creates a temporary directory inside projectRoot/tmp with the given pattern.
+// The directory is automatically cleaned up after the test completes.
+// On test failure, the directory path is logged and the directory is preserved for inspection.
+// On test success, the directory is removed.
+//
+// Usage:
+//
+//	tmpDir := cfg.MkTempDir(t, projectRoot, "mytest_*")
+//	// Use tmpDir for test files
+func MkTempDir(t *testing.T, projectRoot, pattern string) string {
+	t.Helper()
+
+	baseDir := filepath.Join(projectRoot, "tmp")
+	tmpDir, err := os.MkdirTemp(baseDir, pattern)
+	if err != nil {
+		t.Fatalf("MkTempDir: failed to create temporary directory: %v", err)
+	}
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("Temporary directory preserved for inspection: %s", tmpDir)
+		} else {
+			os.RemoveAll(tmpDir)
+		}
+	})
+
+	return tmpDir
 }

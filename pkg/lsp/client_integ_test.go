@@ -172,10 +172,7 @@ func TestLSPClientDiagnostics(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a temporary file with syntax error in tmp directory
-	tmpDir := filepath.Join(projectRoot, "tmp")
-	err = os.MkdirAll(tmpDir, 0755)
-	require.NoError(t, err)
-
+	tmpDir := cfg.MkTempDir(t, projectRoot, "test_diagnostics_*")
 	testFile := filepath.Join(tmpDir, "test_diagnostics.go")
 	testContent := `package main
 
@@ -187,7 +184,6 @@ func main() {
 
 	err = os.WriteFile(testFile, []byte(testContent), 0644)
 	require.NoError(t, err)
-	defer os.Remove(testFile)
 
 	// Set up mock response if using mock LSP
 	if mock := asMock(client); mock != nil {
@@ -244,10 +240,7 @@ func TestLSPClientDefinition(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a temporary file in tmp directory
-	tmpDir := filepath.Join(projectRoot, "tmp")
-	err = os.MkdirAll(tmpDir, 0755)
-	require.NoError(t, err)
-
+	tmpDir := cfg.MkTempDir(t, projectRoot, "test_definition_*")
 	testFile := filepath.Join(tmpDir, "test_definition.go")
 	testContent := `package main
 
@@ -264,7 +257,6 @@ func main() {
 
 	err = os.WriteFile(testFile, []byte(testContent), 0644)
 	require.NoError(t, err)
-	defer os.Remove(testFile)
 
 	// Open the file first
 	_, err = client.TouchAndValidate(testFile, false)
@@ -330,10 +322,7 @@ func TestLSPClientReferences(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a temporary file in tmp directory
-	tmpDir := filepath.Join(projectRoot, "tmp")
-	err = os.MkdirAll(tmpDir, 0755)
-	require.NoError(t, err)
-
+	tmpDir := cfg.MkTempDir(t, projectRoot, "test_references_*")
 	testFile := filepath.Join(tmpDir, "test_references.go")
 	testContent := `package main
 
@@ -347,7 +336,6 @@ func myFunc() {
 
 	err = os.WriteFile(testFile, []byte(testContent), 0644)
 	require.NoError(t, err)
-	defer os.Remove(testFile)
 
 	// Open the file first
 	_, err = client.TouchAndValidate(testFile, false)
@@ -420,10 +408,7 @@ func TestLSPClientMultipleFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a unique temporary subdirectory for this test to avoid package conflicts
-	tmpDir := filepath.Join(projectRoot, "tmp", "test_multiple_files")
-	err = os.MkdirAll(tmpDir, 0755)
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := cfg.MkTempDir(t, projectRoot, "test_multiple_files_*")
 
 	file1 := filepath.Join(tmpDir, "test_multi_1.go")
 	file1Content := `package main
@@ -512,10 +497,7 @@ func TestLSPClientDocumentUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a unique temporary subdirectory for this test to avoid package conflicts
-	tmpDir := filepath.Join(projectRoot, "tmp", "test_update")
-	err = os.MkdirAll(tmpDir, 0755)
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := cfg.MkTempDir(t, projectRoot, "test_update_*")
 
 	testFile := filepath.Join(tmpDir, "test_update.go")
 
@@ -610,10 +592,7 @@ func TestLSPClientHover(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a temporary file in tmp directory
-	tmpDir := filepath.Join(projectRoot, "tmp")
-	err = os.MkdirAll(tmpDir, 0755)
-	require.NoError(t, err)
-
+	tmpDir := cfg.MkTempDir(t, projectRoot, "test_hover_*")
 	testFile := filepath.Join(tmpDir, "test_hover.go")
 	testContent := `package main
 
@@ -631,7 +610,6 @@ func main() {
 
 	err = os.WriteFile(testFile, []byte(testContent), 0644)
 	require.NoError(t, err)
-	defer os.Remove(testFile)
 
 	// Open the file first
 	_, err = client.TouchAndValidate(testFile, false)
@@ -717,10 +695,7 @@ func TestLSPClientHoverMarkdownFormat(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a temporary file in tmp directory
-	tmpDir := filepath.Join(projectRoot, "tmp")
-	err = os.MkdirAll(tmpDir, 0755)
-	require.NoError(t, err)
-
+	tmpDir := cfg.MkTempDir(t, projectRoot, "test_hover_format_*")
 	testFile := filepath.Join(tmpDir, "test_hover_format.go")
 	testContent := `package main
 
@@ -738,7 +713,6 @@ func main() {
 
 	err = os.WriteFile(testFile, []byte(testContent), 0644)
 	require.NoError(t, err)
-	defer os.Remove(testFile)
 
 	// Open the file first
 	_, err = client.TouchAndValidate(testFile, false)
@@ -791,10 +765,7 @@ func TestLSPClientDocumentSymbols(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a temporary file in tmp directory
-	tmpDir := filepath.Join(projectRoot, "tmp")
-	err = os.MkdirAll(tmpDir, 0755)
-	require.NoError(t, err)
-
+	tmpDir := cfg.MkTempDir(t, projectRoot, "test_symbols_*")
 	testFile := filepath.Join(tmpDir, "test_symbols.go")
 	testContent := `package main
 
@@ -829,7 +800,6 @@ func main() {
 
 	err = os.WriteFile(testFile, []byte(testContent), 0644)
 	require.NoError(t, err)
-	defer os.Remove(testFile)
 
 	// Open the file first
 	_, err = client.TouchAndValidate(testFile, false)
@@ -1031,9 +1001,7 @@ func TestLSPClientWorkspaceSymbols(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create test files in tmp directory
-	tmpDir := filepath.Join(projectRoot, "tmp")
-	err = os.MkdirAll(tmpDir, 0755)
-	require.NoError(t, err)
+	tmpDir := cfg.MkTempDir(t, projectRoot, "test_ws_symbols_*")
 
 	// Create first test file with a unique type
 	testFile1 := filepath.Join(tmpDir, "test_ws_symbols_1.go")
@@ -1053,7 +1021,6 @@ const UniqueTestConstant = 42
 
 	err = os.WriteFile(testFile1, []byte(testContent1), 0644)
 	require.NoError(t, err)
-	defer os.Remove(testFile1)
 
 	// Create second test file with another unique type
 	testFile2 := filepath.Join(tmpDir, "test_ws_symbols_2.go")
@@ -1070,7 +1037,6 @@ func helper() {
 
 	err = os.WriteFile(testFile2, []byte(testContent2), 0644)
 	require.NoError(t, err)
-	defer os.Remove(testFile2)
 
 	// Open both files to ensure they're indexed
 	_, err = client.TouchAndValidate(testFile1, false)
@@ -1209,10 +1175,7 @@ func TestLSPClientCallHierarchy(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create temporary files in tmp directory
-	tmpDir := filepath.Join(projectRoot, "tmp")
-	err = os.MkdirAll(tmpDir, 0755)
-	require.NoError(t, err)
-
+	tmpDir := cfg.MkTempDir(t, projectRoot, "test_call_hierarchy_*")
 	testFile := filepath.Join(tmpDir, "test_call_hierarchy.go")
 	testContent := `package main
 
@@ -1246,7 +1209,6 @@ func main() {
 
 	err = os.WriteFile(testFile, []byte(testContent), 0644)
 	require.NoError(t, err)
-	defer os.Remove(testFile)
 
 	// Open the file first
 	_, err = client.TouchAndValidate(testFile, false)
@@ -1529,9 +1491,7 @@ func TestLSPClientCallHierarchyMultipleFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create temporary files in tmp directory
-	tmpDir := filepath.Join(projectRoot, "tmp")
-	err = os.MkdirAll(tmpDir, 0755)
-	require.NoError(t, err)
+	tmpDir := cfg.MkTempDir(t, projectRoot, "test_call_hierarchy_multi_*")
 
 	// File 1: defines a shared function
 	file1 := filepath.Join(tmpDir, "test_call_hierarchy_1.go")
@@ -1565,15 +1525,12 @@ func CallerInFile3() {
 
 	err = os.WriteFile(file1, []byte(file1Content), 0644)
 	require.NoError(t, err)
-	defer os.Remove(file1)
 
 	err = os.WriteFile(file2, []byte(file2Content), 0644)
 	require.NoError(t, err)
-	defer os.Remove(file2)
 
 	err = os.WriteFile(file3, []byte(file3Content), 0644)
 	require.NoError(t, err)
-	defer os.Remove(file3)
 
 	// Open all files
 	_, err = client.TouchAndValidate(file1, false)
@@ -1706,10 +1663,7 @@ func TestLSPClientCallHierarchyNoResults(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a temporary file in tmp directory
-	tmpDir := filepath.Join(projectRoot, "tmp")
-	err = os.MkdirAll(tmpDir, 0755)
-	require.NoError(t, err)
-
+	tmpDir := cfg.MkTempDir(t, projectRoot, "test_call_hierarchy_no_results_*")
 	testFile := filepath.Join(tmpDir, "test_call_hierarchy_no_results.go")
 	testContent := `package main
 
@@ -1725,7 +1679,6 @@ func main() {
 
 	err = os.WriteFile(testFile, []byte(testContent), 0644)
 	require.NoError(t, err)
-	defer os.Remove(testFile)
 
 	// Open the file first
 	_, err = client.TouchAndValidate(testFile, false)
