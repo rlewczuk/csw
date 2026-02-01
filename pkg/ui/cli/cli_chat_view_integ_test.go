@@ -94,7 +94,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for response
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(2 * time.Millisecond)
 
 		// Verify output contains both user message and assistant response
 		outputStr := output.String()
@@ -152,7 +152,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for complete response
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(2 * time.Millisecond)
 
 		// Verify output contains complete streamed response
 		outputStr := output.String()
@@ -248,7 +248,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for response
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 
 		// Verify output does not contain permission prompt
 		outputStr := output.String()
@@ -301,7 +301,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(2 * time.Millisecond)
 
 		// Setup second LLM response
 		mockServer.AddStreamingResponse("/api/chat", "POST", true,
@@ -315,7 +315,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(2 * time.Millisecond)
 
 		// Verify both conversations appear in output
 		outputStr := output.String()
