@@ -14,25 +14,6 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
-// PromptScanner scans and loads prompt fragments from a source.
-type PromptScanner interface {
-	// GetFragments generates a prompt for the given tags, role and state.
-	// returns map where keys are filenames (dir/file_prefix with role name or 'all' as dir and no extension)
-	// and values are unprocessed contents of those files
-	GetFragments(tags []string, role *conf.AgentRoleConfig) (map[string]string, error)
-
-	// GetToolFragments returns tool description fragments from the tools directory.
-	// Returns a map where keys are "<tool-name>/<file-name>" (e.g., "vfs.read/vfs.read.schema.json", "vfs.read/vfs.read.md")
-	// and values are file contents. Supports tag-specific overrides (e.g., "vfs.read-kimi.md" instead of "vfs.read.md").
-	GetToolFragments(tags []string, role *conf.AgentRoleConfig) (map[string]string, error)
-
-	// HasChanged returns true if any of the fragments has changed since last scan.
-	HasChanged() bool
-
-	// Close stops watching for changes and releases all resources.
-	Close() error
-}
-
 // PromptGenerator generates a prompt for the given tags, role and state.
 type PromptGenerator interface {
 	// GetPrompt generates a prompt for the given tags, role and state.
@@ -43,12 +24,6 @@ type PromptGenerator interface {
 	// GetToolInfo returns information about a tool including its description and parameter schema.
 	// Returns error if tool description is not found.
 	GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *AgentState) (tool.ToolInfo, error)
-}
-
-// FSPromptGenerator implements PromptGenerator interface.
-// It accepts one or more PromptScanner instances and merges their fragments.
-type FSPromptGenerator struct {
-	scanners []PromptScanner
 }
 
 // ConfPromptGenerator implements PromptGenerator interface.
@@ -66,17 +41,6 @@ type promptFragment struct {
 	filename string
 	content  string
 	isAll    bool // true if from "all" directory
-}
-
-// NewFSPromptGenerator creates a new FSPromptGenerator with the given scanners.
-func NewFSPromptGenerator(scanners ...PromptScanner) (*FSPromptGenerator, error) {
-	if len(scanners) == 0 {
-		return nil, fmt.Errorf("NewFSPromptGenerator() [prompt.go]: at least one scanner is required")
-	}
-
-	return &FSPromptGenerator{
-		scanners: scanners,
-	}, nil
 }
 
 // NewConfPromptGenerator creates a new ConfPromptGenerator with the given ConfigStore.
@@ -163,81 +127,6 @@ func filterDuplicates(fragments []promptFragment) []promptFragment {
 	}
 
 	return result
-}
-
-// GetToolInfo returns information about a tool. Not implemented for FSPromptGenerator.
-// Use ConfPromptGenerator instead for tool info support.
-func (g *FSPromptGenerator) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *AgentState) (tool.ToolInfo, error) {
-	return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: not implemented for FSPromptGenerator, use ConfPromptGenerator instead")
-}
-
-// GetPrompt generates a prompt for the given tags, role and state.
-// Takes map of fragments from scanners, concatenates and processes using text/template
-// to create final prompt.
-func (g *FSPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error) {
-	// Get fragments from all scanners
-	fragments := make(map[string]string)
-	// Merge fragments from all scanners in order
-	for _, scanner := range g.scanners {
-		scannerFragments, err := scanner.GetFragments(tags, role)
-		if err != nil {
-			return "", fmt.Errorf("GetPrompt() [prompt.go]: failed to get fragments: %w", err)
-		}
-		// Merge: later scanners override earlier ones
-		for key, value := range scannerFragments {
-			fragments[key] = value
-		}
-	}
-
-	// Sort fragment keys by extracting the order number
-	type keyOrder struct {
-		key   string
-		order int
-	}
-
-	keyOrders := make([]keyOrder, 0, len(fragments))
-	for key := range fragments {
-		// Extract order from key (e.g., "all/10-system" -> 10)
-		parts := strings.Split(filepath.Base(key), "-")
-		if len(parts) > 0 {
-			if order, err := strconv.Atoi(parts[0]); err == nil {
-				keyOrders = append(keyOrders, keyOrder{key: key, order: order})
-				continue
-			}
-		}
-		// Fallback: order = 0 if we can't parse
-		keyOrders = append(keyOrders, keyOrder{key: key, order: 0})
-	}
-
-	// Sort by order, then by key alphabetically for stable sorting
-	sort.Slice(keyOrders, func(i, j int) bool {
-		if keyOrders[i].order != keyOrders[j].order {
-			return keyOrders[i].order < keyOrders[j].order
-		}
-		return keyOrders[i].key < keyOrders[j].key
-	})
-
-	// Concatenate fragments
-	var combined strings.Builder
-	for i, ko := range keyOrders {
-		if i > 0 {
-			combined.WriteString("\n\n")
-		}
-		combined.WriteString(fragments[ko.key])
-	}
-
-	// Process template
-	tmpl, err := template.New("prompt").Parse(combined.String())
-	if err != nil {
-		return "", fmt.Errorf("GetPrompt() [prompt_impl.go]: failed to parse template: %w", err)
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, state); err != nil {
-		return "", fmt.Errorf("GetPrompt() [prompt_impl.go]: failed to execute template: %w", err)
-	}
-
-	return buf.String(), nil
 }
 
 // GetPrompt generates a prompt for the given tags, role and state.
