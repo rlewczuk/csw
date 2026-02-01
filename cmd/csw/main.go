@@ -9,10 +9,12 @@ import (
 )
 
 var (
-	modelName  string
-	configPath string
-	roleName   string
-	lspServer  string
+	modelName     string
+	configPath    string
+	roleName      string
+	lspServer     string
+	saveSessionTo string
+	saveSession   bool
 )
 
 func main() {
@@ -48,7 +50,7 @@ func main() {
 				workDir = wd
 			}
 
-			return runTUI(workDir, configPath, modelName, roleName, lspServer)
+			return runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo, saveSession)
 		},
 	}
 
@@ -57,6 +59,8 @@ func main() {
 	rootCmd.Flags().StringVar(&configPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
 	rootCmd.Flags().StringVar(&roleName, "role", "developer", "Agent role name")
 	rootCmd.Flags().StringVar(&lspServer, "lsp-server", "gopls", "Path to LSP server binary (empty to disable LSP)")
+	rootCmd.Flags().StringVar(&saveSessionTo, "save-session-to", "", "Save session conversation to specified markdown file")
+	rootCmd.Flags().BoolVar(&saveSession, "save-session", false, "Save session conversation to session.md in session log directory")
 
 	// Add subcommands
 	rootCmd.AddCommand(ConfCommand())
