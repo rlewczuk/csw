@@ -24,6 +24,7 @@ type mockResponse struct {
 	chunks      []string      // for streaming responses
 	closeAfter  bool          // whether to close stream after current chunks
 	waitCh      chan struct{} // channel to signal new chunks available
+	statusCode  int           // HTTP status code (default: 200)
 }
 
 // NewMockHTTPServer creates a new mock HTTP server.
@@ -57,6 +58,12 @@ func (m *MockHTTPServer) Close() {
 // AddRestResponse adds a response for a specific REST endpoint.
 // Multiple calls append responses to a FIFO queue.
 func (m *MockHTTPServer) AddRestResponse(path, method, response string) {
+	m.AddRestResponseWithStatus(path, method, response, http.StatusOK)
+}
+
+// AddRestResponseWithStatus adds a response with a custom status code for a specific REST endpoint.
+// Multiple calls append responses to a FIFO queue.
+func (m *MockHTTPServer) AddRestResponseWithStatus(path, method, response string, statusCode int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -74,6 +81,7 @@ func (m *MockHTTPServer) AddRestResponse(path, method, response string) {
 	m.responses[path][method].queue = append(m.responses[path][method].queue, &mockResponse{
 		isStreaming: false,
 		body:        response,
+		statusCode:  statusCode,
 	})
 }
 
@@ -124,7 +132,11 @@ func (m *MockHTTPServer) HandleRequest(w http.ResponseWriter, r *http.Request) {
 
 	if !resp.isStreaming {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		statusCode := resp.statusCode
+		if statusCode == 0 {
+			statusCode = http.StatusOK
+		}
+		w.WriteHeader(statusCode)
 		w.Write([]byte(resp.body))
 		return
 	}

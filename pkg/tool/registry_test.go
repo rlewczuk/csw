@@ -120,7 +120,8 @@ func TestRegisterVFSTools(t *testing.T) {
 	RegisterVFSTools(registry, mockVFS)
 
 	// Test that all VFS tools are registered
-	vfsTools := []string{"vfs.read", "vfs.write", "vfs.delete", "vfs.ls", "vfs.move"}
+	// Note: vfs.delete and vfs.move are currently disabled
+	vfsTools := []string{"vfs.read", "vfs.write", "vfs.edit", "vfs.ls", "vfs.find", "vfs.grep"}
 
 	for _, toolName := range vfsTools {
 		tool, err := registry.Get(toolName)

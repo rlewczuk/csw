@@ -510,6 +510,10 @@ func (s *SweSession) Run(ctx context.Context) error {
 		// Use streaming chat API
 		stream := chatModel.ChatStream(ctx, s.messages, nil, tools)
 
+		if s.logger != nil {
+			s.logger.Debug("chat_stream_created", "num_messages", len(s.messages), "num_tools", len(tools))
+		}
+
 		// Accumulate the response from the stream
 		responseMsg := &models.ChatMessage{
 			Role:  models.ChatRoleAssistant,
@@ -519,7 +523,16 @@ func (s *SweSession) Run(ctx context.Context) error {
 		// Track tool calls we've seen to handle start events
 		seenToolCalls := make(map[string]bool)
 
+		if s.logger != nil {
+			s.logger.Debug("starting_stream_iteration")
+		}
+
+		fragmentCount := 0
 		for fragment := range stream {
+			fragmentCount++
+			if s.logger != nil {
+				s.logger.Debug("stream_fragment_received", "fragment_num", fragmentCount, "num_parts", len(fragment.Parts))
+			}
 			// Merge the fragment parts into the accumulated response
 			for _, part := range fragment.Parts {
 				responseMsg.Parts = append(responseMsg.Parts, part)
@@ -551,6 +564,18 @@ func (s *SweSession) Run(ctx context.Context) error {
 					}
 				}
 			}
+		}
+
+		if s.logger != nil {
+			s.logger.Debug("stream_iteration_complete", "fragment_count", fragmentCount, "num_parts", len(responseMsg.Parts))
+		}
+
+		// Check if we got an empty response
+		if fragmentCount == 0 {
+			if s.logger != nil {
+				s.logger.Warn("stream_returned_no_fragments", "num_messages", len(s.messages), "num_tools", len(tools))
+			}
+			return fmt.Errorf("SweSession.Run() [session.go]: stream returned no fragments - this usually indicates a silent error in the model provider")
 		}
 
 		// Add the accumulated response to messages
