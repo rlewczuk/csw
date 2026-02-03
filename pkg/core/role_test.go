@@ -209,8 +209,10 @@ func TestAgentRoleIntegration(t *testing.T) {
 	t.Run("SetRole updates role field", func(t *testing.T) {
 		mockStore := impl.NewMockConfigStore()
 		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
-			"developer": developerRole,
-			"readonly":  readOnlyRole,
+			"custom": {
+				Name:        "custom",
+				Description: "A custom role",
+			},
 		})
 		registry := NewAgentRoleRegistry(mockStore)
 
@@ -220,51 +222,59 @@ func TestAgentRoleIntegration(t *testing.T) {
 			Tools:                tools,
 			VFS:                  mockVFS,
 			Roles:                registry,
+			ConfigStore:          mockStore,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
+		// No default role set (no "developer" role exists, no global config default)
 		assert.Nil(t, session.Role())
 
-		err = session.SetRole("developer")
+		// Set role explicitly
+		err = session.SetRole("custom")
 		require.NoError(t, err)
 		assert.NotNil(t, session.Role())
-		assert.Equal(t, "developer", session.Role().Name)
+		assert.Equal(t, "custom", session.Role().Name)
 	})
 
 	t.Run("SetRole updates system prompt", func(t *testing.T) {
 		mockStore := impl.NewMockConfigStore()
 		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
-			"developer": developerRole,
+			"tester": {
+				Name:        "tester",
+				Description: "A software tester role",
+			},
 		})
 		registry := NewAgentRoleRegistry(mockStore)
 
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
 			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are an experienced software developer."),
+			PromptGenerator:      newMockPromptGenerator("You are an experienced software tester."),
 			Tools:                tools,
 			VFS:                  mockVFS,
 			Roles:                registry,
+			ConfigStore:          mockStore,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
-		// Check that initially there is no system prompt (no role set yet)
+		// With automatic role selection, there should be no default role
+		// (no "developer" role exists, no global config default)
 		messages := session.ChatMessages()
 		require.Len(t, messages, 0)
 
-		// Set role and check updated system prompt
-		err = session.SetRole("developer")
+		// Set role and check system prompt is created
+		err = session.SetRole("tester")
 		require.NoError(t, err)
 
 		messages = session.ChatMessages()
 		require.Len(t, messages, 1)
 		assert.Equal(t, models.ChatRoleSystem, messages[0].Role)
-		assert.Equal(t, "You are an experienced software developer.", messages[0].Parts[0].Text)
+		assert.Equal(t, "You are an experienced software tester.", messages[0].Parts[0].Text)
 	})
 
 	t.Run("SetRole wraps VFS with access control", func(t *testing.T) {

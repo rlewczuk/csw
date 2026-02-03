@@ -176,6 +176,7 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 		Tools:           toolRegistry,
 		VFS:             localVFS,
 		Roles:           roleRegistry,
+		ConfigStore:     configStore,
 		LogBaseDir:      logsDir,
 	}
 
