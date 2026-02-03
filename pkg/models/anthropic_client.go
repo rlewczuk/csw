@@ -11,6 +11,7 @@ import (
 	"iter"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -272,10 +273,12 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 	return func(yield func(*ChatMessage) bool) {
 		// Validate inputs
 		if len(messages) == 0 {
+			fmt.Fprintf(os.Stderr, "ERROR: AnthropicChatModel.ChatStream() [anthropic_client.go]: messages cannot be empty\n")
 			return
 		}
 
 		if m.model == "" {
+			fmt.Fprintf(os.Stderr, "ERROR: AnthropicChatModel.ChatStream() [anthropic_client.go]: model cannot be empty\n")
 			return
 		}
 
@@ -332,11 +335,13 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 
 		body, err := json.Marshal(chatReq)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: AnthropicChatModel.ChatStream() [anthropic_client.go]: failed to marshal request: %v\n", err)
 			return
 		}
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: AnthropicChatModel.ChatStream() [anthropic_client.go]: failed to create request: %v\n", err)
 			return
 		}
 		req.Header.Set("Content-Type", "application/json")
@@ -345,11 +350,13 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 
 		resp, err := m.client.httpClient.Do(req)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: AnthropicChatModel.ChatStream() [anthropic_client.go]: HTTP request failed: %v\n", err)
 			return
 		}
 		defer resp.Body.Close()
 
 		if err := m.client.checkStatusCode(resp); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: AnthropicChatModel.ChatStream() [anthropic_client.go]: API error (status %d): %v\n", resp.StatusCode, err)
 			return
 		}
 

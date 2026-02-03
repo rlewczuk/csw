@@ -11,6 +11,7 @@ import (
 	"iter"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -244,10 +245,12 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 	return func(yield func(*ChatMessage) bool) {
 		// Validate inputs
 		if len(messages) == 0 {
+			fmt.Fprintf(os.Stderr, "ERROR: OpenAIChatModel.ChatStream() [openai_client.go]: messages cannot be empty\n")
 			return
 		}
 
 		if m.model == "" {
+			fmt.Fprintf(os.Stderr, "ERROR: OpenAIChatModel.ChatStream() [openai_client.go]: model cannot be empty\n")
 			return
 		}
 
@@ -282,11 +285,13 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 
 		body, err := json.Marshal(chatReq)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: OpenAIChatModel.ChatStream() [openai_client.go]: failed to marshal request: %v\n", err)
 			return
 		}
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: OpenAIChatModel.ChatStream() [openai_client.go]: failed to create request: %v\n", err)
 			return
 		}
 		req.Header.Set("Content-Type", "application/json")
@@ -295,11 +300,13 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 
 		resp, err := m.client.httpClient.Do(req)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: OpenAIChatModel.ChatStream() [openai_client.go]: HTTP request failed: %v\n", err)
 			return
 		}
 		defer resp.Body.Close()
 
 		if err := m.client.checkStatusCode(resp); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: OpenAIChatModel.ChatStream() [openai_client.go]: API error (status %d): %v\n", resp.StatusCode, err)
 			return
 		}
 
