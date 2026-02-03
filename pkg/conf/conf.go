@@ -96,6 +96,8 @@ type ModelProviderConfig struct {
 	// Streaming controls whether to use streaming API for chat completions
 	// Defaults to true for backward compatibility
 	Streaming *bool `json:"streaming,omitempty"`
+	// Verbose controls whether to print raw response and headers to stdout
+	Verbose bool `json:"verbose,omitempty"`
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for ModelProviderConfig.
