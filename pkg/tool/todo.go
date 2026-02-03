@@ -20,7 +20,7 @@ type TodoItem struct {
 	Priority string `json:"priority"`
 }
 
-// TodoWriteTool implements the todo.write tool for updating the todo list.
+// TodoWriteTool implements the todoWrite tool for updating the todo list.
 type TodoWriteTool struct {
 	session TodoSession
 }
@@ -139,7 +139,7 @@ func (t *TodoWriteTool) Execute(args ToolCall) ToolResponse {
 	}
 }
 
-// TodoReadTool implements the todo.read tool for retrieving the current todo list.
+// TodoReadTool implements the todoRead tool for retrieving the current todo list.
 type TodoReadTool struct {
 	session TodoSession
 }

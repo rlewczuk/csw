@@ -7,7 +7,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
-// VFSGrepTool implements the vfs.grep tool.
+// VFSGrepTool implements the vfsGrep tool.
 type VFSGrepTool struct {
 	vfs vfs.VFS
 }

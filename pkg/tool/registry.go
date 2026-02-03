@@ -62,19 +62,19 @@ func (r *ToolRegistry) Execute(args ToolCall) ToolResponse {
 }
 
 // RegisterVFSTools registers all VFS tools with the given VFS implementation.
-// Line numbers are enabled by default for the vfs.read tool.
+// Line numbers are enabled by default for the vfsRead tool.
 func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS) {
-	registry.Register("vfs.read", NewVFSReadTool(vfsImpl, true))
-	registry.Register("vfs.write", NewVFSWriteTool(vfsImpl, nil))
-	registry.Register("vfs.edit", NewVFSEditTool(vfsImpl, nil))
-	//registry.Register("vfs.delete", NewVFSDeleteTool(vfsImpl))
-	registry.Register("vfs.ls", NewVFSListTool(vfsImpl))
-	//registry.Register("vfs.move", NewVFSMoveTool(vfsImpl))
-	registry.Register("vfs.find", NewVFSFindTool(vfsImpl))
-	registry.Register("vfs.grep", NewVFSGrepTool(vfsImpl))
+	registry.Register("vfsRead", NewVFSReadTool(vfsImpl, true))
+	registry.Register("vfsWrite", NewVFSWriteTool(vfsImpl, nil))
+	registry.Register("vfsEdit", NewVFSEditTool(vfsImpl, nil))
+	//registry.Register("vfsDelete", NewVFSDeleteTool(vfsImpl))
+	registry.Register("vfsList", NewVFSListTool(vfsImpl))
+	//registry.Register("vfsMode", NewVFSMoveTool(vfsImpl))
+	registry.Register("vfsFind", NewVFSFindTool(vfsImpl))
+	registry.Register("vfsGrep", NewVFSGrepTool(vfsImpl))
 }
 
-// RegisterRunBashTool registers the run.bash tool with the given CommandRunner and privileges.
+// RegisterRunBashTool registers the runBash tool with the given CommandRunner and privileges.
 func RegisterRunBashTool(registry *ToolRegistry, r runner.CommandRunner, privileges map[string]conf.AccessFlag) {
-	registry.Register("run.bash", NewRunBashTool(r, privileges))
+	registry.Register("runBash", NewRunBashTool(r, privileges))
 }

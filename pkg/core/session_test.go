@@ -108,7 +108,7 @@ func TestSessionToolSelection(t *testing.T) {
 		// instead of s.Tools.ListInfo() when passing tools to the model provider.
 		//
 		// The bug means:
-		// 1. Session-specific tools (todo.read, todo.write) are not presented to the LLM
+		// 1. Session-specific tools (todoRead, todoWrite) are not presented to the LLM
 		// 2. Access control wrappers applied to session tools are bypassed
 		//
 		// Expected behavior: Run() should use s.Tools.ListInfo()
@@ -124,13 +124,13 @@ func TestSessionToolSelection(t *testing.T) {
 
 		// Verify the session has session-specific tools
 		sessionToolNames := session.Tools.List()
-		assert.Contains(t, sessionToolNames, "todo.read", "session should have todo.read tool")
-		assert.Contains(t, sessionToolNames, "todo.write", "session should have todo.write tool")
+		assert.Contains(t, sessionToolNames, "todoRead", "session should have todoRead tool")
+		assert.Contains(t, sessionToolNames, "todoWrite", "session should have todoWrite tool")
 
 		// Verify the system does NOT have session-specific tools
 		systemToolNames := system.Tools.List()
-		assert.NotContains(t, systemToolNames, "todo.read", "system should not have todo.read")
-		assert.NotContains(t, systemToolNames, "todo.write", "system should not have todo.write")
+		assert.NotContains(t, systemToolNames, "todoRead", "system should not have todoRead")
+		assert.NotContains(t, systemToolNames, "todoWrite", "system should not have todoWrite")
 
 		// The counts should be different
 		assert.NotEqual(t, len(systemToolNames), len(sessionToolNames),
@@ -147,16 +147,16 @@ func TestSessionToolSelection(t *testing.T) {
 		session := controller.GetSession()
 
 		// Without SetRole, session tools should be a copy of system tools
-		// plus session-specific tools like todo.read/todo.write
+		// plus session-specific tools like todoRead/todoWrite
 		sessionToolNames := session.Tools.List()
 
 		// Should have session-specific tools
-		assert.Contains(t, sessionToolNames, "todo.read")
-		assert.Contains(t, sessionToolNames, "todo.write")
+		assert.Contains(t, sessionToolNames, "todoRead")
+		assert.Contains(t, sessionToolNames, "todoWrite")
 
 		// Should also have system tools like VFS tools
-		assert.Contains(t, sessionToolNames, "vfs.read")
-		assert.Contains(t, sessionToolNames, "vfs.write")
+		assert.Contains(t, sessionToolNames, "vfsRead")
+		assert.Contains(t, sessionToolNames, "vfsWrite")
 	})
 }
 
@@ -276,14 +276,14 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 		session := controller.GetSession()
 
 		// Verify grep tool is registered
-		grepTool, err := session.Tools.Get("vfs.grep")
+		grepTool, err := session.Tools.Get("vfsGrep")
 		require.NoError(t, err)
 		require.NotNil(t, grepTool)
 
 		// Execute grep tool to find "main"
 		response := grepTool.Execute(tool.ToolCall{
 			ID:       "test-grep-1",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: tool.NewToolValue(map[string]any{
 				"pattern": "main",
 			}),
@@ -309,13 +309,13 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 
 		session := controller.GetSession()
 
-		grepTool, err := session.Tools.Get("vfs.grep")
+		grepTool, err := session.Tools.Get("vfsGrep")
 		require.NoError(t, err)
 
 		// Execute grep tool with include filter for .go files only
 		response := grepTool.Execute(tool.ToolCall{
 			ID:       "test-grep-2",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: tool.NewToolValue(map[string]any{
 				"pattern": "main",
 				"include": "*.go",
@@ -342,13 +342,13 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 
 		session := controller.GetSession()
 
-		grepTool, err := session.Tools.Get("vfs.grep")
+		grepTool, err := session.Tools.Get("vfsGrep")
 		require.NoError(t, err)
 
 		// Execute grep tool with path filter for src/ directory
 		response := grepTool.Execute(tool.ToolCall{
 			ID:       "test-grep-3",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: tool.NewToolValue(map[string]any{
 				"pattern": "main",
 				"path":    "src",
@@ -375,13 +375,13 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 
 		session := controller.GetSession()
 
-		grepTool, err := session.Tools.Get("vfs.grep")
+		grepTool, err := session.Tools.Get("vfsGrep")
 		require.NoError(t, err)
 
 		// Execute grep tool with pattern that doesn't match
 		response := grepTool.Execute(tool.ToolCall{
 			ID:       "test-grep-4",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: tool.NewToolValue(map[string]any{
 				"pattern": "nonexistent_pattern_xyz",
 			}),
@@ -404,13 +404,13 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 
 		session := controller.GetSession()
 
-		grepTool, err := session.Tools.Get("vfs.grep")
+		grepTool, err := session.Tools.Get("vfsGrep")
 		require.NoError(t, err)
 
 		// Execute grep tool with low limit
 		response := grepTool.Execute(tool.ToolCall{
 			ID:       "test-grep-5",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: tool.NewToolValue(map[string]any{
 				"pattern": "main",
 				"limit":   2,
@@ -460,14 +460,14 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		session := controller.GetSession()
 
 		// Verify edit tool is registered
-		editTool, err := session.Tools.Get("vfs.edit")
+		editTool, err := session.Tools.Get("vfsEdit")
 		require.NoError(t, err)
 		require.NotNil(t, editTool)
 
 		// Execute edit tool to replace "hello"
 		response := editTool.Execute(tool.ToolCall{
 			ID:       "test-edit-1",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{
 				"path":      "test.txt",
 				"oldString": "hello",
@@ -505,14 +505,14 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		session := controller.GetSession()
 
 		// Verify edit tool is registered
-		editTool, err := session.Tools.Get("vfs.edit")
+		editTool, err := session.Tools.Get("vfsEdit")
 		require.NoError(t, err)
 		require.NotNil(t, editTool)
 
 		// Execute edit tool to replace all "foo"
 		response := editTool.Execute(tool.ToolCall{
 			ID:       "test-edit-2",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{
 				"path":       "test2.txt",
 				"oldString":  "foo",
@@ -549,12 +549,12 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		session := controller.GetSession()
 
 		// Execute edit tool with non-existent string
-		editTool, err := session.Tools.Get("vfs.edit")
+		editTool, err := session.Tools.Get("vfsEdit")
 		require.NoError(t, err)
 
 		response := editTool.Execute(tool.ToolCall{
 			ID:       "test-edit-3",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{
 				"path":      "test3.txt",
 				"oldString": "goodbye",
@@ -582,12 +582,12 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		session := controller.GetSession()
 
 		// Execute edit tool without replaceAll
-		editTool, err := session.Tools.Get("vfs.edit")
+		editTool, err := session.Tools.Get("vfsEdit")
 		require.NoError(t, err)
 
 		response := editTool.Execute(tool.ToolCall{
 			ID:       "test-edit-4",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{
 				"path":      "test4.txt",
 				"oldString": "hello",
@@ -616,12 +616,12 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		session := controller.GetSession()
 
 		// Execute edit tool with multiline replacement
-		editTool, err := session.Tools.Get("vfs.edit")
+		editTool, err := session.Tools.Get("vfsEdit")
 		require.NoError(t, err)
 
 		response := editTool.Execute(tool.ToolCall{
 			ID:       "test-edit-5",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{
 				"path":      "test5.go",
 				"oldString": "func main() {\n\tfmt.Println(\"hello\")\n}",
@@ -708,11 +708,11 @@ func TestSessionLSPIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify VFS tools are registered
-		editTool, err := session.Tools.Get("vfs.edit")
+		editTool, err := session.Tools.Get("vfsEdit")
 		require.NoError(t, err)
 		assert.NotNil(t, editTool)
 
-		writeTool, err := session.Tools.Get("vfs.write")
+		writeTool, err := session.Tools.Get("vfsWrite")
 		require.NoError(t, err)
 		assert.NotNil(t, writeTool)
 	})
@@ -762,13 +762,13 @@ func TestSessionLSPIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get edit tool
-		editTool, err := session.Tools.Get("vfs.edit")
+		editTool, err := session.Tools.Get("vfsEdit")
 		require.NoError(t, err)
 
 		// Execute edit
 		response := editTool.Execute(tool.ToolCall{
 			ID:       "test-edit-lsp",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{
 				"path":      "test.go",
 				"oldString": "\"hello\"",
@@ -826,13 +826,13 @@ func TestSessionLSPIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get write tool
-		writeTool, err := session.Tools.Get("vfs.write")
+		writeTool, err := session.Tools.Get("vfsWrite")
 		require.NoError(t, err)
 
 		// Execute write with invalid content
 		response := writeTool.Execute(tool.ToolCall{
 			ID:       "test-write-lsp",
-			Function: "vfs.write",
+			Function: "vfsWrite",
 			Arguments: tool.NewToolValue(map[string]any{
 				"path":    "new.go",
 				"content": "// incomplete file",
@@ -890,12 +890,12 @@ func TestSessionLSPIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Execute edit without LSP
-		editTool, err := session.Tools.Get("vfs.edit")
+		editTool, err := session.Tools.Get("vfsEdit")
 		require.NoError(t, err)
 
 		response := editTool.Execute(tool.ToolCall{
 			ID:       "test-edit-no-lsp",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{
 				"path":      "no-lsp.go",
 				"oldString": "func main() {}",
@@ -933,7 +933,7 @@ func TestSessionWriter(t *testing.T) {
 		// Simulate tool call
 		toolCall := &tool.ToolCall{
 			ID:       "test-tool-1",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: tool.NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
@@ -963,8 +963,8 @@ func TestSessionWriter(t *testing.T) {
 		assert.Contains(t, contentStr, "Hello, please help me")
 		assert.Contains(t, contentStr, "# Assistant (#2)")
 		assert.Contains(t, contentStr, "Sure, I can help you with that.")
-		assert.Contains(t, contentStr, "# Tool call: vfs.read (#1)")
-		assert.Contains(t, contentStr, "# Tool response: vfs.read (#1)")
+		assert.Contains(t, contentStr, "# Tool call: vfsRead (#1)")
+		assert.Contains(t, contentStr, "# Tool response: vfsRead (#1)")
 		assert.Contains(t, contentStr, "file content")
 
 		// Verify delegate was called
@@ -1053,7 +1053,7 @@ func TestSessionWriter(t *testing.T) {
 
 		toolCall := &tool.ToolCall{
 			ID:       "test-tool-error",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: tool.NewToolValue(map[string]any{
 				"path": "missing.txt",
 			}),

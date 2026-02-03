@@ -258,7 +258,7 @@ func TestChatPresenter_ToolCallHandling(t *testing.T) {
 
 		// Setup LLM responses with tool call
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfs.write","arguments":{"path":"test.txt","content":"Hello World"}}}]},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfsWrite","arguments":{"path":"test.txt","content":"Hello World"}}}]},"done":false}`,
 			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","done":true,"done_reason":"stop"}`,
 		)
 
@@ -433,7 +433,7 @@ func TestChatPresenter_PermissionFlow(t *testing.T) {
 
 	// Mock response: Assistant tries to write file
 	mockServer.AddStreamingResponse("/api/chat", "POST", false,
-		`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfs.write","arguments":{"path":"protected.txt","content":"secret"}}}]},"done":false}`,
+		`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfsWrite","arguments":{"path":"protected.txt","content":"secret"}}}]},"done":false}`,
 		`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 

@@ -48,7 +48,7 @@ func TestTodoWriteTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "todo.write",
+			Function: "todoWrite",
 			Arguments: NewToolValue(map[string]any{
 				"todos": []any{
 					map[string]any{
@@ -97,7 +97,7 @@ func TestTodoWriteTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
-			Function:  "todo.write",
+			Function:  "todoWrite",
 			Arguments: NewToolValue(map[string]any{}),
 		})
 
@@ -116,7 +116,7 @@ func TestTodoWriteTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "todo.write",
+			Function: "todoWrite",
 			Arguments: NewToolValue(map[string]any{
 				"todos": "not an array",
 			}),
@@ -137,7 +137,7 @@ func TestTodoWriteTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "todo.write",
+			Function: "todoWrite",
 			Arguments: NewToolValue(map[string]any{
 				"todos": []any{
 					"not an object",
@@ -160,7 +160,7 @@ func TestTodoWriteTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "todo.write",
+			Function: "todoWrite",
 			Arguments: NewToolValue(map[string]any{
 				"todos": []any{
 					map[string]any{
@@ -187,7 +187,7 @@ func TestTodoWriteTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "todo.write",
+			Function: "todoWrite",
 			Arguments: NewToolValue(map[string]any{
 				"todos": []any{
 					map[string]any{
@@ -215,7 +215,7 @@ func TestTodoWriteTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "todo.write",
+			Function: "todoWrite",
 			Arguments: NewToolValue(map[string]any{
 				"todos": []any{
 					map[string]any{
@@ -245,7 +245,7 @@ func TestTodoReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
-			Function:  "todo.read",
+			Function:  "todoRead",
 			Arguments: NewToolValue(map[string]any{}),
 		})
 
@@ -287,7 +287,7 @@ func TestTodoReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
-			Function:  "todo.read",
+			Function:  "todoRead",
 			Arguments: NewToolValue(map[string]any{}),
 		})
 
@@ -321,7 +321,7 @@ func TestTodoIntegration(t *testing.T) {
 		// Write todos
 		writeResponse := writeTool.Execute(ToolCall{
 			ID:       "write-id",
-			Function: "todo.write",
+			Function: "todoWrite",
 			Arguments: NewToolValue(map[string]any{
 				"todos": []any{
 					map[string]any{
@@ -344,7 +344,7 @@ func TestTodoIntegration(t *testing.T) {
 		// Read todos
 		readResponse := readTool.Execute(ToolCall{
 			ID:        "read-id",
-			Function:  "todo.read",
+			Function:  "todoRead",
 			Arguments: NewToolValue(map[string]any{}),
 		})
 		require.NoError(t, readResponse.Error)
@@ -367,7 +367,7 @@ func TestTodoIntegration(t *testing.T) {
 		// Write initial todos with 2 pending
 		writeResponse := writeTool.Execute(ToolCall{
 			ID:       "write-1",
-			Function: "todo.write",
+			Function: "todoWrite",
 			Arguments: NewToolValue(map[string]any{
 				"todos": []any{
 					map[string]any{
@@ -391,7 +391,7 @@ func TestTodoIntegration(t *testing.T) {
 		// Update one to completed
 		writeResponse = writeTool.Execute(ToolCall{
 			ID:       "write-2",
-			Function: "todo.write",
+			Function: "todoWrite",
 			Arguments: NewToolValue(map[string]any{
 				"todos": []any{
 					map[string]any{

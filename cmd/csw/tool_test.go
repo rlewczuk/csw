@@ -122,7 +122,7 @@ func TestToolCommand_Info(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test that we can get tool info (using a tool that should exist in defaults)
-	// We'll test with vfs.read since it's a basic tool that should always be there
+	// We'll test with vfsRead since it's a basic tool that should always be there
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
@@ -133,13 +133,13 @@ func TestToolCommand_Info(t *testing.T) {
 	require.True(t, exists)
 	require.NotNil(t, allRole.ToolFragments)
 
-	// Check if vfs.read tool exists
-	_, hasSchema := allRole.ToolFragments["vfs.read/vfs.read.schema.json"]
-	_, hasDesc := allRole.ToolFragments["vfs.read/vfs.read.md"]
+	// Check if vfsRead tool exists
+	_, hasSchema := allRole.ToolFragments["vfsRead/vfsRead.schema.json"]
+	_, hasDesc := allRole.ToolFragments["vfsRead/vfsRead.md"]
 	if hasSchema && hasDesc {
-		// If vfs.read exists, verify the fragments exist
-		assert.True(t, hasSchema, "vfs.read should have vfs.read.schema.json")
-		assert.True(t, hasDesc, "vfs.read should have vfs.read.md")
+		// If vfsRead exists, verify the fragments exist
+		assert.True(t, hasSchema, "vfsRead should have vfsRead.schema.json")
+		assert.True(t, hasDesc, "vfsRead should have vfsRead.md")
 	}
 }
 
@@ -176,18 +176,18 @@ func TestToolCommand_Desc(t *testing.T) {
 	require.NotNil(t, allRole.ToolFragments)
 
 	// Verify tool description exists
-	_, hasDesc := allRole.ToolFragments["vfs.read/vfs.read.md"]
+	_, hasDesc := allRole.ToolFragments["vfsRead/vfsRead.md"]
 	if hasDesc {
-		desc := allRole.ToolFragments["vfs.read/vfs.read.md"]
+		desc := allRole.ToolFragments["vfsRead/vfsRead.md"]
 		assert.NotEmpty(t, desc, "tool description should not be empty")
 	}
 }
 
 func TestOutputToolListTable(t *testing.T) {
 	tools := map[string]string{
-		"vfs.read":  "Reads a file from the local filesystem",
-		"vfs.write": "Writes content to a file",
-		"vfs.ls":    "Lists files in a directory",
+		"vfsRead":  "Reads a file from the local filesystem",
+		"vfsWrite": "Writes content to a file",
+		"vfsList":  "Lists files in a directory",
 	}
 
 	// Capture output
@@ -206,15 +206,15 @@ func TestOutputToolListTable(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, output, "NAME")
 	assert.Contains(t, output, "DESCRIPTION")
-	assert.Contains(t, output, "vfs.read")
-	assert.Contains(t, output, "vfs.write")
-	assert.Contains(t, output, "vfs.ls")
+	assert.Contains(t, output, "vfsRead")
+	assert.Contains(t, output, "vfsWrite")
+	assert.Contains(t, output, "vfsList")
 }
 
 func TestOutputToolListJSON(t *testing.T) {
 	tools := map[string]string{
-		"vfs.read":  "Reads a file from the local filesystem",
-		"vfs.write": "Writes content to a file",
+		"vfsRead":  "Reads a file from the local filesystem",
+		"vfsWrite": "Writes content to a file",
 	}
 
 	// Capture output
@@ -239,9 +239,9 @@ func TestOutputToolListJSON(t *testing.T) {
 	assert.Len(t, result, 2)
 
 	// Verify entries (sorted by name)
-	assert.Equal(t, "vfs.read", result[0].Name)
+	assert.Equal(t, "vfsRead", result[0].Name)
 	assert.Equal(t, "Reads a file from the local filesystem", result[0].Description)
-	assert.Equal(t, "vfs.write", result[1].Name)
+	assert.Equal(t, "vfsWrite", result[1].Name)
 	assert.Equal(t, "Writes content to a file", result[1].Description)
 }
 

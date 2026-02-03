@@ -268,7 +268,7 @@ func TestAppPresenter_Integration(t *testing.T) {
 
 		// Setup LLM responses with tool call
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfs.write","arguments":{"path":"test.txt","content":"Test content"}}}]},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfsWrite","arguments":{"path":"test.txt","content":"Test content"}}}]},"done":false}`,
 			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","done":true,"done_reason":"stop"}`,
 		)
 

@@ -200,9 +200,9 @@ func TestAgentRoleIntegration(t *testing.T) {
 			},
 		},
 		ToolsAccess: map[string]conf.AccessFlag{
-			"vfs.read": conf.AccessAllow,
-			"vfs.ls":   conf.AccessAllow,
-			"**":       conf.AccessDeny,
+			"vfsRead": conf.AccessAllow,
+			"vfsList": conf.AccessAllow,
+			"**":      conf.AccessDeny,
 		},
 	}
 
@@ -332,25 +332,25 @@ func TestAgentRoleIntegration(t *testing.T) {
 		err = session.SetRole("readonly")
 		require.NoError(t, err)
 
-		// Test that vfs.write is denied
+		// Test that vfsWrite is denied
 		writeArgs := tool.NewToolValue(map[string]interface{}{
 			"path":    "test.txt",
 			"content": "content",
 		})
 		writeResponse := session.Tools.Execute(tool.ToolCall{
-			Function:  "vfs.write",
+			Function:  "vfsWrite",
 			Arguments: writeArgs,
 		})
 		assert.Error(t, writeResponse.Error)
 		assert.Contains(t, writeResponse.Error.Error(), "access denied")
 
-		// Test that vfs.read is allowed
+		// Test that vfsRead is allowed
 		mockVFS.WriteFile("existing.txt", []byte("content"))
 		readArgs := tool.NewToolValue(map[string]interface{}{
 			"path": "existing.txt",
 		})
 		readResponse := session.Tools.Execute(tool.ToolCall{
-			Function:  "vfs.read",
+			Function:  "vfsRead",
 			Arguments: readArgs,
 		})
 		assert.NoError(t, readResponse.Error)
@@ -409,7 +409,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			"content": "content",
 		})
 		writeResponse := session.Tools.Execute(tool.ToolCall{
-			Function:  "vfs.write",
+			Function:  "vfsWrite",
 			Arguments: writeArgs1,
 		})
 		assert.NoError(t, writeResponse.Error)
@@ -425,7 +425,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			"content": "content",
 		})
 		writeResponse = session.Tools.Execute(tool.ToolCall{
-			Function:  "vfs.write",
+			Function:  "vfsWrite",
 			Arguments: writeArgs2,
 		})
 		assert.Error(t, writeResponse.Error)

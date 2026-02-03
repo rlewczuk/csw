@@ -16,7 +16,7 @@ func TestRunBashTool_Execute_MissingCommand(t *testing.T) {
 
 	args := ToolCall{
 		ID:        "test-id",
-		Function:  "run.bash",
+		Function:  "runBash",
 		Arguments: NewToolValue(map[string]any{}),
 	}
 
@@ -39,7 +39,7 @@ func TestRunBashTool_Execute_AllowedCommand(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "echo 'test'",
 		}),
@@ -64,7 +64,7 @@ func TestRunBashTool_Execute_DeniedCommand(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "rm -rf /",
 		}),
@@ -88,7 +88,7 @@ func TestRunBashTool_Execute_AskPermission(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "ls -la",
 		}),
@@ -117,7 +117,7 @@ func TestRunBashTool_Execute_ExplicitAskPermission(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "cat file.txt",
 		}),
@@ -145,7 +145,7 @@ func TestRunBashTool_Execute_CommandWithNonZeroExitCode(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "exit 42",
 		}),
@@ -170,7 +170,7 @@ func TestRunBashTool_Execute_CommandWithError(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "timeout command",
 		}),
@@ -230,7 +230,7 @@ func TestRunBashTool_CheckPermission_MostSpecificMatch(t *testing.T) {
 
 			args := ToolCall{
 				ID:       "test-id",
-				Function: "run.bash",
+				Function: "runBash",
 				Arguments: NewToolValue(map[string]any{
 					"command": tt.command,
 				}),
@@ -255,7 +255,7 @@ func TestRunBashTool_CheckPermission_NoPrivileges(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "any command",
 		}),
@@ -274,7 +274,7 @@ func TestRunBashTool_PermissionQuery_Options(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "test command",
 		}),
@@ -306,7 +306,7 @@ func TestRunBashTool_Execute_WithRelativeWorkdir(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "pwd",
 			"workdir": "subdir",
@@ -335,7 +335,7 @@ func TestRunBashTool_Execute_WithAbsoluteWorkdir(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "ls",
 			"workdir": "/absolute/path",
@@ -368,7 +368,7 @@ func TestRunBashTool_Execute_WithTimeout(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "echo test",
 			"timeout": int64(30),
@@ -394,7 +394,7 @@ func TestRunBashTool_Execute_WithInvalidTimeout(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "echo test",
 			"timeout": int64(-5),
@@ -420,7 +420,7 @@ func TestRunBashTool_Execute_WithWorkdirAndTimeout(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "ls",
 			"workdir": "test-dir",
@@ -447,7 +447,7 @@ func TestRunBashTool_Execute_WithoutProjectRoot(t *testing.T) {
 
 	args := ToolCall{
 		ID:       "test-id",
-		Function: "run.bash",
+		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "pwd",
 			"workdir": "subdir",

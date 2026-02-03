@@ -93,7 +93,7 @@ func toolListCommand() *cobra.Command {
 			for key := range toolFragments {
 				// Look for <toolname>.schema.json files to identify tools
 				if strings.HasSuffix(key, ".schema.json") {
-					// Extract tool name from key (e.g., "vfs.read/vfs.read.schema.json" -> "vfs.read")
+					// Extract tool name from key (e.g., "vfsRead/vfsRead.schema.json" -> "vfsRead")
 					parts := strings.Split(key, "/")
 					if len(parts) != 2 {
 						continue

@@ -23,7 +23,7 @@ func TestVFSGrepTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: NewToolValue(map[string]any{
 				"pattern": "hello",
 			}),
@@ -48,7 +48,7 @@ func TestVFSGrepTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
-			Function:  "vfs.grep",
+			Function:  "vfsGrep",
 			Arguments: NewToolValue(nil),
 		})
 
@@ -70,7 +70,7 @@ func TestVFSGrepTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: NewToolValue(map[string]any{
 				"pattern": "hello",
 			}),
@@ -96,7 +96,7 @@ func TestVFSGrepTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: NewToolValue(map[string]any{
 				"pattern": "hello",
 				"path":    "dir1",
@@ -126,7 +126,7 @@ func TestVFSGrepTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: NewToolValue(map[string]any{
 				"pattern": "hello",
 				"include": "*.go",
@@ -158,7 +158,7 @@ func TestVFSGrepTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: NewToolValue(map[string]any{
 				"pattern": "hello",
 				"include": "*.go, *.md",
@@ -189,7 +189,7 @@ func TestVFSGrepTool(t *testing.T) {
 		// Execute with limit of 3
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: NewToolValue(map[string]any{
 				"pattern": "hello",
 				"limit":   3,
@@ -221,7 +221,7 @@ func TestVFSGrepTool(t *testing.T) {
 		// Execute with regex pattern
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: NewToolValue(map[string]any{
 				"pattern": "test[0-9]+",
 			}),
@@ -247,7 +247,7 @@ func TestVFSGrepTool(t *testing.T) {
 		// Execute with invalid regex
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: NewToolValue(map[string]any{
 				"pattern": "[invalid",
 			}),
@@ -272,7 +272,7 @@ func TestVFSGrepTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: NewToolValue(map[string]any{
 				"pattern": "match",
 			}),
@@ -331,7 +331,7 @@ func TestVFSGrepToolIntegration(t *testing.T) {
 		// Execute - search for "main"
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.grep",
+			Function: "vfsGrep",
 			Arguments: NewToolValue(map[string]any{
 				"pattern": "main",
 			}),
@@ -366,7 +366,7 @@ func TestVFSGrepToolTimeout(t *testing.T) {
 		go func() {
 			response := tool.Execute(ToolCall{
 				ID:       "test-id",
-				Function: "vfs.grep",
+				Function: "vfsGrep",
 				Arguments: NewToolValue(map[string]any{
 					"pattern": "line",
 				}),

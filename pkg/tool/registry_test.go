@@ -120,8 +120,8 @@ func TestRegisterVFSTools(t *testing.T) {
 	RegisterVFSTools(registry, mockVFS)
 
 	// Test that all VFS tools are registered
-	// Note: vfs.delete and vfs.move are currently disabled
-	vfsTools := []string{"vfs.read", "vfs.write", "vfs.edit", "vfs.ls", "vfs.find", "vfs.grep"}
+	// Note: vfsDelete and vfsMode are currently disabled
+	vfsTools := []string{"vfsRead", "vfsWrite", "vfsEdit", "vfsList", "vfsFind", "vfsGrep"}
 
 	for _, toolName := range vfsTools {
 		tool, err := registry.Get(toolName)
@@ -139,7 +139,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	// Test writing a file
 	writeArgs := ToolCall{
 		ID:       "write-id",
-		Function: "vfs.write",
+		Function: "vfsWrite",
 		Arguments: NewToolValue(map[string]any{
 			"path":    "test.txt",
 			"content": "Hello, World!",
@@ -154,7 +154,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	// Test reading the file
 	readArgs := ToolCall{
 		ID:       "read-id",
-		Function: "vfs.read",
+		Function: "vfsRead",
 		Arguments: NewToolValue(map[string]any{
 			"path": "test.txt",
 		}),
@@ -170,7 +170,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	// Test listing files
 	listArgs := ToolCall{
 		ID:       "list-id",
-		Function: "vfs.ls",
+		Function: "vfsList",
 		Arguments: NewToolValue(map[string]any{
 			"path": ".",
 		}),

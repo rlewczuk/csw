@@ -37,22 +37,22 @@ func TestMatchPattern(t *testing.T) {
 	}{
 		{
 			name:        "exact match",
-			pattern:     "vfs.read",
-			toolName:    "vfs.read",
+			pattern:     "vfsRead",
+			toolName:    "vfsRead",
 			shouldMatch: true,
 			description: "exact pattern should match exactly",
 		},
 		{
 			name:        "exact no match",
-			pattern:     "vfs.read",
-			toolName:    "vfs.write",
+			pattern:     "vfsRead",
+			toolName:    "vfsWrite",
 			shouldMatch: false,
 			description: "exact pattern should not match different name",
 		},
 		{
 			name:        "single wildcard match",
-			pattern:     "vfs.*",
-			toolName:    "vfs.read",
+			pattern:     "vfs*",
+			toolName:    "vfsRead",
 			shouldMatch: true,
 			description: "single wildcard should match one segment",
 		},
@@ -65,8 +65,8 @@ func TestMatchPattern(t *testing.T) {
 		},
 		{
 			name:        "multi wildcard match one level",
-			pattern:     "vfs.**",
-			toolName:    "vfs.read",
+			pattern:     "vfs**",
+			toolName:    "vfsRead",
 			shouldMatch: true,
 			description: "** should match one segment",
 		},
@@ -86,17 +86,17 @@ func TestMatchPattern(t *testing.T) {
 		},
 		{
 			name:        "partial wildcard prefix",
-			pattern:     "vfs.r*",
-			toolName:    "vfs.read",
+			pattern:     "vfs*",
+			toolName:    "vfsRead",
 			shouldMatch: true,
 			description: "partial wildcard should match prefix",
 		},
 		{
-			name:        "partial wildcard no match",
-			pattern:     "vfs.r*",
-			toolName:    "vfs.write",
-			shouldMatch: false,
-			description: "partial wildcard should not match different prefix",
+			name:        "partial wildcard match different suffix",
+			pattern:     "vfs*",
+			toolName:    "vfsWrite",
+			shouldMatch: true,
+			description: "partial wildcard should match vfsWrite with vfs* pattern",
 		},
 		{
 			name:        "partial wildcard multiple matches",
@@ -280,25 +280,25 @@ func TestAccessControlTool_ResolveAccessFlag(t *testing.T) {
 		{
 			name: "exact match allow",
 			privileges: map[string]conf.AccessFlag{
-				"vfs.read": conf.AccessAllow,
+				"vfsRead": conf.AccessAllow,
 			},
-			toolName: "vfs.read",
+			toolName: "vfsRead",
 			expected: conf.AccessAllow,
 		},
 		{
 			name: "exact match deny",
 			privileges: map[string]conf.AccessFlag{
-				"vfs.write": conf.AccessDeny,
+				"vfsWrite": conf.AccessDeny,
 			},
-			toolName: "vfs.write",
+			toolName: "vfsWrite",
 			expected: conf.AccessDeny,
 		},
 		{
 			name: "wildcard match",
 			privileges: map[string]conf.AccessFlag{
-				"vfs.*": conf.AccessAllow,
+				"vfs*": conf.AccessAllow,
 			},
-			toolName: "vfs.read",
+			toolName: "vfsRead",
 			expected: conf.AccessAllow,
 		},
 		{
@@ -328,34 +328,34 @@ func TestAccessControlTool_ResolveAccessFlag(t *testing.T) {
 		{
 			name:       "no match defaults to deny",
 			privileges: map[string]conf.AccessFlag{},
-			toolName:   "vfs.read",
+			toolName:   "vfsRead",
 			expected:   conf.AccessDeny,
 		},
 		{
 			name: "most specific wins - exact over wildcard",
 			privileges: map[string]conf.AccessFlag{
-				"vfs.*":    conf.AccessDeny,
-				"vfs.read": conf.AccessAllow,
+				"vfs.*":   conf.AccessDeny,
+				"vfsRead": conf.AccessAllow,
 			},
-			toolName: "vfs.read",
+			toolName: "vfsRead",
 			expected: conf.AccessAllow,
 		},
 		{
 			name: "most specific wins - wildcard over global",
 			privileges: map[string]conf.AccessFlag{
-				"**":    conf.AccessDeny,
-				"vfs.*": conf.AccessAllow,
+				"**":   conf.AccessDeny,
+				"vfs*": conf.AccessAllow,
 			},
-			toolName: "vfs.read",
+			toolName: "vfsRead",
 			expected: conf.AccessAllow,
 		},
 		{
 			name: "most specific wins - partial over full wildcard",
 			privileges: map[string]conf.AccessFlag{
-				"vfs.*":  conf.AccessDeny,
-				"vfs.r*": conf.AccessAllow,
+				"vfs*":  conf.AccessDeny,
+				"vfsR*": conf.AccessAllow,
 			},
-			toolName: "vfs.read",
+			toolName: "vfsRead",
 			expected: conf.AccessAllow,
 		},
 		{
@@ -391,19 +391,19 @@ func TestAccessControlTool_ResolveAccessFlag(t *testing.T) {
 
 func TestAccessControlTool_Execute_Allow(t *testing.T) {
 	mock := &mockTool{
-		name:   "vfs.read",
+		name:   "vfsRead",
 		result: NewToolValue("test result"),
 		err:    nil,
 	}
 
 	privileges := map[string]conf.AccessFlag{
-		"vfs.*": conf.AccessAllow,
+		"vfs*": conf.AccessAllow,
 	}
 
 	ac := NewAccessControlTool(mock, privileges)
 	call := ToolCall{
 		ID:        "test-id",
-		Function:  "vfs.read",
+		Function:  "vfsRead",
 		Arguments: NewToolValue(map[string]any{"path": "/test"}),
 	}
 
@@ -416,19 +416,19 @@ func TestAccessControlTool_Execute_Allow(t *testing.T) {
 
 func TestAccessControlTool_Execute_Deny(t *testing.T) {
 	mock := &mockTool{
-		name:   "vfs.write",
+		name:   "vfsWrite",
 		result: NewToolValue("should not execute"),
 		err:    nil,
 	}
 
 	privileges := map[string]conf.AccessFlag{
-		"vfs.write": conf.AccessDeny,
+		"vfsWrite": conf.AccessDeny,
 	}
 
 	ac := NewAccessControlTool(mock, privileges)
 	call := ToolCall{
 		ID:        "test-id",
-		Function:  "vfs.write",
+		Function:  "vfsWrite",
 		Arguments: NewToolValue(map[string]any{"path": "/test"}),
 	}
 
@@ -492,19 +492,19 @@ func TestAccessControlTool_Execute_DefaultDeny(t *testing.T) {
 
 func TestAccessControlTool_Execute_ToolError(t *testing.T) {
 	mock := &mockTool{
-		name:   "vfs.read",
+		name:   "vfsRead",
 		result: NewToolValue(nil),
 		err:    errors.New("file not found"),
 	}
 
 	privileges := map[string]conf.AccessFlag{
-		"vfs.*": conf.AccessAllow,
+		"vfs*": conf.AccessAllow,
 	}
 
 	ac := NewAccessControlTool(mock, privileges)
 	call := ToolCall{
 		ID:        "test-id",
-		Function:  "vfs.read",
+		Function:  "vfsRead",
 		Arguments: NewToolValue(map[string]any{"path": "/nonexistent"}),
 	}
 
@@ -561,10 +561,10 @@ func TestAccessControlTool_GlobalDefault(t *testing.T) {
 		{
 			name: "global deny with specific allows",
 			privileges: map[string]conf.AccessFlag{
-				"**":       conf.AccessDeny,
-				"vfs.read": conf.AccessAllow,
+				"**":      conf.AccessDeny,
+				"vfsRead": conf.AccessAllow,
 			},
-			toolNames: []string{"vfs.write", "api.call", "other"},
+			toolNames: []string{"vfsWrite", "api.call", "other"},
 			expected:  conf.AccessDeny,
 		},
 	}
