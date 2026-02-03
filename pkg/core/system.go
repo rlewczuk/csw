@@ -43,6 +43,10 @@ type SweSystem struct {
 	// LSP client for code validation and analysis (optional, can be nil)
 	LSP lsp.LSP
 
+	// ConfigStore for accessing global configuration (optional, can be nil)
+	// Used to determine default role and other global settings
+	ConfigStore conf.ConfigStore
+
 	// Map of sessions by ID
 	sessions map[string]*SweSession
 
@@ -144,6 +148,29 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 	// Register session-specific tools (like todo tools)
 	session.registerSessionTools()
 
+	// Set default role automatically using fallback chain:
+	// 1. Global config default role
+	// 2. Hardcoded "developer" role
+	defaultRole, err := s.resolveDefaultRole()
+	if err == nil && defaultRole != "" {
+		// Attempt to set the default role
+		// If this fails (role not found), we'll continue without a role
+		// and let the caller decide whether to set a role explicitly
+		if err := session.SetRole(defaultRole); err != nil {
+			// Log the error but don't fail session creation
+			if sessionLogger != nil {
+				sessionLogger.Warn("failed to set default role",
+					"role", defaultRole,
+					"error", err,
+				)
+			}
+		} else {
+			if sessionLogger != nil {
+				sessionLogger.Info("default_role_set", "role", defaultRole)
+			}
+		}
+	}
+
 	// Store session
 	s.sessionsMu.Lock()
 	if s.sessions == nil {
@@ -153,6 +180,36 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 	s.sessionsMu.Unlock()
 
 	return session, nil
+}
+
+// resolveDefaultRole determines the default role to use for new sessions.
+// It uses the following fallback chain:
+// 1. Default role from global config (if ConfigStore is set)
+// 2. Hardcoded "developer" role
+// Returns empty string if no default role can be resolved.
+func (s *SweSystem) resolveDefaultRole() (string, error) {
+	// Try to get default role from global config
+	if s.ConfigStore != nil {
+		globalConfig, err := s.ConfigStore.GetGlobalConfig()
+		if err == nil && globalConfig != nil && globalConfig.DefaultRole != "" {
+			// Verify the role exists in the registry
+			if s.Roles != nil {
+				if _, ok := s.Roles.Get(globalConfig.DefaultRole); ok {
+					return globalConfig.DefaultRole, nil
+				}
+			}
+		}
+	}
+
+	// Fallback to hardcoded "developer" role
+	if s.Roles != nil {
+		if _, ok := s.Roles.Get("developer"); ok {
+			return "developer", nil
+		}
+	}
+
+	// If no role can be resolved, return empty string
+	return "", nil
 }
 
 // GetSession returns the session with the given ID.

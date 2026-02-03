@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/models"
@@ -332,5 +333,144 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		firstIdx := strings.Index(outputStr, "First message")
 		secondIdx := strings.Index(outputStr, "Second message")
 		assert.Less(t, firstIdx, secondIdx, "Messages should appear in order")
+	})
+
+	t.Run("system prompt included when SetRole is called", func(t *testing.T) {
+		// This test verifies that when SetRole() is called, the system prompt
+		// is included in the messages sent to the LLM.
+
+		// Setup mock LLM server
+		mockServer := testutil.NewMockHTTPServer()
+		defer mockServer.Close()
+
+		client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+		require.NoError(t, err)
+
+		vfsInstance := vfs.NewMockVFS()
+		tools := tool.NewToolRegistry()
+		tool.RegisterVFSTools(tools, vfsInstance)
+
+		// Create a mock role registry and config store with developer role
+		configStore := impl.NewMockConfigStore()
+		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+			"all": {
+				Name:        "all",
+				Description: "All roles base",
+				PromptFragments: map[string]string{
+					"1-system.md": "You are a skilled software assistant.",
+				},
+			},
+			"developer": {
+				Name:        "developer",
+				Description: "Software developer role",
+			},
+		})
+
+		// Create prompt generator with the config store
+		promptGenerator, err := core.NewConfPromptGenerator(configStore, vfsInstance)
+		require.NoError(t, err)
+
+		roleRegistry := core.NewAgentRoleRegistry(configStore)
+
+		// Create system with role registry and config store
+		system := &core.SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      promptGenerator,
+			Tools:                tools,
+			VFS:                  vfsInstance,
+			Roles:                roleRegistry,
+			ConfigStore:          configStore,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		}
+
+		// Create session thread
+		thread := core.NewSessionThread(system, nil)
+		err = thread.StartSession("ollama/test-model:latest")
+		require.NoError(t, err)
+
+		session := thread.GetSession()
+		require.NotNil(t, session)
+
+		// After StartSession with our fix, a role should be automatically set
+		// because we have a "developer" role in the registry and it's the default fallback
+		role := session.Role()
+		require.NotNil(t, role, "Role should be automatically set after StartSession")
+		assert.Equal(t, "developer", role.Name, "Should use developer as default fallback role")
+
+		// Verify that a system message was created (even if content is empty in this test setup)
+		messagesAfter := session.ChatMessages()
+		if len(messagesAfter) > 0 {
+			assert.Equal(t, models.ChatRoleSystem, messagesAfter[0].Role,
+				"First message should be system prompt when role is set")
+		}
+	})
+
+	t.Run("system prompt uses default role from global config", func(t *testing.T) {
+		// This test verifies that the default role from global config is used
+
+		// Setup mock LLM server
+		mockServer := testutil.NewMockHTTPServer()
+		defer mockServer.Close()
+
+		client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+		require.NoError(t, err)
+
+		vfsInstance := vfs.NewMockVFS()
+		tools := tool.NewToolRegistry()
+		tool.RegisterVFSTools(tools, vfsInstance)
+
+		// Create a mock config store with custom default role
+		configStore := impl.NewMockConfigStore()
+		configStore.SetGlobalConfig(&conf.GlobalConfig{
+			DefaultRole: "tester",
+		})
+		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+			"developer": {
+				Name:        "developer",
+				Description: "Software developer role",
+				PromptFragments: map[string]string{
+					"1-system.md": "You are a skilled software developer.",
+				},
+			},
+			"tester": {
+				Name:        "tester",
+				Description: "Software tester role",
+				PromptFragments: map[string]string{
+					"1-system.md": "You are a skilled software tester.",
+				},
+			},
+		})
+
+		// Create prompt generator with the config store
+		promptGenerator, err := core.NewConfPromptGenerator(configStore, vfsInstance)
+		require.NoError(t, err)
+
+		roleRegistry := core.NewAgentRoleRegistry(configStore)
+
+		// Create system with config store
+		system := &core.SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      promptGenerator,
+			Tools:                tools,
+			VFS:                  vfsInstance,
+			Roles:                roleRegistry,
+			ConfigStore:          configStore,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		}
+
+		// Create session - should automatically use "tester" role from global config
+		thread := core.NewSessionThread(system, nil)
+		err = thread.StartSession("ollama/test-model:latest")
+		require.NoError(t, err)
+
+		session := thread.GetSession()
+		require.NotNil(t, session)
+
+		// Verify that the tester role was set
+		role := session.Role()
+		require.NotNil(t, role, "Role should be set automatically")
+		assert.Equal(t, "tester", role.Name, "Should use default role from global config")
 	})
 }

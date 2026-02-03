@@ -572,3 +572,9 @@ func (g *ConfPromptGenerator) GetAgentFiles(dir string) (map[string]string, erro
 
 	return result, nil
 }
+
+// GetConfigStore returns the underlying config store.
+// This is useful for accessing global configuration like default role.
+func (g *ConfPromptGenerator) GetConfigStore() conf.ConfigStore {
+	return g.store
+}

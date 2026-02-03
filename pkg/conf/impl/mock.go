@@ -97,7 +97,9 @@ func (m *MockConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 
 	// Return a copy
 	config := &conf.GlobalConfig{
-		ModelTags: make([]conf.ModelTagMapping, len(m.globalConfig.ModelTags)),
+		ModelTags:       make([]conf.ModelTagMapping, len(m.globalConfig.ModelTags)),
+		DefaultProvider: m.globalConfig.DefaultProvider,
+		DefaultRole:     m.globalConfig.DefaultRole,
 	}
 	copy(config.ModelTags, m.globalConfig.ModelTags)
 
