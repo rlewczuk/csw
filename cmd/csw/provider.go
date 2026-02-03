@@ -254,37 +254,38 @@ func providerSetDefaultCommand(scope *ConfigScope) *cobra.Command {
 }
 
 func providerTestCommand(scope *ConfigScope) *cobra.Command {
-	return &cobra.Command{
+	var useStreaming bool
+
+	cmd := &cobra.Command{
 		Use:   "test <provider-name> <model-name>",
 		Short: "Test a provider",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Silence usage message on errors
+			cmd.SilenceUsage = true
+
 			providerName := args[0]
 			modelName := args[1]
 
 			// Use composite config to get provider configuration from all sources
 			store, err := GetCompositeConfigStore()
 			if err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
 			configs, err := store.GetModelProviderConfigs()
 			if err != nil {
-				cmd.SilenceUsage = true
 				return fmt.Errorf("providerTestCommand() [provider.go]: failed to get provider configs: %w", err)
 			}
 
 			config, exists := configs[providerName]
 			if !exists {
-				cmd.SilenceUsage = true
 				return fmt.Errorf("providerTestCommand() [provider.go]: provider not found: %s", providerName)
 			}
 
 			// Create provider
 			provider, err := models.ModelFromConfig(config)
 			if err != nil {
-				cmd.SilenceUsage = true
 				return fmt.Errorf("providerTestCommand() [provider.go]: failed to create provider: %w", err)
 			}
 
@@ -295,16 +296,58 @@ func providerTestCommand(scope *ConfigScope) *cobra.Command {
 			fmt.Printf("Testing provider '%s' with model '%s'...\n\n", providerName, modelName)
 
 			message := models.NewTextMessage(models.ChatRoleUser, "Please introduce yourself in one sentence.")
-			response, err := chatModel.Chat(context.Background(), []*models.ChatMessage{message}, nil, nil)
-			if err != nil {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("providerTestCommand() [provider.go]: chat failed: %w", err)
+
+			if useStreaming {
+				// Use ChatStream for streaming response
+				fmt.Print("Response: ")
+				stream := chatModel.ChatStream(context.Background(), []*models.ChatMessage{message}, nil, nil)
+				hasContent := false
+				for fragment := range stream {
+					fmt.Print(fragment.GetText())
+					hasContent = true
+				}
+				fmt.Println()
+
+				// If no content was received, it likely means there was an error
+				if !hasContent {
+					fmt.Fprintf(os.Stderr, "\nNo response received from the model. This usually indicates an error occurred.\n")
+					fmt.Fprintf(os.Stderr, "Common causes:\n")
+					fmt.Fprintf(os.Stderr, "  - Invalid API key or authentication failure\n")
+					fmt.Fprintf(os.Stderr, "  - Incorrect API endpoint URL\n")
+					fmt.Fprintf(os.Stderr, "  - Model name not supported by the provider\n")
+					fmt.Fprintf(os.Stderr, "  - Network connectivity issues\n")
+					fmt.Fprintf(os.Stderr, "\nCheck the error messages above for more details.\n")
+					return fmt.Errorf("providerTestCommand() [provider.go]: no response received from model")
+				}
+			} else {
+				// Use Chat for non-streaming response
+				response, err := chatModel.Chat(context.Background(), []*models.ChatMessage{message}, nil, nil)
+				if err != nil {
+					return fmt.Errorf("providerTestCommand() [provider.go]: chat request failed: %w", err)
+				}
+
+				responseText := response.GetText()
+				if responseText == "" {
+					fmt.Fprintf(os.Stderr, "\nNo response received from the model. This usually indicates an error occurred.\n")
+					fmt.Fprintf(os.Stderr, "Common causes:\n")
+					fmt.Fprintf(os.Stderr, "  - Invalid API key or authentication failure\n")
+					fmt.Fprintf(os.Stderr, "  - Incorrect API endpoint URL\n")
+					fmt.Fprintf(os.Stderr, "  - Model name not supported by the provider\n")
+					fmt.Fprintf(os.Stderr, "  - Network connectivity issues\n")
+					fmt.Fprintf(os.Stderr, "\nCheck the error messages above for more details.\n")
+					return fmt.Errorf("providerTestCommand() [provider.go]: no response received from model")
+				}
+
+				fmt.Printf("Response: %s\n", responseText)
 			}
 
-			fmt.Printf("Response: %s\n", response.GetText())
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&useStreaming, "streaming", false, "Use streaming mode (ChatStream)")
+
+	return cmd
 }
 
 func providerModelsCommand(useJSON *bool) *cobra.Command {
