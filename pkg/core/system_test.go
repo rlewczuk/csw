@@ -503,3 +503,91 @@ func TestSweSystemShutdown(t *testing.T) {
 		assert.Empty(t, system.ListSessions())
 	})
 }
+
+func TestSystemStreamingConfiguration(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+
+	vfs := vfs.NewMockVFS()
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfs)
+
+	t.Run("session uses streaming from provider config", func(t *testing.T) {
+		// Create provider with streaming enabled
+		streamingEnabled := true
+		config := &conf.ModelProviderConfig{
+			Type:      "ollama",
+			Name:      "ollama",
+			URL:       mockServer.URL(),
+			Streaming: &streamingEnabled,
+		}
+		client, err := models.NewOllamaClient(config)
+		require.NoError(t, err)
+
+		system := &SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfs,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		assert.True(t, session.streaming)
+	})
+
+	t.Run("session uses non-streaming from provider config", func(t *testing.T) {
+		// Create provider with streaming disabled
+		streamingDisabled := false
+		config := &conf.ModelProviderConfig{
+			Type:      "ollama",
+			Name:      "ollama",
+			URL:       mockServer.URL(),
+			Streaming: &streamingDisabled,
+		}
+		client, err := models.NewOllamaClient(config)
+		require.NoError(t, err)
+
+		system := &SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfs,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		assert.False(t, session.streaming)
+	})
+
+	t.Run("session defaults to streaming when not configured", func(t *testing.T) {
+		// Create provider without streaming config
+		config := &conf.ModelProviderConfig{
+			Type: "ollama",
+			Name: "ollama",
+			URL:  mockServer.URL(),
+		}
+		client, err := models.NewOllamaClient(config)
+		require.NoError(t, err)
+
+		system := &SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfs,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		assert.True(t, session.streaming, "Should default to streaming mode for backward compatibility")
+	})
+}

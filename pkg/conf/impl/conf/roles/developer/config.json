@@ -3,10 +3,10 @@
   "vfs-privileges": {
     "**": {
       "read": "allow",
-      "write": "ask",
+      "write": "allow",
       "delete": "ask",
-      "list": "ask",
-      "find": "ask",
+      "list": "allow",
+      "find": "allow",
       "move": "ask"
     },
     "/**": {

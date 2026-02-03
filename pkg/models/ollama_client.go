@@ -25,6 +25,7 @@ type OllamaClient struct {
 	baseURL    string
 	httpClient *http.Client
 	model      string
+	config     *conf.ModelProviderConfig
 }
 
 // OllamaChatModel is a chat model implementation for Ollama
@@ -76,6 +77,7 @@ func NewOllamaClient(config *conf.ModelProviderConfig) (*OllamaClient, error) {
 	return &OllamaClient{
 		baseURL:    strings.TrimSuffix(config.URL, "/"),
 		httpClient: httpClient,
+		config:     config,
 	}, nil
 }
 
@@ -93,7 +95,14 @@ func NewOllamaClientWithHTTPClient(baseURL string, httpClient *http.Client) (*Ol
 	return &OllamaClient{
 		baseURL:    strings.TrimSuffix(baseURL, "/"),
 		httpClient: httpClient,
+		config:     nil, // No config for test clients
 	}, nil
+}
+
+// GetConfig returns the provider configuration for this client.
+// Returns nil if client was created without config (e.g., in tests).
+func (c *OllamaClient) GetConfig() *conf.ModelProviderConfig {
+	return c.config
 }
 
 // SetModel sets the model to use for chat and embedding operations
