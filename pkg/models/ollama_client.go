@@ -112,10 +112,21 @@ func (c *OllamaClient) SetModel(model string) {
 
 // ChatModel returns a ChatModel implementation for the given model and options
 func (c *OllamaClient) ChatModel(model string, options *ChatOptions) ChatModel {
+	// Merge config verbose flag with provided options
+	mergedOptions := options
+	if c.config != nil && c.config.Verbose {
+		if mergedOptions == nil {
+			mergedOptions = &ChatOptions{}
+		}
+		// Config verbose flag sets default, but explicit option overrides
+		if !mergedOptions.Verbose {
+			mergedOptions.Verbose = c.config.Verbose
+		}
+	}
 	return &OllamaChatModel{
 		client:  c,
 		model:   model,
-		options: options,
+		options: mergedOptions,
 	}
 }
 
@@ -218,19 +229,33 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	}
 	req.Header.Set("Content-Type", "application/json")
 
+	// Print verbose request output if enabled
+	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
+
 	resp, err := m.client.httpClient.Do(req)
 	if err != nil {
 		return nil, m.client.handleHTTPError(err)
 	}
 	defer resp.Body.Close()
 
+	// Log response before checking status (so errors are also logged)
+	if err := wrapResponseBodyForLogging(resp, effectiveOptions != nil && effectiveOptions.Verbose); err != nil {
+		return nil, err
+	}
+
 	if err := m.client.checkStatusCode(resp); err != nil {
 		return nil, err
 	}
 
+	// Read the response body (already logged if verbose)
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
 	// Ollama sends multiple JSON objects even with stream=false
 	// We need to read all of them and merge the results
-	decoder := json.NewDecoder(resp.Body)
+	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
 	var mergedMessage OllamaMessage
 	mergedMessage.Role = "assistant"
 
@@ -321,12 +346,18 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 		}
 		req.Header.Set("Content-Type", "application/json")
 
+		// Print verbose request output if enabled
+		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
+
 		resp, err := m.client.httpClient.Do(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: OllamaChatModel.ChatStream() [ollama_client.go]: HTTP request failed: %v\n", err)
 			return
 		}
 		defer resp.Body.Close()
+
+		// Log response headers before checking status (so errors are also logged)
+		logVerboseStreamResponseHeaders(resp, effectiveOptions != nil && effectiveOptions.Verbose)
 
 		if err := m.client.checkStatusCode(resp); err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: OllamaChatModel.ChatStream() [ollama_client.go]: API error (status %d): %v\n", resp.StatusCode, err)
@@ -346,9 +377,23 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 			var chatResp OllamaChatResponse
 			if err := decoder.Decode(&chatResp); err != nil {
 				if err == io.EOF {
+					if effectiveOptions != nil && effectiveOptions.Verbose {
+						fmt.Println("=== End of Streaming Response ===")
+						fmt.Println()
+					}
 					return
 				}
+				if effectiveOptions != nil && effectiveOptions.Verbose {
+					fmt.Println("=== End of Streaming Response ===")
+					fmt.Println()
+				}
 				return
+			}
+
+			// Print verbose JSON chunk
+			if effectiveOptions != nil && effectiveOptions.Verbose {
+				jsonBytes, _ := json.Marshal(chatResp)
+				fmt.Println(string(jsonBytes))
 			}
 
 			// Convert the streamed message to ChatMessage
@@ -356,6 +401,10 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 
 			// Check if this is the final message
 			if chatResp.Done {
+				if effectiveOptions != nil && effectiveOptions.Verbose {
+					fmt.Println("=== End of Streaming Response ===")
+					fmt.Println()
+				}
 				// Yield the final fragment if it has content or tool calls
 				if len(result.Parts) > 0 && (result.GetText() != "" || len(result.GetToolCalls()) > 0) {
 					if !yield(result) {

@@ -45,6 +45,7 @@ type ChatOptions struct {
 	Temperature float32
 	TopP        float32
 	TopK        int
+	Verbose     bool
 }
 
 // ChatMessagePart represents a part of a chat message. A message can contain text, tool calls, or tool responses.

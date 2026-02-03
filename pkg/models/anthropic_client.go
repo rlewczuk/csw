@@ -117,10 +117,21 @@ func (c *AnthropicClient) GetConfig() *conf.ModelProviderConfig {
 
 // ChatModel returns a ChatModel implementation for the given model and options
 func (c *AnthropicClient) ChatModel(model string, options *ChatOptions) ChatModel {
+	// Merge config verbose flag with provided options
+	mergedOptions := options
+	if c.config != nil && c.config.Verbose {
+		if mergedOptions == nil {
+			mergedOptions = &ChatOptions{}
+		}
+		// Config verbose flag sets default, but explicit option overrides
+		if !mergedOptions.Verbose {
+			mergedOptions.Verbose = c.config.Verbose
+		}
+	}
 	return &AnthropicChatModel{
 		client:  c,
 		model:   model,
-		options: options,
+		options: mergedOptions,
 	}
 }
 
@@ -253,18 +264,32 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	req.Header.Set("x-api-key", m.client.apiKey)
 	req.Header.Set("anthropic-version", m.client.apiVersion)
 
+	// Print verbose request output if enabled
+	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
+
 	resp, err := m.client.httpClient.Do(req)
 	if err != nil {
 		return nil, m.client.handleHTTPError(err)
 	}
 	defer resp.Body.Close()
 
+	// Log response before checking status (so errors are also logged)
+	if err := wrapResponseBodyForLogging(resp, effectiveOptions != nil && effectiveOptions.Verbose); err != nil {
+		return nil, err
+	}
+
 	if err := m.client.checkStatusCode(resp); err != nil {
 		return nil, err
 	}
 
+	// Read the response body (already logged if verbose)
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
 	var chatResp AnthropicMessagesResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
+	if err := json.Unmarshal(bodyBytes, &chatResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
@@ -357,12 +382,18 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		req.Header.Set("x-api-key", m.client.apiKey)
 		req.Header.Set("anthropic-version", m.client.apiVersion)
 
+		// Print verbose request output if enabled
+		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
+
 		resp, err := m.client.httpClient.Do(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: AnthropicChatModel.ChatStream() [anthropic_client.go]: HTTP request failed: %v\n", err)
 			return
 		}
 		defer resp.Body.Close()
+
+		// Log response headers before checking status (so errors are also logged)
+		logVerboseStreamResponseHeaders(resp, effectiveOptions != nil && effectiveOptions.Verbose)
 
 		if err := m.client.checkStatusCode(resp); err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: AnthropicChatModel.ChatStream() [anthropic_client.go]: API error (status %d): %v\n", resp.StatusCode, err)
@@ -381,6 +412,11 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			}
 
 			line := scanner.Text()
+
+			// Print raw line in verbose mode
+			if effectiveOptions != nil && effectiveOptions.Verbose {
+				fmt.Println(line)
+			}
 
 			// Skip empty lines
 			if line == "" {
@@ -449,6 +485,10 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 						return
 					}
 				case "message_stop":
+					if effectiveOptions != nil && effectiveOptions.Verbose {
+						fmt.Println("=== End of Streaming Response ===")
+						fmt.Println()
+					}
 					return
 				}
 			}
@@ -456,6 +496,10 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 
 		// Check for scanner error
 		if err := scanner.Err(); err != nil {
+			if effectiveOptions != nil && effectiveOptions.Verbose {
+				fmt.Println("=== End of Streaming Response ===")
+				fmt.Println()
+			}
 			return
 		}
 	}

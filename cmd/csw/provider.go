@@ -255,6 +255,7 @@ func providerSetDefaultCommand(scope *ConfigScope) *cobra.Command {
 
 func providerTestCommand(scope *ConfigScope) *cobra.Command {
 	var useStreaming bool
+	var verbose bool
 
 	cmd := &cobra.Command{
 		Use:   "test <provider-name> <model-name>",
@@ -289,8 +290,13 @@ func providerTestCommand(scope *ConfigScope) *cobra.Command {
 				return fmt.Errorf("providerTestCommand() [provider.go]: failed to create provider: %w", err)
 			}
 
+			// Create chat options with verbose flag
+			options := &models.ChatOptions{
+				Verbose: verbose,
+			}
+
 			// Create chat model
-			chatModel := provider.ChatModel(modelName, nil)
+			chatModel := provider.ChatModel(modelName, options)
 
 			// Send test message
 			fmt.Printf("Testing provider '%s' with model '%s'...\n\n", providerName, modelName)
@@ -346,6 +352,7 @@ func providerTestCommand(scope *ConfigScope) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&useStreaming, "streaming", false, "Use streaming mode (ChatStream)")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "Print raw response and headers")
 
 	return cmd
 }
