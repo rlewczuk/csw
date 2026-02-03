@@ -1,0 +1,11 @@
+name: developer
+description: Developer role for testing
+vfs-privileges:
+  "**":
+    read: allow
+    write: allow
+    delete: ask
+    list: allow
+    find: allow
+tools-access:
+  "**": allow
