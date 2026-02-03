@@ -68,7 +68,7 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 		// Populate mock server with LLM responses
 		// First response: assistant makes a tool call to write the file
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfs.write","arguments":{"path":"hello_world.py","content":"print(\"Hello World\")\n"}}}]},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfsWrite","arguments":{"path":"hello_world.py","content":"print(\"Hello World\")\n"}}}]},"done":false}`,
 			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 		)
 
@@ -108,7 +108,7 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 		// Populate mock server with LLM responses
 		// First response: assistant makes a tool call to write the file
 		mockServer.AddStreamingResponse("/api/chat", "POST", false,
-			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfs.write","arguments":{"path":"test.txt","content":"test content"}}}]},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","tool_calls":[{"function":{"name":"vfsWrite","arguments":{"path":"test.txt","content":"test content"}}}]},"done":false}`,
 			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 		)
 
@@ -131,7 +131,7 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 		assert.NotEmpty(t, mockHandler.ToolCallDetails, "should have captured tool call details")
 		// Should have tool call result
 		assert.NotEmpty(t, mockHandler.ToolCallResults, "should have captured tool call result")
-		assert.Equal(t, "vfs.write", mockHandler.ToolCallResults[0].Call.Function)
+		assert.Equal(t, "vfsWrite", mockHandler.ToolCallResults[0].Call.Function)
 		// Should have markdown chunks from the final response
 		assert.NotEmpty(t, mockHandler.MarkdownChunks, "should have captured markdown chunks")
 		assert.Contains(t, mockHandler.MarkdownChunks, "File created successfully.")

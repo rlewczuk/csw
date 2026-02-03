@@ -10,7 +10,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
-// VFSReadTool implements the vfs.read tool.
+// VFSReadTool implements the vfsRead tool.
 type VFSReadTool struct {
 	vfs         vfs.VFS
 	lineNumbers bool
@@ -107,7 +107,7 @@ func createPermissionQuery(args ToolCall, path, action, op string) ToolResponse 
 	}
 }
 
-// VFSWriteTool implements the vfs.write tool.
+// VFSWriteTool implements the vfsWrite tool.
 type VFSWriteTool struct {
 	vfs vfs.VFS
 	lsp lsp.LSP
@@ -186,7 +186,7 @@ func (t *VFSWriteTool) Execute(args ToolCall) ToolResponse {
 	}
 }
 
-// VFSDeleteTool implements the vfs.delete tool.
+// VFSDeleteTool implements the vfsDelete tool.
 type VFSDeleteTool struct {
 	vfs vfs.VFS
 }
@@ -228,7 +228,7 @@ func (t *VFSDeleteTool) Execute(args ToolCall) ToolResponse {
 	}
 }
 
-// VFSListTool implements the vfs.ls tool.
+// VFSListTool implements the vfsList tool.
 type VFSListTool struct {
 	vfs vfs.VFS
 }
@@ -280,7 +280,7 @@ func (t *VFSListTool) Execute(args ToolCall) ToolResponse {
 	}
 }
 
-// VFSMoveTool implements the vfs.move tool.
+// VFSMoveTool implements the vfsMode tool.
 type VFSMoveTool struct {
 	vfs vfs.VFS
 }
@@ -331,7 +331,7 @@ func (t *VFSMoveTool) Execute(args ToolCall) ToolResponse {
 	}
 }
 
-// VFSFindTool implements the vfs.find tool.
+// VFSFindTool implements the vfsFind tool.
 type VFSFindTool struct {
 	vfs vfs.VFS
 }
@@ -385,7 +385,7 @@ func (t *VFSFindTool) Execute(args ToolCall) ToolResponse {
 	}
 }
 
-// VFSEditTool implements the vfs.edit tool.
+// VFSEditTool implements the vfsEdit tool.
 type VFSEditTool struct {
 	vfs vfs.VFS
 	lsp lsp.LSP

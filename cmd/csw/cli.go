@@ -271,17 +271,17 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 				session.Tools.Register(name, t)
 			}
 			// Re-register VFS tools with the all-access VFS
-			session.Tools.Register("vfs.read", tool.NewVFSReadTool(allAccessVFS, true))
-			session.Tools.Register("vfs.write", tool.NewVFSWriteTool(allAccessVFS, nil))
-			session.Tools.Register("vfs.edit", tool.NewVFSEditTool(allAccessVFS, nil))
-			session.Tools.Register("vfs.delete", tool.NewVFSDeleteTool(allAccessVFS))
-			session.Tools.Register("vfs.ls", tool.NewVFSListTool(allAccessVFS))
-			session.Tools.Register("vfs.move", tool.NewVFSMoveTool(allAccessVFS))
-			session.Tools.Register("vfs.find", tool.NewVFSFindTool(allAccessVFS))
-			session.Tools.Register("vfs.grep", tool.NewVFSGrepTool(allAccessVFS))
+			session.Tools.Register("vfsRead", tool.NewVFSReadTool(allAccessVFS, true))
+			session.Tools.Register("vfsWrite", tool.NewVFSWriteTool(allAccessVFS, nil))
+			session.Tools.Register("vfsEdit", tool.NewVFSEditTool(allAccessVFS, nil))
+			session.Tools.Register("vfsDelete", tool.NewVFSDeleteTool(allAccessVFS))
+			session.Tools.Register("vfsList", tool.NewVFSListTool(allAccessVFS))
+			session.Tools.Register("vfsMode", tool.NewVFSMoveTool(allAccessVFS))
+			session.Tools.Register("vfsFind", tool.NewVFSFindTool(allAccessVFS))
+			session.Tools.Register("vfsGrep", tool.NewVFSGrepTool(allAccessVFS))
 			// Re-register session-specific tools (like todo tools)
-			session.Tools.Register("todo.read", tool.NewTodoReadTool(session))
-			session.Tools.Register("todo.write", tool.NewTodoWriteTool(session))
+			session.Tools.Register("todoRead", tool.NewTodoReadTool(session))
+			session.Tools.Register("todoWrite", tool.NewTodoWriteTool(session))
 		}
 	}
 

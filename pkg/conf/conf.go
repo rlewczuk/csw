@@ -44,7 +44,7 @@ type AgentRoleConfig struct {
 	PromptFragments map[string]string `json:"-"`
 
 	// Tool fragments for this role (as a map of "<tool-name>/<file-name>" -> content), this is transient field, not serialized to JSON
-	// Example keys: "vfs.read/vfs.read.schema.json", "vfs.read/vfs.read.md", "vfs.read/vfs.read-kimi.md"
+	// Example keys: "vfsRead/vfsRead.schema.json", "vfsRead/vfsRead.md", "vfsRead/vfsRead-kimi.md"
 	ToolFragments map[string]string `json:"-"`
 
 	// HiddenPatterns contains glob patterns for files and directories that should be hidden from VFS operations

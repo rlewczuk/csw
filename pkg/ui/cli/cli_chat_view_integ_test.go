@@ -180,7 +180,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 			Tools: []*ui.ToolUI{
 				{
 					Id:     "tool1",
-					Name:   "vfs.read",
+					Name:   "vfsRead",
 					Status: ui.ToolStatusStarted,
 				},
 			},
@@ -197,8 +197,8 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		// Verify output
 		outputStr := output.String()
 		assert.Contains(t, outputStr, "Assistant: Let me read that file")
-		assert.Contains(t, outputStr, "TOOL: vfs.read (started)")
-		assert.Contains(t, outputStr, "TOOL: vfs.read (succeeded)")
+		assert.Contains(t, outputStr, "TOOL: vfsRead (started)")
+		assert.Contains(t, outputStr, "TOOL: vfsRead (succeeded)")
 	})
 
 	t.Run("accepts all permissions automatically when configured", func(t *testing.T) {
@@ -240,7 +240,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		// Setup LLM response with tool call
 		mockServer.AddStreamingResponse("/api/chat", "POST", true,
-			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Creating file","tool_calls":[{"id":"call_1","type":"function","function":{"name":"vfs.write","arguments":"{\"path\":\"new.txt\",\"content\":\"test\"}"}}]},"done":false}`,
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Creating file","tool_calls":[{"id":"call_1","type":"function","function":{"name":"vfsWrite","arguments":"{\"path\":\"new.txt\",\"content\":\"test\"}"}}]},"done":false}`,
 			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 		)
 

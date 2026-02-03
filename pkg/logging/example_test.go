@@ -45,7 +45,7 @@ func ExampleGetSessionLogger() {
 	// For more complex logging like tool calls, use helper functions
 	toolCall := &tool.ToolCall{
 		ID:       "call-1",
-		Function: "vfs.write",
+		Function: "vfsWrite",
 		Arguments: tool.NewToolValue(map[string]any{
 			"path":    "test.txt",
 			"content": "Hello, World!",

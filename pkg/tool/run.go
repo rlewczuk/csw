@@ -22,7 +22,7 @@ func (e *RunCommandError) Error() string {
 	return fmt.Sprintf("RunCommandError [run.go]: %s: %s", e.Message, e.Command)
 }
 
-// RunBashTool implements the run.bash tool for executing bash commands.
+// RunBashTool implements the runBash tool for executing bash commands.
 type RunBashTool struct {
 	runner      runner.CommandRunner
 	privileges  map[string]conf.AccessFlag

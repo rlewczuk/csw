@@ -27,14 +27,14 @@ Usage notes:
 - If the output exceeds ${maxLines} lines or ${maxBytes} bytes, it will be truncated and the full output will be written to a file. You can use Read with offset/limit to read specific sections or Grep to search the full content. Because of this, you do NOT need to use `head`, `tail`, or other truncation commands to limit output - just run the command directly.
 
 - Avoid using Bash with the `find`, `grep`, `cat`, `head`, `tail`, `sed`, `awk`, or `echo` commands, unless explicitly instructed or when these commands are truly necessary for the task. Instead, always prefer using the dedicated tools for these commands:
-    - File search: Use `vfs.find` tool (NOT find or ls)
-    - Content search: Use `vfs.grep` (NOT grep or rg)
-    - Read files: Use `vfs.read` tool (NOT cat/head/tail)
+    - File search: Use `vfsFind` tool (NOT find or ls)
+    - Content search: Use `vfsGrep` (NOT grep or rg)
+    - Read files: Use `vfsRead` tool (NOT cat/head/tail)
     - Edit files: Use `vfs.patch` (NOT sed/awk)
-    - Write files: Use `vfs.write` (NOT echo >/cat <<EOF)
+    - Write files: Use `vfsWrite` (NOT echo >/cat <<EOF)
     - Communication: Output text directly (NOT echo/printf)
 - When issuing multiple commands:
-    - If the commands are independent and can run in parallel, make multiple `run.bash` tool calls in a single message. For example, if you need to run "git status" and "git diff", send a single message with two `vfs.bash` tool calls in parallel.
+    - If the commands are independent and can run in parallel, make multiple `runBash` tool calls in a single message. For example, if you need to run "git status" and "git diff", send a single message with two `vfs.bash` tool calls in parallel.
     - If the commands depend on each other and must run sequentially, use a single Bash call with '&&' to chain them together (e.g., `git add . && git commit -m "message" && git push`). For instance, if one operation must complete before another starts (like mkdir before cp, Write before Bash for git operations, or git add before git commit), run these operations sequentially instead.
     - Use ';' only when you need to run commands sequentially but don't care if earlier commands fail
     - DO NOT use newlines to separate commands (newlines are ok in quoted strings)

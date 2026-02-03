@@ -18,10 +18,10 @@ type AccessControlTool struct {
 // NewAccessControlTool creates a new AccessControlTool that wraps the given tool.
 // The privileges map specifies access flags for different tool name patterns.
 // Supported patterns:
-//   - Exact name: "vfs.read" matches only "vfs.read"
-//   - Single segment wildcard: "vfs.*" matches "vfs.read", "vfs.write" etc., but not "vfs.local.read"
-//   - Multi-segment wildcard: "vfs.**" matches "vfs.read", "vfs.local.read", "vfs.local.impl.read" etc.
-//   - Partial match with wildcard: "vfs.r*" matches "vfs.read", "vfs.remove" but not "vfs.write"
+//   - Exact name: "vfsRead" matches only "vfsRead"
+//   - Single segment wildcard: "vfs.*" matches "vfsRead", "vfsWrite" etc., but not "vfs.local.read"
+//   - Multi-segment wildcard: "vfs.**" matches "vfsRead", "vfs.local.read", "vfs.local.impl.read" etc.
+//   - Partial match with wildcard: "vfs.r*" matches "vfsRead", "vfs.remove" but not "vfsWrite"
 //   - Global default: "**" matches any tool name
 //
 // If multiple patterns match a tool name, the most specific one is used.

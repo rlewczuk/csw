@@ -842,15 +842,15 @@ func (s *SweSession) SetRole(roleName string) error {
 
 	// Re-register VFS tools to use the session's VFS
 	// This ensures that VFS access controls are respected
-	// Line numbers are enabled by default for vfs.read
-	s.Tools.Register("vfs.read", tool.NewVFSReadTool(s.VFS, true))
-	s.Tools.Register("vfs.write", tool.NewVFSWriteTool(s.VFS, s.LSP))
-	s.Tools.Register("vfs.edit", tool.NewVFSEditTool(s.VFS, s.LSP))
-	//s.Tools.Register("vfs.delete", tool.NewVFSDeleteTool(s.VFS))
-	s.Tools.Register("vfs.ls", tool.NewVFSListTool(s.VFS))
-	//s.Tools.Register("vfs.move", tool.NewVFSMoveTool(s.VFS))
-	s.Tools.Register("vfs.find", tool.NewVFSFindTool(s.VFS))
-	s.Tools.Register("vfs.grep", tool.NewVFSGrepTool(s.VFS))
+	// Line numbers are enabled by default for vfsRead
+	s.Tools.Register("vfsRead", tool.NewVFSReadTool(s.VFS, true))
+	s.Tools.Register("vfsWrite", tool.NewVFSWriteTool(s.VFS, s.LSP))
+	s.Tools.Register("vfsEdit", tool.NewVFSEditTool(s.VFS, s.LSP))
+	//s.Tools.Register("vfsDelete", tool.NewVFSDeleteTool(s.VFS))
+	s.Tools.Register("vfsList", tool.NewVFSListTool(s.VFS))
+	//s.Tools.Register("vfsMode", tool.NewVFSMoveTool(s.VFS))
+	s.Tools.Register("vfsFind", tool.NewVFSFindTool(s.VFS))
+	s.Tools.Register("vfsGrep", tool.NewVFSGrepTool(s.VFS))
 
 	// Re-register session-specific tools
 	s.registerSessionTools()
@@ -989,8 +989,8 @@ func (s *SweSession) CountPendingTodos() int {
 // registerSessionTools registers session-specific tools that need access to the session.
 func (s *SweSession) registerSessionTools() {
 	// Register todo tools
-	s.Tools.Register("todo.read", tool.NewTodoReadTool(s))
-	s.Tools.Register("todo.write", tool.NewTodoWriteTool(s))
+	s.Tools.Register("todoRead", tool.NewTodoReadTool(s))
+	s.Tools.Register("todoWrite", tool.NewTodoWriteTool(s))
 }
 
 // SessionWriter wraps a SessionThreadOutput and writes the session to a markdown file.

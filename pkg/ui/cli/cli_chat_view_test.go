@@ -119,7 +119,7 @@ func TestCliChatView_Init(t *testing.T) {
 					Tools: []*ui.ToolUI{
 						{
 							Id:     "tool1",
-							Name:   "vfs.read",
+							Name:   "vfsRead",
 							Status: ui.ToolStatusSucceeded,
 						},
 					},
@@ -132,7 +132,7 @@ func TestCliChatView_Init(t *testing.T) {
 
 		outputStr := output.String()
 		assert.Contains(t, outputStr, "Assistant: Running tool")
-		assert.Contains(t, outputStr, "TOOL: vfs.read (succeeded)")
+		assert.Contains(t, outputStr, "TOOL: vfsRead (succeeded)")
 	})
 }
 
@@ -166,7 +166,7 @@ func TestCliChatView_AddMessage(t *testing.T) {
 			Tools: []*ui.ToolUI{
 				{
 					Id:     "tool1",
-					Name:   "vfs.write",
+					Name:   "vfsWrite",
 					Status: ui.ToolStatusExecuting,
 				},
 			},
@@ -178,7 +178,7 @@ func TestCliChatView_AddMessage(t *testing.T) {
 
 		outputStr := output.String()
 		assert.Contains(t, outputStr, "Assistant: Executing")
-		assert.Contains(t, outputStr, "TOOL: vfs.write (executing)")
+		assert.Contains(t, outputStr, "TOOL: vfsWrite (executing)")
 	})
 }
 
@@ -256,7 +256,7 @@ func TestCliChatView_UpdateTool(t *testing.T) {
 			Tools: []*ui.ToolUI{
 				{
 					Id:     "tool1",
-					Name:   "vfs.read",
+					Name:   "vfsRead",
 					Status: ui.ToolStatusStarted,
 				},
 			},
@@ -269,14 +269,14 @@ func TestCliChatView_UpdateTool(t *testing.T) {
 		// Update tool
 		updatedTool := &ui.ToolUI{
 			Id:     "tool1",
-			Name:   "vfs.read",
+			Name:   "vfsRead",
 			Status: ui.ToolStatusSucceeded,
 		}
 
 		err := view.UpdateTool(updatedTool)
 		require.NoError(t, err)
 		assert.Equal(t, ui.ToolStatusSucceeded, view.messages[0].Tools[0].Status)
-		assert.Contains(t, output.String(), "TOOL: vfs.read (succeeded)")
+		assert.Contains(t, output.String(), "TOOL: vfsRead (succeeded)")
 	})
 }
 

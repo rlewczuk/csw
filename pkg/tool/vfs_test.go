@@ -24,7 +24,7 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
@@ -45,7 +45,7 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
-			Function:  "vfs.read",
+			Function:  "vfsRead",
 			Arguments: NewToolValue(nil),
 		})
 
@@ -64,7 +64,7 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.ls",
+			Function: "vfsList",
 			Arguments: NewToolValue(map[string]any{
 				"path": ".",
 			}),
@@ -89,7 +89,7 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path":  "test.txt",
 				"limit": 3,
@@ -115,7 +115,7 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path":   "test.txt",
 				"offset": 2,
@@ -141,7 +141,7 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path":   "test.txt",
 				"offset": 1,
@@ -168,7 +168,7 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path":   "test.txt",
 				"offset": 10,
@@ -194,7 +194,7 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path":  "test.txt",
 				"limit": 2,
@@ -228,7 +228,7 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
@@ -261,7 +261,7 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path":   "test.txt",
 				"offset": 0,
@@ -288,7 +288,7 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
@@ -316,7 +316,7 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute with offset
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path":   "test.txt",
 				"offset": 2,
@@ -345,7 +345,7 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
@@ -370,7 +370,7 @@ func TestVFSWriteTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.write",
+			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
 				"path":    "test.txt",
 				"content": "hello world",
@@ -396,7 +396,7 @@ func TestVFSWriteTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.write",
+			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
 				"content": "hello",
 			}),
@@ -417,7 +417,7 @@ func TestVFSWriteTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.write",
+			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
@@ -443,7 +443,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.delete",
+			Function: "vfsDelete",
 			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
@@ -468,7 +468,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
-			Function:  "vfs.delete",
+			Function:  "vfsDelete",
 			Arguments: NewToolValue(nil),
 		})
 
@@ -487,7 +487,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.delete",
+			Function: "vfsDelete",
 			Arguments: NewToolValue(map[string]any{
 				"path": "non-existent.txt",
 			}),
@@ -568,7 +568,7 @@ func TestVFSListTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
-			Function:  "vfs.ls",
+			Function:  "vfsList",
 			Arguments: NewToolValue(nil),
 		})
 
@@ -587,7 +587,7 @@ func TestVFSListTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.ls",
+			Function: "vfsList",
 			Arguments: NewToolValue(map[string]any{
 				"path": "non-existent",
 			}),
@@ -613,7 +613,7 @@ func TestVFSMoveTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.move",
+			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
 				"path":        "source.txt",
 				"destination": "dest.txt",
@@ -643,7 +643,7 @@ func TestVFSMoveTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.move",
+			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
 				"destination": "dest.txt",
 			}),
@@ -664,7 +664,7 @@ func TestVFSMoveTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.move",
+			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
 				"path": "source.txt",
 			}),
@@ -685,7 +685,7 @@ func TestVFSMoveTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.move",
+			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
 				"path":        "non-existent.txt",
 				"destination": "dest.txt",
@@ -714,7 +714,7 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
@@ -729,7 +729,7 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 		query, ok := response.Error.(*ToolPermissionsQuery)
 		require.True(t, ok, "Error should be ToolPermissionsQuery")
 		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfs.read", query.Tool.Function)
+		assert.Equal(t, "vfsRead", query.Tool.Function)
 		assert.Equal(t, "Permission Required", query.Title)
 		assert.Contains(t, query.Details, "test.txt")
 		assert.True(t, query.AllowCustomResponse)
@@ -753,7 +753,7 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
@@ -779,7 +779,7 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.read",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
@@ -807,7 +807,7 @@ func TestVFSWriteToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.write",
+			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
 				"path":    "test.txt",
 				"content": "hello",
@@ -823,7 +823,7 @@ func TestVFSWriteToolPermissionQuery(t *testing.T) {
 		query, ok := response.Error.(*ToolPermissionsQuery)
 		require.True(t, ok, "Error should be ToolPermissionsQuery")
 		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfs.write", query.Tool.Function)
+		assert.Equal(t, "vfsWrite", query.Tool.Function)
 		assert.Equal(t, "Permission Required", query.Title)
 		assert.Contains(t, query.Details, "test.txt")
 		assert.True(t, query.AllowCustomResponse)
@@ -844,7 +844,7 @@ func TestVFSWriteToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.write",
+			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
 				"path":    "test.txt",
 				"content": "hello",
@@ -875,7 +875,7 @@ func TestVFSWriteToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.write",
+			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
 				"path":    "test.txt",
 				"content": "hello",
@@ -907,7 +907,7 @@ func TestVFSDeleteToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.delete",
+			Function: "vfsDelete",
 			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
@@ -922,7 +922,7 @@ func TestVFSDeleteToolPermissionQuery(t *testing.T) {
 		query, ok := response.Error.(*ToolPermissionsQuery)
 		require.True(t, ok, "Error should be ToolPermissionsQuery")
 		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfs.delete", query.Tool.Function)
+		assert.Equal(t, "vfsDelete", query.Tool.Function)
 		assert.Equal(t, "Permission Required", query.Title)
 		assert.Contains(t, query.Details, "test.txt")
 		assert.True(t, query.AllowCustomResponse)
@@ -946,7 +946,7 @@ func TestVFSDeleteToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.delete",
+			Function: "vfsDelete",
 			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
@@ -978,7 +978,7 @@ func TestVFSDeleteToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.delete",
+			Function: "vfsDelete",
 			Arguments: NewToolValue(map[string]any{
 				"path": "test.txt",
 			}),
@@ -1009,7 +1009,7 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.ls",
+			Function: "vfsList",
 			Arguments: NewToolValue(map[string]any{
 				"path": "dir",
 			}),
@@ -1024,7 +1024,7 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		query, ok := response.Error.(*ToolPermissionsQuery)
 		require.True(t, ok, "Error should be ToolPermissionsQuery")
 		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfs.ls", query.Tool.Function)
+		assert.Equal(t, "vfsList", query.Tool.Function)
 		assert.Equal(t, "Permission Required", query.Title)
 		assert.Contains(t, query.Details, "dir")
 		assert.True(t, query.AllowCustomResponse)
@@ -1050,7 +1050,7 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.ls",
+			Function: "vfsList",
 			Arguments: NewToolValue(map[string]any{
 				"path": ".",
 			}),
@@ -1078,7 +1078,7 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.ls",
+			Function: "vfsList",
 			Arguments: NewToolValue(map[string]any{
 				"path": ".",
 			}),
@@ -1109,7 +1109,7 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.move",
+			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
 				"path":        "source.txt",
 				"destination": "dest.txt",
@@ -1125,7 +1125,7 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		query, ok := response.Error.(*ToolPermissionsQuery)
 		require.True(t, ok, "Error should be ToolPermissionsQuery")
 		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfs.move", query.Tool.Function)
+		assert.Equal(t, "vfsMode", query.Tool.Function)
 		assert.Equal(t, "Permission Required", query.Title)
 		assert.Contains(t, query.Details, "source.txt")
 		assert.True(t, query.AllowCustomResponse)
@@ -1149,7 +1149,7 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.move",
+			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
 				"path":        "source.txt",
 				"destination": "dest.txt",
@@ -1185,7 +1185,7 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.move",
+			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
 				"path":        "source.txt",
 				"destination": "dest.txt",
@@ -1216,7 +1216,7 @@ func TestVFSFindTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.find",
+			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
 				"query":     "*.txt",
 				"recursive": false,
@@ -1254,7 +1254,7 @@ func TestVFSFindTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.find",
+			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
 				"query":     "*.txt",
 				"recursive": true,
@@ -1287,7 +1287,7 @@ func TestVFSFindTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.find",
+			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
 				"query":     "*.go",
 				"recursive": false,
@@ -1318,7 +1318,7 @@ func TestVFSFindTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.find",
+			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
 				"query": "*.txt",
 			}),
@@ -1344,7 +1344,7 @@ func TestVFSFindTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:        "test-id",
-			Function:  "vfs.find",
+			Function:  "vfsFind",
 			Arguments: NewToolValue(nil),
 		})
 
@@ -1370,7 +1370,7 @@ func TestVFSFindTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.find",
+			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
 				"query":     "test_*",
 				"recursive": false,
@@ -1409,7 +1409,7 @@ func TestVFSFindToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.find",
+			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
 				"query":     "*.txt",
 				"recursive": false,
@@ -1425,7 +1425,7 @@ func TestVFSFindToolPermissionQuery(t *testing.T) {
 		query, ok := response.Error.(*ToolPermissionsQuery)
 		require.True(t, ok, "Error should be ToolPermissionsQuery")
 		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfs.find", query.Tool.Function)
+		assert.Equal(t, "vfsFind", query.Tool.Function)
 		assert.Equal(t, "Permission Required", query.Title)
 		assert.Contains(t, query.Details, "*.txt")
 		assert.True(t, query.AllowCustomResponse)
@@ -1451,7 +1451,7 @@ func TestVFSFindToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.find",
+			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
 				"query":     "*.txt",
 				"recursive": false,
@@ -1480,7 +1480,7 @@ func TestVFSFindToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.find",
+			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
 				"query":     "*.txt",
 				"recursive": false,
@@ -1507,7 +1507,7 @@ func TestVFSEditTool(t *testing.T) {
 		// Execute - should fail because multiple occurrences without replaceAll
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "test.txt",
 				"oldString": "hello",
@@ -1533,7 +1533,7 @@ func TestVFSEditTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":       "test.txt",
 				"oldString":  "hello",
@@ -1567,7 +1567,7 @@ func TestVFSEditTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"oldString": "hello",
 				"newString": "hi",
@@ -1589,7 +1589,7 @@ func TestVFSEditTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "test.txt",
 				"newString": "hi",
@@ -1611,7 +1611,7 @@ func TestVFSEditTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "test.txt",
 				"oldString": "hello",
@@ -1633,7 +1633,7 @@ func TestVFSEditTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "non-existent.txt",
 				"oldString": "hello",
@@ -1658,7 +1658,7 @@ func TestVFSEditTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "test.txt",
 				"oldString": "goodbye",
@@ -1684,7 +1684,7 @@ func TestVFSEditTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "test.txt",
 				"oldString": "hello ",
@@ -1719,7 +1719,7 @@ func TestVFSEditTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":       "test.txt",
 				"oldString":  "line1",
@@ -1761,7 +1761,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "test.txt",
 				"oldString": "hello",
@@ -1778,7 +1778,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		query, ok := response.Error.(*ToolPermissionsQuery)
 		require.True(t, ok, "Error should be ToolPermissionsQuery")
 		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfs.edit", query.Tool.Function)
+		assert.Equal(t, "vfsEdit", query.Tool.Function)
 		assert.Equal(t, "Permission Required", query.Title)
 		assert.Contains(t, query.Details, "test.txt")
 		assert.True(t, query.AllowCustomResponse)
@@ -1802,7 +1802,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "test.txt",
 				"oldString": "hello",
@@ -1819,7 +1819,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		query, ok := response.Error.(*ToolPermissionsQuery)
 		require.True(t, ok, "Error should be ToolPermissionsQuery")
 		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfs.edit", query.Tool.Function)
+		assert.Equal(t, "vfsEdit", query.Tool.Function)
 		assert.Equal(t, "Permission Required", query.Title)
 		assert.Contains(t, query.Details, "test.txt")
 		assert.True(t, query.AllowCustomResponse)
@@ -1843,7 +1843,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "test.txt",
 				"oldString": "hello",
@@ -1879,7 +1879,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "test.txt",
 				"oldString": "hello",
@@ -1910,7 +1910,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "test.txt",
 				"oldString": "hello",
@@ -1931,11 +1931,11 @@ func TestToolPermissionsQueryError(t *testing.T) {
 		query := &ToolPermissionsQuery{
 			Id: "test-id-123",
 			Tool: &ToolCall{
-				Function: "vfs.read",
+				Function: "vfsRead",
 			},
 		}
 		errMsg := query.Error()
-		assert.Contains(t, errMsg, "vfs.read")
+		assert.Contains(t, errMsg, "vfsRead")
 		assert.Contains(t, errMsg, "test-id-123")
 		assert.Contains(t, errMsg, "permission query")
 	})
@@ -1965,7 +1965,7 @@ func TestVFSWriteToolWithLSP(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.write",
+			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
 				"path":    "test.go",
 				"content": "package main\n\nfunc main() {}\n",
@@ -2010,7 +2010,7 @@ func TestVFSWriteToolWithLSP(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.write",
+			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
 				"path":    "test.go",
 				"content": "package main\n\nfunc main() { invalid }\n",
@@ -2037,7 +2037,7 @@ func TestVFSWriteToolWithLSP(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.write",
+			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
 				"path":    "test.txt",
 				"content": "hello world",
@@ -2073,7 +2073,7 @@ func TestVFSEditToolWithLSP(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "test.go",
 				"oldString": "func main() {}",
@@ -2121,7 +2121,7 @@ func TestVFSEditToolWithLSP(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "test.go",
 				"oldString": "func main() {}",
@@ -2152,7 +2152,7 @@ func TestVFSEditToolWithLSP(t *testing.T) {
 		// Execute
 		response := tool.Execute(ToolCall{
 			ID:       "test-id",
-			Function: "vfs.edit",
+			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
 				"path":      "test.txt",
 				"oldString": "hello",
