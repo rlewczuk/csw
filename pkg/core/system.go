@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/lsp"
 	"github.com/codesnort/codesnort-swe/pkg/models"
@@ -79,6 +80,18 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		return nil, fmt.Errorf("SweSystem.NewSession() [system.go]: provider not found: %s", providerName)
 	}
 
+	// Determine streaming mode from provider config
+	// Default to true for backward compatibility
+	streaming := true
+	if configProvider, ok := provider.(interface {
+		GetConfig() *conf.ModelProviderConfig
+	}); ok {
+		config := configProvider.GetConfig()
+		if config != nil && config.Streaming != nil {
+			streaming = *config.Streaming
+		}
+	}
+
 	// Create a new tool registry for the session by copying system tools
 	sessionTools := tool.NewToolRegistry()
 	for _, name := range s.Tools.List() {
@@ -120,6 +133,7 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		workDir:       ".",
 		todoList:      make([]tool.TodoItem, 0),
 		logger:        sessionLogger,
+		streaming:     streaming,
 	}
 
 	// Log session creation

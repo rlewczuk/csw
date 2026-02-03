@@ -24,6 +24,7 @@ type OpenAIClient struct {
 	baseURL    string
 	httpClient *http.Client
 	apiKey     string
+	config     *conf.ModelProviderConfig
 }
 
 // OpenAIChatModel is a chat model implementation for OpenAI
@@ -80,6 +81,7 @@ func NewOpenAIClient(config *conf.ModelProviderConfig) (*OpenAIClient, error) {
 		baseURL:    strings.TrimSuffix(config.URL, "/"),
 		httpClient: httpClient,
 		apiKey:     apiKey,
+		config:     config,
 	}, nil
 }
 
@@ -98,7 +100,14 @@ func NewOpenAIClientWithHTTPClient(baseURL string, httpClient *http.Client) (*Op
 		baseURL:    strings.TrimSuffix(baseURL, "/"),
 		httpClient: httpClient,
 		apiKey:     "test", // Default API key for testing
+		config:     nil,    // No config for test clients
 	}, nil
+}
+
+// GetConfig returns the provider configuration for this client.
+// Returns nil if client was created without config (e.g., in tests).
+func (c *OpenAIClient) GetConfig() *conf.ModelProviderConfig {
+	return c.config
 }
 
 // ChatModel returns a ChatModel implementation for the given model and options

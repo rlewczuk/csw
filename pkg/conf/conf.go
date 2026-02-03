@@ -93,6 +93,9 @@ type ModelProviderConfig struct {
 	// ModelTags contains model-to-tag mappings specific to this provider.
 	// Each mapping has a regexp pattern for model names and a tag to assign.
 	ModelTags []ModelTagMapping `json:"model_tags,omitempty"`
+	// Streaming controls whether to use streaming API for chat completions
+	// Defaults to true for backward compatibility
+	Streaming *bool `json:"streaming,omitempty"`
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for ModelProviderConfig.

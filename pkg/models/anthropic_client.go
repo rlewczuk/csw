@@ -25,6 +25,7 @@ type AnthropicClient struct {
 	httpClient *http.Client
 	apiKey     string
 	apiVersion string
+	config     *conf.ModelProviderConfig
 }
 
 // AnthropicChatModel is a chat model implementation for Anthropic
@@ -83,6 +84,7 @@ func NewAnthropicClient(config *conf.ModelProviderConfig) (*AnthropicClient, err
 		httpClient: httpClient,
 		apiKey:     apiKey,
 		apiVersion: apiVersion,
+		config:     config,
 	}, nil
 }
 
@@ -103,7 +105,14 @@ func NewAnthropicClientWithHTTPClient(baseURL string, httpClient *http.Client) (
 		httpClient: httpClient,
 		apiKey:     "", // API key not required for mock server
 		apiVersion: apiVersion,
+		config:     nil, // No config for test clients
 	}, nil
+}
+
+// GetConfig returns the provider configuration for this client.
+// Returns nil if client was created without config (e.g., in tests).
+func (c *AnthropicClient) GetConfig() *conf.ModelProviderConfig {
+	return c.config
 }
 
 // ChatModel returns a ChatModel implementation for the given model and options

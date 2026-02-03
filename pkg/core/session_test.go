@@ -1127,3 +1127,133 @@ func TestSessionThreadWithWriter(t *testing.T) {
 		assert.Contains(t, contentStr, "Test prompt")
 	})
 }
+
+func TestSessionStreamingMode(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+
+	// Create provider config with streaming enabled
+	streamingEnabled := true
+	config := &conf.ModelProviderConfig{
+		Type:      "ollama",
+		Name:      "ollama",
+		URL:       mockServer.URL(),
+		Streaming: &streamingEnabled,
+	}
+
+	client, err := models.NewOllamaClient(config)
+	require.NoError(t, err)
+
+	vfsInstance := vfs.NewMockVFS()
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfsInstance)
+
+	system := &SweSystem{
+		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
+		Tools:                tools,
+		VFS:                  vfsInstance,
+		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+	}
+
+	t.Run("streaming mode enabled", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
+		require.NoError(t, err)
+		assert.NotNil(t, session)
+
+		// Verify streaming mode is enabled
+		assert.True(t, session.streaming)
+	})
+}
+
+func TestSessionNonStreamingMode(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+
+	// Create provider config with streaming disabled
+	streamingDisabled := false
+	config := &conf.ModelProviderConfig{
+		Type:      "ollama",
+		Name:      "ollama",
+		URL:       mockServer.URL(),
+		Streaming: &streamingDisabled,
+	}
+
+	client, err := models.NewOllamaClient(config)
+	require.NoError(t, err)
+
+	vfsInstance := vfs.NewMockVFS()
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfsInstance)
+
+	system := &SweSystem{
+		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
+		Tools:                tools,
+		VFS:                  vfsInstance,
+		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+	}
+
+	t.Run("streaming mode disabled", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
+		require.NoError(t, err)
+		assert.NotNil(t, session)
+
+		// Verify streaming mode is disabled
+		assert.False(t, session.streaming)
+	})
+
+	t.Run("non-streaming mode session created correctly", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		thread := NewSessionThread(system, mockHandler)
+
+		err := thread.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := thread.GetSession()
+		require.NotNil(t, session)
+		assert.False(t, session.streaming, "Session should be in non-streaming mode")
+	})
+}
+
+func TestSessionStreamingModeDefault(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+
+	// Create provider config WITHOUT streaming field (should default to true)
+	config := &conf.ModelProviderConfig{
+		Type: "ollama",
+		Name: "ollama",
+		URL:  mockServer.URL(),
+	}
+
+	client, err := models.NewOllamaClient(config)
+	require.NoError(t, err)
+
+	vfsInstance := vfs.NewMockVFS()
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfsInstance)
+
+	system := &SweSystem{
+		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
+		Tools:                tools,
+		VFS:                  vfsInstance,
+		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+	}
+
+	t.Run("streaming defaults to true", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
+		require.NoError(t, err)
+		assert.NotNil(t, session)
+
+		// Verify streaming mode defaults to true
+		assert.True(t, session.streaming)
+	})
+}

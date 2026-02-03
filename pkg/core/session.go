@@ -446,6 +446,7 @@ type SweSession struct {
 	todoList      []tool.TodoItem
 	todoMu        sync.Mutex
 	logger        *slog.Logger
+	streaming     bool
 }
 
 // Prompt adds user prompt to the conversation and starts processing if processing is not already in progress.
@@ -507,78 +508,23 @@ func (s *SweSession) Run(ctx context.Context) error {
 			}
 		}
 
-		// Use streaming chat API
-		stream := chatModel.ChatStream(ctx, s.messages, nil, tools)
+		// Use streaming or non-streaming API based on session configuration
+		var responseMsg *models.ChatMessage
+		var err error
 
-		if s.logger != nil {
-			s.logger.Debug("chat_stream_created", "num_messages", len(s.messages), "num_tools", len(tools))
+		if s.streaming {
+			// Use streaming chat API
+			responseMsg, err = s.runStreamingChat(ctx, chatModel, tools)
+		} else {
+			// Use non-streaming chat API
+			responseMsg, err = s.runNonStreamingChat(ctx, chatModel, tools)
 		}
 
-		// Accumulate the response from the stream
-		responseMsg := &models.ChatMessage{
-			Role:  models.ChatRoleAssistant,
-			Parts: []models.ChatMessagePart{},
+		if err != nil {
+			return err
 		}
 
-		// Track tool calls we've seen to handle start events
-		seenToolCalls := make(map[string]bool)
-
-		if s.logger != nil {
-			s.logger.Debug("starting_stream_iteration")
-		}
-
-		fragmentCount := 0
-		for fragment := range stream {
-			fragmentCount++
-			if s.logger != nil {
-				s.logger.Debug("stream_fragment_received", "fragment_num", fragmentCount, "num_parts", len(fragment.Parts))
-			}
-			// Merge the fragment parts into the accumulated response
-			for _, part := range fragment.Parts {
-				responseMsg.Parts = append(responseMsg.Parts, part)
-
-				// Notify UI handler about the fragment
-				if s.outputHandler != nil {
-					if part.Text != "" {
-						s.outputHandler.AddMarkdownChunk(part.Text)
-						// Log assistant output
-						if s.logger != nil {
-							s.logger.Debug("assistant_output_chunk", "chunk", part.Text)
-						}
-					}
-					if part.ToolCall != nil {
-						// Send start event if this is the first time we see this tool call
-						if !seenToolCalls[part.ToolCall.ID] {
-							s.outputHandler.AddToolCallStart(part.ToolCall)
-							seenToolCalls[part.ToolCall.ID] = true
-							// Log tool call start
-							if s.logger != nil {
-								s.logger.Info("tool_call_start",
-									"tool_id", part.ToolCall.ID,
-									"function", part.ToolCall.Function,
-								)
-							}
-						}
-						// Always send details event as chunks arrive
-						s.outputHandler.AddToolCallDetails(part.ToolCall)
-					}
-				}
-			}
-		}
-
-		if s.logger != nil {
-			s.logger.Debug("stream_iteration_complete", "fragment_count", fragmentCount, "num_parts", len(responseMsg.Parts))
-		}
-
-		// Check if we got an empty response
-		if fragmentCount == 0 {
-			if s.logger != nil {
-				s.logger.Warn("stream_returned_no_fragments", "num_messages", len(s.messages), "num_tools", len(tools))
-			}
-			return fmt.Errorf("SweSession.Run() [session.go]: stream returned no fragments - this usually indicates a silent error in the model provider")
-		}
-
-		// Add the accumulated response to messages
+		// Add the response to messages
 		s.messages = append(s.messages, responseMsg)
 
 		// Check if there are any tool calls in the response
@@ -595,6 +541,129 @@ func (s *SweSession) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// runStreamingChat executes a streaming chat request and returns the accumulated response.
+func (s *SweSession) runStreamingChat(ctx context.Context, chatModel models.ChatModel, tools []tool.ToolInfo) (*models.ChatMessage, error) {
+	stream := chatModel.ChatStream(ctx, s.messages, nil, tools)
+
+	if s.logger != nil {
+		s.logger.Debug("chat_stream_created", "num_messages", len(s.messages), "num_tools", len(tools))
+	}
+
+	// Accumulate the response from the stream
+	responseMsg := &models.ChatMessage{
+		Role:  models.ChatRoleAssistant,
+		Parts: []models.ChatMessagePart{},
+	}
+
+	// Track tool calls we've seen to handle start events
+	seenToolCalls := make(map[string]bool)
+
+	if s.logger != nil {
+		s.logger.Debug("starting_stream_iteration")
+	}
+
+	fragmentCount := 0
+	for fragment := range stream {
+		fragmentCount++
+		if s.logger != nil {
+			s.logger.Debug("stream_fragment_received", "fragment_num", fragmentCount, "num_parts", len(fragment.Parts))
+		}
+		// Merge the fragment parts into the accumulated response
+		for _, part := range fragment.Parts {
+			responseMsg.Parts = append(responseMsg.Parts, part)
+
+			// Notify UI handler about the fragment
+			if s.outputHandler != nil {
+				if part.Text != "" {
+					s.outputHandler.AddMarkdownChunk(part.Text)
+					// Log assistant output
+					if s.logger != nil {
+						s.logger.Debug("assistant_output_chunk", "chunk", part.Text)
+					}
+				}
+				if part.ToolCall != nil {
+					// Send start event if this is the first time we see this tool call
+					if !seenToolCalls[part.ToolCall.ID] {
+						s.outputHandler.AddToolCallStart(part.ToolCall)
+						seenToolCalls[part.ToolCall.ID] = true
+						// Log tool call start
+						if s.logger != nil {
+							s.logger.Info("tool_call_start",
+								"tool_id", part.ToolCall.ID,
+								"function", part.ToolCall.Function,
+							)
+						}
+					}
+					// Always send details event as chunks arrive
+					s.outputHandler.AddToolCallDetails(part.ToolCall)
+				}
+			}
+		}
+	}
+
+	if s.logger != nil {
+		s.logger.Debug("stream_iteration_complete", "fragment_count", fragmentCount, "num_parts", len(responseMsg.Parts))
+	}
+
+	// Check if we got an empty response
+	if fragmentCount == 0 {
+		if s.logger != nil {
+			s.logger.Warn("stream_returned_no_fragments", "num_messages", len(s.messages), "num_tools", len(tools))
+		}
+		return nil, fmt.Errorf("SweSession.runStreamingChat() [session.go]: stream returned no fragments - this usually indicates a silent error in the model provider")
+	}
+
+	return responseMsg, nil
+}
+
+// runNonStreamingChat executes a non-streaming chat request and returns the response.
+func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.ChatModel, tools []tool.ToolInfo) (*models.ChatMessage, error) {
+	if s.logger != nil {
+		s.logger.Debug("chat_non_streaming_request", "num_messages", len(s.messages), "num_tools", len(tools))
+	}
+
+	// Use non-streaming chat API
+	responseMsg, err := chatModel.Chat(ctx, s.messages, nil, tools)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Error("chat_non_streaming_error", "error", err)
+		}
+		return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: chat request failed: %w", err)
+	}
+
+	if s.logger != nil {
+		s.logger.Debug("chat_non_streaming_complete", "num_parts", len(responseMsg.Parts))
+	}
+
+	// Notify UI handler about the response
+	if s.outputHandler != nil {
+		// Process all parts of the response
+		for _, part := range responseMsg.Parts {
+			if part.Text != "" {
+				s.outputHandler.AddMarkdownChunk(part.Text)
+				// Log assistant output
+				if s.logger != nil {
+					s.logger.Debug("assistant_output_chunk", "chunk", part.Text)
+				}
+			}
+			if part.ToolCall != nil {
+				// Send tool call events
+				s.outputHandler.AddToolCallStart(part.ToolCall)
+				s.outputHandler.AddToolCallDetails(part.ToolCall)
+				// Log tool call
+				if s.logger != nil {
+					s.logger.Info("tool_call_start",
+						"tool_id", part.ToolCall.ID,
+						"function", part.ToolCall.Function,
+					)
+				}
+			}
+		}
+	}
+
+	return responseMsg, nil
 }
 
 // executeToolCalls executes the given tool calls and appends the results to the conversation.
