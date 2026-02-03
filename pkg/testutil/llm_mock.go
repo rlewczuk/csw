@@ -2,6 +2,7 @@
 package testutil
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -12,6 +13,25 @@ type MockHTTPServer struct {
 	Server    *httptest.Server
 	mu        sync.Mutex
 	responses map[string]map[string]*responseQueue // path -> method -> response queue
+	requests  []CapturedRequest
+}
+
+// CapturedRequest represents a captured HTTP request.
+type CapturedRequest struct {
+	Method string
+	Path   string
+	Body   []byte
+	Header http.Header
+}
+
+// GetRequests returns all captured requests.
+func (m *MockHTTPServer) GetRequests() []CapturedRequest {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	// Return a copy
+	requests := make([]CapturedRequest, len(m.requests))
+	copy(requests, m.requests)
+	return requests
 }
 
 type responseQueue struct {
@@ -113,6 +133,16 @@ func (m *MockHTTPServer) AddStreamingResponse(path, method string, closeAfter bo
 // HandleRequest handles incoming HTTP requests by matching against configured responses.
 func (m *MockHTTPServer) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	m.mu.Lock()
+
+	// Capture request
+	body, _ := io.ReadAll(r.Body)
+	m.requests = append(m.requests, CapturedRequest{
+		Method: r.Method,
+		Path:   r.URL.Path,
+		Body:   body,
+		Header: r.Header,
+	})
+
 	pathResponses := m.responses[r.URL.Path]
 	var respQueue *responseQueue
 	if pathResponses != nil {
