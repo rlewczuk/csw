@@ -9,6 +9,14 @@
       "tag": "openai"
     },
     {
+      "model": "^kimi.*",
+      "tag": "kimi"
+    },
+    {
+      "model": "^moonshot.*",
+      "tag": "kimi"
+    },
+    {
       "model": ".*-instruct$",
       "tag": "instruct"
     },

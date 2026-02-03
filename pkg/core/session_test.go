@@ -1257,3 +1257,124 @@ func TestSessionStreamingModeDefault(t *testing.T) {
 		assert.True(t, session.streaming)
 	})
 }
+
+// TestSessionSystemPrompt tests that system prompt is correctly set when creating
+// a session with default role and when changing roles.
+func TestSessionSystemPrompt(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+	require.NoError(t, err)
+	vfsInstance := vfs.NewMockVFS()
+
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfsInstance)
+
+	// Create mock config store with roles
+	configStore := impl.NewMockConfigStore()
+	developerRole := &conf.AgentRoleConfig{
+		Name:        "developer",
+		Description: "Software developer role",
+	}
+	testerRole := &conf.AgentRoleConfig{
+		Name:        "tester",
+		Description: "QA tester role",
+	}
+	configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"developer": developerRole,
+		"tester":    testerRole,
+	})
+
+	roleRegistry := NewAgentRoleRegistry(configStore)
+
+	system := &SweSystem{
+		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
+		PromptGenerator:      newMockSessionPromptGenerator("You are a skilled software developer."),
+		Tools:                tools,
+		VFS:                  vfsInstance,
+		Roles:                roleRegistry,
+		ConfigStore:          configStore,
+		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+	}
+
+	t.Run("system prompt is set when creating session with default role", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
+		require.NoError(t, err)
+		assert.NotNil(t, session)
+
+		// Verify role was set
+		assert.NotNil(t, session.role)
+		assert.Equal(t, "developer", session.role.Name)
+
+		// Verify system prompt was added to messages
+		require.Greater(t, len(session.messages), 0, "session should have at least one message (system prompt)")
+		assert.Equal(t, models.ChatRoleSystem, session.messages[0].Role, "first message should be system prompt")
+
+		// Verify the system prompt content
+		systemPrompt := session.messages[0].GetText()
+		assert.Contains(t, systemPrompt, "You are a skilled software developer.", "system prompt should contain the role description")
+	})
+
+	t.Run("system prompt is updated when changing role", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
+		require.NoError(t, err)
+
+		// Verify initial role and system prompt
+		assert.Equal(t, "developer", session.role.Name)
+		require.Greater(t, len(session.messages), 0)
+		assert.Equal(t, models.ChatRoleSystem, session.messages[0].Role)
+		initialPrompt := session.messages[0].GetText()
+
+		// Add a user message to simulate conversation
+		session.UserPrompt("Hello")
+
+		// Change role to tester
+		err = session.SetRole("tester")
+		require.NoError(t, err)
+
+		// Verify role was changed
+		assert.Equal(t, "tester", session.role.Name)
+
+		// Verify system prompt is still the first message
+		require.Greater(t, len(session.messages), 0)
+		assert.Equal(t, models.ChatRoleSystem, session.messages[0].Role, "first message should still be system prompt after role change")
+
+		// Verify system prompt was updated (should be the same since our mock returns same prompt)
+		newPrompt := session.messages[0].GetText()
+		assert.Equal(t, initialPrompt, newPrompt, "system prompt should be maintained when changing role")
+
+		// Verify user message is still there
+		require.Greater(t, len(session.messages), 1, "user message should still exist after role change")
+		assert.Equal(t, models.ChatRoleUser, session.messages[1].Role)
+	})
+
+	t.Run("system prompt persists when setting same role twice", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
+		require.NoError(t, err)
+
+		// Verify initial role and system prompt
+		assert.Equal(t, "developer", session.role.Name)
+		require.Greater(t, len(session.messages), 0)
+		assert.Equal(t, models.ChatRoleSystem, session.messages[0].Role)
+		initialPrompt := session.messages[0].GetText()
+
+		// Set the same role again (this happens in CLI)
+		err = session.SetRole("developer")
+		require.NoError(t, err)
+
+		// Verify role is still set
+		assert.Equal(t, "developer", session.role.Name)
+
+		// Verify system prompt is still there
+		require.Greater(t, len(session.messages), 0, "system prompt should still exist")
+		assert.Equal(t, models.ChatRoleSystem, session.messages[0].Role, "first message should still be system prompt")
+
+		// Verify system prompt content hasn't changed
+		newPrompt := session.messages[0].GetText()
+		assert.Equal(t, initialPrompt, newPrompt, "system prompt should be the same")
+	})
+}
