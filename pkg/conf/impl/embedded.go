@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"gopkg.in/yaml.v3"
 )
 
 //go:embed all:conf
@@ -190,23 +191,40 @@ func (s *EmbeddedConfigStore) loadAllConfig() error {
 	return nil
 }
 
-// loadGlobalConfig loads the global configuration from embedded global.json.
+// loadGlobalConfig loads the global configuration from embedded global.yml or global.json.
+// YAML takes precedence over JSON if both exist.
 func (s *EmbeddedConfigStore) loadGlobalConfig() error {
-	globalPath := "conf/global.json"
+	// Try YAML first (takes precedence)
+	yamlPath := "conf/global.yml"
+	data, err := embeddedConfigFS.ReadFile(yamlPath)
+	if err == nil {
+		var config conf.GlobalConfig
+		if err := yaml.Unmarshal(data, &config); err != nil {
+			return fmt.Errorf("loadGlobalConfig(): failed to parse %s: %w", yamlPath, err)
+		}
+		s.globalConfig = &config
+		return nil
+	}
 
-	data, err := embeddedConfigFS.ReadFile(globalPath)
+	if !isNotExist(err) {
+		return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", yamlPath, err)
+	}
+
+	// Fall back to JSON
+	jsonPath := "conf/global.json"
+	data, err = embeddedConfigFS.ReadFile(jsonPath)
 	if err != nil {
 		if isNotExist(err) {
 			// Global config is optional, use empty config
 			s.globalConfig = &conf.GlobalConfig{}
 			return nil
 		}
-		return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", globalPath, err)
+		return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", jsonPath, err)
 	}
 
 	var config conf.GlobalConfig
 	if err := json.Unmarshal(data, &config); err != nil {
-		return fmt.Errorf("loadGlobalConfig(): failed to parse %s: %w", globalPath, err)
+		return fmt.Errorf("loadGlobalConfig(): failed to parse %s: %w", jsonPath, err)
 	}
 
 	s.globalConfig = &config
@@ -214,6 +232,7 @@ func (s *EmbeddedConfigStore) loadGlobalConfig() error {
 }
 
 // loadModelProviderConfigs loads all model provider configurations from the embedded models directory.
+// YAML files take precedence over JSON files if both exist for the same provider.
 func (s *EmbeddedConfigStore) loadModelProviderConfigs() error {
 	modelsDir := "conf/models"
 
@@ -228,8 +247,45 @@ func (s *EmbeddedConfigStore) loadModelProviderConfigs() error {
 	}
 
 	configs := make(map[string]*conf.ModelProviderConfig)
+	// Track which providers we've loaded (to handle YAML precedence)
+	loadedProviders := make(map[string]bool)
+
+	// First pass: load YAML files (takes precedence)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".yml" {
+			continue
+		}
+
+		providerName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
+		providerPath := filepath.Join(modelsDir, entry.Name())
+		data, err := embeddedConfigFS.ReadFile(providerPath)
+		if err != nil {
+			return fmt.Errorf("loadModelProviderConfigs(): failed to read %s: %w", providerPath, err)
+		}
+
+		var config conf.ModelProviderConfig
+		if err := yaml.Unmarshal(data, &config); err != nil {
+			return fmt.Errorf("loadModelProviderConfigs(): failed to parse %s: %w", providerPath, err)
+		}
+
+		// If name is not set, use filename without extension
+		if config.Name == "" {
+			config.Name = providerName
+		}
+
+		configs[config.Name] = &config
+		loadedProviders[providerName] = true
+	}
+
+	// Second pass: load JSON files (only if YAML doesn't exist for that provider)
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+
+		providerName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
+		// Skip if already loaded from YAML
+		if loadedProviders[providerName] {
 			continue
 		}
 
@@ -246,7 +302,7 @@ func (s *EmbeddedConfigStore) loadModelProviderConfigs() error {
 
 		// If name is not set, use filename without extension
 		if config.Name == "" {
-			config.Name = entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
+			config.Name = providerName
 		}
 
 		configs[config.Name] = &config
@@ -259,6 +315,7 @@ func (s *EmbeddedConfigStore) loadModelProviderConfigs() error {
 // loadAgentRoleConfigs loads all agent role configurations from the embedded roles directory.
 // The special "all" meta-role is loaded without requiring config.json, as it only contains
 // prompt fragments that are merged into other roles.
+// YAML files take precedence over JSON files if both exist for the same role.
 func (s *EmbeddedConfigStore) loadAgentRoleConfigs() error {
 	rolesDir := "conf/roles"
 
@@ -279,40 +336,55 @@ func (s *EmbeddedConfigStore) loadAgentRoleConfigs() error {
 		}
 
 		roleName := entry.Name()
-		configPath := filepath.Join(rolesDir, roleName, "config.json")
 
+		// Try YAML first (takes precedence)
+		configPath := filepath.Join(rolesDir, roleName, "config.yml")
 		data, err := embeddedConfigFS.ReadFile(configPath)
 		if err != nil {
-			if isNotExist(err) {
-				// Special case: "all" is a meta-role that only contains prompt fragments
-				// to be merged into other roles. It doesn't require a config.json file.
-				if roleName == "all" {
-					// Load only prompt fragments for the "all" meta-role
-					promptFragments, err := s.loadPromptFragments(filepath.Join(rolesDir, roleName))
-					if err != nil {
-						return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, err)
-					}
-					// Load tool fragments from conf/tools directory (shared by all roles)
-					toolFragments, err := s.loadToolFragments()
-					if err != nil {
-						return fmt.Errorf("loadAgentRoleConfigs(): failed to load tool fragments: %w", err)
-					}
-					configs["all"] = &conf.AgentRoleConfig{
-						Name:            "all",
-						PromptFragments: promptFragments,
-						ToolFragments:   toolFragments,
-					}
-					continue
-				}
-				// config.json is required for all other roles
-				return fmt.Errorf("loadAgentRoleConfigs(): role %s missing config.json", roleName)
+			if !isNotExist(err) {
+				return fmt.Errorf("loadAgentRoleConfigs(): failed to read %s: %w", configPath, err)
 			}
-			return fmt.Errorf("loadAgentRoleConfigs(): failed to read %s: %w", configPath, err)
+			// Fall back to JSON
+			configPath = filepath.Join(rolesDir, roleName, "config.json")
+			data, err = embeddedConfigFS.ReadFile(configPath)
+			if err != nil {
+				if isNotExist(err) {
+					// Special case: "all" is a meta-role that only contains prompt fragments
+					// to be merged into other roles. It doesn't require a config file.
+					if roleName == "all" {
+						// Load only prompt fragments for the "all" meta-role
+						promptFragments, err := s.loadPromptFragments(filepath.Join(rolesDir, roleName))
+						if err != nil {
+							return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, err)
+						}
+						// Load tool fragments from conf/tools directory (shared by all roles)
+						toolFragments, err := s.loadToolFragments()
+						if err != nil {
+							return fmt.Errorf("loadAgentRoleConfigs(): failed to load tool fragments: %w", err)
+						}
+						configs["all"] = &conf.AgentRoleConfig{
+							Name:            "all",
+							PromptFragments: promptFragments,
+							ToolFragments:   toolFragments,
+						}
+						continue
+					}
+					// config file is required for all other roles
+					return fmt.Errorf("loadAgentRoleConfigs(): role %s missing config.yml or config.json", roleName)
+				}
+				return fmt.Errorf("loadAgentRoleConfigs(): failed to read %s: %w", configPath, err)
+			}
 		}
 
 		var config conf.AgentRoleConfig
-		if err := json.Unmarshal(data, &config); err != nil {
-			return fmt.Errorf("loadAgentRoleConfigs(): failed to parse %s: %w", configPath, err)
+		if filepath.Ext(configPath) == ".yml" {
+			if err := yaml.Unmarshal(data, &config); err != nil {
+				return fmt.Errorf("loadAgentRoleConfigs(): failed to parse %s: %w", configPath, err)
+			}
+		} else {
+			if err := json.Unmarshal(data, &config); err != nil {
+				return fmt.Errorf("loadAgentRoleConfigs(): failed to parse %s: %w", configPath, err)
+			}
 		}
 
 		// If name is not set, use directory name

@@ -967,3 +967,284 @@ func TestLocalConfigStore_PromptFragments_Copy(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "Original prompt.", test1_2.PromptFragments["10-system"])
 }
+
+func TestLocalConfigStore_YAMLGlobalConfig(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Create global.yml
+	globalYAML := `model_tags:
+  - model: "^claude-.*"
+    tag: "anthropic"
+default_provider: "test-provider"
+default_role: "test-role"
+`
+	err = os.WriteFile(filepath.Join(tmpDir, "global.yml"), []byte(globalYAML), 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	// Test GetGlobalConfig
+	config, err := store.GetGlobalConfig()
+	require.NoError(t, err)
+	assert.Len(t, config.ModelTags, 1)
+	assert.Equal(t, "^claude-.*", config.ModelTags[0].Model)
+	assert.Equal(t, "anthropic", config.ModelTags[0].Tag)
+	assert.Equal(t, "test-provider", config.DefaultProvider)
+	assert.Equal(t, "test-role", config.DefaultRole)
+}
+
+func TestLocalConfigStore_YAMLPrecedence_Global(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Create both global.yml and global.json
+	globalYAML := `model_tags:
+  - model: "^gpt-.*"
+    tag: "openai"
+default_provider: "yaml-provider"
+`
+	globalJSON := `{
+  "model_tags": [
+    {"model": "^claude-.*", "tag": "anthropic"}
+  ],
+  "default_provider": "json-provider"
+}`
+
+	err = os.WriteFile(filepath.Join(tmpDir, "global.yml"), []byte(globalYAML), 0644)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(tmpDir, "global.json"), []byte(globalJSON), 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	// YAML should take precedence
+	config, err := store.GetGlobalConfig()
+	require.NoError(t, err)
+	assert.Len(t, config.ModelTags, 1)
+	assert.Equal(t, "^gpt-.*", config.ModelTags[0].Model)
+	assert.Equal(t, "openai", config.ModelTags[0].Tag)
+	assert.Equal(t, "yaml-provider", config.DefaultProvider)
+}
+
+func TestLocalConfigStore_YAMLModelProvider(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	modelsDir := filepath.Join(tmpDir, "models")
+	require.NoError(t, os.Mkdir(modelsDir, 0755))
+
+	// Create YAML model provider config
+	providerYAML := `type: openai
+name: openai-yaml
+description: OpenAI via YAML
+url: https://api.openai.com/v1
+api_key: yaml-key
+`
+	err = os.WriteFile(filepath.Join(modelsDir, "openai.yml"), []byte(providerYAML), 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	// Test GetModelProviderConfigs
+	configs, err := store.GetModelProviderConfigs()
+	require.NoError(t, err)
+	assert.Len(t, configs, 1)
+
+	openai, ok := configs["openai-yaml"]
+	require.True(t, ok)
+	assert.Equal(t, "openai", openai.Type)
+	assert.Equal(t, "OpenAI via YAML", openai.Description)
+	assert.Equal(t, "https://api.openai.com/v1", openai.URL)
+	assert.Equal(t, "yaml-key", openai.APIKey)
+}
+
+func TestLocalConfigStore_YAMLPrecedence_ModelProvider(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	modelsDir := filepath.Join(tmpDir, "models")
+	require.NoError(t, os.Mkdir(modelsDir, 0755))
+
+	// Create both YAML and JSON for the same provider
+	providerYAML := `type: openai
+name: test-provider
+description: YAML version
+url: https://yaml.example.com
+`
+	providerJSON := `{
+  "type": "anthropic",
+  "name": "test-provider",
+  "description": "JSON version",
+  "url": "https://json.example.com"
+}`
+
+	err = os.WriteFile(filepath.Join(modelsDir, "test-provider.yml"), []byte(providerYAML), 0644)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(modelsDir, "test-provider.json"), []byte(providerJSON), 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	// YAML should take precedence
+	configs, err := store.GetModelProviderConfigs()
+	require.NoError(t, err)
+	assert.Len(t, configs, 1)
+
+	provider, ok := configs["test-provider"]
+	require.True(t, ok)
+	assert.Equal(t, "openai", provider.Type)
+	assert.Equal(t, "YAML version", provider.Description)
+	assert.Equal(t, "https://yaml.example.com", provider.URL)
+}
+
+func TestLocalConfigStore_YAMLRoleConfig(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	rolesDir := filepath.Join(tmpDir, "roles")
+	require.NoError(t, os.Mkdir(rolesDir, 0755))
+
+	// Create YAML role config
+	roleDir := filepath.Join(rolesDir, "yaml-role")
+	require.NoError(t, os.Mkdir(roleDir, 0755))
+
+	roleYAML := `name: yaml-role
+description: A role defined in YAML
+vfs-privileges:
+  "**":
+    read: allow
+    write: ask
+tools-access:
+  read: allow
+  write: deny
+`
+	err = os.WriteFile(filepath.Join(roleDir, "config.yml"), []byte(roleYAML), 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	// Test GetAgentRoleConfigs
+	configs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	assert.Len(t, configs, 1)
+
+	role, ok := configs["yaml-role"]
+	require.True(t, ok)
+	assert.Equal(t, "yaml-role", role.Name)
+	assert.Equal(t, "A role defined in YAML", role.Description)
+	assert.Equal(t, conf.AccessAllow, role.VFSPrivileges["**"].Read)
+	assert.Equal(t, conf.AccessAsk, role.VFSPrivileges["**"].Write)
+	assert.Equal(t, conf.AccessAllow, role.ToolsAccess["read"])
+	assert.Equal(t, conf.AccessDeny, role.ToolsAccess["write"])
+}
+
+func TestLocalConfigStore_YAMLPrecedence_RoleConfig(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	rolesDir := filepath.Join(tmpDir, "roles")
+	require.NoError(t, os.Mkdir(rolesDir, 0755))
+
+	// Create both YAML and JSON config for the same role
+	roleDir := filepath.Join(rolesDir, "test-role")
+	require.NoError(t, os.Mkdir(roleDir, 0755))
+
+	roleYAML := `name: test-role
+description: YAML version
+vfs-privileges: {}
+tools-access:
+  read: allow
+`
+	roleJSON := `{
+  "name": "test-role",
+  "description": "JSON version",
+  "vfs-privileges": {},
+  "tools-access": {
+    "read": "deny"
+  }
+}`
+
+	err = os.WriteFile(filepath.Join(roleDir, "config.yml"), []byte(roleYAML), 0644)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(roleDir, "config.json"), []byte(roleJSON), 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	// YAML should take precedence
+	configs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	assert.Len(t, configs, 1)
+
+	role, ok := configs["test-role"]
+	require.True(t, ok)
+	assert.Equal(t, "YAML version", role.Description)
+	assert.Equal(t, conf.AccessAllow, role.ToolsAccess["read"])
+}
+
+func TestLocalConfigStore_YAMLConfigFileWatching(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Create initial global.yml
+	globalYAML := `model_tags:
+  - model: "^gpt-.*"
+    tag: "openai"
+`
+	err = os.WriteFile(filepath.Join(tmpDir, "global.yml"), []byte(globalYAML), 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	// Get initial timestamp
+	initialTime, err := store.LastGlobalConfigUpdate()
+	require.NoError(t, err)
+
+	// Wait a bit to ensure timestamp difference
+	time.Sleep(10 * time.Millisecond)
+
+	// Modify global.yml
+	globalYAML = `model_tags:
+  - model: "^claude-.*"
+    tag: "anthropic"
+  - model: "^gpt-.*"
+    tag: "openai"
+`
+	err = os.WriteFile(filepath.Join(tmpDir, "global.yml"), []byte(globalYAML), 0644)
+	require.NoError(t, err)
+
+	// Wait for file watcher to process the event
+	time.Sleep(20 * time.Millisecond)
+
+	// Verify config was reloaded
+	config, err := store.GetGlobalConfig()
+	require.NoError(t, err)
+	assert.Len(t, config.ModelTags, 2)
+
+	// Verify timestamp was updated
+	newTime, err := store.LastGlobalConfigUpdate()
+	require.NoError(t, err)
+	assert.True(t, newTime.After(initialTime))
+}

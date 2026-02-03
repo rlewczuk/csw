@@ -1,0 +1,4 @@
+type: beha
+name: beha
+description: Beha API
+url: http://localhost:8080

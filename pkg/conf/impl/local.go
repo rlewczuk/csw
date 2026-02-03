@@ -30,11 +30,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/fsnotify/fsnotify"
+	"gopkg.in/yaml.v3"
 )
 
 // LocalConfigStore implements conf.ConfigStore interface for local filesystem-based configuration.
@@ -218,27 +220,49 @@ func (s *LocalConfigStore) loadAllConfig() error {
 	return nil
 }
 
-// loadGlobalConfig loads the global configuration from global.json.
+// loadGlobalConfig loads the global configuration from global.yml or global.json.
+// YAML takes precedence over JSON if both exist.
 func (s *LocalConfigStore) loadGlobalConfig() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	globalPath := filepath.Join(s.configDir, "global.json")
+	yamlPath := filepath.Join(s.configDir, "global.yml")
+	jsonPath := filepath.Join(s.configDir, "global.json")
 
-	data, err := os.ReadFile(globalPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// Global config is optional, use empty config
-			s.globalConfig = &conf.GlobalConfig{}
-			s.globalConfigUpdate = time.Now()
-			return nil
+	var data []byte
+	var configPath string
+	var err error
+
+	// Try YAML first (takes precedence)
+	data, err = os.ReadFile(yamlPath)
+	if err == nil {
+		configPath = yamlPath
+	} else if os.IsNotExist(err) {
+		// Try JSON if YAML doesn't exist
+		data, err = os.ReadFile(jsonPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// Global config is optional, use empty config
+				s.globalConfig = &conf.GlobalConfig{}
+				s.globalConfigUpdate = time.Now()
+				return nil
+			}
+			return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", jsonPath, err)
 		}
-		return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", globalPath, err)
+		configPath = jsonPath
+	} else {
+		return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", yamlPath, err)
 	}
 
 	var config conf.GlobalConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		return fmt.Errorf("loadGlobalConfig(): failed to parse %s: %w", globalPath, err)
+	if strings.HasSuffix(configPath, ".yml") || strings.HasSuffix(configPath, ".yaml") {
+		if err := yaml.Unmarshal(data, &config); err != nil {
+			return fmt.Errorf("loadGlobalConfig(): failed to parse %s: %w", configPath, err)
+		}
+	} else {
+		if err := json.Unmarshal(data, &config); err != nil {
+			return fmt.Errorf("loadGlobalConfig(): failed to parse %s: %w", configPath, err)
+		}
 	}
 
 	s.globalConfig = &config
@@ -248,6 +272,7 @@ func (s *LocalConfigStore) loadGlobalConfig() error {
 }
 
 // loadModelProviderConfigs loads all model provider configurations from the models directory.
+// Supports both .json and .yml/.yaml files, with YAML taking precedence over JSON if both exist.
 func (s *LocalConfigStore) loadModelProviderConfigs() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -265,9 +290,51 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 		return fmt.Errorf("loadModelProviderConfigs(): failed to read models directory: %w", err)
 	}
 
+	// Track which provider names have been loaded (YAML takes precedence)
+	loadedProviders := make(map[string]bool)
 	configs := make(map[string]*conf.ModelProviderConfig)
+
+	// First pass: load YAML files (takes precedence)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if ext != ".yml" && ext != ".yaml" {
+			continue
+		}
+
+		providerPath := filepath.Join(modelsDir, entry.Name())
+		data, err := os.ReadFile(providerPath)
+		if err != nil {
+			return fmt.Errorf("loadModelProviderConfigs(): failed to read %s: %w", providerPath, err)
+		}
+
+		var config conf.ModelProviderConfig
+		if err := yaml.Unmarshal(data, &config); err != nil {
+			return fmt.Errorf("loadModelProviderConfigs(): failed to parse %s: %w", providerPath, err)
+		}
+
+		// If name is not set, use filename without extension
+		baseName := entry.Name()[:len(entry.Name())-len(ext)]
+		if config.Name == "" {
+			config.Name = baseName
+		}
+
+		configs[config.Name] = &config
+		loadedProviders[baseName] = true
+	}
+
+	// Second pass: load JSON files (only if no YAML version exists)
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+
+		baseName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
+		if loadedProviders[baseName] {
+			// Skip JSON if YAML version was already loaded
 			continue
 		}
 
@@ -284,7 +351,7 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 
 		// If name is not set, use filename without extension
 		if config.Name == "" {
-			config.Name = entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
+			config.Name = baseName
 		}
 
 		configs[config.Name] = &config
@@ -299,6 +366,7 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 // loadAgentRoleConfigs loads all agent role configurations from the roles directory.
 // The special "all" meta-role is loaded without requiring config.json, as it only contains
 // prompt fragments that are merged into other roles.
+// Supports both config.yaml and config.json, with YAML taking precedence.
 func (s *LocalConfigStore) loadAgentRoleConfigs() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -323,34 +391,70 @@ func (s *LocalConfigStore) loadAgentRoleConfigs() error {
 		}
 
 		roleName := entry.Name()
-		configPath := filepath.Join(rolesDir, roleName, "config.json")
+		roleDir := filepath.Join(rolesDir, roleName)
 
-		data, err := os.ReadFile(configPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				// Special case: "all" is a meta-role that only contains prompt fragments
-				// to be merged into other roles. It doesn't require a config.json file.
-				if roleName == "all" {
-					// Load only prompt fragments for the "all" meta-role
-					promptFragments, err := s.loadPromptFragments(filepath.Join(rolesDir, roleName))
-					if err != nil {
-						return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, err)
+		// Try YAML first (takes precedence), then JSON
+		yamlPath := filepath.Join(roleDir, "config.yaml")
+		ymlPath := filepath.Join(roleDir, "config.yml")
+		jsonPath := filepath.Join(roleDir, "config.json")
+
+		var data []byte
+		var configPath string
+		var useYAML bool
+
+		// Try config.yaml first
+		data, err = os.ReadFile(yamlPath)
+		if err == nil {
+			configPath = yamlPath
+			useYAML = true
+		} else if os.IsNotExist(err) {
+			// Try config.yml next
+			data, err = os.ReadFile(ymlPath)
+			if err == nil {
+				configPath = ymlPath
+				useYAML = true
+			} else if os.IsNotExist(err) {
+				// Try config.json last
+				data, err = os.ReadFile(jsonPath)
+				if err != nil {
+					if os.IsNotExist(err) {
+						// Special case: "all" is a meta-role that only contains prompt fragments
+						// to be merged into other roles. It doesn't require a config file.
+						if roleName == "all" {
+							// Load only prompt fragments for the "all" meta-role
+							promptFragments, err := s.loadPromptFragments(roleDir)
+							if err != nil {
+								return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, err)
+							}
+							configs["all"] = &conf.AgentRoleConfig{
+								Name:            "all",
+								PromptFragments: promptFragments,
+							}
+							continue
+						}
+						// config file is required for all other roles
+						return fmt.Errorf("loadAgentRoleConfigs(): role %s missing config.json or config.yaml", roleName)
 					}
-					configs["all"] = &conf.AgentRoleConfig{
-						Name:            "all",
-						PromptFragments: promptFragments,
-					}
-					continue
+					return fmt.Errorf("loadAgentRoleConfigs(): failed to read %s: %w", jsonPath, err)
 				}
-				// config.json is required for all other roles
-				return fmt.Errorf("loadAgentRoleConfigs(): role %s missing config.json", roleName)
+				configPath = jsonPath
+				useYAML = false
+			} else {
+				return fmt.Errorf("loadAgentRoleConfigs(): failed to read %s: %w", ymlPath, err)
 			}
-			return fmt.Errorf("loadAgentRoleConfigs(): failed to read %s: %w", configPath, err)
+		} else {
+			return fmt.Errorf("loadAgentRoleConfigs(): failed to read %s: %w", yamlPath, err)
 		}
 
 		var config conf.AgentRoleConfig
-		if err := json.Unmarshal(data, &config); err != nil {
-			return fmt.Errorf("loadAgentRoleConfigs(): failed to parse %s: %w", configPath, err)
+		if useYAML {
+			if err := yaml.Unmarshal(data, &config); err != nil {
+				return fmt.Errorf("loadAgentRoleConfigs(): failed to parse %s: %w", configPath, err)
+			}
+		} else {
+			if err := json.Unmarshal(data, &config); err != nil {
+				return fmt.Errorf("loadAgentRoleConfigs(): failed to parse %s: %w", configPath, err)
+			}
 		}
 
 		// If name is not set, use directory name
@@ -359,7 +463,7 @@ func (s *LocalConfigStore) loadAgentRoleConfigs() error {
 		}
 
 		// Load prompt fragments from .md files in the role directory
-		promptFragments, err := s.loadPromptFragments(filepath.Join(rolesDir, roleName))
+		promptFragments, err := s.loadPromptFragments(roleDir)
 		if err != nil {
 			return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, err)
 		}
@@ -404,10 +508,16 @@ func (s *LocalConfigStore) loadPromptFragments(roleDir string) (map[string]strin
 
 // setupWatchers sets up file system watchers for all configuration directories.
 func (s *LocalConfigStore) setupWatchers() error {
-	// Watch global.json
-	globalPath := filepath.Join(s.configDir, "global.json")
-	if _, err := os.Stat(globalPath); err == nil {
-		if err := s.watcher.Add(globalPath); err != nil {
+	// Watch global config files (YAML takes precedence but watch both)
+	yamlPath := filepath.Join(s.configDir, "global.yml")
+	jsonPath := filepath.Join(s.configDir, "global.json")
+	if _, err := os.Stat(yamlPath); err == nil {
+		if err := s.watcher.Add(yamlPath); err != nil {
+			return fmt.Errorf("setupWatchers(): failed to watch global.yml: %w", err)
+		}
+	}
+	if _, err := os.Stat(jsonPath); err == nil {
+		if err := s.watcher.Add(jsonPath); err != nil {
 			return fmt.Errorf("setupWatchers(): failed to watch global.json: %w", err)
 		}
 	}
@@ -474,12 +584,13 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 		return
 	}
 
-	globalPath := filepath.Join(s.configDir, "global.json")
+	globalYAMLPath := filepath.Join(s.configDir, "global.yml")
+	globalJSONPath := filepath.Join(s.configDir, "global.json")
 	modelsDir := filepath.Join(s.configDir, "models")
 	rolesDir := filepath.Join(s.configDir, "roles")
 
-	// Check if it's global.json
-	if event.Name == globalPath {
+	// Check if it's global config file (YAML or JSON)
+	if event.Name == globalYAMLPath || event.Name == globalJSONPath {
 		if err := s.loadGlobalConfig(); err != nil {
 			fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload global config: %v\n", err)
 		}
@@ -487,11 +598,14 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 	}
 
 	// Check if it's in models directory
-	if filepath.Dir(event.Name) == modelsDir && filepath.Ext(event.Name) == ".json" {
-		if err := s.loadModelProviderConfigs(); err != nil {
-			fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload model provider configs: %v\n", err)
+	if filepath.Dir(event.Name) == modelsDir {
+		ext := strings.ToLower(filepath.Ext(event.Name))
+		if ext == ".json" || ext == ".yml" || ext == ".yaml" {
+			if err := s.loadModelProviderConfigs(); err != nil {
+				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload model provider configs: %v\n", err)
+			}
+			return
 		}
-		return
 	}
 
 	// Check if it's a new role directory
@@ -504,14 +618,19 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 		}
 	}
 
-	// Check if it's in a role directory (config.json or .md file)
+	// Check if it's in a role directory (config.yaml, config.yml, config.json, or .md file)
 	eventDir := filepath.Dir(event.Name)
-	eventExt := filepath.Ext(event.Name)
-	if filepath.Dir(eventDir) == rolesDir && (filepath.Base(event.Name) == "config.json" || eventExt == ".md") {
-		if err := s.loadAgentRoleConfigs(); err != nil {
-			fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload agent role configs: %v\n", err)
+	baseName := filepath.Base(event.Name)
+	eventExt := strings.ToLower(filepath.Ext(event.Name))
+	if filepath.Dir(eventDir) == rolesDir {
+		isConfigFile := baseName == "config.yaml" || baseName == "config.yml" || baseName == "config.json"
+		isMarkdownFile := eventExt == ".md"
+		if isConfigFile || isMarkdownFile {
+			if err := s.loadAgentRoleConfigs(); err != nil {
+				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload agent role configs: %v\n", err)
+			}
+			return
 		}
-		return
 	}
 }
 

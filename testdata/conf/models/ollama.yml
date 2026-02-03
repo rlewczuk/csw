@@ -1,0 +1,6 @@
+type: ollama
+name: ollama
+description: Local Ollama instance
+url: http://localhost:11434
+connect_timeout: 30s
+request_timeout: 300s
