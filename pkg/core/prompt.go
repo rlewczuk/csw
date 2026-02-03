@@ -407,7 +407,32 @@ func (g *ConfPromptGenerator) GetToolInfo(tags []string, toolName string, role *
 	}
 
 	// Parse the schema (description is now in the schema file)
-	return parseToolDescription(toolName, schemaContent)
+	toolInfo, err := parseToolDescription(toolName, schemaContent)
+	if err != nil {
+		return tool.ToolInfo{}, err
+	}
+
+	// Look for detailed description in <toolname>.md
+	mdKey := fmt.Sprintf("%s/%s.md", toolName, toolName)
+	if mdContent, ok := toolFragments[mdKey]; ok {
+		if toolInfo.Description != "" {
+			toolInfo.Description += "\n\n"
+		}
+		toolInfo.Description += mdContent
+	}
+
+	// Look for tagged descriptions in <toolname>-<tag>.md
+	for _, tag := range tags {
+		tagKey := fmt.Sprintf("%s/%s-%s.md", toolName, toolName, tag)
+		if tagContent, ok := toolFragments[tagKey]; ok {
+			if toolInfo.Description != "" {
+				toolInfo.Description += "\n\n"
+			}
+			toolInfo.Description += tagContent
+		}
+	}
+
+	return toolInfo, nil
 }
 
 // parseToolDescription parses a tool description from JSON Schema file.

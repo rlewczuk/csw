@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -473,4 +475,131 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		require.NotNil(t, role, "Role should be set automatically")
 		assert.Equal(t, "tester", role.Name, "Should use default role from global config")
 	})
+
+	t.Run("tool description from markdown file is included", func(t *testing.T) {
+		// This test verifies that tool descriptions from markdown files are included
+		// in the tool info sent to the LLM.
+
+		// Setup mock LLM server
+		mockServer := testutil.NewMockHTTPServer()
+		defer mockServer.Close()
+
+		client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+		require.NoError(t, err)
+
+		vfsInstance := vfs.NewMockVFS()
+		tools := tool.NewToolRegistry()
+		// Register a dummy tool
+		dTool := &dummyTool{name: "dummyTool"}
+		tools.Register("dummyTool", dTool)
+
+		// Create a mock config store with a role that has tool fragments
+		configStore := impl.NewMockConfigStore()
+		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+			"developer": {
+				Name:        "developer",
+				Description: "Software developer role",
+				PromptFragments: map[string]string{
+					"1-system.md": "You are a skilled software developer.",
+				},
+				ToolFragments: map[string]string{
+					"dummyTool/dummyTool.schema.json": `{
+						"type": "object",
+						"description": "Short description from schema",
+						"properties": {
+							"arg": { "type": "string" }
+						}
+					}`,
+					"dummyTool/dummyTool.md":         "# Detailed Tool Description\n\nThis is a detailed description from markdown.",
+					"dummyTool/dummyTool-special.md": "\n\nExtra special instructions.",
+				},
+			},
+		})
+
+		// Create REAL prompt generator (not mock)
+		promptGenerator, err := core.NewConfPromptGenerator(configStore, vfsInstance)
+		require.NoError(t, err)
+
+		roleRegistry := core.NewAgentRoleRegistry(configStore)
+
+		// Create system
+		system := &core.SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      promptGenerator,
+			Tools:                tools,
+			VFS:                  vfsInstance,
+			Roles:                roleRegistry,
+			ConfigStore:          configStore,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		}
+
+		// Add a tag mapping to ensure we have the 'special' tag
+		system.ModelTags.SetGlobalMappings([]conf.ModelTagMapping{
+			{Model: ".*", Tag: "special"},
+		})
+
+		// Create session
+		thread := core.NewSessionThread(system, nil)
+
+		err = thread.StartSession("ollama/test-model:latest")
+		require.NoError(t, err)
+
+		// Mock the LLM response to avoid hanging
+		mockServer.AddStreamingResponse("/api/chat", "POST", true,
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello"},"done":true}`,
+		)
+
+		// Trigger a run to send request
+		ctx := context.Background()
+		session := thread.GetSession()
+		err = session.Run(ctx)
+		require.NoError(t, err)
+
+		// Verify the request body sent to LLM
+		requests := mockServer.GetRequests()
+		require.NotEmpty(t, requests)
+		lastRequest := requests[len(requests)-1]
+
+		// Parse request body
+		var chatReq struct {
+			Tools []struct {
+				Function struct {
+					Name        string `json:"name"`
+					Description string `json:"description"`
+				} `json:"function"`
+			} `json:"tools"`
+		}
+		err = json.Unmarshal(lastRequest.Body, &chatReq)
+		require.NoError(t, err)
+
+		// Find the dummy tool
+		var foundTool bool
+		for _, toolObj := range chatReq.Tools {
+			if toolObj.Function.Name == "dummyTool" {
+				foundTool = true
+				// Check if description contains the markdown content
+				assert.Contains(t, toolObj.Function.Description, "This is a detailed description from markdown",
+					"Tool description should contain content from markdown file")
+				// Check if tagged description is included
+				assert.Contains(t, toolObj.Function.Description, "Extra special instructions",
+					"Tool description should contain tagged content")
+			}
+		}
+
+		assert.True(t, foundTool, "dummyTool should be in the request")
+	})
+}
+
+// dummyTool is a simple tool implementation for testing
+type dummyTool struct {
+	name string
+}
+
+func (d *dummyTool) Execute(args tool.ToolCall) tool.ToolResponse {
+	return tool.ToolResponse{
+		Call:   &args,
+		Result: tool.NewToolValue("success"),
+		Done:   true,
+	}
 }
