@@ -232,6 +232,11 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	// Print verbose request output if enabled
 	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
 
+	// Log request using structured logger if available
+	if effectiveOptions != nil && effectiveOptions.Logger != nil {
+		logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
+	}
+
 	resp, err := m.client.httpClient.Do(req)
 	if err != nil {
 		return nil, m.client.handleHTTPError(err)
@@ -258,6 +263,7 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
 	var mergedMessage OllamaMessage
 	mergedMessage.Role = "assistant"
+	var lastChatResp OllamaChatResponse
 
 	for {
 		var chatResp OllamaChatResponse
@@ -267,6 +273,7 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 			}
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
+		lastChatResp = chatResp
 
 		// Merge content
 		if chatResp.Message.Content != "" {
@@ -281,6 +288,12 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 		if chatResp.Done {
 			break
 		}
+	}
+
+	// Log response using structured logger if available
+	// We log the last response which contains the final state
+	if effectiveOptions != nil && effectiveOptions.Logger != nil {
+		logHTTPResponseWithObfuscation(effectiveOptions.Logger, resp, lastChatResp)
 	}
 
 	// Convert response to models.ChatMessage
@@ -349,6 +362,11 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 		// Print verbose request output if enabled
 		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
 
+		// Log request using structured logger if available
+		if effectiveOptions != nil && effectiveOptions.Logger != nil {
+			logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
+		}
+
 		resp, err := m.client.httpClient.Do(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: OllamaChatModel.ChatStream() [ollama_client.go]: HTTP request failed: %v\n", err)
@@ -394,6 +412,11 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 			if effectiveOptions != nil && effectiveOptions.Verbose {
 				jsonBytes, _ := json.Marshal(chatResp)
 				fmt.Println(string(jsonBytes))
+			}
+
+			// Log each chunk using structured logger if available
+			if effectiveOptions != nil && effectiveOptions.Logger != nil {
+				logHTTPResponseChunk(effectiveOptions.Logger, chatResp)
 			}
 
 			// Convert the streamed message to ChatMessage

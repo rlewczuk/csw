@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"iter"
+	"log/slog"
 
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
@@ -46,6 +47,7 @@ type ChatOptions struct {
 	TopP        float32
 	TopK        int
 	Verbose     bool
+	Logger      *slog.Logger
 }
 
 // ChatMessagePart represents a part of a chat message. A message can contain text, tool calls, or tool responses.

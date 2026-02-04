@@ -267,6 +267,11 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	// Print verbose request output if enabled
 	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
 
+	// Log request using structured logger if available
+	if effectiveOptions != nil && effectiveOptions.Logger != nil {
+		logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
+	}
+
 	resp, err := m.client.httpClient.Do(req)
 	if err != nil {
 		return nil, m.client.handleHTTPError(err)
@@ -291,6 +296,11 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	var chatResp AnthropicMessagesResponse
 	if err := json.Unmarshal(bodyBytes, &chatResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Log response using structured logger if available
+	if effectiveOptions != nil && effectiveOptions.Logger != nil {
+		logHTTPResponseWithObfuscation(effectiveOptions.Logger, resp, chatResp)
 	}
 
 	if len(chatResp.Content) == 0 {
@@ -385,6 +395,11 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		// Print verbose request output if enabled
 		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
 
+		// Log request using structured logger if available
+		if effectiveOptions != nil && effectiveOptions.Logger != nil {
+			logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
+		}
+
 		resp, err := m.client.httpClient.Do(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: AnthropicChatModel.ChatStream() [anthropic_client.go]: HTTP request failed: %v\n", err)
@@ -441,6 +456,11 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 				if err := json.Unmarshal([]byte(data), &event); err != nil {
 					// Skip invalid JSON
 					continue
+				}
+
+				// Log each chunk using structured logger if available
+				if effectiveOptions != nil && effectiveOptions.Logger != nil {
+					logHTTPResponseChunk(effectiveOptions.Logger, event)
 				}
 
 				// Handle different event types
