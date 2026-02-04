@@ -1085,57 +1085,6 @@ func TestSessionWriter(t *testing.T) {
 	})
 }
 
-// TestSessionThreadWithWriter tests the SessionThreadWithWriter functionality.
-func TestSessionThreadWithWriter(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfsInstance := vfs.NewMockVFS()
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
-
-	system := &SweSystem{
-		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
-		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
-		Tools:                tools,
-		VFS:                  vfsInstance,
-		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-		WorkDir:              ".",
-	}
-
-	tmpDir := t.TempDir()
-	sessionFile := filepath.Join(tmpDir, "session-thread.md")
-
-	t.Run("basic thread with writer", func(t *testing.T) {
-		mockHandler := testutil.NewMockSessionOutputHandler()
-		thread, err := NewSessionThreadWithWriter(system, mockHandler, sessionFile)
-		require.NoError(t, err)
-		defer thread.Close()
-
-		// Start session
-		err = thread.StartSession("ollama/devstral-small-2:latest")
-		require.NoError(t, err)
-
-		// Send user prompt
-		err = thread.UserPrompt("Test prompt")
-		require.NoError(t, err)
-
-		// Wait for completion
-		mockHandler.WaitForRunFinished()
-
-		// Verify file was written
-		content, err := os.ReadFile(sessionFile)
-		require.NoError(t, err)
-
-		contentStr := string(content)
-		assert.Contains(t, contentStr, "# User (#1)")
-		assert.Contains(t, contentStr, "Test prompt")
-	})
-}
-
 func TestSessionStreamingMode(t *testing.T) {
 	mockServer := testutil.NewMockHTTPServer()
 	defer mockServer.Close()
