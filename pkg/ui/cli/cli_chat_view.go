@@ -33,6 +33,10 @@ type CliChatView struct {
 
 	// stopCh signals the input reading goroutine to stop
 	stopCh chan struct{}
+
+	// renderedText tracks the text that has been rendered for each message
+	// Key is message ID, value is the text that was printed
+	renderedText map[string]string
 }
 
 // NewCliChatView creates a new CLI chat view.
@@ -52,6 +56,7 @@ func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Read
 		acceptAllPermissions: acceptAllPermissions,
 		messages:             make([]*ui.ChatMessageUI, 0),
 		stopCh:               make(chan struct{}),
+		renderedText:         make(map[string]string),
 	}
 
 	// Setup scanner only for interactive mode
@@ -274,13 +279,42 @@ func (v *CliChatView) renderMessage(msg *ui.ChatMessageUI) {
 			fmt.Fprintf(v.output, "\nYou: %s\n", msg.Text)
 		}
 	case ui.ChatRoleAssistant:
+		v.renderAssistantMessage(msg)
+	}
+}
+
+// renderAssistantMessage renders an assistant message, handling streaming updates.
+// Must be called with mu locked.
+func (v *CliChatView) renderAssistantMessage(msg *ui.ChatMessageUI) {
+	// Get the previously rendered text for this message
+	prevRendered := v.renderedText[msg.Id]
+
+	// Check if this is a streaming update (new text starts with previously rendered text)
+	// or a full update (text is completely different)
+	isStreamingUpdate := false
+	if len(prevRendered) > 0 && len(msg.Text) >= len(prevRendered) {
+		// Check if the new text starts with what we already rendered
+		isStreamingUpdate = msg.Text[:len(prevRendered)] == prevRendered
+	}
+
+	if isStreamingUpdate {
+		// Streaming update: only print the delta
+		if len(msg.Text) > len(prevRendered) {
+			newContent := msg.Text[len(prevRendered):]
+			fmt.Fprint(v.output, newContent)
+			v.renderedText[msg.Id] = msg.Text
+		}
+	} else {
+		// Full update or new message: print the full message
 		if msg.Text != "" {
-			fmt.Fprintf(v.output, "\nAssistant: %s\n", msg.Text)
+			fmt.Fprintf(v.output, "\nAssistant: %s", msg.Text)
+			v.renderedText[msg.Id] = msg.Text
 		}
-		// Render tool calls
-		for _, tool := range msg.Tools {
-			v.renderTool(tool)
-		}
+	}
+
+	// Render tool calls
+	for _, tool := range msg.Tools {
+		v.renderTool(tool)
 	}
 }
 
