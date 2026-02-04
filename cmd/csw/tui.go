@@ -22,7 +22,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
-func runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo string, saveSession bool) error {
+func runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo string, saveSession, logLLMRequests bool) error {
 
 	// Resolve working directory
 	workDir, err := ResolveWorkDir(workDir)
@@ -143,6 +143,7 @@ func runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo s
 		LSP:             lspClient,
 		LogBaseDir:      logsDir,
 		WorkDir:         workDir,
+		LogLLMRequests:  logLLMRequests,
 	}
 
 	// Create a context that can be cancelled on interrupt
