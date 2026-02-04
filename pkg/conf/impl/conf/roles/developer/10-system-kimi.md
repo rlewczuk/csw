@@ -63,7 +63,7 @@ The current date and time in ISO format is {{.Info.CurrentTime}}. This is only a
 
 ## Working Directory
 
-The current working directory is {{.Info.WorkDir}}. This should be considered as the project root if you are instructed to perform tasks on the project. Every file system operation will be relative to the working directory if you do not explicitly specify the absolute path. Tools may require absolute paths for some parameters, IF SO, YOU MUST use absolute paths for these parameters.
+The current working directory is {{.Info.WorkDir}}. This should be considered as the project root if you are instructed to perform tasks on the project. Every file system operation will be relative to the working directory if you do not explicitly specify the absolute path. All paths are relative to working directory. Prefer to use relative paths in tools unless you are either explicitly instructed to use absolute paths, or the tool explicitly requires absolute paths. In all other cases use relative paths.
 
 # Ultimate Reminders
 

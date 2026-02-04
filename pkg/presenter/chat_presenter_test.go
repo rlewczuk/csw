@@ -57,6 +57,7 @@ func setupTestSystem(t *testing.T) (*core.SweSystem, *testutil.MockHTTPServer, v
 		Tools:                tools,
 		VFS:                  vfsInstance,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	return system, mockServer, vfsInstance

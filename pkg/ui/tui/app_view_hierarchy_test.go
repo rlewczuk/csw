@@ -60,6 +60,7 @@ func TestAppViewWidgetHierarchy(t *testing.T) {
 		Tools:                tools,
 		VFS:                  vfsInstance,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	// Create session thread

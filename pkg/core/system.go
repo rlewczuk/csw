@@ -62,6 +62,9 @@ type SweSystem struct {
 	// SessionLoggerFactory is used to create session loggers.
 	// If nil, defaults to file-based logging.
 	SessionLoggerFactory SessionLoggerFactory
+
+	// Working directory for the system
+	WorkDir string
 }
 
 func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) (*SweSession, error) {
@@ -134,7 +137,7 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		LSP:           s.LSP,
 		Tools:         sessionTools,
 		outputHandler: outputHandler,
-		workDir:       ".",
+		workDir:       s.WorkDir,
 		todoList:      make([]tool.TodoItem, 0),
 		logger:        sessionLogger,
 		streaming:     streaming,

@@ -224,6 +224,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			Roles:                registry,
 			ConfigStore:          mockStore,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -257,6 +258,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			Roles:                registry,
 			ConfigStore:          mockStore,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -291,6 +293,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			VFS:                  mockVFS,
 			Roles:                registry,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -333,6 +336,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			VFS:                  mockVFS,
 			Roles:                registry,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -378,6 +382,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			VFS:                  mockVFS,
 			Roles:                registry,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -403,6 +408,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			VFS:                  mockVFS,
 			Roles:                registry,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -460,6 +466,7 @@ func TestSweSessionGetState(t *testing.T) {
 			VFS:                  mockVFS,
 			Roles:                registry,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -477,6 +484,7 @@ func TestSweSessionGetState(t *testing.T) {
 			VFS:                  mockVFS,
 			Roles:                registry,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
@@ -511,6 +519,7 @@ func TestSweSessionGetState(t *testing.T) {
 			VFS:                  mockVFS,
 			Roles:                registry,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		session, err := system.NewSession("mock/test-model", nil)
