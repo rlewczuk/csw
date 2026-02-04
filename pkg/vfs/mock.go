@@ -121,7 +121,7 @@ func (m *MockVFS) validatePath(path string) (string, error) {
 
 	// Prevent absolute paths or paths that try to escape
 	if filepath.IsAbs(cleanPath) {
-		return "", fmt.Errorf("MockVFS.validatePath() [mock.go]: %w", ErrInvalidPath)
+		return "", fmt.Errorf("MockVFS.validatePath() [mock.go]: %w", ErrPermissionDenied)
 	}
 
 	// Check for path traversal attempts

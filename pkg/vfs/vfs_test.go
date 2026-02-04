@@ -310,7 +310,7 @@ func TestMoveFile(t *testing.T) {
 	t.Run("MoveWithAbsoluteSourcePath", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			err := fixture.VFS.MoveFile("/etc/passwd", "newname.txt")
-			assert.ErrorIs(t, err, ErrInvalidPath, "Expected ErrInvalidPath for absolute source path")
+			assert.ErrorIs(t, err, ErrPermissionDenied, "Expected ErrInvalidPath for absolute source path")
 		})
 	})
 
@@ -319,7 +319,7 @@ func TestMoveFile(t *testing.T) {
 			require.NoError(t, fixture.VFS.WriteFile("file.txt", []byte("content")), "Failed to create test file")
 
 			err := fixture.VFS.MoveFile("file.txt", "/tmp/newfile.txt")
-			assert.ErrorIs(t, err, ErrInvalidPath, "Expected ErrInvalidPath for absolute destination path")
+			assert.ErrorIs(t, err, ErrPermissionDenied, "Expected ErrInvalidPath for absolute destination path")
 		})
 	})
 
@@ -424,7 +424,7 @@ func TestWriteFile(t *testing.T) {
 	t.Run("AbsolutePath", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			err := fixture.VFS.WriteFile("/tmp/evil.txt", []byte("evil"))
-			assert.ErrorIs(t, err, ErrInvalidPath, "Expected ErrInvalidPath for absolute path")
+			assert.ErrorIs(t, err, ErrPermissionDenied, "Expected ErrInvalidPath for absolute path")
 		})
 	})
 
