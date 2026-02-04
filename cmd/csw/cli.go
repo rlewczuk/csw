@@ -221,12 +221,12 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 			sessionLogDir := filepath.Join(logsDir, "sessions", sessionID)
 			sessionFilePath = filepath.Join(sessionLogDir, "session.md")
 
-			// Create new thread with writer
+			// Create new thread with writer, preserving the existing session
 			if sessionWriter != nil {
 				// Close existing writer
 				sessionWriter.Close()
 			}
-			writer, err := core.NewSessionThreadWithWriter(sweSystem, nil, sessionFilePath)
+			writer, err := core.NewSessionThreadWithWriterAndSession(sweSystem, session, nil, sessionFilePath)
 			if err != nil {
 				return fmt.Errorf("runCLI() [cli.go]: failed to create session writer: %w", err)
 			}
@@ -234,10 +234,8 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 			thread = writer.SessionThread
 			defer writer.Close()
 
-			// Restart session with new thread
-			if err := thread.StartSession(modelName); err != nil {
-				return fmt.Errorf("runCLI() [cli.go]: failed to restart session: %w", err)
-			}
+			// Note: We don't need to call StartSession here because we're reusing the existing session.
+			// The session already has the conversation history and is ready to continue.
 		}
 	}
 
@@ -307,9 +305,18 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 	done := make(chan error, 1)
 
 	// Set up a custom output handler to track completion
-	originalHandler := chatPresenter
+	// The output handler chain should be:
+	// cliOutputHandler -> SessionWriter (if exists) -> chatPresenter
+	// This ensures the SessionWriter can write to the file, and chatPresenter displays to user.
+	var handlerChain core.SessionThreadOutput = chatPresenter
+	if sessionWriter != nil {
+		// Get the SessionWriter and set its delegate to chatPresenter
+		// Then wrap the SessionWriter with cliOutputHandler
+		sessionWriter.GetWriter().SetDelegate(chatPresenter)
+		handlerChain = sessionWriter.GetWriter()
+	}
 	wrappedHandler := &cliOutputHandler{
-		delegate: originalHandler,
+		delegate: handlerChain,
 		done:     done,
 	}
 	thread.SetOutputHandler(wrappedHandler)
