@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/lsp"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
@@ -589,12 +590,7 @@ func (s *SweSession) runStreamingChat(ctx context.Context, chatModel models.Chat
 						s.outputHandler.AddToolCallStart(part.ToolCall)
 						seenToolCalls[part.ToolCall.ID] = true
 						// Log tool call start
-						if s.logger != nil {
-							s.logger.Info("tool_call_start",
-								"tool_id", part.ToolCall.ID,
-								"function", part.ToolCall.Function,
-							)
-						}
+						logging.LogToolCall(s.logger, part.ToolCall)
 					}
 					// Always send details event as chunks arrive
 					s.outputHandler.AddToolCallDetails(part.ToolCall)
@@ -652,13 +648,7 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 				// Send tool call events
 				s.outputHandler.AddToolCallStart(part.ToolCall)
 				s.outputHandler.AddToolCallDetails(part.ToolCall)
-				// Log tool call
-				if s.logger != nil {
-					s.logger.Info("tool_call_start",
-						"tool_id", part.ToolCall.ID,
-						"function", part.ToolCall.Function,
-					)
-				}
+				logging.LogToolCall(s.logger, part.ToolCall)
 			}
 		}
 	}
@@ -695,18 +685,7 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 		}
 
 		toolResponses = append(toolResponses, &response)
-
-		// Log tool result
-		if s.logger != nil {
-			toolID := ""
-			if response.Call != nil {
-				toolID = response.Call.ID
-			}
-			s.logger.Info("tool_result",
-				"tool_id", toolID,
-				"success", response.Error == nil,
-			)
-		}
+		logging.LogToolResult(s.logger, &response)
 
 		// Notify UI handler about tool result
 		if s.outputHandler != nil {

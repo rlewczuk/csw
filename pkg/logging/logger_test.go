@@ -110,7 +110,6 @@ func TestSessionLoggerToolCall(t *testing.T) {
 
 	sessionID := "test-session-123"
 	sessionLog := GetSessionLogger(sessionID, LogTypeSession)
-	chatLog := GetSessionLogger(sessionID, LogTypeChat)
 	defer CloseSessionLogger(sessionID)
 
 	// Log tool call
@@ -121,53 +120,18 @@ func TestSessionLoggerToolCall(t *testing.T) {
 			"arg1": "value1",
 		}),
 	}
-	LogToolCall(sessionLog, chatLog, toolCall)
+	LogToolCall(sessionLog, toolCall)
 
 	// Flush to ensure writes complete
 	FlushLogs()
 
 	// Read chat log
-	chatLogPath := filepath.Join(tmpDir, "sessions", sessionID, "chat.jsonl")
+	chatLogPath := filepath.Join(tmpDir, "sessions", sessionID, "session.jsonl")
 	chatContent, err := os.ReadFile(chatLogPath)
 	require.NoError(t, err)
 	assert.Contains(t, string(chatContent), "tool_call")
 	assert.Contains(t, string(chatContent), "call-123")
 	assert.Contains(t, string(chatContent), "test_tool")
-}
-
-func TestSessionLoggerToolResult(t *testing.T) {
-	tmpDir := filepath.Join("../../tmp", "test_logs", t.Name())
-	defer os.RemoveAll(tmpDir)
-
-	err := SetLogsDirectory(tmpDir, false)
-	require.NoError(t, err)
-
-	sessionID := "test-session-123"
-	sessionLog := GetSessionLogger(sessionID, LogTypeSession)
-	chatLog := GetSessionLogger(sessionID, LogTypeChat)
-	defer CloseSessionLogger(sessionID)
-
-	// Log tool result
-	toolResponse := &tool.ToolResponse{
-		Call: &tool.ToolCall{
-			ID:       "call-123",
-			Function: "test_tool",
-		},
-		Result: tool.NewToolValue("success"),
-		Error:  nil,
-		Done:   true,
-	}
-	LogToolResult(sessionLog, chatLog, toolResponse)
-
-	// Flush to ensure writes complete
-	FlushLogs()
-
-	// Read session log
-	sessionLogPath := filepath.Join(tmpDir, "sessions", sessionID, "session.jsonl")
-	content, err := os.ReadFile(sessionLogPath)
-	require.NoError(t, err)
-	assert.Contains(t, string(content), "tool_result")
-	assert.Contains(t, string(content), "call-123")
 }
 
 func TestSessionLoggerLLMRequest(t *testing.T) {

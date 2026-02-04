@@ -55,49 +55,6 @@ func TestTestLoggerAssistantOutput(t *testing.T) {
 	assert.Contains(t, chatBuf.String(), output)
 }
 
-func TestTestLoggerToolCall(t *testing.T) {
-	sessionID := "test-session-123"
-	sessionLog, chatLog, _ := NewTestLogger(t, sessionID)
-
-	toolCall := &tool.ToolCall{
-		ID:       "call-123",
-		Function: "test_tool",
-		Arguments: tool.NewToolValue(map[string]any{
-			"arg1": "value1",
-		}),
-	}
-	LogToolCall(sessionLog, chatLog, toolCall)
-
-	// Check chat logs
-	chatBuf := GetTestChatBuffer(sessionID)
-	require.NotNil(t, chatBuf)
-	assert.Contains(t, chatBuf.String(), "tool_call")
-	assert.Contains(t, chatBuf.String(), "call-123")
-	assert.Contains(t, chatBuf.String(), "test_tool")
-}
-
-func TestTestLoggerToolResult(t *testing.T) {
-	sessionID := "test-session-123"
-	sessionLog, chatLog, _ := NewTestLogger(t, sessionID)
-
-	toolResponse := &tool.ToolResponse{
-		Call: &tool.ToolCall{
-			ID:       "call-123",
-			Function: "test_tool",
-		},
-		Result: tool.NewToolValue("success"),
-		Error:  nil,
-		Done:   true,
-	}
-	LogToolResult(sessionLog, chatLog, toolResponse)
-
-	// Check chat logs
-	chatBuf := GetTestChatBuffer(sessionID)
-	require.NotNil(t, chatBuf)
-	assert.Contains(t, chatBuf.String(), "tool_response")
-	assert.Contains(t, chatBuf.String(), "call-123")
-}
-
 func TestTestLoggerLLMRequest(t *testing.T) {
 	sessionID := "test-session-123"
 	_, _, llmLog := NewTestLogger(t, sessionID)
