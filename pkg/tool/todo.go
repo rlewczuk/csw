@@ -31,11 +31,11 @@ func NewTodoWriteTool(session TodoSession) *TodoWriteTool {
 }
 
 // Execute executes the tool with the given arguments and returns the response.
-func (t *TodoWriteTool) Execute(args ToolCall) ToolResponse {
+func (t *TodoWriteTool) Execute(args *ToolCall) *ToolResponse {
 	todosValue, ok := args.Arguments.GetOK("todos")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("TodoWriteTool.Execute() [todo.go]: missing required argument: todos"),
 			Done:  true,
 		}
@@ -43,8 +43,8 @@ func (t *TodoWriteTool) Execute(args ToolCall) ToolResponse {
 
 	todosArray, ok := todosValue.ArrayOK()
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("TodoWriteTool.Execute() [todo.go]: todos must be an array"),
 			Done:  true,
 		}
@@ -55,8 +55,8 @@ func (t *TodoWriteTool) Execute(args ToolCall) ToolResponse {
 	for i, todoValue := range todosArray {
 		todoObj, ok := todoValue.ObjectOK()
 		if !ok {
-			return ToolResponse{
-				Call:  &args,
+			return &ToolResponse{
+				Call:  args,
 				Error: fmt.Errorf("TodoWriteTool.Execute() [todo.go]: todo item at index %d is not an object", i),
 				Done:  true,
 			}
@@ -64,8 +64,8 @@ func (t *TodoWriteTool) Execute(args ToolCall) ToolResponse {
 
 		id, ok := todoObj["id"].AsStringOK()
 		if !ok {
-			return ToolResponse{
-				Call:  &args,
+			return &ToolResponse{
+				Call:  args,
 				Error: fmt.Errorf("TodoWriteTool.Execute() [todo.go]: todo item at index %d missing or invalid 'id'", i),
 				Done:  true,
 			}
@@ -73,8 +73,8 @@ func (t *TodoWriteTool) Execute(args ToolCall) ToolResponse {
 
 		content, ok := todoObj["content"].AsStringOK()
 		if !ok {
-			return ToolResponse{
-				Call:  &args,
+			return &ToolResponse{
+				Call:  args,
 				Error: fmt.Errorf("TodoWriteTool.Execute() [todo.go]: todo item at index %d missing or invalid 'content'", i),
 				Done:  true,
 			}
@@ -82,8 +82,8 @@ func (t *TodoWriteTool) Execute(args ToolCall) ToolResponse {
 
 		status, ok := todoObj["status"].AsStringOK()
 		if !ok {
-			return ToolResponse{
-				Call:  &args,
+			return &ToolResponse{
+				Call:  args,
 				Error: fmt.Errorf("TodoWriteTool.Execute() [todo.go]: todo item at index %d missing or invalid 'status'", i),
 				Done:  true,
 			}
@@ -91,8 +91,8 @@ func (t *TodoWriteTool) Execute(args ToolCall) ToolResponse {
 
 		priority, ok := todoObj["priority"].AsStringOK()
 		if !ok {
-			return ToolResponse{
-				Call:  &args,
+			return &ToolResponse{
+				Call:  args,
 				Error: fmt.Errorf("TodoWriteTool.Execute() [todo.go]: todo item at index %d missing or invalid 'priority'", i),
 				Done:  true,
 			}
@@ -100,8 +100,8 @@ func (t *TodoWriteTool) Execute(args ToolCall) ToolResponse {
 
 		// Validate status
 		if status != "pending" && status != "in_progress" && status != "completed" && status != "cancelled" {
-			return ToolResponse{
-				Call:  &args,
+			return &ToolResponse{
+				Call:  args,
 				Error: fmt.Errorf("TodoWriteTool.Execute() [todo.go]: todo item at index %d has invalid status: %s", i, status),
 				Done:  true,
 			}
@@ -109,8 +109,8 @@ func (t *TodoWriteTool) Execute(args ToolCall) ToolResponse {
 
 		// Validate priority
 		if priority != "low" && priority != "medium" && priority != "high" {
-			return ToolResponse{
-				Call:  &args,
+			return &ToolResponse{
+				Call:  args,
 				Error: fmt.Errorf("TodoWriteTool.Execute() [todo.go]: todo item at index %d has invalid priority: %s", i, priority),
 				Done:  true,
 			}
@@ -132,8 +132,8 @@ func (t *TodoWriteTool) Execute(args ToolCall) ToolResponse {
 	result.Set("message", fmt.Sprintf("Todo list updated with %d items", len(todos)))
 	result.Set("pending", t.session.CountPendingTodos())
 
-	return ToolResponse{
-		Call:   &args,
+	return &ToolResponse{
+		Call:   args,
 		Result: result,
 		Done:   true,
 	}
@@ -150,15 +150,15 @@ func NewTodoReadTool(session TodoSession) *TodoReadTool {
 }
 
 // Execute executes the tool with the given arguments and returns the response.
-func (t *TodoReadTool) Execute(args ToolCall) ToolResponse {
+func (t *TodoReadTool) Execute(args *ToolCall) *ToolResponse {
 	todos := t.session.GetTodoList()
 	pending := t.session.CountPendingTodos()
 
 	// Convert todos to ToolValue format
 	todosJSON, err := json.Marshal(todos)
 	if err != nil {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("TodoReadTool.Execute() [todo.go]: failed to marshal todos: %w", err),
 			Done:  true,
 		}
@@ -166,8 +166,8 @@ func (t *TodoReadTool) Execute(args ToolCall) ToolResponse {
 
 	var todosArray []any
 	if err := json.Unmarshal(todosJSON, &todosArray); err != nil {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("TodoReadTool.Execute() [todo.go]: failed to unmarshal todos: %w", err),
 			Done:  true,
 		}
@@ -177,8 +177,8 @@ func (t *TodoReadTool) Execute(args ToolCall) ToolResponse {
 	result.Set("todos", todosArray)
 	result.Set("pending", pending)
 
-	return ToolResponse{
-		Call:   &args,
+	return &ToolResponse{
+		Call:   args,
 		Result: result,
 		Done:   true,
 	}

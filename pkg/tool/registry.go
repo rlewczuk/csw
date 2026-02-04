@@ -48,11 +48,11 @@ func (r *ToolRegistry) List() []string {
 
 // Execute executes the tool with the given function name and arguments.
 // It delegates execution to the appropriate tool based on the function name.
-func (r *ToolRegistry) Execute(args ToolCall) ToolResponse {
+func (r *ToolRegistry) Execute(args *ToolCall) *ToolResponse {
 	tool, err := r.Get(args.Function)
 	if err != nil {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: err,
 			Done:  true,
 		}

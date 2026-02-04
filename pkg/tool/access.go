@@ -35,7 +35,7 @@ func NewAccessControlTool(tool Tool, privileges map[string]conf.AccessFlag) *Acc
 
 // Execute checks access permissions before executing the underlying tool.
 // Returns an error if access is denied.
-func (a *AccessControlTool) Execute(call ToolCall) ToolResponse {
+func (a *AccessControlTool) Execute(call *ToolCall) *ToolResponse {
 	toolName := call.Function
 	flag := a.resolveAccessFlag(toolName)
 
@@ -44,11 +44,11 @@ func (a *AccessControlTool) Execute(call ToolCall) ToolResponse {
 		resp := a.tool.Execute(call)
 		if resp.Error != nil {
 			if perr, ok := resp.Error.(*vfs.PermissionError); ok {
-				return ToolResponse{
-					Call: &call,
+				return &ToolResponse{
+					Call: call,
 					Error: &ToolPermissionsQuery{
 						Id:      call.ID,
-						Tool:    &call,
+						Tool:    call,
 						Title:   "Permission Required",
 						Details: fmt.Sprintf("Access to file %s required for %s", perr.Path, perr.Operation),
 						Options: []string{"Allow", "Deny"},
@@ -64,18 +64,18 @@ func (a *AccessControlTool) Execute(call ToolCall) ToolResponse {
 		}
 		return resp
 	case conf.AccessDeny:
-		return ToolResponse{
-			Call:  &call,
+		return &ToolResponse{
+			Call:  call,
 			Error: fmt.Errorf("AccessControlTool.Execute() [access.go]: access denied for tool: %s", toolName),
 			Done:  true,
 		}
 	case conf.AccessAsk:
 		// Return ToolPermissionsQuery as error
-		return ToolResponse{
-			Call: &call,
+		return &ToolResponse{
+			Call: call,
 			Error: &ToolPermissionsQuery{
 				Id:      call.ID, // Use tool call ID as query ID for now, or generate new one
-				Tool:    &call,
+				Tool:    call,
 				Title:   "Permission Required",
 				Details: fmt.Sprintf("Tool %s requires permission", toolName),
 				Options: []string{"Allow", "Deny"},
@@ -83,8 +83,8 @@ func (a *AccessControlTool) Execute(call ToolCall) ToolResponse {
 			Done: true,
 		}
 	default:
-		return ToolResponse{
-			Call:  &call,
+		return &ToolResponse{
+			Call:  call,
 			Error: fmt.Errorf("AccessControlTool.Execute() [access.go]: unknown access flag for tool: %s", toolName),
 			Done:  true,
 		}

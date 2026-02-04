@@ -603,9 +603,9 @@ type dummyTool struct {
 	name string
 }
 
-func (d *dummyTool) Execute(args tool.ToolCall) tool.ToolResponse {
-	return tool.ToolResponse{
-		Call:   &args,
+func (d *dummyTool) Execute(args *tool.ToolCall) *tool.ToolResponse {
+	return &tool.ToolResponse{
+		Call:   args,
 		Result: tool.NewToolValue("success"),
 		Done:   true,
 	}

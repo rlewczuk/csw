@@ -18,11 +18,11 @@ func NewVFSGrepTool(v vfs.VFS) *VFSGrepTool {
 }
 
 // Execute executes the tool with the given arguments and returns the response.
-func (t *VFSGrepTool) Execute(args ToolCall) ToolResponse {
+func (t *VFSGrepTool) Execute(args *ToolCall) *ToolResponse {
 	pattern, ok := args.Arguments.StringOK("pattern")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSGrepTool.Execute() [grep.go]: missing required argument: pattern"),
 			Done:  true,
 		}
@@ -59,8 +59,8 @@ func (t *VFSGrepTool) Execute(args ToolCall) ToolResponse {
 	// Create grep filter
 	grepFilter, err := vfs.NewGrepFilter(pattern, t.vfs, path, globFilter)
 	if err != nil {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSGrepTool.Execute() [grep.go]: %w", err),
 			Done:  true,
 		}
@@ -75,8 +75,8 @@ func (t *VFSGrepTool) Execute(args ToolCall) ToolResponse {
 		return createPermissionQuery(args, perr.Path, "searching files", "read")
 	}
 	if err != nil {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSGrepTool.Execute() [grep.go]: %w", err),
 			Done:  true,
 		}
@@ -87,8 +87,8 @@ func (t *VFSGrepTool) Execute(args ToolCall) ToolResponse {
 
 	var result ToolValue
 	result.Set("content", content)
-	return ToolResponse{
-		Call:   &args,
+	return &ToolResponse{
+		Call:   args,
 		Result: result,
 		Done:   true,
 	}

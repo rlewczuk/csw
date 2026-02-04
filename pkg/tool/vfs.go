@@ -23,11 +23,11 @@ func NewVFSReadTool(v vfs.VFS, lineNumbers bool) *VFSReadTool {
 }
 
 // Execute executes the tool with the given arguments and returns the response.
-func (t *VFSReadTool) Execute(args ToolCall) ToolResponse {
+func (t *VFSReadTool) Execute(args *ToolCall) *ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSReadTool.Execute() [vfs.go]: missing required argument: path"),
 			Done:  true,
 		}
@@ -57,8 +57,8 @@ func (t *VFSReadTool) Execute(args ToolCall) ToolResponse {
 		return createPermissionQuery(args, perr.Path, "reading file", "read")
 	}
 	if err != nil {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: err,
 			Done:  true,
 		}
@@ -74,17 +74,17 @@ func (t *VFSReadTool) Execute(args ToolCall) ToolResponse {
 
 	var result ToolValue
 	result.Set("content", contentStr)
-	return ToolResponse{
-		Call:   &args,
+	return &ToolResponse{
+		Call:   args,
 		Result: result,
 		Done:   true,
 	}
 }
 
-func createPermissionQuery(args ToolCall, path, action, op string) ToolResponse {
+func createPermissionQuery(args *ToolCall, path, action, op string) *ToolResponse {
 	query := &ToolPermissionsQuery{
 		Id:      shared.GenerateUUIDv7(),
-		Tool:    &args,
+		Tool:    args,
 		Title:   "Permission Required",
 		Details: fmt.Sprintf("Allow %s at path: %s", action, path),
 		Options: []string{
@@ -100,8 +100,8 @@ func createPermissionQuery(args ToolCall, path, action, op string) ToolResponse 
 			"operation": op,
 		},
 	}
-	return ToolResponse{
-		Call:  &args,
+	return &ToolResponse{
+		Call:  args,
 		Error: query,
 		Done:  true,
 	}
@@ -120,11 +120,11 @@ func NewVFSWriteTool(v vfs.VFS, l lsp.LSP) *VFSWriteTool {
 }
 
 // Execute executes the tool with the given arguments and returns the response.
-func (t *VFSWriteTool) Execute(args ToolCall) ToolResponse {
+func (t *VFSWriteTool) Execute(args *ToolCall) *ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSWriteTool.Execute() [vfs.go]: missing required argument: path"),
 			Done:  true,
 		}
@@ -132,8 +132,8 @@ func (t *VFSWriteTool) Execute(args ToolCall) ToolResponse {
 
 	content, ok := args.Arguments.StringOK("content")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSWriteTool.Execute() [vfs.go]: missing required argument: content"),
 			Done:  true,
 		}
@@ -147,8 +147,8 @@ func (t *VFSWriteTool) Execute(args ToolCall) ToolResponse {
 		return createPermissionQuery(args, perr.Path, "writing to file", "write")
 	}
 	if err != nil {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: err,
 			Done:  true,
 		}
@@ -179,8 +179,8 @@ func (t *VFSWriteTool) Execute(args ToolCall) ToolResponse {
 		result.Set("validation", validationMsg)
 	}
 
-	return ToolResponse{
-		Call:   &args,
+	return &ToolResponse{
+		Call:   args,
 		Result: result,
 		Done:   true,
 	}
@@ -197,11 +197,11 @@ func NewVFSDeleteTool(v vfs.VFS) *VFSDeleteTool {
 }
 
 // Execute executes the tool with the given arguments and returns the response.
-func (t *VFSDeleteTool) Execute(args ToolCall) ToolResponse {
+func (t *VFSDeleteTool) Execute(args *ToolCall) *ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSDeleteTool.Execute() [vfs.go]: missing required argument: path"),
 			Done:  true,
 		}
@@ -215,15 +215,15 @@ func (t *VFSDeleteTool) Execute(args ToolCall) ToolResponse {
 		return createPermissionQuery(args, perr.Path, "deleting file", "delete")
 	}
 	if err != nil {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: err,
 			Done:  true,
 		}
 	}
 
-	return ToolResponse{
-		Call: &args,
+	return &ToolResponse{
+		Call: args,
 		Done: true,
 	}
 }
@@ -239,11 +239,11 @@ func NewVFSListTool(v vfs.VFS) *VFSListTool {
 }
 
 // Execute executes the tool with the given arguments and returns the response.
-func (t *VFSListTool) Execute(args ToolCall) ToolResponse {
+func (t *VFSListTool) Execute(args *ToolCall) *ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSListTool.Execute() [vfs.go]: missing required argument: path"),
 			Done:  true,
 		}
@@ -258,8 +258,8 @@ func (t *VFSListTool) Execute(args ToolCall) ToolResponse {
 	}
 	if err != nil {
 
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: err,
 			Done:  true,
 		}
@@ -273,8 +273,8 @@ func (t *VFSListTool) Execute(args ToolCall) ToolResponse {
 
 	var result ToolValue
 	result.Set("files", filesArray)
-	return ToolResponse{
-		Call:   &args,
+	return &ToolResponse{
+		Call:   args,
 		Result: result,
 		Done:   true,
 	}
@@ -291,11 +291,11 @@ func NewVFSMoveTool(v vfs.VFS) *VFSMoveTool {
 }
 
 // Execute executes the tool with the given arguments and returns the response.
-func (t *VFSMoveTool) Execute(args ToolCall) ToolResponse {
+func (t *VFSMoveTool) Execute(args *ToolCall) *ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSMoveTool.Execute() [vfs.go]: missing required argument: path"),
 			Done:  true,
 		}
@@ -303,8 +303,8 @@ func (t *VFSMoveTool) Execute(args ToolCall) ToolResponse {
 
 	destination, ok := args.Arguments.StringOK("destination")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSMoveTool.Execute() [vfs.go]: missing required argument: destination"),
 			Done:  true,
 		}
@@ -318,15 +318,15 @@ func (t *VFSMoveTool) Execute(args ToolCall) ToolResponse {
 		return createPermissionQuery(args, perr.Path, "moving file", "move")
 	}
 	if err != nil {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: err,
 			Done:  true,
 		}
 	}
 
-	return ToolResponse{
-		Call: &args,
+	return &ToolResponse{
+		Call: args,
 		Done: true,
 	}
 }
@@ -342,11 +342,11 @@ func NewVFSFindTool(v vfs.VFS) *VFSFindTool {
 }
 
 // Execute executes the tool with the given arguments and returns the response.
-func (t *VFSFindTool) Execute(args ToolCall) ToolResponse {
+func (t *VFSFindTool) Execute(args *ToolCall) *ToolResponse {
 	query, ok := args.Arguments.StringOK("query")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSFindTool.Execute() [vfs.go]: missing required argument: query"),
 			Done:  true,
 		}
@@ -363,8 +363,8 @@ func (t *VFSFindTool) Execute(args ToolCall) ToolResponse {
 		return createPermissionQuery(args, perr.Path, "finding files", "find")
 	}
 	if err != nil {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: err,
 			Done:  true,
 		}
@@ -378,8 +378,8 @@ func (t *VFSFindTool) Execute(args ToolCall) ToolResponse {
 
 	var result ToolValue
 	result.Set("files", filesArray)
-	return ToolResponse{
-		Call:   &args,
+	return &ToolResponse{
+		Call:   args,
 		Result: result,
 		Done:   true,
 	}
@@ -398,11 +398,11 @@ func NewVFSEditTool(v vfs.VFS, l lsp.LSP) *VFSEditTool {
 }
 
 // Execute executes the tool with the given arguments and returns the response.
-func (t *VFSEditTool) Execute(args ToolCall) ToolResponse {
+func (t *VFSEditTool) Execute(args *ToolCall) *ToolResponse {
 	path, ok := args.Arguments.StringOK("path")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSEditTool.Execute() [vfs.go]: missing required argument: path"),
 			Done:  true,
 		}
@@ -410,8 +410,8 @@ func (t *VFSEditTool) Execute(args ToolCall) ToolResponse {
 
 	oldString, ok := args.Arguments.StringOK("oldString")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSEditTool.Execute() [vfs.go]: missing required argument: oldString"),
 			Done:  true,
 		}
@@ -419,8 +419,8 @@ func (t *VFSEditTool) Execute(args ToolCall) ToolResponse {
 
 	newString, ok := args.Arguments.StringOK("newString")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("VFSEditTool.Execute() [vfs.go]: missing required argument: newString"),
 			Done:  true,
 		}
@@ -439,8 +439,8 @@ func (t *VFSEditTool) Execute(args ToolCall) ToolResponse {
 		return createPermissionQuery(args, perr.Path, "editing file", "write")
 	}
 	if err != nil {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: err,
 			Done:  true,
 		}
@@ -473,8 +473,8 @@ func (t *VFSEditTool) Execute(args ToolCall) ToolResponse {
 		resultContent += validationMsg
 	}
 	result.Set("content", resultContent)
-	return ToolResponse{
-		Call:   &args,
+	return &ToolResponse{
+		Call:   args,
 		Result: result,
 		Done:   true,
 	}

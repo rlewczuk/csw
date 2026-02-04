@@ -22,7 +22,7 @@ func TestVFSReadTool(t *testing.T) {
 		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -43,7 +43,7 @@ func TestVFSReadTool(t *testing.T) {
 		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:        "test-id",
 			Function:  "vfsRead",
 			Arguments: NewToolValue(nil),
@@ -62,7 +62,7 @@ func TestVFSReadTool(t *testing.T) {
 		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsList",
 			Arguments: NewToolValue(map[string]any{
@@ -87,7 +87,7 @@ func TestVFSReadTool(t *testing.T) {
 		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -113,7 +113,7 @@ func TestVFSReadTool(t *testing.T) {
 		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -139,7 +139,7 @@ func TestVFSReadTool(t *testing.T) {
 		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -166,7 +166,7 @@ func TestVFSReadTool(t *testing.T) {
 		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -192,7 +192,7 @@ func TestVFSReadTool(t *testing.T) {
 		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -226,7 +226,7 @@ func TestVFSReadTool(t *testing.T) {
 		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -259,7 +259,7 @@ func TestVFSReadTool(t *testing.T) {
 		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -286,7 +286,7 @@ func TestVFSReadTool(t *testing.T) {
 		tool := NewVFSReadTool(mockVFS, true)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -314,7 +314,7 @@ func TestVFSReadTool(t *testing.T) {
 		tool := NewVFSReadTool(mockVFS, true)
 
 		// Execute with offset
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -343,7 +343,7 @@ func TestVFSReadTool(t *testing.T) {
 		tool := NewVFSReadTool(mockVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -368,7 +368,7 @@ func TestVFSWriteTool(t *testing.T) {
 		tool := NewVFSWriteTool(mockVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
@@ -394,7 +394,7 @@ func TestVFSWriteTool(t *testing.T) {
 		tool := NewVFSWriteTool(mockVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
@@ -415,7 +415,7 @@ func TestVFSWriteTool(t *testing.T) {
 		tool := NewVFSWriteTool(mockVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
@@ -441,7 +441,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		tool := NewVFSDeleteTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsDelete",
 			Arguments: NewToolValue(map[string]any{
@@ -466,7 +466,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		tool := NewVFSDeleteTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:        "test-id",
 			Function:  "vfsDelete",
 			Arguments: NewToolValue(nil),
@@ -485,7 +485,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		tool := NewVFSDeleteTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsDelete",
 			Arguments: NewToolValue(map[string]any{
@@ -513,7 +513,7 @@ func TestVFSListTool(t *testing.T) {
 		tool := NewVFSListTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfs.list",
 			Arguments: NewToolValue(map[string]any{
@@ -541,7 +541,7 @@ func TestVFSListTool(t *testing.T) {
 		tool := NewVFSListTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfs.list",
 			Arguments: NewToolValue(map[string]any{
@@ -566,7 +566,7 @@ func TestVFSListTool(t *testing.T) {
 		tool := NewVFSListTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:        "test-id",
 			Function:  "vfsList",
 			Arguments: NewToolValue(nil),
@@ -585,7 +585,7 @@ func TestVFSListTool(t *testing.T) {
 		tool := NewVFSListTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsList",
 			Arguments: NewToolValue(map[string]any{
@@ -611,7 +611,7 @@ func TestVFSMoveTool(t *testing.T) {
 		tool := NewVFSMoveTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
@@ -641,7 +641,7 @@ func TestVFSMoveTool(t *testing.T) {
 		tool := NewVFSMoveTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
@@ -662,7 +662,7 @@ func TestVFSMoveTool(t *testing.T) {
 		tool := NewVFSMoveTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
@@ -683,7 +683,7 @@ func TestVFSMoveTool(t *testing.T) {
 		tool := NewVFSMoveTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
@@ -712,7 +712,7 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 		tool := NewVFSReadTool(accessVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -751,7 +751,7 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 		tool := NewVFSReadTool(accessVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -777,7 +777,7 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 		tool := NewVFSReadTool(accessVFS, false)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
@@ -805,7 +805,7 @@ func TestVFSWriteToolPermissionQuery(t *testing.T) {
 		tool := NewVFSWriteTool(accessVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
@@ -842,7 +842,7 @@ func TestVFSWriteToolPermissionQuery(t *testing.T) {
 		tool := NewVFSWriteTool(accessVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
@@ -873,7 +873,7 @@ func TestVFSWriteToolPermissionQuery(t *testing.T) {
 		tool := NewVFSWriteTool(accessVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
@@ -905,7 +905,7 @@ func TestVFSDeleteToolPermissionQuery(t *testing.T) {
 		tool := NewVFSDeleteTool(accessVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsDelete",
 			Arguments: NewToolValue(map[string]any{
@@ -944,7 +944,7 @@ func TestVFSDeleteToolPermissionQuery(t *testing.T) {
 		tool := NewVFSDeleteTool(accessVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsDelete",
 			Arguments: NewToolValue(map[string]any{
@@ -976,7 +976,7 @@ func TestVFSDeleteToolPermissionQuery(t *testing.T) {
 		tool := NewVFSDeleteTool(accessVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsDelete",
 			Arguments: NewToolValue(map[string]any{
@@ -1007,7 +1007,7 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		tool := NewVFSListTool(accessVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsList",
 			Arguments: NewToolValue(map[string]any{
@@ -1048,7 +1048,7 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		tool := NewVFSListTool(accessVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsList",
 			Arguments: NewToolValue(map[string]any{
@@ -1076,7 +1076,7 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		tool := NewVFSListTool(accessVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsList",
 			Arguments: NewToolValue(map[string]any{
@@ -1107,7 +1107,7 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		tool := NewVFSMoveTool(accessVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
@@ -1147,7 +1147,7 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		tool := NewVFSMoveTool(accessVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
@@ -1183,7 +1183,7 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		tool := NewVFSMoveTool(accessVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsMode",
 			Arguments: NewToolValue(map[string]any{
@@ -1214,7 +1214,7 @@ func TestVFSFindTool(t *testing.T) {
 		tool := NewVFSFindTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
@@ -1252,7 +1252,7 @@ func TestVFSFindTool(t *testing.T) {
 		tool := NewVFSFindTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
@@ -1285,7 +1285,7 @@ func TestVFSFindTool(t *testing.T) {
 		tool := NewVFSFindTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
@@ -1316,7 +1316,7 @@ func TestVFSFindTool(t *testing.T) {
 		tool := NewVFSFindTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
@@ -1342,7 +1342,7 @@ func TestVFSFindTool(t *testing.T) {
 		tool := NewVFSFindTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:        "test-id",
 			Function:  "vfsFind",
 			Arguments: NewToolValue(nil),
@@ -1368,7 +1368,7 @@ func TestVFSFindTool(t *testing.T) {
 		tool := NewVFSFindTool(mockVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
@@ -1407,7 +1407,7 @@ func TestVFSFindToolPermissionQuery(t *testing.T) {
 		tool := NewVFSFindTool(accessVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
@@ -1449,7 +1449,7 @@ func TestVFSFindToolPermissionQuery(t *testing.T) {
 		tool := NewVFSFindTool(accessVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
@@ -1478,7 +1478,7 @@ func TestVFSFindToolPermissionQuery(t *testing.T) {
 		tool := NewVFSFindTool(accessVFS)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsFind",
 			Arguments: NewToolValue(map[string]any{
@@ -1505,7 +1505,7 @@ func TestVFSEditTool(t *testing.T) {
 		tool := NewVFSEditTool(mockVFS, nil)
 
 		// Execute - should fail because multiple occurrences without replaceAll
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1531,7 +1531,7 @@ func TestVFSEditTool(t *testing.T) {
 		tool := NewVFSEditTool(mockVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1565,7 +1565,7 @@ func TestVFSEditTool(t *testing.T) {
 		tool := NewVFSEditTool(mockVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1587,7 +1587,7 @@ func TestVFSEditTool(t *testing.T) {
 		tool := NewVFSEditTool(mockVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1609,7 +1609,7 @@ func TestVFSEditTool(t *testing.T) {
 		tool := NewVFSEditTool(mockVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1631,7 +1631,7 @@ func TestVFSEditTool(t *testing.T) {
 		tool := NewVFSEditTool(mockVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1656,7 +1656,7 @@ func TestVFSEditTool(t *testing.T) {
 		tool := NewVFSEditTool(mockVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1682,7 +1682,7 @@ func TestVFSEditTool(t *testing.T) {
 		tool := NewVFSEditTool(mockVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1717,7 +1717,7 @@ func TestVFSEditTool(t *testing.T) {
 		tool := NewVFSEditTool(mockVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1759,7 +1759,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		tool := NewVFSEditTool(accessVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1800,7 +1800,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		tool := NewVFSEditTool(accessVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1841,7 +1841,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		tool := NewVFSEditTool(accessVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1877,7 +1877,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		tool := NewVFSEditTool(accessVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1908,7 +1908,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		tool := NewVFSEditTool(accessVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -1963,7 +1963,7 @@ func TestVFSWriteToolWithLSP(t *testing.T) {
 		tool := NewVFSWriteTool(mockVFS, mockLSP)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
@@ -2008,7 +2008,7 @@ func TestVFSWriteToolWithLSP(t *testing.T) {
 		tool := NewVFSWriteTool(mockVFS, mockLSP)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
@@ -2035,7 +2035,7 @@ func TestVFSWriteToolWithLSP(t *testing.T) {
 		tool := NewVFSWriteTool(mockVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsWrite",
 			Arguments: NewToolValue(map[string]any{
@@ -2071,7 +2071,7 @@ func TestVFSEditToolWithLSP(t *testing.T) {
 		tool := NewVFSEditTool(mockVFS, mockLSP)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -2119,7 +2119,7 @@ func TestVFSEditToolWithLSP(t *testing.T) {
 		tool := NewVFSEditTool(mockVFS, mockLSP)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{
@@ -2150,7 +2150,7 @@ func TestVFSEditToolWithLSP(t *testing.T) {
 		tool := NewVFSEditTool(mockVFS, nil)
 
 		// Execute
-		response := tool.Execute(ToolCall{
+		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsEdit",
 			Arguments: NewToolValue(map[string]any{

@@ -539,5 +539,5 @@ func (t *ToolInfo) ShortDescription() string {
 // It can also represent a group of tools, delegating execution to other tools.
 type Tool interface {
 	// Execute executes the tool with the given arguments and returns the response.
-	Execute(args ToolCall) ToolResponse
+	Execute(args *ToolCall) *ToolResponse
 }

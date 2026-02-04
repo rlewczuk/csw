@@ -662,7 +662,7 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 	toolResponses := make([]*tool.ToolResponse, 0, len(toolCalls))
 	for _, toolCall := range toolCalls {
 		// Use s.Tools which might have access control wrappers
-		response := s.Tools.Execute(*toolCall)
+		response := s.Tools.Execute(toolCall)
 
 		// Check for permission query
 		if permQuery, ok := response.Error.(*tool.ToolPermissionsQuery); ok {
@@ -681,12 +681,12 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 			return response.Error
 		}
 
-		toolResponses = append(toolResponses, &response)
-		logging.LogToolResult(s.logger, &response)
+		toolResponses = append(toolResponses, response)
+		logging.LogToolResult(s.logger, response)
 
 		// Notify UI handler about tool result
 		if s.outputHandler != nil {
-			s.outputHandler.AddToolCallResult(&response)
+			s.outputHandler.AddToolCallResult(response)
 		}
 	}
 

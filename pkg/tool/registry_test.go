@@ -14,11 +14,11 @@ type MockTool struct {
 	name string
 }
 
-func (m *MockTool) Execute(args ToolCall) ToolResponse {
+func (m *MockTool) Execute(args *ToolCall) *ToolResponse {
 	var result ToolValue
 	result.Set("executed", m.name)
-	return ToolResponse{
-		Call:   &args,
+	return &ToolResponse{
+		Call:   args,
 		Error:  nil,
 		Result: result,
 		Done:   true,
@@ -81,7 +81,7 @@ func TestToolRegistry_Execute(t *testing.T) {
 
 	registry.Register("test", tool)
 
-	args := ToolCall{
+	args := &ToolCall{
 		ID:       "test-id",
 		Function: "test",
 		Arguments: NewToolValue(map[string]any{
@@ -99,7 +99,7 @@ func TestToolRegistry_Execute(t *testing.T) {
 func TestToolRegistry_ExecuteNotFound(t *testing.T) {
 	registry := NewToolRegistry()
 
-	args := ToolCall{
+	args := &ToolCall{
 		ID:        "test-id",
 		Function:  "nonexistent",
 		Arguments: NewToolValue(nil),
@@ -137,7 +137,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	RegisterVFSTools(registry, mockVFS)
 
 	// Test writing a file
-	writeArgs := ToolCall{
+	writeArgs := &ToolCall{
 		ID:       "write-id",
 		Function: "vfsWrite",
 		Arguments: NewToolValue(map[string]any{
@@ -152,7 +152,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	assert.True(t, writeResponse.Done)
 
 	// Test reading the file
-	readArgs := ToolCall{
+	readArgs := &ToolCall{
 		ID:       "read-id",
 		Function: "vfsRead",
 		Arguments: NewToolValue(map[string]any{
@@ -168,7 +168,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	assert.Equal(t, "    1  Hello, World!", readResponse.Result.Get("content").AsString())
 
 	// Test listing files
-	listArgs := ToolCall{
+	listArgs := &ToolCall{
 		ID:       "list-id",
 		Function: "vfsList",
 		Arguments: NewToolValue(map[string]any{
