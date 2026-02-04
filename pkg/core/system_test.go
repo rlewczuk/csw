@@ -603,3 +603,77 @@ func TestSystemStreamingConfiguration(t *testing.T) {
 		assert.True(t, session.streaming, "Should default to streaming mode for backward compatibility")
 	})
 }
+
+func TestLogLLMRequestsOption(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+	require.NoError(t, err)
+	vfsInstance := vfs.NewMockVFS()
+
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfsInstance)
+
+	t.Run("session has llmLogger when LogLLMRequests is enabled", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfsInstance,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
+			LogLLMRequests:       true,
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		assert.NotNil(t, session)
+
+		// Verify llmLogger is set
+		assert.NotNil(t, session.llmLogger, "llmLogger should be set when LogLLMRequests is enabled")
+	})
+
+	t.Run("session has nil llmLogger when LogLLMRequests is disabled", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfsInstance,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
+			LogLLMRequests:       false,
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		assert.NotNil(t, session)
+
+		// Verify llmLogger is nil
+		assert.Nil(t, session.llmLogger, "llmLogger should be nil when LogLLMRequests is disabled")
+	})
+
+	t.Run("session has nil llmLogger when LogLLMRequests is not set (default)", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfsInstance,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
+			// LogLLMRequests not set - defaults to false
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+		assert.NotNil(t, session)
+
+		// Verify llmLogger is nil
+		assert.Nil(t, session.llmLogger, "llmLogger should be nil when LogLLMRequests is not set")
+	})
+}

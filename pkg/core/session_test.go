@@ -1077,3 +1077,166 @@ func TestSessionSystemPrompt(t *testing.T) {
 		assert.Equal(t, initialPrompt, newPrompt, "system prompt should be the same")
 	})
 }
+
+func TestSessionLLMLoggerUsage(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
+	require.NoError(t, err)
+	vfsInstance := vfs.NewMockVFS()
+
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfsInstance)
+
+	t.Run("runNonStreamingChat uses llmLogger when enabled", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockSessionPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfsInstance,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
+			LogLLMRequests:       true,
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+
+		// Verify llmLogger is set
+		assert.NotNil(t, session.llmLogger, "llmLogger should be set")
+
+		// Setup non-streaming response
+		mockServer.AddRestResponse("/api/chat", "POST", `{"model":"test-model:latest","message":{"role":"assistant","content":"Hello!"},"done":true}`)
+
+		// Set session to non-streaming mode
+		session.streaming = false
+
+		// Add a user message
+		session.UserPrompt("Hi there")
+
+		// Run the session - this should use llmLogger in runNonStreamingChat
+		err = session.Run(t.Context())
+		require.NoError(t, err)
+
+		// Verify the response was processed
+		assert.Contains(t, mockHandler.MarkdownChunks, "Hello!")
+	})
+
+	t.Run("runStreamingChat uses llmLogger when enabled", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockSessionPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfsInstance,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
+			LogLLMRequests:       true,
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+
+		// Verify llmLogger is set
+		assert.NotNil(t, session.llmLogger, "llmLogger should be set")
+
+		// Setup streaming response
+		mockServer.AddStreamingResponse("/api/chat", "POST", true,
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello"},"done":false}`,
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":"!"},"done":true,"done_reason":"stop"}`,
+		)
+
+		// Ensure session is in streaming mode
+		session.streaming = true
+
+		// Add a user message
+		session.UserPrompt("Hi there")
+
+		// Run the session - this should use llmLogger in runStreamingChat
+		err = session.Run(t.Context())
+		require.NoError(t, err)
+
+		// Verify the response was processed
+		assert.Contains(t, mockHandler.MarkdownChunks, "Hello")
+		assert.Contains(t, mockHandler.MarkdownChunks, "!")
+	})
+
+	t.Run("runNonStreamingChat works without llmLogger", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockSessionPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfsInstance,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
+			LogLLMRequests:       false, // Disabled
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+
+		// Verify llmLogger is nil
+		assert.Nil(t, session.llmLogger, "llmLogger should be nil")
+
+		// Setup non-streaming response
+		mockServer.AddRestResponse("/api/chat", "POST", `{"model":"test-model:latest","message":{"role":"assistant","content":"Hello!"},"done":true}`)
+
+		// Set session to non-streaming mode
+		session.streaming = false
+
+		// Add a user message
+		session.UserPrompt("Hi there")
+
+		// Run the session - this should work without llmLogger
+		err = session.Run(t.Context())
+		require.NoError(t, err)
+
+		// Verify the response was processed
+		assert.Contains(t, mockHandler.MarkdownChunks, "Hello!")
+	})
+
+	t.Run("runStreamingChat works without llmLogger", func(t *testing.T) {
+		system := &SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      newMockSessionPromptGenerator("You are a test assistant."),
+			Tools:                tools,
+			VFS:                  vfsInstance,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
+			LogLLMRequests:       false, // Disabled
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+		require.NoError(t, err)
+
+		// Verify llmLogger is nil
+		assert.Nil(t, session.llmLogger, "llmLogger should be nil")
+
+		// Setup streaming response
+		mockServer.AddStreamingResponse("/api/chat", "POST", true,
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello"},"done":false}`,
+			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":"!"},"done":true,"done_reason":"stop"}`,
+		)
+
+		// Ensure session is in streaming mode
+		session.streaming = true
+
+		// Add a user message
+		session.UserPrompt("Hi there")
+
+		// Run the session - this should work without llmLogger
+		err = session.Run(t.Context())
+		require.NoError(t, err)
+
+		// Verify the response was processed
+		assert.Contains(t, mockHandler.MarkdownChunks, "Hello")
+		assert.Contains(t, mockHandler.MarkdownChunks, "!")
+	})
+}

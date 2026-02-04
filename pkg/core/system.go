@@ -65,6 +65,9 @@ type SweSystem struct {
 
 	// Working directory for the system
 	WorkDir string
+
+	// LogLLMRequests enables logging of LLM requests and responses
+	LogLLMRequests bool
 }
 
 func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) (*SweSession, error) {
@@ -125,6 +128,12 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		sessionLogger = logging.GetSessionLogger(sessionID, logging.LogTypeSession)
 	}
 
+	// Create LLM logger if LogLLMRequests is enabled
+	var llmLogger *slog.Logger
+	if s.LogLLMRequests {
+		llmLogger = logging.GetSessionLogger(sessionID, logging.LogTypeLLM)
+	}
+
 	session := &SweSession{
 		id:            sessionID,
 		system:        s,
@@ -140,6 +149,7 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		workDir:       s.WorkDir,
 		todoList:      make([]tool.TodoItem, 0),
 		logger:        sessionLogger,
+		llmLogger:     llmLogger,
 		streaming:     streaming,
 	}
 
