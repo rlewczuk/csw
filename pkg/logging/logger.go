@@ -490,23 +490,6 @@ func FlushLogs() error {
 	return nil
 }
 
-// EnableTestMode enables test mode where loggers don't create files.
-// This should be called in init() or TestMain().
-func EnableTestMode() {
-	testModeMu.Lock()
-	defer testModeMu.Unlock()
-	testMode = true
-}
-
-// DisableTestMode disables test mode.
-func DisableTestMode() {
-	testModeMu.Lock()
-	defer testModeMu.Unlock()
-	testMode = false
-}
-
-// Helper functions for logging specific events
-
 // LogUserInput logs user input to both session and chat logs.
 func LogUserInput(sessionLog *slog.Logger, input string) {
 	sessionLog.Info("user_message", "content", input, "role", "user")
