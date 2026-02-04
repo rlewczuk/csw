@@ -523,12 +523,15 @@ func LogAssistantOutput(sessionLog, chatLog *slog.Logger, chunk string) {
 }
 
 // LogToolCall logs a tool call.
-func LogToolCall(sessionLog, chatLog *slog.Logger, call *tool.ToolCall) {
-	sessionLog.Info("tool_call_start",
+func LogToolCall(logger *slog.Logger, call *tool.ToolCall) {
+	if logger == nil {
+		return
+	}
+	logger.Info("tool_call_start",
 		"tool_id", call.ID,
 		"function", call.Function,
 	)
-	chatLog.Info("tool_call",
+	logger.Info("tool_call",
 		"id", call.ID,
 		"function", call.Function,
 		"arguments", call.Arguments,
@@ -536,17 +539,16 @@ func LogToolCall(sessionLog, chatLog *slog.Logger, call *tool.ToolCall) {
 }
 
 // LogToolResult logs a tool execution result.
-func LogToolResult(sessionLog, chatLog *slog.Logger, response *tool.ToolResponse) {
+func LogToolResult(sessionLog *slog.Logger, response *tool.ToolResponse) {
+	if sessionLog == nil {
+		return
+	}
 	toolID := ""
 	if response.Call != nil {
 		toolID = response.Call.ID
 	}
 
-	sessionLog.Info("tool_result",
-		"tool_id", toolID,
-		"success", response.Error == nil,
-	)
-	chatLog.Info("tool_response",
+	sessionLog.Info("tool_response",
 		"id", toolID,
 		"result", response.Result,
 		"error", fmt.Sprintf("%v", response.Error),

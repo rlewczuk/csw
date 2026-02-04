@@ -35,7 +35,6 @@ func ExampleGetSessionLogger() {
 
 	sessionID := "session-123"
 	sessionLogger := logging.GetSessionLogger(sessionID, logging.LogTypeSession)
-	chatLogger := logging.GetSessionLogger(sessionID, logging.LogTypeChat)
 	defer logging.CloseSessionLogger(sessionID)
 
 	// Log basic messages
@@ -51,7 +50,7 @@ func ExampleGetSessionLogger() {
 			"content": "Hello, World!",
 		}),
 	}
-	logging.LogToolCall(sessionLogger, chatLogger, toolCall)
+	logging.LogToolCall(sessionLogger, toolCall)
 
 	fmt.Println("Session logger created successfully")
 	// Output: Session logger created successfully
