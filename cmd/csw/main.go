@@ -7,12 +7,13 @@ import (
 )
 
 var (
-	modelName     string
-	configPath    string
-	roleName      string
-	lspServer     string
-	saveSessionTo string
-	saveSession   bool
+	modelName      string
+	configPath     string
+	roleName       string
+	lspServer      string
+	saveSessionTo  string
+	saveSession    bool
+	logLLMRequests bool
 )
 
 func main() {
@@ -32,7 +33,7 @@ func main() {
 				return err
 			}
 
-			return runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo, saveSession)
+			return runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo, saveSession, logLLMRequests)
 		},
 	}
 
@@ -43,6 +44,7 @@ func main() {
 	rootCmd.Flags().StringVar(&lspServer, "lsp-server", "gopls", "Path to LSP server binary (empty to disable LSP)")
 	rootCmd.Flags().StringVar(&saveSessionTo, "save-session-to", "", "Save session conversation to specified markdown file")
 	rootCmd.Flags().BoolVar(&saveSession, "save-session", false, "Save session conversation to session.md in session log directory")
+	rootCmd.Flags().BoolVar(&logLLMRequests, "log-llm-requests", false, "Log LLM requests and responses")
 
 	// Add subcommands
 	rootCmd.AddCommand(ConfCommand())

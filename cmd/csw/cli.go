@@ -26,14 +26,15 @@ import (
 // CliCommand creates the cli command.
 func CliCommand() *cobra.Command {
 	var (
-		cliModel         string
-		cliRole          string
-		cliWorkDir       string
-		cliAllowAllPerms bool
-		cliInteractive   bool
-		cliConfigPath    string
-		cliSaveSessionTo string
-		cliSaveSession   bool
+		cliModel          string
+		cliRole           string
+		cliWorkDir        string
+		cliAllowAllPerms  bool
+		cliInteractive    bool
+		cliConfigPath     string
+		cliSaveSessionTo  string
+		cliSaveSession    bool
+		cliLogLLMRequests bool
 	)
 
 	cmd := &cobra.Command{
@@ -67,7 +68,7 @@ func CliCommand() *cobra.Command {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
 			}
 
-			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession)
+			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests)
 		},
 	}
 
@@ -80,11 +81,12 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliConfigPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
 	cmd.Flags().StringVar(&cliSaveSessionTo, "save-session-to", "", "Save session conversation to specified markdown file")
 	cmd.Flags().BoolVar(&cliSaveSession, "save-session", false, "Save session conversation to session.md in session log directory")
+	cmd.Flags().BoolVar(&cliLogLLMRequests, "log-llm-requests", false, "Log LLM requests and responses")
 
 	return cmd
 }
 
-func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession bool) error {
+func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool) error {
 	ctx := context.Background()
 
 	// Resolve working directory
@@ -181,6 +183,7 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 		ConfigStore:     configStore,
 		LogBaseDir:      logsDir,
 		WorkDir:         workDir,
+		LogLLMRequests:  logLLMRequests,
 	}
 
 	// Create session thread
