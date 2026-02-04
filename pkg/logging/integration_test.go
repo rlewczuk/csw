@@ -25,7 +25,6 @@ func TestLogDirectoryStructure(t *testing.T) {
 	// Create session loggers (all three types)
 	sessionID := "integration-test-session"
 	sessionLogger := GetSessionLogger(sessionID, LogTypeSession)
-	chatLogger := GetSessionLogger(sessionID, LogTypeChat)
 	llmLogger := GetSessionLogger(sessionID, LogTypeLLM)
 	defer CloseSessionLogger(sessionID)
 
@@ -33,7 +32,6 @@ func TestLogDirectoryStructure(t *testing.T) {
 	sessionLogger.Info("test_session_log")
 	sessionLogger.Info("user_input", "input", "test input")
 	sessionLogger.Debug("assistant_output_chunk", "chunk", "test output")
-	chatLogger.Info("test_chat_log")
 	llmLogger.Info("test_llm_log")
 
 	// Flush to ensure writes complete
@@ -56,10 +54,6 @@ func TestLogDirectoryStructure(t *testing.T) {
 	_, err = os.Stat(sessionLogPath)
 	assert.NoError(t, err, "session.jsonl should exist at: %s", sessionLogPath)
 
-	chatLogPath := filepath.Join(sessionDir, "chat.jsonl")
-	_, err = os.Stat(chatLogPath)
-	assert.NoError(t, err, "chat.jsonl should exist at: %s", chatLogPath)
-
 	llmLogPath := filepath.Join(sessionDir, "llm.jsonl")
 	_, err = os.Stat(llmLogPath)
 	assert.NoError(t, err, "llm.jsonl should exist at: %s", llmLogPath)
@@ -68,6 +62,5 @@ func TestLogDirectoryStructure(t *testing.T) {
 	t.Logf("Main log: %s", mainLogPath)
 	t.Logf("Session dir: %s", sessionDir)
 	t.Logf("Session log: %s", sessionLogPath)
-	t.Logf("Chat log: %s", chatLogPath)
 	t.Logf("LLM log: %s", llmLogPath)
 }

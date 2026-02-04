@@ -3,7 +3,6 @@
 // The logging system maintains the following log files:
 //   - .cswdata/logs/csw.jsonl - main log file for general application logs
 //   - .cswdata/logs/sessions/<session_id>/session.jsonl - session-specific logs
-//   - .cswdata/logs/sessions/<session_id>/chat.jsonl - chat messages in internal format
 //   - .cswdata/logs/sessions/<session_id>/llm.jsonl - raw LLM requests/responses
 //
 // All logs are written in JSONL format (one JSON object per line) using log/slog.
@@ -19,7 +18,6 @@
 //
 //	// Get session-specific loggers
 //	sessionLog := logging.GetSessionLogger(sessionID, "session")
-//	chatLog := logging.GetSessionLogger(sessionID, "chat")
 //	llmLog := logging.GetSessionLogger(sessionID, "llm")
 //
 //	// Clean up when session is done
@@ -48,7 +46,6 @@ type LogType string
 
 const (
 	LogTypeSession LogType = "session"
-	LogTypeChat    LogType = "chat"
 	LogTypeLLM     LogType = "llm"
 )
 
@@ -419,7 +416,7 @@ func CloseSessionLogger(sessionID string) error {
 	defer sessionLoggersMu.Unlock()
 
 	var errs []error
-	for _, logType := range []LogType{LogTypeSession, LogTypeChat, LogTypeLLM} {
+	for _, logType := range []LogType{LogTypeSession, LogTypeLLM} {
 		key := sessionLoggerKey{sessionID: sessionID, logType: logType}
 		if writer, ok := sessionWriters[key]; ok {
 			if err := writer.Close(); err != nil {
@@ -511,15 +508,13 @@ func DisableTestMode() {
 // Helper functions for logging specific events
 
 // LogUserInput logs user input to both session and chat logs.
-func LogUserInput(sessionLog, chatLog *slog.Logger, input string) {
-	sessionLog.Info("user_input", "input", input)
-	chatLog.Info("user_message", "content", input, "role", "user")
+func LogUserInput(sessionLog *slog.Logger, input string) {
+	sessionLog.Info("user_message", "content", input, "role", "user")
 }
 
 // LogAssistantOutput logs assistant output chunks.
-func LogAssistantOutput(sessionLog, chatLog *slog.Logger, chunk string) {
-	sessionLog.Debug("assistant_output_chunk", "chunk", chunk)
-	chatLog.Info("assistant_chunk", "content", chunk, "role", "assistant")
+func LogAssistantOutput(sessionLog *slog.Logger, chunk string) {
+	sessionLog.Info("assistant_chunk", "content", chunk, "role", "assistant")
 }
 
 // LogToolCall logs a tool call.

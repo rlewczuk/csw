@@ -1,10 +1,8 @@
 package logging
 
 import (
-	"strings"
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,7 +10,7 @@ import (
 
 func TestTestLoggerBasicLogging(t *testing.T) {
 	sessionID := "test-session-123"
-	sessionLog, _, _ := NewTestLogger(t, sessionID)
+	sessionLog, _ := NewTestLogger(t, sessionID)
 
 	// Test basic logging
 	sessionLog.Info("test_message", "key", "value")
@@ -27,37 +25,9 @@ func TestTestLoggerBasicLogging(t *testing.T) {
 	assert.Contains(t, buf.String(), "debug_message")
 }
 
-func TestTestLoggerUserInput(t *testing.T) {
-	sessionID := "test-session-123"
-	sessionLog, chatLog, _ := NewTestLogger(t, sessionID)
-
-	userInput := "Hello, world!"
-	LogUserInput(sessionLog, chatLog, userInput)
-
-	// Check chat logs
-	chatBuf := GetTestChatBuffer(sessionID)
-	require.NotNil(t, chatBuf)
-	assert.Contains(t, chatBuf.String(), "user_message")
-	assert.Contains(t, chatBuf.String(), userInput)
-}
-
-func TestTestLoggerAssistantOutput(t *testing.T) {
-	sessionID := "test-session-123"
-	sessionLog, chatLog, _ := NewTestLogger(t, sessionID)
-
-	output := "Assistant response"
-	LogAssistantOutput(sessionLog, chatLog, output)
-
-	// Check chat logs
-	chatBuf := GetTestChatBuffer(sessionID)
-	require.NotNil(t, chatBuf)
-	assert.Contains(t, chatBuf.String(), "assistant_chunk")
-	assert.Contains(t, chatBuf.String(), output)
-}
-
 func TestTestLoggerLLMRequest(t *testing.T) {
 	sessionID := "test-session-123"
-	_, _, llmLog := NewTestLogger(t, sessionID)
+	_, llmLog := NewTestLogger(t, sessionID)
 
 	requestBody := map[string]any{
 		"model":  "test-model",
@@ -75,7 +45,7 @@ func TestTestLoggerLLMRequest(t *testing.T) {
 
 func TestTestLoggerLLMResponse(t *testing.T) {
 	sessionID := "test-session-123"
-	_, _, llmLog := NewTestLogger(t, sessionID)
+	_, llmLog := NewTestLogger(t, sessionID)
 
 	responseBody := map[string]any{
 		"result": "test result",
@@ -92,7 +62,7 @@ func TestTestLoggerLLMResponse(t *testing.T) {
 
 func TestTestLoggerPermissionQuery(t *testing.T) {
 	sessionID := "test-session-123"
-	sessionLog, _, _ := NewTestLogger(t, sessionID)
+	sessionLog, _ := NewTestLogger(t, sessionID)
 
 	query := &tool.ToolPermissionsQuery{
 		Id: "query-123",
@@ -111,31 +81,9 @@ func TestTestLoggerPermissionQuery(t *testing.T) {
 	assert.Contains(t, sessionBuf.String(), "query-123")
 }
 
-func TestTestLoggerChatMessages(t *testing.T) {
-	sessionID := "test-session-123"
-	_, chatLog, _ := NewTestLogger(t, sessionID)
-
-	messages := []*models.ChatMessage{
-		models.NewTextMessage(models.ChatRoleUser, "test message 1"),
-		models.NewTextMessage(models.ChatRoleAssistant, "test message 2"),
-	}
-	LogChatMessages(chatLog, messages)
-
-	// Check chat logs
-	chatBuf := GetTestChatBuffer(sessionID)
-	require.NotNil(t, chatBuf)
-	content := chatBuf.String()
-	assert.Contains(t, content, "chat_message")
-	assert.Contains(t, content, "test message 1")
-	assert.Contains(t, content, "test message 2")
-	// Count occurrences of "chat_message"
-	count := strings.Count(content, "chat_message")
-	assert.Equal(t, 2, count, "should have 2 chat messages")
-}
-
 func TestFlushTestLogger(t *testing.T) {
 	sessionID := "test-session-123"
-	sessionLog, _, _ := NewTestLogger(t, sessionID)
+	sessionLog, _ := NewTestLogger(t, sessionID)
 
 	sessionLog.Info("test message")
 
