@@ -1,17 +1,22 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/codesnort/codesnort-swe/pkg/presenter"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/codesnort/codesnort-swe/pkg/ui"
+	"github.com/codesnort/codesnort-swe/pkg/ui/logmd"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,7 +48,68 @@ func (m *mockPromptGenerator) GetAgentFiles(dir string) (map[string]string, erro
 	return make(map[string]string), nil
 }
 
-func TestSaveSessionFlagWritesConversation(t *testing.T) {
+// mockChatView is a mock implementation of ui.IChatView for testing
+type mockChatView struct {
+	mu         sync.Mutex
+	messages   []*ui.ChatMessageUI
+	initCalled bool
+}
+
+func newMockChatView() *mockChatView {
+	return &mockChatView{
+		messages: make([]*ui.ChatMessageUI, 0),
+	}
+}
+
+func (m *mockChatView) Init(session *ui.ChatSessionUI) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.initCalled = true
+	m.messages = append(m.messages, session.Messages...)
+	return nil
+}
+
+func (m *mockChatView) AddMessage(msg *ui.ChatMessageUI) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.messages = append(m.messages, msg)
+	return nil
+}
+
+func (m *mockChatView) UpdateMessage(msg *ui.ChatMessageUI) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, existing := range m.messages {
+		if existing.Id == msg.Id {
+			m.messages[i] = msg
+			return nil
+		}
+	}
+	return nil
+}
+
+func (m *mockChatView) UpdateTool(tool *ui.ToolUI) error {
+	return nil
+}
+
+func (m *mockChatView) MoveToBottom() error {
+	return nil
+}
+
+func (m *mockChatView) QueryPermission(query *ui.PermissionQueryUI) error {
+	return nil
+}
+
+func (m *mockChatView) GetMessages() []*ui.ChatMessageUI {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([]*ui.ChatMessageUI, len(m.messages))
+	copy(result, m.messages)
+	return result
+}
+
+// TestLogmdChatViewLogsSession tests that LogmdChatView properly logs session activity to markdown.
+func TestLogmdChatViewLogsSession(t *testing.T) {
 	mockServer := testutil.NewMockHTTPServer()
 	defer mockServer.Close()
 
@@ -82,125 +148,71 @@ func TestSaveSessionFlagWritesConversation(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	// Simulate the bug: create a regular thread first (without writer)
-	// Then create a new thread with writer (simulating --save-session behavior)
+	// Create session file
+	sessionFilePath := filepath.Join(tmpDir, "session.md")
+	sessionFile, err := os.Create(sessionFilePath)
+	require.NoError(t, err)
+	defer sessionFile.Close()
+
+	// Create thread
 	thread := core.NewSessionThread(system, nil)
 
 	// Start session
 	err = thread.StartSession("ollama/test-model")
 	require.NoError(t, err)
 
-	// Add a user prompt (this would be the initial prompt)
-	err = thread.UserPrompt("Hello, this is a test prompt")
+	// Create base presenter and view
+	basePresenter := presenter.NewChatPresenter(system, thread)
+	baseView := newMockChatView()
+
+	// Wrap with LogmdChatView
+	mu := &sync.Mutex{}
+	logView := logmd.NewLogmdChatView(baseView, sessionFile, mu)
+
+	// Set view on presenter
+	err = basePresenter.SetView(logView)
 	require.NoError(t, err)
 
-	// Wait for completion
-	handler := testutil.NewMockSessionOutputHandler()
-	thread.SetOutputHandler(handler)
-	handler.WaitForRunFinished()
+	// Set output handler to the presenter (so it receives assistant messages)
+	thread.SetOutputHandler(basePresenter)
 
-	// Now simulate what happens with --save-session flag:
-	// A new thread is created with writer, but messages are not transferred
-	sessionLogDir := filepath.Join(logsDir, "sessions", thread.GetSession().ID())
-	sessionFilePath := filepath.Join(sessionLogDir, "session.md")
-
-	// Create new thread with writer (this is what the buggy code does)
-	writerThread, err := core.NewSessionThreadWithWriter(system, nil, sessionFilePath)
-	require.NoError(t, err)
-	defer writerThread.Close()
-
-	// Start new session (bug: this creates a NEW empty session)
-	err = writerThread.StartSession("ollama/test-model")
-	require.NoError(t, err)
-
-	// The bug: the new session has NO messages from the old session
-	// So when we check the session file, it should be empty or missing the conversation
-	content, err := os.ReadFile(sessionFilePath)
-	if err == nil {
-		// If file exists, it should be empty or just have headers without the conversation
-		contentStr := string(content)
-		// This assertion demonstrates the bug - the conversation is missing
-		assert.NotContains(t, contentStr, "Hello, this is a test prompt",
-			"BUG: With current implementation, the session file should NOT contain the user prompt because the session was recreated")
+	// Send user message through the presenter
+	userMsg := &ui.ChatMessageUI{
+		Role: ui.ChatRoleUser,
+		Text: "Hello, this is a test prompt",
 	}
-}
-
-func TestSaveSessionWithTransferredMessages(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-
-	// Create provider config pointing to mock server
-	providerConfig := &conf.ModelProviderConfig{
-		Type: "ollama",
-		Name: "ollama",
-		URL:  mockServer.URL(),
-	}
-
-	client, err := models.NewOllamaClient(providerConfig)
+	err = basePresenter.SendUserMessage(userMsg)
 	require.NoError(t, err)
 
-	vfsInstance := vfs.NewMockVFS()
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	// Wait for completion using a done channel
+	done := make(chan struct{})
+	go func() {
+		// Poll for completion
+		for {
+			if !thread.IsRunning() {
+				close(done)
+				return
+			}
+		}
+	}()
+	<-done
 
-	tmpDir := t.TempDir()
-	logsDir := filepath.Join(tmpDir, "logs")
-	err = os.MkdirAll(logsDir, 0755)
-	require.NoError(t, err)
-
-	system := &core.SweSystem{
-		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-		ModelTags:       models.NewModelTagRegistry(),
-		PromptGenerator: newMockPromptGenerator("You are a helpful assistant."),
-		Tools:           tools,
-		VFS:             vfsInstance,
-		WorkDir:         tmpDir,
-		LogBaseDir:      logsDir,
-	}
-
-	// Set up mock streaming response
-	mockServer.AddStreamingResponse("/api/chat", "POST", true,
-		`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello! I received your test prompt."},"done":false}`,
-		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
-	)
-
-	// Create a thread with writer from the start (correct behavior)
-	sessionLogDir := filepath.Join(logsDir, "sessions", "test-session")
-	sessionFilePath := filepath.Join(sessionLogDir, "session.md")
-
-	// Create output handler to track completion
-	handler := testutil.NewMockSessionOutputHandler()
-
-	writerThread, err := core.NewSessionThreadWithWriter(system, handler, sessionFilePath)
-	require.NoError(t, err)
-	defer writerThread.Close()
-
-	// Start session
-	err = writerThread.StartSession("ollama/test-model")
-	require.NoError(t, err)
-
-	// Add a user prompt
-	err = writerThread.UserPrompt("Hello, this is a test prompt")
-	require.NoError(t, err)
-
-	// Wait for completion
-	handler.WaitForRunFinished()
-
-	// Verify the session file contains the conversation
+	// Read session file content
 	content, err := os.ReadFile(sessionFilePath)
 	require.NoError(t, err)
 
 	contentStr := string(content)
-	assert.Contains(t, contentStr, "# User", "session file should contain user message header")
+
+	// Verify the session file contains the conversation
+	assert.Contains(t, contentStr, "# Chat Session", "session file should contain header")
+	assert.Contains(t, contentStr, "## User", "session file should contain user message header")
 	assert.Contains(t, contentStr, "Hello, this is a test prompt", "session file should contain the user prompt")
-	assert.Contains(t, contentStr, "# Assistant", "session file should contain assistant message header")
+	assert.Contains(t, contentStr, "## Assistant", "session file should contain assistant message header")
 	assert.NotEmpty(t, strings.TrimSpace(contentStr), "session file should not be empty")
 }
 
-// TestSaveSessionWithExistingSession tests the fix for the --save-session bug.
-// It simulates the scenario where a session is started first, then wrapped with
-// a writer to preserve the conversation history.
-func TestSaveSessionWithExistingSession(t *testing.T) {
+// TestLogmdChatPresenterLogsCalls tests that LogmdChatPresenter properly logs method calls to markdown.
+func TestLogmdChatPresenterLogsCalls(t *testing.T) {
 	mockServer := testutil.NewMockHTTPServer()
 	defer mockServer.Close()
 
@@ -239,65 +251,268 @@ func TestSaveSessionWithExistingSession(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	// Step 1: Create a regular thread (simulating --save-session behavior before fix)
-	handler := testutil.NewMockSessionOutputHandler()
-	thread := core.NewSessionThread(system, handler)
+	// Create session file
+	sessionFilePath := filepath.Join(tmpDir, "session.md")
+	sessionFile, err := os.Create(sessionFilePath)
+	require.NoError(t, err)
+	defer sessionFile.Close()
 
-	// Step 2: Start session and add user prompt
+	// Create thread
+	thread := core.NewSessionThread(system, nil)
+
+	// Start session
 	err = thread.StartSession("ollama/test-model")
 	require.NoError(t, err)
 
-	err = thread.UserPrompt("Hello, this is a test prompt")
+	// Create base presenter and view
+	basePresenter := presenter.NewChatPresenter(system, thread)
+	baseView := newMockChatView()
+
+	// Wrap presenter with LogmdChatPresenter
+	mu := &sync.Mutex{}
+	logPresenter := logmd.NewLogmdChatPresenter(basePresenter, sessionFile, mu)
+
+	// Set view on wrapped presenter
+	err = logPresenter.SetView(baseView)
 	require.NoError(t, err)
 
-	// Wait for completion
-	handler.WaitForRunFinished()
+	// Set output handler on thread (use base presenter for output handling)
+	thread.SetOutputHandler(basePresenter)
 
-	// Step 3: Now simulate what happens with --save-session flag (after fix)
-	// Get the existing session and wrap it with a writer
-	session := thread.GetSession()
-	require.NotNil(t, session)
-
-	sessionLogDir := filepath.Join(logsDir, "sessions", session.ID())
-	sessionFilePath := filepath.Join(sessionLogDir, "session.md")
-
-	// Create new handler for the writer thread
-	writerHandler := testutil.NewMockSessionOutputHandler()
-
-	// Use the new function to create a thread with writer that preserves the session
-	writerThread, err := core.NewSessionThreadWithWriterAndSession(system, session, writerHandler, sessionFilePath)
-	require.NoError(t, err)
-	defer writerThread.Close()
-
-	// The session should already have the conversation history
-	messages := session.ChatMessages()
-	require.Greater(t, len(messages), 0, "session should have messages from the conversation")
-
-	// Verify the session file was created and contains the conversation
-	// Note: The user message was already processed before the writer was attached,
-	// so it won't be in the file. But we can verify the session still has the messages.
-	// In real usage with --save-session, the conversation happens AFTER the writer is attached.
-
-	// For a more realistic test, let's add another message after the writer is attached
-	mockServer.AddStreamingResponse("/api/chat", "POST", true,
-		`{"model":"test-model","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"I can help you with that!"},"done":false}`,
-		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
-	)
-
-	err = writerThread.UserPrompt("Can you help me?")
+	// Send user message through the wrapped presenter
+	userMsg := &ui.ChatMessageUI{
+		Role: ui.ChatRoleUser,
+		Text: "Hello, this is a test prompt",
+	}
+	err = logPresenter.SendUserMessage(userMsg)
 	require.NoError(t, err)
 
-	writerHandler.WaitForRunFinished()
+	// Wait for completion using a done channel
+	done := make(chan struct{})
+	go func() {
+		// Poll for completion
+		for {
+			if !thread.IsRunning() {
+				close(done)
+				return
+			}
+		}
+	}()
+	<-done
 
-	// Verify the session file contains the new conversation
+	// Read session file content
 	content, err := os.ReadFile(sessionFilePath)
 	require.NoError(t, err)
 
 	contentStr := string(content)
-	assert.Contains(t, contentStr, "# User", "session file should contain user message header")
-	assert.Contains(t, contentStr, "Can you help me?", "session file should contain the second user prompt")
-	assert.Contains(t, contentStr, "# Assistant", "session file should contain assistant message header")
-	assert.NotEmpty(t, strings.TrimSpace(contentStr), "session file should not be empty")
+
+	// Verify the session file contains the logged method calls
+	assert.Contains(t, contentStr, "## System", "session file should contain system message header")
+	assert.Contains(t, contentStr, "SendUserMessage", "session file should contain SendUserMessage method call")
+	assert.Contains(t, contentStr, "Hello, this is a test prompt", "session file should contain the user prompt text")
+}
+
+// TestLogmdWrappersIntegration tests the integration of LogmdChatView and LogmdChatPresenter.
+func TestLogmdWrappersIntegration(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+
+	// Create provider config pointing to mock server
+	providerConfig := &conf.ModelProviderConfig{
+		Type: "ollama",
+		Name: "ollama",
+		URL:  mockServer.URL(),
+	}
+
+	client, err := models.NewOllamaClient(providerConfig)
+	require.NoError(t, err)
+
+	vfsInstance := vfs.NewMockVFS()
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfsInstance)
+
+	tmpDir := t.TempDir()
+	logsDir := filepath.Join(tmpDir, "logs")
+	err = os.MkdirAll(logsDir, 0755)
+	require.NoError(t, err)
+
+	system := &core.SweSystem{
+		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+		ModelTags:       models.NewModelTagRegistry(),
+		PromptGenerator: newMockPromptGenerator("You are a helpful assistant."),
+		Tools:           tools,
+		VFS:             vfsInstance,
+		WorkDir:         tmpDir,
+		LogBaseDir:      logsDir,
+	}
+
+	// Set up mock streaming response
+	mockServer.AddStreamingResponse("/api/chat", "POST", true,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello! I received your test prompt."},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	// Create session file
+	sessionFilePath := filepath.Join(tmpDir, "session.md")
+	sessionFile, err := os.Create(sessionFilePath)
+	require.NoError(t, err)
+	defer sessionFile.Close()
+
+	// Create thread
+	thread := core.NewSessionThread(system, nil)
+
+	// Start session
+	err = thread.StartSession("ollama/test-model")
+	require.NoError(t, err)
+
+	// Create base presenter and view
+	basePresenter := presenter.NewChatPresenter(system, thread)
+	baseView := newMockChatView()
+
+	// Wrap both with logging wrappers
+	mu := &sync.Mutex{}
+	logView := logmd.NewLogmdChatView(baseView, sessionFile, mu)
+	logPresenter := logmd.NewLogmdChatPresenter(basePresenter, sessionFile, mu)
+
+	// Set wrapped view on wrapped presenter
+	err = logPresenter.SetView(logView)
+	require.NoError(t, err)
+
+	// Set output handler on thread (use base presenter for output handling)
+	thread.SetOutputHandler(basePresenter)
+
+	// Send user message through the wrapped presenter
+	userMsg := &ui.ChatMessageUI{
+		Role: ui.ChatRoleUser,
+		Text: "Hello, this is a test prompt",
+	}
+	err = logPresenter.SendUserMessage(userMsg)
+	require.NoError(t, err)
+
+	// Wait for completion using a done channel
+	done := make(chan struct{})
+	go func() {
+		// Poll for completion
+		for {
+			if !thread.IsRunning() {
+				close(done)
+				return
+			}
+		}
+	}()
+	<-done
+
+	// Read session file content
+	content, err := os.ReadFile(sessionFilePath)
+	require.NoError(t, err)
+
+	contentStr := string(content)
+
+	// Verify the session file contains both view and presenter logs
+	assert.Contains(t, contentStr, "# Chat Session", "session file should contain chat session header")
+	assert.Contains(t, contentStr, "## User", "session file should contain user message header")
+	assert.Contains(t, contentStr, "Hello, this is a test prompt", "session file should contain the user prompt")
+	assert.Contains(t, contentStr, "## Assistant", "session file should contain assistant message header")
+	assert.Contains(t, contentStr, "## System", "session file should contain system message header (from presenter)")
+	assert.Contains(t, contentStr, "SendUserMessage", "session file should contain SendUserMessage method call")
+}
+
+// TestSaveSessionWithWriterBuffer tests session saving using a buffer instead of file.
+func TestSaveSessionWithWriterBuffer(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+
+	// Create provider config pointing to mock server
+	providerConfig := &conf.ModelProviderConfig{
+		Type: "ollama",
+		Name: "ollama",
+		URL:  mockServer.URL(),
+	}
+
+	client, err := models.NewOllamaClient(providerConfig)
+	require.NoError(t, err)
+
+	vfsInstance := vfs.NewMockVFS()
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfsInstance)
+
+	tmpDir := t.TempDir()
+	logsDir := filepath.Join(tmpDir, "logs")
+	err = os.MkdirAll(logsDir, 0755)
+	require.NoError(t, err)
+
+	system := &core.SweSystem{
+		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+		ModelTags:       models.NewModelTagRegistry(),
+		PromptGenerator: newMockPromptGenerator("You are a helpful assistant."),
+		Tools:           tools,
+		VFS:             vfsInstance,
+		WorkDir:         tmpDir,
+		LogBaseDir:      logsDir,
+	}
+
+	// Set up mock streaming response
+	mockServer.AddStreamingResponse("/api/chat", "POST", true,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello! I received your test prompt."},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	// Use a buffer to capture the logged output
+	var buf bytes.Buffer
+
+	// Create thread
+	thread := core.NewSessionThread(system, nil)
+
+	// Start session
+	err = thread.StartSession("ollama/test-model")
+	require.NoError(t, err)
+
+	// Create base presenter and view
+	basePresenter := presenter.NewChatPresenter(system, thread)
+	baseView := newMockChatView()
+
+	// Wrap both with logging wrappers using buffer
+	mu := &sync.Mutex{}
+	logView := logmd.NewLogmdChatView(baseView, &buf, mu)
+	logPresenter := logmd.NewLogmdChatPresenter(basePresenter, &buf, mu)
+
+	// Set wrapped view on wrapped presenter
+	err = logPresenter.SetView(logView)
+	require.NoError(t, err)
+
+	// Set output handler on thread (use base presenter for output handling)
+	thread.SetOutputHandler(basePresenter)
+
+	// Send user message through the wrapped presenter
+	userMsg := &ui.ChatMessageUI{
+		Role: ui.ChatRoleUser,
+		Text: "Hello, this is a test prompt",
+	}
+	err = logPresenter.SendUserMessage(userMsg)
+	require.NoError(t, err)
+
+	// Wait for completion using a done channel
+	done := make(chan struct{})
+	go func() {
+		// Poll for completion
+		for {
+			if !thread.IsRunning() {
+				close(done)
+				return
+			}
+		}
+	}()
+	<-done
+
+	contentStr := buf.String()
+
+	// Verify the buffer contains both view and presenter logs
+	assert.Contains(t, contentStr, "# Chat Session", "buffer should contain chat session header")
+	assert.Contains(t, contentStr, "## User", "buffer should contain user message header")
+	assert.Contains(t, contentStr, "Hello, this is a test prompt", "buffer should contain the user prompt")
+	assert.Contains(t, contentStr, "## Assistant", "buffer should contain assistant message header")
+	assert.Contains(t, contentStr, "## System", "buffer should contain system message header (from presenter)")
+	assert.Contains(t, contentStr, "SendUserMessage", "buffer should contain SendUserMessage method call")
 }
 
 func TestKimiTagResolution(t *testing.T) {
