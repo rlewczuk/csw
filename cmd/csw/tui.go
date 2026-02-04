@@ -23,6 +23,13 @@ import (
 )
 
 func runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo string, saveSession bool) error {
+
+	// Resolve working directory
+	workDir, err := ResolveWorkDir(workDir)
+	if err != nil {
+		return err
+	}
+
 	// Initialize logging infrastructure
 	// Logs directory is placed in project dir at .cswdata/logs
 	// Logging is set to debug level by default
@@ -135,6 +142,7 @@ func runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo s
 		Roles:           roleRegistry,
 		LSP:             lspClient,
 		LogBaseDir:      logsDir,
+		WorkDir:         workDir,
 	}
 
 	// Create a context that can be cancelled on interrupt

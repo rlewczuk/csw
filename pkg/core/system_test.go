@@ -58,6 +58,7 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -99,6 +100,7 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
@@ -155,6 +157,7 @@ func TestSweSystemSessionManagement(t *testing.T) {
 		Tools:                tools,
 		VFS:                  vfs,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	mockHandler := testutil.NewMockSessionOutputHandler()
@@ -264,6 +267,7 @@ func TestSweSystemGetSessionThread(t *testing.T) {
 		Tools:                tools,
 		VFS:                  vfs,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	mockHandler := testutil.NewMockSessionOutputHandler()
@@ -345,6 +349,7 @@ func TestSweSystemShutdown(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		// Should not panic
@@ -362,6 +367,7 @@ func TestSweSystemShutdown(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -396,6 +402,7 @@ func TestSweSystemShutdown(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -440,6 +447,7 @@ func TestSweSystemShutdown(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -486,6 +494,7 @@ func TestSweSystemShutdown(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -531,6 +540,7 @@ func TestSystemStreamingConfiguration(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -558,6 +568,7 @@ func TestSystemStreamingConfiguration(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -583,6 +594,7 @@ func TestSystemStreamingConfiguration(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfs,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()

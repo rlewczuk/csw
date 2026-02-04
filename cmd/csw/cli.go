@@ -178,6 +178,7 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 		Roles:           roleRegistry,
 		ConfigStore:     configStore,
 		LogBaseDir:      logsDir,
+		WorkDir:         workDir,
 	}
 
 	// Determine session file path if session saving is enabled

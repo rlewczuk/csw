@@ -60,6 +60,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		// Create session thread
@@ -170,6 +171,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		// Create session thread
@@ -266,6 +268,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		// Create session thread
@@ -353,6 +356,7 @@ func TestAppViewMenuInteraction(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		// Create session thread
@@ -427,6 +431,7 @@ func TestAppViewMenuInteraction(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		// Create session thread

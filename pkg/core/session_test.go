@@ -63,6 +63,7 @@ func TestSessionThread(t *testing.T) {
 		Tools:                tools,
 		VFS:                  vfsInstance,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	t.Run("basic initialization and session management", func(t *testing.T) {
@@ -101,6 +102,7 @@ func TestSessionToolSelection(t *testing.T) {
 		Tools:                tools,
 		VFS:                  vfsInstance,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	t.Run("bug: Run uses system tools instead of session tools", func(t *testing.T) {
@@ -177,6 +179,7 @@ func TestSessionThreadSafety(t *testing.T) {
 		Tools:                tools,
 		VFS:                  vfsInstance,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	t.Run("concurrent GetSession calls", func(t *testing.T) {
@@ -264,6 +267,7 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 		Tools:                tools,
 		VFS:                  vfsInstance,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	t.Run("grep tool finds matches across files", func(t *testing.T) {
@@ -448,6 +452,7 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		Tools:                tools,
 		VFS:                  vfsInstance,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	t.Run("edit tool replaces unique occurrence and returns diff", func(t *testing.T) {
@@ -668,6 +673,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 		VFS:                  vfsInstance,
 		LSP:                  mockLSP,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	t.Run("session receives LSP from system", func(t *testing.T) {
@@ -859,6 +865,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 			VFS:                  vfsInstance,
 			LSP:                  nil, // No LSP
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 		tool.RegisterVFSTools(systemNoLSP.Tools, vfsInstance)
 
@@ -1096,6 +1103,7 @@ func TestSessionThreadWithWriter(t *testing.T) {
 		Tools:                tools,
 		VFS:                  vfsInstance,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	tmpDir := t.TempDir()
@@ -1155,6 +1163,7 @@ func TestSessionStreamingMode(t *testing.T) {
 		Tools:                tools,
 		VFS:                  vfsInstance,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	t.Run("streaming mode enabled", func(t *testing.T) {
@@ -1195,6 +1204,7 @@ func TestSessionNonStreamingMode(t *testing.T) {
 		Tools:                tools,
 		VFS:                  vfsInstance,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	t.Run("streaming mode disabled", func(t *testing.T) {
@@ -1245,6 +1255,7 @@ func TestSessionStreamingModeDefault(t *testing.T) {
 		Tools:                tools,
 		VFS:                  vfsInstance,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	t.Run("streaming defaults to true", func(t *testing.T) {
@@ -1296,6 +1307,7 @@ func TestSessionSystemPrompt(t *testing.T) {
 		Roles:                roleRegistry,
 		ConfigStore:          configStore,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+		WorkDir:              ".",
 	}
 
 	t.Run("system prompt is set when creating session with default role", func(t *testing.T) {

@@ -73,6 +73,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		// Create session thread
@@ -128,6 +129,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		// Create session thread
@@ -223,6 +225,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		// Create session thread
@@ -281,6 +284,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 			Tools:                tools,
 			VFS:                  vfsInstance,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		// Create session thread
@@ -384,6 +388,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 			Roles:                roleRegistry,
 			ConfigStore:          configStore,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		// Create session thread
@@ -460,6 +465,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 			Roles:                roleRegistry,
 			ConfigStore:          configStore,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		// Create session - should automatically use "tester" role from global config
@@ -532,6 +538,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 			Roles:                roleRegistry,
 			ConfigStore:          configStore,
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
 		}
 
 		// Add a tag mapping to ensure we have the 'special' tag
