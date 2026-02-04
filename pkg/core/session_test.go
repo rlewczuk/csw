@@ -283,7 +283,7 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 		require.NotNil(t, grepTool)
 
 		// Execute grep tool to find "main"
-		response := grepTool.Execute(tool.ToolCall{
+		response := grepTool.Execute(&tool.ToolCall{
 			ID:       "test-grep-1",
 			Function: "vfsGrep",
 			Arguments: tool.NewToolValue(map[string]any{
@@ -315,7 +315,7 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Execute grep tool with include filter for .go files only
-		response := grepTool.Execute(tool.ToolCall{
+		response := grepTool.Execute(&tool.ToolCall{
 			ID:       "test-grep-2",
 			Function: "vfsGrep",
 			Arguments: tool.NewToolValue(map[string]any{
@@ -348,7 +348,7 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Execute grep tool with path filter for src/ directory
-		response := grepTool.Execute(tool.ToolCall{
+		response := grepTool.Execute(&tool.ToolCall{
 			ID:       "test-grep-3",
 			Function: "vfsGrep",
 			Arguments: tool.NewToolValue(map[string]any{
@@ -381,7 +381,7 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Execute grep tool with pattern that doesn't match
-		response := grepTool.Execute(tool.ToolCall{
+		response := grepTool.Execute(&tool.ToolCall{
 			ID:       "test-grep-4",
 			Function: "vfsGrep",
 			Arguments: tool.NewToolValue(map[string]any{
@@ -410,7 +410,7 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Execute grep tool with low limit
-		response := grepTool.Execute(tool.ToolCall{
+		response := grepTool.Execute(&tool.ToolCall{
 			ID:       "test-grep-5",
 			Function: "vfsGrep",
 			Arguments: tool.NewToolValue(map[string]any{
@@ -468,7 +468,7 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		require.NotNil(t, editTool)
 
 		// Execute edit tool to replace "hello"
-		response := editTool.Execute(tool.ToolCall{
+		response := editTool.Execute(&tool.ToolCall{
 			ID:       "test-edit-1",
 			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{
@@ -513,7 +513,7 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		require.NotNil(t, editTool)
 
 		// Execute edit tool to replace all "foo"
-		response := editTool.Execute(tool.ToolCall{
+		response := editTool.Execute(&tool.ToolCall{
 			ID:       "test-edit-2",
 			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{
@@ -555,7 +555,7 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		editTool, err := session.Tools.Get("vfsEdit")
 		require.NoError(t, err)
 
-		response := editTool.Execute(tool.ToolCall{
+		response := editTool.Execute(&tool.ToolCall{
 			ID:       "test-edit-3",
 			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{
@@ -588,7 +588,7 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		editTool, err := session.Tools.Get("vfsEdit")
 		require.NoError(t, err)
 
-		response := editTool.Execute(tool.ToolCall{
+		response := editTool.Execute(&tool.ToolCall{
 			ID:       "test-edit-4",
 			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{
@@ -622,7 +622,7 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		editTool, err := session.Tools.Get("vfsEdit")
 		require.NoError(t, err)
 
-		response := editTool.Execute(tool.ToolCall{
+		response := editTool.Execute(&tool.ToolCall{
 			ID:       "test-edit-5",
 			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{
@@ -770,7 +770,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Execute edit
-		response := editTool.Execute(tool.ToolCall{
+		response := editTool.Execute(&tool.ToolCall{
 			ID:       "test-edit-lsp",
 			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{
@@ -834,7 +834,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Execute write with invalid content
-		response := writeTool.Execute(tool.ToolCall{
+		response := writeTool.Execute(&tool.ToolCall{
 			ID:       "test-write-lsp",
 			Function: "vfsWrite",
 			Arguments: tool.NewToolValue(map[string]any{
@@ -898,7 +898,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 		editTool, err := session.Tools.Get("vfsEdit")
 		require.NoError(t, err)
 
-		response := editTool.Execute(tool.ToolCall{
+		response := editTool.Execute(&tool.ToolCall{
 			ID:       "test-edit-no-lsp",
 			Function: "vfsEdit",
 			Arguments: tool.NewToolValue(map[string]any{

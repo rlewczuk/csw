@@ -52,11 +52,11 @@ func NewRunBashToolWithRoot(r runner.CommandRunner, privileges map[string]conf.A
 }
 
 // Execute executes the tool with the given arguments and returns the response.
-func (t *RunBashTool) Execute(args ToolCall) ToolResponse {
+func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 	command, ok := args.Arguments.StringOK("command")
 	if !ok {
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("RunBashTool.Execute() [run.go]: missing required argument: command"),
 			Done:  true,
 		}
@@ -85,8 +85,8 @@ func (t *RunBashTool) Execute(args ToolCall) ToolResponse {
 	timeout := time.Duration(0)
 	if timeoutSecs, ok := args.Arguments.IntOK("timeout"); ok {
 		if timeoutSecs <= 0 {
-			return ToolResponse{
-				Call:  &args,
+			return &ToolResponse{
+				Call:  args,
 				Error: fmt.Errorf("RunBashTool.Execute() [run.go]: timeout must be positive, got %d", timeoutSecs),
 				Done:  true,
 			}
@@ -104,8 +104,8 @@ func (t *RunBashTool) Execute(args ToolCall) ToolResponse {
 
 	switch access {
 	case conf.AccessDeny:
-		return ToolResponse{
-			Call: &args,
+		return &ToolResponse{
+			Call: args,
 			Error: &RunCommandError{
 				Command: command,
 				Message: "permission denied",
@@ -175,7 +175,7 @@ func countWildcards(pattern string) int {
 }
 
 // createPermissionQuery creates a permission query for the user.
-func (t *RunBashTool) createPermissionQuery(args ToolCall, command string, workdir string, timeout time.Duration) ToolResponse {
+func (t *RunBashTool) createPermissionQuery(args *ToolCall, command string, workdir string, timeout time.Duration) *ToolResponse {
 	details := fmt.Sprintf("Allow running command: %s", command)
 	if workdir != "" {
 		details += fmt.Sprintf("\nWorkdir: %s", workdir)
@@ -186,7 +186,7 @@ func (t *RunBashTool) createPermissionQuery(args ToolCall, command string, workd
 
 	query := &ToolPermissionsQuery{
 		Id:      shared.GenerateUUIDv7(),
-		Tool:    &args,
+		Tool:    args,
 		Title:   "Permission Required",
 		Details: details,
 		Options: []string{
@@ -200,15 +200,15 @@ func (t *RunBashTool) createPermissionQuery(args ToolCall, command string, workd
 			"command": command,
 		},
 	}
-	return ToolResponse{
-		Call:  &args,
+	return &ToolResponse{
+		Call:  args,
 		Error: query,
 		Done:  true,
 	}
 }
 
 // createWorkdirPermissionQuery creates a permission query for absolute workdir.
-func (t *RunBashTool) createWorkdirPermissionQuery(args ToolCall, command string, workdir string, timeout time.Duration) ToolResponse {
+func (t *RunBashTool) createWorkdirPermissionQuery(args *ToolCall, command string, workdir string, timeout time.Duration) *ToolResponse {
 	details := fmt.Sprintf("Allow running command with absolute path:\nCommand: %s\nWorkdir: %s", command, workdir)
 	if timeout > 0 {
 		details += fmt.Sprintf("\nTimeout: %v", timeout)
@@ -216,7 +216,7 @@ func (t *RunBashTool) createWorkdirPermissionQuery(args ToolCall, command string
 
 	query := &ToolPermissionsQuery{
 		Id:      shared.GenerateUUIDv7(),
-		Tool:    &args,
+		Tool:    args,
 		Title:   "Permission Required for Absolute Path",
 		Details: details,
 		Options: []string{
@@ -230,15 +230,15 @@ func (t *RunBashTool) createWorkdirPermissionQuery(args ToolCall, command string
 			"workdir": workdir,
 		},
 	}
-	return ToolResponse{
-		Call:  &args,
+	return &ToolResponse{
+		Call:  args,
 		Error: query,
 		Done:  true,
 	}
 }
 
 // executeCommand executes the command using the runner.
-func (t *RunBashTool) executeCommand(args ToolCall, command string, workdir string, timeout time.Duration) ToolResponse {
+func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir string, timeout time.Duration) *ToolResponse {
 	var output string
 	var exitCode int
 	var err error
@@ -257,8 +257,8 @@ func (t *RunBashTool) executeCommand(args ToolCall, command string, workdir stri
 
 	if err != nil {
 		// If there's an error from the runner itself (timeout, etc.), return it
-		return ToolResponse{
-			Call:  &args,
+		return &ToolResponse{
+			Call:  args,
 			Error: fmt.Errorf("RunBashTool.executeCommand() [run.go]: %w", err),
 			Done:  true,
 		}
@@ -269,8 +269,8 @@ func (t *RunBashTool) executeCommand(args ToolCall, command string, workdir stri
 	result.Set("output", output)
 	result.Set("exit_code", exitCode)
 
-	return ToolResponse{
-		Call:   &args,
+	return &ToolResponse{
+		Call:   args,
 		Result: result,
 		Done:   true,
 	}

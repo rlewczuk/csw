@@ -17,10 +17,10 @@ type mockTool struct {
 	err         error
 }
 
-func (m *mockTool) Execute(call ToolCall) ToolResponse {
+func (m *mockTool) Execute(call *ToolCall) *ToolResponse {
 	m.executed = true
-	return ToolResponse{
-		Call:   &call,
+	return &ToolResponse{
+		Call:   call,
 		Error:  m.err,
 		Result: m.result,
 		Done:   true,
@@ -401,7 +401,7 @@ func TestAccessControlTool_Execute_Allow(t *testing.T) {
 	}
 
 	ac := NewAccessControlTool(mock, privileges)
-	call := ToolCall{
+	call := &ToolCall{
 		ID:        "test-id",
 		Function:  "vfsRead",
 		Arguments: NewToolValue(map[string]any{"path": "/test"}),
@@ -426,7 +426,7 @@ func TestAccessControlTool_Execute_Deny(t *testing.T) {
 	}
 
 	ac := NewAccessControlTool(mock, privileges)
-	call := ToolCall{
+	call := &ToolCall{
 		ID:        "test-id",
 		Function:  "vfsWrite",
 		Arguments: NewToolValue(map[string]any{"path": "/test"}),
@@ -452,7 +452,7 @@ func TestAccessControlTool_Execute_Ask(t *testing.T) {
 	}
 
 	ac := NewAccessControlTool(mock, privileges)
-	call := ToolCall{
+	call := &ToolCall{
 		ID:        "test-id",
 		Function:  "sensitive.operation",
 		Arguments: NewToolValue(map[string]any{}),
@@ -477,7 +477,7 @@ func TestAccessControlTool_Execute_DefaultDeny(t *testing.T) {
 	privileges := map[string]conf.AccessFlag{}
 
 	ac := NewAccessControlTool(mock, privileges)
-	call := ToolCall{
+	call := &ToolCall{
 		ID:        "test-id",
 		Function:  "unknown.tool",
 		Arguments: NewToolValue(map[string]any{}),
@@ -502,7 +502,7 @@ func TestAccessControlTool_Execute_ToolError(t *testing.T) {
 	}
 
 	ac := NewAccessControlTool(mock, privileges)
-	call := ToolCall{
+	call := &ToolCall{
 		ID:        "test-id",
 		Function:  "vfsRead",
 		Arguments: NewToolValue(map[string]any{"path": "/nonexistent"}),
@@ -532,7 +532,7 @@ func TestAccessControlTool_MultipleMatchingPatterns(t *testing.T) {
 	flag := ac.resolveAccessFlag("api.v1.users.read")
 	assert.Equal(t, conf.AccessDeny, flag, "most specific pattern should win")
 
-	call := ToolCall{
+	call := &ToolCall{
 		ID:        "test-id",
 		Function:  "api.v1.users.read",
 		Arguments: NewToolValue(map[string]any{}),

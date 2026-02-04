@@ -351,7 +351,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			"path":    "test.txt",
 			"content": "content",
 		})
-		writeResponse := session.Tools.Execute(tool.ToolCall{
+		writeResponse := session.Tools.Execute(&tool.ToolCall{
 			Function:  "vfsWrite",
 			Arguments: writeArgs,
 		})
@@ -363,7 +363,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 		readArgs := tool.NewToolValue(map[string]interface{}{
 			"path": "existing.txt",
 		})
-		readResponse := session.Tools.Execute(tool.ToolCall{
+		readResponse := session.Tools.Execute(&tool.ToolCall{
 			Function:  "vfsRead",
 			Arguments: readArgs,
 		})
@@ -424,7 +424,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			"path":    "test.txt",
 			"content": "content",
 		})
-		writeResponse := session.Tools.Execute(tool.ToolCall{
+		writeResponse := session.Tools.Execute(&tool.ToolCall{
 			Function:  "vfsWrite",
 			Arguments: writeArgs1,
 		})
@@ -440,7 +440,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			"path":    "test2.txt",
 			"content": "content",
 		})
-		writeResponse = session.Tools.Execute(tool.ToolCall{
+		writeResponse = session.Tools.Execute(&tool.ToolCall{
 			Function:  "vfsWrite",
 			Arguments: writeArgs2,
 		})

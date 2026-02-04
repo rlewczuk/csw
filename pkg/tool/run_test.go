@@ -20,7 +20,7 @@ func TestRunBashTool_Execute_MissingCommand(t *testing.T) {
 		Arguments: NewToolValue(map[string]any{}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	assert.NotNil(t, response.Error)
 	assert.Contains(t, response.Error.Error(), "missing required argument: command")
@@ -45,7 +45,7 @@ func TestRunBashTool_Execute_AllowedCommand(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	assert.NoError(t, response.Error)
 	assert.True(t, response.Done)
@@ -70,7 +70,7 @@ func TestRunBashTool_Execute_DeniedCommand(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	assert.Error(t, response.Error)
 	_, ok := response.Error.(*RunCommandError)
@@ -94,7 +94,7 @@ func TestRunBashTool_Execute_AskPermission(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	assert.Error(t, response.Error)
 	query, ok := response.Error.(*ToolPermissionsQuery)
@@ -123,7 +123,7 @@ func TestRunBashTool_Execute_ExplicitAskPermission(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	assert.Error(t, response.Error)
 	query, ok := response.Error.(*ToolPermissionsQuery)
@@ -151,7 +151,7 @@ func TestRunBashTool_Execute_CommandWithNonZeroExitCode(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	assert.NoError(t, response.Error)
 	assert.True(t, response.Done)
@@ -176,7 +176,7 @@ func TestRunBashTool_Execute_CommandWithError(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	assert.Error(t, response.Error)
 	assert.Contains(t, response.Error.Error(), "command timed out")
@@ -236,7 +236,7 @@ func TestRunBashTool_CheckPermission_MostSpecificMatch(t *testing.T) {
 				}),
 			}
 
-			response := tool.Execute(args)
+			response := tool.Execute(&args)
 
 			if tt.shouldExecute {
 				assert.NoError(t, response.Error)
@@ -261,7 +261,7 @@ func TestRunBashTool_CheckPermission_NoPrivileges(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	// Should ask for permission when no privileges are defined
 	_, ok := response.Error.(*ToolPermissionsQuery)
@@ -280,7 +280,7 @@ func TestRunBashTool_PermissionQuery_Options(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	query, ok := response.Error.(*ToolPermissionsQuery)
 	require.True(t, ok)
@@ -313,7 +313,7 @@ func TestRunBashTool_Execute_WithRelativeWorkdir(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	assert.NoError(t, response.Error)
 	assert.True(t, response.Done)
@@ -342,7 +342,7 @@ func TestRunBashTool_Execute_WithAbsoluteWorkdir(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	// Should ask for permission due to absolute path
 	assert.Error(t, response.Error)
@@ -375,7 +375,7 @@ func TestRunBashTool_Execute_WithTimeout(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	assert.NoError(t, response.Error)
 	assert.True(t, response.Done)
@@ -401,7 +401,7 @@ func TestRunBashTool_Execute_WithInvalidTimeout(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	assert.Error(t, response.Error)
 	assert.Contains(t, response.Error.Error(), "timeout must be positive")
@@ -428,7 +428,7 @@ func TestRunBashTool_Execute_WithWorkdirAndTimeout(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	assert.NoError(t, response.Error)
 	assert.True(t, response.Done)
@@ -454,7 +454,7 @@ func TestRunBashTool_Execute_WithoutProjectRoot(t *testing.T) {
 		}),
 	}
 
-	response := tool.Execute(args)
+	response := tool.Execute(&args)
 
 	assert.NoError(t, response.Error)
 	assert.True(t, response.Done)
