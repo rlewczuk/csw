@@ -27,9 +27,6 @@ func TestGetSessionLogger(t *testing.T) {
 	require.NotNil(t, sessionLogger, "GetSessionLogger() should return non-nil logger")
 	defer CloseSessionLogger(sessionID)
 
-	chatLogger := GetSessionLogger(sessionID, LogTypeChat)
-	require.NotNil(t, chatLogger, "GetSessionLogger() for chat should return non-nil logger")
-
 	llmLogger := GetSessionLogger(sessionID, LogTypeLLM)
 	require.NotNil(t, llmLogger, "GetSessionLogger() for llm should return non-nil logger")
 
@@ -76,12 +73,11 @@ func TestSessionLoggerUserInput(t *testing.T) {
 
 	sessionID := "test-session-123"
 	sessionLog := GetSessionLogger(sessionID, LogTypeSession)
-	chatLog := GetSessionLogger(sessionID, LogTypeChat)
 	defer CloseSessionLogger(sessionID)
 
 	// Log user input
 	userInput := "Hello, world!"
-	LogUserInput(sessionLog, chatLog, userInput)
+	LogUserInput(sessionLog, userInput)
 
 	// Flush to ensure writes complete
 	FlushLogs()
@@ -90,15 +86,8 @@ func TestSessionLoggerUserInput(t *testing.T) {
 	sessionLogPath := filepath.Join(tmpDir, "sessions", sessionID, "session.jsonl")
 	content, err := os.ReadFile(sessionLogPath)
 	require.NoError(t, err)
-	assert.Contains(t, string(content), "user_input")
+	assert.Contains(t, string(content), "user_messag")
 	assert.Contains(t, string(content), userInput)
-
-	// Read chat log
-	chatLogPath := filepath.Join(tmpDir, "sessions", sessionID, "chat.jsonl")
-	chatContent, err := os.ReadFile(chatLogPath)
-	require.NoError(t, err)
-	assert.Contains(t, string(chatContent), "user_message")
-	assert.Contains(t, string(chatContent), userInput)
 }
 
 func TestSessionLoggerToolCall(t *testing.T) {
@@ -256,13 +245,12 @@ func TestLogFormatIsValidJSON(t *testing.T) {
 
 	sessionID := "test-session-123"
 	sessionLog := GetSessionLogger(sessionID, LogTypeSession)
-	chatLog := GetSessionLogger(sessionID, LogTypeChat)
 	defer CloseSessionLogger(sessionID)
 
 	// Log various types of messages
 	sessionLog.Info("test_message", "key1", "value1", "key2", 123)
-	LogUserInput(sessionLog, chatLog, "test input")
-	LogAssistantOutput(sessionLog, chatLog, "test output")
+	LogUserInput(sessionLog, "test input")
+	LogAssistantOutput(sessionLog, "test output")
 
 	// Flush to ensure writes complete
 	FlushLogs()
@@ -293,12 +281,10 @@ func TestInMemoryLogging(t *testing.T) {
 	sessionID := "test-session-inmem"
 
 	sessionLog := GetSessionLogger(sessionID, LogTypeSession)
-	chatLog := GetSessionLogger(sessionID, LogTypeChat)
 	defer CloseSessionLogger(sessionID)
 
 	// Log some messages
 	sessionLog.Info("test_message_1")
-	chatLog.Info("test_chat_message")
 
 	// Verify no files were created
 	_, err := os.Stat(filepath.Join(".cswdata/logs/sessions", sessionID))
