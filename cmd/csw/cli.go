@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
@@ -17,6 +18,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/ui"
 	"github.com/codesnort/codesnort-swe/pkg/ui/cli"
+	"github.com/codesnort/codesnort-swe/pkg/ui/logmd"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/spf13/cobra"
 )
@@ -181,61 +183,25 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 		WorkDir:         workDir,
 	}
 
-	// Determine session file path if session saving is enabled
-	var sessionFilePath string
-	if saveSessionTo != "" {
-		sessionFilePath = saveSessionTo
-	} else if saveSession {
-		// Will be set after starting the session to get session ID
-		// For now, leave it empty
-	}
-
-	// Create session thread (possibly with writer)
-	var thread *core.SessionThread
-	var sessionWriter *core.SessionThreadWithWriter
-	if sessionFilePath != "" {
-		// Create thread with session writer
-		writer, err := core.NewSessionThreadWithWriter(sweSystem, nil, sessionFilePath)
-		if err != nil {
-			return fmt.Errorf("runCLI() [cli.go]: failed to create session writer: %w", err)
-		}
-		sessionWriter = writer
-		thread = writer.SessionThread
-		defer writer.Close()
-	} else {
-		// Create regular thread
-		thread = core.NewSessionThread(sweSystem, nil)
-	}
+	// Create session thread
+	thread := core.NewSessionThread(sweSystem, nil)
 
 	// Start session
 	if err := thread.StartSession(modelName); err != nil {
 		return fmt.Errorf("runCLI() [cli.go]: failed to start session: %w", err)
 	}
 
-	// If --save-session is set and we don't have a file path yet, create it now
-	if saveSession && saveSessionTo == "" {
-		// Get session ID
+	// Determine session file path if session saving is enabled
+	var sessionFilePath string
+	if saveSessionTo != "" {
+		sessionFilePath = saveSessionTo
+	} else if saveSession {
+		// Get session ID and create path
 		session := thread.GetSession()
 		if session != nil {
 			sessionID := session.ID()
 			sessionLogDir := filepath.Join(logsDir, "sessions", sessionID)
 			sessionFilePath = filepath.Join(sessionLogDir, "session.md")
-
-			// Create new thread with writer, preserving the existing session
-			if sessionWriter != nil {
-				// Close existing writer
-				sessionWriter.Close()
-			}
-			writer, err := core.NewSessionThreadWithWriterAndSession(sweSystem, session, nil, sessionFilePath)
-			if err != nil {
-				return fmt.Errorf("runCLI() [cli.go]: failed to create session writer: %w", err)
-			}
-			sessionWriter = writer
-			thread = writer.SessionThread
-			defer writer.Close()
-
-			// Note: We don't need to call StartSession here because we're reusing the existing session.
-			// The session already has the conversation history and is ready to continue.
 		}
 	}
 
@@ -286,10 +252,39 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 	}
 
 	// Create chat presenter
-	chatPresenter := presenter.NewChatPresenter(sweSystem, thread)
+	basePresenter := presenter.NewChatPresenter(sweSystem, thread)
 
 	// Create CLI chat view
-	cliView := cli.NewCliChatView(chatPresenter, os.Stdout, os.Stdin, interactive, allowAllPerms)
+	baseCliView := cli.NewCliChatView(basePresenter, os.Stdout, os.Stdin, interactive, allowAllPerms)
+
+	// These will be the potentially wrapped versions used for output handling
+	var chatPresenter ui.IChatPresenter = basePresenter
+	var cliView ui.IChatView = baseCliView
+
+	// Wrap with session logging if enabled
+	var sessionFile *os.File
+	if sessionFilePath != "" {
+		// Ensure directory exists
+		sessionDir := filepath.Dir(sessionFilePath)
+		if err := os.MkdirAll(sessionDir, 0755); err != nil {
+			return fmt.Errorf("runCLI() [cli.go]: failed to create session directory: %w", err)
+		}
+
+		// Create session file
+		var err error
+		sessionFile, err = os.Create(sessionFilePath)
+		if err != nil {
+			return fmt.Errorf("runCLI() [cli.go]: failed to create session file: %w", err)
+		}
+		defer sessionFile.Close()
+
+		// Create mutex for thread-safe writes
+		mu := &sync.Mutex{}
+
+		// Wrap view and presenter with logging wrappers
+		cliView = logmd.NewLogmdChatView(baseCliView, sessionFile, mu)
+		chatPresenter = logmd.NewLogmdChatPresenter(basePresenter, sessionFile, mu)
+	}
 
 	// Set view on presenter
 	if err := chatPresenter.SetView(cliView); err != nil {
@@ -298,25 +293,16 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 
 	// If interactive, start reading input
 	if interactive {
-		cliView.StartReadingInput()
+		baseCliView.StartReadingInput()
 	}
 
 	// Create a channel to track when processing is done
 	done := make(chan error, 1)
 
 	// Set up a custom output handler to track completion
-	// The output handler chain should be:
-	// cliOutputHandler -> SessionWriter (if exists) -> chatPresenter
-	// This ensures the SessionWriter can write to the file, and chatPresenter displays to user.
-	var handlerChain core.SessionThreadOutput = chatPresenter
-	if sessionWriter != nil {
-		// Get the SessionWriter and set its delegate to chatPresenter
-		// Then wrap the SessionWriter with cliOutputHandler
-		sessionWriter.GetWriter().SetDelegate(chatPresenter)
-		handlerChain = sessionWriter.GetWriter()
-	}
+	// The basePresenter implements SessionThreadOutput
 	wrappedHandler := &cliOutputHandler{
-		delegate: handlerChain,
+		delegate: basePresenter,
 		done:     done,
 	}
 	thread.SetOutputHandler(wrappedHandler)
