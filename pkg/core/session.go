@@ -1184,6 +1184,13 @@ func (w *SessionWriter) Close() error {
 	return nil
 }
 
+// SetDelegate sets the delegate output handler for the SessionWriter.
+func (w *SessionWriter) SetDelegate(delegate SessionThreadOutput) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.delegate = delegate
+}
+
 // SessionThreadWithWriter wraps a SessionThread and automatically logs user prompts to a SessionWriter.
 type SessionThreadWithWriter struct {
 	*SessionThread
@@ -1205,6 +1212,29 @@ func NewSessionThreadWithWriter(system *SweSystem, outputHandler SessionThreadOu
 		SessionThread: thread,
 		writer:        writer,
 	}, nil
+}
+
+// NewSessionThreadWithWriterAndSession creates a new SessionThread that writes to a markdown file
+// using an existing session. This preserves the conversation history.
+func NewSessionThreadWithWriterAndSession(system *SweSystem, session *SweSession, outputHandler SessionThreadOutput, filePath string) (*SessionThreadWithWriter, error) {
+	// Create the session writer that wraps the output handler
+	writer, err := NewSessionWriter(filePath, outputHandler)
+	if err != nil {
+		return nil, fmt.Errorf("NewSessionThreadWithWriterAndSession() [session.go]: %w", err)
+	}
+
+	// Create the session thread with the existing session and writer as the output handler
+	thread := NewSessionThreadWithSession(system, session, writer)
+
+	return &SessionThreadWithWriter{
+		SessionThread: thread,
+		writer:        writer,
+	}, nil
+}
+
+// GetWriter returns the SessionWriter used by this thread.
+func (t *SessionThreadWithWriter) GetWriter() *SessionWriter {
+	return t.writer
 }
 
 // UserPrompt overrides the parent UserPrompt to log the message.
