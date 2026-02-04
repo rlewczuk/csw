@@ -64,27 +64,21 @@ func (l *LocalVFS) validatePath(path string) (string, error) {
 		return "", fmt.Errorf("LocalVFS.validatePath() [local.go]: %w", ErrInvalidPath)
 	}
 
-	// Clean the path to remove any .. or . components
-	cleanPath := filepath.Clean(path)
-
-	// Prevent absolute paths or paths that try to escape
-	if filepath.IsAbs(cleanPath) {
-		return "", fmt.Errorf("LocalVFS.validatePath() [local.go]: %w", ErrInvalidPath)
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(l.root, path)
 	}
 
-	// Join with root and ensure it's still within root
-	absPath := filepath.Join(l.root, cleanPath)
-	absPath, err := filepath.Abs(absPath)
+	// Clean the path to remove any .. or . components
+	cleanPath, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
 		return "", err
 	}
 
-	// Ensure the resolved path is still within root
-	if !strings.HasPrefix(absPath, l.root+string(filepath.Separator)) && absPath != l.root {
-		return "", fmt.Errorf("LocalVFS.validatePath() [local.go]: %w", ErrPermissionDenied)
+	if strings.HasPrefix(cleanPath, l.root) {
+		return cleanPath, nil
 	}
 
-	return absPath, nil
+	return "", fmt.Errorf("LocalVFS.validatePath() [local.go]: %w", ErrPermissionDenied)
 }
 
 // ReadFile reads the content of the file located at the given path and returns its data as a byte slice.
