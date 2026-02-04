@@ -444,6 +444,7 @@ type SweSession struct {
 	todoList      []tool.TodoItem
 	todoMu        sync.Mutex
 	logger        *slog.Logger
+	llmLogger     *slog.Logger
 	streaming     bool
 }
 
@@ -463,7 +464,15 @@ func (s *SweSession) Run(ctx context.Context) error {
 		s.logger.Debug("session_run_start", "session_id", s.id, "model", s.model)
 	}
 
-	chatModel := s.provider.ChatModel(s.model, nil)
+	// Create chat options with LLM logger if available
+	var chatOptions *models.ChatOptions
+	if s.llmLogger != nil {
+		chatOptions = &models.ChatOptions{
+			Logger: s.llmLogger,
+		}
+	}
+
+	chatModel := s.provider.ChatModel(s.model, chatOptions)
 
 	// Build tools list using PromptGenerator.GetToolInfo()
 	tools := []tool.ToolInfo{}
@@ -543,7 +552,15 @@ func (s *SweSession) Run(ctx context.Context) error {
 
 // runStreamingChat executes a streaming chat request and returns the accumulated response.
 func (s *SweSession) runStreamingChat(ctx context.Context, chatModel models.ChatModel, tools []tool.ToolInfo) (*models.ChatMessage, error) {
-	stream := chatModel.ChatStream(ctx, s.messages, nil, tools)
+	// Create chat options with LLM logger if available
+	var chatOptions *models.ChatOptions
+	if s.llmLogger != nil {
+		chatOptions = &models.ChatOptions{
+			Logger: s.llmLogger,
+		}
+	}
+
+	stream := chatModel.ChatStream(ctx, s.messages, chatOptions, tools)
 
 	if s.logger != nil {
 		s.logger.Debug("chat_stream_created", "num_messages", len(s.messages), "num_tools", len(tools))
@@ -617,8 +634,16 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 		s.logger.Debug("chat_non_streaming_request", "num_messages", len(s.messages), "num_tools", len(tools))
 	}
 
+	// Create chat options with LLM logger if available
+	var chatOptions *models.ChatOptions
+	if s.llmLogger != nil {
+		chatOptions = &models.ChatOptions{
+			Logger: s.llmLogger,
+		}
+	}
+
 	// Use non-streaming chat API
-	responseMsg, err := chatModel.Chat(ctx, s.messages, nil, tools)
+	responseMsg, err := chatModel.Chat(ctx, s.messages, chatOptions, tools)
 	if err != nil {
 		if s.logger != nil {
 			s.logger.Error("chat_non_streaming_error", "error", err)
