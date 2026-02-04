@@ -1,7 +1,10 @@
 package models
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -841,4 +844,172 @@ func createAnthropicTimeToolInfo() tool.ToolInfo {
 		Description: "Get the current time in a given location",
 		Schema:      schema,
 	}
+}
+
+func TestAnthropicClient_Logging(t *testing.T) {
+	tc := getAnthropicTestClient(t)
+	defer tc.Close()
+
+	ctx := context.Background()
+
+	t.Run("logs request and response in Chat method", func(t *testing.T) {
+		// Setup mock response
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_log_1","type":"message","role":"assistant","content":[{"type":"text","text":"Logged response"}],"model":"claude-sonnet-4-5-20250929","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`)
+		}
+
+		// Create a test logger
+		var buf bytes.Buffer
+		handler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})
+		testLogger := slog.New(handler)
+
+		options := &ChatOptions{
+			Temperature: 0.7,
+			Logger:      testLogger,
+		}
+
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, options)
+
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Test logging"}},
+			},
+		}
+
+		response, err := chatModel.Chat(ctx, messages, nil, nil)
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+
+		// Check that logs were written
+		logOutput := buf.String()
+		assert.Contains(t, logOutput, "llm_request")
+		assert.Contains(t, logOutput, "llm_response")
+		assert.Contains(t, logOutput, "url")
+		assert.Contains(t, logOutput, "method")
+		assert.Contains(t, logOutput, "headers")
+		assert.Contains(t, logOutput, "body")
+		assert.Contains(t, logOutput, "status")
+
+		// Verify request body contains expected fields
+		assert.Contains(t, logOutput, "model")
+		assert.Contains(t, logOutput, "messages")
+	})
+
+	t.Run("logs request and each chunk in ChatStream method", func(t *testing.T) {
+		// Setup mock streaming response
+		if tc.Mock != nil {
+			tc.Mock.AddStreamingResponse("/v1/messages", "POST", true,
+				`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_stream_log","type":"message","role":"assistant","content":[],"model":"`+testAnthropicModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
+				`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
+				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Chunk1"}}`,
+				`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Chunk2"}}`,
+				`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
+			)
+		}
+
+		// Create a test logger
+		var buf bytes.Buffer
+		handler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})
+		testLogger := slog.New(handler)
+
+		options := &ChatOptions{
+			Temperature: 0.7,
+			Logger:      testLogger,
+		}
+
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, options)
+
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Test streaming logging"}},
+			},
+		}
+
+		iterator := chatModel.ChatStream(ctx, messages, nil, nil)
+		require.NotNil(t, iterator)
+
+		// Consume the iterator
+		for range iterator {
+			// Just consume
+		}
+
+		// Check that logs were written
+		logOutput := buf.String()
+		assert.Contains(t, logOutput, "llm_request")
+		assert.Contains(t, logOutput, "llm_response")
+
+		// Should have multiple response logs (one per chunk)
+		responseCount := strings.Count(logOutput, `"msg":"llm_response"`)
+		assert.GreaterOrEqual(t, responseCount, 1, "expected at least one response log entry")
+	})
+
+	t.Run("does not log when logger is nil", func(t *testing.T) {
+		// Setup mock response
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_nolog","type":"message","role":"assistant","content":[{"type":"text","text":"No log"}],"model":"claude-sonnet-4-5-20250929","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`)
+		}
+
+		options := &ChatOptions{
+			Temperature: 0.7,
+			Logger:      nil,
+		}
+
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, options)
+
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Test no logging"}},
+			},
+		}
+
+		response, err := chatModel.Chat(ctx, messages, nil, nil)
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+		// No assertions needed - if it doesn't panic, the test passes
+	})
+
+	t.Run("obfuscates sensitive headers in logs", func(t *testing.T) {
+		// Setup mock response
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_obf","type":"message","role":"assistant","content":[{"type":"text","text":"Obfuscated"}],"model":"claude-sonnet-4-5-20250929","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`)
+		}
+
+		// Create a test logger
+		var buf bytes.Buffer
+		handler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})
+		testLogger := slog.New(handler)
+
+		options := &ChatOptions{
+			Temperature: 0.7,
+			Logger:      testLogger,
+		}
+
+		chatModel := tc.Client.ChatModel(testAnthropicModelName, options)
+
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Test obfuscation"}},
+			},
+		}
+
+		_, err := chatModel.Chat(ctx, messages, nil, nil)
+		require.NoError(t, err)
+
+		// Check that logs don't contain the full API key
+		logOutput := buf.String()
+		// The x-api-key header should be obfuscated
+		assert.NotContains(t, logOutput, "test-api-key")
+	})
 }

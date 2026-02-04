@@ -1,8 +1,10 @@
 package models
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -972,5 +974,135 @@ func TestOllamaClient_ToolCalling(t *testing.T) {
 		// The response should contain text explaining the error
 		responseText := finalResponse.GetText()
 		assert.NotEmpty(t, responseText, "expected LLM to return text response after tool error")
+	})
+}
+
+func TestOllamaClient_Logging(t *testing.T) {
+	tc := getOllamaTestClient(t)
+	defer tc.Close()
+
+	ctx := context.Background()
+
+	t.Run("logs request and response in Chat method", func(t *testing.T) {
+		// Setup mock response
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Logged response"},"done":true,"done_reason":"stop"}`)
+		}
+
+		// Create a test logger
+		var buf bytes.Buffer
+		handler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})
+		testLogger := slog.New(handler)
+
+		options := &ChatOptions{
+			Temperature: 0.7,
+			Logger:      testLogger,
+		}
+
+		chatModel := tc.Client.ChatModel(testOllamaModelName, options)
+
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Test logging"}},
+			},
+		}
+
+		response, err := chatModel.Chat(ctx, messages, nil, nil)
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+
+		// Check that logs were written
+		logOutput := buf.String()
+		assert.Contains(t, logOutput, "llm_request")
+		assert.Contains(t, logOutput, "llm_response")
+		assert.Contains(t, logOutput, "url")
+		assert.Contains(t, logOutput, "method")
+		assert.Contains(t, logOutput, "headers")
+		assert.Contains(t, logOutput, "body")
+		assert.Contains(t, logOutput, "status")
+
+		// Verify request body contains expected fields
+		assert.Contains(t, logOutput, "model")
+		assert.Contains(t, logOutput, "messages")
+	})
+
+	t.Run("logs request and each chunk in ChatStream method", func(t *testing.T) {
+		// Setup mock streaming response
+		if tc.Mock != nil {
+			tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Chunk1"},"done":false}`,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":"Chunk2"},"done":false}`,
+				`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}`,
+			)
+		}
+
+		// Create a test logger
+		var buf bytes.Buffer
+		handler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})
+		testLogger := slog.New(handler)
+
+		options := &ChatOptions{
+			Temperature: 0.7,
+			Logger:      testLogger,
+		}
+
+		chatModel := tc.Client.ChatModel(testOllamaModelName, options)
+
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Test streaming logging"}},
+			},
+		}
+
+		iterator := chatModel.ChatStream(ctx, messages, nil, nil)
+		require.NotNil(t, iterator)
+
+		// Consume the iterator
+		for range iterator {
+			// Just consume
+		}
+
+		// Check that logs were written
+		logOutput := buf.String()
+		assert.Contains(t, logOutput, "llm_request")
+		assert.Contains(t, logOutput, "llm_response")
+
+		// Should have multiple response logs (one per chunk)
+		responseCount := strings.Count(logOutput, `"msg":"llm_response"`)
+		assert.GreaterOrEqual(t, responseCount, 1, "expected at least one response log entry")
+	})
+
+	t.Run("does not log when logger is nil", func(t *testing.T) {
+		// Setup mock response
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"No log"},"done":true,"done_reason":"stop"}`)
+		}
+
+		options := &ChatOptions{
+			Temperature: 0.7,
+			Logger:      nil,
+		}
+
+		chatModel := tc.Client.ChatModel(testOllamaModelName, options)
+
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Test no logging"}},
+			},
+		}
+
+		response, err := chatModel.Chat(ctx, messages, nil, nil)
+
+		require.NoError(t, err)
+		assert.NotNil(t, response)
+		// No assertions needed - if it doesn't panic, the test passes
 	})
 }

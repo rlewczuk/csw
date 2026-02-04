@@ -233,6 +233,11 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	// Print verbose request output if enabled
 	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
 
+	// Log request using structured logger if available
+	if effectiveOptions != nil && effectiveOptions.Logger != nil {
+		logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
+	}
+
 	resp, err := m.client.httpClient.Do(req)
 	if err != nil {
 		return nil, m.client.handleHTTPError(err)
@@ -257,6 +262,11 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	var chatResp OpenaiChatCompletionResponse
 	if err := json.Unmarshal(bodyBytes, &chatResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Log response using structured logger if available
+	if effectiveOptions != nil && effectiveOptions.Logger != nil {
+		logHTTPResponseWithObfuscation(effectiveOptions.Logger, resp, chatResp)
 	}
 
 	if len(chatResp.Choices) == 0 {
@@ -335,6 +345,11 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 		// Print verbose request output if enabled
 		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
 
+		// Log request using structured logger if available
+		if effectiveOptions != nil && effectiveOptions.Logger != nil {
+			logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
+		}
+
 		resp, err := m.client.httpClient.Do(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: OpenAIChatModel.ChatStream() [openai_client.go]: HTTP request failed: %v\n", err)
@@ -393,6 +408,11 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 				if err := json.Unmarshal([]byte(data), &chatResp); err != nil {
 					// Skip invalid JSON (might be [DONE] or other markers)
 					continue
+				}
+
+				// Log each chunk using structured logger if available
+				if effectiveOptions != nil && effectiveOptions.Logger != nil {
+					logHTTPResponseChunk(effectiveOptions.Logger, chatResp)
 				}
 
 				if len(chatResp.Choices) == 0 {
