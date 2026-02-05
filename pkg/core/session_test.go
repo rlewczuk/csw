@@ -96,6 +96,7 @@ func TestSessionToolSelection(t *testing.T) {
 
 	system := &SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
+		ModelTags:            models.NewModelTagRegistry(),
 		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
 		Tools:                tools,
 		VFS:                  vfsInstance,

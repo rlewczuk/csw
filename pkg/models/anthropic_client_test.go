@@ -1013,3 +1013,166 @@ func TestAnthropicClient_Logging(t *testing.T) {
 		assert.NotContains(t, logOutput, "test-api-key")
 	})
 }
+
+// TestConvertToAnthropicMessageWithMixedContent verifies that when converting a ChatMessage
+// containing both text and tool calls to Anthropic format, all parts are preserved.
+// This is a regression test for a bug where tool calls were being stripped from assistant
+// messages that also contained text.
+func TestConvertToAnthropicMessageWithMixedContent(t *testing.T) {
+	t.Run("assistant message with text and tool call preserves both", func(t *testing.T) {
+		// Create a message with both text and tool call
+		msg := &ChatMessage{
+			Role: ChatRoleAssistant,
+			Parts: []ChatMessagePart{
+				{Text: "Let me check that for you."},
+				{ToolCall: &tool.ToolCall{
+					ID:       "tool_123",
+					Function: "vfsRead",
+					Arguments: tool.NewToolValue(map[string]any{
+						"path": "/test/file.txt",
+					}),
+				}},
+			},
+		}
+
+		// Convert to Anthropic format
+		result := convertToAnthropicMessage(msg)
+
+		// The result should have content as an array (not a simple string)
+		contentBlocks, ok := result.Content.([]AnthropicContentBlock)
+		require.True(t, ok, "Content should be an array of content blocks, not a simple string")
+
+		// Should have 2 content blocks: text and tool_use
+		require.Len(t, contentBlocks, 2, "Should have 2 content blocks (text + tool_use)")
+
+		// First block should be text
+		assert.Equal(t, "text", contentBlocks[0].Type)
+		assert.Equal(t, "Let me check that for you.", contentBlocks[0].Text)
+
+		// Second block should be tool_use
+		assert.Equal(t, "tool_use", contentBlocks[1].Type)
+		assert.Equal(t, "tool_123", contentBlocks[1].ID)
+		assert.Equal(t, "vfsRead", contentBlocks[1].Name)
+	})
+
+	t.Run("assistant message with only text uses simple string format", func(t *testing.T) {
+		// Create a message with only text
+		msg := &ChatMessage{
+			Role: ChatRoleAssistant,
+			Parts: []ChatMessagePart{
+				{Text: "Hello, how can I help you?"},
+			},
+		}
+
+		// Convert to Anthropic format
+		result := convertToAnthropicMessage(msg)
+
+		// The result should have content as a simple string
+		contentStr, ok := result.Content.(string)
+		require.True(t, ok, "Content should be a simple string for text-only messages")
+		assert.Equal(t, "Hello, how can I help you?", contentStr)
+	})
+
+	t.Run("assistant message with only tool calls uses array format", func(t *testing.T) {
+		// Create a message with only tool calls
+		msg := &ChatMessage{
+			Role: ChatRoleAssistant,
+			Parts: []ChatMessagePart{
+				{ToolCall: &tool.ToolCall{
+					ID:       "tool_1",
+					Function: "vfsRead",
+					Arguments: tool.NewToolValue(map[string]any{
+						"path": "/test/file.txt",
+					}),
+				}},
+			},
+		}
+
+		// Convert to Anthropic format
+		result := convertToAnthropicMessage(msg)
+
+		// The result should have content as an array
+		contentBlocks, ok := result.Content.([]AnthropicContentBlock)
+		require.True(t, ok, "Content should be an array of content blocks")
+
+		// Should have 1 content block: tool_use
+		require.Len(t, contentBlocks, 1, "Should have 1 content block (tool_use)")
+		assert.Equal(t, "tool_use", contentBlocks[0].Type)
+		assert.Equal(t, "tool_1", contentBlocks[0].ID)
+	})
+
+	t.Run("assistant message with multiple tool calls and text preserves all", func(t *testing.T) {
+		// Create a message with text and multiple tool calls
+		msg := &ChatMessage{
+			Role: ChatRoleAssistant,
+			Parts: []ChatMessagePart{
+				{Text: "I'll check multiple files."},
+				{ToolCall: &tool.ToolCall{
+					ID:       "tool_1",
+					Function: "vfsRead",
+					Arguments: tool.NewToolValue(map[string]any{
+						"path": "/test/file1.txt",
+					}),
+				}},
+				{ToolCall: &tool.ToolCall{
+					ID:       "tool_2",
+					Function: "vfsRead",
+					Arguments: tool.NewToolValue(map[string]any{
+						"path": "/test/file2.txt",
+					}),
+				}},
+			},
+		}
+
+		// Convert to Anthropic format
+		result := convertToAnthropicMessage(msg)
+
+		// The result should have content as an array
+		contentBlocks, ok := result.Content.([]AnthropicContentBlock)
+		require.True(t, ok, "Content should be an array of content blocks")
+
+		// Should have 3 content blocks: text + 2 tool_use
+		require.Len(t, contentBlocks, 3, "Should have 3 content blocks (text + 2 tool_use)")
+
+		// First block should be text
+		assert.Equal(t, "text", contentBlocks[0].Type)
+		assert.Equal(t, "I'll check multiple files.", contentBlocks[0].Text)
+
+		// Second and third blocks should be tool_use
+		assert.Equal(t, "tool_use", contentBlocks[1].Type)
+		assert.Equal(t, "tool_1", contentBlocks[1].ID)
+		assert.Equal(t, "tool_use", contentBlocks[2].Type)
+		assert.Equal(t, "tool_2", contentBlocks[2].ID)
+	})
+
+	t.Run("user message with tool responses converts correctly", func(t *testing.T) {
+		// Create a user message with tool responses
+		msg := &ChatMessage{
+			Role: ChatRoleUser,
+			Parts: []ChatMessagePart{
+				{ToolResponse: &tool.ToolResponse{
+					Call: &tool.ToolCall{
+						ID:       "tool_123",
+						Function: "vfsRead",
+					},
+					Result: tool.NewToolValue(map[string]any{
+						"content": "file contents here",
+					}),
+					Done: true,
+				}},
+			},
+		}
+
+		// Convert to Anthropic format
+		result := convertToAnthropicMessage(msg)
+
+		// The result should have content as an array
+		contentBlocks, ok := result.Content.([]AnthropicContentBlock)
+		require.True(t, ok, "Content should be an array of content blocks")
+
+		// Should have 1 content block: tool_result
+		require.Len(t, contentBlocks, 1, "Should have 1 content block (tool_result)")
+		assert.Equal(t, "tool_result", contentBlocks[0].Type)
+		assert.Equal(t, "tool_123", contentBlocks[0].ToolUseID)
+	})
+}
