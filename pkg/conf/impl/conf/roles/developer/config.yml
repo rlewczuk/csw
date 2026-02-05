@@ -16,3 +16,18 @@ vfs-privileges:
     move: deny
 tools-access:
   "**": allow
+run-privileges:
+  "rm*": deny
+  "git*": allow
+  "npm*": allow
+  "docker*": allow
+  "mvn*": allow
+  "gradle*": allow
+  "yarn*": allow
+  "npx*": allow
+  "node*": allow
+  "pnpm*": allow
+  "cargo*": allow
+  "dotnet*": allow
+  "go*": allow"
+  ".*": allow

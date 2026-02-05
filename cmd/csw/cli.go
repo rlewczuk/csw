@@ -15,6 +15,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/presenter"
+	"github.com/codesnort/codesnort-swe/pkg/runner"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/ui"
 	"github.com/codesnort/codesnort-swe/pkg/ui/cli"
@@ -159,6 +160,10 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 	// Create tool registry and register VFS tools
 	toolRegistry := tool.NewToolRegistry()
 	tool.RegisterVFSTools(toolRegistry, localVFS)
+
+	// Register runBash tool with role privileges
+	bashRunner := runner.NewBashRunner(workDir, 0)
+	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges)
 
 	// Create prompt generator
 	promptGenerator, err := core.NewConfPromptGenerator(configStore, localVFS)
