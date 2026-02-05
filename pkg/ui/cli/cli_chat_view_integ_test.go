@@ -184,9 +184,11 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 			Text: "Let me read that file",
 			Tools: []*ui.ToolUI{
 				{
-					Id:     "tool1",
-					Name:   "vfsRead",
-					Status: ui.ToolStatusStarted,
+					Id:      "tool1",
+					Name:    "vfsRead",
+					Status:  ui.ToolStatusStarted,
+					Props:   [][]string{{"path", "/test/file.txt"}},
+					Message: "",
 				},
 			},
 		}
@@ -196,14 +198,15 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		// Update tool status to succeeded
 		msg.Tools[0].Status = ui.ToolStatusSucceeded
+		msg.Tools[0].Message = "file content here"
 		err = view.UpdateTool(msg.Tools[0])
 		require.NoError(t, err)
 
 		// Verify output
 		outputStr := output.String()
 		assert.Contains(t, outputStr, "Assistant: Let me read that file")
-		assert.Contains(t, outputStr, "TOOL: vfsRead (started)")
-		assert.Contains(t, outputStr, "TOOL: vfsRead (succeeded)")
+		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1) - path: /test/file.txt")
+		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1) - (succeeded) result: file content here")
 	})
 
 	t.Run("accepts all permissions automatically when configured", func(t *testing.T) {

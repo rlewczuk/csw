@@ -335,7 +335,37 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) {
 		status = string(tool.Status)
 	}
 
-	fmt.Fprintf(v.output, "TOOL: %s (%s)\n", tool.Name, status)
+	// Render parameters on the first line
+	var paramsStr strings.Builder
+	for i, prop := range tool.Props {
+		if len(prop) >= 2 {
+			if i > 0 {
+				paramsStr.WriteString(", ")
+			}
+			paramsStr.WriteString(prop[0])
+			paramsStr.WriteString(": ")
+			paramsStr.WriteString(v.truncateString(prop[1], 40))
+		}
+	}
+
+	fmt.Fprintf(v.output, "TOOL: %s (%s) - %s\n", tool.Name, tool.Id, paramsStr.String())
+
+	// Render result on a new line if there's a message or status is final
+	if tool.Message != "" || tool.Status == ui.ToolStatusSucceeded || tool.Status == ui.ToolStatusFailed {
+		resultValue := v.truncateString(tool.Message, 40)
+		if resultValue == "" {
+			resultValue = "(no result)"
+		}
+		fmt.Fprintf(v.output, "TOOL: %s (%s) - (%s) result: %s\n", tool.Name, tool.Id, status, resultValue)
+	}
+}
+
+// truncateString truncates a string to maxLen characters and adds ellipsis if needed.
+func (v *CliChatView) truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 var _ ui.IChatView = (*CliChatView)(nil)

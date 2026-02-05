@@ -118,9 +118,11 @@ func TestCliChatView_Init(t *testing.T) {
 					Text: "Running tool",
 					Tools: []*ui.ToolUI{
 						{
-							Id:     "tool1",
-							Name:   "vfsRead",
-							Status: ui.ToolStatusSucceeded,
+							Id:      "tool1",
+							Name:    "vfsRead",
+							Status:  ui.ToolStatusSucceeded,
+							Props:   [][]string{{"path", "/test/file.txt"}},
+							Message: "file content here",
 						},
 					},
 				},
@@ -132,7 +134,8 @@ func TestCliChatView_Init(t *testing.T) {
 
 		outputStr := output.String()
 		assert.Contains(t, outputStr, "Assistant: Running tool")
-		assert.Contains(t, outputStr, "TOOL: vfsRead (succeeded)")
+		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1) - path: /test/file.txt")
+		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1) - (succeeded) result: file content here")
 	})
 }
 
@@ -165,9 +168,11 @@ func TestCliChatView_AddMessage(t *testing.T) {
 			Text: "Executing",
 			Tools: []*ui.ToolUI{
 				{
-					Id:     "tool1",
-					Name:   "vfsWrite",
-					Status: ui.ToolStatusExecuting,
+					Id:      "tool1",
+					Name:    "vfsWrite",
+					Status:  ui.ToolStatusExecuting,
+					Props:   [][]string{{"path", "/test.txt"}, {"content", "hello"}},
+					Message: "written",
 				},
 			},
 		}
@@ -178,7 +183,8 @@ func TestCliChatView_AddMessage(t *testing.T) {
 
 		outputStr := output.String()
 		assert.Contains(t, outputStr, "Assistant: Executing")
-		assert.Contains(t, outputStr, "TOOL: vfsWrite (executing)")
+		assert.Contains(t, outputStr, "TOOL: vfsWrite (tool1) - path: /test.txt, content: hello")
+		assert.Contains(t, outputStr, "TOOL: vfsWrite (tool1) - (executing) result: written")
 	})
 }
 
@@ -276,7 +282,7 @@ func TestCliChatView_UpdateTool(t *testing.T) {
 		err := view.UpdateTool(updatedTool)
 		require.NoError(t, err)
 		assert.Equal(t, ui.ToolStatusSucceeded, view.messages[0].Tools[0].Status)
-		assert.Contains(t, output.String(), "TOOL: vfsRead (succeeded)")
+		assert.Contains(t, output.String(), "TOOL: vfsRead (tool1) - (succeeded) result:")
 	})
 }
 
@@ -385,14 +391,14 @@ func TestCliChatView_QueryPermission(t *testing.T) {
 
 func TestCliChatView_ToolStatus(t *testing.T) {
 	tests := []struct {
-		name   string
-		status ui.ToolStatusUI
-		want   string
+		name       string
+		status     ui.ToolStatusUI
+		wantInLine string
 	}{
-		{"succeeded", ui.ToolStatusSucceeded, "succeeded"},
-		{"failed", ui.ToolStatusFailed, "failed"},
-		{"started", ui.ToolStatusStarted, "started"},
-		{"executing", ui.ToolStatusExecuting, "executing"},
+		{"succeeded", ui.ToolStatusSucceeded, "TOOL: test.tool (tool1) - (succeeded) result:"},
+		{"failed", ui.ToolStatusFailed, "TOOL: test.tool (tool1) - (failed) result:"},
+		{"started", ui.ToolStatusStarted, "TOOL: test.tool (tool1) - "},
+		{"executing", ui.ToolStatusExecuting, "TOOL: test.tool (tool1) - "},
 	}
 
 	for _, tt := range tests {
@@ -417,7 +423,90 @@ func TestCliChatView_ToolStatus(t *testing.T) {
 			view.AddMessage(msg)
 
 			outputStr := output.String()
-			assert.Contains(t, outputStr, "TOOL: test.tool ("+tt.want+")")
+			assert.Contains(t, outputStr, tt.wantInLine)
 		})
 	}
+}
+
+func TestCliChatView_TruncateString(t *testing.T) {
+	t.Run("truncates long strings", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		longValue := strings.Repeat("a", 50)
+		truncated := view.truncateString(longValue, 40)
+
+		assert.Equal(t, 43, len(truncated))
+		assert.True(t, strings.HasSuffix(truncated, "..."))
+	})
+
+	t.Run("does not truncate short strings", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		shortValue := "short string"
+		result := view.truncateString(shortValue, 40)
+
+		assert.Equal(t, shortValue, result)
+	})
+
+	t.Run("truncates long parameter values in tool output", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		longContent := strings.Repeat("x", 50)
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Executing",
+			Tools: []*ui.ToolUI{
+				{
+					Id:      "tool1",
+					Name:    "vfsWrite",
+					Status:  ui.ToolStatusSucceeded,
+					Props:   [][]string{{"path", "/test.txt"}, {"content", longContent}},
+					Message: "done",
+				},
+			},
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		// Should contain truncated content with ellipsis
+		assert.Contains(t, outputStr, "content: "+strings.Repeat("x", 40)+"...")
+	})
+
+	t.Run("truncates long result message in tool output", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		longResult := strings.Repeat("y", 50)
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Executing",
+			Tools: []*ui.ToolUI{
+				{
+					Id:      "tool1",
+					Name:    "vfsRead",
+					Status:  ui.ToolStatusSucceeded,
+					Props:   [][]string{{"path", "/test.txt"}},
+					Message: longResult,
+				},
+			},
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		// Should contain truncated result with ellipsis
+		assert.Contains(t, outputStr, "result: "+strings.Repeat("y", 40)+"...")
+	})
 }
