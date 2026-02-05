@@ -603,8 +603,16 @@ func (c *AnthropicClient) checkStatusCode(resp *http.Response) error {
 
 // convertToAnthropicMessage converts a models.ChatMessage to Anthropic AnthropicMessageParam format
 func convertToAnthropicMessage(msg *ChatMessage) AnthropicMessageParam {
-	// Check if message contains only text
-	if len(msg.Parts) > 0 && msg.Parts[0].Text != "" && msg.Parts[0].ToolCall == nil && msg.Parts[0].ToolResponse == nil {
+	// Check if message contains only text (no tool calls or tool responses)
+	hasOnlyText := true
+	for _, part := range msg.Parts {
+		if part.ToolCall != nil || part.ToolResponse != nil {
+			hasOnlyText = false
+			break
+		}
+	}
+
+	if hasOnlyText && len(msg.Parts) > 0 {
 		// Simple text message
 		return AnthropicMessageParam{
 			Role:    string(msg.Role),
