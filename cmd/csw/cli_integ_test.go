@@ -13,6 +13,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/presenter"
+	"github.com/codesnort/codesnort-swe/pkg/runner"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/ui"
@@ -616,4 +617,130 @@ func TestSystemPromptGenerationForKimi(t *testing.T) {
 	// The prompt generator excludes fragments with tags that are not in the provided tags list
 	// 50-system-generic.md starts with "You are {{.Info.AgentName}}, an interactive CLI tool"
 	assert.NotContains(t, prompt, "an interactive CLI tool")
+}
+
+// TestRunBashToolIntegration tests that runBash tool is properly registered and presented to LLM.
+func TestRunBashToolIntegration(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+
+	// Create provider config pointing to mock server
+	providerConfig := &conf.ModelProviderConfig{
+		Type: "ollama",
+		Name: "ollama",
+		URL:  mockServer.URL(),
+	}
+
+	client, err := models.NewOllamaClient(providerConfig)
+	require.NoError(t, err)
+
+	vfsInstance := vfs.NewMockVFS()
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, vfsInstance)
+
+	// Register runBash tool with mock runner
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetDefaultResponse("test output", 0, nil)
+	tool.RegisterRunBashTool(tools, mockRunner, map[string]conf.AccessFlag{
+		"echo .*": conf.AccessAllow,
+	})
+
+	tmpDir := t.TempDir()
+	logsDir := filepath.Join(tmpDir, "logs")
+	err = os.MkdirAll(logsDir, 0755)
+	require.NoError(t, err)
+
+	system := &core.SweSystem{
+		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+		ModelTags:       models.NewModelTagRegistry(),
+		PromptGenerator: newMockPromptGenerator("You are a helpful assistant."),
+		Tools:           tools,
+		VFS:             vfsInstance,
+		WorkDir:         tmpDir,
+		LogBaseDir:      logsDir,
+	}
+
+	// Set up mock streaming response with tool call
+	// First response: assistant makes a tool call to run bash command (closeAfter=false to continue processing)
+	mockServer.AddStreamingResponse("/api/chat", "POST", false,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"runBash","arguments":{"command":"echo hello"}}}]},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	// Second response: after tool execution, assistant confirms completion
+	mockServer.AddStreamingResponse("/api/chat", "POST", true,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"Command executed successfully."},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	// Create thread
+	thread := core.NewSessionThread(system, nil)
+
+	// Start session
+	err = thread.StartSession("ollama/test-model")
+	require.NoError(t, err)
+
+	// Create presenter and view
+	basePresenter := presenter.NewChatPresenter(system, thread)
+	baseView := newMockChatView()
+
+	err = basePresenter.SetView(baseView)
+	require.NoError(t, err)
+
+	// Set output handler
+	thread.SetOutputHandler(basePresenter)
+
+	// Send user message
+	userMsg := &ui.ChatMessageUI{
+		Role: ui.ChatRoleUser,
+		Text: "Run echo hello",
+	}
+	err = basePresenter.SendUserMessage(userMsg)
+	require.NoError(t, err)
+
+	// Wait for completion
+	done := make(chan struct{})
+	go func() {
+		for {
+			if !thread.IsRunning() {
+				close(done)
+				return
+			}
+		}
+	}()
+	<-done
+
+	// Verify that runBash tool was registered
+	toolNames := tools.List()
+	assert.Contains(t, toolNames, "runBash", "runBash tool should be registered")
+
+	// Verify that the mock runner was called (tool was executed)
+	executions := mockRunner.GetExecutions()
+	assert.GreaterOrEqual(t, len(executions), 1, "runBash tool should have been executed")
+
+	// Verify the command was executed
+	if len(executions) > 0 {
+		lastExec := mockRunner.GetLastExecution()
+		require.NotNil(t, lastExec)
+		assert.Equal(t, "echo hello", lastExec.Command)
+		assert.Equal(t, 0, lastExec.ExitCode)
+		assert.Equal(t, "test output", lastExec.Output)
+	}
+
+	// Verify that captured requests contain runBash tool in the tools list
+	requests := mockServer.GetRequests()
+	require.GreaterOrEqual(t, len(requests), 1, "should have captured at least one request")
+
+	// Find the chat request and verify it contains runBash tool
+	var foundToolList bool
+	for _, req := range requests {
+		if req.Path == "/api/chat" && req.Method == "POST" {
+			bodyStr := string(req.Body)
+			// Verify runBash is in the tools list sent to LLM
+			assert.Contains(t, bodyStr, "runBash", "LLM request should contain runBash tool")
+			foundToolList = true
+			break
+		}
+	}
+	assert.True(t, foundToolList, "should have found a chat request with runBash tool")
 }

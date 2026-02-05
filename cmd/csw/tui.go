@@ -17,6 +17,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/lsp"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/presenter"
+	"github.com/codesnort/codesnort-swe/pkg/runner"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/ui/tui"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
@@ -105,6 +106,10 @@ func runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo s
 	// Create tool registry and register VFS tools
 	toolRegistry := tool.NewToolRegistry()
 	tool.RegisterVFSTools(toolRegistry, localVFS)
+
+	// Register runBash tool with role privileges
+	bashRunner := runner.NewBashRunner(workDir, 0)
+	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges)
 
 	// Create prompt generator
 	promptGenerator, err := core.NewConfPromptGenerator(configStore, localVFS)
