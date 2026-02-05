@@ -225,7 +225,7 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	chatReq := AnthropicMessagesRequest{
 		Model:     m.model,
 		Messages:  anthropicMessages,
-		MaxTokens: 4096, // Default max tokens
+		MaxTokens: 131072, // Default max tokens
 		Stream:    false,
 		Tools:     convertToolsToAnthropic(tools),
 	}
