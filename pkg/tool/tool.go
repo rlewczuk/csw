@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 )
 
 // ToolValue represents a value that can be passed as an argument to a tool or returned as a result.
@@ -382,6 +384,12 @@ type ToolCall struct {
 	// Arguments contains the arguments to be passed to the tool.
 	// Must be an object (map[string]any). Supports nested objects and arrays.
 	Arguments ToolValue
+
+	// Access controls the permission for this specific tool call.
+	// When set to AccessAuto (default), the system uses config to determine permission.
+	// When set to AccessAllow or AccessDeny, it overrides the config for this call.
+	// This allows re-executing a tool call after permission is granted/denied.
+	Access conf.AccessFlag
 }
 
 // ToolPermissionsQuery represents a query for user permissions to use a tool.

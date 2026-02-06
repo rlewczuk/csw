@@ -10,6 +10,7 @@ import (
 type AccessFlag string
 
 const (
+	AccessAuto  AccessFlag = "auto"
 	AccessAllow AccessFlag = "allow"
 	AccessDeny  AccessFlag = "deny"
 	AccessAsk   AccessFlag = "ask"

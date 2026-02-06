@@ -37,7 +37,14 @@ func NewAccessControlTool(tool Tool, privileges map[string]conf.AccessFlag) *Acc
 // Returns an error if access is denied.
 func (a *AccessControlTool) Execute(call *ToolCall) *ToolResponse {
 	toolName := call.Function
-	flag := a.resolveAccessFlag(toolName)
+
+	// Check if the tool call has an explicit access override
+	// This allows re-executing a tool call after permission is granted/denied
+	flag := call.Access
+	if flag == conf.AccessAuto || flag == "" {
+		// Use the configured access flag
+		flag = a.resolveAccessFlag(toolName)
+	}
 
 	switch flag {
 	case conf.AccessAllow:
