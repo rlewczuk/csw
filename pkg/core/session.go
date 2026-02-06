@@ -275,7 +275,9 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 	toolResponses := make([]*tool.ToolResponse, 0, len(toolCalls))
 	for _, toolCall := range toolCalls {
 		// Use s.Tools which might have access control wrappers
+		s.logger.Info("executing_tool_call", "tool", toolCall.Function, "args", toolCall.Arguments)
 		response := s.Tools.Execute(toolCall)
+		s.logger.Info("tool_call_executed", "tool", toolCall.Function, "response", response)
 
 		// Check for permission query
 		if permQuery, ok := response.Error.(*tool.ToolPermissionsQuery); ok {
