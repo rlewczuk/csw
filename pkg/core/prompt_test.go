@@ -11,10 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseFilename(t *testing.T) {
+func TestParseFragmentKey(t *testing.T) {
 	tests := []struct {
 		name         string
 		filename     string
+		hasExtension bool
 		wantOrder    int
 		wantKind     string
 		wantToolName string
@@ -22,32 +23,36 @@ func TestParseFilename(t *testing.T) {
 		wantOk       bool
 	}{
 		{
-			name:      "system fragment without tag",
-			filename:  "10-system.md",
-			wantOrder: 10,
-			wantKind:  "system",
-			wantTag:   "all",
-			wantOk:    true,
+			name:         "system fragment without tag",
+			filename:     "10-system.md",
+			hasExtension: true,
+			wantOrder:    10,
+			wantKind:     "system",
+			wantTag:      "all",
+			wantOk:       true,
 		},
 		{
-			name:      "system fragment with tag",
-			filename:  "20-system-anthropic.md",
-			wantOrder: 20,
-			wantKind:  "system",
-			wantTag:   "anthropic",
-			wantOk:    true,
+			name:         "system fragment with tag",
+			filename:     "20-system-anthropic.md",
+			hasExtension: true,
+			wantOrder:    20,
+			wantKind:     "system",
+			wantTag:      "anthropic",
+			wantOk:       true,
 		},
 		{
-			name:      "system fragment with multi-part tag",
-			filename:  "20-system-anthropic-v2.md",
-			wantOrder: 20,
-			wantKind:  "system",
-			wantTag:   "anthropic-v2",
-			wantOk:    true,
+			name:         "system fragment with multi-part tag",
+			filename:     "20-system-anthropic-v2.md",
+			hasExtension: true,
+			wantOrder:    20,
+			wantKind:     "system",
+			wantTag:      "anthropic-v2",
+			wantOk:       true,
 		},
 		{
 			name:         "tools fragment without tag",
 			filename:     "30-tools-read.md",
+			hasExtension: true,
 			wantOrder:    30,
 			wantKind:     "tools",
 			wantToolName: "read",
@@ -57,6 +62,7 @@ func TestParseFilename(t *testing.T) {
 		{
 			name:         "tools fragment with tag",
 			filename:     "40-tools-write-anthropic.md",
+			hasExtension: true,
 			wantOrder:    40,
 			wantKind:     "tools",
 			wantToolName: "write",
@@ -64,40 +70,61 @@ func TestParseFilename(t *testing.T) {
 			wantOk:       true,
 		},
 		{
-			name:     "invalid no extension",
-			filename: "10-system",
-			wantOk:   false,
+			name:         "invalid no extension",
+			filename:     "10-system",
+			hasExtension: true,
+			wantOk:       false,
 		},
 		{
-			name:     "invalid wrong extension",
-			filename: "10-system.txt",
-			wantOk:   false,
+			name:         "invalid wrong extension",
+			filename:     "10-system.txt",
+			hasExtension: true,
+			wantOk:       false,
 		},
 		{
-			name:     "invalid no number",
-			filename: "system.md",
-			wantOk:   false,
+			name:         "invalid no number",
+			filename:     "system.md",
+			hasExtension: true,
+			wantOk:       false,
 		},
 		{
-			name:     "invalid number",
-			filename: "abc-system.md",
-			wantOk:   false,
+			name:         "invalid number",
+			filename:     "abc-system.md",
+			hasExtension: true,
+			wantOk:       false,
 		},
 		{
-			name:     "invalid kind",
-			filename: "10-unknown.md",
-			wantOk:   false,
+			name:         "invalid kind",
+			filename:     "10-unknown.md",
+			hasExtension: true,
+			wantOk:       false,
 		},
 		{
-			name:     "invalid tools without toolname",
-			filename: "10-tools.md",
-			wantOk:   false,
+			name:         "invalid tools without toolname",
+			filename:     "10-tools.md",
+			hasExtension: true,
+			wantOk:       false,
+		},
+		{
+			name:         "no extension expected",
+			filename:     "50-system",
+			hasExtension: false,
+			wantOrder:    50,
+			wantKind:     "system",
+			wantTag:      "all",
+			wantOk:       true,
+		},
+		{
+			name:         "extension rejected when not expected",
+			filename:     "50-system.md",
+			hasExtension: false,
+			wantOk:       false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			order, kind, toolName, tag, ok := parseFilename(tt.filename)
+			order, kind, toolName, tag, ok := parseFragmentKey(tt.filename, tt.hasExtension)
 			assert.Equal(t, tt.wantOk, ok)
 			if tt.wantOk {
 				assert.Equal(t, tt.wantOrder, order)

@@ -63,15 +63,22 @@ func NewConfPromptGenerator(store conf.ConfigStore, filesystem vfs.VFS) (*ConfPr
 	}, nil
 }
 
-// parseFilename parses a prompt fragment filename.
+// parseFragmentKey parses a prompt fragment key or filename.
 // Returns: order, kind, toolName, tag, ok
-// Format: <num>-system-<tag>.md or <num>-system.md or <num>-tools-<toolname>-<tag>.md
-func parseFilename(filename string) (int, string, string, string, bool) {
-	// Remove .md extension
-	if !strings.HasSuffix(filename, ".md") {
+// Formats:
+// - With extension: <num>-system-<tag>.md or <num>-system.md or <num>-tools-<toolname>-<tag>.md
+// - Without extension: <num>-system or <num>-system-<tag> or <num>-tools-<toolname> or <num>-tools-<toolname>-<tag>
+// If hasExtension is true, .md is required. If false, .md is rejected.
+func parseFragmentKey(key string, hasExtension bool) (int, string, string, string, bool) {
+	name := key
+	if hasExtension {
+		if !strings.HasSuffix(key, ".md") {
+			return 0, "", "", "", false
+		}
+		name = strings.TrimSuffix(key, ".md")
+	} else if strings.HasSuffix(key, ".md") {
 		return 0, "", "", "", false
 	}
-	name := strings.TrimSuffix(filename, ".md")
 
 	// Split by dash
 	parts := strings.Split(name, "-")
@@ -305,59 +312,19 @@ func (g *ConfPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfi
 // Key format: "<num>-system" or "<num>-system-<tag>" or "<num>-tools-<toolname>" or "<num>-tools-<toolname>-<tag>"
 // Returns nil if the key is invalid.
 func parseFragmentFromKey(key string, content string, isAll bool) *promptFragment {
-	// Parse filename part (same format as parseFilename but without .md extension)
-	parts := strings.Split(key, "-")
-	if len(parts) < 2 {
+	order, kind, toolName, tag, ok := parseFragmentKey(key, false)
+	if !ok {
 		return nil
 	}
 
-	// Parse order
-	order, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return nil
-	}
-
-	kind := parts[1]
-
-	switch kind {
-	case "system":
-		// Format: <num>-system-<tag> or <num>-system
-		tag := "all"
-		if len(parts) > 2 {
-			tag = strings.Join(parts[2:], "-")
-		}
-		return &promptFragment{
-			order:    order,
-			kind:     kind,
-			toolName: "",
-			tag:      tag,
-			filename: key,
-			content:  content,
-			isAll:    isAll,
-		}
-
-	case "tools":
-		// Format: <num>-tools-<toolname>-<tag> or <num>-tools-<toolname>
-		if len(parts) < 3 {
-			return nil
-		}
-		toolName := parts[2]
-		tag := "all"
-		if len(parts) > 3 {
-			tag = strings.Join(parts[3:], "-")
-		}
-		return &promptFragment{
-			order:    order,
-			kind:     kind,
-			toolName: toolName,
-			tag:      tag,
-			filename: key,
-			content:  content,
-			isAll:    isAll,
-		}
-
-	default:
-		return nil
+	return &promptFragment{
+		order:    order,
+		kind:     kind,
+		toolName: toolName,
+		tag:      tag,
+		filename: key,
+		content:  content,
+		isAll:    isAll,
 	}
 }
 
