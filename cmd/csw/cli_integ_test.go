@@ -786,7 +786,7 @@ func TestCLIPermissionQueryWithResponse(t *testing.T) {
 
 	tools := tool.NewToolRegistry()
 	// Register VFS tools with the restricted VFS
-	tool.RegisterVFSTools(tools, restrictedVFS, nil)
+	tool.RegisterVFSTools(tools, restrictedVFS, nil, nil)
 
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")

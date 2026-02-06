@@ -579,7 +579,11 @@ func buildSessionToolRegistry(systemTools *tool.ToolRegistry, vfsImpl vfs.VFS, l
 		}
 	}
 
-	tool.RegisterVFSTools(registry, vfsImpl, lspClient)
+	var logger *slog.Logger
+	if session != nil {
+		logger = session.logger
+	}
+	tool.RegisterVFSTools(registry, vfsImpl, lspClient, logger)
 
 	if session != nil {
 		session.registerSessionTools(registry)

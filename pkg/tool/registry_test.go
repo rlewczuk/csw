@@ -117,7 +117,7 @@ func TestRegisterVFSTools(t *testing.T) {
 	registry := NewToolRegistry()
 	mockVFS := vfs.NewMockVFS()
 
-	RegisterVFSTools(registry, mockVFS, nil)
+	RegisterVFSTools(registry, mockVFS, nil, nil)
 
 	// Test that all VFS tools are registered
 	// Note: vfsDelete and vfsMode are currently disabled
@@ -134,7 +134,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	registry := NewToolRegistry()
 	mockVFS := vfs.NewMockVFS()
 
-	RegisterVFSTools(registry, mockVFS, nil)
+	RegisterVFSTools(registry, mockVFS, nil, nil)
 
 	// Test writing a file
 	writeArgs := &ToolCall{

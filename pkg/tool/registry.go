@@ -2,6 +2,7 @@ package tool
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/lsp"
@@ -65,10 +66,22 @@ func (r *ToolRegistry) Execute(args *ToolCall) *ToolResponse {
 // RegisterVFSTools registers all VFS tools with the given VFS implementation.
 // Line numbers are enabled by default for the vfsRead tool.
 // lspClient is optional and can be nil.
-func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS, lspClient lsp.LSP) {
+// logger is optional and can be nil.
+func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS, lspClient lsp.LSP, logger *slog.Logger) {
 	registry.Register("vfsRead", NewVFSReadTool(vfsImpl, true))
-	registry.Register("vfsWrite", NewVFSWriteTool(vfsImpl, lspClient))
-	registry.Register("vfsEdit", NewVFSEditTool(vfsImpl, lspClient))
+
+	writeTool := NewVFSWriteTool(vfsImpl, lspClient)
+	if logger != nil {
+		writeTool.SetLogger(logger)
+	}
+	registry.Register("vfsWrite", writeTool)
+
+	editTool := NewVFSEditTool(vfsImpl, lspClient)
+	if logger != nil {
+		editTool.SetLogger(logger)
+	}
+	registry.Register("vfsEdit", editTool)
+
 	//registry.Register("vfsDelete", NewVFSDeleteTool(vfsImpl))
 	registry.Register("vfsList", NewVFSListTool(vfsImpl))
 	//registry.Register("vfsMode", NewVFSMoveTool(vfsImpl))
