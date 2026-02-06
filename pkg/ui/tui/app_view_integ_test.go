@@ -51,7 +51,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 
 		vfsInstance := vfs.NewMockVFS()
 		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance)
+		tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -162,7 +162,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 
 		vfsInstance := vfs.NewMockVFS()
 		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance)
+		tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -259,7 +259,7 @@ func TestAppViewWithChatIntegration(t *testing.T) {
 
 		vfsInstance := vfs.NewMockVFS()
 		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance)
+		tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -347,7 +347,7 @@ func TestAppViewMenuInteraction(t *testing.T) {
 
 		vfsInstance := vfs.NewMockVFS()
 		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance)
+		tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -422,7 +422,7 @@ func TestAppViewMenuInteraction(t *testing.T) {
 
 		vfsInstance := vfs.NewMockVFS()
 		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance)
+		tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},

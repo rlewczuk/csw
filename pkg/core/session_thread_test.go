@@ -48,7 +48,7 @@ func TestSessionThread(t *testing.T) {
 	vfsInstance := vfs.NewMockVFS()
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	system := &SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -88,7 +88,7 @@ func TestSessionToolSelection(t *testing.T) {
 	vfsInstance := vfs.NewMockVFS()
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	system := &SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -165,7 +165,7 @@ func TestSessionThreadSafety(t *testing.T) {
 	vfsInstance := vfs.NewMockVFS()
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	system := &SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},

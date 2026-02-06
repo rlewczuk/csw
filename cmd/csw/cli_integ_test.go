@@ -128,7 +128,7 @@ func TestLogmdChatViewLogsSession(t *testing.T) {
 
 	vfsInstance := vfs.NewMockVFS()
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")
@@ -231,7 +231,7 @@ func TestLogmdChatPresenterLogsCalls(t *testing.T) {
 
 	vfsInstance := vfs.NewMockVFS()
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")
@@ -332,7 +332,7 @@ func TestLogmdWrappersIntegration(t *testing.T) {
 
 	vfsInstance := vfs.NewMockVFS()
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")
@@ -437,7 +437,7 @@ func TestSaveSessionWithWriterBuffer(t *testing.T) {
 
 	vfsInstance := vfs.NewMockVFS()
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")
@@ -638,7 +638,7 @@ func TestRunBashToolIntegration(t *testing.T) {
 
 	vfsInstance := vfs.NewMockVFS()
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	// Register runBash tool with mock runner
 	mockRunner := runner.NewMockRunner()
@@ -782,7 +782,7 @@ func TestCLIPermissionQueryHandling(t *testing.T) {
 
 	tools := tool.NewToolRegistry()
 	// Register VFS tools with the restricted VFS
-	tool.RegisterVFSTools(tools, restrictedVFS)
+	tool.RegisterVFSTools(tools, restrictedVFS, nil)
 
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")
@@ -935,7 +935,7 @@ func TestCLIPermissionQueryWithResponse(t *testing.T) {
 
 	tools := tool.NewToolRegistry()
 	// Register VFS tools with the restricted VFS
-	tool.RegisterVFSTools(tools, restrictedVFS)
+	tool.RegisterVFSTools(tools, restrictedVFS, nil)
 
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")

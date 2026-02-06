@@ -48,7 +48,7 @@ func setupTestSystem(t *testing.T) (*core.SweSystem, *testutil.MockHTTPServer, v
 	vfsInstance := vfs.NewMockVFS()
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	system := &core.SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},

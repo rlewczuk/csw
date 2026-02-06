@@ -61,7 +61,7 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 	require.NoError(t, err)
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	system := &SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -246,7 +246,7 @@ func TestSessionEditToolIntegration(t *testing.T) {
 	require.NoError(t, err)
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	system := &SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -466,7 +466,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 	require.NoError(t, err)
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	system := &SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -670,7 +670,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 			WorkDir:              ".",
 		}
-		tool.RegisterVFSTools(systemNoLSP.Tools, vfsInstance)
+		tool.RegisterVFSTools(systemNoLSP.Tools, vfsInstance, nil)
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		controller := NewSessionThread(systemNoLSP, mockHandler)
@@ -738,7 +738,7 @@ func TestSessionStreamingModeDefault(t *testing.T) {
 
 	vfsInstance := vfs.NewMockVFS()
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	system := &SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -771,7 +771,7 @@ func TestSessionSystemPrompt(t *testing.T) {
 	vfsInstance := vfs.NewMockVFS()
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	// Create mock config store with roles
 	configStore := impl.NewMockConfigStore()
@@ -891,7 +891,7 @@ func TestSessionLLMLoggerUsage(t *testing.T) {
 	vfsInstance := vfs.NewMockVFS()
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	t.Run("runNonStreamingChat uses llmLogger when enabled", func(t *testing.T) {
 		system := &SweSystem{
@@ -1097,7 +1097,7 @@ func TestPermissionLoopBug(t *testing.T) {
 	restrictedVFS := vfs.NewAccessControlVFS(localVFS, accessConfig)
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, restrictedVFS)
+	tool.RegisterVFSTools(tools, restrictedVFS, nil)
 
 	// Create a role with tool access set to "ask"
 	configStore := impl.NewMockConfigStore()

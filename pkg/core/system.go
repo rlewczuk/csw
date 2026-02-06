@@ -102,13 +102,6 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		}
 	}
 
-	// Create a new tool registry for the session by copying system tools
-	sessionTools := tool.NewToolRegistry()
-	for _, name := range s.Tools.List() {
-		t, _ := s.Tools.Get(name)
-		sessionTools.Register(name, t)
-	}
-
 	sessionID := shared.GenerateUUIDv7()
 
 	// Create session logger
@@ -144,7 +137,7 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		role:          nil,
 		VFS:           s.VFS,
 		LSP:           s.LSP,
-		Tools:         sessionTools,
+		Tools:         nil,
 		outputHandler: outputHandler,
 		workDir:       s.WorkDir,
 		todoList:      make([]tool.TodoItem, 0),
@@ -158,8 +151,8 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		sessionLogger.Info("session_created", "session_id", sessionID, "provider", providerName, "model", modelName)
 	}
 
-	// Register session-specific tools (like todo tools)
-	session.registerSessionTools()
+	// Build session tools registry (system tools + VFS + session-specific)
+	session.Tools = buildSessionToolRegistry(s.Tools, session.VFS, session.LSP, session)
 
 	// Set default role automatically using fallback chain:
 	// 1. Global config default role
