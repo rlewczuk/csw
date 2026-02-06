@@ -51,22 +51,8 @@ func (a *AccessControlTool) Execute(call *ToolCall) *ToolResponse {
 		resp := a.tool.Execute(call)
 		if resp.Error != nil {
 			if perr, ok := resp.Error.(*vfs.PermissionError); ok {
-				return &ToolResponse{
-					Call: call,
-					Error: &ToolPermissionsQuery{
-						Id:      call.ID,
-						Tool:    call,
-						Title:   "Permission Required",
-						Details: fmt.Sprintf("Access to file %s required for %s", perr.Path, perr.Operation),
-						Options: []string{"Allow", "Deny"},
-						Meta: map[string]string{
-							"type":      "vfs",
-							"path":      perr.Path,
-							"operation": perr.Operation,
-						},
-					},
-					Done: true,
-				}
+				action := vfsActionFromOperation(perr.Operation)
+				return NewVFSPermissionQuery(call, perr.Path, action, perr.Operation)
 			}
 		}
 		return resp
@@ -78,17 +64,10 @@ func (a *AccessControlTool) Execute(call *ToolCall) *ToolResponse {
 		}
 	case conf.AccessAsk:
 		// Return ToolPermissionsQuery as error
-		return &ToolResponse{
-			Call: call,
-			Error: &ToolPermissionsQuery{
-				Id:      call.ID, // Use tool call ID as query ID for now, or generate new one
-				Tool:    call,
-				Title:   "Permission Required",
-				Details: fmt.Sprintf("Tool %s requires permission", toolName),
-				Options: []string{"Allow", "Deny"},
-			},
-			Done: true,
-		}
+		return NewPermissionQuery(call, PermissionTitleRequired, fmt.Sprintf("Tool %s requires permission", toolName), PermissionOptions(), map[string]string{
+			"type": "tool",
+			"tool": toolName,
+		})
 	default:
 		return &ToolResponse{
 			Call:  call,

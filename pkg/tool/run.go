@@ -8,7 +8,6 @@ import (
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/runner"
-	"github.com/codesnort/codesnort-swe/pkg/shared"
 )
 
 // RunCommandError represents a permission error for running commands.
@@ -109,7 +108,15 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 				Done: true,
 			}
 		} else {
-			return t.createWorkdirPermissionQuery(args, command, resolvedWorkdir, timeout)
+			details := fmt.Sprintf("Allow running command with absolute path:\nCommand: %s\nWorkdir: %s", command, resolvedWorkdir)
+			if timeout > 0 {
+				details += fmt.Sprintf("\nTimeout: %v", timeout)
+			}
+			return NewPermissionQuery(args, PermissionTitleAbsolutePath, details, PermissionOptions(), map[string]string{
+				"type":    "run_absolute_workdir",
+				"command": command,
+				"workdir": resolvedWorkdir,
+			})
 		}
 	}
 
@@ -132,13 +139,33 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 			Done: true,
 		}
 	case conf.AccessAsk:
-		return t.createPermissionQuery(args, command, resolvedWorkdir, timeout)
+		details := fmt.Sprintf("Allow running command: %s", command)
+		if resolvedWorkdir != "" {
+			details += fmt.Sprintf("\nWorkdir: %s", resolvedWorkdir)
+		}
+		if timeout > 0 {
+			details += fmt.Sprintf("\nTimeout: %v", timeout)
+		}
+		return NewPermissionQuery(args, PermissionTitleRequired, details, PermissionOptions(PermissionOptionAllowRemember), map[string]string{
+			"type":    "run",
+			"command": command,
+		})
 	case conf.AccessAllow:
 		// Execute the command
 		return t.executeCommand(args, command, resolvedWorkdir, timeout)
 	default:
 		// Default to Ask if not specified
-		return t.createPermissionQuery(args, command, resolvedWorkdir, timeout)
+		details := fmt.Sprintf("Allow running command: %s", command)
+		if resolvedWorkdir != "" {
+			details += fmt.Sprintf("\nWorkdir: %s", resolvedWorkdir)
+		}
+		if timeout > 0 {
+			details += fmt.Sprintf("\nTimeout: %v", timeout)
+		}
+		return NewPermissionQuery(args, PermissionTitleRequired, details, PermissionOptions(PermissionOptionAllowRemember), map[string]string{
+			"type":    "run",
+			"command": command,
+		})
 	}
 }
 
@@ -191,69 +218,6 @@ func countWildcards(pattern string) int {
 		}
 	}
 	return count
-}
-
-// createPermissionQuery creates a permission query for the user.
-func (t *RunBashTool) createPermissionQuery(args *ToolCall, command string, workdir string, timeout time.Duration) *ToolResponse {
-	details := fmt.Sprintf("Allow running command: %s", command)
-	if workdir != "" {
-		details += fmt.Sprintf("\nWorkdir: %s", workdir)
-	}
-	if timeout > 0 {
-		details += fmt.Sprintf("\nTimeout: %v", timeout)
-	}
-
-	query := &ToolPermissionsQuery{
-		Id:      shared.GenerateUUIDv7(),
-		Tool:    args,
-		Title:   "Permission Required",
-		Details: details,
-		Options: []string{
-			"Allow",
-			"Deny",
-			"Allow and remember (add to privileges)",
-		},
-		AllowCustomResponse: true,
-		Meta: map[string]string{
-			"type":    "run",
-			"command": command,
-		},
-	}
-	return &ToolResponse{
-		Call:  args,
-		Error: query,
-		Done:  true,
-	}
-}
-
-// createWorkdirPermissionQuery creates a permission query for absolute workdir.
-func (t *RunBashTool) createWorkdirPermissionQuery(args *ToolCall, command string, workdir string, timeout time.Duration) *ToolResponse {
-	details := fmt.Sprintf("Allow running command with absolute path:\nCommand: %s\nWorkdir: %s", command, workdir)
-	if timeout > 0 {
-		details += fmt.Sprintf("\nTimeout: %v", timeout)
-	}
-
-	query := &ToolPermissionsQuery{
-		Id:      shared.GenerateUUIDv7(),
-		Tool:    args,
-		Title:   "Permission Required for Absolute Path",
-		Details: details,
-		Options: []string{
-			"Allow",
-			"Deny",
-		},
-		AllowCustomResponse: true,
-		Meta: map[string]string{
-			"type":    "run_absolute_workdir",
-			"command": command,
-			"workdir": workdir,
-		},
-	}
-	return &ToolResponse{
-		Call:  args,
-		Error: query,
-		Done:  true,
-	}
 }
 
 // executeCommand executes the command using the runner.
