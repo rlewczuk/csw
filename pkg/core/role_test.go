@@ -252,7 +252,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
 			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are an experienced software tester."),
+			PromptGenerator:      &testPromptGenerator{prompt: "You are an experienced software tester."},
 			Tools:                tools,
 			VFS:                  mockVFS,
 			Roles:                registry,

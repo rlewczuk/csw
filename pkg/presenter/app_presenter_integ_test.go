@@ -15,7 +15,8 @@ import (
 )
 
 func TestAppPresenter_SetView(t *testing.T) {
-	system, _, _ := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
 	presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
 
 	mockView := mock.NewMockAppView()
@@ -29,7 +30,8 @@ func TestAppPresenter_SetView(t *testing.T) {
 }
 
 func TestAppPresenter_NewSession(t *testing.T) {
-	system, _, _ := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
 
 	t.Run("creates new session without view", func(t *testing.T) {
 		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
@@ -90,7 +92,8 @@ func TestAppPresenter_NewSession(t *testing.T) {
 
 	t.Run("creates session with default role", func(t *testing.T) {
 		// Create a fresh system for this test
-		roleSystem, _, _ := setupTestSystem(t)
+		roleFixture := newPresenterFixture(t)
+		roleSystem := roleFixture.System
 
 		// Setup role in system
 		roleName := "test_role"
@@ -137,7 +140,8 @@ func TestAppPresenter_NewSession(t *testing.T) {
 }
 
 func TestAppPresenter_OpenSession(t *testing.T) {
-	system, _, _ := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
 
 	t.Run("reopens existing session", func(t *testing.T) {
 		// Create a session first
@@ -185,7 +189,8 @@ func TestAppPresenter_OpenSession(t *testing.T) {
 }
 
 func TestAppPresenter_Exit(t *testing.T) {
-	system, _, _ := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
 
 	t.Run("calls shutdown on system", func(t *testing.T) {
 		// Create some sessions
@@ -211,7 +216,10 @@ func TestAppPresenter_Exit(t *testing.T) {
 }
 
 func TestAppPresenter_Integration(t *testing.T) {
-	system, mockServer, vfsInstance := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
+	mockServer := fixture.Server
+	vfsInstance := fixture.VFS
 
 	t.Run("create session and send message", func(t *testing.T) {
 		presenter := NewAppPresenter(system, "ollama/devstral-small-2:latest", "")
