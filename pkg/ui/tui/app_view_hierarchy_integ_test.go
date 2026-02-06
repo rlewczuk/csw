@@ -4,73 +4,34 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/codesnort/codesnort-swe/pkg/core"
+	coretestfixture "github.com/codesnort/codesnort-swe/pkg/core/testfixture"
 	"github.com/codesnort/codesnort-swe/pkg/gtv"
 	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
 	"github.com/codesnort/codesnort-swe/pkg/gtv/tui"
-	"github.com/codesnort/codesnort-swe/pkg/logging"
-	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/presenter"
-	"github.com/codesnort/codesnort-swe/pkg/testutil"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
+	"github.com/codesnort/codesnort-swe/pkg/ui/tui/testfixture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// hierarchyMockPromptGen is a mock prompt generator for hierarchy tests
-type hierarchyMockPromptGen struct{}
-
-func (m *hierarchyMockPromptGen) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *core.AgentState) (string, error) {
-	return "You are a helpful assistant.", nil
-}
-
-func (m *hierarchyMockPromptGen) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *core.AgentState) (tool.ToolInfo, error) {
-	schema := tool.NewToolSchema()
-	return tool.ToolInfo{
-		Name:        toolName,
-		Description: "Mock tool for testing",
-		Schema:      schema,
-	}, nil
-}
-
-func (m *hierarchyMockPromptGen) GetAgentFiles(dir string) (map[string]string, error) {
-	return make(map[string]string), nil
+func newAppHierarchyFixture(t *testing.T) *testfixture.TuiFixture {
+	return testfixture.NewTuiFixture(t,
+		coretestfixture.WithPromptGenerator(coretestfixture.NewStaticPromptGenerator("You are a helpful assistant.")),
+	)
 }
 
 // TestAppViewWidgetHierarchy verifies that all widgets in the TAppView hierarchy
 // have their Parent fields set correctly.
 func TestAppViewWidgetHierarchy(t *testing.T) {
-	// Setup mock LLM server
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-
-	vfsInstance := vfs.NewMockVFS()
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
-	system := &core.SweSystem{
-		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
-		PromptGenerator:      &hierarchyMockPromptGen{},
-		Tools:                tools,
-		VFS:                  vfsInstance,
-		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-		WorkDir:              ".",
-	}
+	fixture := newAppHierarchyFixture(t)
 
 	// Create session thread
-	thread := core.NewSessionThread(system, nil)
-	err = thread.StartSession("ollama/test-model:latest")
+	thread := fixture.NewSessionThread(nil)
+	err := thread.StartSession("ollama/test-model:latest")
 	require.NoError(t, err)
 
 	// Create presenters
-	appPresenter := presenter.NewAppPresenter(system, "ollama/test-model:latest", "")
-	chatPresenter := presenter.NewChatPresenter(system, thread)
+	appPresenter := fixture.NewAppPresenter("ollama/test-model:latest", "")
+	chatPresenter := fixture.NewChatPresenter(thread)
 
 	// Create TAppView (similar to main.go)
 	screen := tio.NewScreenBuffer(80, 24, 0)

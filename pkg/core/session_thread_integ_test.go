@@ -3,62 +3,14 @@ package core
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/codesnort/codesnort-swe/pkg/logging"
-	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// mockSessionThreadPromptGenerator is a simple mock implementation of PromptGenerator for testing
-type mockSessionThreadPromptGenerator struct {
-	prompt string
-}
-
-func newMockSessionThreadPromptGenerator(prompt string) *mockSessionThreadPromptGenerator {
-	return &mockSessionThreadPromptGenerator{prompt: prompt}
-}
-
-func (m *mockSessionThreadPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error) {
-	return m.prompt, nil
-}
-
-func (m *mockSessionThreadPromptGenerator) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *AgentState) (tool.ToolInfo, error) {
-	// Return a simple tool info for testing
-	schema := tool.NewToolSchema()
-	return tool.ToolInfo{
-		Name:        toolName,
-		Description: "Mock tool for testing",
-		Schema:      schema,
-	}, nil
-}
-
-func (m *mockSessionThreadPromptGenerator) GetAgentFiles(dir string) (map[string]string, error) {
-	return make(map[string]string), nil
-}
-
 func TestSessionThread(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfsInstance := vfs.NewMockVFS()
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
-	system := &SweSystem{
-		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
-		PromptGenerator:      newMockSessionThreadPromptGenerator("You are skilled software developer."),
-		Tools:                tools,
-		VFS:                  vfsInstance,
-		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-		WorkDir:              ".",
-	}
+	fixture := newSweSystemFixture(t, "You are skilled software developer.")
+	system := fixture.system
 
 	t.Run("basic initialization and session management", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -81,24 +33,8 @@ func TestSessionThread(t *testing.T) {
 // not the system-level tools. This is a regression test for a bug where
 // s.system.Tools.ListInfo() was used instead of s.Tools.ListInfo().
 func TestSessionToolSelection(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfsInstance := vfs.NewMockVFS()
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
-	system := &SweSystem{
-		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
-		PromptGenerator:      newMockSessionThreadPromptGenerator("You are skilled software developer."),
-		Tools:                tools,
-		VFS:                  vfsInstance,
-		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-		WorkDir:              ".",
-	}
+	fixture := newSweSystemFixture(t, "You are skilled software developer.")
+	system := fixture.system
 
 	t.Run("bug: Run uses system tools instead of session tools", func(t *testing.T) {
 		// This test exposes a bug where SweSession.Run() uses s.system.Tools.ListInfo()
@@ -158,24 +94,9 @@ func TestSessionToolSelection(t *testing.T) {
 }
 
 func TestSessionThreadSafety(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfsInstance := vfs.NewMockVFS()
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
-	system := &SweSystem{
-		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
-		PromptGenerator:      newMockSessionThreadPromptGenerator("You are skilled software developer."),
-		Tools:                tools,
-		VFS:                  vfsInstance,
-		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-		WorkDir:              ".",
-	}
+	fixture := newSweSystemFixture(t, "You are skilled software developer.")
+	system := fixture.system
+	mockServer := fixture.server
 
 	t.Run("concurrent GetSession calls", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()

@@ -7,7 +7,6 @@ import (
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
-	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/lsp"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
@@ -17,61 +16,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockPromptGenerator is defined in system_test.go but we need it here too for session tests
-// This is a simple mock implementation of PromptGenerator for testing
-type mockSessionPromptGenerator struct {
-	prompt string
-}
-
-func newMockSessionPromptGenerator(prompt string) *mockSessionPromptGenerator {
-	return &mockSessionPromptGenerator{prompt: prompt}
-}
-
-func (m *mockSessionPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error) {
-	return m.prompt, nil
-}
-
-func (m *mockSessionPromptGenerator) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *AgentState) (tool.ToolInfo, error) {
-	// Return a simple tool info for testing
-	schema := tool.NewToolSchema()
-	return tool.ToolInfo{
-		Name:        toolName,
-		Description: "Mock tool for testing",
-		Schema:      schema,
-	}, nil
-}
-
-func (m *mockSessionPromptGenerator) GetAgentFiles(dir string) (map[string]string, error) {
-	return make(map[string]string), nil
-}
-
 func TestSessionGrepToolIntegration(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfsInstance := vfs.NewMockVFS()
+	fixture := newSweSystemFixture(t, "You are skilled software developer.")
+	system := fixture.system
+	vfsInstance := fixture.vfs
 
 	// Setup test files in VFS
-	err = vfsInstance.WriteFile("src/main.go", []byte("package main\n\nfunc main() {\n\tfmt.Println(\"hello\")\n}"))
+	err := vfsInstance.WriteFile("src/main.go", []byte("package main\n\nfunc main() {\n\tfmt.Println(\"hello\")\n}"))
 	require.NoError(t, err)
 	err = vfsInstance.WriteFile("src/utils.go", []byte("package main\n\nfunc helper() {\n\tfmt.Println(\"help\")\n}"))
 	require.NoError(t, err)
 	err = vfsInstance.WriteFile("README.md", []byte("# Project\n\nThis is a test project with main content."))
 	require.NoError(t, err)
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
-	system := &SweSystem{
-		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
-		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
-		Tools:                tools,
-		VFS:                  vfsInstance,
-		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-		WorkDir:              ".",
-	}
 
 	t.Run("grep tool finds matches across files", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -235,28 +191,13 @@ func TestSessionGrepToolIntegration(t *testing.T) {
 }
 
 func TestSessionEditToolIntegration(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfsInstance := vfs.NewMockVFS()
+	fixture := newSweSystemFixture(t, "You are skilled software developer.")
+	system := fixture.system
+	vfsInstance := fixture.vfs
 
 	// Setup test file in VFS
-	err = vfsInstance.WriteFile("test.txt", []byte("hello world\ngoodbye world"))
+	err := vfsInstance.WriteFile("test.txt", []byte("hello world\ngoodbye world"))
 	require.NoError(t, err)
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
-	system := &SweSystem{
-		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
-		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
-		Tools:                tools,
-		VFS:                  vfsInstance,
-		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-		WorkDir:              ".",
-	}
 
 	t.Run("edit tool replaces unique occurrence and returns diff", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -453,31 +394,14 @@ func TestSessionEditToolIntegration(t *testing.T) {
 }
 
 func TestSessionLSPIntegration(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfsInstance := vfs.NewMockVFS()
-
 	// Create mock LSP
 	mockLSP, err := lsp.NewMockLSP(".")
 	require.NoError(t, err)
 	err = mockLSP.Init(true)
 	require.NoError(t, err)
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
-	system := &SweSystem{
-		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
-		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
-		Tools:                tools,
-		VFS:                  vfsInstance,
-		LSP:                  mockLSP,
-		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-		WorkDir:              ".",
-	}
+	fixture := newSweSystemFixture(t, "You are skilled software developer.", withLSP(mockLSP))
+	system := fixture.system
+	vfsInstance := fixture.vfs
 
 	t.Run("session receives LSP from system", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -659,18 +583,9 @@ func TestSessionLSPIntegration(t *testing.T) {
 	})
 
 	t.Run("session works without LSP when LSP is nil", func(t *testing.T) {
-		// Create system without LSP
-		systemNoLSP := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
-			Tools:                tool.NewToolRegistry(),
-			VFS:                  vfsInstance,
-			LSP:                  nil, // No LSP
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
-		tool.RegisterVFSTools(systemNoLSP.Tools, vfsInstance, nil)
+		fixtureNoLSP := newSweSystemFixture(t, "You are skilled software developer.")
+		systemNoLSP := fixtureNoLSP.system
+		vfsInstance := fixtureNoLSP.vfs
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		controller := NewSessionThread(systemNoLSP, mockHandler)
@@ -723,32 +638,19 @@ func TestSessionLSPIntegration(t *testing.T) {
 }
 
 func TestSessionStreamingModeDefault(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
+	fixture := newSweSystemFixture(t, "You are skilled software developer.")
+	system := fixture.system
 
 	// Create provider config WITHOUT streaming field (should default to true)
 	config := &conf.ModelProviderConfig{
 		Type: "ollama",
 		Name: "ollama",
-		URL:  mockServer.URL(),
+		URL:  fixture.server.URL(),
 	}
 
 	client, err := models.NewOllamaClient(config)
 	require.NoError(t, err)
-
-	vfsInstance := vfs.NewMockVFS()
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
-	system := &SweSystem{
-		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
-		PromptGenerator:      newMockSessionPromptGenerator("You are skilled software developer."),
-		Tools:                tools,
-		VFS:                  vfsInstance,
-		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-		WorkDir:              ".",
-	}
+	system.ModelProviders = map[string]models.ModelProvider{"ollama": client}
 
 	t.Run("streaming defaults to true", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -764,15 +666,6 @@ func TestSessionStreamingModeDefault(t *testing.T) {
 // TestSessionSystemPrompt tests that system prompt is correctly set when creating
 // a session with default role and when changing roles.
 func TestSessionSystemPrompt(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfsInstance := vfs.NewMockVFS()
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
 	// Create mock config store with roles
 	configStore := impl.NewMockConfigStore()
 	developerRole := &conf.AgentRoleConfig{
@@ -789,18 +682,8 @@ func TestSessionSystemPrompt(t *testing.T) {
 	})
 
 	roleRegistry := NewAgentRoleRegistry(configStore)
-
-	system := &SweSystem{
-		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
-		PromptGenerator:      newMockSessionPromptGenerator("You are a skilled software developer."),
-		Tools:                tools,
-		VFS:                  vfsInstance,
-		Roles:                roleRegistry,
-		ConfigStore:          configStore,
-		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-		WorkDir:              ".",
-	}
+	fixture := newSweSystemFixture(t, "You are a skilled software developer.", withConfigStore(configStore), withRoles(roleRegistry))
+	system := fixture.system
 
 	t.Run("system prompt is set when creating session with default role", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -884,26 +767,10 @@ func TestSessionSystemPrompt(t *testing.T) {
 }
 
 func TestSessionLLMLoggerUsage(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfsInstance := vfs.NewMockVFS()
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
 	t.Run("runNonStreamingChat uses llmLogger when enabled", func(t *testing.T) {
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockSessionPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-			LogLLMRequests:       true,
-		}
+		fixture := newSweSystemFixture(t, "You are a test assistant.", withLogLLMRequests(true))
+		system := fixture.system
+		mockServer := fixture.server
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
@@ -930,16 +797,9 @@ func TestSessionLLMLoggerUsage(t *testing.T) {
 	})
 
 	t.Run("runStreamingChat uses llmLogger when enabled", func(t *testing.T) {
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockSessionPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-			LogLLMRequests:       true,
-		}
+		fixture := newSweSystemFixture(t, "You are a test assistant.", withLogLLMRequests(true))
+		system := fixture.system
+		mockServer := fixture.server
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
@@ -970,16 +830,9 @@ func TestSessionLLMLoggerUsage(t *testing.T) {
 	})
 
 	t.Run("runNonStreamingChat works without llmLogger", func(t *testing.T) {
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockSessionPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-			LogLLMRequests:       false, // Disabled
-		}
+		fixture := newSweSystemFixture(t, "You are a test assistant.", withLogLLMRequests(false))
+		system := fixture.system
+		mockServer := fixture.server
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
@@ -1006,16 +859,9 @@ func TestSessionLLMLoggerUsage(t *testing.T) {
 	})
 
 	t.Run("runStreamingChat works without llmLogger", func(t *testing.T) {
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockSessionPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-			LogLLMRequests:       false, // Disabled
-		}
+		fixture := newSweSystemFixture(t, "You are a test assistant.", withLogLLMRequests(false))
+		system := fixture.system
+		mockServer := fixture.server
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
@@ -1046,43 +892,11 @@ func TestSessionLLMLoggerUsage(t *testing.T) {
 	})
 }
 
-// mockPermissionPromptGenerator is a mock prompt generator for permission tests
-type mockPermissionPromptGenerator struct {
-	prompt string
-}
-
-func newMockPermissionPromptGenerator(prompt string) *mockPermissionPromptGenerator {
-	return &mockPermissionPromptGenerator{prompt: prompt}
-}
-
-func (m *mockPermissionPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error) {
-	return m.prompt, nil
-}
-
-func (m *mockPermissionPromptGenerator) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *AgentState) (tool.ToolInfo, error) {
-	schema := tool.NewToolSchema()
-	return tool.ToolInfo{
-		Name:        toolName,
-		Description: "Mock tool for testing",
-		Schema:      schema,
-	}, nil
-}
-
-func (m *mockPermissionPromptGenerator) GetAgentFiles(dir string) (map[string]string, error) {
-	return make(map[string]string), nil
-}
-
 // TestPermissionLoopBug tests that when a tool permission is automatically allowed,
 // the session does not fall into an infinite loop of asking for permission.
 // This is a regression test for a bug where granting permission would cause
 // the same tool call to be executed repeatedly.
 func TestPermissionLoopBug(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-
 	// Create a local VFS
 	localVFS, err := vfs.NewLocalVFS(t.TempDir(), nil)
 	require.NoError(t, err)
@@ -1095,9 +909,6 @@ func TestPermissionLoopBug(t *testing.T) {
 		},
 	}
 	restrictedVFS := vfs.NewAccessControlVFS(localVFS, accessConfig)
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, restrictedVFS, nil)
 
 	// Create a role with tool access set to "ask"
 	configStore := impl.NewMockConfigStore()
@@ -1112,16 +923,9 @@ func TestPermissionLoopBug(t *testing.T) {
 		"test": testRole,
 	})
 	roleRegistry := NewAgentRoleRegistry(configStore)
-
-	system := &SweSystem{
-		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-		ModelTags:       models.NewModelTagRegistry(),
-		PromptGenerator: newMockPermissionPromptGenerator("You are a helpful assistant."),
-		Tools:           tools,
-		VFS:             restrictedVFS,
-		Roles:           roleRegistry,
-		WorkDir:         t.TempDir(),
-	}
+	fixture := newSweSystemFixture(t, "You are a helpful assistant.", withVFS(restrictedVFS), withRoles(roleRegistry), withConfigStore(configStore), withWorkDir(t.TempDir()))
+	system := fixture.system
+	mockServer := fixture.server
 
 	t.Run("permission allow should not cause infinite loop", func(t *testing.T) {
 		// Set up mock streaming response with tool call

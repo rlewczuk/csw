@@ -12,10 +12,10 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/core"
+	coretestfixture "github.com/codesnort/codesnort-swe/pkg/core/testfixture"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/presenter"
 	"github.com/codesnort/codesnort-swe/pkg/runner"
-	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/ui"
 	"github.com/codesnort/codesnort-swe/pkg/ui/logmd"
@@ -24,32 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// mockPromptGenerator is a simple mock implementation of PromptGenerator for testing
-type mockPromptGenerator struct {
-	prompt string
-}
-
-func newMockPromptGenerator(prompt string) *mockPromptGenerator {
-	return &mockPromptGenerator{prompt: prompt}
-}
-
-func (m *mockPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *core.AgentState) (string, error) {
-	return m.prompt, nil
-}
-
-func (m *mockPromptGenerator) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *core.AgentState) (tool.ToolInfo, error) {
-	schema := tool.NewToolSchema()
-	return tool.ToolInfo{
-		Name:        toolName,
-		Description: "Mock tool for testing",
-		Schema:      schema,
-	}, nil
-}
-
-func (m *mockPromptGenerator) GetAgentFiles(dir string) (map[string]string, error) {
-	return make(map[string]string), nil
-}
 
 // mockChatView is a mock implementation of ui.IChatView for testing
 type mockChatView struct {
@@ -62,6 +36,13 @@ func newMockChatView() *mockChatView {
 	return &mockChatView{
 		messages: make([]*ui.ChatMessageUI, 0),
 	}
+}
+
+func newCliSystemFixture(t *testing.T, prompt string, opts ...coretestfixture.SweSystemFixtureOption) *coretestfixture.SweSystemFixture {
+	base := []coretestfixture.SweSystemFixtureOption{
+		coretestfixture.WithPromptGenerator(coretestfixture.NewStaticPromptGenerator(prompt)),
+	}
+	return coretestfixture.NewSweSystemFixture(t, append(base, opts...)...)
 }
 
 func (m *mockChatView) Init(session *ui.ChatSessionUI) error {
@@ -113,37 +94,17 @@ func (m *mockChatView) GetMessages() []*ui.ChatMessageUI {
 
 // TestLogmdChatViewLogsSession tests that LogmdChatView properly logs session activity to markdown.
 func TestLogmdChatViewLogsSession(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-
-	// Create provider config pointing to mock server
-	providerConfig := &conf.ModelProviderConfig{
-		Type: "ollama",
-		Name: "ollama",
-		URL:  mockServer.URL(),
-	}
-
-	client, err := models.NewOllamaClient(providerConfig)
-	require.NoError(t, err)
-
-	vfsInstance := vfs.NewMockVFS()
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
+	var err error
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")
 	err = os.MkdirAll(logsDir, 0755)
 	require.NoError(t, err)
-
-	system := &core.SweSystem{
-		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-		ModelTags:       models.NewModelTagRegistry(),
-		PromptGenerator: newMockPromptGenerator("You are a helpful assistant."),
-		Tools:           tools,
-		VFS:             vfsInstance,
-		WorkDir:         tmpDir,
-		LogBaseDir:      logsDir,
-	}
+	fixture := newCliSystemFixture(t, "You are a helpful assistant.",
+		coretestfixture.WithWorkDir(tmpDir),
+		coretestfixture.WithLogBaseDir(logsDir),
+	)
+	system := fixture.System
+	mockServer := fixture.Server
 
 	// Set up mock streaming response
 	mockServer.AddStreamingResponse("/api/chat", "POST", true,
@@ -216,37 +177,16 @@ func TestLogmdChatViewLogsSession(t *testing.T) {
 
 // TestLogmdChatPresenterLogsCalls tests that LogmdChatPresenter properly logs method calls to markdown.
 func TestLogmdChatPresenterLogsCalls(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-
-	// Create provider config pointing to mock server
-	providerConfig := &conf.ModelProviderConfig{
-		Type: "ollama",
-		Name: "ollama",
-		URL:  mockServer.URL(),
-	}
-
-	client, err := models.NewOllamaClient(providerConfig)
-	require.NoError(t, err)
-
-	vfsInstance := vfs.NewMockVFS()
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")
-	err = os.MkdirAll(logsDir, 0755)
+	err := os.MkdirAll(logsDir, 0755)
 	require.NoError(t, err)
-
-	system := &core.SweSystem{
-		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-		ModelTags:       models.NewModelTagRegistry(),
-		PromptGenerator: newMockPromptGenerator("You are a helpful assistant."),
-		Tools:           tools,
-		VFS:             vfsInstance,
-		WorkDir:         tmpDir,
-		LogBaseDir:      logsDir,
-	}
+	fixture := newCliSystemFixture(t, "You are a helpful assistant.",
+		coretestfixture.WithWorkDir(tmpDir),
+		coretestfixture.WithLogBaseDir(logsDir),
+	)
+	system := fixture.System
+	mockServer := fixture.Server
 
 	// Set up mock streaming response
 	mockServer.AddStreamingResponse("/api/chat", "POST", true,
@@ -317,37 +257,16 @@ func TestLogmdChatPresenterLogsCalls(t *testing.T) {
 
 // TestLogmdWrappersIntegration tests the integration of LogmdChatView and LogmdChatPresenter.
 func TestLogmdWrappersIntegration(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-
-	// Create provider config pointing to mock server
-	providerConfig := &conf.ModelProviderConfig{
-		Type: "ollama",
-		Name: "ollama",
-		URL:  mockServer.URL(),
-	}
-
-	client, err := models.NewOllamaClient(providerConfig)
-	require.NoError(t, err)
-
-	vfsInstance := vfs.NewMockVFS()
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")
-	err = os.MkdirAll(logsDir, 0755)
+	err := os.MkdirAll(logsDir, 0755)
 	require.NoError(t, err)
-
-	system := &core.SweSystem{
-		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-		ModelTags:       models.NewModelTagRegistry(),
-		PromptGenerator: newMockPromptGenerator("You are a helpful assistant."),
-		Tools:           tools,
-		VFS:             vfsInstance,
-		WorkDir:         tmpDir,
-		LogBaseDir:      logsDir,
-	}
+	fixture := newCliSystemFixture(t, "You are a helpful assistant.",
+		coretestfixture.WithWorkDir(tmpDir),
+		coretestfixture.WithLogBaseDir(logsDir),
+	)
+	system := fixture.System
+	mockServer := fixture.Server
 
 	// Set up mock streaming response
 	mockServer.AddStreamingResponse("/api/chat", "POST", true,
@@ -422,37 +341,17 @@ func TestLogmdWrappersIntegration(t *testing.T) {
 
 // TestSaveSessionWithWriterBuffer tests session saving using a buffer instead of file.
 func TestSaveSessionWithWriterBuffer(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-
-	// Create provider config pointing to mock server
-	providerConfig := &conf.ModelProviderConfig{
-		Type: "ollama",
-		Name: "ollama",
-		URL:  mockServer.URL(),
-	}
-
-	client, err := models.NewOllamaClient(providerConfig)
-	require.NoError(t, err)
-
-	vfsInstance := vfs.NewMockVFS()
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
+	var err error
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")
 	err = os.MkdirAll(logsDir, 0755)
 	require.NoError(t, err)
-
-	system := &core.SweSystem{
-		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-		ModelTags:       models.NewModelTagRegistry(),
-		PromptGenerator: newMockPromptGenerator("You are a helpful assistant."),
-		Tools:           tools,
-		VFS:             vfsInstance,
-		WorkDir:         tmpDir,
-		LogBaseDir:      logsDir,
-	}
+	fixture := newCliSystemFixture(t, "You are a helpful assistant.",
+		coretestfixture.WithWorkDir(tmpDir),
+		coretestfixture.WithLogBaseDir(logsDir),
+	)
+	system := fixture.System
+	mockServer := fixture.Server
 
 	// Set up mock streaming response
 	mockServer.AddStreamingResponse("/api/chat", "POST", true,
@@ -623,22 +522,9 @@ func TestSystemPromptGenerationForKimi(t *testing.T) {
 
 // TestRunBashToolIntegration tests that runBash tool is properly registered and presented to LLM.
 func TestRunBashToolIntegration(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-
-	// Create provider config pointing to mock server
-	providerConfig := &conf.ModelProviderConfig{
-		Type: "ollama",
-		Name: "ollama",
-		URL:  mockServer.URL(),
-	}
-
-	client, err := models.NewOllamaClient(providerConfig)
-	require.NoError(t, err)
-
+	var err error
 	vfsInstance := vfs.NewMockVFS()
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	// Register runBash tool with mock runner
 	mockRunner := runner.NewMockRunner()
@@ -651,16 +537,14 @@ func TestRunBashToolIntegration(t *testing.T) {
 	logsDir := filepath.Join(tmpDir, "logs")
 	err = os.MkdirAll(logsDir, 0755)
 	require.NoError(t, err)
-
-	system := &core.SweSystem{
-		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-		ModelTags:       models.NewModelTagRegistry(),
-		PromptGenerator: newMockPromptGenerator("You are a helpful assistant."),
-		Tools:           tools,
-		VFS:             vfsInstance,
-		WorkDir:         tmpDir,
-		LogBaseDir:      logsDir,
-	}
+	fixture := newCliSystemFixture(t, "You are a helpful assistant.",
+		coretestfixture.WithVFS(vfsInstance),
+		coretestfixture.WithTools(tools),
+		coretestfixture.WithWorkDir(tmpDir),
+		coretestfixture.WithLogBaseDir(logsDir),
+	)
+	system := fixture.System
+	mockServer := fixture.Server
 
 	// Set up mock streaming response with tool call
 	// First response: assistant makes a tool call to run bash command (closeAfter=false to continue processing)
@@ -750,19 +634,6 @@ func TestRunBashToolIntegration(t *testing.T) {
 // TestCLIPermissionQueryHandling tests that CLI mode handles permission queries correctly.
 // When not in interactive mode and without --allow-all-permissions, permissions should be denied by default.
 func TestCLIPermissionQueryHandling(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-
-	// Create provider config pointing to mock server
-	providerConfig := &conf.ModelProviderConfig{
-		Type: "ollama",
-		Name: "ollama",
-		URL:  mockServer.URL(),
-	}
-
-	client, err := models.NewOllamaClient(providerConfig)
-	require.NoError(t, err)
-
 	// Create a VFS with access control that requires asking for permissions
 	localVFS, err := vfs.NewLocalVFS(t.TempDir(), nil)
 	require.NoError(t, err)
@@ -780,24 +651,17 @@ func TestCLIPermissionQueryHandling(t *testing.T) {
 	}
 	restrictedVFS := vfs.NewAccessControlVFS(localVFS, accessConfig)
 
-	tools := tool.NewToolRegistry()
-	// Register VFS tools with the restricted VFS
-	tool.RegisterVFSTools(tools, restrictedVFS, nil)
-
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")
 	err = os.MkdirAll(logsDir, 0755)
 	require.NoError(t, err)
-
-	system := &core.SweSystem{
-		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-		ModelTags:       models.NewModelTagRegistry(),
-		PromptGenerator: newMockPromptGenerator("You are a helpful assistant."),
-		Tools:           tools,
-		VFS:             restrictedVFS,
-		WorkDir:         tmpDir,
-		LogBaseDir:      logsDir,
-	}
+	fixture := newCliSystemFixture(t, "You are a helpful assistant.",
+		coretestfixture.WithVFS(restrictedVFS),
+		coretestfixture.WithWorkDir(tmpDir),
+		coretestfixture.WithLogBaseDir(logsDir),
+	)
+	system := fixture.System
+	mockServer := fixture.Server
 
 	// Set up mock streaming response with tool call that requires permission
 	// First response: assistant makes a tool call to vfsRead (closeAfter=false to continue processing)
@@ -903,19 +767,6 @@ func (m *permissionTrackingMockView) QueryPermission(query *ui.PermissionQueryUI
 // when the view calls PermissionResponse (simulating real CLI behavior).
 // This test reproduces the bug where the session hangs after permission denial.
 func TestCLIPermissionQueryWithResponse(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-
-	// Create provider config pointing to mock server
-	providerConfig := &conf.ModelProviderConfig{
-		Type: "ollama",
-		Name: "ollama",
-		URL:  mockServer.URL(),
-	}
-
-	client, err := models.NewOllamaClient(providerConfig)
-	require.NoError(t, err)
-
 	// Create a VFS with access control that requires asking for permissions
 	localVFS, err := vfs.NewLocalVFS(t.TempDir(), nil)
 	require.NoError(t, err)
@@ -941,16 +792,15 @@ func TestCLIPermissionQueryWithResponse(t *testing.T) {
 	logsDir := filepath.Join(tmpDir, "logs")
 	err = os.MkdirAll(logsDir, 0755)
 	require.NoError(t, err)
-
-	system := &core.SweSystem{
-		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
-		ModelTags:       models.NewModelTagRegistry(),
-		PromptGenerator: newMockPromptGenerator("You are a helpful assistant."),
-		Tools:           tools,
-		VFS:             restrictedVFS,
-		WorkDir:         tmpDir,
-		LogBaseDir:      logsDir,
-	}
+	fixture := newCliSystemFixture(t, "You are a helpful assistant.",
+		coretestfixture.WithVFS(restrictedVFS),
+		coretestfixture.WithTools(tools),
+		coretestfixture.WithoutVFSTools(),
+		coretestfixture.WithWorkDir(tmpDir),
+		coretestfixture.WithLogBaseDir(logsDir),
+	)
+	system := fixture.System
+	mockServer := fixture.Server
 
 	// Set up mock streaming response with tool call that requires permission
 	// First response: assistant makes a tool call to vfsRead (closeAfter=false to continue processing)

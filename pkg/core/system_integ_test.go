@@ -5,61 +5,18 @@ import (
 	"testing"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// mockPromptGenerator is a simple mock implementation of PromptGenerator for testing
-type mockPromptGenerator struct {
-	prompt string
-}
-
-func newMockPromptGenerator(prompt string) *mockPromptGenerator {
-	return &mockPromptGenerator{prompt: prompt}
-}
-
-func (m *mockPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error) {
-	return m.prompt, nil
-}
-
-func (m *mockPromptGenerator) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *AgentState) (tool.ToolInfo, error) {
-	schema := tool.NewToolSchema()
-	return tool.ToolInfo{
-		Name:        toolName,
-		Description: "Mock tool for testing",
-		Schema:      schema,
-	}, nil
-}
-
-func (m *mockPromptGenerator) GetAgentFiles(dir string) (map[string]string, error) {
-	return make(map[string]string), nil
-}
-
 func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfs := vfs.NewMockVFS()
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfs, nil)
-
 	t.Run("basic initialization", func(t *testing.T) {
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are skilled software developer."),
-			Tools:                tools,
-			VFS:                  vfs,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		fixture := newSweSystemFixture(t, "You are skilled software developer.")
+		system := fixture.system
+		mockServer := fixture.server
+		vfsInstance := fixture.vfs
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
@@ -85,23 +42,16 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 		err = session.Run(context.Background())
 		assert.NoError(t, err)
 
-		bytes, err := vfs.ReadFile("hello_world.py")
+		bytes, err := vfsInstance.ReadFile("hello_world.py")
 		assert.NoError(t, err)
 		assert.Contains(t, string(bytes), "print(\"Hello World\")")
 	})
 
 	t.Run("UI output handler integration", func(t *testing.T) {
+		fixture := newSweSystemFixture(t, "You are skilled software developer.")
+		system := fixture.system
+		mockServer := fixture.server
 		mockHandler := testutil.NewMockSessionOutputHandler()
-
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are skilled software developer."),
-			Tools:                tools,
-			VFS:                  vfs,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
 
 		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
 		require.NoError(t, err)
@@ -141,24 +91,8 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 }
 
 func TestSweSystemSessionManagement(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfs := vfs.NewMockVFS()
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfs, nil)
-
-	system := &SweSystem{
-		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
-		PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
-		Tools:                tools,
-		VFS:                  vfs,
-		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-		WorkDir:              ".",
-	}
+	fixture := newSweSystemFixture(t, "You are a test assistant.")
+	system := fixture.system
 
 	mockHandler := testutil.NewMockSessionOutputHandler()
 
@@ -251,24 +185,8 @@ func TestSweSystemSessionManagement(t *testing.T) {
 }
 
 func TestSweSystemGetSessionThread(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfs := vfs.NewMockVFS()
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfs, nil)
-
-	system := &SweSystem{
-		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
-		PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
-		Tools:                tools,
-		VFS:                  vfs,
-		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-		WorkDir:              ".",
-	}
+	fixture := newSweSystemFixture(t, "You are a test assistant.")
+	system := fixture.system
 
 	mockHandler := testutil.NewMockSessionOutputHandler()
 
@@ -332,25 +250,9 @@ func TestSweSystemGetSessionThread(t *testing.T) {
 }
 
 func TestSweSystemShutdown(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfs := vfs.NewMockVFS()
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfs, nil)
-
 	t.Run("Shutdown with no sessions or threads", func(t *testing.T) {
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfs,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		fixture := newSweSystemFixture(t, "You are a test assistant.")
+		system := fixture.system
 
 		// Should not panic
 		system.Shutdown()
@@ -360,15 +262,8 @@ func TestSweSystemShutdown(t *testing.T) {
 	})
 
 	t.Run("Shutdown with sessions but no threads", func(t *testing.T) {
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfs,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		fixture := newSweSystemFixture(t, "You are a test assistant.")
+		system := fixture.system
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 
@@ -395,15 +290,8 @@ func TestSweSystemShutdown(t *testing.T) {
 	})
 
 	t.Run("Shutdown with sessions and threads", func(t *testing.T) {
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfs,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		fixture := newSweSystemFixture(t, "You are a test assistant.")
+		system := fixture.system
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 
@@ -440,15 +328,9 @@ func TestSweSystemShutdown(t *testing.T) {
 	})
 
 	t.Run("Shutdown interrupts running threads", func(t *testing.T) {
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfs,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		fixture := newSweSystemFixture(t, "You are a test assistant.")
+		system := fixture.system
+		mockServer := fixture.server
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 
@@ -487,15 +369,8 @@ func TestSweSystemShutdown(t *testing.T) {
 	})
 
 	t.Run("Shutdown is idempotent", func(t *testing.T) {
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfs,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		fixture := newSweSystemFixture(t, "You are a test assistant.")
+		system := fixture.system
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 
@@ -514,14 +389,11 @@ func TestSweSystemShutdown(t *testing.T) {
 }
 
 func TestSystemStreamingConfiguration(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-
-	vfs := vfs.NewMockVFS()
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfs, nil)
-
 	t.Run("session uses streaming from provider config", func(t *testing.T) {
+		fixture := newSweSystemFixture(t, "You are a test assistant.")
+		system := fixture.system
+		mockServer := fixture.server
+
 		// Create provider with streaming enabled
 		streamingEnabled := true
 		config := &conf.ModelProviderConfig{
@@ -532,16 +404,7 @@ func TestSystemStreamingConfiguration(t *testing.T) {
 		}
 		client, err := models.NewOllamaClient(config)
 		require.NoError(t, err)
-
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfs,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		system.ModelProviders = map[string]models.ModelProvider{"ollama": client}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
@@ -550,6 +413,10 @@ func TestSystemStreamingConfiguration(t *testing.T) {
 	})
 
 	t.Run("session uses non-streaming from provider config", func(t *testing.T) {
+		fixture := newSweSystemFixture(t, "You are a test assistant.")
+		system := fixture.system
+		mockServer := fixture.server
+
 		// Create provider with streaming disabled
 		streamingDisabled := false
 		config := &conf.ModelProviderConfig{
@@ -560,16 +427,7 @@ func TestSystemStreamingConfiguration(t *testing.T) {
 		}
 		client, err := models.NewOllamaClient(config)
 		require.NoError(t, err)
-
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfs,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		system.ModelProviders = map[string]models.ModelProvider{"ollama": client}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
@@ -578,6 +436,10 @@ func TestSystemStreamingConfiguration(t *testing.T) {
 	})
 
 	t.Run("session defaults to streaming when not configured", func(t *testing.T) {
+		fixture := newSweSystemFixture(t, "You are a test assistant.")
+		system := fixture.system
+		mockServer := fixture.server
+
 		// Create provider without streaming config
 		config := &conf.ModelProviderConfig{
 			Type: "ollama",
@@ -586,16 +448,7 @@ func TestSystemStreamingConfiguration(t *testing.T) {
 		}
 		client, err := models.NewOllamaClient(config)
 		require.NoError(t, err)
-
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfs,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		system.ModelProviders = map[string]models.ModelProvider{"ollama": client}
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
@@ -605,26 +458,9 @@ func TestSystemStreamingConfiguration(t *testing.T) {
 }
 
 func TestLogLLMRequestsOption(t *testing.T) {
-	mockServer := testutil.NewMockHTTPServer()
-	defer mockServer.Close()
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-	vfsInstance := vfs.NewMockVFS()
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
 	t.Run("session has llmLogger when LogLLMRequests is enabled", func(t *testing.T) {
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-			LogLLMRequests:       true,
-		}
+		fixture := newSweSystemFixture(t, "You are a test assistant.", withLogLLMRequests(true))
+		system := fixture.system
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
@@ -636,16 +472,8 @@ func TestLogLLMRequestsOption(t *testing.T) {
 	})
 
 	t.Run("session has nil llmLogger when LogLLMRequests is disabled", func(t *testing.T) {
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-			LogLLMRequests:       false,
-		}
+		fixture := newSweSystemFixture(t, "You are a test assistant.", withLogLLMRequests(false))
+		system := fixture.system
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
@@ -657,16 +485,8 @@ func TestLogLLMRequestsOption(t *testing.T) {
 	})
 
 	t.Run("session has nil llmLogger when LogLLMRequests is not set (default)", func(t *testing.T) {
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      newMockPromptGenerator("You are a test assistant."),
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-			// LogLLMRequests not set - defaults to false
-		}
+		fixture := newSweSystemFixture(t, "You are a test assistant.")
+		system := fixture.system
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := system.NewSession("ollama/test-model:latest", mockHandler)

@@ -11,19 +11,15 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/core"
-	"github.com/codesnort/codesnort-swe/pkg/logging"
+	coretestfixture "github.com/codesnort/codesnort-swe/pkg/core/testfixture"
 	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/presenter"
-	"github.com/codesnort/codesnort-swe/pkg/testutil"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/ui"
+	"github.com/codesnort/codesnort-swe/pkg/ui/cli/testfixture"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// cliViewMockPromptGen is a mock prompt generator for CLI view tests.
-type cliViewMockPromptGen struct{}
 
 // mockCliPresenter is a minimal mock presenter for simple tests.
 type mockCliPresenter struct{}
@@ -36,53 +32,24 @@ func (m *mockCliPresenter) Resume() error                                   { re
 func (m *mockCliPresenter) PermissionResponse(response string) error        { return nil }
 func (m *mockCliPresenter) SetModel(model string) error                     { return nil }
 
-func (m *cliViewMockPromptGen) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *core.AgentState) (string, error) {
-	return "You are a helpful assistant.", nil
-}
-
-func (m *cliViewMockPromptGen) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *core.AgentState) (tool.ToolInfo, error) {
-	schema := tool.NewToolSchema()
-	return tool.ToolInfo{
-		Name:        toolName,
-		Description: "Mock tool for testing",
-		Schema:      schema,
-	}, nil
-}
-
-func (m *cliViewMockPromptGen) GetAgentFiles(dir string) (map[string]string, error) {
-	return make(map[string]string), nil
+func newCliFixture(t *testing.T) *testfixture.CliFixture {
+	return testfixture.NewCliFixture(t,
+		coretestfixture.WithPromptGenerator(coretestfixture.NewStaticPromptGenerator("You are a helpful assistant.")),
+	)
 }
 
 func TestCliChatView_IntegrationWithSession(t *testing.T) {
 	t.Run("chat response appears in non-interactive mode", func(t *testing.T) {
-		// Setup mock LLM server
-		mockServer := testutil.NewMockHTTPServer()
-		defer mockServer.Close()
-
-		client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-		require.NoError(t, err)
-
-		vfsInstance := vfs.NewMockVFS()
-		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance, nil)
-
-		system := &core.SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      &cliViewMockPromptGen{},
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		fixture := newCliFixture(t)
+		mockServer := fixture.Server
 
 		// Create session thread
-		thread := core.NewSessionThread(system, nil)
-		err = thread.StartSession("ollama/test-model:latest")
+		thread := fixture.NewSessionThread(nil)
+		err := thread.StartSession("ollama/test-model:latest")
 		require.NoError(t, err)
 
 		// Create chat presenter
-		chatPresenter := presenter.NewChatPresenter(system, thread)
+		chatPresenter := fixture.NewChatPresenter(thread)
 
 		// Create CLI view in non-interactive mode
 		output := &bytes.Buffer{}
@@ -111,34 +78,16 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 	})
 
 	t.Run("streaming response updates appear in output", func(t *testing.T) {
-		// Setup mock LLM server
-		mockServer := testutil.NewMockHTTPServer()
-		defer mockServer.Close()
-
-		client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-		require.NoError(t, err)
-
-		vfsInstance := vfs.NewMockVFS()
-		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance, nil)
-
-		system := &core.SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      &cliViewMockPromptGen{},
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		fixture := newCliFixture(t)
+		mockServer := fixture.Server
 
 		// Create session thread
-		thread := core.NewSessionThread(system, nil)
-		err = thread.StartSession("ollama/test-model:latest")
+		thread := fixture.NewSessionThread(nil)
+		err := thread.StartSession("ollama/test-model:latest")
 		require.NoError(t, err)
 
 		// Create chat presenter
-		chatPresenter := presenter.NewChatPresenter(system, thread)
+		chatPresenter := fixture.NewChatPresenter(thread)
 
 		// Create CLI view in non-interactive mode
 		output := &bytes.Buffer{}
@@ -210,34 +159,16 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 	})
 
 	t.Run("accepts all permissions automatically when configured", func(t *testing.T) {
-		// Setup mock LLM server
-		mockServer := testutil.NewMockHTTPServer()
-		defer mockServer.Close()
-
-		client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-		require.NoError(t, err)
-
-		vfsInstance := vfs.NewMockVFS()
-		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance, nil)
-
-		system := &core.SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      &cliViewMockPromptGen{},
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		fixture := newCliFixture(t)
+		mockServer := fixture.Server
 
 		// Create session thread
-		thread := core.NewSessionThread(system, nil)
-		err = thread.StartSession("ollama/test-model:latest")
+		thread := fixture.NewSessionThread(nil)
+		err := thread.StartSession("ollama/test-model:latest")
 		require.NoError(t, err)
 
 		// Create chat presenter
-		chatPresenter := presenter.NewChatPresenter(system, thread)
+		chatPresenter := fixture.NewChatPresenter(thread)
 
 		// Create CLI view with acceptAllPermissions=true
 		output := &bytes.Buffer{}
@@ -269,34 +200,16 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 	})
 
 	t.Run("multiple messages in session", func(t *testing.T) {
-		// Setup mock LLM server
-		mockServer := testutil.NewMockHTTPServer()
-		defer mockServer.Close()
-
-		client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-		require.NoError(t, err)
-
-		vfsInstance := vfs.NewMockVFS()
-		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance, nil)
-
-		system := &core.SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      &cliViewMockPromptGen{},
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		fixture := newCliFixture(t)
+		mockServer := fixture.Server
 
 		// Create session thread
-		thread := core.NewSessionThread(system, nil)
-		err = thread.StartSession("ollama/test-model:latest")
+		thread := fixture.NewSessionThread(nil)
+		err := thread.StartSession("ollama/test-model:latest")
 		require.NoError(t, err)
 
 		// Create chat presenter
-		chatPresenter := presenter.NewChatPresenter(system, thread)
+		chatPresenter := fixture.NewChatPresenter(thread)
 
 		// Create CLI view
 		output := &bytes.Buffer{}
@@ -347,17 +260,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 	t.Run("system prompt included when SetRole is called", func(t *testing.T) {
 		// This test verifies that when SetRole() is called, the system prompt
 		// is included in the messages sent to the LLM.
-
-		// Setup mock LLM server
-		mockServer := testutil.NewMockHTTPServer()
-		defer mockServer.Close()
-
-		client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-		require.NoError(t, err)
-
 		vfsInstance := vfs.NewMockVFS()
-		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 		// Create a mock role registry and config store with developer role
 		configStore := impl.NewMockConfigStore()
@@ -380,19 +283,13 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		require.NoError(t, err)
 
 		roleRegistry := core.NewAgentRoleRegistry(configStore)
-
-		// Create system with role registry and config store
-		system := &core.SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      promptGenerator,
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			Roles:                roleRegistry,
-			ConfigStore:          configStore,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		fixture := coretestfixture.NewSweSystemFixture(t,
+			coretestfixture.WithPromptGenerator(promptGenerator),
+			coretestfixture.WithRoles(roleRegistry),
+			coretestfixture.WithConfigStore(configStore),
+			coretestfixture.WithVFS(vfsInstance),
+		)
+		system := fixture.System
 
 		// Create session thread
 		thread := core.NewSessionThread(system, nil)
@@ -418,17 +315,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 	t.Run("system prompt uses default role from global config", func(t *testing.T) {
 		// This test verifies that the default role from global config is used
-
-		// Setup mock LLM server
-		mockServer := testutil.NewMockHTTPServer()
-		defer mockServer.Close()
-
-		client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-		require.NoError(t, err)
-
 		vfsInstance := vfs.NewMockVFS()
-		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 		// Create a mock config store with custom default role
 		configStore := impl.NewMockConfigStore()
@@ -457,19 +344,13 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		require.NoError(t, err)
 
 		roleRegistry := core.NewAgentRoleRegistry(configStore)
-
-		// Create system with config store
-		system := &core.SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      promptGenerator,
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			Roles:                roleRegistry,
-			ConfigStore:          configStore,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		fixture := coretestfixture.NewSweSystemFixture(t,
+			coretestfixture.WithPromptGenerator(promptGenerator),
+			coretestfixture.WithRoles(roleRegistry),
+			coretestfixture.WithConfigStore(configStore),
+			coretestfixture.WithVFS(vfsInstance),
+		)
+		system := fixture.System
 
 		// Create session - should automatically use "tester" role from global config
 		thread := core.NewSessionThread(system, nil)
@@ -488,14 +369,6 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 	t.Run("tool description from markdown file is included", func(t *testing.T) {
 		// This test verifies that tool descriptions from markdown files are included
 		// in the tool info sent to the LLM.
-
-		// Setup mock LLM server
-		mockServer := testutil.NewMockHTTPServer()
-		defer mockServer.Close()
-
-		client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-		require.NoError(t, err)
-
 		vfsInstance := vfs.NewMockVFS()
 		tools := tool.NewToolRegistry()
 		// Register a dummy tool
@@ -530,19 +403,15 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		require.NoError(t, err)
 
 		roleRegistry := core.NewAgentRoleRegistry(configStore)
-
-		// Create system
-		system := &core.SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      promptGenerator,
-			Tools:                tools,
-			VFS:                  vfsInstance,
-			Roles:                roleRegistry,
-			ConfigStore:          configStore,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+		fixture := coretestfixture.NewSweSystemFixture(t,
+			coretestfixture.WithPromptGenerator(promptGenerator),
+			coretestfixture.WithRoles(roleRegistry),
+			coretestfixture.WithConfigStore(configStore),
+			coretestfixture.WithVFS(vfsInstance),
+			coretestfixture.WithTools(tools),
+		)
+		system := fixture.System
+		mockServer := fixture.Server
 
 		// Add a tag mapping to ensure we have the 'special' tag
 		system.ModelTags.SetGlobalMappings([]conf.ModelTagMapping{

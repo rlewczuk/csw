@@ -7,64 +7,17 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/core"
-	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/testutil"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/ui"
 	"github.com/codesnort/codesnort-swe/pkg/ui/mock"
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// Mock prompt generator for tests
-type mockPromptGen struct{}
-
-func (m *mockPromptGen) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *core.AgentState) (string, error) {
-	return "You are skilled software developer.", nil
-}
-
-func (m *mockPromptGen) GetToolInfo(tags []string, toolName string, role *conf.AgentRoleConfig, state *core.AgentState) (tool.ToolInfo, error) {
-	schema := tool.NewToolSchema()
-	return tool.ToolInfo{
-		Name:        toolName,
-		Description: "Mock tool for testing",
-		Schema:      schema,
-	}, nil
-}
-
-func (m *mockPromptGen) GetAgentFiles(dir string) (map[string]string, error) {
-	return make(map[string]string), nil
-}
-
-func setupTestSystem(t *testing.T) (*core.SweSystem, *testutil.MockHTTPServer, vfs.VFS) {
-	mockServer := testutil.NewMockHTTPServer()
-	t.Cleanup(func() { mockServer.Close() })
-
-	client, err := models.NewOllamaClientWithHTTPClient(mockServer.URL(), mockServer.Client())
-	require.NoError(t, err)
-
-	vfsInstance := vfs.NewMockVFS()
-
-	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance, nil)
-
-	system := &core.SweSystem{
-		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
-		ModelTags:            models.NewModelTagRegistry(),
-		PromptGenerator:      &mockPromptGen{},
-		Tools:                tools,
-		VFS:                  vfsInstance,
-		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-		WorkDir:              ".",
-	}
-
-	return system, mockServer, vfsInstance
-}
-
 func TestChatPresenter_SetView(t *testing.T) {
-	system, _, _ := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
 
 	t.Run("set view without session", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -100,7 +53,9 @@ func TestChatPresenter_SetView(t *testing.T) {
 }
 
 func TestChatPresenter_SendUserMessage(t *testing.T) {
-	system, mockServer, _ := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
+	mockServer := fixture.Server
 
 	t.Run("send message and receive response", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -152,7 +107,8 @@ func TestChatPresenter_SendUserMessage(t *testing.T) {
 }
 
 func TestChatPresenter_SaveUserMessage(t *testing.T) {
-	system, _, _ := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
 
 	t.Run("save message without processing", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -189,7 +145,9 @@ func TestChatPresenter_SaveUserMessage(t *testing.T) {
 }
 
 func TestChatPresenter_PauseResume(t *testing.T) {
-	system, mockServer, _ := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
+	mockServer := fixture.Server
 
 	t.Run("pause and resume processing", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -242,7 +200,10 @@ func TestChatPresenter_PauseResume(t *testing.T) {
 }
 
 func TestChatPresenter_ToolCallHandling(t *testing.T) {
-	system, mockServer, vfsInstance := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
+	mockServer := fixture.Server
+	vfsInstance := fixture.VFS
 
 	t.Run("tool call updates are propagated to view", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -292,7 +253,9 @@ func TestChatPresenter_ToolCallHandling(t *testing.T) {
 }
 
 func TestChatPresenter_SessionPersistence(t *testing.T) {
-	system, mockServer, _ := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
+	mockServer := fixture.Server
 
 	t.Run("session state persists across presenter instances", func(t *testing.T) {
 		// Create first presenter and send a message
@@ -362,7 +325,9 @@ func TestChatPresenter_SessionPersistence(t *testing.T) {
 }
 
 func TestChatPresenter_MoveToBottom(t *testing.T) {
-	system, mockServer, _ := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
+	mockServer := fixture.Server
 
 	t.Run("view scrolls to bottom on new content", func(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
@@ -401,7 +366,10 @@ func TestChatPresenter_MoveToBottom(t *testing.T) {
 }
 
 func TestChatPresenter_PermissionFlow(t *testing.T) {
-	system, mockServer, vfsInstance := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
+	mockServer := fixture.Server
+	vfsInstance := fixture.VFS
 
 	// Define a role with VFS permission required
 	roleName := "restricted_role"
@@ -476,7 +444,8 @@ func TestChatPresenter_PermissionFlow(t *testing.T) {
 }
 
 func TestChatPresenter_SetModel(t *testing.T) {
-	system, _, _ := setupTestSystem(t)
+	fixture := newPresenterFixture(t)
+	system := fixture.System
 	// Add another provider
 	mockServer2 := testutil.NewMockHTTPServer()
 	t.Cleanup(func() { mockServer2.Close() })
