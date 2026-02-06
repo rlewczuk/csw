@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/logging"
@@ -222,41 +221,6 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 		// Set working directory
 		session.SetWorkDir(workDir)
 
-		// If allow-all-permissions is set, override the access controls
-		if allowAllPerms {
-			// Replace VFS with one that allows all operations
-			allAccessVFS := vfs.NewAccessControlVFS(localVFS, map[string]conf.FileAccess{
-				"*": {
-					Read:   conf.AccessAllow,
-					Write:  conf.AccessAllow,
-					Delete: conf.AccessAllow,
-					List:   conf.AccessAllow,
-					Find:   conf.AccessAllow,
-					Move:   conf.AccessAllow,
-				},
-			})
-			session.VFS = allAccessVFS
-
-			// Re-create tool registry without access control wrappers
-			session.Tools = tool.NewToolRegistry()
-			// Register system tools
-			for _, name := range sweSystem.Tools.List() {
-				t, _ := sweSystem.Tools.Get(name)
-				session.Tools.Register(name, t)
-			}
-			// Re-register VFS tools with the all-access VFS
-			session.Tools.Register("vfsRead", tool.NewVFSReadTool(allAccessVFS, true))
-			session.Tools.Register("vfsWrite", tool.NewVFSWriteTool(allAccessVFS, nil))
-			session.Tools.Register("vfsEdit", tool.NewVFSEditTool(allAccessVFS, nil))
-			session.Tools.Register("vfsDelete", tool.NewVFSDeleteTool(allAccessVFS))
-			session.Tools.Register("vfsList", tool.NewVFSListTool(allAccessVFS))
-			session.Tools.Register("vfsMode", tool.NewVFSMoveTool(allAccessVFS))
-			session.Tools.Register("vfsFind", tool.NewVFSFindTool(allAccessVFS))
-			session.Tools.Register("vfsGrep", tool.NewVFSGrepTool(allAccessVFS))
-			// Re-register session-specific tools (like todo tools)
-			session.Tools.Register("todoRead", tool.NewTodoReadTool(session))
-			session.Tools.Register("todoWrite", tool.NewTodoWriteTool(session))
-		}
 	}
 
 	// Create chat presenter
