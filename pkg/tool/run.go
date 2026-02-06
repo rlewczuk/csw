@@ -96,11 +96,30 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 
 	// Check permissions for absolute workdir
 	if needsPermission {
-		return t.createWorkdirPermissionQuery(args, command, resolvedWorkdir, timeout)
+		// Check if explicit access is granted
+		if args.Access == conf.AccessAllow {
+			// Proceed
+		} else if args.Access == conf.AccessDeny {
+			return &ToolResponse{
+				Call: args,
+				Error: &RunCommandError{
+					Command: command,
+					Message: "permission denied for absolute path",
+				},
+				Done: true,
+			}
+		} else {
+			return t.createWorkdirPermissionQuery(args, command, resolvedWorkdir, timeout)
+		}
 	}
 
 	// Check permissions for command
 	access := t.checkPermission(command)
+
+	// Override with explicit access from tool call if set
+	if args.Access != "" && args.Access != conf.AccessAuto {
+		access = args.Access
+	}
 
 	switch access {
 	case conf.AccessDeny:
