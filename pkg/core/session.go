@@ -55,13 +55,7 @@ func (s *SweSession) Run(ctx context.Context) error {
 		s.logger.Debug("session_run_start", "session_id", s.id, "model", s.model)
 	}
 
-	// Create chat options with LLM logger if available
-	var chatOptions *models.ChatOptions
-	if s.llmLogger != nil {
-		chatOptions = &models.ChatOptions{
-			Logger: s.llmLogger,
-		}
-	}
+	chatOptions := s.buildChatOptions()
 
 	chatModel := s.provider.ChatModel(s.model, chatOptions)
 
@@ -124,10 +118,10 @@ func (s *SweSession) Run(ctx context.Context) error {
 
 		if s.streaming {
 			// Use streaming chat API
-			responseMsg, err = s.runStreamingChat(ctx, chatModel, tools)
+			responseMsg, err = s.runStreamingChat(ctx, chatModel, tools, chatOptions)
 		} else {
 			// Use non-streaming chat API
-			responseMsg, err = s.runNonStreamingChat(ctx, chatModel, tools)
+			responseMsg, err = s.runNonStreamingChat(ctx, chatModel, tools, chatOptions)
 		}
 
 		if err != nil {
@@ -153,16 +147,52 @@ func (s *SweSession) Run(ctx context.Context) error {
 	return nil
 }
 
-// runStreamingChat executes a streaming chat request and returns the accumulated response.
-func (s *SweSession) runStreamingChat(ctx context.Context, chatModel models.ChatModel, tools []tool.ToolInfo) (*models.ChatMessage, error) {
-	// Create chat options with LLM logger if available
-	var chatOptions *models.ChatOptions
-	if s.llmLogger != nil {
-		chatOptions = &models.ChatOptions{
-			Logger: s.llmLogger,
-		}
+func (s *SweSession) buildChatOptions() *models.ChatOptions {
+	if s.llmLogger == nil {
+		return nil
 	}
 
+	return &models.ChatOptions{
+		Logger: s.llmLogger,
+	}
+}
+
+func (s *SweSession) emitAssistantParts(parts []models.ChatMessagePart, streaming bool) {
+	if s.outputHandler == nil {
+		return
+	}
+
+	var seenToolCalls map[string]bool
+	if streaming {
+		seenToolCalls = make(map[string]bool)
+	}
+
+	for _, part := range parts {
+		if part.Text != "" {
+			s.outputHandler.AddMarkdownChunk(part.Text)
+			if s.logger != nil {
+				s.logger.Debug("assistant_output_chunk", "chunk", part.Text)
+			}
+		}
+		if part.ToolCall != nil {
+			if streaming {
+				if !seenToolCalls[part.ToolCall.ID] {
+					s.outputHandler.AddToolCallStart(part.ToolCall)
+					seenToolCalls[part.ToolCall.ID] = true
+					logging.LogToolCall(s.logger, part.ToolCall)
+				}
+				s.outputHandler.AddToolCallDetails(part.ToolCall)
+			} else {
+				s.outputHandler.AddToolCallStart(part.ToolCall)
+				s.outputHandler.AddToolCallDetails(part.ToolCall)
+				logging.LogToolCall(s.logger, part.ToolCall)
+			}
+		}
+	}
+}
+
+// runStreamingChat executes a streaming chat request and returns the accumulated response.
+func (s *SweSession) runStreamingChat(ctx context.Context, chatModel models.ChatModel, tools []tool.ToolInfo, chatOptions *models.ChatOptions) (*models.ChatMessage, error) {
 	stream := chatModel.ChatStream(ctx, s.messages, chatOptions, tools)
 
 	if s.logger != nil {
@@ -175,9 +205,6 @@ func (s *SweSession) runStreamingChat(ctx context.Context, chatModel models.Chat
 		Parts: []models.ChatMessagePart{},
 	}
 
-	// Track tool calls we've seen to handle start events
-	seenToolCalls := make(map[string]bool)
-
 	if s.logger != nil {
 		s.logger.Debug("starting_stream_iteration")
 	}
@@ -189,31 +216,7 @@ func (s *SweSession) runStreamingChat(ctx context.Context, chatModel models.Chat
 			s.logger.Debug("stream_fragment_received", "fragment_num", fragmentCount, "num_parts", len(fragment.Parts))
 		}
 		// Merge the fragment parts into the accumulated response
-		for _, part := range fragment.Parts {
-			responseMsg.Parts = append(responseMsg.Parts, part)
-
-			// Notify UI handler about the fragment
-			if s.outputHandler != nil {
-				if part.Text != "" {
-					s.outputHandler.AddMarkdownChunk(part.Text)
-					// Log assistant output
-					if s.logger != nil {
-						s.logger.Debug("assistant_output_chunk", "chunk", part.Text)
-					}
-				}
-				if part.ToolCall != nil {
-					// Send start event if this is the first time we see this tool call
-					if !seenToolCalls[part.ToolCall.ID] {
-						s.outputHandler.AddToolCallStart(part.ToolCall)
-						seenToolCalls[part.ToolCall.ID] = true
-						// Log tool call start
-						logging.LogToolCall(s.logger, part.ToolCall)
-					}
-					// Always send details event as chunks arrive
-					s.outputHandler.AddToolCallDetails(part.ToolCall)
-				}
-			}
-		}
+		responseMsg.Parts = append(responseMsg.Parts, fragment.Parts...)
 	}
 
 	if s.logger != nil {
@@ -228,21 +231,15 @@ func (s *SweSession) runStreamingChat(ctx context.Context, chatModel models.Chat
 		return nil, fmt.Errorf("SweSession.runStreamingChat() [session.go]: stream returned no fragments - this usually indicates a silent error in the model provider")
 	}
 
+	s.emitAssistantParts(responseMsg.Parts, true)
+
 	return responseMsg, nil
 }
 
 // runNonStreamingChat executes a non-streaming chat request and returns the response.
-func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.ChatModel, tools []tool.ToolInfo) (*models.ChatMessage, error) {
+func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.ChatModel, tools []tool.ToolInfo, chatOptions *models.ChatOptions) (*models.ChatMessage, error) {
 	if s.logger != nil {
 		s.logger.Debug("chat_non_streaming_request", "num_messages", len(s.messages), "num_tools", len(tools))
-	}
-
-	// Create chat options with LLM logger if available
-	var chatOptions *models.ChatOptions
-	if s.llmLogger != nil {
-		chatOptions = &models.ChatOptions{
-			Logger: s.llmLogger,
-		}
 	}
 
 	// Use non-streaming chat API
@@ -258,25 +255,7 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 		s.logger.Debug("chat_non_streaming_complete", "num_parts", len(responseMsg.Parts))
 	}
 
-	// Notify UI handler about the response
-	if s.outputHandler != nil {
-		// Process all parts of the response
-		for _, part := range responseMsg.Parts {
-			if part.Text != "" {
-				s.outputHandler.AddMarkdownChunk(part.Text)
-				// Log assistant output
-				if s.logger != nil {
-					s.logger.Debug("assistant_output_chunk", "chunk", part.Text)
-				}
-			}
-			if part.ToolCall != nil {
-				// Send tool call events
-				s.outputHandler.AddToolCallStart(part.ToolCall)
-				s.outputHandler.AddToolCallDetails(part.ToolCall)
-				logging.LogToolCall(s.logger, part.ToolCall)
-			}
-		}
-	}
+	s.emitAssistantParts(responseMsg.Parts, false)
 
 	return responseMsg, nil
 }
