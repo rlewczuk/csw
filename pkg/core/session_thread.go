@@ -332,6 +332,20 @@ func (c *SessionThread) runSessionLoop() {
 						c.mu.Unlock()
 
 						c.outputHandler.OnPermissionQuery(permErr)
+
+						// Check if the permission was immediately responded to (e.g., by CLI view)
+						// If resumePending is true, the permission was handled synchronously and
+						// we should continue processing instead of returning
+						c.mu.Lock()
+						wasResumed := c.resumePending
+						c.mu.Unlock()
+
+						if wasResumed {
+							// Permission was handled synchronously, continue to next iteration
+							// which will process resumePending
+							continue
+						}
+
 						return
 					}
 					c.outputHandler.RunFinished(err)
@@ -393,6 +407,20 @@ func (c *SessionThread) runSessionLoop() {
 			c.mu.Unlock()
 
 			c.outputHandler.OnPermissionQuery(permErr)
+
+			// Check if the permission was immediately responded to (e.g., by CLI view)
+			// If resumePending is true, the permission was handled synchronously and
+			// we should continue processing instead of returning
+			c.mu.Lock()
+			wasResumed := c.resumePending
+			c.mu.Unlock()
+
+			if wasResumed {
+				// Permission was handled synchronously, continue to next iteration
+				// which will process resumePending
+				continue
+			}
+
 			return
 		}
 

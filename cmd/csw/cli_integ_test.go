@@ -897,3 +897,168 @@ func (m *permissionTrackingMockView) QueryPermission(query *ui.PermissionQueryUI
 	}
 	return nil
 }
+
+// TestCLIPermissionQueryWithResponse tests that CLI mode properly handles permission queries
+// when the view calls PermissionResponse (simulating real CLI behavior).
+// This test reproduces the bug where the session hangs after permission denial.
+func TestCLIPermissionQueryWithResponse(t *testing.T) {
+	mockServer := testutil.NewMockHTTPServer()
+	defer mockServer.Close()
+
+	// Create provider config pointing to mock server
+	providerConfig := &conf.ModelProviderConfig{
+		Type: "ollama",
+		Name: "ollama",
+		URL:  mockServer.URL(),
+	}
+
+	client, err := models.NewOllamaClient(providerConfig)
+	require.NoError(t, err)
+
+	// Create a VFS with access control that requires asking for permissions
+	localVFS, err := vfs.NewLocalVFS(t.TempDir(), nil)
+	require.NoError(t, err)
+
+	// Wrap with access control that asks for all permissions
+	accessConfig := map[string]conf.FileAccess{
+		"*": {
+			Read:   conf.AccessAsk,
+			Write:  conf.AccessAsk,
+			Delete: conf.AccessAsk,
+			List:   conf.AccessAsk,
+			Find:   conf.AccessAsk,
+			Move:   conf.AccessAsk,
+		},
+	}
+	restrictedVFS := vfs.NewAccessControlVFS(localVFS, accessConfig)
+
+	tools := tool.NewToolRegistry()
+	// Register VFS tools with the restricted VFS
+	tool.RegisterVFSTools(tools, restrictedVFS)
+
+	tmpDir := t.TempDir()
+	logsDir := filepath.Join(tmpDir, "logs")
+	err = os.MkdirAll(logsDir, 0755)
+	require.NoError(t, err)
+
+	system := &core.SweSystem{
+		ModelProviders:  map[string]models.ModelProvider{"ollama": client},
+		ModelTags:       models.NewModelTagRegistry(),
+		PromptGenerator: newMockPromptGenerator("You are a helpful assistant."),
+		Tools:           tools,
+		VFS:             restrictedVFS,
+		WorkDir:         tmpDir,
+		LogBaseDir:      logsDir,
+	}
+
+	// Set up mock streaming response with tool call that requires permission
+	// First response: assistant makes a tool call to vfsRead (closeAfter=false to continue processing)
+	mockServer.AddStreamingResponse("/api/chat", "POST", false,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"vfsRead","arguments":{"path":"test.txt"}}}]},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	// Second response: after permission denial, assistant should handle the error
+	mockServer.AddStreamingResponse("/api/chat", "POST", true,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"I apologize, but I cannot read that file without permission."},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	// Create thread
+	thread := core.NewSessionThread(system, nil)
+
+	// Start session
+	err = thread.StartSession("ollama/test-model")
+	require.NoError(t, err)
+
+	// Create presenter and view - non-interactive mode, no allow-all-permissions
+	basePresenter := presenter.NewChatPresenter(system, thread)
+
+	// Use a mock view that actually calls PermissionResponse (like real CLI view does)
+	var permissionQueryReceived bool
+	var permissionResponse string
+	mockView := &autoDenyPermissionMockView{
+		presenter: basePresenter,
+		onQueryPermission: func(query *ui.PermissionQueryUI) {
+			permissionQueryReceived = true
+			// Find the "Deny" option or use the last option
+			if len(query.Options) > 0 {
+				response := query.Options[len(query.Options)-1]
+				for _, opt := range query.Options {
+					if opt == "Deny" {
+						response = opt
+						break
+					}
+				}
+				permissionResponse = response
+			}
+		},
+	}
+
+	err = basePresenter.SetView(mockView)
+	require.NoError(t, err)
+
+	// Set output handler
+	thread.SetOutputHandler(basePresenter)
+
+	// Send user message that will trigger a tool call requiring permission
+	userMsg := &ui.ChatMessageUI{
+		Role: ui.ChatRoleUser,
+		Text: "Read the file test.txt",
+	}
+	err = basePresenter.SendUserMessage(userMsg)
+	require.NoError(t, err)
+
+	// Wait for completion with timeout
+	done := make(chan struct{})
+	go func() {
+		for {
+			if !thread.IsRunning() {
+				close(done)
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-done:
+		// Success - session completed
+	case <-time.After(10 * time.Second):
+		t.Fatal("Test timed out - session did not complete, likely due to hanging on permission query")
+	}
+
+	// Verify that permission query was received and denied
+	assert.True(t, permissionQueryReceived, "Permission query should have been received")
+	assert.Equal(t, "Deny", permissionResponse, "Permission should have been denied in non-interactive mode")
+}
+
+// autoDenyPermissionMockView is a mock view that automatically denies permissions
+// by calling PermissionResponse, simulating the real CLI view behavior
+type autoDenyPermissionMockView struct {
+	presenter         ui.IChatPresenter
+	onQueryPermission func(*ui.PermissionQueryUI)
+}
+
+func (m *autoDenyPermissionMockView) Init(session *ui.ChatSessionUI) error      { return nil }
+func (m *autoDenyPermissionMockView) AddMessage(msg *ui.ChatMessageUI) error    { return nil }
+func (m *autoDenyPermissionMockView) UpdateMessage(msg *ui.ChatMessageUI) error { return nil }
+func (m *autoDenyPermissionMockView) UpdateTool(tool *ui.ToolUI) error          { return nil }
+func (m *autoDenyPermissionMockView) MoveToBottom() error                       { return nil }
+func (m *autoDenyPermissionMockView) QueryPermission(query *ui.PermissionQueryUI) error {
+	if m.onQueryPermission != nil {
+		m.onQueryPermission(query)
+	}
+	// Automatically deny the permission (like CLI view does in non-interactive mode)
+	if m.presenter != nil && len(query.Options) > 0 {
+		// Find the "Deny" option or use the last option
+		response := query.Options[len(query.Options)-1]
+		for _, opt := range query.Options {
+			if opt == "Deny" {
+				response = opt
+				break
+			}
+		}
+		return m.presenter.PermissionResponse(response)
+	}
+	return nil
+}
