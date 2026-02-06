@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/codesnort/codesnort-swe/pkg/lsp"
-	"github.com/codesnort/codesnort-swe/pkg/shared"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
@@ -51,10 +50,10 @@ func (t *VFSReadTool) Execute(args *ToolCall) *ToolResponse {
 
 	content, err := t.vfs.ReadFile(path)
 	if err == vfs.ErrAskPermission {
-		return createPermissionQuery(args, path, "reading file", "read")
+		return NewVFSPermissionQuery(args, path, "reading file", "read")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		return createPermissionQuery(args, perr.Path, "reading file", "read")
+		return NewVFSPermissionQuery(args, perr.Path, "reading file", "read")
 	}
 	if err != nil {
 		return &ToolResponse{
@@ -78,32 +77,6 @@ func (t *VFSReadTool) Execute(args *ToolCall) *ToolResponse {
 		Call:   args,
 		Result: result,
 		Done:   true,
-	}
-}
-
-func createPermissionQuery(args *ToolCall, path, action, op string) *ToolResponse {
-	query := &ToolPermissionsQuery{
-		Id:      shared.GenerateUUIDv7(),
-		Tool:    args,
-		Title:   "Permission Required",
-		Details: fmt.Sprintf("Allow %s at path: %s", action, path),
-		Options: []string{
-			"Allow",
-			"Deny",
-			fmt.Sprintf("Allow in %s*", filepath.Dir(path)),
-			fmt.Sprintf("Allow from %s/*", path),
-		},
-		AllowCustomResponse: true,
-		Meta: map[string]string{
-			"type":      "vfs",
-			"path":      path,
-			"operation": op,
-		},
-	}
-	return &ToolResponse{
-		Call:  args,
-		Error: query,
-		Done:  true,
 	}
 }
 
@@ -141,10 +114,10 @@ func (t *VFSWriteTool) Execute(args *ToolCall) *ToolResponse {
 
 	err := t.vfs.WriteFile(path, []byte(content))
 	if err == vfs.ErrAskPermission {
-		return createPermissionQuery(args, path, "writing to file", "write")
+		return NewVFSPermissionQuery(args, path, "writing to file", "write")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		return createPermissionQuery(args, perr.Path, "writing to file", "write")
+		return NewVFSPermissionQuery(args, perr.Path, "writing to file", "write")
 	}
 	if err != nil {
 		return &ToolResponse{
@@ -209,10 +182,10 @@ func (t *VFSDeleteTool) Execute(args *ToolCall) *ToolResponse {
 
 	err := t.vfs.DeleteFile(path, false, false)
 	if err == vfs.ErrAskPermission {
-		return createPermissionQuery(args, path, "deleting file", "delete")
+		return NewVFSPermissionQuery(args, path, "deleting file", "delete")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		return createPermissionQuery(args, perr.Path, "deleting file", "delete")
+		return NewVFSPermissionQuery(args, perr.Path, "deleting file", "delete")
 	}
 	if err != nil {
 		return &ToolResponse{
@@ -251,10 +224,10 @@ func (t *VFSListTool) Execute(args *ToolCall) *ToolResponse {
 
 	files, err := t.vfs.ListFiles(path, false)
 	if err == vfs.ErrAskPermission {
-		return createPermissionQuery(args, path, "listing files", "list")
+		return NewVFSPermissionQuery(args, path, "listing files", "list")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		return createPermissionQuery(args, perr.Path, "listing files", "list")
+		return NewVFSPermissionQuery(args, perr.Path, "listing files", "list")
 	}
 	if err != nil {
 
@@ -312,10 +285,10 @@ func (t *VFSMoveTool) Execute(args *ToolCall) *ToolResponse {
 
 	err := t.vfs.MoveFile(path, destination)
 	if err == vfs.ErrAskPermission {
-		return createPermissionQuery(args, path, "moving file", "move")
+		return NewVFSPermissionQuery(args, path, "moving file", "move")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		return createPermissionQuery(args, perr.Path, "moving file", "move")
+		return NewVFSPermissionQuery(args, perr.Path, "moving file", "move")
 	}
 	if err != nil {
 		return &ToolResponse{
@@ -357,10 +330,10 @@ func (t *VFSFindTool) Execute(args *ToolCall) *ToolResponse {
 
 	files, err := t.vfs.FindFiles(query, recursive)
 	if err == vfs.ErrAskPermission {
-		return createPermissionQuery(args, query, "finding files", "find")
+		return NewVFSPermissionQuery(args, query, "finding files", "find")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		return createPermissionQuery(args, perr.Path, "finding files", "find")
+		return NewVFSPermissionQuery(args, perr.Path, "finding files", "find")
 	}
 	if err != nil {
 		return &ToolResponse{
@@ -433,10 +406,10 @@ func (t *VFSEditTool) Execute(args *ToolCall) *ToolResponse {
 	patcher := vfs.NewFilePatcher(t.vfs)
 	diff, err := patcher.ApplyEdits(path, oldString, newString, replaceAll)
 	if err == vfs.ErrAskPermission {
-		return createPermissionQuery(args, path, "editing file", "write")
+		return NewVFSPermissionQuery(args, path, "editing file", "write")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		return createPermissionQuery(args, perr.Path, "editing file", "write")
+		return NewVFSPermissionQuery(args, perr.Path, "editing file", "write")
 	}
 	if err != nil {
 		return &ToolResponse{

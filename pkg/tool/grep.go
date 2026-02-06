@@ -69,10 +69,10 @@ func (t *VFSGrepTool) Execute(args *ToolCall) *ToolResponse {
 	// Perform the search
 	matches, err := grepFilter.Search()
 	if err == vfs.ErrAskPermission {
-		return createPermissionQuery(args, path, "searching files", "read")
+		return NewVFSPermissionQuery(args, path, "searching files", "read")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		return createPermissionQuery(args, perr.Path, "searching files", "read")
+		return NewVFSPermissionQuery(args, perr.Path, "searching files", "read")
 	}
 	if err != nil {
 		return &ToolResponse{
