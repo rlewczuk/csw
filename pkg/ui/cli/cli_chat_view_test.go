@@ -429,6 +429,177 @@ func TestCliChatView_ToolStatus(t *testing.T) {
 	}
 }
 
+func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
+	t.Run("tools are not printed multiple times when message is updated", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		// Add initial assistant message with a tool
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Let me help",
+			Tools: []*ui.ToolUI{
+				{
+					Id:     "tool1",
+					Name:   "vfsRead",
+					Status: ui.ToolStatusSucceeded,
+					Props:  [][]string{{"path", "/test.txt"}},
+				},
+			},
+		}
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		// Clear output to track only updates
+		output.Reset()
+
+		// Update the message text (simulating streaming)
+		updatedMsg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Let me help you",
+			Tools: []*ui.ToolUI{
+				{
+					Id:     "tool1",
+					Name:   "vfsRead",
+					Status: ui.ToolStatusSucceeded,
+					Props:  [][]string{{"path", "/test.txt"}},
+				},
+			},
+		}
+		err = view.UpdateMessage(updatedMsg)
+		require.NoError(t, err)
+
+		// Count how many times the tool appears in output
+		outputStr := output.String()
+		toolCount := strings.Count(outputStr, "TOOL: vfsRead (tool1)")
+
+		// Tool should appear at most once (for the delta text, not for the tool)
+		assert.LessOrEqual(t, toolCount, 1, "Tool should not be printed multiple times when message is updated, got %d occurrences", toolCount)
+	})
+
+	t.Run("tools are printed again only when status changes", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		// Add initial assistant message with a tool in started state
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Running",
+			Tools: []*ui.ToolUI{
+				{
+					Id:     "tool1",
+					Name:   "vfsRead",
+					Status: ui.ToolStatusStarted,
+					Props:  [][]string{{"path", "/test.txt"}},
+				},
+			},
+		}
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		// Clear output
+		output.Reset()
+
+		// Update the message with same tool status (should not reprint tool)
+		updatedMsg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Running tool",
+			Tools: []*ui.ToolUI{
+				{
+					Id:     "tool1",
+					Name:   "vfsRead",
+					Status: ui.ToolStatusStarted,
+					Props:  [][]string{{"path", "/test.txt"}},
+				},
+			},
+		}
+		err = view.UpdateMessage(updatedMsg)
+		require.NoError(t, err)
+
+		// Tool should not be printed again since status hasn't changed
+		outputStr := output.String()
+		toolCount := strings.Count(outputStr, "TOOL: vfsRead (tool1)")
+		assert.Equal(t, 0, toolCount, "Tool should not be reprinted when status hasn't changed")
+
+		// Now update with a different status via UpdateTool
+		output.Reset()
+		updatedTool := &ui.ToolUI{
+			Id:      "tool1",
+			Name:    "vfsRead",
+			Status:  ui.ToolStatusSucceeded,
+			Message: "file content",
+		}
+		err = view.UpdateTool(updatedTool)
+		require.NoError(t, err)
+
+		// Tool should be printed now since status changed
+		outputStr = output.String()
+		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1)")
+		assert.Contains(t, outputStr, "(succeeded) result:")
+	})
+
+	t.Run("multiple message updates do not duplicate tools", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		// Add initial assistant message
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "",
+		}
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		totalToolCount := 0
+
+		// Simulate multiple streaming updates with tools
+		for i := 0; i < 5; i++ {
+			output.Reset()
+			updatedMsg := &ui.ChatMessageUI{
+				Id:   "msg1",
+				Role: ui.ChatRoleAssistant,
+				Text: strings.Repeat("x", i+1),
+				Tools: []*ui.ToolUI{
+					{
+						Id:     "tool1",
+						Name:   "vfsRead",
+						Status: ui.ToolStatusSucceeded,
+						Props:  [][]string{{"path", "/test.txt"}},
+					},
+				},
+			}
+			err = view.UpdateMessage(updatedMsg)
+			require.NoError(t, err)
+
+			// Count tool occurrences in this update
+			outputStr := output.String()
+			toolCount := strings.Count(outputStr, "TOOL: vfsRead (tool1)")
+			totalToolCount += toolCount
+
+			// Tool should appear at most once (on first update when it's first seen)
+			// and never again on subsequent updates
+			if i == 0 {
+				// First update: tool may be printed once
+				assert.LessOrEqual(t, toolCount, 2, "Tool should be printed at most twice on first update (params line + result line)")
+			} else {
+				// Subsequent updates: tool should not be reprinted
+				assert.Equal(t, 0, toolCount, "Tool should not be reprinted on streaming update %d", i)
+			}
+		}
+
+		// Total tool occurrences across all updates should be at most 2 (params line + result line)
+		assert.LessOrEqual(t, totalToolCount, 2, "Tool should not be duplicated across all streaming updates")
+	})
+}
+
 func TestCliChatView_TruncateString(t *testing.T) {
 	t.Run("truncates long strings", func(t *testing.T) {
 		output := &bytes.Buffer{}

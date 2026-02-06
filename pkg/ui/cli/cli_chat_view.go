@@ -37,6 +37,10 @@ type CliChatView struct {
 	// renderedText tracks the text that has been rendered for each message
 	// Key is message ID, value is the text that was printed
 	renderedText map[string]string
+
+	// renderedTools tracks the last rendered status for each tool
+	// Key is tool ID, value is the status that was last printed
+	renderedTools map[string]ui.ToolStatusUI
 }
 
 // NewCliChatView creates a new CLI chat view.
@@ -57,6 +61,7 @@ func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Read
 		messages:             make([]*ui.ChatMessageUI, 0),
 		stopCh:               make(chan struct{}),
 		renderedText:         make(map[string]string),
+		renderedTools:        make(map[string]ui.ToolStatusUI),
 	}
 
 	// Setup scanner only for interactive mode
@@ -332,6 +337,12 @@ func (v *CliChatView) renderAssistantMessage(msg *ui.ChatMessageUI) {
 // renderTool renders a tool call status.
 // Must be called with mu locked.
 func (v *CliChatView) renderTool(tool *ui.ToolUI) {
+	// Check if this tool has already been rendered with the same status
+	if lastStatus, ok := v.renderedTools[tool.Id]; ok && lastStatus == tool.Status {
+		// Tool already rendered with this status, skip
+		return
+	}
+
 	var status string
 	switch tool.Status {
 	case ui.ToolStatusSucceeded:
@@ -369,6 +380,9 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) {
 		}
 		fmt.Fprintf(v.output, "TOOL: %s (%s) - (%s) result: %s\n", tool.Name, tool.Id, status, resultValue)
 	}
+
+	// Mark this tool as rendered with current status
+	v.renderedTools[tool.Id] = tool.Status
 }
 
 // truncateString truncates a string to maxLen characters and adds ellipsis if needed.
