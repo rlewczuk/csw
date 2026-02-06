@@ -103,8 +103,23 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create VFS: %w", err)
 	}
 
+	var lspClient lsp.LSP
+	if params.LSPServer != "" {
+		logger := logging.GetGlobalLogger()
+		logger.Debug("lsp_initialization", "enabled", true, "server", params.LSPServer)
+		client, err := lsp.NewClient(params.LSPServer, workDir)
+		if err != nil {
+			logger.Warn("failed to create LSP client, continuing without LSP", "error", err)
+		} else if err := client.Init(false); err != nil {
+			logger.Warn("failed to initialize LSP client, continuing without LSP", "error", err)
+		} else {
+			lspClient = client
+			logger.Debug("lsp_initialized", "server", params.LSPServer)
+		}
+	}
+
 	toolRegistry := tool.NewToolRegistry()
-	tool.RegisterVFSTools(toolRegistry, localVFS)
+	tool.RegisterVFSTools(toolRegistry, localVFS, lspClient)
 
 	bashRunner := runner.NewBashRunner(workDir, 0)
 	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges)
@@ -119,21 +134,6 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
-	}
-
-	var lspClient lsp.LSP
-	if params.LSPServer != "" {
-		logger := logging.GetGlobalLogger()
-		logger.Debug("lsp_initialization", "enabled", true, "server", params.LSPServer)
-		client, err := lsp.NewClient(params.LSPServer, workDir)
-		if err != nil {
-			logger.Warn("failed to create LSP client, continuing without LSP", "error", err)
-		} else if err := client.Init(false); err != nil {
-			logger.Warn("failed to initialize LSP client, continuing without LSP", "error", err)
-		} else {
-			lspClient = client
-			logger.Debug("lsp_initialized", "server", params.LSPServer)
-		}
 	}
 
 	sweSystem := &core.SweSystem{

@@ -64,7 +64,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		vfsInstance := vfs.NewMockVFS()
 		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance)
+		tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -120,7 +120,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		vfsInstance := vfs.NewMockVFS()
 		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance)
+		tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -219,7 +219,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		vfsInstance := vfs.NewMockVFS()
 		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance)
+		tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -278,7 +278,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		vfsInstance := vfs.NewMockVFS()
 		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance)
+		tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 		system := &core.SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -357,7 +357,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		vfsInstance := vfs.NewMockVFS()
 		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance)
+		tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 		// Create a mock role registry and config store with developer role
 		configStore := impl.NewMockConfigStore()
@@ -428,7 +428,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		vfsInstance := vfs.NewMockVFS()
 		tools := tool.NewToolRegistry()
-		tool.RegisterVFSTools(tools, vfsInstance)
+		tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 		// Create a mock config store with custom default role
 		configStore := impl.NewMockConfigStore()

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/codesnort/codesnort-swe/pkg/lsp"
 	"github.com/codesnort/codesnort-swe/pkg/runner"
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
@@ -63,10 +64,11 @@ func (r *ToolRegistry) Execute(args *ToolCall) *ToolResponse {
 
 // RegisterVFSTools registers all VFS tools with the given VFS implementation.
 // Line numbers are enabled by default for the vfsRead tool.
-func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS) {
+// lspClient is optional and can be nil.
+func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS, lspClient lsp.LSP) {
 	registry.Register("vfsRead", NewVFSReadTool(vfsImpl, true))
-	registry.Register("vfsWrite", NewVFSWriteTool(vfsImpl, nil))
-	registry.Register("vfsEdit", NewVFSEditTool(vfsImpl, nil))
+	registry.Register("vfsWrite", NewVFSWriteTool(vfsImpl, lspClient))
+	registry.Register("vfsEdit", NewVFSEditTool(vfsImpl, lspClient))
 	//registry.Register("vfsDelete", NewVFSDeleteTool(vfsImpl))
 	registry.Register("vfsList", NewVFSListTool(vfsImpl))
 	//registry.Register("vfsMode", NewVFSMoveTool(vfsImpl))

@@ -48,7 +48,7 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 	vfs := vfs.NewMockVFS()
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfs)
+	tool.RegisterVFSTools(tools, vfs, nil)
 
 	t.Run("basic initialization", func(t *testing.T) {
 		system := &SweSystem{
@@ -148,7 +148,7 @@ func TestSweSystemSessionManagement(t *testing.T) {
 	vfs := vfs.NewMockVFS()
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfs)
+	tool.RegisterVFSTools(tools, vfs, nil)
 
 	system := &SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -258,7 +258,7 @@ func TestSweSystemGetSessionThread(t *testing.T) {
 	vfs := vfs.NewMockVFS()
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfs)
+	tool.RegisterVFSTools(tools, vfs, nil)
 
 	system := &SweSystem{
 		ModelProviders:       map[string]models.ModelProvider{"ollama": client},
@@ -339,7 +339,7 @@ func TestSweSystemShutdown(t *testing.T) {
 	vfs := vfs.NewMockVFS()
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfs)
+	tool.RegisterVFSTools(tools, vfs, nil)
 
 	t.Run("Shutdown with no sessions or threads", func(t *testing.T) {
 		system := &SweSystem{
@@ -519,7 +519,7 @@ func TestSystemStreamingConfiguration(t *testing.T) {
 
 	vfs := vfs.NewMockVFS()
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfs)
+	tool.RegisterVFSTools(tools, vfs, nil)
 
 	t.Run("session uses streaming from provider config", func(t *testing.T) {
 		// Create provider with streaming enabled
@@ -612,7 +612,7 @@ func TestLogLLMRequestsOption(t *testing.T) {
 	vfsInstance := vfs.NewMockVFS()
 
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, vfsInstance)
+	tool.RegisterVFSTools(tools, vfsInstance, nil)
 
 	t.Run("session has llmLogger when LogLLMRequests is enabled", func(t *testing.T) {
 		system := &SweSystem{

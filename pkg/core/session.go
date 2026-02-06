@@ -444,28 +444,8 @@ func (s *SweSession) SetRole(roleName string) error {
 		s.VFS = s.system.VFS
 	}
 
-	// Create a new tool registry for the session
-	// We start with system tools
-	s.Tools = tool.NewToolRegistry()
-	for _, name := range s.system.Tools.List() {
-		t, _ := s.system.Tools.Get(name)
-		s.Tools.Register(name, t)
-	}
-
-	// Re-register VFS tools to use the session's VFS
-	// This ensures that VFS access controls are respected
-	// Line numbers are enabled by default for vfsRead
-	s.Tools.Register("vfsRead", tool.NewVFSReadTool(s.VFS, true))
-	s.Tools.Register("vfsWrite", tool.NewVFSWriteTool(s.VFS, s.LSP))
-	s.Tools.Register("vfsEdit", tool.NewVFSEditTool(s.VFS, s.LSP))
-	//s.Tools.Register("vfsDelete", tool.NewVFSDeleteTool(s.VFS))
-	s.Tools.Register("vfsList", tool.NewVFSListTool(s.VFS))
-	//s.Tools.Register("vfsMode", tool.NewVFSMoveTool(s.VFS))
-	s.Tools.Register("vfsFind", tool.NewVFSFindTool(s.VFS))
-	s.Tools.Register("vfsGrep", tool.NewVFSGrepTool(s.VFS))
-
-	// Re-register session-specific tools
-	s.registerSessionTools()
+	// Rebuild tools with the session's VFS and role
+	s.Tools = buildSessionToolRegistry(s.system.Tools, s.VFS, s.LSP, s)
 
 	// Create a new tool registry with access-controlled tools if needed
 	if role.ToolsAccess != nil {
@@ -605,8 +585,26 @@ func (s *SweSession) CountPendingTodos() int {
 }
 
 // registerSessionTools registers session-specific tools that need access to the session.
-func (s *SweSession) registerSessionTools() {
+func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 	// Register todo tools
-	s.Tools.Register("todoRead", tool.NewTodoReadTool(s))
-	s.Tools.Register("todoWrite", tool.NewTodoWriteTool(s))
+	registry.Register("todoRead", tool.NewTodoReadTool(s))
+	registry.Register("todoWrite", tool.NewTodoWriteTool(s))
+}
+
+func buildSessionToolRegistry(systemTools *tool.ToolRegistry, vfsImpl vfs.VFS, lspClient lsp.LSP, session *SweSession) *tool.ToolRegistry {
+	registry := tool.NewToolRegistry()
+	if systemTools != nil {
+		for _, name := range systemTools.List() {
+			t, _ := systemTools.Get(name)
+			registry.Register(name, t)
+		}
+	}
+
+	tool.RegisterVFSTools(registry, vfsImpl, lspClient)
+
+	if session != nil {
+		session.registerSessionTools(registry)
+	}
+
+	return registry
 }
