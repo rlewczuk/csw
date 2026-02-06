@@ -166,8 +166,19 @@ func (v *CliChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 		return nil
 	}
 
-	// If not interactive, do nothing - wait for another mechanism to handle permission
+	// If not interactive, deny all permissions by default
 	if !v.interactive {
+		if v.presenter != nil && len(query.Options) > 0 {
+			// Find and select the "Deny" option, or use the last option as fallback
+			denyOption := query.Options[len(query.Options)-1]
+			for _, opt := range query.Options {
+				if opt == "Deny" {
+					denyOption = opt
+					break
+				}
+			}
+			return v.presenter.PermissionResponse(denyOption)
+		}
 		return nil
 	}
 

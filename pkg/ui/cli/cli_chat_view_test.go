@@ -317,7 +317,7 @@ func TestCliChatView_QueryPermission(t *testing.T) {
 		assert.Equal(t, "Allow", presenter.PermissionResponseCalls[0])
 	})
 
-	t.Run("does not prompt when interactive=false and acceptAllPermissions=false", func(t *testing.T) {
+	t.Run("automatically denies when interactive=false and acceptAllPermissions=false", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
 		view := NewCliChatView(presenter, output, nil, false, false)
@@ -331,8 +331,9 @@ func TestCliChatView_QueryPermission(t *testing.T) {
 		err := view.QueryPermission(query)
 		require.NoError(t, err)
 
-		// Should not have called presenter
-		assert.Len(t, presenter.PermissionResponseCalls, 0)
+		// Should have called presenter with "Deny" option
+		assert.Len(t, presenter.PermissionResponseCalls, 1)
+		assert.Equal(t, "Deny", presenter.PermissionResponseCalls[0])
 		assert.Equal(t, "", output.String())
 	})
 
