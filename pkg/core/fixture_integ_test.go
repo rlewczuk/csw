@@ -62,7 +62,7 @@ func newSweSystemFixture(t *testing.T, prompt string, opts ...sweSystemFixtureOp
 	}
 
 	if config.registerVFSTools {
-		tool.RegisterVFSTools(config.tools, config.vfsInstance, nil)
+		tool.RegisterVFSTools(config.tools, config.vfsInstance, nil, nil)
 	}
 
 	if config.promptGenerator == nil {

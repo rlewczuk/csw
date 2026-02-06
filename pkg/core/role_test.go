@@ -165,7 +165,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 	})
 	mockVFS := vfs.NewMockVFS()
 	tools := tool.NewToolRegistry()
-	tool.RegisterVFSTools(tools, mockVFS, nil)
+	tool.RegisterVFSTools(tools, mockVFS, nil, nil)
 
 	// Define test roles
 	developerRole := &conf.AgentRoleConfig{

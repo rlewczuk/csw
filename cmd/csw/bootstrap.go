@@ -119,7 +119,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	}
 
 	toolRegistry := tool.NewToolRegistry()
-	tool.RegisterVFSTools(toolRegistry, localVFS, lspClient)
+	tool.RegisterVFSTools(toolRegistry, localVFS, lspClient, nil)
 
 	bashRunner := runner.NewBashRunner(workDir, 0)
 	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges)
