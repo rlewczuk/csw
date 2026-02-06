@@ -9,17 +9,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/logging"
-	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/presenter"
-	"github.com/codesnort/codesnort-swe/pkg/runner"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 	"github.com/codesnort/codesnort-swe/pkg/ui"
 	"github.com/codesnort/codesnort-swe/pkg/ui/cli"
 	"github.com/codesnort/codesnort-swe/pkg/ui/logmd"
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
 	"github.com/spf13/cobra"
 )
 
@@ -89,106 +85,21 @@ func CliCommand() *cobra.Command {
 func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool) error {
 	ctx := context.Background()
 
-	// Resolve working directory
-	workDir, err := ResolveWorkDir(workDir)
+	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
+		WorkDir:        workDir,
+		ConfigPath:     configPath,
+		ModelName:      modelName,
+		RoleName:       roleName,
+		LogLLMRequests: logLLMRequests,
+	})
 	if err != nil {
 		return err
-	}
-
-	// Initialize logging infrastructure
-	logsDir := filepath.Join(workDir, ".cswdata", "logs")
-	if err := logging.SetLogsDirectory(logsDir, true); err != nil {
-		return fmt.Errorf("runCLI() [cli.go]: failed to initialize logging: %w", err)
 	}
 	defer logging.FlushLogs()
 
-	// Build config path hierarchy
-	configPathStr, err := BuildConfigPath(configPath)
-	if err != nil {
-		return err
-	}
-
-	// Create composite config store
-	configStore, err := impl.NewCompositeConfigStore(workDir, configPathStr)
-	if err != nil {
-		return fmt.Errorf("runCLI() [cli.go]: failed to create config store: %w", err)
-	}
-
-	// Create provider registry
-	providerRegistry := models.NewProviderRegistry(configStore)
-	if len(providerRegistry.List()) == 0 {
-		return fmt.Errorf("runCLI() [cli.go]: no model providers found in config")
-	}
-
-	// Determine model to use
-	modelName, err = ResolveModelName(modelName, configStore, providerRegistry)
-	if err != nil {
-		return err
-	}
-
-	// Create model provider map
-	modelProviders, err := CreateProviderMap(providerRegistry)
-	if err != nil {
-		return err
-	}
-
-	// Create role registry
-	roleRegistry := core.NewAgentRoleRegistry(configStore)
-	if len(roleRegistry.List()) == 0 {
-		return fmt.Errorf("runCLI() [cli.go]: no roles found in config")
-	}
-
-	// Get role configuration
-	roleConfig, ok := roleRegistry.Get(roleName)
-	if !ok {
-		return fmt.Errorf("runCLI() [cli.go]: role not found: %s (available: %v)", roleName, roleRegistry.List())
-	}
-
-	// Build hide patterns
-	hidePatterns, err := vfs.BuildHidePatterns(workDir, roleConfig.HiddenPatterns)
-	if err != nil {
-		return fmt.Errorf("runCLI() [cli.go]: failed to build hide patterns: %w", err)
-	}
-
-	// Create VFS
-	localVFS, err := vfs.NewLocalVFS(workDir, hidePatterns)
-	if err != nil {
-		return fmt.Errorf("runCLI() [cli.go]: failed to create VFS: %w", err)
-	}
-
-	// Create tool registry and register VFS tools
-	toolRegistry := tool.NewToolRegistry()
-	tool.RegisterVFSTools(toolRegistry, localVFS)
-
-	// Register runBash tool with role privileges
-	bashRunner := runner.NewBashRunner(workDir, 0)
-	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges)
-
-	// Create prompt generator
-	promptGenerator, err := core.NewConfPromptGenerator(configStore, localVFS)
-	if err != nil {
-		return fmt.Errorf("runCLI() [cli.go]: failed to create prompt generator: %w", err)
-	}
-
-	// Create model tag registry and populate from config
-	modelTagRegistry, err := CreateModelTagRegistry(configStore, providerRegistry)
-	if err != nil {
-		return err
-	}
-
-	// Create SweSystem
-	sweSystem := &core.SweSystem{
-		ModelProviders:  modelProviders,
-		ModelTags:       modelTagRegistry,
-		PromptGenerator: promptGenerator,
-		Tools:           toolRegistry,
-		VFS:             localVFS,
-		Roles:           roleRegistry,
-		ConfigStore:     configStore,
-		LogBaseDir:      logsDir,
-		WorkDir:         workDir,
-		LogLLMRequests:  logLLMRequests,
-	}
+	workDir = buildResult.WorkDir
+	modelName = buildResult.ModelName
+	logsDir := buildResult.LogsDir
 
 	// Create session thread
 	thread := core.NewSessionThread(sweSystem, nil)
