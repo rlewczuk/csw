@@ -25,6 +25,9 @@ When you need to generate and run a test script, or generate and use some tempor
 - DO NOT use scripts to edit files, always edit files manually; if there are too many changes, just edit bigger chunks manually;
 - When returning errors, always add function name and file name to error message; if function is a receiver, add 'Type.Method()' as a function name;
 - Before implementing any algorithm or utility function, always check if golang standard library already provides it;
+- When adding new global object (eg. function, method, struct, interface, type, constant etc.), add short doc comment describing what it is and what it does;
+  - comment should be compliant with godoc format (eg. start comment with object name)
+  - when adding interface, also add godoc comment to each method describing what it is and what it does;
 
 Packages implemented:
 - `pkg/core`: Core agent logic
