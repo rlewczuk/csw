@@ -34,6 +34,9 @@ type SweSession struct {
 	logger        *slog.Logger
 	llmLogger     *slog.Logger
 	streaming     bool
+	// pendingPermissionToolCall stores the tool call that was blocked by a permission query
+	// This is used to re-execute the tool after permission is granted
+	pendingPermissionToolCall *tool.ToolCall
 }
 
 // Prompt adds user prompt to the conversation and starts processing if processing is not already in progress.
@@ -89,15 +92,27 @@ func (s *SweSession) Run(ctx context.Context) error {
 
 	// Keep processing until the assistant doesn't make any tool calls
 	for {
-		// Check for pending tool calls from previous run (e.g. after permission grant)
-		if len(s.messages) > 0 {
-			lastMsg := s.messages[len(s.messages)-1]
-			if lastMsg.Role == models.ChatRoleAssistant {
-				toolCalls := lastMsg.GetToolCalls()
-				if len(toolCalls) > 0 {
-					// Execute pending tools
-					if err := s.executeToolCalls(toolCalls); err != nil {
-						return err
+		// Check if there's a pending tool call from a previous permission query
+		// This happens when permission was granted and we need to re-execute the blocked tool
+		if s.pendingPermissionToolCall != nil {
+			// Execute just the pending tool call with the updated permission
+			if err := s.executeToolCalls([]*tool.ToolCall{s.pendingPermissionToolCall}); err != nil {
+				return err
+			}
+			// After executing the pending tool call, continue to get the next LLM response
+			// Don't check for more tool calls in the assistant message since we just executed the pending one
+		} else {
+			// Check for pending tool calls from previous run (e.g. after permission grant)
+			// Only do this if we didn't just execute a pending tool call
+			if len(s.messages) > 0 {
+				lastMsg := s.messages[len(s.messages)-1]
+				if lastMsg.Role == models.ChatRoleAssistant {
+					toolCalls := lastMsg.GetToolCalls()
+					if len(toolCalls) > 0 {
+						// Execute pending tools
+						if err := s.executeToolCalls(toolCalls); err != nil {
+							return err
+						}
 					}
 				}
 			}
@@ -293,6 +308,8 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 					"details", permQuery.Details,
 				)
 			}
+			// Store the blocked tool call so we can re-execute it after permission is granted
+			s.pendingPermissionToolCall = toolCall
 			return response.Error
 		}
 
@@ -307,6 +324,10 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 
 	// Add tool responses to the conversation
 	s.messages = append(s.messages, models.NewToolResponseMessage(toolResponses...))
+
+	// Clear any pending permission tool call since all tools executed successfully
+	s.pendingPermissionToolCall = nil
+
 	return nil
 }
 
@@ -520,6 +541,12 @@ func (s *SweSession) UpdatePermission(query *tool.ToolPermissionsQuery, response
 			ac.SetPermission(toolName, flag)
 		}
 	}
+
+	// Update the pending tool call's access flag so it will be re-executed with the new permission
+	if s.pendingPermissionToolCall != nil && s.pendingPermissionToolCall.ID == query.Tool.ID {
+		s.pendingPermissionToolCall.Access = flag
+	}
+
 	return nil
 }
 
