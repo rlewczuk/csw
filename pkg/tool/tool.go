@@ -542,10 +542,24 @@ func (t *ToolInfo) ShortDescription() string {
 	return ""
 }
 
+// DisplayMode controls how the tool information is displayed.
+type DisplayMode uint32
+
+const (
+	DisplayModeShort DisplayMode = iota
+	DisplayModeFull
+	DisplayModeJSON
+	DisplayModeOneliner
+)
+
 // Tool represents a tool that can be executed by the agent.
 // It is responsible for executing the tool and returning the response.
 // It can also represent a group of tools, delegating execution to other tools.
 type Tool interface {
 	// Execute executes the tool with the given arguments and returns the response.
 	Execute(args *ToolCall) *ToolResponse
+
+	// Display returns a string representation of the tool in the given mode.
+	// The second return value is a map of properties to display in the UI (for example, language, diff format etc.).
+	// TODO Display(mode DisplayMode, color bool) (string,map[string]string)
 }
