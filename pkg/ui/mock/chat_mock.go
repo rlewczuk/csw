@@ -21,6 +21,16 @@ type MockChatView struct {
 	UpdateToolCalls      []*ui.ToolUI
 	MoveToBottomCalls    int
 	QueryPermissionCalls []*ui.PermissionQueryUI
+
+	// Automatic permission response configuration
+	// When set, QueryPermission will automatically respond with this value
+	// instead of recording the call and returning. Use "Accept" to accept
+	// the first option, "Deny" to deny (select last option or "Deny" option),
+	// or any other string to respond with that value.
+	AutoPermissionResponse string
+
+	// Presenter for sending automatic permission responses
+	Presenter ui.IChatPresenter
 }
 
 // NewMockChatView creates a new MockChatView instance.
@@ -61,6 +71,30 @@ func (m *MockChatView) MoveToBottom() error {
 // QueryPermission queries user for permission to use a tool.
 func (m *MockChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 	m.QueryPermissionCalls = append(m.QueryPermissionCalls, query)
+
+	// Handle automatic permission response if configured
+	if m.AutoPermissionResponse != "" && m.Presenter != nil && len(query.Options) > 0 {
+		var response string
+		switch m.AutoPermissionResponse {
+		case "Accept":
+			// Accept the first option
+			response = query.Options[0]
+		case "Deny":
+			// Find the "Deny" option or use the last option
+			response = query.Options[len(query.Options)-1]
+			for _, opt := range query.Options {
+				if opt == "Deny" {
+					response = opt
+					break
+				}
+			}
+		default:
+			// Use the configured response directly
+			response = m.AutoPermissionResponse
+		}
+		return m.Presenter.PermissionResponse(response)
+	}
+
 	return m.QueryPermissionErr
 }
 
@@ -79,6 +113,9 @@ func (m *MockChatView) Reset() {
 	m.UpdateToolCalls = nil
 	m.MoveToBottomCalls = 0
 	m.QueryPermissionCalls = nil
+
+	m.AutoPermissionResponse = ""
+	m.Presenter = nil
 }
 
 // MockChatPresenter implements ui.IChatPresenter interface for testing purposes.
