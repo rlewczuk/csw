@@ -613,7 +613,7 @@ func TestVFSMoveTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
-			Function: "vfsMode",
+			Function: "vfsMove",
 			Arguments: NewToolValue(map[string]any{
 				"path":        "source.txt",
 				"destination": "dest.txt",
@@ -643,7 +643,7 @@ func TestVFSMoveTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
-			Function: "vfsMode",
+			Function: "vfsMove",
 			Arguments: NewToolValue(map[string]any{
 				"destination": "dest.txt",
 			}),
@@ -664,7 +664,7 @@ func TestVFSMoveTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
-			Function: "vfsMode",
+			Function: "vfsMove",
 			Arguments: NewToolValue(map[string]any{
 				"path": "source.txt",
 			}),
@@ -685,7 +685,7 @@ func TestVFSMoveTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
-			Function: "vfsMode",
+			Function: "vfsMove",
 			Arguments: NewToolValue(map[string]any{
 				"path":        "non-existent.txt",
 				"destination": "dest.txt",
@@ -1109,7 +1109,7 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
-			Function: "vfsMode",
+			Function: "vfsMove",
 			Arguments: NewToolValue(map[string]any{
 				"path":        "source.txt",
 				"destination": "dest.txt",
@@ -1125,12 +1125,49 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		query, ok := response.Error.(*ToolPermissionsQuery)
 		require.True(t, ok, "Error should be ToolPermissionsQuery")
 		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfsMode", query.Tool.Function)
+		assert.Equal(t, "vfsMove", query.Tool.Function)
 		assert.Equal(t, "Permission Required", query.Title)
 		assert.Contains(t, query.Details, "source.txt")
 		assert.True(t, query.AllowCustomResponse)
 		assert.Contains(t, query.Options, "Allow")
 		assert.Contains(t, query.Options, "Deny")
+	})
+
+	t.Run("should request write permission for destination", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		err := mockVFS.WriteFile("source.txt", []byte("hello"))
+		require.NoError(t, err)
+
+		privileges := map[string]conf.FileAccess{
+			"source.txt": {Move: conf.AccessAllow},
+			"dest.txt":   {Write: conf.AccessAsk},
+		}
+		accessVFS := vfs.NewAccessControlVFS(mockVFS, privileges)
+
+		tool := NewVFSMoveTool(accessVFS)
+
+		// Execute
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsMove",
+			Arguments: NewToolValue(map[string]any{
+				"path":        "source.txt",
+				"destination": "dest.txt",
+			}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.Error(t, response.Error)
+		assert.True(t, response.Done)
+
+		query, ok := response.Error.(*ToolPermissionsQuery)
+		require.True(t, ok, "Error should be ToolPermissionsQuery")
+		assert.Equal(t, "dest.txt", query.Meta["path"])
+		assert.Equal(t, "write", query.Meta["operation"])
+		assert.Contains(t, query.Details, "writing to file")
+		assert.Contains(t, query.Details, "dest.txt")
 	})
 
 	t.Run("should succeed when access is allow", func(t *testing.T) {
@@ -1149,7 +1186,7 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
-			Function: "vfsMode",
+			Function: "vfsMove",
 			Arguments: NewToolValue(map[string]any{
 				"path":        "source.txt",
 				"destination": "dest.txt",
@@ -1185,7 +1222,7 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		// Execute
 		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
-			Function: "vfsMode",
+			Function: "vfsMove",
 			Arguments: NewToolValue(map[string]any{
 				"path":        "source.txt",
 				"destination": "dest.txt",
