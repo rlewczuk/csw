@@ -173,7 +173,7 @@ func SetLogsDirectory(dirPath string, sync bool) error {
 			globalWriter = mainLogFile
 		}
 
-		multiWriter := io.MultiWriter(writer, os.Stderr)
+		multiWriter := io.MultiWriter(writer)
 		handler := slog.NewJSONHandler(multiWriter, &slog.HandlerOptions{
 			Level: slog.LevelDebug,
 		})
@@ -280,7 +280,7 @@ func GetGlobalLogger() *slog.Logger {
 				globalWriter = mainLogFile
 			}
 
-			multiWriter := io.MultiWriter(writer, os.Stderr)
+			multiWriter := io.MultiWriter(writer)
 			handler := slog.NewJSONHandler(multiWriter, &slog.HandlerOptions{
 				Level: slog.LevelDebug,
 			})
