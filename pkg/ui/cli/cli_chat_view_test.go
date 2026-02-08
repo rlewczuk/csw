@@ -256,7 +256,7 @@ func TestCliChatView_AddMessage(t *testing.T) {
 		assert.Contains(t, outputStr, "TOOL: vfsWrite (tool1) - succeeded")
 	})
 
-	t.Run("falls back to tool name when Display field is empty", func(t *testing.T) {
+	t.Run("does not render tool when summary is empty", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
 		view := NewCliChatView(presenter, output, nil, false, false)
@@ -278,7 +278,7 @@ func TestCliChatView_AddMessage(t *testing.T) {
 		require.NoError(t, err)
 
 		outputStr := output.String()
-		assert.Contains(t, outputStr, "TOOL: customTool (tool1) - succeeded")
+		assert.NotContains(t, outputStr, "TOOL:")
 	})
 }
 
@@ -417,6 +417,42 @@ func TestCliChatView_UpdateTool(t *testing.T) {
 	})
 }
 
+func TestCliChatView_ToolRenderOutputOnUpdate(t *testing.T) {
+	t.Run("renders summary once it becomes available", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Done",
+			Tools: []*ui.ToolUI{
+				{
+					Id:     "tool1",
+					Name:   "vfsRead",
+					Status: ui.ToolStatusSucceeded,
+				},
+			},
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+		assert.NotContains(t, output.String(), "TOOL:")
+
+		updatedTool := &ui.ToolUI{
+			Id:      "tool1",
+			Name:    "vfsRead",
+			Status:  ui.ToolStatusSucceeded,
+			Summary: "Read file: /test.txt",
+		}
+
+		err = view.UpdateTool(updatedTool)
+		require.NoError(t, err)
+		assert.Contains(t, output.String(), "TOOL: Read file: /test.txt (tool1) - succeeded")
+	})
+}
+
 func TestCliChatView_MoveToBottom(t *testing.T) {
 	t.Run("is a no-op", func(t *testing.T) {
 		output := &bytes.Buffer{}
@@ -541,9 +577,10 @@ func TestCliChatView_ToolStatus(t *testing.T) {
 			view := NewCliChatView(presenter, output, nil, false, false)
 
 			tool := &ui.ToolUI{
-				Id:     "tool1",
-				Name:   "test.tool",
-				Status: tt.status,
+				Id:      "tool1",
+				Name:    "test.tool",
+				Summary: "test.tool",
+				Status:  tt.status,
 			}
 
 			msg := &ui.ChatMessageUI{
@@ -767,7 +804,7 @@ func TestCliChatView_ToolDisplayField(t *testing.T) {
 		assert.NotContains(t, outputStr, "vfsRead")
 	})
 
-	t.Run("falls back to Name when Display is empty", func(t *testing.T) {
+	t.Run("does not render when Display is empty", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
 		view := NewCliChatView(presenter, output, nil, false, false)
@@ -790,6 +827,6 @@ func TestCliChatView_ToolDisplayField(t *testing.T) {
 		require.NoError(t, err)
 
 		outputStr := output.String()
-		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1) - succeeded")
+		assert.NotContains(t, outputStr, "TOOL:")
 	})
 }

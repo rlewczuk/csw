@@ -148,6 +148,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		// Update tool status to succeeded
 		msg.Tools[0].Status = ui.ToolStatusSucceeded
 		msg.Tools[0].Message = "file content here"
+		msg.Tools[0].Summary = "vfsRead"
 		err = view.UpdateTool(msg.Tools[0])
 		require.NoError(t, err)
 
