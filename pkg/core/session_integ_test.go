@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -1012,4 +1013,154 @@ func (h *autoAllowPermissionHandler) OnPermissionQuery(query *tool.ToolPermissio
 
 func (h *autoAllowPermissionHandler) SetThread(thread *SessionThread) {
 	h.thread = thread
+}
+
+// TestSessionVFSMoveToolIntegration tests the vfsMove tool integration with the session.
+// This test exposes a known bug where either tool call result or its ID are not
+// propagated back to the LLM properly.
+func TestSessionVFSMoveToolIntegration(t *testing.T) {
+	fixture := newSweSystemFixture(t, "You are skilled software developer.")
+	system := fixture.system
+	vfsInstance := fixture.vfs
+
+	// Setup test file in VFS
+	err := vfsInstance.WriteFile("oldname.txt", []byte("hello world"))
+	require.NoError(t, err)
+
+	t.Run("vfsMove tool result is propagated to LLM with correct tool call ID", func(t *testing.T) {
+		// Create mock provider that will record tool responses
+		mockProvider := models.NewMockProvider([]models.ModelInfo{
+			{Name: "test-model", Model: "test-model"},
+		})
+
+		// First response: assistant makes a tool call to vfsMove (using non-streaming response)
+		firstResponse := &models.MockChatResponse{
+			Response: &models.ChatMessage{
+				Role: models.ChatRoleAssistant,
+				Parts: []models.ChatMessagePart{
+					{
+						ToolCall: &tool.ToolCall{
+							ID:       "move-call-123",
+							Function: "vfsMove",
+							Arguments: tool.NewToolValue(map[string]any{
+								"path":        "oldname.txt",
+								"destination": "newname.txt",
+							}),
+						},
+					},
+				},
+			},
+		}
+		mockProvider.SetChatResponse("test-model", firstResponse)
+
+		// Set up the system to use mock provider
+		system.ModelProviders = map[string]models.ModelProvider{"mock": mockProvider}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("mock/test-model", mockHandler)
+		require.NoError(t, err)
+
+		// Disable streaming for simpler test flow
+		session.streaming = false
+
+		// Add a user message to trigger the conversation
+		session.UserPrompt("Please rename oldname.txt to newname.txt")
+
+		// Run the session - this should execute the vfsMove tool
+		// Note: This will loop infinitely because the mock returns the same tool call
+		// every time. We use a timeout context to stop after first iteration.
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+		defer cancel()
+		_ = session.Run(ctx)
+
+		// Verify the file was moved in VFS (tool was executed)
+		_, err = vfsInstance.ReadFile("oldname.txt")
+		assert.Error(t, err, "oldname.txt should not exist after move")
+
+		content, err := vfsInstance.ReadFile("newname.txt")
+		require.NoError(t, err)
+		assert.Equal(t, "hello world", string(content))
+
+		// Check that the tool response was recorded by the mock provider
+		// This exposes the bug: either tool call result or its ID are not propagated back
+		require.NotEmpty(t, mockProvider.RecordedToolResponses, "Tool responses should be recorded and sent back to LLM")
+
+		// Verify the tool response contains the correct tool call ID
+		foundMoveResponse := false
+		for _, resp := range mockProvider.RecordedToolResponses {
+			if resp.Call != nil && resp.Call.ID == "move-call-123" {
+				foundMoveResponse = true
+				require.True(t, resp.Done, "Tool response should be marked as done")
+				require.NoError(t, resp.Error, "Tool response should not have an error")
+				// Verify result contains expected fields
+				resultMsg := resp.Result.Get("message").AsString()
+				require.Equal(t, "File successfully moved", resultMsg)
+				break
+			}
+		}
+		assert.True(t, foundMoveResponse, "Tool response with matching tool call ID should be sent to LLM")
+	})
+
+	t.Run("vfsMove tool result contains proper result data", func(t *testing.T) {
+		// Create mock provider that will record tool responses
+		mockProvider := models.NewMockProvider([]models.ModelInfo{
+			{Name: "test-model", Model: "test-model"},
+		})
+
+		// First response: assistant makes a tool call to vfsMove (using non-streaming response)
+		firstResponse := &models.MockChatResponse{
+			Response: &models.ChatMessage{
+				Role: models.ChatRoleAssistant,
+				Parts: []models.ChatMessagePart{
+					{
+						ToolCall: &tool.ToolCall{
+							ID:       "move-call-456",
+							Function: "vfsMove",
+							Arguments: tool.NewToolValue(map[string]any{
+								"path":        "oldname.txt",
+								"destination": "anothername.txt",
+							}),
+						},
+					},
+				},
+			},
+		}
+		mockProvider.SetChatResponse("test-model", firstResponse)
+
+		// Reset VFS state
+		err := vfsInstance.WriteFile("oldname.txt", []byte("hello world"))
+		require.NoError(t, err)
+
+		// Set up the system to use mock provider
+		system.ModelProviders = map[string]models.ModelProvider{"mock": mockProvider}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("mock/test-model", mockHandler)
+		require.NoError(t, err)
+
+		// Disable streaming for simpler test flow
+		session.streaming = false
+
+		// Add a user message to trigger the conversation
+		session.UserPrompt("Please rename the file")
+
+		// Run the session with timeout to prevent infinite loop
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+		defer cancel()
+		_ = session.Run(ctx)
+
+		// Verify that tool responses were properly recorded
+		require.NotEmpty(t, mockProvider.RecordedToolResponses, "Tool responses should be recorded")
+
+		// Verify the response contains result with proper data
+		for _, resp := range mockProvider.RecordedToolResponses {
+			if resp.Call != nil && resp.Call.Function == "vfsMove" {
+				// Check that result contains path and destination
+				path := resp.Result.Get("path").AsString()
+				dest := resp.Result.Get("destination").AsString()
+				require.NotEmpty(t, path, "Result should contain path")
+				require.NotEmpty(t, dest, "Result should contain destination")
+			}
+		}
+	})
 }

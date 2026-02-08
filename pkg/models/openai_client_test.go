@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"strings"
@@ -184,6 +185,53 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 		assert.Equal(t, ChatRoleAssistant, response.Role)
 		assert.NotEmpty(t, response.Parts)
 		assert.Greater(t, len(response.GetText()), 0)
+	})
+
+	t.Run("sends tool response as role tool", func(t *testing.T) {
+		if tc.Mock == nil {
+			t.Skip("Skipping test: mock server required")
+		}
+		tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-125","object":"chat.completion","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`)
+		initialRequests := tc.Mock.GetRequests()
+
+		callID := "vfsMove:1"
+		toolCall := &tool.ToolCall{
+			ID:       callID,
+			Function: "vfsMove",
+			Arguments: tool.NewToolValue(map[string]any{
+				"path":        "/tmp/source.txt",
+				"destination": "/tmp/dest.txt",
+			}),
+		}
+		toolResp := &tool.ToolResponse{
+			Call: toolCall,
+			Done: true,
+		}
+
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "do it"),
+			NewToolCallMessage(toolCall),
+			NewToolResponseMessage(toolResp),
+		}
+
+		_, err := chatModel.Chat(ctx, messages, nil, nil)
+		require.NoError(t, err)
+
+		reqs := tc.Mock.GetRequests()
+		require.Greater(t, len(reqs), len(initialRequests))
+		lastReq := reqs[len(reqs)-1]
+		require.Equal(t, "/chat/completions", lastReq.Path)
+		require.Equal(t, "POST", lastReq.Method)
+
+		var chatReq OpenaiChatCompletionRequest
+		require.NoError(t, json.Unmarshal(lastReq.Body, &chatReq))
+		require.NotEmpty(t, chatReq.Messages)
+
+		last := chatReq.Messages[len(chatReq.Messages)-1]
+		assert.Equal(t, "tool", last.Role)
+		assert.Equal(t, callID, last.ToolCallID)
+		assert.Equal(t, "null", last.Content)
 	})
 
 	t.Run("handles context with timeout", func(t *testing.T) {
