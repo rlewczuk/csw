@@ -265,7 +265,7 @@ func (p *ChatPresenter) AddToolCallResult(result *tool.ToolResponse) {
 				// Get the render result from the tool
 				if p.system != nil && p.system.Tools != nil {
 					if toolImpl, err := p.system.Tools.Get(result.Call.Function); err == nil {
-						summary, details, meta := toolImpl.Render()
+						summary, details, meta := toolImpl.Render(result.Call)
 						t.Summary = summary
 						t.Details = details
 						t.Meta = meta

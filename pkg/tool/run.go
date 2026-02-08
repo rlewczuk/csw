@@ -260,6 +260,6 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 }
 
 // Render returns a string representation of the tool call.
-func (t *RunBashTool) Render() (string, string, map[string]string) {
+func (t *RunBashTool) Render(call *ToolCall) (string, string, map[string]string) {
 	return "runBash", "runBash", make(map[string]string)
 }

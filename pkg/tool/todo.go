@@ -185,11 +185,11 @@ func (t *TodoReadTool) Execute(args *ToolCall) *ToolResponse {
 }
 
 // Render returns a string representation of the tool call.
-func (t *TodoWriteTool) Render() (string, string, map[string]string) {
+func (t *TodoWriteTool) Render(call *ToolCall) (string, string, map[string]string) {
 	return "todoWrite", "todoWrite", make(map[string]string)
 }
 
 // Render returns a string representation of the tool call.
-func (t *TodoReadTool) Render() (string, string, map[string]string) {
+func (t *TodoReadTool) Render(call *ToolCall) (string, string, map[string]string) {
 	return "todoRead", "todoRead", make(map[string]string)
 }

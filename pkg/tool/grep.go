@@ -165,6 +165,17 @@ func formatInt64(n int64) string {
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSGrepTool) Render() (string, string, map[string]string) {
-	return "vfsGrep", "vfsGrep", make(map[string]string)
+func (t *VFSGrepTool) Render(call *ToolCall) (string, string, map[string]string) {
+	pattern, _ := call.Arguments.StringOK("pattern")
+	path := call.Arguments.String("path")
+	oneLiner := truncateString("VFS: grep "+pattern, 128)
+	if path != "" {
+		oneLiner = truncateString("VFS: grep "+pattern+" in "+path, 128)
+	}
+	full := oneLiner + "\n\n"
+	// Try to get content from result if available
+	if content, ok := call.Arguments.Get("content").AsStringOK(); ok && content != "" {
+		full += content
+	}
+	return oneLiner, full, make(map[string]string)
 }

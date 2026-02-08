@@ -581,6 +581,6 @@ func TestAccessControlTool_GlobalDefault(t *testing.T) {
 	}
 }
 
-func (m *mockTool) Render() (string, string, map[string]string) {
+func (m *mockTool) Render(call *ToolCall) (string, string, map[string]string) {
 	return m.name, m.name, make(map[string]string)
 }

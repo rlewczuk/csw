@@ -728,36 +728,86 @@ func uriToPath(uri string) string {
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSReadTool) Render() (string, string, map[string]string) {
-	return "vfsRead", "vfsRead", make(map[string]string)
+func (t *VFSReadTool) Render(call *ToolCall) (string, string, map[string]string) {
+	path, _ := call.Arguments.StringOK("path")
+	oneLiner := truncateString("VFS: read "+path, 128)
+	full := oneLiner + "\n\n"
+	// Try to get content from result if available
+	if content, ok := call.Arguments.Get("content").AsStringOK(); ok && content != "" {
+		full += content
+	}
+	return oneLiner, full, make(map[string]string)
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSWriteTool) Render() (string, string, map[string]string) {
-	return "vfsWrite", "vfsWrite", make(map[string]string)
+func (t *VFSWriteTool) Render(call *ToolCall) (string, string, map[string]string) {
+	path, _ := call.Arguments.StringOK("path")
+	oneLiner := truncateString("VFS: write "+path, 128)
+	full := oneLiner + "\n\n"
+	// Try to get content from arguments
+	if content, ok := call.Arguments.StringOK("content"); ok && content != "" {
+		full += content
+	}
+	return oneLiner, full, make(map[string]string)
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSDeleteTool) Render() (string, string, map[string]string) {
-	return "vfsDelete", "vfsDelete", make(map[string]string)
+func (t *VFSDeleteTool) Render(call *ToolCall) (string, string, map[string]string) {
+	path, _ := call.Arguments.StringOK("path")
+	oneLiner := truncateString("VFS: delete "+path, 128)
+	full := oneLiner
+	return oneLiner, full, make(map[string]string)
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSListTool) Render() (string, string, map[string]string) {
-	return "vfsList", "vfsList", make(map[string]string)
+func (t *VFSListTool) Render(call *ToolCall) (string, string, map[string]string) {
+	path, _ := call.Arguments.StringOK("path")
+	oneLiner := truncateString("VFS: list "+path, 128)
+	full := oneLiner + "\n\n"
+	// Try to get files from result if available
+	if files, ok := call.Arguments.Get("files").ArrayOK(); ok && len(files) > 0 {
+		for _, f := range files {
+			full += f.AsString() + "\n"
+		}
+	}
+	return oneLiner, full, make(map[string]string)
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSMoveTool) Render() (string, string, map[string]string) {
-	return "vfsMove", "vfsMove", make(map[string]string)
+func (t *VFSMoveTool) Render(call *ToolCall) (string, string, map[string]string) {
+	path, _ := call.Arguments.StringOK("path")
+	destination, _ := call.Arguments.StringOK("destination")
+	oneLiner := truncateString("VFS: move "+path+" -> "+destination, 128)
+	full := oneLiner
+	return oneLiner, full, make(map[string]string)
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSFindTool) Render() (string, string, map[string]string) {
-	return "vfsFind", "vfsFind", make(map[string]string)
+func (t *VFSFindTool) Render(call *ToolCall) (string, string, map[string]string) {
+	query, _ := call.Arguments.StringOK("query")
+	oneLiner := truncateString("VFS: find "+query, 128)
+	full := oneLiner + "\n\n"
+	// Try to get files from result if available
+	if files, ok := call.Arguments.Get("files").ArrayOK(); ok && len(files) > 0 {
+		for _, f := range files {
+			full += f.AsString() + "\n"
+		}
+	}
+	return oneLiner, full, make(map[string]string)
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSEditTool) Render() (string, string, map[string]string) {
-	return "vfsEdit", "vfsEdit", make(map[string]string)
+func (t *VFSEditTool) Render(call *ToolCall) (string, string, map[string]string) {
+	path, _ := call.Arguments.StringOK("path")
+	oldString, _ := call.Arguments.StringOK("oldString")
+	newString, _ := call.Arguments.StringOK("newString")
+	oneLiner := truncateString("VFS: edit "+path, 128)
+	full := oneLiner + "\n\n"
+	// Create unified diff without line numbers
+	full += "--- " + path + "\n"
+	full += "+++ " + path + "\n"
+	full += "@@ -1 +1 @@\n"
+	full += "-" + oldString + "\n"
+	full += "+" + newString + "\n"
+	return oneLiner, full, make(map[string]string)
 }

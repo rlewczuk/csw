@@ -352,7 +352,7 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) {
 		return
 	}
 
-	outputLine := fmt.Sprintf("TOOL: %s (%s) - %s\n", displayStr, tool.Id, tool.Status)
+	outputLine := fmt.Sprintf("%s: %s\n", displayStr, tool.Status)
 
 	// Check if this tool has already been rendered with the same output
 	if lastOutput, ok := v.renderedTools[tool.Id]; ok && lastOutput == outputLine {

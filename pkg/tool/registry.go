@@ -119,6 +119,6 @@ func RegisterRunBashTool(registry *ToolRegistry, r runner.CommandRunner, privile
 }
 
 // Render returns a string representation of the tool call.
-func (r *ToolRegistry) Render() (string, string, map[string]string) {
+func (r *ToolRegistry) Render(call *ToolCall) (string, string, map[string]string) {
 	return "ToolRegistry", "ToolRegistry", make(map[string]string)
 }

@@ -553,7 +553,7 @@ type Tool interface {
 	// First string is one-line summary of the tool call (equivalent of DisplayModeShort).
 	// Second string is full information (equivalent of DisplayModeFull).
 	// Map contains additional properties that can be used to display in the UI.
-	Render() (string, string, map[string]string)
+	Render(call *ToolCall) (string, string, map[string]string)
 }
 
 // truncateString truncates a string to the specified maximum length,
