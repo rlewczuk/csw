@@ -103,7 +103,7 @@ func TestCliChatView_Init(t *testing.T) {
 		assert.Contains(t, outputStr, "Assistant: Hi there!")
 	})
 
-	t.Run("initializes with tool calls", func(t *testing.T) {
+	t.Run("initializes with tool calls in final status", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
 		view := NewCliChatView(presenter, output, nil, false, false)
@@ -123,6 +123,7 @@ func TestCliChatView_Init(t *testing.T) {
 							Status:  ui.ToolStatusSucceeded,
 							Props:   [][]string{{"path", "/test/file.txt"}},
 							Message: "file content here",
+							Display: "vfsRead",
 						},
 					},
 				},
@@ -134,8 +135,47 @@ func TestCliChatView_Init(t *testing.T) {
 
 		outputStr := output.String()
 		assert.Contains(t, outputStr, "Assistant: Running tool")
-		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1) - path: /test/file.txt")
-		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1) - (succeeded) result: file content here")
+		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1) - succeeded")
+	})
+
+	t.Run("does not display tools in started or executing status", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		session := &ui.ChatSessionUI{
+			Id:    "test-session",
+			Model: "test-model",
+			Messages: []*ui.ChatMessageUI{
+				{
+					Id:   "msg1",
+					Role: ui.ChatRoleAssistant,
+					Text: "Running tool",
+					Tools: []*ui.ToolUI{
+						{
+							Id:     "tool1",
+							Name:   "vfsRead",
+							Status: ui.ToolStatusStarted,
+							Props:  [][]string{{"path", "/test/file.txt"}},
+						},
+						{
+							Id:     "tool2",
+							Name:   "vfsWrite",
+							Status: ui.ToolStatusExecuting,
+							Props:  [][]string{{"path", "/test.txt"}},
+						},
+					},
+				},
+			},
+		}
+
+		err := view.Init(session)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "Assistant: Running tool")
+		assert.NotContains(t, outputStr, "TOOL: vfsRead")
+		assert.NotContains(t, outputStr, "TOOL: vfsWrite")
 	})
 }
 
@@ -157,7 +197,7 @@ func TestCliChatView_AddMessage(t *testing.T) {
 		assert.Contains(t, output.String(), "You: Test message")
 	})
 
-	t.Run("adds assistant message with tools", func(t *testing.T) {
+	t.Run("does not display tools in executing status", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
 		view := NewCliChatView(presenter, output, nil, false, false)
@@ -183,8 +223,62 @@ func TestCliChatView_AddMessage(t *testing.T) {
 
 		outputStr := output.String()
 		assert.Contains(t, outputStr, "Assistant: Executing")
-		assert.Contains(t, outputStr, "TOOL: vfsWrite (tool1) - path: /test.txt, content: hello")
-		assert.Contains(t, outputStr, "TOOL: vfsWrite (tool1) - (executing) result: written")
+		assert.NotContains(t, outputStr, "TOOL:")
+	})
+
+	t.Run("displays tools in succeeded status with Display field", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Done",
+			Tools: []*ui.ToolUI{
+				{
+					Id:      "tool1",
+					Name:    "vfsWrite",
+					Status:  ui.ToolStatusSucceeded,
+					Props:   [][]string{{"path", "/test.txt"}},
+					Message: "written",
+					Display: "vfsWrite",
+				},
+			},
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+		assert.Len(t, view.messages, 1)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "Assistant: Done")
+		assert.Contains(t, outputStr, "TOOL: vfsWrite (tool1) - succeeded")
+	})
+
+	t.Run("falls back to tool name when Display field is empty", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Done",
+			Tools: []*ui.ToolUI{
+				{
+					Id:     "tool1",
+					Name:   "customTool",
+					Status: ui.ToolStatusSucceeded,
+				},
+			},
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "TOOL: customTool (tool1) - succeeded")
 	})
 }
 
@@ -249,7 +343,44 @@ func TestCliChatView_UpdateMessage(t *testing.T) {
 }
 
 func TestCliChatView_UpdateTool(t *testing.T) {
-	t.Run("updates tool status", func(t *testing.T) {
+	t.Run("updates tool status and displays when in final status", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		// Add message with tool in started state (should not be displayed)
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Running",
+			Tools: []*ui.ToolUI{
+				{
+					Id:     "tool1",
+					Name:   "vfsRead",
+					Status: ui.ToolStatusStarted,
+				},
+			},
+		}
+		view.AddMessage(msg)
+
+		// Clear output
+		output.Reset()
+
+		// Update tool to succeeded status
+		updatedTool := &ui.ToolUI{
+			Id:      "tool1",
+			Name:    "vfsRead",
+			Status:  ui.ToolStatusSucceeded,
+			Display: "vfsRead",
+		}
+
+		err := view.UpdateTool(updatedTool)
+		require.NoError(t, err)
+		assert.Equal(t, ui.ToolStatusSucceeded, view.messages[0].Tools[0].Status)
+		assert.Contains(t, output.String(), "TOOL: vfsRead (tool1) - succeeded")
+	})
+
+	t.Run("does not display tool when status is started or executing", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
 		view := NewCliChatView(presenter, output, nil, false, false)
@@ -272,17 +403,17 @@ func TestCliChatView_UpdateTool(t *testing.T) {
 		// Clear output
 		output.Reset()
 
-		// Update tool
+		// Update tool to executing status
 		updatedTool := &ui.ToolUI{
 			Id:     "tool1",
 			Name:   "vfsRead",
-			Status: ui.ToolStatusSucceeded,
+			Status: ui.ToolStatusExecuting,
 		}
 
 		err := view.UpdateTool(updatedTool)
 		require.NoError(t, err)
-		assert.Equal(t, ui.ToolStatusSucceeded, view.messages[0].Tools[0].Status)
-		assert.Contains(t, output.String(), "TOOL: vfsRead (tool1) - (succeeded) result:")
+		assert.Equal(t, ui.ToolStatusExecuting, view.messages[0].Tools[0].Status)
+		assert.NotContains(t, output.String(), "TOOL:")
 	})
 }
 
@@ -392,14 +523,15 @@ func TestCliChatView_QueryPermission(t *testing.T) {
 
 func TestCliChatView_ToolStatus(t *testing.T) {
 	tests := []struct {
-		name       string
-		status     ui.ToolStatusUI
-		wantInLine string
+		name           string
+		status         ui.ToolStatusUI
+		shouldDisplay  bool
+		expectedOutput string
 	}{
-		{"succeeded", ui.ToolStatusSucceeded, "TOOL: test.tool (tool1) - (succeeded) result:"},
-		{"failed", ui.ToolStatusFailed, "TOOL: test.tool (tool1) - (failed) result:"},
-		{"started", ui.ToolStatusStarted, "TOOL: test.tool (tool1) - "},
-		{"executing", ui.ToolStatusExecuting, "TOOL: test.tool (tool1) - "},
+		{"succeeded", ui.ToolStatusSucceeded, true, "TOOL: test.tool (tool1) - succeeded"},
+		{"failed", ui.ToolStatusFailed, true, "TOOL: test.tool (tool1) - failed"},
+		{"started", ui.ToolStatusStarted, false, ""},
+		{"executing", ui.ToolStatusExecuting, false, ""},
 	}
 
 	for _, tt := range tests {
@@ -424,7 +556,11 @@ func TestCliChatView_ToolStatus(t *testing.T) {
 			view.AddMessage(msg)
 
 			outputStr := output.String()
-			assert.Contains(t, outputStr, tt.wantInLine)
+			if tt.shouldDisplay {
+				assert.Contains(t, outputStr, tt.expectedOutput)
+			} else {
+				assert.NotContains(t, outputStr, "TOOL:")
+			}
 		})
 	}
 }
@@ -435,17 +571,17 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 		presenter := mock.NewMockChatPresenter()
 		view := NewCliChatView(presenter, output, nil, false, false)
 
-		// Add initial assistant message with a tool
+		// Add initial assistant message with a tool in succeeded status
 		msg := &ui.ChatMessageUI{
 			Id:   "msg1",
 			Role: ui.ChatRoleAssistant,
 			Text: "Let me help",
 			Tools: []*ui.ToolUI{
 				{
-					Id:     "tool1",
-					Name:   "vfsRead",
-					Status: ui.ToolStatusSucceeded,
-					Props:  [][]string{{"path", "/test.txt"}},
+					Id:      "tool1",
+					Name:    "vfsRead",
+					Status:  ui.ToolStatusSucceeded,
+					Display: "vfsRead",
 				},
 			},
 		}
@@ -462,10 +598,10 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 			Text: "Let me help you",
 			Tools: []*ui.ToolUI{
 				{
-					Id:     "tool1",
-					Name:   "vfsRead",
-					Status: ui.ToolStatusSucceeded,
-					Props:  [][]string{{"path", "/test.txt"}},
+					Id:      "tool1",
+					Name:    "vfsRead",
+					Status:  ui.ToolStatusSucceeded,
+					Display: "vfsRead",
 				},
 			},
 		}
@@ -474,18 +610,18 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 
 		// Count how many times the tool appears in output
 		outputStr := output.String()
-		toolCount := strings.Count(outputStr, "TOOL: vfsRead (tool1)")
+		toolCount := strings.Count(outputStr, "TOOL: vfsRead")
 
-		// Tool should appear at most once (for the delta text, not for the tool)
-		assert.LessOrEqual(t, toolCount, 1, "Tool should not be printed multiple times when message is updated, got %d occurrences", toolCount)
+		// Tool should not appear again since it was already rendered with the same status
+		assert.Equal(t, 0, toolCount, "Tool should not be printed again when status hasn't changed")
 	})
 
-	t.Run("tools are printed again only when status changes", func(t *testing.T) {
+	t.Run("tools are printed again only when status changes to final", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
 		view := NewCliChatView(presenter, output, nil, false, false)
 
-		// Add initial assistant message with a tool in started state
+		// Add initial assistant message with a tool in started state (not displayed)
 		msg := &ui.ChatMessageUI{
 			Id:   "msg1",
 			Role: ui.ChatRoleAssistant,
@@ -501,6 +637,10 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 		}
 		err := view.AddMessage(msg)
 		require.NoError(t, err)
+
+		// Tool should not be printed since it's in started status
+		outputStr := output.String()
+		assert.NotContains(t, outputStr, "TOOL:")
 
 		// Clear output
 		output.Reset()
@@ -523,9 +663,8 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 		require.NoError(t, err)
 
 		// Tool should not be printed again since status hasn't changed
-		outputStr := output.String()
-		toolCount := strings.Count(outputStr, "TOOL: vfsRead (tool1)")
-		assert.Equal(t, 0, toolCount, "Tool should not be reprinted when status hasn't changed")
+		outputStr = output.String()
+		assert.NotContains(t, outputStr, "TOOL:")
 
 		// Now update with a different status via UpdateTool
 		output.Reset()
@@ -533,15 +672,14 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 			Id:      "tool1",
 			Name:    "vfsRead",
 			Status:  ui.ToolStatusSucceeded,
-			Message: "file content",
+			Display: "vfsRead",
 		}
 		err = view.UpdateTool(updatedTool)
 		require.NoError(t, err)
 
-		// Tool should be printed now since status changed
+		// Tool should be printed now since status changed to final
 		outputStr = output.String()
-		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1)")
-		assert.Contains(t, outputStr, "(succeeded) result:")
+		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1) - succeeded")
 	})
 
 	t.Run("multiple message updates do not duplicate tools", func(t *testing.T) {
@@ -560,7 +698,7 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 
 		totalToolCount := 0
 
-		// Simulate multiple streaming updates with tools
+		// Simulate multiple streaming updates with tools in succeeded status
 		for i := 0; i < 5; i++ {
 			output.Reset()
 			updatedMsg := &ui.ChatMessageUI{
@@ -569,10 +707,11 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 				Text: strings.Repeat("x", i+1),
 				Tools: []*ui.ToolUI{
 					{
-						Id:     "tool1",
-						Name:   "vfsRead",
-						Status: ui.ToolStatusSucceeded,
-						Props:  [][]string{{"path", "/test.txt"}},
+						Id:      "tool1",
+						Name:    "vfsRead",
+						Status:  ui.ToolStatusSucceeded,
+						Props:   [][]string{{"path", "/test.txt"}},
+						Display: "vfsRead",
 					},
 				},
 			}
@@ -581,95 +720,41 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 
 			// Count tool occurrences in this update
 			outputStr := output.String()
-			toolCount := strings.Count(outputStr, "TOOL: vfsRead (tool1)")
+			toolCount := strings.Count(outputStr, "TOOL: vfsRead")
 			totalToolCount += toolCount
 
 			// Tool should appear at most once (on first update when it's first seen)
 			// and never again on subsequent updates
 			if i == 0 {
 				// First update: tool may be printed once
-				assert.LessOrEqual(t, toolCount, 2, "Tool should be printed at most twice on first update (params line + result line)")
+				assert.LessOrEqual(t, toolCount, 1, "Tool should be printed at most once on first update")
 			} else {
 				// Subsequent updates: tool should not be reprinted
 				assert.Equal(t, 0, toolCount, "Tool should not be reprinted on streaming update %d", i)
 			}
 		}
 
-		// Total tool occurrences across all updates should be at most 2 (params line + result line)
-		assert.LessOrEqual(t, totalToolCount, 2, "Tool should not be duplicated across all streaming updates")
+		// Total tool occurrences across all updates should be at most 1
+		assert.LessOrEqual(t, totalToolCount, 1, "Tool should not be duplicated across all streaming updates")
 	})
 }
 
-func TestCliChatView_TruncateString(t *testing.T) {
-	t.Run("truncates long strings", func(t *testing.T) {
+func TestCliChatView_ToolDisplayField(t *testing.T) {
+	t.Run("uses Display field when available", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
 		view := NewCliChatView(presenter, output, nil, false, false)
 
-		longValue := strings.Repeat("a", 50)
-		truncated := view.truncateString(longValue, 40)
-
-		assert.Equal(t, 43, len(truncated))
-		assert.True(t, strings.HasSuffix(truncated, "..."))
-	})
-
-	t.Run("does not truncate short strings", func(t *testing.T) {
-		output := &bytes.Buffer{}
-		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
-
-		shortValue := "short string"
-		result := view.truncateString(shortValue, 40)
-
-		assert.Equal(t, shortValue, result)
-	})
-
-	t.Run("truncates long parameter values in tool output", func(t *testing.T) {
-		output := &bytes.Buffer{}
-		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
-
-		longContent := strings.Repeat("x", 50)
 		msg := &ui.ChatMessageUI{
 			Id:   "msg1",
 			Role: ui.ChatRoleAssistant,
-			Text: "Executing",
-			Tools: []*ui.ToolUI{
-				{
-					Id:      "tool1",
-					Name:    "vfsWrite",
-					Status:  ui.ToolStatusSucceeded,
-					Props:   [][]string{{"path", "/test.txt"}, {"content", longContent}},
-					Message: "done",
-				},
-			},
-		}
-
-		err := view.AddMessage(msg)
-		require.NoError(t, err)
-
-		outputStr := output.String()
-		// Should contain truncated content with ellipsis
-		assert.Contains(t, outputStr, "content: "+strings.Repeat("x", 40)+"...")
-	})
-
-	t.Run("truncates long result message in tool output", func(t *testing.T) {
-		output := &bytes.Buffer{}
-		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
-
-		longResult := strings.Repeat("y", 50)
-		msg := &ui.ChatMessageUI{
-			Id:   "msg1",
-			Role: ui.ChatRoleAssistant,
-			Text: "Executing",
+			Text: "Done",
 			Tools: []*ui.ToolUI{
 				{
 					Id:      "tool1",
 					Name:    "vfsRead",
 					Status:  ui.ToolStatusSucceeded,
-					Props:   [][]string{{"path", "/test.txt"}},
-					Message: longResult,
+					Display: "Read file: /test.txt",
 				},
 			},
 		}
@@ -678,7 +763,33 @@ func TestCliChatView_TruncateString(t *testing.T) {
 		require.NoError(t, err)
 
 		outputStr := output.String()
-		// Should contain truncated result with ellipsis
-		assert.Contains(t, outputStr, "result: "+strings.Repeat("y", 40)+"...")
+		assert.Contains(t, outputStr, "TOOL: Read file: /test.txt (tool1) - succeeded")
+		assert.NotContains(t, outputStr, "vfsRead")
+	})
+
+	t.Run("falls back to Name when Display is empty", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Done",
+			Tools: []*ui.ToolUI{
+				{
+					Id:     "tool1",
+					Name:   "vfsRead",
+					Status: ui.ToolStatusSucceeded,
+					// Display is empty
+				},
+			},
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1) - succeeded")
 	})
 }
