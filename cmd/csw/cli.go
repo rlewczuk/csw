@@ -31,6 +31,7 @@ func CliCommand() *cobra.Command {
 		cliSaveSessionTo  string
 		cliSaveSession    bool
 		cliLogLLMRequests bool
+		cliLSPServer      string
 	)
 
 	cmd := &cobra.Command{
@@ -64,7 +65,7 @@ func CliCommand() *cobra.Command {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
 			}
 
-			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests)
+			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer)
 		},
 	}
 
@@ -78,11 +79,12 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliSaveSessionTo, "save-session-to", "", "Save session conversation to specified markdown file")
 	cmd.Flags().BoolVar(&cliSaveSession, "save-session", false, "Save session conversation to session.md in session log directory")
 	cmd.Flags().BoolVar(&cliLogLLMRequests, "log-llm-requests", false, "Log LLM requests and responses")
+	cmd.Flags().StringVar(&cliLSPServer, "lsp-server", "", "Path to LSP server binary (empty to disable LSP)")
 
 	return cmd
 }
 
-func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool) error {
+func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer string) error {
 	ctx := context.Background()
 
 	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
@@ -90,6 +92,7 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 		ConfigPath:     configPath,
 		ModelName:      modelName,
 		RoleName:       roleName,
+		LSPServer:      lspServer,
 		LogLLMRequests: logLLMRequests,
 	})
 	if err != nil {

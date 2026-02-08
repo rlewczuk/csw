@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
@@ -107,14 +108,19 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	if params.LSPServer != "" {
 		logger := logging.GetGlobalLogger()
 		logger.Debug("lsp_initialization", "enabled", true, "server", params.LSPServer)
-		client, err := lsp.NewClient(params.LSPServer, workDir)
-		if err != nil {
-			logger.Warn("failed to create LSP client, continuing without LSP", "error", err)
-		} else if err := client.Init(false); err != nil {
-			logger.Warn("failed to initialize LSP client, continuing without LSP", "error", err)
+		// Check if the LSP server binary exists
+		if _, err := os.Stat(params.LSPServer); err != nil {
+			logger.Warn("LSP server binary not found, continuing without LSP", "server", params.LSPServer, "error", err)
 		} else {
-			lspClient = client
-			logger.Debug("lsp_initialized", "server", params.LSPServer)
+			client, err := lsp.NewClient(params.LSPServer, workDir)
+			if err != nil {
+				logger.Warn("failed to create LSP client, continuing without LSP", "error", err)
+			} else if err := client.Init(false); err != nil {
+				logger.Warn("failed to initialize LSP client, continuing without LSP", "error", err)
+			} else {
+				lspClient = client
+				logger.Debug("lsp_initialized", "server", params.LSPServer)
+			}
 		}
 	}
 
