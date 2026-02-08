@@ -390,3 +390,54 @@ func TestVFSDeleteTool_RegisteredAndAdvertised(t *testing.T) {
 	descContent := allRole.ToolFragments["vfsDelete/vfsDelete.md"]
 	assert.NotEmpty(t, descContent, "vfsDelete description should not be empty")
 }
+
+func TestVFSMoveTool_RegisteredAndAdvertised(t *testing.T) {
+	// Create temporary directories
+	tmpDir, err := os.MkdirTemp("", "csw-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	tmpHome, err := os.MkdirTemp("", "csw-home-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpHome)
+
+	// Set HOME to temp directory
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", oldHome)
+
+	// Change to temp directory
+	oldDir, err := os.Getwd()
+	require.NoError(t, err)
+	defer os.Chdir(oldDir)
+	err = os.Chdir(tmpDir)
+	require.NoError(t, err)
+
+	// Get composite config store (loads from embedded defaults)
+	store, err := GetCompositeConfigStore()
+	require.NoError(t, err)
+
+	roleConfigs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+
+	// Verify vfsMove is advertised to LLM via tool fragments
+	allRole, exists := roleConfigs["all"]
+	require.True(t, exists, "all role should exist")
+	require.NotNil(t, allRole.ToolFragments, "all role should have tool fragments")
+
+	// Check that vfsMove has both schema and description files
+	_, hasSchema := allRole.ToolFragments["vfsMove/vfsMove.schema.json"]
+	_, hasDesc := allRole.ToolFragments["vfsMove/vfsMove.md"]
+	assert.True(t, hasSchema, "vfsMove should have vfsMove.schema.json advertised to LLM")
+	assert.True(t, hasDesc, "vfsMove should have vfsMove.md advertised to LLM")
+
+	// Verify the schema content is valid JSON
+	schemaContent := allRole.ToolFragments["vfsMove/vfsMove.schema.json"]
+	assert.NotEmpty(t, schemaContent, "vfsMove schema should not be empty")
+	assert.Contains(t, schemaContent, "path", "vfsMove schema should contain 'path' property")
+	assert.Contains(t, schemaContent, "destination", "vfsMove schema should contain 'destination' property")
+
+	// Verify the description content
+	descContent := allRole.ToolFragments["vfsMove/vfsMove.md"]
+	assert.NotEmpty(t, descContent, "vfsMove description should not be empty")
+}
