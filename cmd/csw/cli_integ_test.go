@@ -33,6 +33,13 @@ type mockChatView struct {
 	initCalled bool
 }
 
+type autoAllowPermissionTrackingView struct {
+	presenter            ui.IChatPresenter
+	permissionQueryCount int
+	toolResultCount      int
+	mu                   sync.Mutex
+}
+
 func newMockChatView() *mockChatView {
 	return &mockChatView{
 		messages: make([]*ui.ChatMessageUI, 0),
@@ -91,6 +98,53 @@ func (m *mockChatView) GetMessages() []*ui.ChatMessageUI {
 	result := make([]*ui.ChatMessageUI, len(m.messages))
 	copy(result, m.messages)
 	return result
+}
+
+func (v *autoAllowPermissionTrackingView) Init(session *ui.ChatSessionUI) error {
+	return nil
+}
+
+func (v *autoAllowPermissionTrackingView) AddMessage(msg *ui.ChatMessageUI) error {
+	return nil
+}
+
+func (v *autoAllowPermissionTrackingView) UpdateMessage(msg *ui.ChatMessageUI) error {
+	return nil
+}
+
+func (v *autoAllowPermissionTrackingView) UpdateTool(tool *ui.ToolUI) error {
+	if tool.Status == ui.ToolStatusSucceeded || tool.Status == ui.ToolStatusFailed {
+		v.mu.Lock()
+		v.toolResultCount++
+		v.mu.Unlock()
+	}
+	return nil
+}
+
+func (v *autoAllowPermissionTrackingView) MoveToBottom() error {
+	return nil
+}
+
+func (v *autoAllowPermissionTrackingView) QueryPermission(query *ui.PermissionQueryUI) error {
+	v.mu.Lock()
+	v.permissionQueryCount++
+	v.mu.Unlock()
+	if v.presenter != nil && len(query.Options) > 0 {
+		return v.presenter.PermissionResponse(query.Options[0])
+	}
+	return nil
+}
+
+func (v *autoAllowPermissionTrackingView) PermissionQueries() int {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.permissionQueryCount
+}
+
+func (v *autoAllowPermissionTrackingView) ToolResults() int {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.toolResultCount
 }
 
 // TestLogmdChatViewLogsSession tests that LogmdChatView properly logs session activity to markdown.
@@ -833,6 +887,91 @@ func TestCLIPermissionQueryHandling(t *testing.T) {
 	// Verify that permission query was received and denied
 	assert.True(t, permissionQueryReceived, "Permission query should have been received")
 	assert.Equal(t, "Deny", permissionResponse, "Permission should have been denied in non-interactive mode")
+}
+
+// TestCLIAllowAllPermissionsExecutesAllToolCalls verifies that allow-all-permissions
+// mode continues executing subsequent tool calls after an auto-granted permission.
+func TestCLIAllowAllPermissionsExecutesAllToolCalls(t *testing.T) {
+	mockVFS := vfs.NewMockVFS()
+	err := mockVFS.WriteFile("test.txt", []byte("hello"))
+	require.NoError(t, err)
+
+	accessConfig := map[string]conf.FileAccess{
+		"*": {
+			Read:   conf.AccessAsk,
+			Write:  conf.AccessAsk,
+			Delete: conf.AccessAsk,
+			List:   conf.AccessAsk,
+			Find:   conf.AccessAsk,
+			Move:   conf.AccessAsk,
+		},
+	}
+	restrictedVFS := vfs.NewAccessControlVFS(mockVFS, accessConfig)
+
+	tools := tool.NewToolRegistry()
+	tool.RegisterVFSTools(tools, restrictedVFS, nil, nil)
+
+	tmpDir := t.TempDir()
+	logsDir := filepath.Join(tmpDir, "logs")
+	err = os.MkdirAll(logsDir, 0755)
+	require.NoError(t, err)
+	fixture := newCliSystemFixture(t, "You are a helpful assistant.",
+		coretestfixture.WithVFS(restrictedVFS),
+		coretestfixture.WithTools(tools),
+		coretestfixture.WithoutVFSTools(),
+		coretestfixture.WithWorkDir(tmpDir),
+		coretestfixture.WithLogBaseDir(logsDir),
+	)
+	system := fixture.System
+	mockServer := fixture.Server
+
+	mockServer.AddStreamingResponse("/api/chat", "POST", false,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"","tool_calls":[{"id":"call-1","function":{"name":"vfsRead","arguments":{"path":"test.txt"}}},{"id":"call-2","function":{"name":"vfsList","arguments":{"path":".","recursive":false}}}]},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	mockServer.AddStreamingResponse("/api/chat", "POST", true,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"All done."},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	thread := core.NewSessionThread(system, nil)
+	err = thread.StartSession("ollama/test-model")
+	require.NoError(t, err)
+
+	basePresenter := presenter.NewChatPresenter(system, thread)
+	view := &autoAllowPermissionTrackingView{presenter: basePresenter}
+
+	err = basePresenter.SetView(view)
+	require.NoError(t, err)
+
+	thread.SetOutputHandler(basePresenter)
+
+	userMsg := &ui.ChatMessageUI{
+		Role: ui.ChatRoleUser,
+		Text: "Read and list files",
+	}
+	err = basePresenter.SendUserMessage(userMsg)
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		for {
+			if !thread.IsRunning() {
+				close(done)
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Test timed out - session did not complete")
+	}
+
+	assert.Equal(t, 2, view.PermissionQueries(), "Should query permission for both tool calls")
+	assert.Equal(t, 2, view.ToolResults(), "Should execute and complete both tool calls")
 }
 
 // permissionTrackingMockView is a mock view that tracks permission queries

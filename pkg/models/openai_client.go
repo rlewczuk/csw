@@ -670,6 +670,11 @@ func convertToOpenAIMessage(msg *ChatMessage) OpenaiChatCompletionMessage {
 		Role: string(msg.Role),
 	}
 
+	toolResponses := msg.GetToolResponses()
+	if len(toolResponses) > 0 {
+		openaiMsg.Role = "tool"
+	}
+
 	// Check if message contains only text
 	hasOnlyText := true
 	for _, part := range msg.Parts {
@@ -702,8 +707,6 @@ func convertToOpenAIMessage(msg *ChatMessage) OpenaiChatCompletionMessage {
 				// OpenaiTool response - set tool_call_id and content
 				// Prefer Call.ID if available, fall back to ID for backward compatibility
 				if part.ToolResponse.Call != nil {
-					openaiMsg.ToolCallID = part.ToolResponse.Call.ID
-				} else {
 					openaiMsg.ToolCallID = part.ToolResponse.Call.ID
 				}
 				if part.ToolResponse.Error != nil {

@@ -298,7 +298,7 @@ func (t *VFSListTool) Execute(args *ToolCall) *ToolResponse {
 	}
 }
 
-// VFSMoveTool implements the vfsMode tool.
+// VFSMoveTool implements the vfsMove tool.
 type VFSMoveTool struct {
 	vfs vfs.VFS
 }
@@ -328,24 +328,36 @@ func (t *VFSMoveTool) Execute(args *ToolCall) *ToolResponse {
 		}
 	}
 
+	result := ToolValue{}
+	result.Set("path", path)
+	result.Set("destination", destination)
+
 	err := t.vfs.MoveFile(path, destination)
 	if err == vfs.ErrAskPermission {
 		return NewVFSPermissionQuery(args, path, "moving file", "move")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		return NewVFSPermissionQuery(args, perr.Path, "moving file", "move")
+		operation := perr.Operation
+		action := vfsActionFromOperation(operation)
+		if operation == "" {
+			operation = "move"
+			action = "moving file"
+		}
+		return NewVFSPermissionQuery(args, perr.Path, action, operation)
 	}
 	if err != nil {
 		return &ToolResponse{
-			Call:  args,
-			Error: err,
-			Done:  true,
+			Call:   args,
+			Error:  err,
+			Result: result,
+			Done:   true,
 		}
 	}
 
 	return &ToolResponse{
-		Call: args,
-		Done: true,
+		Call:   args,
+		Result: *result.Set("message", "File successfully moved"),
+		Done:   true,
 	}
 }
 
