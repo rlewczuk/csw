@@ -41,6 +41,9 @@ type CliChatView struct {
 	// renderedTools tracks the last rendered output for each tool
 	// Key is tool ID, value is the output line that was last printed
 	renderedTools map[string]string
+
+	// lastMessageWasAssistant tracks if the last message rendered was from the assistant
+	lastMessageWasAssistant bool
 }
 
 // NewCliChatView creates a new CLI chat view.
@@ -294,6 +297,8 @@ func (v *CliChatView) renderMessage(msg *ui.ChatMessageUI) {
 		if msg.Text != "" {
 			fmt.Fprintf(v.output, "\nYou: %s\n", msg.Text)
 		}
+		// User message resets the assistant flag
+		v.lastMessageWasAssistant = false
 	case ui.ChatRoleAssistant:
 		v.renderAssistantMessage(msg)
 	}
@@ -333,10 +338,8 @@ func (v *CliChatView) renderAssistantMessage(msg *ui.ChatMessageUI) {
 		v.renderTool(tool)
 	}
 
-	// Ensure assistant message ends with a newline (only for non-streaming updates of existing messages)
-	if !isStreamingUpdate && msg.Text != "" && !strings.HasSuffix(msg.Text, "\n") && prevRendered != "" {
-		fmt.Fprint(v.output, "\n")
-	}
+	// Mark that the last message was from assistant
+	v.lastMessageWasAssistant = true
 }
 
 // renderTool renders a tool call status.
@@ -355,6 +358,12 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) {
 	}
 	if displayStr == "" {
 		return
+	}
+
+	// Check if last message was assistant, if so print newline
+	if v.lastMessageWasAssistant {
+		fmt.Fprint(v.output, "\n")
+		v.lastMessageWasAssistant = false
 	}
 
 	outputLine := fmt.Sprintf("%s: %s\n", displayStr, tool.Status)
