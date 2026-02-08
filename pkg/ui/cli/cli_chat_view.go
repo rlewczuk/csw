@@ -38,9 +38,9 @@ type CliChatView struct {
 	// Key is message ID, value is the text that was printed
 	renderedText map[string]string
 
-	// renderedTools tracks the last rendered status for each tool
-	// Key is tool ID, value is the status that was last printed
-	renderedTools map[string]ui.ToolStatusUI
+	// renderedTools tracks the last rendered output for each tool
+	// Key is tool ID, value is the output line that was last printed
+	renderedTools map[string]string
 }
 
 // NewCliChatView creates a new CLI chat view.
@@ -61,7 +61,7 @@ func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Read
 		messages:             make([]*ui.ChatMessageUI, 0),
 		stopCh:               make(chan struct{}),
 		renderedText:         make(map[string]string),
-		renderedTools:        make(map[string]ui.ToolStatusUI),
+		renderedTools:        make(map[string]string),
 	}
 
 	// Setup scanner only for interactive mode
@@ -343,23 +343,27 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) {
 		return
 	}
 
-	// Check if this tool has already been rendered with the same status
-	if lastStatus, ok := v.renderedTools[tool.Id]; ok && lastStatus == tool.Status {
-		// Tool already rendered with this status, skip
+	// Use the Summary field from ToolUI if available, otherwise fall back to Details
+	displayStr := tool.Summary
+	if displayStr == "" {
+		displayStr = tool.Details
+	}
+	if displayStr == "" {
 		return
 	}
 
-	// Use the Summary field from ToolUI if available, otherwise fall back to tool name
-	displayStr := tool.Summary
-	if displayStr == "" {
-		displayStr = tool.Name
+	outputLine := fmt.Sprintf("TOOL: %s (%s) - %s\n", displayStr, tool.Id, tool.Status)
+
+	// Check if this tool has already been rendered with the same output
+	if lastOutput, ok := v.renderedTools[tool.Id]; ok && lastOutput == outputLine {
+		return
 	}
 
 	// Render the tool call result
-	fmt.Fprintf(v.output, "TOOL: %s (%s) - %s\n", displayStr, tool.Id, tool.Status)
+	fmt.Fprint(v.output, outputLine)
 
-	// Mark this tool as rendered with current status
-	v.renderedTools[tool.Id] = tool.Status
+	// Mark this tool as rendered with current output
+	v.renderedTools[tool.Id] = outputLine
 }
 
 var _ ui.IChatView = (*CliChatView)(nil)
