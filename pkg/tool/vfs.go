@@ -171,6 +171,10 @@ func (t *VFSWriteTool) Execute(args *ToolCall) *ToolResponse {
 			}
 			validationMsg = formatDiagnostics(diagsWithURI, path)
 		}
+	} else {
+		if t.logger != nil {
+			t.logger.Info("vfsWrite_lsp_not_available", "path", path)
+		}
 	}
 
 	// Log after calling tool with result
@@ -502,6 +506,10 @@ func (t *VFSEditTool) Execute(args *ToolCall) *ToolResponse {
 				}
 			}
 			validationMsg = formatDiagnostics(diagsWithURI, path)
+		}
+	} else {
+		if t.logger != nil {
+			t.logger.Info("vfsEdit_lsp_not_available", "path", path)
 		}
 	}
 
