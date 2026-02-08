@@ -332,6 +332,11 @@ func (v *CliChatView) renderAssistantMessage(msg *ui.ChatMessageUI) {
 	for _, tool := range msg.Tools {
 		v.renderTool(tool)
 	}
+
+	// Ensure assistant message ends with a newline (only for non-streaming updates of existing messages)
+	if !isStreamingUpdate && msg.Text != "" && !strings.HasSuffix(msg.Text, "\n") && prevRendered != "" {
+		fmt.Fprint(v.output, "\n")
+	}
 }
 
 // renderTool renders a tool call status.
