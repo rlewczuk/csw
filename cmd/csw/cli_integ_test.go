@@ -13,6 +13,7 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	coretestfixture "github.com/codesnort/codesnort-swe/pkg/core/testfixture"
+	"github.com/codesnort/codesnort-swe/pkg/logging"
 	"github.com/codesnort/codesnort-swe/pkg/models"
 	"github.com/codesnort/codesnort-swe/pkg/presenter"
 	"github.com/codesnort/codesnort-swe/pkg/runner"
@@ -629,6 +630,94 @@ func TestRunBashToolIntegration(t *testing.T) {
 		}
 	}
 	assert.True(t, foundToolList, "should have found a chat request with runBash tool")
+}
+
+// TestCLIVFSToolLogging verifies that VFS write/edit tools log to the session logger.
+func TestCLIVFSToolLogging(t *testing.T) {
+	vfsInstance := vfs.NewMockVFS()
+
+	tmpDir := t.TempDir()
+	logsDir := filepath.Join(tmpDir, "logs")
+	err := os.MkdirAll(logsDir, 0755)
+	require.NoError(t, err)
+
+	fixture := newCliSystemFixture(t, "You are a helpful assistant.",
+		coretestfixture.WithVFS(vfsInstance),
+		coretestfixture.WithWorkDir(tmpDir),
+		coretestfixture.WithLogBaseDir(logsDir),
+	)
+	system := fixture.System
+	mockServer := fixture.Server
+
+	// First response: assistant makes a tool call to vfsWrite
+	mockServer.AddStreamingResponse("/api/chat", "POST", false,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"vfsWrite","arguments":{"path":"notes.txt","content":"hello"}}}]},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	// Second response: assistant makes a tool call to vfsEdit
+	mockServer.AddStreamingResponse("/api/chat", "POST", false,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"vfsEdit","arguments":{"path":"notes.txt","oldString":"hello","newString":"hello world","replaceAll":true}}}]},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	// Third response: assistant confirms completion
+	mockServer.AddStreamingResponse("/api/chat", "POST", true,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:04Z","message":{"role":"assistant","content":"Updated the file."},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:05Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	// Create thread
+	thread := core.NewSessionThread(system, nil)
+
+	// Start session
+	err = thread.StartSession("ollama/test-model")
+	require.NoError(t, err)
+
+	// Create presenter and view
+	basePresenter := presenter.NewChatPresenter(system, thread)
+	baseView := newMockChatView()
+
+	err = basePresenter.SetView(baseView)
+	require.NoError(t, err)
+
+	// Set output handler
+	thread.SetOutputHandler(basePresenter)
+
+	// Send user message
+	userMsg := &ui.ChatMessageUI{
+		Role: ui.ChatRoleUser,
+		Text: "Create a file and update it",
+	}
+	err = basePresenter.SendUserMessage(userMsg)
+	require.NoError(t, err)
+
+	// Wait for completion with timeout
+	done := make(chan struct{})
+	go func() {
+		for {
+			if !thread.IsRunning() {
+				close(done)
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-done:
+		// Session completed
+	case <-time.After(10 * time.Second):
+		t.Fatal("Test timed out - session did not complete")
+	}
+
+	session := thread.GetSession()
+	require.NotNil(t, session)
+	logBuffer := logging.GetTestSessionBuffer(session.ID())
+	require.NotNil(t, logBuffer)
+
+	logOutput := logBuffer.String()
+	assert.Contains(t, logOutput, "vfsWrite_start", "vfsWrite_start should be logged")
+	assert.Contains(t, logOutput, "vfsEdit_start", "vfsEdit_start should be logged")
 }
 
 // TestCLIPermissionQueryHandling tests that CLI mode handles permission queries correctly.

@@ -16,6 +16,13 @@ type ToolRegistry struct {
 	tools map[string]Tool
 }
 
+// LoggerSetter is implemented by tools that accept a logger for structured output.
+// SetLogger assigns the logger instance used by the tool.
+type LoggerSetter interface {
+	// SetLogger assigns the logger instance used by the tool.
+	SetLogger(logger *slog.Logger)
+}
+
 // NewToolRegistry creates a new ToolRegistry instance.
 func NewToolRegistry() *ToolRegistry {
 	return &ToolRegistry{
@@ -46,6 +53,23 @@ func (r *ToolRegistry) List() []string {
 		names = append(names, name)
 	}
 	return names
+}
+
+// ApplyLogger assigns a logger to all tools that support LoggerSetter.
+func (r *ToolRegistry) ApplyLogger(logger *slog.Logger) {
+	if logger == nil {
+		return
+	}
+
+	for _, name := range r.List() {
+		toolInstance, err := r.Get(name)
+		if err != nil {
+			continue
+		}
+		if setter, ok := toolInstance.(LoggerSetter); ok {
+			setter.SetLogger(logger)
+		}
+	}
 }
 
 // Execute executes the tool with the given function name and arguments.

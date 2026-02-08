@@ -589,5 +589,7 @@ func buildSessionToolRegistry(systemTools *tool.ToolRegistry, vfsImpl vfs.VFS, l
 		session.registerSessionTools(registry)
 	}
 
+	registry.ApplyLogger(logger)
+
 	return registry
 }
