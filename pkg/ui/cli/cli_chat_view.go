@@ -336,61 +336,30 @@ func (v *CliChatView) renderAssistantMessage(msg *ui.ChatMessageUI) {
 
 // renderTool renders a tool call status.
 // Must be called with mu locked.
+// Only displays tool calls in final status (succeeded or failed).
 func (v *CliChatView) renderTool(tool *ui.ToolUI) {
+	// Only render in final status (succeeded or failed)
+	if tool.Status != ui.ToolStatusSucceeded && tool.Status != ui.ToolStatusFailed {
+		return
+	}
+
 	// Check if this tool has already been rendered with the same status
 	if lastStatus, ok := v.renderedTools[tool.Id]; ok && lastStatus == tool.Status {
 		// Tool already rendered with this status, skip
 		return
 	}
 
-	var status string
-	switch tool.Status {
-	case ui.ToolStatusSucceeded:
-		status = "succeeded"
-	case ui.ToolStatusFailed:
-		status = "failed"
-	case ui.ToolStatusStarted:
-		status = "started"
-	case ui.ToolStatusExecuting:
-		status = "executing"
-	default:
-		status = string(tool.Status)
+	// Use the Display field from ToolUI if available, otherwise fall back to tool name
+	displayStr := tool.Display
+	if displayStr == "" {
+		displayStr = tool.Name
 	}
 
-	// Render parameters on the first line
-	var paramsStr strings.Builder
-	for i, prop := range tool.Props {
-		if len(prop) >= 2 {
-			if i > 0 {
-				paramsStr.WriteString(", ")
-			}
-			paramsStr.WriteString(prop[0])
-			paramsStr.WriteString(": ")
-			paramsStr.WriteString(v.truncateString(prop[1], 40))
-		}
-	}
-
-	fmt.Fprintf(v.output, "TOOL: %s (%s) - %s\n", tool.Name, tool.Id, paramsStr.String())
-
-	// Render result on a new line if there's a message or status is final
-	if tool.Message != "" || tool.Status == ui.ToolStatusSucceeded || tool.Status == ui.ToolStatusFailed {
-		resultValue := v.truncateString(tool.Message, 40)
-		if resultValue == "" {
-			resultValue = "(no result)"
-		}
-		fmt.Fprintf(v.output, "TOOL: %s (%s) - (%s) result: %s\n", tool.Name, tool.Id, status, resultValue)
-	}
+	// Render the tool call result
+	fmt.Fprintf(v.output, "TOOL: %s (%s) - %s\n", displayStr, tool.Id, tool.Status)
 
 	// Mark this tool as rendered with current status
 	v.renderedTools[tool.Id] = tool.Status
-}
-
-// truncateString truncates a string to maxLen characters and adds ellipsis if needed.
-func (v *CliChatView) truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
 }
 
 var _ ui.IChatView = (*CliChatView)(nil)

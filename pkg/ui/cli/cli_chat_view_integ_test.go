@@ -154,8 +154,8 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		// Verify output
 		outputStr := output.String()
 		assert.Contains(t, outputStr, "Assistant: Let me read that file")
-		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1) - path: /test/file.txt")
-		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1) - (succeeded) result: file content here")
+		// Tool should be displayed in final status using Display field (or name as fallback)
+		assert.Contains(t, outputStr, "TOOL: vfsRead (tool1) - succeeded")
 	})
 
 	t.Run("accepts all permissions automatically when configured", func(t *testing.T) {

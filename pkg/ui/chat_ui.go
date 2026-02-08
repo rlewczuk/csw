@@ -34,6 +34,9 @@ type ToolUI struct {
 
 	// Tool arguments
 	Props [][]string `json:"props"`
+
+	// Display is the string representation of the tool call result from Tool.Display()
+	Display string `json:"display"`
 }
 
 // ChatMessageUI represents a chat message as seen by the user in UI.
