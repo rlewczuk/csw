@@ -718,3 +718,38 @@ func uriToPath(uri string) string {
 	// Convert to platform-specific path
 	return filepath.FromSlash(path)
 }
+
+// Display returns a string representation of the tool call.
+func (t *VFSReadTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
+	return "vfsRead", make(map[string]string)
+}
+
+// Display returns a string representation of the tool call.
+func (t *VFSWriteTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
+	return "vfsWrite", make(map[string]string)
+}
+
+// Display returns a string representation of the tool call.
+func (t *VFSDeleteTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
+	return "vfsDelete", make(map[string]string)
+}
+
+// Display returns a string representation of the tool call.
+func (t *VFSListTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
+	return "vfsList", make(map[string]string)
+}
+
+// Display returns a string representation of the tool call.
+func (t *VFSMoveTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
+	return "vfsMove", make(map[string]string)
+}
+
+// Display returns a string representation of the tool call.
+func (t *VFSFindTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
+	return "vfsFind", make(map[string]string)
+}
+
+// Display returns a string representation of the tool call.
+func (t *VFSEditTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
+	return "vfsEdit", make(map[string]string)
+}

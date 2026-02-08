@@ -580,3 +580,7 @@ func TestAccessControlTool_GlobalDefault(t *testing.T) {
 		})
 	}
 }
+
+func (m *mockTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
+	return m.name, make(map[string]string)
+}

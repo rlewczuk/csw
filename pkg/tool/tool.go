@@ -550,6 +550,7 @@ const (
 	DisplayModeFull
 	DisplayModeJSON
 	DisplayModeOneliner
+	DisplayModeNone
 )
 
 // Tool represents a tool that can be executed by the agent.
@@ -561,5 +562,17 @@ type Tool interface {
 
 	// Display returns a string representation of the tool in the given mode.
 	// The second return value is a map of properties to display in the UI (for example, language, diff format etc.).
-	// TODO Display(mode DisplayMode, color bool) (string,map[string]string)
+	Display(mode DisplayMode, color bool) (string, map[string]string)
+}
+
+// truncateString truncates a string to the specified maximum length,
+// adding an ellipsis if truncated.
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return s[:maxLen]
+	}
+	return s[:maxLen-3] + "..."
 }

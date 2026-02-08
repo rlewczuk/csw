@@ -183,3 +183,13 @@ func (t *TodoReadTool) Execute(args *ToolCall) *ToolResponse {
 		Done:   true,
 	}
 }
+
+// Display returns a string representation of the tool call.
+func (t *TodoWriteTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
+	return "todoWrite", make(map[string]string)
+}
+
+// Display returns a string representation of the tool call.
+func (t *TodoReadTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
+	return "todoRead", make(map[string]string)
+}

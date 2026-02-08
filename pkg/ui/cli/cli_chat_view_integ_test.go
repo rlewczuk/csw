@@ -482,3 +482,7 @@ func (d *dummyTool) Execute(args *tool.ToolCall) *tool.ToolResponse {
 		Done:   true,
 	}
 }
+
+func (d *dummyTool) Display(mode tool.DisplayMode, color bool) (string, map[string]string) {
+	return d.name, make(map[string]string)
+}
