@@ -413,3 +413,203 @@ func TestTodoIntegration(t *testing.T) {
 		assert.Equal(t, int64(1), writeResponse.Result.Get("pending").AsInt())
 	})
 }
+
+func TestTodoWriteTool_Render(t *testing.T) {
+	t.Run("should render empty todo list", func(t *testing.T) {
+		mockSession := NewMockTodoSession()
+		tool := NewTodoWriteTool(mockSession)
+		call := &ToolCall{ID: "test-id", Function: "todoWrite", Arguments: NewToolValue(map[string]any{})}
+
+		oneLiner, full, extra := tool.Render(call)
+
+		assert.Equal(t, "(0/0 no tasks)", oneLiner)
+		assert.Equal(t, "Todo list: 0/0 tasks completed\n", full)
+		assert.Empty(t, extra)
+	})
+
+	t.Run("should render todo list with all pending tasks", func(t *testing.T) {
+		mockSession := NewMockTodoSession()
+		mockSession.SetTodoList([]TodoItem{
+			{ID: "1", Content: "First task", Status: "pending", Priority: "high"},
+			{ID: "2", Content: "Second task", Status: "pending", Priority: "medium"},
+		})
+		tool := NewTodoWriteTool(mockSession)
+		call := &ToolCall{ID: "test-id", Function: "todoWrite", Arguments: NewToolValue(map[string]any{})}
+
+		oneLiner, full, extra := tool.Render(call)
+
+		// First task is shown as current (1/2) when all are pending
+		assert.Equal(t, "(1/2 First task)", oneLiner)
+		assert.Contains(t, full, "Todo list: 0/2 tasks completed")
+		assert.Contains(t, full, "[ ] First task")
+		assert.Contains(t, full, "[ ] Second task")
+		assert.Empty(t, extra)
+	})
+
+	t.Run("should render todo list with in_progress task", func(t *testing.T) {
+		mockSession := NewMockTodoSession()
+		mockSession.SetTodoList([]TodoItem{
+			{ID: "1", Content: "First task", Status: "completed", Priority: "high"},
+			{ID: "2", Content: "Second task", Status: "in_progress", Priority: "medium"},
+			{ID: "3", Content: "Third task", Status: "pending", Priority: "low"},
+		})
+		tool := NewTodoWriteTool(mockSession)
+		call := &ToolCall{ID: "test-id", Function: "todoWrite", Arguments: NewToolValue(map[string]any{})}
+
+		oneLiner, full, extra := tool.Render(call)
+
+		// completed (1) + in_progress (1) = 2, so (2/3)
+		assert.Equal(t, "(2/3 Second task)", oneLiner)
+		assert.Contains(t, full, "Todo list: 1/3 tasks completed")
+		assert.Contains(t, full, "[✓] First task")
+		assert.Contains(t, full, "[*] Second task")
+		assert.Contains(t, full, "[ ] Third task")
+		assert.Empty(t, extra)
+	})
+
+	t.Run("should render todo list with all completed tasks", func(t *testing.T) {
+		mockSession := NewMockTodoSession()
+		mockSession.SetTodoList([]TodoItem{
+			{ID: "1", Content: "First task", Status: "completed", Priority: "high"},
+			{ID: "2", Content: "Second task", Status: "completed", Priority: "medium"},
+		})
+		tool := NewTodoWriteTool(mockSession)
+		call := &ToolCall{ID: "test-id", Function: "todoWrite", Arguments: NewToolValue(map[string]any{})}
+
+		oneLiner, full, extra := tool.Render(call)
+
+		// All completed, last completed is shown as current
+		assert.Equal(t, "(2/2 Second task)", oneLiner)
+		assert.Contains(t, full, "Todo list: 2/2 tasks completed")
+		assert.Contains(t, full, "[✓] First task")
+		assert.Contains(t, full, "[✓] Second task")
+		assert.Empty(t, extra)
+	})
+
+	t.Run("should render todo list with cancelled tasks", func(t *testing.T) {
+		mockSession := NewMockTodoSession()
+		mockSession.SetTodoList([]TodoItem{
+			{ID: "1", Content: "First task", Status: "completed", Priority: "high"},
+			{ID: "2", Content: "Cancelled task", Status: "cancelled", Priority: "medium"},
+			{ID: "3", Content: "Third task", Status: "pending", Priority: "low"},
+		})
+		tool := NewTodoWriteTool(mockSession)
+		call := &ToolCall{ID: "test-id", Function: "todoWrite", Arguments: NewToolValue(map[string]any{})}
+
+		oneLiner, full, extra := tool.Render(call)
+
+		// completed (1) + no in_progress, so last completed is shown
+		assert.Equal(t, "(1/3 First task)", oneLiner)
+		assert.Contains(t, full, "Todo list: 1/3 tasks completed")
+		assert.Contains(t, full, "[✓] First task")
+		assert.Contains(t, full, "[-] Cancelled task")
+		assert.Contains(t, full, "[ ] Third task")
+		assert.Empty(t, extra)
+	})
+}
+
+func TestTodoReadTool_Render(t *testing.T) {
+	t.Run("should render empty todo list", func(t *testing.T) {
+		mockSession := NewMockTodoSession()
+		tool := NewTodoReadTool(mockSession)
+		call := &ToolCall{ID: "test-id", Function: "todoRead", Arguments: NewToolValue(map[string]any{})}
+
+		oneLiner, full, extra := tool.Render(call)
+
+		assert.Equal(t, "(0/0 no tasks)", oneLiner)
+		assert.Equal(t, "Todo list: 0/0 tasks completed\n", full)
+		assert.Empty(t, extra)
+	})
+
+	t.Run("should render todo list with mixed statuses", func(t *testing.T) {
+		mockSession := NewMockTodoSession()
+		mockSession.SetTodoList([]TodoItem{
+			{ID: "1", Content: "Completed task", Status: "completed", Priority: "high"},
+			{ID: "2", Content: "In progress task", Status: "in_progress", Priority: "medium"},
+			{ID: "3", Content: "Pending task", Status: "pending", Priority: "low"},
+			{ID: "4", Content: "Cancelled task", Status: "cancelled", Priority: "low"},
+		})
+		tool := NewTodoReadTool(mockSession)
+		call := &ToolCall{ID: "test-id", Function: "todoRead", Arguments: NewToolValue(map[string]any{})}
+
+		oneLiner, full, extra := tool.Render(call)
+
+		// completed (1) + in_progress (1) = 2, so (2/4)
+		assert.Equal(t, "(2/4 In progress task)", oneLiner)
+		assert.Contains(t, full, "Todo list: 1/4 tasks completed")
+		assert.Contains(t, full, "[✓] Completed task")
+		assert.Contains(t, full, "[*] In progress task")
+		assert.Contains(t, full, "[ ] Pending task")
+		assert.Contains(t, full, "[-] Cancelled task")
+		assert.Empty(t, extra)
+	})
+}
+
+func TestRenderTodoList(t *testing.T) {
+	t.Run("empty list", func(t *testing.T) {
+		oneLiner, full := renderTodoList([]TodoItem{})
+		assert.Equal(t, "(0/0 no tasks)", oneLiner)
+		assert.Equal(t, "Todo list: 0/0 tasks completed\n", full)
+	})
+
+	t.Run("single pending task", func(t *testing.T) {
+		todos := []TodoItem{
+			{ID: "1", Content: "Only task", Status: "pending", Priority: "high"},
+		}
+		oneLiner, full := renderTodoList(todos)
+		assert.Equal(t, "(1/1 Only task)", oneLiner)
+		assert.Contains(t, full, "Todo list: 0/1 tasks completed")
+		assert.Contains(t, full, "[ ] Only task")
+	})
+
+	t.Run("single in_progress task", func(t *testing.T) {
+		todos := []TodoItem{
+			{ID: "1", Content: "Current task", Status: "in_progress", Priority: "high"},
+		}
+		oneLiner, full := renderTodoList(todos)
+		assert.Equal(t, "(1/1 Current task)", oneLiner)
+		assert.Contains(t, full, "Todo list: 0/1 tasks completed")
+		assert.Contains(t, full, "[*] Current task")
+	})
+
+	t.Run("single completed task", func(t *testing.T) {
+		todos := []TodoItem{
+			{ID: "1", Content: "Done task", Status: "completed", Priority: "high"},
+		}
+		oneLiner, full := renderTodoList(todos)
+		assert.Equal(t, "(1/1 Done task)", oneLiner)
+		assert.Contains(t, full, "Todo list: 1/1 tasks completed")
+		assert.Contains(t, full, "[✓] Done task")
+	})
+
+	t.Run("progressive completion", func(t *testing.T) {
+		// All pending - first task shown
+		todos := []TodoItem{
+			{ID: "1", Content: "Task 1", Status: "pending", Priority: "high"},
+			{ID: "2", Content: "Task 2", Status: "pending", Priority: "medium"},
+			{ID: "3", Content: "Task 3", Status: "pending", Priority: "low"},
+		}
+		oneLiner, _ := renderTodoList(todos)
+		assert.Equal(t, "(1/3 Task 1)", oneLiner)
+
+		// First completed
+		todos[0].Status = "completed"
+		oneLiner, _ = renderTodoList(todos)
+		assert.Equal(t, "(1/3 Task 1)", oneLiner)
+
+		// Second in progress
+		todos[1].Status = "in_progress"
+		oneLiner, _ = renderTodoList(todos)
+		assert.Equal(t, "(2/3 Task 2)", oneLiner)
+
+		// Second completed
+		todos[1].Status = "completed"
+		oneLiner, _ = renderTodoList(todos)
+		assert.Equal(t, "(2/3 Task 2)", oneLiner)
+
+		// All completed
+		todos[2].Status = "completed"
+		oneLiner, _ = renderTodoList(todos)
+		assert.Equal(t, "(3/3 Task 3)", oneLiner)
+	})
+}
