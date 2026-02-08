@@ -93,3 +93,8 @@ func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS, lspClient lsp.LSP
 func RegisterRunBashTool(registry *ToolRegistry, r runner.CommandRunner, privileges map[string]conf.AccessFlag) {
 	registry.Register("runBash", NewRunBashTool(r, privileges))
 }
+
+// Display returns a string representation of the tool call.
+func (r *ToolRegistry) Display(mode DisplayMode, color bool) (string, map[string]string) {
+	return "ToolRegistry", make(map[string]string)
+}

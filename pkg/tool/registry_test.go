@@ -185,3 +185,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	require.Len(t, filesArr, 1)
 	assert.Equal(t, "test.txt", filesArr[0].AsString())
 }
+
+func (m *MockTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
+	return m.name, make(map[string]string)
+}

@@ -258,3 +258,8 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 		Done:   true,
 	}
 }
+
+// Display returns a string representation of the tool call.
+func (t *RunBashTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
+	return "runBash", make(map[string]string)
+}
