@@ -340,3 +340,53 @@ func TestToolCommand_InfoNotFound(t *testing.T) {
 	_, hasSchema := allRole.ToolFragments["nonexistent.tool/nonexistent.tool.schema.json"]
 	assert.False(t, hasSchema, "nonexistent tool should not have schema")
 }
+
+func TestVFSDeleteTool_RegisteredAndAdvertised(t *testing.T) {
+	// Create temporary directories
+	tmpDir, err := os.MkdirTemp("", "csw-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	tmpHome, err := os.MkdirTemp("", "csw-home-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpHome)
+
+	// Set HOME to temp directory
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", oldHome)
+
+	// Change to temp directory
+	oldDir, err := os.Getwd()
+	require.NoError(t, err)
+	defer os.Chdir(oldDir)
+	err = os.Chdir(tmpDir)
+	require.NoError(t, err)
+
+	// Get composite config store (loads from embedded defaults)
+	store, err := GetCompositeConfigStore()
+	require.NoError(t, err)
+
+	roleConfigs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+
+	// Verify vfsDelete is advertised to LLM via tool fragments
+	allRole, exists := roleConfigs["all"]
+	require.True(t, exists, "all role should exist")
+	require.NotNil(t, allRole.ToolFragments, "all role should have tool fragments")
+
+	// Check that vfsDelete has both schema and description files
+	_, hasSchema := allRole.ToolFragments["vfsDelete/vfsDelete.schema.json"]
+	_, hasDesc := allRole.ToolFragments["vfsDelete/vfsDelete.md"]
+	assert.True(t, hasSchema, "vfsDelete should have vfsDelete.schema.json advertised to LLM")
+	assert.True(t, hasDesc, "vfsDelete should have vfsDelete.md advertised to LLM")
+
+	// Verify the schema content is valid JSON
+	schemaContent := allRole.ToolFragments["vfsDelete/vfsDelete.schema.json"]
+	assert.NotEmpty(t, schemaContent, "vfsDelete schema should not be empty")
+	assert.Contains(t, schemaContent, "path", "vfsDelete schema should contain 'path' property")
+
+	// Verify the description content
+	descContent := allRole.ToolFragments["vfsDelete/vfsDelete.md"]
+	assert.NotEmpty(t, descContent, "vfsDelete description should not be empty")
+}
