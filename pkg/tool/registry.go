@@ -118,7 +118,7 @@ func RegisterRunBashTool(registry *ToolRegistry, r runner.CommandRunner, privile
 	registry.Register("runBash", NewRunBashTool(r, privileges))
 }
 
-// Display returns a string representation of the tool call.
-func (r *ToolRegistry) Display(mode DisplayMode, color bool) (string, map[string]string) {
-	return "ToolRegistry", make(map[string]string)
+// Render returns a string representation of the tool call.
+func (r *ToolRegistry) Render() (string, string, map[string]string) {
+	return "ToolRegistry", "ToolRegistry", make(map[string]string)
 }

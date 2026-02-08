@@ -727,37 +727,37 @@ func uriToPath(uri string) string {
 	return filepath.FromSlash(path)
 }
 
-// Display returns a string representation of the tool call.
-func (t *VFSReadTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
-	return "vfsRead", make(map[string]string)
+// Render returns a string representation of the tool call.
+func (t *VFSReadTool) Render() (string, string, map[string]string) {
+	return "vfsRead", "vfsRead", make(map[string]string)
 }
 
-// Display returns a string representation of the tool call.
-func (t *VFSWriteTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
-	return "vfsWrite", make(map[string]string)
+// Render returns a string representation of the tool call.
+func (t *VFSWriteTool) Render() (string, string, map[string]string) {
+	return "vfsWrite", "vfsWrite", make(map[string]string)
 }
 
-// Display returns a string representation of the tool call.
-func (t *VFSDeleteTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
-	return "vfsDelete", make(map[string]string)
+// Render returns a string representation of the tool call.
+func (t *VFSDeleteTool) Render() (string, string, map[string]string) {
+	return "vfsDelete", "vfsDelete", make(map[string]string)
 }
 
-// Display returns a string representation of the tool call.
-func (t *VFSListTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
-	return "vfsList", make(map[string]string)
+// Render returns a string representation of the tool call.
+func (t *VFSListTool) Render() (string, string, map[string]string) {
+	return "vfsList", "vfsList", make(map[string]string)
 }
 
-// Display returns a string representation of the tool call.
-func (t *VFSMoveTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
-	return "vfsMove", make(map[string]string)
+// Render returns a string representation of the tool call.
+func (t *VFSMoveTool) Render() (string, string, map[string]string) {
+	return "vfsMove", "vfsMove", make(map[string]string)
 }
 
-// Display returns a string representation of the tool call.
-func (t *VFSFindTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
-	return "vfsFind", make(map[string]string)
+// Render returns a string representation of the tool call.
+func (t *VFSFindTool) Render() (string, string, map[string]string) {
+	return "vfsFind", "vfsFind", make(map[string]string)
 }
 
-// Display returns a string representation of the tool call.
-func (t *VFSEditTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
-	return "vfsEdit", make(map[string]string)
+// Render returns a string representation of the tool call.
+func (t *VFSEditTool) Render() (string, string, map[string]string) {
+	return "vfsEdit", "vfsEdit", make(map[string]string)
 }

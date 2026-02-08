@@ -186,6 +186,6 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	assert.Equal(t, "test.txt", filesArr[0].AsString())
 }
 
-func (m *MockTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
-	return m.name, make(map[string]string)
+func (m *MockTool) Render() (string, string, map[string]string) {
+	return m.name, m.name, make(map[string]string)
 }
