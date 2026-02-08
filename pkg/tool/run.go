@@ -261,5 +261,12 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 
 // Render returns a string representation of the tool call.
 func (t *RunBashTool) Render(call *ToolCall) (string, string, map[string]string) {
-	return "runBash", "runBash", make(map[string]string)
+	command, _ := call.Arguments.StringOK("command")
+	oneLiner := truncateString("bash: "+command, 128)
+	full := command + "\n\n"
+	// Try to get output from result if available
+	if output, ok := call.Arguments.Get("output").AsStringOK(); ok && output != "" {
+		full += output
+	}
+	return oneLiner, full, make(map[string]string)
 }

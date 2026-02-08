@@ -2,6 +2,7 @@ package tool
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
@@ -459,4 +460,58 @@ func TestRunBashTool_Execute_WithoutProjectRoot(t *testing.T) {
 	assert.NoError(t, response.Error)
 	assert.True(t, response.Done)
 	assert.Equal(t, 1, mockRunner.ExecutionCount())
+}
+
+func TestRunBashTool_Render(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	tool := NewRunBashTool(mockRunner, nil)
+
+	tests := []struct {
+		name           string
+		args           *ToolCall
+		wantSummary    string
+		wantDetails    string
+		wantInSummary  string
+		wantInDetails  string
+	}{
+		{
+			name: "basic command",
+			args: &ToolCall{
+				Function:  "runBash",
+				Arguments: NewToolValue(map[string]any{"command": "echo hello"}),
+			},
+			wantInSummary: "bash: echo hello",
+			wantInDetails: "echo hello\n\n",
+		},
+		{
+			name: "command with output",
+			args: &ToolCall{
+				Function:  "runBash",
+				Arguments: NewToolValue(map[string]any{"command": "ls -la", "output": "file1.txt\nfile2.txt\n"}),
+			},
+			wantInSummary: "bash: ls -la",
+			wantInDetails: "ls -la\n\nfile1.txt\nfile2.txt\n",
+		},
+		{
+			name: "long command should be truncated in summary",
+			args: &ToolCall{
+				Function:  "runBash",
+				Arguments: NewToolValue(map[string]any{"command": "this is a very long command that should be truncated in the summary because it exceeds the maximum length limit of 128 characters for sure"}),
+			},
+			wantInSummary: "...",
+			wantInDetails: "this is a very long command",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			summary, details, meta := tool.Render(tt.args)
+			assert.NotEmpty(t, summary, "Summary should not be empty")
+			assert.True(t, strings.HasPrefix(summary, "bash: "), "Summary should start with 'bash: '")
+			assert.Contains(t, summary, tt.wantInSummary, "Summary should contain expected text")
+			assert.LessOrEqual(t, len(summary), 128, "Summary should not exceed 128 characters")
+			assert.NotNil(t, meta, "Meta should not be nil")
+			assert.Contains(t, details, tt.wantInDetails, "Details should contain expected text")
+		})
+	}
 }
