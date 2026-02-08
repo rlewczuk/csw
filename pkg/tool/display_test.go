@@ -41,7 +41,7 @@ func TestVFSReadTool_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			summary, details, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
-			assert.True(t, strings.HasPrefix(summary, "VFS: read "), "Summary should start with 'VFS: read '")
+			assert.True(t, strings.HasPrefix(summary, "read "), "Summary should start with 'read '")
 			assert.Contains(t, summary, tt.wantPath, "Summary should contain path")
 			assert.LessOrEqual(t, len(summary), 128, "Summary should not exceed 128 characters")
 			assert.NotNil(t, meta, "Meta should not be nil")
@@ -56,9 +56,9 @@ func TestVFSWriteTool_Render(t *testing.T) {
 	tool := NewVFSWriteTool(mockVFS, nil)
 
 	tests := []struct {
-		name     string
-		args     *ToolCall
-		wantPath string
+		name        string
+		args        *ToolCall
+		wantPath    string
 		wantContent string
 	}{
 		{
@@ -76,7 +76,7 @@ func TestVFSWriteTool_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			summary, details, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
-			assert.True(t, strings.HasPrefix(summary, "VFS: write "), "Summary should start with 'VFS: write '")
+			assert.True(t, strings.HasPrefix(summary, "write "), "Summary should start with 'write '")
 			assert.Contains(t, summary, tt.wantPath, "Summary should contain path")
 			assert.LessOrEqual(t, len(summary), 128, "Summary should not exceed 128 characters")
 			assert.NotNil(t, meta, "Meta should not be nil")
@@ -110,7 +110,7 @@ func TestVFSDeleteTool_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			summary, details, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
-			assert.True(t, strings.HasPrefix(summary, "VFS: delete "), "Summary should start with 'VFS: delete '")
+			assert.True(t, strings.HasPrefix(summary, "delete "), "Summary should start with 'delete '")
 			assert.Contains(t, summary, tt.wantPath, "Summary should contain path")
 			assert.LessOrEqual(t, len(summary), 128, "Summary should not exceed 128 characters")
 			assert.NotNil(t, meta, "Meta should not be nil")
@@ -143,7 +143,7 @@ func TestVFSListTool_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			summary, details, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
-			assert.True(t, strings.HasPrefix(summary, "VFS: list "), "Summary should start with 'VFS: list '")
+			assert.True(t, strings.HasPrefix(summary, "list "), "Summary should start with 'list '")
 			assert.Contains(t, summary, tt.wantPath, "Summary should contain path")
 			assert.LessOrEqual(t, len(summary), 128, "Summary should not exceed 128 characters")
 			assert.NotNil(t, meta, "Meta should not be nil")
@@ -178,7 +178,7 @@ func TestVFSMoveTool_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			summary, details, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
-			assert.True(t, strings.HasPrefix(summary, "VFS: move "), "Summary should start with 'VFS: move '")
+			assert.True(t, strings.HasPrefix(summary, "move "), "Summary should start with 'move '")
 			assert.Contains(t, summary, tt.wantPath, "Summary should contain path")
 			assert.Contains(t, summary, tt.wantDestination, "Summary should contain destination")
 			assert.LessOrEqual(t, len(summary), 128, "Summary should not exceed 128 characters")
@@ -212,7 +212,7 @@ func TestVFSFindTool_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			summary, details, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
-			assert.True(t, strings.HasPrefix(summary, "VFS: find "), "Summary should start with 'VFS: find '")
+			assert.True(t, strings.HasPrefix(summary, "find "), "Summary should start with 'find '")
 			assert.Contains(t, summary, tt.wantQuery, "Summary should contain query")
 			assert.LessOrEqual(t, len(summary), 128, "Summary should not exceed 128 characters")
 			assert.NotNil(t, meta, "Meta should not be nil")
@@ -227,11 +227,11 @@ func TestVFSEditTool_Render(t *testing.T) {
 	tool := NewVFSEditTool(mockVFS, nil)
 
 	tests := []struct {
-		name        string
-		args        *ToolCall
-		wantPath    string
-		wantOldStr  string
-		wantNewStr  string
+		name       string
+		args       *ToolCall
+		wantPath   string
+		wantOldStr string
+		wantNewStr string
 	}{
 		{
 			name: "basic edit",
@@ -249,7 +249,7 @@ func TestVFSEditTool_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			summary, details, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
-			assert.True(t, strings.HasPrefix(summary, "VFS: edit "), "Summary should start with 'VFS: edit '")
+			assert.True(t, strings.HasPrefix(summary, "edit "), "Summary should start with 'edit '")
 			assert.Contains(t, summary, tt.wantPath, "Summary should contain path")
 			assert.LessOrEqual(t, len(summary), 128, "Summary should not exceed 128 characters")
 			assert.NotNil(t, meta, "Meta should not be nil")
@@ -269,10 +269,10 @@ func TestVFSGrepTool_Render(t *testing.T) {
 	tool := NewVFSGrepTool(mockVFS)
 
 	tests := []struct {
-		name         string
-		args         *ToolCall
-		wantPattern  string
-		wantPath     string
+		name        string
+		args        *ToolCall
+		wantPattern string
+		wantPath    string
 	}{
 		{
 			name: "basic grep without path",
@@ -298,7 +298,7 @@ func TestVFSGrepTool_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			summary, details, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
-			assert.True(t, strings.HasPrefix(summary, "VFS: grep "), "Summary should start with 'VFS: grep '")
+			assert.True(t, strings.HasPrefix(summary, "grep "), "Summary should start with 'grep '")
 			assert.Contains(t, summary, tt.wantPattern, "Summary should contain pattern")
 			if tt.wantPath != "" {
 				assert.Contains(t, summary, tt.wantPath, "Summary should contain path")

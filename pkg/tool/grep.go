@@ -168,9 +168,9 @@ func formatInt64(n int64) string {
 func (t *VFSGrepTool) Render(call *ToolCall) (string, string, map[string]string) {
 	pattern, _ := call.Arguments.StringOK("pattern")
 	path := call.Arguments.String("path")
-	oneLiner := truncateString("VFS: grep "+pattern, 128)
+	oneLiner := truncateString("grep "+pattern, 128)
 	if path != "" {
-		oneLiner = truncateString("VFS: grep "+pattern+" in "+path, 128)
+		oneLiner = truncateString("grep "+pattern+" in "+path, 128)
 	}
 	full := oneLiner + "\n\n"
 	// Try to get content from result if available
