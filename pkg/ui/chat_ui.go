@@ -35,8 +35,14 @@ type ToolUI struct {
 	// Tool arguments
 	Props [][]string `json:"props"`
 
-	// Display is the string representation of the tool call result from Tool.Display()
-	Display string `json:"display"`
+	// Summary is the one-line summary of the tool call result from Tool.Render()
+	Summary string `json:"summary"`
+
+	// Details is the full information of the tool call result from Tool.Render()
+	Details string `json:"details"`
+
+	// Meta contains additional properties from Tool.Render() that can be used to display in the UI
+	Meta map[string]string `json:"meta"`
 }
 
 // ChatMessageUI represents a chat message as seen by the user in UI.

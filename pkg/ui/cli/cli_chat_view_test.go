@@ -123,7 +123,7 @@ func TestCliChatView_Init(t *testing.T) {
 							Status:  ui.ToolStatusSucceeded,
 							Props:   [][]string{{"path", "/test/file.txt"}},
 							Message: "file content here",
-							Display: "vfsRead",
+							Summary: "vfsRead",
 						},
 					},
 				},
@@ -242,7 +242,7 @@ func TestCliChatView_AddMessage(t *testing.T) {
 					Status:  ui.ToolStatusSucceeded,
 					Props:   [][]string{{"path", "/test.txt"}},
 					Message: "written",
-					Display: "vfsWrite",
+					Summary: "vfsWrite",
 				},
 			},
 		}
@@ -371,7 +371,7 @@ func TestCliChatView_UpdateTool(t *testing.T) {
 			Id:      "tool1",
 			Name:    "vfsRead",
 			Status:  ui.ToolStatusSucceeded,
-			Display: "vfsRead",
+			Summary: "vfsRead",
 		}
 
 		err := view.UpdateTool(updatedTool)
@@ -581,7 +581,7 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 					Id:      "tool1",
 					Name:    "vfsRead",
 					Status:  ui.ToolStatusSucceeded,
-					Display: "vfsRead",
+					Summary: "vfsRead",
 				},
 			},
 		}
@@ -601,7 +601,7 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 					Id:      "tool1",
 					Name:    "vfsRead",
 					Status:  ui.ToolStatusSucceeded,
-					Display: "vfsRead",
+					Summary: "vfsRead",
 				},
 			},
 		}
@@ -672,7 +672,7 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 			Id:      "tool1",
 			Name:    "vfsRead",
 			Status:  ui.ToolStatusSucceeded,
-			Display: "vfsRead",
+			Summary: "vfsRead",
 		}
 		err = view.UpdateTool(updatedTool)
 		require.NoError(t, err)
@@ -711,7 +711,7 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 						Name:    "vfsRead",
 						Status:  ui.ToolStatusSucceeded,
 						Props:   [][]string{{"path", "/test.txt"}},
-						Display: "vfsRead",
+						Summary: "vfsRead",
 					},
 				},
 			}
@@ -754,7 +754,7 @@ func TestCliChatView_ToolDisplayField(t *testing.T) {
 					Id:      "tool1",
 					Name:    "vfsRead",
 					Status:  ui.ToolStatusSucceeded,
-					Display: "Read file: /test.txt",
+					Summary: "Read file: /test.txt",
 				},
 			},
 		}

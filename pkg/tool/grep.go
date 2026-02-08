@@ -164,7 +164,7 @@ func formatInt64(n int64) string {
 	return string(digits)
 }
 
-// Display returns a string representation of the tool call.
-func (t *VFSGrepTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
-	return "vfsGrep", make(map[string]string)
+// Render returns a string representation of the tool call.
+func (t *VFSGrepTool) Render() (string, string, map[string]string) {
+	return "vfsGrep", "vfsGrep", make(map[string]string)
 }

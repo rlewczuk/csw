@@ -262,11 +262,13 @@ func (p *ChatPresenter) AddToolCallResult(result *tool.ToolResponse) {
 				} else {
 					t.Status = ui.ToolStatusSucceeded
 				}
-				// Get the display string from the tool
+				// Get the render result from the tool
 				if p.system != nil && p.system.Tools != nil {
 					if toolImpl, err := p.system.Tools.Get(result.Call.Function); err == nil {
-						displayStr, _ := toolImpl.Display(tool.DisplayModeShort, false)
-						t.Display = displayStr
+						summary, details, meta := toolImpl.Render()
+						t.Summary = summary
+						t.Details = details
+						t.Meta = meta
 					}
 				}
 				toolState = t

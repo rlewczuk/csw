@@ -349,8 +349,8 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) {
 		return
 	}
 
-	// Use the Display field from ToolUI if available, otherwise fall back to tool name
-	displayStr := tool.Display
+	// Use the Summary field from ToolUI if available, otherwise fall back to tool name
+	displayStr := tool.Summary
 	if displayStr == "" {
 		displayStr = tool.Name
 	}

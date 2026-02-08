@@ -226,7 +226,7 @@ func matchSegmentPattern(pattern, segment string) bool {
 	return true
 }
 
-// Display returns a string representation of the tool call.
-func (a *AccessControlTool) Display(mode DisplayMode, color bool) (string, map[string]string) {
-	return "AccessControl", make(map[string]string)
+// Render returns a string representation of the tool call.
+func (a *AccessControlTool) Render() (string, string, map[string]string) {
+	return "AccessControl", "AccessControl", make(map[string]string)
 }
