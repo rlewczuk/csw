@@ -376,7 +376,18 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) bool {
 		v.lastMessageWasAssistant = false
 	}
 
-	outputLine := fmt.Sprintf("! %s: %s\n", displayStr, tool.Status)
+	// Choose icon based on status
+	var icon string
+	switch tool.Status {
+	case ui.ToolStatusSucceeded:
+		icon = "✅"
+	case ui.ToolStatusFailed:
+		icon = "❌"
+	default:
+		icon = "⌛"
+	}
+
+	outputLine := fmt.Sprintf("%s %s\n", icon, displayStr)
 
 	// Check if this tool has already been rendered with the same output
 	if lastOutput, ok := v.renderedTools[tool.Id]; ok && lastOutput == outputLine {
