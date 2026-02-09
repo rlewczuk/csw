@@ -340,6 +340,39 @@ func TestCliChatView_UpdateMessage(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "New content", view.messages[0].Text)
 	})
+
+	t.Run("streamed assistant updates append without newlines", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Hello ",
+		}
+		view.AddMessage(msg)
+
+		updatedMsg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Hello world",
+		}
+		err := view.UpdateMessage(updatedMsg)
+		require.NoError(t, err)
+
+		updatedMsg = &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Hello world!",
+		}
+		err = view.UpdateMessage(updatedMsg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "Assistant: Hello world!")
+		assert.NotContains(t, outputStr, "Hello \nworld")
+	})
 }
 
 func TestCliChatView_UpdateTool(t *testing.T) {
@@ -450,6 +483,82 @@ func TestCliChatView_ToolRenderOutputOnUpdate(t *testing.T) {
 		err = view.UpdateTool(updatedTool)
 		require.NoError(t, err)
 		assert.Contains(t, output.String(), "✅ Read file: /test.txt")
+	})
+}
+
+func TestCliChatView_ToolNewlineAfterStreamedAssistant(t *testing.T) {
+	t.Run("adds newline when assistant does not end with newline", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Working",
+			Tools: []*ui.ToolUI{
+				{
+					Id:     "tool1",
+					Name:   "vfsRead",
+					Status: ui.ToolStatusStarted,
+				},
+			},
+		}
+		view.AddMessage(msg)
+
+		updatedMsg := &ui.ChatMessageUI{
+			Id:    "msg1",
+			Role:  ui.ChatRoleAssistant,
+			Text:  "Working on it",
+			Tools: msg.Tools,
+		}
+		err := view.UpdateMessage(updatedMsg)
+		require.NoError(t, err)
+
+		updatedTool := &ui.ToolUI{
+			Id:      "tool1",
+			Name:    "vfsRead",
+			Status:  ui.ToolStatusSucceeded,
+			Summary: "vfsRead",
+		}
+		err = view.UpdateTool(updatedTool)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "Assistant: Working on it\n✅ vfsRead")
+	})
+
+	t.Run("does not add extra newline when assistant already ends with newline", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Done\n",
+			Tools: []*ui.ToolUI{
+				{
+					Id:     "tool1",
+					Name:   "vfsRead",
+					Status: ui.ToolStatusStarted,
+				},
+			},
+		}
+		view.AddMessage(msg)
+
+		updatedTool := &ui.ToolUI{
+			Id:      "tool1",
+			Name:    "vfsRead",
+			Status:  ui.ToolStatusSucceeded,
+			Summary: "vfsRead",
+		}
+		err := view.UpdateTool(updatedTool)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "Assistant: Done\n✅ vfsRead")
+		assert.NotContains(t, outputStr, "Done\n\n✅ vfsRead")
 	})
 }
 
