@@ -135,7 +135,7 @@ func TestCliChatView_Init(t *testing.T) {
 
 		outputStr := output.String()
 		assert.Contains(t, outputStr, "Assistant: Running tool")
-		assert.Contains(t, outputStr, "vfsRead: succeeded")
+		assert.Contains(t, outputStr, "✅ vfsRead")
 	})
 
 	t.Run("does not display tools in started or executing status", func(t *testing.T) {
@@ -253,7 +253,7 @@ func TestCliChatView_AddMessage(t *testing.T) {
 
 		outputStr := output.String()
 		assert.Contains(t, outputStr, "Assistant: Done")
-		assert.Contains(t, outputStr, "vfsWrite: succeeded")
+		assert.Contains(t, outputStr, "✅ vfsWrite")
 	})
 
 	t.Run("does not render tool when summary is empty", func(t *testing.T) {
@@ -377,7 +377,7 @@ func TestCliChatView_UpdateTool(t *testing.T) {
 		err := view.UpdateTool(updatedTool)
 		require.NoError(t, err)
 		assert.Equal(t, ui.ToolStatusSucceeded, view.messages[0].Tools[0].Status)
-		assert.Contains(t, output.String(), "vfsRead: succeeded")
+		assert.Contains(t, output.String(), "✅ vfsRead")
 	})
 
 	t.Run("does not display tool when status is started or executing", func(t *testing.T) {
@@ -449,7 +449,7 @@ func TestCliChatView_ToolRenderOutputOnUpdate(t *testing.T) {
 
 		err = view.UpdateTool(updatedTool)
 		require.NoError(t, err)
-		assert.Contains(t, output.String(), "Read file: /test.txt: succeeded")
+		assert.Contains(t, output.String(), "✅ Read file: /test.txt")
 	})
 }
 
@@ -564,8 +564,8 @@ func TestCliChatView_ToolStatus(t *testing.T) {
 		shouldDisplay  bool
 		expectedOutput string
 	}{
-		{"succeeded", ui.ToolStatusSucceeded, true, "test.tool: succeeded"},
-		{"failed", ui.ToolStatusFailed, true, "test.tool: failed"},
+		{"succeeded", ui.ToolStatusSucceeded, true, "✅ test.tool"},
+		{"failed", ui.ToolStatusFailed, true, "❌ test.tool"},
 		{"started", ui.ToolStatusStarted, false, ""},
 		{"executing", ui.ToolStatusExecuting, false, ""},
 	}
@@ -647,7 +647,7 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 
 		// Count how many times the tool appears in output
 		outputStr := output.String()
-		toolCount := strings.Count(outputStr, "vfsRead: succeeded")
+		toolCount := strings.Count(outputStr, "✅ vfsRead")
 
 		// Tool should not appear again since it was already rendered with the same status
 		assert.Equal(t, 0, toolCount, "Tool should not be printed again when status hasn't changed")
@@ -716,7 +716,7 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 
 		// Tool should be printed now since status changed to final
 		outputStr = output.String()
-		assert.Contains(t, outputStr, "vfsRead: succeeded")
+		assert.Contains(t, outputStr, "✅ vfsRead")
 	})
 
 	t.Run("multiple message updates do not duplicate tools", func(t *testing.T) {
@@ -757,7 +757,7 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 
 			// Count tool occurrences in this update
 			outputStr := output.String()
-			toolCount := strings.Count(outputStr, "vfsRead: succeeded")
+			toolCount := strings.Count(outputStr, "✅ vfsRead")
 			totalToolCount += toolCount
 
 			// Tool should appear at most once (on first update when it's first seen)
@@ -800,7 +800,7 @@ func TestCliChatView_ToolDisplayField(t *testing.T) {
 		require.NoError(t, err)
 
 		outputStr := output.String()
-		assert.Contains(t, outputStr, "Read file: /test.txt: succeeded")
+		assert.Contains(t, outputStr, "✅ Read file: /test.txt")
 		assert.NotContains(t, outputStr, "vfsRead")
 	})
 
