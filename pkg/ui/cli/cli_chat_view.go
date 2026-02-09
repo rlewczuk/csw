@@ -334,21 +334,29 @@ func (v *CliChatView) renderAssistantMessage(msg *ui.ChatMessageUI) {
 	}
 
 	// Render tool calls
+	toolsRendered := false
 	for _, tool := range msg.Tools {
-		v.renderTool(tool)
+		if v.renderTool(tool) {
+			toolsRendered = true
+		}
 	}
 
 	// Mark that the last message was from assistant
-	v.lastMessageWasAssistant = true
+	// But only if no tools were rendered - if tools were rendered, the last output was a tool
+	// and lastMessageWasAssistant should remain false (or be set to false by renderTool)
+	if !toolsRendered {
+		v.lastMessageWasAssistant = true
+	}
 }
 
 // renderTool renders a tool call status.
 // Must be called with mu locked.
 // Only displays tool calls in final status (succeeded or failed).
-func (v *CliChatView) renderTool(tool *ui.ToolUI) {
+// Returns true if the tool was rendered (i.e., it was in final status and had display content).
+func (v *CliChatView) renderTool(tool *ui.ToolUI) bool {
 	// Only render in final status (succeeded or failed)
 	if tool.Status != ui.ToolStatusSucceeded && tool.Status != ui.ToolStatusFailed {
-		return
+		return false
 	}
 
 	// Use the Summary field from ToolUI if available, otherwise fall back to Details
@@ -357,10 +365,12 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) {
 		displayStr = tool.Details
 	}
 	if displayStr == "" {
-		return
+		return false
 	}
 
 	// Check if last message was assistant, if so print newline
+	// This ensures tools are visually separated from the assistant message
+	// but only the first tool prints this newline
 	if v.lastMessageWasAssistant {
 		fmt.Fprint(v.output, "\n")
 		v.lastMessageWasAssistant = false
@@ -370,7 +380,7 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) {
 
 	// Check if this tool has already been rendered with the same output
 	if lastOutput, ok := v.renderedTools[tool.Id]; ok && lastOutput == outputLine {
-		return
+		return false
 	}
 
 	// Render the tool call result
@@ -378,6 +388,8 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) {
 
 	// Mark this tool as rendered with current output
 	v.renderedTools[tool.Id] = outputLine
+
+	return true
 }
 
 var _ ui.IChatView = (*CliChatView)(nil)
