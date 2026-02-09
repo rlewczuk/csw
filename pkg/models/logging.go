@@ -143,3 +143,21 @@ func parseJSONBody(body []byte) interface{} {
 	}
 	return result
 }
+
+// logHTTPErrorResponse logs an HTTP error response with the given logger.
+// It logs the response status, headers, and raw body as structured fields.
+// This function is a no-op if logger is nil.
+// The body is logged as a raw string (not parsed JSON) to preserve error details.
+func logHTTPErrorResponse(logger *slog.Logger, resp *http.Response, body []byte) {
+	if logger == nil {
+		return
+	}
+
+	headers := obfuscateSensitiveHeadersForLogging(resp.Header)
+
+	logger.Info("llm_response_error",
+		slog.Int("status", resp.StatusCode),
+		slog.Any("headers", headers),
+		slog.String("body", string(body)),
+	)
+}
