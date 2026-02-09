@@ -1158,7 +1158,7 @@ func TestOpenAIClient_ContextLengthLimit(t *testing.T) {
 		assert.Equal(t, 4096, chatReq.MaxTokens)
 	})
 
-	t.Run("Chat method does not set max_tokens when ContextLengthLimit is zero", func(t *testing.T) {
+	t.Run("Chat method uses default max_tokens when ContextLengthLimit is zero", func(t *testing.T) {
 		mock := testutil.NewMockHTTPServer()
 		defer mock.Close()
 
@@ -1181,13 +1181,13 @@ func TestOpenAIClient_ContextLengthLimit(t *testing.T) {
 		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
 		require.NoError(t, err)
 
-		// Verify max_tokens was not set in the request
+		// Verify default max_tokens was set in the request
 		reqs := mock.GetRequests()
 		require.Len(t, reqs, 1)
 
 		var chatReq OpenaiChatCompletionRequest
 		err = json.Unmarshal(reqs[0].Body, &chatReq)
 		require.NoError(t, err)
-		assert.Equal(t, 0, chatReq.MaxTokens)
+		assert.Equal(t, DefaultContextLengthLimit, chatReq.MaxTokens)
 	})
 }
