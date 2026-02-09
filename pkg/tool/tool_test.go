@@ -818,6 +818,77 @@ func TestLLMAPICompatibility(t *testing.T) {
 	})
 }
 
+func TestTruncateOutput(t *testing.T) {
+	tests := []struct {
+		name     string
+		output   string
+		maxLines int
+		expected string
+	}{
+		{
+			name:     "no truncation needed - fewer lines than limit",
+			output:   "line1\nline2\nline3",
+			maxLines: 5,
+			expected: "line1\nline2\nline3",
+		},
+		{
+			name:     "no truncation needed - exact limit",
+			output:   "line1\nline2\nline3",
+			maxLines: 3,
+			expected: "line1\nline2\nline3",
+		},
+		{
+			name:     "truncation needed",
+			output:   "line1\nline2\nline3\nline4\nline5",
+			maxLines: 3,
+			expected: "line1\nline2\nline3\nOutput is truncated.",
+		},
+		{
+			name:     "zero limit means no limit",
+			output:   "line1\nline2\nline3\nline4\nline5",
+			maxLines: 0,
+			expected: "line1\nline2\nline3\nline4\nline5",
+		},
+		{
+			name:     "negative limit means no limit",
+			output:   "line1\nline2\nline3",
+			maxLines: -1,
+			expected: "line1\nline2\nline3",
+		},
+		{
+			name:     "single line output",
+			output:   "single line",
+			maxLines: 5,
+			expected: "single line",
+		},
+		{
+			name:     "empty output",
+			output:   "",
+			maxLines: 5,
+			expected: "",
+		},
+		{
+			name:     "limit of 1",
+			output:   "line1\nline2\nline3",
+			maxLines: 1,
+			expected: "line1\nOutput is truncated.",
+		},
+		{
+			name:     "output with trailing newline truncated",
+			output:   "line1\nline2\nline3\n",
+			maxLines: 2,
+			expected: "line1\nline2\nOutput is truncated.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := truncateOutput(tt.output, tt.maxLines)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestToolInfo_ShortDescription(t *testing.T) {
 	tests := []struct {
 		name        string

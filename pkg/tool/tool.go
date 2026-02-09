@@ -567,3 +567,21 @@ func truncateString(s string, maxLen int) string {
 	}
 	return s[:maxLen-3] + "..."
 }
+
+// truncateOutput truncates the output to at most maxLines lines.
+// If the output is truncated, a message is appended indicating truncation.
+// A maxLines value of 0 means no limit.
+func truncateOutput(output string, maxLines int) string {
+	if maxLines <= 0 {
+		return output
+	}
+
+	lines := strings.Split(output, "\n")
+	if len(lines) <= maxLines {
+		return output
+	}
+
+	truncated := strings.Join(lines[:maxLines], "\n")
+	truncated += "\nOutput is truncated."
+	return truncated
+}

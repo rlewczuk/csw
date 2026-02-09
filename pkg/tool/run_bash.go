@@ -93,6 +93,19 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 		timeout = time.Duration(timeoutSecs) * time.Second
 	}
 
+	// Parse optional limit argument (default: 200 lines, 0 means no limit)
+	limit := 200
+	if limitArg, ok := args.Arguments.IntOK("limit"); ok {
+		if limitArg < 0 {
+			return &ToolResponse{
+				Call:  args,
+				Error: fmt.Errorf("RunBashTool.Execute() [run.go]: limit must be non-negative, got %d", limitArg),
+				Done:  true,
+			}
+		}
+		limit = int(limitArg)
+	}
+
 	// Check permissions for absolute workdir
 	if needsPermission {
 		// Check if explicit access is granted
@@ -152,7 +165,7 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 		})
 	case conf.AccessAllow:
 		// Execute the command
-		return t.executeCommand(args, command, resolvedWorkdir, timeout)
+		return t.executeCommand(args, command, resolvedWorkdir, timeout, limit)
 	default:
 		// Default to Ask if not specified
 		details := fmt.Sprintf("Allow running command: %s", command)
@@ -161,6 +174,9 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 		}
 		if timeout > 0 {
 			details += fmt.Sprintf("\nTimeout: %v", timeout)
+		}
+		if limit != 200 {
+			details += fmt.Sprintf("\nLimit: %d", limit)
 		}
 		return NewPermissionQuery(args, PermissionTitleRequired, details, PermissionOptions(PermissionOptionAllowRemember), map[string]string{
 			"type":    "run",
@@ -221,7 +237,7 @@ func countWildcards(pattern string) int {
 }
 
 // executeCommand executes the command using the runner.
-func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir string, timeout time.Duration) *ToolResponse {
+func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir string, timeout time.Duration, limit int) *ToolResponse {
 	var output string
 	var exitCode int
 	var err error
@@ -245,6 +261,11 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 			Error: fmt.Errorf("RunBashTool.executeCommand() [run.go]: %w", err),
 			Done:  true,
 		}
+	}
+
+	// Apply line limit if specified (limit > 0)
+	if limit > 0 {
+		output = truncateOutput(output, limit)
 	}
 
 	// Return the output and exit code
