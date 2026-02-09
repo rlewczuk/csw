@@ -44,6 +44,9 @@ type CliChatView struct {
 
 	// lastMessageWasAssistant tracks if the last message rendered was from the assistant
 	lastMessageWasAssistant bool
+
+	// lastAssistantEndedWithNewline tracks if the last assistant output ended with a newline
+	lastAssistantEndedWithNewline bool
 }
 
 // NewCliChatView creates a new CLI chat view.
@@ -123,11 +126,17 @@ func (v *CliChatView) UpdateMessage(msg *ui.ChatMessageUI) error {
 	}
 
 	// If not found by ID, try to find by role (for backwards compatibility)
-	for i, m := range v.messages {
-		if msg.Id == "" && m.Role == msg.Role && m.Text == "" {
-			v.messages[i] = msg
-			v.renderMessage(msg)
-			return nil
+	if msg.Id == "" {
+		for i := len(v.messages) - 1; i >= 0; i-- {
+			m := v.messages[i]
+			if m.Role == msg.Role {
+				if msg.Id == "" && m.Id != "" {
+					msg.Id = m.Id
+				}
+				v.messages[i] = msg
+				v.renderMessage(msg)
+				return nil
+			}
 		}
 	}
 
@@ -318,19 +327,26 @@ func (v *CliChatView) renderAssistantMessage(msg *ui.ChatMessageUI) {
 		isStreamingUpdate = msg.Text[:len(prevRendered)] == prevRendered
 	}
 
+	printedContent := ""
 	if isStreamingUpdate {
 		// Streaming update: only print the delta
 		if len(msg.Text) > len(prevRendered) {
 			newContent := msg.Text[len(prevRendered):]
 			fmt.Fprint(v.output, newContent)
 			v.renderedText[msg.Id] = msg.Text
+			printedContent = newContent
 		}
 	} else {
 		// Full update or new message: print the full message
 		if msg.Text != "" {
 			fmt.Fprintf(v.output, "\nAssistant: %s", msg.Text)
 			v.renderedText[msg.Id] = msg.Text
+			printedContent = msg.Text
 		}
+	}
+
+	if printedContent != "" {
+		v.lastAssistantEndedWithNewline = strings.HasSuffix(printedContent, "\n")
 	}
 
 	// Render tool calls
@@ -371,10 +387,10 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) bool {
 	// Check if last message was assistant, if so print newline
 	// This ensures tools are visually separated from the assistant message
 	// but only the first tool prints this newline
-	if v.lastMessageWasAssistant {
+	if v.lastMessageWasAssistant && !v.lastAssistantEndedWithNewline {
 		fmt.Fprint(v.output, "\n")
-		v.lastMessageWasAssistant = false
 	}
+	v.lastMessageWasAssistant = false
 
 	// Choose icon based on status
 	var icon string
@@ -396,6 +412,7 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) bool {
 
 	// Render the tool call result
 	fmt.Fprint(v.output, outputLine)
+	v.lastAssistantEndedWithNewline = true
 
 	// Mark this tool as rendered with current output
 	v.renderedTools[tool.Id] = outputLine
