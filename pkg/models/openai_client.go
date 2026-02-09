@@ -19,6 +19,9 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
+// DefaultContextLengthLimit is the default maximum number of tokens for context length.
+const DefaultContextLengthLimit = 131072
+
 // OpenAIClient is a client for interacting with OpenAI-compatible API
 type OpenAIClient struct {
 	baseURL    string
@@ -203,10 +206,11 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 
 	// Build request
 	chatReq := OpenaiChatCompletionRequest{
-		Model:    m.model,
-		Messages: openaiMessages,
-		Stream:   false,
-		Tools:    convertToolsToOpenAI(tools),
+		Model:     m.model,
+		Messages:  openaiMessages,
+		Stream:    false,
+		Tools:     convertToolsToOpenAI(tools),
+		MaxTokens: DefaultContextLengthLimit,
 	}
 
 	// Apply config ContextLengthLimit as MaxTokens if set
@@ -317,10 +321,11 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 
 		// Build request with streaming enabled
 		chatReq := OpenaiChatCompletionRequest{
-			Model:    m.model,
-			Messages: openaiMessages,
-			Stream:   true,
-			Tools:    convertToolsToOpenAI(tools),
+			Model:     m.model,
+			Messages:  openaiMessages,
+			Stream:    true,
+			Tools:     convertToolsToOpenAI(tools),
+			MaxTokens: DefaultContextLengthLimit,
 		}
 
 		// Apply config ContextLengthLimit as MaxTokens if set

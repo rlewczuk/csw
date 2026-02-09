@@ -1182,7 +1182,7 @@ func TestOllamaClient_ContextLengthLimit(t *testing.T) {
 		assert.Equal(t, 4096, chatReq.Options.NumPredict)
 	})
 
-	t.Run("Chat method does not set num_predict when ContextLengthLimit is zero", func(t *testing.T) {
+	t.Run("Chat method uses default num_predict when ContextLengthLimit is zero", func(t *testing.T) {
 		mock := testutil.NewMockHTTPServer()
 		defer mock.Close()
 
@@ -1205,14 +1205,15 @@ func TestOllamaClient_ContextLengthLimit(t *testing.T) {
 		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
 		require.NoError(t, err)
 
-		// Verify Options was not set in the request (since no options provided and ContextLengthLimit is 0)
+		// Verify default num_predict was set in the request
 		reqs := mock.GetRequests()
 		require.Len(t, reqs, 1)
 
 		var chatReq OllamaChatRequest
 		err = json.Unmarshal(reqs[0].Body, &chatReq)
 		require.NoError(t, err)
-		assert.Nil(t, chatReq.Options)
+		require.NotNil(t, chatReq.Options)
+		assert.Equal(t, DefaultContextLengthLimit, chatReq.Options.NumPredict)
 	})
 
 	t.Run("Chat method sets num_predict with options when ContextLengthLimit is set", func(t *testing.T) {

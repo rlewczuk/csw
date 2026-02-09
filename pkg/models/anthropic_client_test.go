@@ -1285,7 +1285,7 @@ func TestAnthropicClient_ContextLengthLimit(t *testing.T) {
 		var chatReq AnthropicMessagesRequest
 		err = json.Unmarshal(reqs[0].Body, &chatReq)
 		require.NoError(t, err)
-		assert.Equal(t, 131072, chatReq.MaxTokens)
+		assert.Equal(t, DefaultContextLengthLimit, chatReq.MaxTokens)
 	})
 
 	t.Run("ChatStream method uses default max_tokens when ContextLengthLimit is zero", func(t *testing.T) {
@@ -1326,6 +1326,6 @@ func TestAnthropicClient_ContextLengthLimit(t *testing.T) {
 		var chatReq AnthropicMessagesRequest
 		err = json.Unmarshal(reqs[0].Body, &chatReq)
 		require.NoError(t, err)
-		assert.Equal(t, 4096, chatReq.MaxTokens)
+		assert.Equal(t, DefaultContextLengthLimit, chatReq.MaxTokens)
 	})
 }
