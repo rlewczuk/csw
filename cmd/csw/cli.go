@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/core"
 	"github.com/codesnort/codesnort-swe/pkg/logging"
@@ -85,6 +86,7 @@ func CliCommand() *cobra.Command {
 }
 
 func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer string) error {
+	startTime := time.Now()
 	ctx := context.Background()
 
 	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
@@ -212,6 +214,7 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 		return ctx.Err()
 	}
 
+	fmt.Printf("\nSession completed in %s\n", time.Since(startTime).Round(time.Second))
 	return nil
 }
 
