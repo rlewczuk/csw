@@ -151,6 +151,7 @@ func (c *OpenAIClient) ListModels() ([]ModelInfo, error) {
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	setUserAgentHeader(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -238,6 +239,7 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
+	setUserAgentHeader(req)
 
 	// Print verbose request output if enabled
 	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
@@ -361,6 +363,7 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
 		req.Header.Set("Accept", "text/event-stream")
+		setUserAgentHeader(req)
 
 		// Print verbose request output if enabled
 		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
@@ -596,6 +599,7 @@ func (m *OpenAIEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
+	setUserAgentHeader(req)
 
 	resp, err := m.client.httpClient.Do(req)
 	if err != nil {

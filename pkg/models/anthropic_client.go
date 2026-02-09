@@ -155,6 +155,7 @@ func (c *AnthropicClient) ListModels() ([]ModelInfo, error) {
 
 	req.Header.Set("x-api-key", c.apiKey)
 	req.Header.Set("anthropic-version", c.apiVersion)
+	setUserAgentHeader(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -268,6 +269,7 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", m.client.apiKey)
 	req.Header.Set("anthropic-version", m.client.apiVersion)
+	setUserAgentHeader(req)
 
 	// Print verbose request output if enabled
 	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
@@ -406,6 +408,7 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("x-api-key", m.client.apiKey)
 		req.Header.Set("anthropic-version", m.client.apiVersion)
+		setUserAgentHeader(req)
 
 		// Print verbose request output if enabled
 		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
