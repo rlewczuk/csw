@@ -13,6 +13,10 @@
     "timeout": {
       "type": "integer",
       "description": "Timeout in seconds. If not specified, default timeout is used."
+    },
+    "limit": {
+      "type": "integer",
+      "description": "Maximum number of lines to return in the output. If not specified, default is 200 lines. Use 0 for no limit."
     }
   },
   "required": ["command"]
