@@ -216,6 +216,10 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 		// Note: OpenAI API doesn't have TopK parameter
 	}
 
+	if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
+		chatReq.MaxTokens = m.client.config.ContextLengthLimit
+	}
+
 	url := m.client.baseURL + "/chat/completions"
 
 	body, err := json.Marshal(chatReq)
@@ -323,6 +327,10 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 			chatReq.Temperature = float64(effectiveOptions.Temperature)
 			chatReq.TopP = float64(effectiveOptions.TopP)
 			// Note: OpenAI API doesn't have TopK parameter
+		}
+
+		if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
+			chatReq.MaxTokens = m.client.config.ContextLengthLimit
 		}
 
 		url := m.client.baseURL + "/chat/completions"

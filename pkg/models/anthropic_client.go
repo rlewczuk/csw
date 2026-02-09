@@ -221,11 +221,16 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		}
 	}
 
+	maxTokens := 131072
+	if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
+		maxTokens = m.client.config.ContextLengthLimit
+	}
+
 	// Build request
 	chatReq := AnthropicMessagesRequest{
 		Model:     m.model,
 		Messages:  anthropicMessages,
-		MaxTokens: 131072, // Default max tokens
+		MaxTokens: maxTokens,
 		Stream:    false,
 		Tools:     convertToolsToAnthropic(tools),
 	}
@@ -348,11 +353,16 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			}
 		}
 
+		maxTokens := 4096
+		if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
+			maxTokens = m.client.config.ContextLengthLimit
+		}
+
 		// Build request with streaming enabled
 		chatReq := AnthropicMessagesRequest{
 			Model:     m.model,
 			Messages:  anthropicMessages,
-			MaxTokens: 4096,
+			MaxTokens: maxTokens,
 			Stream:    true,
 			Tools:     convertToolsToAnthropic(tools),
 		}

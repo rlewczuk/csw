@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"strings"
@@ -314,6 +315,73 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
+	})
+}
+
+func TestOllamaClient_ContextLengthLimit(t *testing.T) {
+	t.Run("sets max tokens for chat", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"ok"},"done":true,"done_reason":"stop"}`)
+
+		client, err := NewOllamaClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			ContextLengthLimit: 321,
+			ConnectTimeout:     connectOllamaTimeout,
+			RequestTimeout:     testOllamaTimeout,
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel(testOllamaModelName, nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "Hello"),
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+
+		reqs := mock.GetRequests()
+		require.NotEmpty(t, reqs)
+
+		var chatReq OllamaChatRequest
+		require.NoError(t, json.Unmarshal(reqs[len(reqs)-1].Body, &chatReq))
+		require.NotNil(t, chatReq.Options)
+		assert.Equal(t, 321, chatReq.Options.NumPredict)
+	})
+
+	t.Run("sets max tokens for streaming", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		mock.AddStreamingResponse("/api/chat", "POST", true,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"ok"},"done":true,"done_reason":"stop"}`,
+		)
+
+		client, err := NewOllamaClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			ContextLengthLimit: 654,
+			ConnectTimeout:     connectOllamaTimeout,
+			RequestTimeout:     testOllamaTimeout,
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel(testOllamaModelName, nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "Hello"),
+		}
+
+		for range chatModel.ChatStream(context.Background(), messages, nil, nil) {
+			// Consume stream
+		}
+
+		reqs := mock.GetRequests()
+		require.NotEmpty(t, reqs)
+
+		var chatReq OllamaChatRequest
+		require.NoError(t, json.Unmarshal(reqs[len(reqs)-1].Body, &chatReq))
+		require.NotNil(t, chatReq.Options)
+		assert.Equal(t, 654, chatReq.Options.NumPredict)
 	})
 }
 

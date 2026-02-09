@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"strings"
 	"testing"
@@ -304,6 +305,76 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, response)
+	})
+}
+
+func TestAnthropicClient_ContextLengthLimit(t *testing.T) {
+	t.Run("sets max tokens for chat", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_test_ctx","type":"message","role":"assistant","content":[{"type":"text","text":"ok"}],"model":"claude-sonnet-4-5-20250929","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`)
+
+		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			APIKey:             "test-key",
+			ContextLengthLimit: 777,
+			ConnectTimeout:     connectAnthropicTimeout,
+			RequestTimeout:     testAnthropicTimeout,
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel(testAnthropicModelName, nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "Hello"),
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+
+		reqs := mock.GetRequests()
+		require.NotEmpty(t, reqs)
+
+		var chatReq AnthropicMessagesRequest
+		require.NoError(t, json.Unmarshal(reqs[len(reqs)-1].Body, &chatReq))
+		assert.Equal(t, 777, chatReq.MaxTokens)
+	})
+
+	t.Run("sets max tokens for streaming", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		mock.AddStreamingResponse("/v1/messages", "POST", true,
+			`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_test_ctx_stream","type":"message","role":"assistant","content":[],"model":"`+testAnthropicModelName+`","usage":{"input_tokens":10,"output_tokens":0}}}`,
+			`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
+			`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ok"}}`,
+			`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
+		)
+
+		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			APIKey:             "test-key",
+			ContextLengthLimit: 888,
+			ConnectTimeout:     connectAnthropicTimeout,
+			RequestTimeout:     testAnthropicTimeout,
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel(testAnthropicModelName, nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "Hello"),
+		}
+
+		for range chatModel.ChatStream(context.Background(), messages, nil, nil) {
+			// Consume stream
+		}
+
+		reqs := mock.GetRequests()
+		require.NotEmpty(t, reqs)
+
+		var chatReq AnthropicMessagesRequest
+		require.NoError(t, json.Unmarshal(reqs[len(reqs)-1].Body, &chatReq))
+		assert.Equal(t, 888, chatReq.MaxTokens)
 	})
 }
 

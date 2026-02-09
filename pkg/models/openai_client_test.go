@@ -330,6 +330,72 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	})
 }
 
+func TestOpenAIClient_ContextLengthLimit(t *testing.T) {
+	t.Run("sets max tokens for chat", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		mock.AddRestResponse("/v1/chat/completions", "POST", `{"id":"chatcmpl-ctx","object":"chat.completion","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`)
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL:                mock.URL() + "/v1",
+			ContextLengthLimit: 123,
+			ConnectTimeout:     connectOpenAITimeout,
+			RequestTimeout:     testOpenAITimeout,
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel(testOpenAIModelName, nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "Hello"),
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+
+		reqs := mock.GetRequests()
+		require.NotEmpty(t, reqs)
+
+		var chatReq OpenaiChatCompletionRequest
+		require.NoError(t, json.Unmarshal(reqs[len(reqs)-1].Body, &chatReq))
+		assert.Equal(t, 123, chatReq.MaxTokens)
+	})
+
+	t.Run("sets max tokens for streaming", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		mock.AddStreamingResponse("/v1/chat/completions", "POST", true,
+			`data: {"id":"chatcmpl-stream-ctx","object":"chat.completion.chunk","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"delta":{"role":"assistant","content":"ok"}}]}`,
+			"data: [DONE]",
+		)
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL:                mock.URL() + "/v1",
+			ContextLengthLimit: 456,
+			ConnectTimeout:     connectOpenAITimeout,
+			RequestTimeout:     testOpenAITimeout,
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel(testOpenAIModelName, nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "Hello"),
+		}
+
+		for range chatModel.ChatStream(context.Background(), messages, nil, nil) {
+			// Consume stream
+		}
+
+		reqs := mock.GetRequests()
+		require.NotEmpty(t, reqs)
+
+		var chatReq OpenaiChatCompletionRequest
+		require.NoError(t, json.Unmarshal(reqs[len(reqs)-1].Body, &chatReq))
+		assert.Equal(t, 456, chatReq.MaxTokens)
+	})
+}
+
 func TestOpenAIClient_ChatModelStream(t *testing.T) {
 	tc := getOpenAITestClient(t)
 	defer tc.Close()
