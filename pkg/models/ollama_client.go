@@ -146,6 +146,7 @@ func (c *OllamaClient) ListModels() ([]ModelInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	setUserAgentHeader(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -241,6 +242,7 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	setUserAgentHeader(req)
 
 	// Print verbose request output if enabled
 	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
@@ -389,6 +391,7 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 			return
 		}
 		req.Header.Set("Content-Type", "application/json")
+		setUserAgentHeader(req)
 
 		// Print verbose request output if enabled
 		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
@@ -510,6 +513,7 @@ func (m *OllamaEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	setUserAgentHeader(req)
 
 	resp, err := m.client.httpClient.Do(req)
 	if err != nil {
