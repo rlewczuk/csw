@@ -216,6 +216,14 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 		}
 	}
 
+	// Apply config ContextLengthLimit as NumPredict if set
+	if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
+		if chatReq.Options == nil {
+			chatReq.Options = &OllamaModelOptions{}
+		}
+		chatReq.Options.NumPredict = m.client.config.ContextLengthLimit
+	}
+
 	url := m.client.baseURL + "/api/chat"
 
 	body, err := json.Marshal(chatReq)
@@ -342,6 +350,14 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 				TopP:        float64(effectiveOptions.TopP),
 				TopK:        effectiveOptions.TopK,
 			}
+		}
+
+		// Apply config ContextLengthLimit as NumPredict if set
+		if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
+			if chatReq.Options == nil {
+				chatReq.Options = &OllamaModelOptions{}
+			}
+			chatReq.Options.NumPredict = m.client.config.ContextLengthLimit
 		}
 
 		url := m.client.baseURL + "/api/chat"

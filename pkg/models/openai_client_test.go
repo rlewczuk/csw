@@ -1084,3 +1084,110 @@ func TestOpenAIClient_Logging(t *testing.T) {
 		assert.NotContains(t, logOutput, "Bearer test")
 	})
 }
+
+func TestOpenAIClient_ContextLengthLimit(t *testing.T) {
+	t.Run("Chat method uses ContextLengthLimit as max_tokens", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			ContextLengthLimit: 2048,
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-maxtokens","object":"chat.completion","created":1640000000,"model":"test-model","choices":[{"index":0,"message":{"role":"assistant","content":"Hello"},"finish_reason":"stop"}]}`)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Hello"}},
+			},
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+
+		// Verify max_tokens was set in the request
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq OpenaiChatCompletionRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+		assert.Equal(t, 2048, chatReq.MaxTokens)
+	})
+
+	t.Run("ChatStream method uses ContextLengthLimit as max_tokens", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			ContextLengthLimit: 4096,
+		})
+		require.NoError(t, err)
+
+		mock.AddStreamingResponse("/chat/completions", "POST", true,
+			`data: {"id":"chatcmpl-stream","object":"chat.completion.chunk","created":1640000000,"model":"test-model","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello"}}]}`,
+			`data: {"id":"chatcmpl-stream","object":"chat.completion.chunk","created":1640000001,"model":"test-model","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
+			"data: [DONE]",
+		)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Hello"}},
+			},
+		}
+
+		iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+		// Consume the iterator
+		for range iterator {
+		}
+
+		// Verify max_tokens was set in the request
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq OpenaiChatCompletionRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+		assert.Equal(t, 4096, chatReq.MaxTokens)
+	})
+
+	t.Run("Chat method does not set max_tokens when ContextLengthLimit is zero", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			ContextLengthLimit: 0,
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-notokens","object":"chat.completion","created":1640000000,"model":"test-model","choices":[{"index":0,"message":{"role":"assistant","content":"Hello"},"finish_reason":"stop"}]}`)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Hello"}},
+			},
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+
+		// Verify max_tokens was not set in the request
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq OpenaiChatCompletionRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+		assert.Equal(t, 0, chatReq.MaxTokens)
+	})
+}

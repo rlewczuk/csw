@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"strings"
 	"testing"
@@ -1174,5 +1175,157 @@ func TestConvertToAnthropicMessageWithMixedContent(t *testing.T) {
 		require.Len(t, contentBlocks, 1, "Should have 1 content block (tool_result)")
 		assert.Equal(t, "tool_result", contentBlocks[0].Type)
 		assert.Equal(t, "tool_123", contentBlocks[0].ToolUseID)
+	})
+}
+
+func TestAnthropicClient_ContextLengthLimit(t *testing.T) {
+	t.Run("Chat method uses ContextLengthLimit as max_tokens", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			APIKey:             "test-key",
+			ContextLengthLimit: 2048,
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_maxtokens","type":"message","role":"assistant","content":[{"type":"text","text":"Hello"}],"model":"test-model","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Hello"}},
+			},
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+
+		// Verify max_tokens was set in the request
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq AnthropicMessagesRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+		assert.Equal(t, 2048, chatReq.MaxTokens)
+	})
+
+	t.Run("ChatStream method uses ContextLengthLimit as max_tokens", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			APIKey:             "test-key",
+			ContextLengthLimit: 4096,
+		})
+		require.NoError(t, err)
+
+		mock.AddStreamingResponse("/v1/messages", "POST", true,
+			`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_stream","type":"message","role":"assistant","content":[],"model":"test-model","usage":{"input_tokens":10,"output_tokens":0}}}`,
+			`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
+			`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}`,
+			`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
+		)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Hello"}},
+			},
+		}
+
+		iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+		// Consume the iterator
+		for range iterator {
+		}
+
+		// Verify max_tokens was set in the request
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq AnthropicMessagesRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+		assert.Equal(t, 4096, chatReq.MaxTokens)
+	})
+
+	t.Run("Chat method uses default max_tokens when ContextLengthLimit is zero", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			APIKey:             "test-key",
+			ContextLengthLimit: 0,
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_default","type":"message","role":"assistant","content":[{"type":"text","text":"Hello"}],"model":"test-model","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Hello"}},
+			},
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+
+		// Verify default max_tokens was set in the request
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq AnthropicMessagesRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+		assert.Equal(t, 131072, chatReq.MaxTokens)
+	})
+
+	t.Run("ChatStream method uses default max_tokens when ContextLengthLimit is zero", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			APIKey:             "test-key",
+			ContextLengthLimit: 0,
+		})
+		require.NoError(t, err)
+
+		mock.AddStreamingResponse("/v1/messages", "POST", true,
+			`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_stream_default","type":"message","role":"assistant","content":[],"model":"test-model","usage":{"input_tokens":10,"output_tokens":0}}}`,
+			`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
+			`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}`,
+			`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
+		)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Hello"}},
+			},
+		}
+
+		iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+		// Consume the iterator
+		for range iterator {
+		}
+
+		// Verify default max_tokens was set in the request
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq AnthropicMessagesRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+		assert.Equal(t, 4096, chatReq.MaxTokens)
 	})
 }
