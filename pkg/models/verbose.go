@@ -198,6 +198,22 @@ func logVerboseStreamResponseHeaders(resp *http.Response, verbose bool) {
 	fmt.Println("\n=== Streaming Response ===")
 }
 
+// logVerboseResponseFromBytes prints the HTTP response details from pre-read body bytes if verbose mode is enabled.
+// This is useful when the body has already been read and needs to be logged.
+func logVerboseResponseFromBytes(resp *http.Response, bodyBytes []byte) {
+	fmt.Println("=== Response Headers ===")
+	obfuscatedHeaders := obfuscateHeaders(resp.Header)
+	for key, values := range obfuscatedHeaders {
+		for _, value := range values {
+			fmt.Printf("%s: %s\n", key, value)
+		}
+	}
+	fmt.Println("\n=== Raw Response ===")
+	fmt.Println(obfuscateJSONBody(bodyBytes))
+	fmt.Println("=== End of Response ===")
+	fmt.Println()
+}
+
 // wrapResponseBodyForLogging wraps an http.Response to allow reading the body
 // for logging while preserving it for further processing.
 // This is useful when checkStatusCode needs to read the body, but we also want to log it.

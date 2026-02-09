@@ -1083,6 +1083,42 @@ func TestOpenAIClient_Logging(t *testing.T) {
 		// The Authorization header should be obfuscated
 		assert.NotContains(t, logOutput, "Bearer test")
 	})
+
+	t.Run("logs error response when API returns error", func(t *testing.T) {
+		// Setup mock error response
+		if tc.Mock != nil {
+			tc.Mock.AddRestResponseWithStatus("/chat/completions", "POST", `{"error":{"message":"Invalid request","type":"invalid_request_error"}}`, 400)
+		}
+
+		// Create a test logger
+		var buf bytes.Buffer
+		handler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})
+		testLogger := slog.New(handler)
+
+		options := &ChatOptions{
+			Temperature: 0.7,
+			Logger:      testLogger,
+		}
+
+		chatModel := tc.Client.ChatModel(testOpenAIModelName, options)
+
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Test error logging"}},
+			},
+		}
+
+		_, err := chatModel.Chat(ctx, messages, nil, nil)
+		require.Error(t, err)
+
+		// Check that error response was logged
+		logOutput := buf.String()
+		assert.Contains(t, logOutput, "llm_response_error")
+		assert.Contains(t, logOutput, "Invalid request")
+	})
 }
 
 func TestOpenAIClient_ContextLengthLimit(t *testing.T) {

@@ -283,19 +283,24 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	}
 	defer resp.Body.Close()
 
-	// Log response before checking status (so errors are also logged)
-	if err := wrapResponseBodyForLogging(resp, effectiveOptions != nil && effectiveOptions.Verbose); err != nil {
-		return nil, err
-	}
-
-	if err := m.client.checkStatusCode(resp); err != nil {
-		return nil, err
-	}
-
-	// Read the response body (already logged if verbose)
+	// Read response body for logging and processing
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Log verbose response if enabled
+	if effectiveOptions != nil && effectiveOptions.Verbose {
+		logVerboseResponseFromBytes(resp, bodyBytes)
+	}
+
+	// Check status code and log error response if needed
+	if err := m.client.checkStatusCode(resp); err != nil {
+		// Log the error response to structured logger
+		if effectiveOptions != nil && effectiveOptions.Logger != nil {
+			logHTTPErrorResponse(effectiveOptions.Logger, resp, bodyBytes)
+		}
+		return nil, err
 	}
 
 	var chatResp AnthropicMessagesResponse
@@ -421,6 +426,11 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		logVerboseStreamResponseHeaders(resp, effectiveOptions != nil && effectiveOptions.Verbose)
 
 		if err := m.client.checkStatusCode(resp); err != nil {
+			// Read and log error response body
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			if effectiveOptions != nil && effectiveOptions.Logger != nil {
+				logHTTPErrorResponse(effectiveOptions.Logger, resp, bodyBytes)
+			}
 			fmt.Fprintf(os.Stderr, "ERROR: AnthropicChatModel.ChatStream() [anthropic_client.go]: API error (status %d): %v\n", resp.StatusCode, err)
 			return
 		}
