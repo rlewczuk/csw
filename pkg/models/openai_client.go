@@ -209,6 +209,11 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 		Tools:    convertToolsToOpenAI(tools),
 	}
 
+	// Apply config ContextLengthLimit as MaxTokens if set
+	if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
+		chatReq.MaxTokens = m.client.config.ContextLengthLimit
+	}
+
 	// Apply options if provided
 	if effectiveOptions != nil {
 		chatReq.Temperature = float64(effectiveOptions.Temperature)

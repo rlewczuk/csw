@@ -472,7 +472,7 @@ func (t *VFSEditTool) Execute(args *ToolCall) *ToolResponse {
 
 	// Create patcher and apply edits
 	patcher := vfs.NewFilePatcher(t.vfs)
-	diff, err := patcher.ApplyEdits(path, oldString, newString, replaceAll)
+	_, err := patcher.ApplyEdits(path, oldString, newString, replaceAll)
 	if err == vfs.ErrAskPermission {
 		if t.logger != nil {
 			t.logger.Info("vfsEdit_permission_required", "path", path)
@@ -497,27 +497,16 @@ func (t *VFSEditTool) Execute(args *ToolCall) *ToolResponse {
 	}
 
 	// Validate with LSP if available
-	var validationMsg string
 	var diagnostics []lsp.Diagnostic
 	if t.lsp != nil {
 		fileDiags, lspErr := t.lsp.TouchAndValidate(path, true)
 		if lspErr != nil {
 			// LSP validation error - log but don't fail the operation
-			validationMsg = fmt.Sprintf("\n\nWarning: LSP validation failed: %v", lspErr)
 			if t.logger != nil {
 				t.logger.Warn("vfsEdit_lsp_validation_failed", "path", path, "error", lspErr.Error())
 			}
 		} else if len(fileDiags) > 0 {
 			diagnostics = fileDiags
-			// Format diagnostics for the edited file
-			diagsWithURI := make([]DiagnosticWithURI, len(fileDiags))
-			for i, d := range fileDiags {
-				diagsWithURI[i] = DiagnosticWithURI{
-					URI:        pathToURI(path),
-					Diagnostic: d,
-				}
-			}
-			validationMsg = formatDiagnostics(diagsWithURI, path)
 		}
 	} else {
 		if t.logger != nil {
@@ -540,13 +529,25 @@ func (t *VFSEditTool) Execute(args *ToolCall) *ToolResponse {
 		}
 	}
 
-	// Return the diff wrapped in a code block, plus validation results
+	// Return proper response content
 	var result ToolValue
-	resultContent := "```diff\n" + diff + "```"
-	if validationMsg != "" {
-		resultContent += validationMsg
+	if len(diagnostics) > 0 {
+		// Format diagnostics with the new format
+		resultContent := "LSP errors detected in this file, please fix:\n"
+		resultContent += fmt.Sprintf("<diagnostics file=\"%s\">\n", path)
+		for _, diag := range diagnostics {
+			if diag.Severity == lsp.SeverityError {
+				line := diag.Range.Start.Line + 1
+				col := diag.Range.Start.Character + 1
+				resultContent += fmt.Sprintf("Error[%d:%d] %s\n", line, col, diag.Message)
+			}
+		}
+		resultContent += "</diagnostics>"
+		result.Set("content", resultContent)
+	} else {
+		// No diagnostics, return success message
+		result.Set("content", "Edit applied successfully")
 	}
-	result.Set("content", resultContent)
 	return &ToolResponse{
 		Call:   args,
 		Result: result,

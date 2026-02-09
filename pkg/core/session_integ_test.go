@@ -229,11 +229,9 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
 
-		// Verify diff was returned
+		// Verify success message was returned
 		content := response.Result.Get("content").AsString()
-		assert.Contains(t, content, "```diff")
-		assert.Contains(t, content, "-hello world")
-		assert.Contains(t, content, "+hi world")
+		assert.Equal(t, "Edit applied successfully", content)
 
 		// Verify file was modified
 		fileContent, err := vfsInstance.ReadFile("test.txt")
@@ -275,9 +273,9 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
 
-		// Verify diff was returned
+		// Verify success message was returned
 		content := response.Result.Get("content").AsString()
-		assert.Contains(t, content, "```diff")
+		assert.Equal(t, "Edit applied successfully", content)
 
 		// Verify file was modified
 		fileContent, err := vfsInstance.ReadFile("test2.txt")
@@ -383,9 +381,9 @@ func TestSessionEditToolIntegration(t *testing.T) {
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
 
-		// Verify diff was returned
+		// Verify success message was returned
 		content := response.Result.Get("content").AsString()
-		assert.Contains(t, content, "```diff")
+		assert.Equal(t, "Edit applied successfully", content)
 
 		// Verify file was modified
 		fileContent, err := vfsInstance.ReadFile("test5.go")
@@ -516,8 +514,10 @@ func TestSessionLSPIntegration(t *testing.T) {
 
 		// Verify LSP diagnostics are included in the result
 		content := response.Result.Get("content").AsString()
-		assert.Contains(t, content, "LSP validation found issues")
-		assert.Contains(t, content, "Error [4:2] undefined: fmt")
+		assert.Contains(t, content, "LSP errors detected in this file, please fix:")
+		assert.Contains(t, content, "<diagnostics file=\"")
+		assert.Contains(t, content, "Error[4:2] undefined: fmt")
+		assert.Contains(t, content, "</diagnostics>")
 	})
 
 	t.Run("VFS write tool uses LSP for validation", func(t *testing.T) {

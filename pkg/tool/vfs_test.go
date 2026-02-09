@@ -1591,11 +1591,9 @@ func TestVFSEditTool(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "hi world hi", string(content))
 
-		// Verify diff was returned
-		diff := response.Result.Get("content").AsString()
-		assert.Contains(t, diff, "```diff")
-		assert.Contains(t, diff, "-hello world hello")
-		assert.Contains(t, diff, "+hi world hi")
+		// Verify success message was returned
+		contentResult := response.Result.Get("content").AsString()
+		assert.Equal(t, "Edit applied successfully", contentResult)
 	})
 
 	t.Run("should return error for missing path argument", func(t *testing.T) {
@@ -1741,9 +1739,9 @@ func TestVFSEditTool(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "world", string(content))
 
-		// Verify diff was returned
-		diff := response.Result.Get("content").AsString()
-		assert.Contains(t, diff, "```diff")
+		// Verify success message was returned
+		contentResult := response.Result.Get("content").AsString()
+		assert.Equal(t, "Edit applied successfully", contentResult)
 	})
 
 	t.Run("should handle multiline content with replaceAll", func(t *testing.T) {
@@ -1777,9 +1775,9 @@ func TestVFSEditTool(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "first\nline2\nline3\nfirst\nline4", string(result))
 
-		// Verify diff was returned
-		diff := response.Result.Get("content").AsString()
-		assert.Contains(t, diff, "```diff")
+		// Verify success message was returned
+		contentResult := response.Result.Get("content").AsString()
+		assert.Equal(t, "Edit applied successfully", contentResult)
 	})
 }
 
@@ -1900,9 +1898,9 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "hi world", string(content))
 
-		// Verify diff was returned
-		diff := response.Result.Get("content").AsString()
-		assert.Contains(t, diff, "```diff")
+		// Verify success message was returned
+		contentResult := response.Result.Get("content").AsString()
+		assert.Equal(t, "Edit applied successfully", contentResult)
 	})
 
 	t.Run("should fail when read access is deny", func(t *testing.T) {
@@ -2125,9 +2123,9 @@ func TestVFSEditToolWithLSP(t *testing.T) {
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
 
-		// Verify diff was returned
-		diff := response.Result.Get("content").AsString()
-		assert.Contains(t, diff, "```diff")
+		// Verify success message was returned
+		contentResult := response.Result.Get("content").AsString()
+		assert.Equal(t, "Edit applied successfully", contentResult)
 	})
 
 	t.Run("should report LSP diagnostics errors after edit", func(t *testing.T) {
@@ -2173,11 +2171,13 @@ func TestVFSEditToolWithLSP(t *testing.T) {
 		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
 
-		// Verify validation message contains error
+		// Verify validation message contains error in new format
 		content := response.Result.Get("content").AsString()
-		assert.Contains(t, content, "LSP validation found issues")
-		assert.Contains(t, content, "Error [3:17]")
+		assert.Contains(t, content, "LSP errors detected in this file, please fix:")
+		assert.Contains(t, content, "<diagnostics file=\"")
+		assert.Contains(t, content, "Error[3:17]")
 		assert.Contains(t, content, "undefined: invalid")
+		assert.Contains(t, content, "</diagnostics>")
 	})
 
 	t.Run("should work without LSP when nil", func(t *testing.T) {
@@ -2208,5 +2208,9 @@ func TestVFSEditToolWithLSP(t *testing.T) {
 		content, err := mockVFS.ReadFile("test.txt")
 		require.NoError(t, err)
 		assert.Equal(t, "hi world", string(content))
+
+		// Verify success message was returned
+		contentResult := response.Result.Get("content").AsString()
+		assert.Equal(t, "Edit applied successfully", contentResult)
 	})
 }
