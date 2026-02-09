@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"strings"
@@ -1104,5 +1105,155 @@ func TestOllamaClient_Logging(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, response)
 		// No assertions needed - if it doesn't panic, the test passes
+	})
+}
+
+func TestOllamaClient_ContextLengthLimit(t *testing.T) {
+	t.Run("Chat method uses ContextLengthLimit as num_predict", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOllamaClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			ContextLengthLimit: 2048,
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponse("/api/chat", "POST", `{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello"},"done":true,"done_reason":"stop"}`)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Hello"}},
+			},
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+
+		// Verify num_predict was set in the request
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq OllamaChatRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+		require.NotNil(t, chatReq.Options)
+		assert.Equal(t, 2048, chatReq.Options.NumPredict)
+	})
+
+	t.Run("ChatStream method uses ContextLengthLimit as num_predict", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOllamaClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			ContextLengthLimit: 4096,
+		})
+		require.NoError(t, err)
+
+		mock.AddStreamingResponse("/api/chat", "POST", true,
+			`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello"},"done":false}`,
+			`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}`,
+		)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Hello"}},
+			},
+		}
+
+		iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+		// Consume the iterator
+		for range iterator {
+		}
+
+		// Verify num_predict was set in the request
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq OllamaChatRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+		require.NotNil(t, chatReq.Options)
+		assert.Equal(t, 4096, chatReq.Options.NumPredict)
+	})
+
+	t.Run("Chat method does not set num_predict when ContextLengthLimit is zero", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOllamaClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			ContextLengthLimit: 0,
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponse("/api/chat", "POST", `{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello"},"done":true,"done_reason":"stop"}`)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Hello"}},
+			},
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+
+		// Verify Options was not set in the request (since no options provided and ContextLengthLimit is 0)
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq OllamaChatRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+		assert.Nil(t, chatReq.Options)
+	})
+
+	t.Run("Chat method sets num_predict with options when ContextLengthLimit is set", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOllamaClient(&conf.ModelProviderConfig{
+			URL:                mock.URL(),
+			ContextLengthLimit: 1024,
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponse("/api/chat", "POST", `{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello"},"done":true,"done_reason":"stop"}`)
+
+		options := &ChatOptions{
+			Temperature: 0.7,
+			TopP:        0.9,
+			TopK:        40,
+		}
+		chatModel := client.ChatModel("test-model", options)
+		messages := []*ChatMessage{
+			{
+				Role:  ChatRoleUser,
+				Parts: []ChatMessagePart{{Text: "Hello"}},
+			},
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+
+		// Verify both options and num_predict were set in the request
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq OllamaChatRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+		require.NotNil(t, chatReq.Options)
+		assert.InDelta(t, 0.7, chatReq.Options.Temperature, 0.01)
+		assert.InDelta(t, 0.9, chatReq.Options.TopP, 0.01)
+		assert.Equal(t, 40, chatReq.Options.TopK)
+		assert.Equal(t, 1024, chatReq.Options.NumPredict)
 	})
 }
