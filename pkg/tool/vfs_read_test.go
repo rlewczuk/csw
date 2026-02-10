@@ -62,9 +62,9 @@ func TestVFSReadTool(t *testing.T) {
 		// Execute
 		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
-			Function: "vfsList",
+			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path": ".",
+				"path": "nonexistent.txt",
 			}),
 		})
 

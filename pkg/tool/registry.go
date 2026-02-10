@@ -107,7 +107,6 @@ func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS, lspClient lsp.LSP
 	registry.Register("vfsEdit", editTool)
 
 	registry.Register("vfsDelete", NewVFSDeleteTool(vfsImpl))
-	registry.Register("vfsList", NewVFSListTool(vfsImpl))
 	registry.Register("vfsMove", NewVFSMoveTool(vfsImpl))
 	registry.Register("vfsFind", NewVFSFindTool(vfsImpl))
 	registry.Register("vfsGrep", NewVFSGrepTool(vfsImpl))

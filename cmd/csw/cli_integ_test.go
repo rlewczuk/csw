@@ -926,7 +926,7 @@ func TestCLIAllowAllPermissionsExecutesAllToolCalls(t *testing.T) {
 	mockServer := fixture.Server
 
 	mockServer.AddStreamingResponse("/api/chat", "POST", false,
-		`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"","tool_calls":[{"id":"call-1","function":{"name":"vfsRead","arguments":{"path":"test.txt"}}},{"id":"call-2","function":{"name":"vfsList","arguments":{"path":".","recursive":false}}}]},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"","tool_calls":[{"id":"call-1","function":{"name":"vfsRead","arguments":{"path":"test.txt"}}},{"id":"call-2","function":{"name":"vfsFind","arguments":{"query":""}}}]},"done":false}`,
 		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 

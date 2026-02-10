@@ -120,7 +120,7 @@ func TestRegisterVFSTools(t *testing.T) {
 	RegisterVFSTools(registry, mockVFS, nil, nil)
 
 	// Test that all VFS tools are registered
-	vfsTools := []string{"vfsRead", "vfsWrite", "vfsEdit", "vfsDelete", "vfsList", "vfsMove", "vfsFind", "vfsGrep"}
+	vfsTools := []string{"vfsRead", "vfsWrite", "vfsEdit", "vfsDelete", "vfsMove", "vfsFind", "vfsGrep"}
 
 	for _, toolName := range vfsTools {
 		tool, err := registry.Get(toolName)
@@ -166,21 +166,21 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	// Line numbers are enabled by default, so expect formatted output
 	assert.Equal(t, "    1  Hello, World!", readResponse.Result.Get("content").AsString())
 
-	// Test listing files
-	listArgs := &ToolCall{
-		ID:       "list-id",
-		Function: "vfsList",
+	// Test finding files
+	findArgs := &ToolCall{
+		ID:       "find-id",
+		Function: "vfsFind",
 		Arguments: NewToolValue(map[string]any{
-			"path": ".",
+			"query": "",
 		}),
 	}
 
-	listResponse := registry.Execute(listArgs)
-	assert.Equal(t, "list-id", listResponse.Call.ID)
-	assert.NoError(t, listResponse.Error)
-	assert.True(t, listResponse.Done)
+	findResponse := registry.Execute(findArgs)
+	assert.Equal(t, "find-id", findResponse.Call.ID)
+	assert.NoError(t, findResponse.Error)
+	assert.True(t, findResponse.Done)
 
-	filesArr := listResponse.Result.Get("files").Array()
+	filesArr := findResponse.Result.Get("files").Array()
 	require.Len(t, filesArr, 1)
 	assert.Equal(t, "test.txt", filesArr[0].AsString())
 }

@@ -487,6 +487,9 @@ func (s *SweSession) UpdatePermission(query *tool.ToolPermissionsQuery, response
 	if query.Meta != nil && query.Meta["type"] == "vfs" {
 		path := query.Meta["path"]
 		op := query.Meta["operation"]
+		if op == "find" && path == "**" {
+			path = "*"
+		}
 
 		ac, ok := s.VFS.(*vfs.AccessControlVFS)
 		if ok {
