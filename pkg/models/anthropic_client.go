@@ -51,9 +51,9 @@ func NewAnthropicClient(config *conf.ModelProviderConfig) (*AnthropicClient, err
 		return nil, fmt.Errorf("NewAnthropicClient() [anthropic_client.go]: URL cannot be empty")
 	}
 
-	// Default options
-	connectTimeout := 10 * time.Second
-	requestTimeout := 60 * time.Second
+	// Default options (1h timeouts to accommodate long-running LLM requests)
+	connectTimeout := 3600 * time.Second
+	requestTimeout := 3600 * time.Second
 	apiKey := ""
 	apiVersion := "2023-06-01" // Default Anthropic API version
 
