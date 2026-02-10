@@ -14,6 +14,10 @@ var (
 	_ ChatModel      = (*OpenAIChatModel)(nil)
 	_ EmbeddingModel = (*OpenAIEmbeddingModel)(nil)
 
+	_ ModelProvider  = (*ResponsesClient)(nil)
+	_ ChatModel      = (*ResponsesChatModel)(nil)
+	_ EmbeddingModel = (*ResponsesEmbeddingModel)(nil)
+
 	_ ModelProvider  = (*MockClient)(nil)
 	_ ChatModel      = (*MockChatModel)(nil)
 	_ EmbeddingModel = (*MockEmbeddingModel)(nil)
