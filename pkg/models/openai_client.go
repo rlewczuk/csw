@@ -53,9 +53,9 @@ func NewOpenAIClient(config *conf.ModelProviderConfig) (*OpenAIClient, error) {
 		return nil, fmt.Errorf("NewOpenAIClient() [openai_client.go]: URL cannot be empty")
 	}
 
-	// Default options
-	connectTimeout := 10 * time.Second
-	requestTimeout := 60 * time.Second
+	// Default options (1h timeouts to accommodate long-running LLM requests)
+	connectTimeout := 3600 * time.Second
+	requestTimeout := 3600 * time.Second
 	apiKey := "ollama" // Default API key for Ollama
 
 	if config.ConnectTimeout > 0 {

@@ -51,9 +51,9 @@ func NewOllamaClient(config *conf.ModelProviderConfig) (*OllamaClient, error) {
 		return nil, fmt.Errorf("NewOllamaClient() [ollama_client.go]: URL cannot be empty")
 	}
 
-	// Default options
-	connectTimeout := 10 * time.Second
-	requestTimeout := 60 * time.Second
+	// Default options (1h timeouts to accommodate long-running LLM requests)
+	connectTimeout := 3600 * time.Second
+	requestTimeout := 3600 * time.Second
 
 	if config.ConnectTimeout > 0 {
 		connectTimeout = config.ConnectTimeout
