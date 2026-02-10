@@ -135,6 +135,8 @@ func ModelFromConfig(config *conf.ModelProviderConfig) (ModelProvider, error) {
 		return NewOpenAIClient(config)
 	case "anthropic":
 		return NewAnthropicClient(config)
+	case "responses":
+		return NewResponsesClient(config)
 	default:
 		return nil, fmt.Errorf("ModelFromConfig() [config.go]: unsupported provider type: %s", config.Type)
 	}
