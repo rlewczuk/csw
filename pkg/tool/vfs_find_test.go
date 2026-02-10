@@ -115,17 +115,19 @@ func TestVFSFindTool(t *testing.T) {
 		assert.Len(t, filesArr, 0)
 	})
 
-	t.Run("should use default recursive=false when not provided", func(t *testing.T) {
+	t.Run("should use default recursive=true when not provided", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
 		err := mockVFS.WriteFile("file1.txt", []byte("content1"))
 		require.NoError(t, err)
 		err = mockVFS.WriteFile("dir/file2.txt", []byte("content2"))
 		require.NoError(t, err)
+		err = mockVFS.WriteFile("dir/subdir/file3.txt", []byte("content3"))
+		require.NoError(t, err)
 
 		tool := NewVFSFindTool(mockVFS)
 
-		// Execute
+		// Execute without recursive parameter
 		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsFind",
@@ -140,29 +142,83 @@ func TestVFSFindTool(t *testing.T) {
 		assert.True(t, response.Done)
 		assert.True(t, response.Result.Has("files"))
 
-		// Verify only root level files are found
+		// Verify all files are found (recursive by default)
 		filesArr := response.Result.Get("files").Array()
-		require.Len(t, filesArr, 1)
-		assert.Equal(t, "file1.txt", filesArr[0].AsString())
+		require.Len(t, filesArr, 3)
+		files := []string{filesArr[0].AsString(), filesArr[1].AsString(), filesArr[2].AsString()}
+		assert.Contains(t, files, "file1.txt")
+		assert.Contains(t, files, filepath.Join("dir", "file2.txt"))
+		assert.Contains(t, files, filepath.Join("dir", "subdir", "file3.txt"))
 	})
 
-	t.Run("should return error for missing query argument", func(t *testing.T) {
+	t.Run("should return all files when query is empty", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
+		err := mockVFS.WriteFile("file1.txt", []byte("content1"))
+		require.NoError(t, err)
+		err = mockVFS.WriteFile("file2.go", []byte("content2"))
+		require.NoError(t, err)
+		err = mockVFS.WriteFile("dir/file3.md", []byte("content3"))
+		require.NoError(t, err)
+
 		tool := NewVFSFindTool(mockVFS)
 
-		// Execute
+		// Execute with empty query
 		response := tool.Execute(&ToolCall{
-			ID:        "test-id",
-			Function:  "vfsFind",
-			Arguments: NewToolValue(nil),
+			ID:       "test-id",
+			Function: "vfsFind",
+			Arguments: NewToolValue(map[string]any{
+				"query":     "",
+				"recursive": true,
+			}),
 		})
 
 		// Assert
 		assert.Equal(t, "test-id", response.Call.ID)
-		assert.Error(t, response.Error)
+		assert.NoError(t, response.Error)
 		assert.True(t, response.Done)
-		assert.Equal(t, 0, response.Result.Len())
+		assert.True(t, response.Result.Has("files"))
+
+		// Verify all files and directories are returned
+		filesArr := response.Result.Get("files").Array()
+		require.Len(t, filesArr, 4)
+		files := []string{filesArr[0].AsString(), filesArr[1].AsString(), filesArr[2].AsString(), filesArr[3].AsString()}
+		assert.Contains(t, files, "file1.txt")
+		assert.Contains(t, files, "file2.go")
+		assert.Contains(t, files, "dir")
+		assert.Contains(t, files, filepath.Join("dir", "file3.md"))
+	})
+
+	t.Run("should return all files when query is not provided", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		err := mockVFS.WriteFile("file1.txt", []byte("content1"))
+		require.NoError(t, err)
+		err = mockVFS.WriteFile("dir/file2.go", []byte("content2"))
+		require.NoError(t, err)
+
+		tool := NewVFSFindTool(mockVFS)
+
+		// Execute without query parameter
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsFind",
+			Arguments: NewToolValue(map[string]any{}),
+		})
+
+		// Assert
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+		assert.True(t, response.Result.Has("files"))
+
+		// Verify all files and directories are returned (recursive by default, empty query)
+		filesArr := response.Result.Get("files").Array()
+		require.Len(t, filesArr, 3)
+		files := []string{filesArr[0].AsString(), filesArr[1].AsString(), filesArr[2].AsString()}
+		assert.Contains(t, files, "file1.txt")
+		assert.Contains(t, files, "dir")
+		assert.Contains(t, files, filepath.Join("dir", "file2.go"))
 	})
 
 	t.Run("should find directories matching pattern", func(t *testing.T) {

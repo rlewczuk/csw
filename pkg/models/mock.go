@@ -28,6 +28,8 @@ type MockChatResponse struct {
 	Response *ChatMessage
 	// StreamFragments are the message fragments for streaming calls
 	StreamFragments []*ChatMessage
+	// FinishWithEmptyMessage adds an empty final fragment to the stream.
+	FinishWithEmptyMessage bool
 	// Error to return (if any)
 	Error error
 }
@@ -187,6 +189,10 @@ func (m *MockChatModel) ChatStream(ctx context.Context, messages []*ChatMessage,
 			return
 		} else {
 			fragments = response.StreamFragments
+		}
+
+		if response != nil && response.FinishWithEmptyMessage {
+			fragments = append(fragments, &ChatMessage{Role: ChatRoleAssistant})
 		}
 
 		// Record tool calls from fragments

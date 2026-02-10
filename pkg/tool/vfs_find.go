@@ -1,8 +1,6 @@
 package tool
 
 import (
-	"fmt"
-
 	"github.com/codesnort/codesnort-swe/pkg/vfs"
 )
 
@@ -18,17 +16,17 @@ func NewVFSFindTool(v vfs.VFS) *VFSFindTool {
 
 // Execute executes the tool with the given arguments and returns the response.
 func (t *VFSFindTool) Execute(args *ToolCall) *ToolResponse {
-	query, ok := args.Arguments.StringOK("query")
-	if !ok {
-		return &ToolResponse{
-			Call:  args,
-			Error: fmt.Errorf("VFSFindTool.Execute() [vfs.go]: missing required argument: query"),
-			Done:  true,
-		}
+	// Get query parameter, empty string means match all files (use "**")
+	query := args.Arguments.String("query")
+	if query == "" {
+		query = "**"
 	}
 
-	// Get recursive flag, default to false if not provided
-	recursive := args.Arguments.Bool("recursive")
+	// Get recursive flag, default to true if not provided
+	recursive := true
+	if args.Arguments.Has("recursive") {
+		recursive = args.Arguments.Bool("recursive")
+	}
 
 	files, err := t.vfs.FindFiles(query, recursive)
 	if err == vfs.ErrAskPermission {

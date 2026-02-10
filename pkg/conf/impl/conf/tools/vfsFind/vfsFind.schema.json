@@ -1,15 +1,16 @@
 {
-  "description": "Searches for files matching a glob pattern within a directory tree.",
+  "description": "Searches for files matching a glob pattern within a directory tree. If query is empty, returns all files.",
   "type": "object",
   "properties": {
-    "path": {
+    "query": {
       "type": "string",
-      "description": "The absolute path to the directory to search in."
+      "description": "The glob pattern to match files against (e.g., \"*.go\", \"test_*.py\"). If empty or not provided, returns all files."
     },
-    "pattern": {
-      "type": "string",
-      "description": "The glob pattern to match files against (e.g., \"*.go\", \"test_*.py\")."
+    "recursive": {
+      "type": "boolean",
+      "description": "Whether to search recursively in subdirectories. Defaults to true.",
+      "default": true
     }
   },
-  "required": ["path", "pattern"]
+  "required": []
 }

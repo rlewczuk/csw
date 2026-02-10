@@ -201,7 +201,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 		},
 		ToolsAccess: map[string]conf.AccessFlag{
 			"vfsRead": conf.AccessAllow,
-			"vfsList": conf.AccessAllow,
+			"vfsFind": conf.AccessAllow,
 			"**":      conf.AccessDeny,
 		},
 	}
