@@ -514,3 +514,88 @@ func TestResponsesClient_StreamLogging(t *testing.T) {
 		assert.GreaterOrEqual(t, responseCount, 1)
 	})
 }
+
+func TestResponsesClient_OptionsHeaders(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewResponsesClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "config-api-key",
+		Headers: map[string]string{
+			"X-Config-Header": "config-value",
+			"X-Shared-Header": "config-shared",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/responses", "POST", `{"id":"resp_opts","object":"response","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Hello"}]}]}`)
+
+	options := &ChatOptions{
+		Headers: map[string]string{
+			"X-Options-Header": "options-value",
+			"X-Shared-Header":  "options-shared",
+			"Authorization":    "Bearer options-auth",
+		},
+	}
+
+	chatModel := client.ChatModel("test-model", options)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hello"),
+	}
+
+	_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Equal(t, "config-value", request.Header.Get("X-Config-Header"))
+	assert.Equal(t, "options-value", request.Header.Get("X-Options-Header"))
+	assert.Equal(t, "options-shared", request.Header.Get("X-Shared-Header"), "options headers should override config headers")
+	assert.Equal(t, "Bearer config-api-key", request.Header.Get("Authorization"), "authorization header should NOT be overridden by options")
+}
+
+func TestResponsesClient_OptionsHeadersStream(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewResponsesClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "config-api-key",
+		Headers: map[string]string{
+			"X-Config-Header": "config-value",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddStreamingResponse("/responses", "POST", true,
+		`data: {"type":"response.output_text.delta","delta":"Hi","item_id":"msg_1","output_index":0,"content_index":0}`,
+		"data: [DONE]",
+	)
+
+	options := &ChatOptions{
+		Headers: map[string]string{
+			"X-Options-Header": "options-value",
+			"X-Api-Key":        "should-not-override",
+		},
+	}
+
+	chatModel := client.ChatModel("test-model", options)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hi"),
+	}
+
+	iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+	for range iterator {
+	}
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Equal(t, "config-value", request.Header.Get("X-Config-Header"))
+	assert.Equal(t, "options-value", request.Header.Get("X-Options-Header"))
+	assert.Empty(t, request.Header.Get("X-Api-Key"), "api-key header should NOT be set from options")
+}

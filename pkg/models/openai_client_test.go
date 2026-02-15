@@ -1227,3 +1227,160 @@ func TestOpenAIClient_ContextLengthLimit(t *testing.T) {
 		assert.Equal(t, DefaultContextLengthLimit, chatReq.MaxTokens)
 	})
 }
+
+func TestOpenAIClient_CustomHeaders(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "test-key",
+		Headers: map[string]string{
+			"X-Custom-Header": "custom-value",
+			"X-Request-ID":    "req-123",
+			"X-Organization":  "my-org",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-custom","object":"chat.completion","created":1640000000,"model":"test-model","choices":[{"index":0,"message":{"role":"assistant","content":"Hello"},"finish_reason":"stop"}]}`)
+
+	chatModel := client.ChatModel("test-model", nil)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hello"),
+	}
+
+	_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Equal(t, "Bearer test-key", request.Header.Get("Authorization"))
+	assert.Equal(t, "custom-value", request.Header.Get("X-Custom-Header"))
+	assert.Equal(t, "req-123", request.Header.Get("X-Request-ID"))
+	assert.Equal(t, "my-org", request.Header.Get("X-Organization"))
+}
+
+func TestOpenAIClient_CustomHeadersStream(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "test-key",
+		Headers: map[string]string{
+			"X-Stream-Header": "stream-value",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddStreamingResponse("/chat/completions", "POST", true,
+		`data: {"id":"chatcmpl-stream-custom","object":"chat.completion.chunk","created":1640000000,"model":"test-model","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"}}]}`,
+		`data: {"id":"chatcmpl-stream-custom","object":"chat.completion.chunk","created":1640000001,"model":"test-model","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
+		"data: [DONE]",
+	)
+
+	chatModel := client.ChatModel("test-model", nil)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hi"),
+	}
+
+	iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+	for range iterator {
+	}
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Equal(t, "Bearer test-key", request.Header.Get("Authorization"))
+	assert.Equal(t, "stream-value", request.Header.Get("X-Stream-Header"))
+}
+
+func TestOpenAIClient_OptionsHeaders(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "config-api-key",
+		Headers: map[string]string{
+			"X-Config-Header": "config-value",
+			"X-Shared-Header": "config-shared",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-opts","object":"chat.completion","created":1640000000,"model":"test-model","choices":[{"index":0,"message":{"role":"assistant","content":"Hello"},"finish_reason":"stop"}]}`)
+
+	options := &ChatOptions{
+		Headers: map[string]string{
+			"X-Options-Header": "options-value",
+			"X-Shared-Header":  "options-shared",
+			"Authorization":    "Bearer options-auth",
+		},
+	}
+
+	chatModel := client.ChatModel("test-model", options)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hello"),
+	}
+
+	_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Equal(t, "config-value", request.Header.Get("X-Config-Header"))
+	assert.Equal(t, "options-value", request.Header.Get("X-Options-Header"))
+	assert.Equal(t, "options-shared", request.Header.Get("X-Shared-Header"), "options headers should override config headers")
+	assert.Equal(t, "Bearer config-api-key", request.Header.Get("Authorization"), "authorization header should NOT be overridden by options")
+}
+
+func TestOpenAIClient_OptionsHeadersStream(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "config-api-key",
+		Headers: map[string]string{
+			"X-Config-Header": "config-value",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddStreamingResponse("/chat/completions", "POST", true,
+		`data: {"id":"chatcmpl-opts-stream","object":"chat.completion.chunk","created":1640000000,"model":"test-model","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"}}]}`,
+		`data: {"id":"chatcmpl-opts-stream","object":"chat.completion.chunk","created":1640000001,"model":"test-model","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
+		"data: [DONE]",
+	)
+
+	options := &ChatOptions{
+		Headers: map[string]string{
+			"X-Options-Header": "options-value",
+			"X-Api-Key":        "should-not-override",
+		},
+	}
+
+	chatModel := client.ChatModel("test-model", options)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hi"),
+	}
+
+	iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+	for range iterator {
+	}
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Equal(t, "config-value", request.Header.Get("X-Config-Header"))
+	assert.Equal(t, "options-value", request.Header.Get("X-Options-Header"))
+	assert.Empty(t, request.Header.Get("X-Api-Key"), "api-key header should NOT be set from options")
+}

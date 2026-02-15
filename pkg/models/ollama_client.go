@@ -105,6 +105,39 @@ func (c *OllamaClient) GetConfig() *conf.ModelProviderConfig {
 	return c.config
 }
 
+func (c *OllamaClient) applyConfiguredHeaders(req *http.Request) {
+	if c == nil || c.config == nil || len(c.config.Headers) == 0 {
+		return
+	}
+
+	for name, value := range c.config.Headers {
+		if name == "" || value == "" {
+			continue
+		}
+		if req.Header.Get(name) != "" {
+			continue
+		}
+		req.Header.Set(name, value)
+	}
+}
+
+func applyOptionsHeaders(req *http.Request, options *ChatOptions) {
+	if options == nil || len(options.Headers) == 0 {
+		return
+	}
+
+	for name, value := range options.Headers {
+		if name == "" || value == "" {
+			continue
+		}
+		lowerName := strings.ToLower(name)
+		if lowerName == "authorization" || lowerName == "x-api-key" || lowerName == "api-key" {
+			continue
+		}
+		req.Header.Set(name, value)
+	}
+}
+
 // SetModel sets the model to use for chat and embedding operations
 func (c *OllamaClient) SetModel(model string) {
 	c.model = model
@@ -147,6 +180,8 @@ func (c *OllamaClient) ListModels() ([]ModelInfo, error) {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	setUserAgentHeader(req)
+	c.applyConfiguredHeaders(req)
+	applyOptionsHeaders(req, nil)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -243,6 +278,8 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	}
 	req.Header.Set("Content-Type", "application/json")
 	setUserAgentHeader(req)
+	m.client.applyConfiguredHeaders(req)
+	applyOptionsHeaders(req, effectiveOptions)
 
 	// Print verbose request output if enabled
 	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
@@ -392,6 +429,8 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 		}
 		req.Header.Set("Content-Type", "application/json")
 		setUserAgentHeader(req)
+		m.client.applyConfiguredHeaders(req)
+		applyOptionsHeaders(req, effectiveOptions)
 
 		// Print verbose request output if enabled
 		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
@@ -514,6 +553,8 @@ func (m *OllamaEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 	}
 	req.Header.Set("Content-Type", "application/json")
 	setUserAgentHeader(req)
+	m.client.applyConfiguredHeaders(req)
+	applyOptionsHeaders(req, nil)
 
 	resp, err := m.client.httpClient.Do(req)
 	if err != nil {

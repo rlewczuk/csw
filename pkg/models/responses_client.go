@@ -171,6 +171,7 @@ func (c *ResponsesClient) ListModels() ([]ModelInfo, error) {
 	}
 	setUserAgentHeader(req)
 	c.applyConfiguredHeaders(req)
+	applyOptionsHeaders(req, nil)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -258,6 +259,7 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	}
 	setUserAgentHeader(req)
 	m.client.applyConfiguredHeaders(req)
+	applyOptionsHeaders(req, effectiveOptions)
 
 	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
 	if effectiveOptions != nil && effectiveOptions.Logger != nil {
@@ -367,6 +369,7 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		}
 		setUserAgentHeader(req)
 		m.client.applyConfiguredHeaders(req)
+		applyOptionsHeaders(req, effectiveOptions)
 
 		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
 		if effectiveOptions != nil && effectiveOptions.Logger != nil {

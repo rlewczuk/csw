@@ -1329,3 +1329,162 @@ func TestAnthropicClient_ContextLengthLimit(t *testing.T) {
 		assert.Equal(t, DefaultContextLengthLimit, chatReq.MaxTokens)
 	})
 }
+
+func TestAnthropicClient_CustomHeaders(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "test-key",
+		Headers: map[string]string{
+			"X-Custom-Header": "custom-value",
+			"X-Request-ID":    "req-123",
+			"X-Organization":  "my-org",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_custom","type":"message","role":"assistant","content":[{"type":"text","text":"Hello"}],"model":"test-model","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`)
+
+	chatModel := client.ChatModel("test-model", nil)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hello"),
+	}
+
+	_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Equal(t, "test-key", request.Header.Get("x-api-key"))
+	assert.Equal(t, "custom-value", request.Header.Get("X-Custom-Header"))
+	assert.Equal(t, "req-123", request.Header.Get("X-Request-ID"))
+	assert.Equal(t, "my-org", request.Header.Get("X-Organization"))
+}
+
+func TestAnthropicClient_CustomHeadersStream(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "test-key",
+		Headers: map[string]string{
+			"X-Stream-Header": "stream-value",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddStreamingResponse("/v1/messages", "POST", true,
+		`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_stream_custom","type":"message","role":"assistant","content":[],"model":"test-model","usage":{"input_tokens":10,"output_tokens":0}}}`,
+		`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
+		`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}`,
+		`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
+	)
+
+	chatModel := client.ChatModel("test-model", nil)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hi"),
+	}
+
+	iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+	for range iterator {
+	}
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Equal(t, "test-key", request.Header.Get("x-api-key"))
+	assert.Equal(t, "stream-value", request.Header.Get("X-Stream-Header"))
+}
+
+func TestAnthropicClient_OptionsHeaders(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "config-api-key",
+		Headers: map[string]string{
+			"X-Config-Header": "config-value",
+			"X-Shared-Header": "config-shared",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_opts","type":"message","role":"assistant","content":[{"type":"text","text":"Hello"}],"model":"test-model","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`)
+
+	options := &ChatOptions{
+		Headers: map[string]string{
+			"X-Options-Header": "options-value",
+			"X-Shared-Header":  "options-shared",
+			"X-Api-Key":        "should-not-override",
+		},
+	}
+
+	chatModel := client.ChatModel("test-model", options)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hello"),
+	}
+
+	_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Equal(t, "config-value", request.Header.Get("X-Config-Header"))
+	assert.Equal(t, "options-value", request.Header.Get("X-Options-Header"))
+	assert.Equal(t, "options-shared", request.Header.Get("X-Shared-Header"), "options headers should override config headers")
+	assert.Equal(t, "config-api-key", request.Header.Get("x-api-key"), "x-api-key header should NOT be overridden by options")
+}
+
+func TestAnthropicClient_OptionsHeadersStream(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "config-api-key",
+		Headers: map[string]string{
+			"X-Config-Header": "config-value",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddStreamingResponse("/v1/messages", "POST", true,
+		`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_opts_stream","type":"message","role":"assistant","content":[],"model":"test-model","usage":{"input_tokens":10,"output_tokens":0}}}`,
+		`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
+		`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}`,
+		`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
+	)
+
+	options := &ChatOptions{
+		Headers: map[string]string{
+			"X-Options-Header": "options-value",
+			"Authorization":    "Bearer should-not-override",
+		},
+	}
+
+	chatModel := client.ChatModel("test-model", options)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hi"),
+	}
+
+	iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+	for range iterator {
+	}
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Equal(t, "config-value", request.Header.Get("X-Config-Header"))
+	assert.Equal(t, "options-value", request.Header.Get("X-Options-Header"))
+	assert.Empty(t, request.Header.Get("Authorization"), "authorization header should NOT be set from options")
+}

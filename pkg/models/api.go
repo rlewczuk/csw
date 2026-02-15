@@ -50,6 +50,7 @@ type ChatOptions struct {
 	Verbose     bool
 	Logger      *slog.Logger
 	SessionID   string
+	Headers     map[string]string
 }
 
 // ChatMessagePart represents a part of a chat message. A message can contain text, tool calls, or tool responses.
