@@ -10,6 +10,7 @@ type OpenaiChatCompletionRequest struct {
 	Seed             int                           `json:"seed,omitempty"`              // Optional: for reproducible outputs
 	Stop             []string                      `json:"stop,omitempty"`              // Optional: stop sequences
 	Stream           bool                          `json:"stream,omitempty"`            // Optional: if true, returns streaming response
+	StreamOptions    *OpenaiStreamOptions          `json:"stream_options,omitempty"`    // Optional: streaming options
 	Temperature      float64                       `json:"temperature,omitempty"`       // Optional: 0.0 to 2.0
 	TopP             float64                       `json:"top_p,omitempty"`             // Optional: 0.0 to 1.0
 	MaxTokens        int                           `json:"max_tokens,omitempty"`        // Optional: max tokens to generate
@@ -19,12 +20,18 @@ type OpenaiChatCompletionRequest struct {
 	N                int                           `json:"n,omitempty"`                 // Optional: number of completions
 }
 
+// OpenaiStreamOptions represents options for streaming responses.
+type OpenaiStreamOptions struct {
+	IncludeUsage bool `json:"include_usage,omitempty"` // Optional: include usage in streaming response
+}
+
 // OpenaiChatCompletionMessage represents a message in the chat
 type OpenaiChatCompletionMessage struct {
-	Role       string           `json:"role"`                   // Required: system, user, assistant, or tool
-	Content    interface{}      `json:"content"`                // Required: string or array of content parts
-	ToolCalls  []OpenaiToolCall `json:"tool_calls,omitempty"`   // Optional: tools the model wants to use
-	ToolCallID string           `json:"tool_call_id,omitempty"` // Optional: for tool responses
+	Role             string           `json:"role"`                        // Required: system, user, assistant, or tool
+	Content          interface{}      `json:"content"`                     // Required: string or array of content parts
+	ReasoningContent string           `json:"reasoning_content,omitempty"` // Optional: reasoning content (for thinking models)
+	ToolCalls        []OpenaiToolCall `json:"tool_calls,omitempty"`        // Optional: tools the model wants to use
+	ToolCallID       string           `json:"tool_call_id,omitempty"`      // Optional: for tool responses
 }
 
 // OpenaiContentPart represents a part of the message content (text or image)

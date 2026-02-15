@@ -1384,3 +1384,160 @@ func TestOpenAIClient_OptionsHeadersStream(t *testing.T) {
 	assert.Equal(t, "options-value", request.Header.Get("X-Options-Header"))
 	assert.Empty(t, request.Header.Get("X-Api-Key"), "api-key header should NOT be set from options")
 }
+
+func TestOpenAIClient_ReasoningContent(t *testing.T) {
+	t.Run("streams reasoning content in same message as text", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL: mock.URL(),
+		})
+		require.NoError(t, err)
+
+		mock.AddStreamingResponse("/chat/completions", "POST", true,
+			`data: {"id":"chatcmpl-reasoning-1","object":"chat.completion.chunk","created":1771161940,"model":"glm-5","choices":[{"index":0,"delta":{"role":"assistant","reasoning_content":"The user"}}]}`,
+			`data: {"id":"chatcmpl-reasoning-1","object":"chat.completion.chunk","created":1771161940,"model":"glm-5","choices":[{"index":0,"delta":{"reasoning_content":" wants"}}]}`,
+			`data: {"id":"chatcmpl-reasoning-1","object":"chat.completion.chunk","created":1771161940,"model":"glm-5","choices":[{"index":0,"delta":{"reasoning_content":" help."}}]}`,
+			`data: {"id":"chatcmpl-reasoning-1","object":"chat.completion.chunk","created":1771161940,"model":"glm-5","choices":[{"index":0,"delta":{"content":"Sure!"}}]}`,
+			`data: {"id":"chatcmpl-reasoning-1","object":"chat.completion.chunk","created":1771161940,"model":"glm-5","choices":[{"index":0,"delta":{"content":" I can help."}}]}`,
+			`data: {"id":"chatcmpl-reasoning-1","object":"chat.completion.chunk","created":1771161940,"model":"glm-5","choices":[{"index":0,"finish_reason":"stop","delta":{"role":"assistant","content":""}}],"usage":{"prompt_tokens":10,"completion_tokens":20,"total_tokens":30}}`,
+			"data: [DONE]",
+		)
+
+		chatModel := client.ChatModel("glm-5", nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "Help me"),
+		}
+
+		iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+		require.NotNil(t, iterator)
+
+		var fragments []*ChatMessage
+
+		for fragment := range iterator {
+			require.NotNil(t, fragment)
+			fragments = append(fragments, fragment)
+		}
+
+		assert.NotEmpty(t, fragments, "expected fragments")
+
+		// All fragments should be assistant role
+		for _, f := range fragments {
+			assert.Equal(t, ChatRoleAssistant, f.Role, "all fragments should have assistant role")
+		}
+
+		// Check that reasoning content is accumulated in the first text fragment
+		var reasoningContent string
+		var textContent string
+		for _, f := range fragments {
+			for _, part := range f.Parts {
+				if part.ReasoningContent != "" {
+					reasoningContent += part.ReasoningContent
+				}
+				if part.Text != "" {
+					textContent += part.Text
+				}
+			}
+		}
+
+		assert.Equal(t, "The user wants help.", reasoningContent, "reasoning content should be accumulated")
+		assert.Equal(t, "Sure! I can help.", textContent, "text content should be accumulated")
+	})
+
+	t.Run("streams reasoning content with tool calls in same message", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL: mock.URL(),
+		})
+		require.NoError(t, err)
+
+		mock.AddStreamingResponse("/chat/completions", "POST", true,
+			`data: {"id":"chatcmpl-reasoning-2","object":"chat.completion.chunk","created":1771161940,"model":"glm-5","choices":[{"index":0,"delta":{"role":"assistant","reasoning_content":"I need"}}]}`,
+			`data: {"id":"chatcmpl-reasoning-2","object":"chat.completion.chunk","created":1771161940,"model":"glm-5","choices":[{"index":0,"delta":{"reasoning_content":" to read"}}]}`,
+			`data: {"id":"chatcmpl-reasoning-2","object":"chat.completion.chunk","created":1771161940,"model":"glm-5","choices":[{"index":0,"delta":{"reasoning_content":" the file."}}]}`,
+			`data: {"id":"chatcmpl-reasoning-2","object":"chat.completion.chunk","created":1771161940,"model":"glm-5","choices":[{"index":0,"delta":{"tool_calls":[{"id":"call_123","index":0,"type":"function","function":{"name":"read","arguments":"{\"filePath\":\"/test/file.go\"}"}}]}}]}`,
+			`data: {"id":"chatcmpl-reasoning-2","object":"chat.completion.chunk","created":1771161940,"model":"glm-5","choices":[{"index":0,"finish_reason":"tool_calls","delta":{"role":"assistant","content":""}}]}`,
+			"data: [DONE]",
+		)
+
+		chatModel := client.ChatModel("glm-5", nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "Read the file"),
+		}
+
+		iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+		require.NotNil(t, iterator)
+
+		var fragments []*ChatMessage
+
+		for fragment := range iterator {
+			require.NotNil(t, fragment)
+			fragments = append(fragments, fragment)
+		}
+
+		assert.NotEmpty(t, fragments, "expected fragments")
+
+		// All fragments should be assistant role
+		for _, f := range fragments {
+			assert.Equal(t, ChatRoleAssistant, f.Role, "all fragments should have assistant role")
+		}
+
+		// Collect reasoning content and tool calls from fragments
+		var reasoningContent string
+		var toolCalls []*tool.ToolCall
+		for _, f := range fragments {
+			for _, part := range f.Parts {
+				if part.ReasoningContent != "" {
+					reasoningContent += part.ReasoningContent
+				}
+				if part.ToolCall != nil {
+					toolCalls = append(toolCalls, part.ToolCall)
+				}
+			}
+		}
+
+		assert.Equal(t, "I need to read the file.", reasoningContent, "reasoning content should be accumulated")
+		assert.Len(t, toolCalls, 1, "expected one tool call")
+		assert.Equal(t, "call_123", toolCalls[0].ID)
+		assert.Equal(t, "read", toolCalls[0].Function)
+	})
+
+	t.Run("includes stream_options in request", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL: mock.URL(),
+		})
+		require.NoError(t, err)
+
+		mock.AddStreamingResponse("/chat/completions", "POST", true,
+			`data: {"id":"chatcmpl-opts","object":"chat.completion.chunk","created":1771161940,"model":"glm-5","choices":[{"index":0,"delta":{"content":"Hi"}}]}`,
+			`data: {"id":"chatcmpl-opts","object":"chat.completion.chunk","created":1771161940,"model":"glm-5","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
+			"data: [DONE]",
+		)
+
+		chatModel := client.ChatModel("glm-5", nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "Hi"),
+		}
+
+		iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+		for range iterator {
+		}
+
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq OpenaiChatCompletionRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+
+		assert.True(t, chatReq.Stream, "stream should be true")
+		require.NotNil(t, chatReq.StreamOptions, "stream_options should not be nil")
+		assert.True(t, chatReq.StreamOptions.IncludeUsage, "include_usage should be true")
+	})
+}

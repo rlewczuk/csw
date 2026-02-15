@@ -57,6 +57,8 @@ type ChatOptions struct {
 type ChatMessagePart struct {
 	// Text contains text content (if this part is text)
 	Text string
+	// ReasoningContent contains reasoning/thinking content from thinking models (e.g., GLM-5)
+	ReasoningContent string
 	// ToolCall contains a tool call request from the LLM (if this part is a tool call)
 	ToolCall *tool.ToolCall
 	// ToolResponse contains a tool execution result (if this part is a tool response)
