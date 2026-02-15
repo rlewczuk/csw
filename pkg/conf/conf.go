@@ -99,6 +99,8 @@ type ModelProviderConfig struct {
 	Streaming *bool `json:"streaming,omitempty" yaml:"streaming,omitempty"`
 	// Verbose controls whether to print raw response and headers to stdout
 	Verbose bool `json:"verbose,omitempty" yaml:"verbose,omitempty"`
+	// Headers contains optional headers to send with provider requests
+	Headers map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for ModelProviderConfig.

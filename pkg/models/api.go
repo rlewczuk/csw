@@ -38,6 +38,7 @@ type ChatRole string
 
 const (
 	ChatRoleAssistant ChatRole = "assistant"
+	ChatRoleDeveloper ChatRole = "developer"
 	ChatRoleSystem    ChatRole = "system"
 	ChatRoleUser      ChatRole = "user"
 )
@@ -48,6 +49,7 @@ type ChatOptions struct {
 	TopK        int
 	Verbose     bool
 	Logger      *slog.Logger
+	SessionID   string
 }
 
 // ChatMessagePart represents a part of a chat message. A message can contain text, tool calls, or tool responses.

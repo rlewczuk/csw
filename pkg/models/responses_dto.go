@@ -2,14 +2,19 @@ package models
 
 // ResponsesCreateRequest represents a request to the Responses API.
 type ResponsesCreateRequest struct {
-	Model           string          `json:"model,omitempty"`
-	Input           []ResponsesItem `json:"input,omitempty"`
-	Tools           []ResponsesTool `json:"tools,omitempty"`
-	ToolChoice      interface{}     `json:"tool_choice,omitempty"`
-	Stream          bool            `json:"stream,omitempty"`
-	Temperature     float64         `json:"temperature,omitempty"`
-	TopP            float64         `json:"top_p,omitempty"`
-	MaxOutputTokens int             `json:"max_output_tokens,omitempty"`
+	Model           string              `json:"model,omitempty"`
+	Input           []ResponsesItem     `json:"input,omitempty"`
+	Tools           []ResponsesTool     `json:"tools,omitempty"`
+	ToolChoice      interface{}         `json:"tool_choice,omitempty"`
+	Store           *bool               `json:"store,omitempty"`
+	Instructions    string              `json:"instructions,omitempty"`
+	Include         []string            `json:"include,omitempty"`
+	PromptCacheKey  string              `json:"prompt_cache_key,omitempty"`
+	Reasoning       *ResponsesReasoning `json:"reasoning,omitempty"`
+	Stream          bool                `json:"stream,omitempty"`
+	Temperature     float64             `json:"temperature,omitempty"`
+	TopP            float64             `json:"top_p,omitempty"`
+	MaxOutputTokens int                 `json:"max_output_tokens,omitempty"`
 }
 
 // ResponsesTool represents a tool definition for Responses API.
@@ -41,17 +46,58 @@ type ResponsesContent struct {
 
 // ResponsesResponse represents a Responses API response.
 type ResponsesResponse struct {
-	ID     string          `json:"id"`
-	Object string          `json:"object"`
-	Status string          `json:"status,omitempty"`
-	Output []ResponsesItem `json:"output,omitempty"`
+	ID                   string               `json:"id"`
+	Object               string               `json:"object"`
+	CreatedAt            int64                `json:"created_at,omitempty"`
+	Status               string               `json:"status,omitempty"`
+	Background           bool                 `json:"background,omitempty"`
+	CompletedAt          *int64               `json:"completed_at,omitempty"`
+	Error                interface{}          `json:"error,omitempty"`
+	FrequencyPenalty     float64              `json:"frequency_penalty,omitempty"`
+	IncompleteDetails    interface{}          `json:"incomplete_details,omitempty"`
+	Instructions         string               `json:"instructions,omitempty"`
+	MaxOutputTokens      *int                 `json:"max_output_tokens,omitempty"`
+	MaxToolCalls         *int                 `json:"max_tool_calls,omitempty"`
+	Model                string               `json:"model,omitempty"`
+	Output               []ResponsesItem      `json:"output,omitempty"`
+	ParallelToolCalls    *bool                `json:"parallel_tool_calls,omitempty"`
+	PresencePenalty      float64              `json:"presence_penalty,omitempty"`
+	PreviousResponseID   string               `json:"previous_response_id,omitempty"`
+	PromptCacheKey       string               `json:"prompt_cache_key,omitempty"`
+	PromptCacheRetention interface{}          `json:"prompt_cache_retention,omitempty"`
+	Reasoning            *ResponsesReasoning  `json:"reasoning,omitempty"`
+	SafetyIdentifier     string               `json:"safety_identifier,omitempty"`
+	ServiceTier          string               `json:"service_tier,omitempty"`
+	Store                *bool                `json:"store,omitempty"`
+	Temperature          float64              `json:"temperature,omitempty"`
+	Text                 *ResponsesTextConfig `json:"text,omitempty"`
+	ToolChoice           interface{}          `json:"tool_choice,omitempty"`
+	Tools                []ResponsesTool      `json:"tools,omitempty"`
 }
 
 // ResponsesStreamEvent represents a streaming event from Responses API.
 type ResponsesStreamEvent struct {
-	Type      string         `json:"type"`
-	Item      *ResponsesItem `json:"item,omitempty"`
-	ItemID    string         `json:"item_id,omitempty"`
-	Delta     string         `json:"delta,omitempty"`
-	Arguments string         `json:"arguments,omitempty"`
+	Type      string             `json:"type"`
+	Response  *ResponsesResponse `json:"response,omitempty"`
+	Item      *ResponsesItem     `json:"item,omitempty"`
+	ItemID    string             `json:"item_id,omitempty"`
+	Delta     string             `json:"delta,omitempty"`
+	Arguments string             `json:"arguments,omitempty"`
+}
+
+// ResponsesReasoning represents reasoning configuration or metadata.
+type ResponsesReasoning struct {
+	Effort  string `json:"effort,omitempty"`
+	Summary string `json:"summary,omitempty"`
+}
+
+// ResponsesTextConfig represents text response configuration.
+type ResponsesTextConfig struct {
+	Format    *ResponsesTextFormat `json:"format,omitempty"`
+	Verbosity string               `json:"verbosity,omitempty"`
+}
+
+// ResponsesTextFormat represents text format configuration.
+type ResponsesTextFormat struct {
+	Type string `json:"type,omitempty"`
 }

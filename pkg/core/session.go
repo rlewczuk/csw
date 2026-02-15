@@ -151,12 +151,13 @@ func (s *SweSession) Run(ctx context.Context) error {
 }
 
 func (s *SweSession) buildChatOptions() *models.ChatOptions {
-	if s.llmLogger == nil {
+	if s.llmLogger == nil && s.id == "" {
 		return nil
 	}
 
 	return &models.ChatOptions{
-		Logger: s.llmLogger,
+		Logger:    s.llmLogger,
+		SessionID: s.id,
 	}
 }
 

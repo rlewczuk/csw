@@ -413,6 +413,56 @@ func TestResponsesClient_ContextLengthLimit(t *testing.T) {
 	})
 }
 
+func TestResponsesClient_RequestHeadersAndSessionID(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewResponsesClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "test-key",
+		Headers: map[string]string{
+			"chatgpt-account-id": "acct_123",
+			"originator":         "opencode",
+			"session-id":         "ses_header",
+			"Authorization":      "Bearer override",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/responses", "POST", `{"id":"resp_headers","object":"response","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}]}`)
+
+	chatModel := client.ChatModel("test-model", nil)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleDeveloper, "Developer instruction"),
+		NewTextMessage(ChatRoleUser, "Hello"),
+	}
+
+	_, err = chatModel.Chat(context.Background(), messages, &ChatOptions{SessionID: "ses_body"}, nil)
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Equal(t, "Bearer test-key", request.Header.Get("Authorization"))
+	assert.Equal(t, "acct_123", request.Header.Get("chatgpt-account-id"))
+	assert.Equal(t, "opencode", request.Header.Get("originator"))
+	assert.Equal(t, "ses_header", request.Header.Get("session-id"))
+
+	var chatReq ResponsesCreateRequest
+	require.NoError(t, json.Unmarshal(request.Body, &chatReq))
+	assert.Equal(t, "ses_body", chatReq.PromptCacheKey)
+
+	foundDeveloper := false
+	for _, item := range chatReq.Input {
+		if item.Role == "developer" {
+			foundDeveloper = true
+			break
+		}
+	}
+	assert.True(t, foundDeveloper, "expected developer role in request input")
+}
+
 func TestResponsesClient_EmbeddingModel(t *testing.T) {
 	tc := getResponsesTestClient(t)
 	defer tc.Close()
