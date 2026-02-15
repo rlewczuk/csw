@@ -131,6 +131,7 @@ func providerShowCommand(useJSON *bool) *cobra.Command {
 
 func providerAddCommand(useJSON *bool, scope *ConfigScope) *cobra.Command {
 	var providerType, url, description, apiKey string
+	var headers []string
 
 	cmd := &cobra.Command{
 		Use:   "add <provider-name> [flags]",
@@ -164,6 +165,19 @@ func providerAddCommand(useJSON *bool, scope *ConfigScope) *cobra.Command {
 				}
 			}
 
+			headerMap, err := parseHeadersFlag(headers)
+			if err != nil {
+				return err
+			}
+			if len(headerMap) > 0 {
+				if config.Headers == nil {
+					config.Headers = make(map[string]string)
+				}
+				for key, value := range headerMap {
+					config.Headers[key] = value
+				}
+			}
+
 			if err := store.SaveModelProviderConfig(config); err != nil {
 				return fmt.Errorf("providerAddCommand() [provider.go]: failed to save provider config: %w", err)
 			}
@@ -177,6 +191,7 @@ func providerAddCommand(useJSON *bool, scope *ConfigScope) *cobra.Command {
 	cmd.Flags().StringVar(&url, "url", "", "Provider URL")
 	cmd.Flags().StringVar(&description, "description", "", "Provider description")
 	cmd.Flags().StringVar(&apiKey, "api-key", "", "API key")
+	cmd.Flags().StringArrayVar(&headers, "header", nil, "Custom header (key=value), repeatable")
 
 	return cmd
 }
@@ -462,6 +477,11 @@ func outputProviderDetails(config *conf.ModelProviderConfig) error {
 	if config.RequestTimeout > 0 {
 		fmt.Fprintf(w, "Request Timeout\t%s\n", config.RequestTimeout)
 	}
+	if len(config.Headers) > 0 {
+		for name, value := range config.Headers {
+			fmt.Fprintf(w, "Header %s\t%s\n", name, maskHeaderValue(name, value))
+		}
+	}
 
 	return nil
 }
@@ -564,6 +584,39 @@ func maskAPIKey(key string) string {
 		return "********"
 	}
 	return key[:4] + "****" + key[len(key)-4:]
+}
+
+func maskHeaderValue(name, value string) string {
+	if value == "" {
+		return value
+	}
+	nameLower := strings.ToLower(name)
+	if strings.Contains(nameLower, "authorization") || strings.Contains(nameLower, "api-key") {
+		return maskAPIKey(value)
+	}
+	return value
+}
+
+func parseHeadersFlag(headers []string) (map[string]string, error) {
+	if len(headers) == 0 {
+		return nil, nil
+	}
+
+	parsed := make(map[string]string, len(headers))
+	for _, header := range headers {
+		parts := strings.SplitN(header, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("parseHeadersFlag() [provider.go]: invalid header %q, expected key=value", header)
+		}
+		name := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		if name == "" || value == "" {
+			return nil, fmt.Errorf("parseHeadersFlag() [provider.go]: invalid header %q, key and value required", header)
+		}
+		parsed[name] = value
+	}
+
+	return parsed, nil
 }
 
 func outputModelsList(modelsList []modelEntry) error {

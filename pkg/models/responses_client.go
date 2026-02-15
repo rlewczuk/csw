@@ -114,6 +114,22 @@ func (c *ResponsesClient) GetConfig() *conf.ModelProviderConfig {
 	return c.config
 }
 
+func (c *ResponsesClient) applyConfiguredHeaders(req *http.Request) {
+	if c == nil || c.config == nil || len(c.config.Headers) == 0 {
+		return
+	}
+
+	for name, value := range c.config.Headers {
+		if name == "" || value == "" {
+			continue
+		}
+		if req.Header.Get(name) != "" {
+			continue
+		}
+		req.Header.Set(name, value)
+	}
+}
+
 // ChatModel returns a ChatModel implementation for the given model and options.
 func (c *ResponsesClient) ChatModel(model string, options *ChatOptions) ChatModel {
 	mergedOptions := options
@@ -154,6 +170,7 @@ func (c *ResponsesClient) ListModels() ([]ModelInfo, error) {
 		req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	}
 	setUserAgentHeader(req)
+	c.applyConfiguredHeaders(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -219,6 +236,9 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	if effectiveOptions != nil {
 		chatReq.Temperature = float64(effectiveOptions.Temperature)
 		chatReq.TopP = float64(effectiveOptions.TopP)
+		if effectiveOptions.SessionID != "" {
+			chatReq.PromptCacheKey = effectiveOptions.SessionID
+		}
 	}
 
 	url := m.client.baseURL + "/responses"
@@ -237,6 +257,7 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
 	}
 	setUserAgentHeader(req)
+	m.client.applyConfiguredHeaders(req)
 
 	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
 	if effectiveOptions != nil && effectiveOptions.Logger != nil {
@@ -321,6 +342,9 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		if effectiveOptions != nil {
 			chatReq.Temperature = float64(effectiveOptions.Temperature)
 			chatReq.TopP = float64(effectiveOptions.TopP)
+			if effectiveOptions.SessionID != "" {
+				chatReq.PromptCacheKey = effectiveOptions.SessionID
+			}
 		}
 
 		url := m.client.baseURL + "/responses"
@@ -342,6 +366,7 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
 		}
 		setUserAgentHeader(req)
+		m.client.applyConfiguredHeaders(req)
 
 		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
 		if effectiveOptions != nil && effectiveOptions.Logger != nil {
