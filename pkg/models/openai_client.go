@@ -113,6 +113,22 @@ func (c *OpenAIClient) GetConfig() *conf.ModelProviderConfig {
 	return c.config
 }
 
+func (c *OpenAIClient) applyConfiguredHeaders(req *http.Request) {
+	if c == nil || c.config == nil || len(c.config.Headers) == 0 {
+		return
+	}
+
+	for name, value := range c.config.Headers {
+		if name == "" || value == "" {
+			continue
+		}
+		if req.Header.Get(name) != "" {
+			continue
+		}
+		req.Header.Set(name, value)
+	}
+}
+
 // ChatModel returns a ChatModel implementation for the given model and options
 func (c *OpenAIClient) ChatModel(model string, options *ChatOptions) ChatModel {
 	// Merge config verbose flag with provided options
@@ -152,6 +168,8 @@ func (c *OpenAIClient) ListModels() ([]ModelInfo, error) {
 
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	setUserAgentHeader(req)
+	c.applyConfiguredHeaders(req)
+	applyOptionsHeaders(req, nil)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -240,6 +258,8 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
 	setUserAgentHeader(req)
+	m.client.applyConfiguredHeaders(req)
+	applyOptionsHeaders(req, effectiveOptions)
 
 	// Print verbose request output if enabled
 	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
@@ -364,6 +384,8 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 		req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
 		req.Header.Set("Accept", "text/event-stream")
 		setUserAgentHeader(req)
+		m.client.applyConfiguredHeaders(req)
+		applyOptionsHeaders(req, effectiveOptions)
 
 		// Print verbose request output if enabled
 		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
@@ -600,6 +622,8 @@ func (m *OpenAIEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
 	setUserAgentHeader(req)
+	m.client.applyConfiguredHeaders(req)
+	applyOptionsHeaders(req, nil)
 
 	resp, err := m.client.httpClient.Do(req)
 	if err != nil {

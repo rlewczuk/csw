@@ -115,6 +115,22 @@ func (c *AnthropicClient) GetConfig() *conf.ModelProviderConfig {
 	return c.config
 }
 
+func (c *AnthropicClient) applyConfiguredHeaders(req *http.Request) {
+	if c == nil || c.config == nil || len(c.config.Headers) == 0 {
+		return
+	}
+
+	for name, value := range c.config.Headers {
+		if name == "" || value == "" {
+			continue
+		}
+		if req.Header.Get(name) != "" {
+			continue
+		}
+		req.Header.Set(name, value)
+	}
+}
+
 // ChatModel returns a ChatModel implementation for the given model and options
 func (c *AnthropicClient) ChatModel(model string, options *ChatOptions) ChatModel {
 	// Merge config verbose flag with provided options
@@ -156,6 +172,8 @@ func (c *AnthropicClient) ListModels() ([]ModelInfo, error) {
 	req.Header.Set("x-api-key", c.apiKey)
 	req.Header.Set("anthropic-version", c.apiVersion)
 	setUserAgentHeader(req)
+	c.applyConfiguredHeaders(req)
+	applyOptionsHeaders(req, nil)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -270,6 +288,8 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	req.Header.Set("x-api-key", m.client.apiKey)
 	req.Header.Set("anthropic-version", m.client.apiVersion)
 	setUserAgentHeader(req)
+	m.client.applyConfiguredHeaders(req)
+	applyOptionsHeaders(req, effectiveOptions)
 
 	// Print verbose request output if enabled
 	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
@@ -409,6 +429,8 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		req.Header.Set("x-api-key", m.client.apiKey)
 		req.Header.Set("anthropic-version", m.client.apiVersion)
 		setUserAgentHeader(req)
+		m.client.applyConfiguredHeaders(req)
+		applyOptionsHeaders(req, effectiveOptions)
 
 		// Print verbose request output if enabled
 		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
