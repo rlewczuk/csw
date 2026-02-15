@@ -348,9 +348,12 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 
 		// Build request with streaming enabled
 		chatReq := OpenaiChatCompletionRequest{
-			Model:     m.model,
-			Messages:  openaiMessages,
-			Stream:    true,
+			Model:    m.model,
+			Messages: openaiMessages,
+			Stream:   true,
+			StreamOptions: &OpenaiStreamOptions{
+				IncludeUsage: true,
+			},
 			Tools:     convertToolsToOpenAI(tools),
 			MaxTokens: DefaultContextLengthLimit,
 		}
@@ -420,6 +423,8 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 
 		// Track accumulated tool calls across chunks
 		toolCallsInProgress := make(map[int]*OpenaiToolCall)
+		// Track accumulated reasoning content
+		var accumulatedReasoningContent string
 
 		for scanner.Scan() {
 			// Check if context is cancelled
@@ -475,6 +480,11 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 				if choice.FinishReason != "" {
 					// If there's content or tool calls in the delta, yield it before ending
 					if choice.Delta != nil {
+						// Accumulate any remaining reasoning content
+						if choice.Delta.ReasoningContent != "" {
+							accumulatedReasoningContent += choice.Delta.ReasoningContent
+						}
+
 						// Yield any remaining content
 						var content string
 						switch v := choice.Delta.Content.(type) {
@@ -490,9 +500,10 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 							result := &ChatMessage{
 								Role: ChatRoleAssistant,
 								Parts: []ChatMessagePart{
-									{Text: content},
+									{Text: content, ReasoningContent: accumulatedReasoningContent},
 								},
 							}
+							accumulatedReasoningContent = ""
 							if !yield(result) {
 								return
 							}
@@ -503,6 +514,13 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 							result := &ChatMessage{
 								Role:  ChatRoleAssistant,
 								Parts: []ChatMessagePart{},
+							}
+							// Add reasoning content as first part if any
+							if accumulatedReasoningContent != "" {
+								result.Parts = append(result.Parts, ChatMessagePart{
+									ReasoningContent: accumulatedReasoningContent,
+								})
+								accumulatedReasoningContent = ""
 							}
 							for _, tc := range toolCallsInProgress {
 								var args map[string]interface{}
@@ -525,6 +543,12 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 
 				// Process delta
 				if choice.Delta != nil {
+					// Handle reasoning content (for thinking models like GLM-5)
+					// Accumulate it instead of yielding separately
+					if choice.Delta.ReasoningContent != "" {
+						accumulatedReasoningContent += choice.Delta.ReasoningContent
+					}
+
 					// Handle text content
 					var content string
 					switch v := choice.Delta.Content.(type) {
@@ -540,9 +564,10 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 						result := &ChatMessage{
 							Role: ChatRoleAssistant,
 							Parts: []ChatMessagePart{
-								{Text: content},
+								{Text: content, ReasoningContent: accumulatedReasoningContent},
 							},
 						}
+						accumulatedReasoningContent = ""
 						if !yield(result) {
 							return
 						}
