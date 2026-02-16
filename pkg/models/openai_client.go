@@ -753,6 +753,16 @@ func convertToOpenAIMessage(msg *ChatMessage) OpenaiChatCompletionMessage {
 		openaiMsg.Role = "tool"
 	}
 
+	var reasoningContent string
+	for _, part := range msg.Parts {
+		if part.ReasoningContent != "" {
+			reasoningContent += part.ReasoningContent
+		}
+	}
+	if reasoningContent != "" {
+		openaiMsg.ReasoningContent = reasoningContent
+	}
+
 	// Check if message contains only text
 	hasOnlyText := true
 	for _, part := range msg.Parts {
@@ -803,6 +813,11 @@ func convertToOpenAIMessage(msg *ChatMessage) OpenaiChatCompletionMessage {
 // convertFromOpenAIMessage converts OpenAI OpenaiChatCompletionMessage to models.ChatMessage
 func convertFromOpenAIMessage(msg *OpenaiChatCompletionMessage) *ChatMessage {
 	var parts []ChatMessagePart
+
+	// Add reasoning content if present (for thinking models like GLM-5)
+	if msg.ReasoningContent != "" {
+		parts = append(parts, ChatMessagePart{ReasoningContent: msg.ReasoningContent})
+	}
 
 	// Add text content if present
 	if contentStr, ok := msg.Content.(string); ok && contentStr != "" {

@@ -56,6 +56,9 @@ type ChatMessageUI struct {
 	// Text content of the message
 	Text string
 
+	// Thinking content of the message (for thinking models)
+	Thinking string
+
 	// List of tools in the message
 	Tools []*ToolUI
 }

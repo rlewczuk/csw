@@ -1164,3 +1164,146 @@ func TestSessionVFSMoveToolIntegration(t *testing.T) {
 		}
 	})
 }
+
+// TestSessionReasoningContent tests that reasoning content from previous messages
+// is properly included in subsequent LLM calls.
+func TestSessionReasoningContent(t *testing.T) {
+	fixture := newSweSystemFixture(t, "You are a helpful assistant.")
+	system := fixture.system
+	vfsInstance := fixture.vfs
+
+	err := vfsInstance.WriteFile("test.txt", []byte("file content"))
+	require.NoError(t, err)
+
+	t.Run("reasoning content is included in subsequent LLM call with tool result", func(t *testing.T) {
+		mockProvider := models.NewMockProvider([]models.ModelInfo{
+			{Name: "test-model", Model: "test-model"},
+		})
+
+		firstResponse := &models.MockChatResponse{
+			Response: &models.ChatMessage{
+				Role: models.ChatRoleAssistant,
+				Parts: []models.ChatMessagePart{
+					{ReasoningContent: "I need to read the file to help the user."},
+					{ToolCall: &tool.ToolCall{
+						ID:       "read-call-1",
+						Function: "vfsRead",
+						Arguments: tool.NewToolValue(map[string]any{
+							"path": "test.txt",
+						}),
+					}},
+				},
+			},
+		}
+
+		secondResponse := &models.MockChatResponse{
+			Response: &models.ChatMessage{
+				Role: models.ChatRoleAssistant,
+				Parts: []models.ChatMessagePart{
+					{Text: "I have read the file."},
+				},
+			},
+		}
+
+		mockProvider.SetChatResponse("test-model", firstResponse)
+		mockProvider.SetChatResponse("test-model", secondResponse)
+
+		system.ModelProviders = map[string]models.ModelProvider{"mock": mockProvider}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("mock/test-model", mockHandler)
+		require.NoError(t, err)
+
+		session.streaming = false
+
+		session.UserPrompt("Read the file test.txt")
+
+		ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+		defer cancel()
+		_ = session.Run(ctx)
+
+		require.GreaterOrEqual(t, len(mockProvider.RecordedMessages), 2, "Should have at least 2 LLM calls")
+
+		secondCallMessages := mockProvider.RecordedMessages[1]
+
+		var foundAssistantWithReasoning bool
+		for _, msg := range secondCallMessages {
+			if msg.Role == models.ChatRoleAssistant {
+				for _, part := range msg.Parts {
+					if part.ReasoningContent == "I need to read the file to help the user." {
+						foundAssistantWithReasoning = true
+						break
+					}
+				}
+			}
+		}
+
+		assert.True(t, foundAssistantWithReasoning, "Second LLM call should include reasoning content from previous assistant message")
+	})
+
+	t.Run("reasoning content is preserved in conversation history", func(t *testing.T) {
+		mockProvider := models.NewMockProvider([]models.ModelInfo{
+			{Name: "test-model", Model: "test-model"},
+		})
+
+		firstResponse := &models.MockChatResponse{
+			Response: &models.ChatMessage{
+				Role: models.ChatRoleAssistant,
+				Parts: []models.ChatMessagePart{
+					{ReasoningContent: "Thinking about the question..."},
+					{Text: "Hello!"},
+				},
+			},
+		}
+
+		secondResponse := &models.MockChatResponse{
+			Response: &models.ChatMessage{
+				Role: models.ChatRoleAssistant,
+				Parts: []models.ChatMessagePart{
+					{Text: "Goodbye!"},
+				},
+			},
+		}
+
+		mockProvider.SetChatResponse("test-model", firstResponse)
+		mockProvider.SetChatResponse("test-model", secondResponse)
+
+		system.ModelProviders = map[string]models.ModelProvider{"mock": mockProvider}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := system.NewSession("mock/test-model", mockHandler)
+		require.NoError(t, err)
+
+		session.streaming = false
+
+		session.UserPrompt("Say hello")
+
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+		_ = session.Run(ctx)
+		cancel()
+
+		session.UserPrompt("Say goodbye")
+
+		ctx, cancel = context.WithTimeout(t.Context(), 100*time.Millisecond)
+		_ = session.Run(ctx)
+		cancel()
+
+		require.GreaterOrEqual(t, len(mockProvider.RecordedMessages), 2, "Should have at least 2 LLM calls")
+
+		secondCallMessages := mockProvider.RecordedMessages[1]
+
+		var foundAssistantWithReasoning bool
+		for _, msg := range secondCallMessages {
+			if msg.Role == models.ChatRoleAssistant {
+				for _, part := range msg.Parts {
+					if part.ReasoningContent == "Thinking about the question..." {
+						foundAssistantWithReasoning = true
+						break
+					}
+				}
+			}
+		}
+
+		assert.True(t, foundAssistantWithReasoning, "Second LLM call should include reasoning content from previous assistant message")
+	})
+}

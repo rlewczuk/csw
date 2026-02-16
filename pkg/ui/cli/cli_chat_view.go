@@ -42,6 +42,10 @@ type CliChatView struct {
 	// Key is tool ID, value is the output line that was last printed
 	renderedTools map[string]string
 
+	// renderedThinking tracks the thinking content that has been rendered for each message
+	// Key is message ID, value is the thinking content that was printed
+	renderedThinking map[string]string
+
 	// lastMessageWasAssistant tracks if the last message rendered was from the assistant
 	lastMessageWasAssistant bool
 
@@ -68,6 +72,7 @@ func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Read
 		stopCh:               make(chan struct{}),
 		renderedText:         make(map[string]string),
 		renderedTools:        make(map[string]string),
+		renderedThinking:     make(map[string]string),
 	}
 
 	// Setup scanner only for interactive mode
@@ -316,6 +321,16 @@ func (v *CliChatView) renderMessage(msg *ui.ChatMessageUI) {
 // renderAssistantMessage renders an assistant message, handling streaming updates.
 // Must be called with mu locked.
 func (v *CliChatView) renderAssistantMessage(msg *ui.ChatMessageUI) {
+	// Render thinking content first if present
+	if msg.Thinking != "" {
+		prevThinking := v.renderedThinking[msg.Id]
+		if len(msg.Thinking) > len(prevThinking) {
+			newThinking := msg.Thinking[len(prevThinking):]
+			fmt.Fprintf(v.output, "\n*%s*", newThinking)
+			v.renderedThinking[msg.Id] = msg.Thinking
+		}
+	}
+
 	// Get the previously rendered text for this message
 	prevRendered := v.renderedText[msg.Id]
 

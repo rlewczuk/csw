@@ -172,6 +172,12 @@ func (s *SweSession) emitAssistantParts(parts []models.ChatMessagePart, streamin
 	}
 
 	for _, part := range parts {
+		if part.ReasoningContent != "" {
+			s.outputHandler.AddThinkingChunk(part.ReasoningContent)
+			if s.logger != nil {
+				s.logger.Debug("assistant_thinking_chunk", "chunk", part.ReasoningContent)
+			}
+		}
 		if part.Text != "" {
 			s.outputHandler.AddMarkdownChunk(part.Text)
 			if s.logger != nil {
