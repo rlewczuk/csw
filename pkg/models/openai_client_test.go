@@ -1540,4 +1540,138 @@ func TestOpenAIClient_ReasoningContent(t *testing.T) {
 		require.NotNil(t, chatReq.StreamOptions, "stream_options should not be nil")
 		assert.True(t, chatReq.StreamOptions.IncludeUsage, "include_usage should be true")
 	})
+
+	t.Run("non-streaming response includes reasoning content", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL: mock.URL(),
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-reasoning-3","object":"chat.completion","created":1771161940,"model":"glm-5","choices":[{"index":0,"message":{"role":"assistant","reasoning_content":"I should help.","content":"Sure!"},"finish_reason":"stop"}]}`)
+
+		chatModel := client.ChatModel("glm-5", nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "Help me"),
+		}
+
+		response, err := chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+		require.NotNil(t, response)
+
+		assert.Equal(t, ChatRoleAssistant, response.Role)
+		require.NotEmpty(t, response.Parts, "expected at least one part")
+
+		var reasoningContent string
+		var textContent string
+		for _, part := range response.Parts {
+			if part.ReasoningContent != "" {
+				reasoningContent += part.ReasoningContent
+			}
+			if part.Text != "" {
+				textContent += part.Text
+			}
+		}
+
+		assert.Equal(t, "I should help.", reasoningContent, "reasoning content should be extracted")
+		assert.Equal(t, "Sure!", textContent, "text content should be extracted")
+	})
+
+	t.Run("sends reasoning content back to LLM in subsequent request", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL: mock.URL(),
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-reasoning-4","object":"chat.completion","created":1771161940,"model":"glm-5","choices":[{"index":0,"message":{"role":"assistant","content":"OK"},"finish_reason":"stop"}]}`)
+
+		chatModel := client.ChatModel("glm-5", nil)
+
+		previousAssistantMsg := &ChatMessage{
+			Role: ChatRoleAssistant,
+			Parts: []ChatMessagePart{
+				{ReasoningContent: "I thought about this.", Text: "Hello"},
+			},
+		}
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "Hi"),
+			previousAssistantMsg,
+			NewTextMessage(ChatRoleUser, "Continue"),
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq OpenaiChatCompletionRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+
+		require.Len(t, chatReq.Messages, 3)
+		assistantMsg := chatReq.Messages[1]
+		assert.Equal(t, "assistant", assistantMsg.Role)
+		assert.Equal(t, "Hello", assistantMsg.Content)
+		assert.Equal(t, "I thought about this.", assistantMsg.ReasoningContent, "reasoning content should be sent back to LLM")
+	})
+
+	t.Run("sends reasoning content with tool calls back to LLM", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL: mock.URL(),
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-reasoning-5","object":"chat.completion","created":1771161940,"model":"glm-5","choices":[{"index":0,"message":{"role":"assistant","content":"Done"},"finish_reason":"stop"}]}`)
+
+		chatModel := client.ChatModel("glm-5", nil)
+
+		previousAssistantMsg := &ChatMessage{
+			Role: ChatRoleAssistant,
+			Parts: []ChatMessagePart{
+				{ReasoningContent: "I need to call a tool."},
+				{ToolCall: &tool.ToolCall{
+					ID:        "call_abc",
+					Function:  "test_func",
+					Arguments: tool.NewToolValue(map[string]any{"arg": "value"}),
+				}},
+			},
+		}
+		toolResultMsg := NewToolResponseMessage(&tool.ToolResponse{
+			Call:   &tool.ToolCall{ID: "call_abc"},
+			Result: tool.NewToolValue("result"),
+			Done:   true,
+		})
+
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "Do something"),
+			previousAssistantMsg,
+			toolResultMsg,
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq OpenaiChatCompletionRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+
+		require.Len(t, chatReq.Messages, 3)
+		assistantMsg := chatReq.Messages[1]
+		assert.Equal(t, "assistant", assistantMsg.Role)
+		assert.Equal(t, "I need to call a tool.", assistantMsg.ReasoningContent, "reasoning content should be sent back with tool calls")
+		require.Len(t, assistantMsg.ToolCalls, 1)
+		assert.Equal(t, "call_abc", assistantMsg.ToolCalls[0].ID)
+	})
 }

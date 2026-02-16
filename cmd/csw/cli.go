@@ -224,6 +224,10 @@ type cliOutputHandler struct {
 	done     chan error
 }
 
+func (h *cliOutputHandler) AddThinkingChunk(thinking string) {
+	h.delegate.AddThinkingChunk(thinking)
+}
+
 func (h *cliOutputHandler) AddMarkdownChunk(markdown string) {
 	h.delegate.AddMarkdownChunk(markdown)
 }

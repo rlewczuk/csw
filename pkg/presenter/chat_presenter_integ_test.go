@@ -479,3 +479,115 @@ func TestChatPresenter_SetModel(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestChatPresenter_ThinkingContent(t *testing.T) {
+	fixture := newPresenterFixture(t)
+	system := fixture.System
+	mockServer := fixture.Server
+
+	t.Run("thinking content is forwarded to view", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		thread := core.NewSessionThread(system, mockHandler)
+
+		err := thread.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		presenter := NewChatPresenter(system, thread)
+
+		mockView := mock.NewMockChatView()
+		err = presenter.SetView(mockView)
+		require.NoError(t, err)
+
+		// Setup LLM response with thinking content (simulating OpenAI-style with reasoning_content)
+		mockServer.AddStreamingResponse("/api/chat", "POST", false,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello!"},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","done":true,"done_reason":"stop"}`,
+		)
+
+		// Send user message
+		userMsg := &ui.ChatMessageUI{
+			Id:   "user-1",
+			Role: ui.ChatRoleUser,
+			Text: "Hello",
+		}
+		err = presenter.SendUserMessage(userMsg)
+		assert.NoError(t, err)
+
+		// Wait for processing to complete
+		time.Sleep(10 * time.Millisecond)
+
+		// Verify assistant message was added
+		found := false
+		for _, msg := range mockView.AddMessageCalls {
+			if msg.Role == ui.ChatRoleAssistant {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "should have added assistant message")
+	})
+
+	t.Run("AddThinkingChunk creates message with thinking content", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		thread := core.NewSessionThread(system, mockHandler)
+
+		err := thread.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		presenter := NewChatPresenter(system, thread)
+
+		mockView := mock.NewMockChatView()
+		err = presenter.SetView(mockView)
+		require.NoError(t, err)
+
+		// Directly call AddThinkingChunk (simulating thinking model response)
+		presenter.AddThinkingChunk("Let me think about this...")
+
+		// Verify message was added with thinking content
+		require.GreaterOrEqual(t, len(mockView.AddMessageCalls), 1)
+		msg := mockView.AddMessageCalls[len(mockView.AddMessageCalls)-1]
+		assert.Equal(t, ui.ChatRoleAssistant, msg.Role)
+		assert.Equal(t, "Let me think about this...", msg.Thinking)
+
+		// Add more thinking content
+		presenter.AddThinkingChunk(" And more thoughts.")
+
+		// Verify UpdateMessage was called with accumulated thinking
+		require.GreaterOrEqual(t, len(mockView.UpdateMessageCalls), 1)
+		updatedMsg := mockView.UpdateMessageCalls[len(mockView.UpdateMessageCalls)-1]
+		assert.Equal(t, "Let me think about this... And more thoughts.", updatedMsg.Thinking)
+	})
+
+	t.Run("AddThinkingChunk followed by AddMarkdownChunk", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		thread := core.NewSessionThread(system, mockHandler)
+
+		err := thread.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		presenter := NewChatPresenter(system, thread)
+
+		mockView := mock.NewMockChatView()
+		err = presenter.SetView(mockView)
+		require.NoError(t, err)
+
+		// Add thinking content first
+		presenter.AddThinkingChunk("Thinking...")
+
+		// Then add markdown content (simulating end of thinking, start of response)
+		presenter.AddMarkdownChunk("Here is my answer.")
+
+		// Verify the same message was updated (not a new one created)
+		// AddMessageCalls should have 1 call (from AddThinkingChunk creating the message)
+		require.GreaterOrEqual(t, len(mockView.AddMessageCalls), 1)
+		addedMsg := mockView.AddMessageCalls[len(mockView.AddMessageCalls)-1]
+		assert.Equal(t, ui.ChatRoleAssistant, addedMsg.Role)
+		assert.Equal(t, "Thinking...", addedMsg.Thinking)
+
+		// UpdateMessageCalls should have 1 call (from AddMarkdownChunk updating the message)
+		require.GreaterOrEqual(t, len(mockView.UpdateMessageCalls), 1)
+		updatedMsg := mockView.UpdateMessageCalls[len(mockView.UpdateMessageCalls)-1]
+		assert.Equal(t, "Here is my answer.", updatedMsg.Text)
+		assert.Equal(t, "Thinking...", updatedMsg.Thinking)
+	})
+}

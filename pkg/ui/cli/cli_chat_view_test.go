@@ -939,3 +939,98 @@ func TestCliChatView_ToolDisplayField(t *testing.T) {
 		assert.NotContains(t, outputStr, "TOOL:")
 	})
 }
+
+func TestCliChatView_ThinkingContent(t *testing.T) {
+	t.Run("displays thinking content as italic", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		msg := &ui.ChatMessageUI{
+			Id:       "msg1",
+			Role:     ui.ChatRoleAssistant,
+			Text:     "Hello!",
+			Thinking: "Let me think about this...",
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "*Let me think about this...*")
+		assert.Contains(t, outputStr, "Assistant: Hello!")
+	})
+
+	t.Run("streaming thinking content updates", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		// Initial message with thinking
+		msg := &ui.ChatMessageUI{
+			Id:       "msg1",
+			Role:     ui.ChatRoleAssistant,
+			Text:     "",
+			Thinking: "Thinking",
+		}
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		output.Reset()
+
+		// Update with more thinking content
+		updatedMsg := &ui.ChatMessageUI{
+			Id:       "msg1",
+			Role:     ui.ChatRoleAssistant,
+			Text:     "",
+			Thinking: "Thinking about it",
+		}
+		err = view.UpdateMessage(updatedMsg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "* about it*")
+	})
+
+	t.Run("thinking content appears before text content", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		msg := &ui.ChatMessageUI{
+			Id:       "msg1",
+			Role:     ui.ChatRoleAssistant,
+			Thinking: "My reasoning",
+			Text:     "My answer",
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		// Thinking should appear first
+		thinkingIdx := strings.Index(outputStr, "*My reasoning*")
+		textIdx := strings.Index(outputStr, "Assistant: My answer")
+		assert.Less(t, thinkingIdx, textIdx, "Thinking should appear before assistant text")
+	})
+
+	t.Run("no thinking output when thinking is empty", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false)
+
+		msg := &ui.ChatMessageUI{
+			Id:       "msg1",
+			Role:     ui.ChatRoleAssistant,
+			Text:     "Hello!",
+			Thinking: "",
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "Assistant: Hello!")
+		assert.NotContains(t, outputStr, "**")
+	})
+}

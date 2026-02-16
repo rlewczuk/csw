@@ -12,10 +12,21 @@ func TestMockSessionOutputHandler(t *testing.T) {
 	t.Run("new handler is empty", func(t *testing.T) {
 		handler := NewMockSessionOutputHandler()
 		require.NotNil(t, handler)
+		assert.Empty(t, handler.ThinkingChunks)
 		assert.Empty(t, handler.MarkdownChunks)
 		assert.Empty(t, handler.ToolCallStarts)
 		assert.Empty(t, handler.ToolCallDetails)
 		assert.Empty(t, handler.ToolCallResults)
+	})
+
+	t.Run("records thinking chunks", func(t *testing.T) {
+		handler := NewMockSessionOutputHandler()
+		handler.AddThinkingChunk("Let me think...")
+		handler.AddThinkingChunk(" And more thoughts.")
+
+		assert.Len(t, handler.ThinkingChunks, 2)
+		assert.Equal(t, "Let me think...", handler.ThinkingChunks[0])
+		assert.Equal(t, " And more thoughts.", handler.ThinkingChunks[1])
 	})
 
 	t.Run("records markdown chunks", func(t *testing.T) {
@@ -72,6 +83,7 @@ func TestMockSessionOutputHandler(t *testing.T) {
 
 	t.Run("reset clears all data", func(t *testing.T) {
 		handler := NewMockSessionOutputHandler()
+		handler.AddThinkingChunk("thinking...")
 		handler.AddMarkdownChunk("test")
 		handler.AddToolCallStart(&tool.ToolCall{ID: "1"})
 		handler.AddToolCallDetails(&tool.ToolCall{ID: "1"})
@@ -81,6 +93,7 @@ func TestMockSessionOutputHandler(t *testing.T) {
 
 		handler.Reset()
 
+		assert.Empty(t, handler.ThinkingChunks)
 		assert.Empty(t, handler.MarkdownChunks)
 		assert.Empty(t, handler.ToolCallStarts)
 		assert.Empty(t, handler.ToolCallDetails)

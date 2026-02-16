@@ -12,14 +12,17 @@ import (
 
 // MockClient implements models.ModelProvider interface for testing purposes.
 type MockClient struct {
-	models         []ModelInfo
-	chatResponses  map[string]*MockChatResponse
-	embedResponses map[string][]float64
-	mu             sync.RWMutex
+	models          []ModelInfo
+	chatResponses   map[string]*MockChatResponse
+	chatResponseQue map[string][]*MockChatResponse
+	embedResponses  map[string][]float64
+	mu              sync.RWMutex
 	// RecordedToolCalls stores tool calls received from the LLM during tests
 	RecordedToolCalls []tool.ToolCall
 	// RecordedToolResponses stores tool responses sent to the LLM during tests
 	RecordedToolResponses []tool.ToolResponse
+	// RecordedMessages stores all messages sent to the mock provider during tests
+	RecordedMessages [][]*ChatMessage
 }
 
 // MockChatResponse holds the configuration for mock chat responses.
@@ -37,9 +40,10 @@ type MockChatResponse struct {
 // NewMockProvider creates a new mock provider with the given model list.
 func NewMockProvider(models []ModelInfo) *MockClient {
 	return &MockClient{
-		models:         models,
-		chatResponses:  make(map[string]*MockChatResponse),
-		embedResponses: make(map[string][]float64),
+		models:          models,
+		chatResponses:   make(map[string]*MockChatResponse),
+		chatResponseQue: make(map[string][]*MockChatResponse),
+		embedResponses:  make(map[string][]float64),
 	}
 }
 
@@ -47,7 +51,14 @@ func NewMockProvider(models []ModelInfo) *MockClient {
 func (p *MockClient) SetChatResponse(modelName string, response *MockChatResponse) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.chatResponses[modelName] = response
+	p.chatResponseQue[modelName] = append(p.chatResponseQue[modelName], response)
+}
+
+// AddChatResponse appends a response to the response queue for a specific model.
+func (p *MockClient) AddChatResponse(modelName string, response *MockChatResponse) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.chatResponseQue[modelName] = append(p.chatResponseQue[modelName], response)
 }
 
 // SetResponsesFromFile configures mock responses for a specific model from a file.
@@ -121,18 +132,23 @@ func (m *MockChatModel) Chat(ctx context.Context, messages []*ChatMessage, optio
 	default:
 	}
 
-	// Record tool responses from incoming messages
+	// Record all messages and tool responses from incoming messages
 	m.provider.mu.Lock()
-	for _, msg := range messages {
+	messageCopy := make([]*ChatMessage, len(messages))
+	for i, msg := range messages {
+		messageCopy[i] = msg
 		for _, resp := range msg.GetToolResponses() {
 			m.provider.RecordedToolResponses = append(m.provider.RecordedToolResponses, *resp)
 		}
 	}
-	m.provider.mu.Unlock()
+	m.provider.RecordedMessages = append(m.provider.RecordedMessages, messageCopy)
 
-	m.provider.mu.RLock()
-	response := m.provider.chatResponses[m.model]
-	m.provider.mu.RUnlock()
+	var response *MockChatResponse
+	if queue := m.provider.chatResponseQue[m.model]; len(queue) > 0 {
+		response = queue[0]
+		m.provider.chatResponseQue[m.model] = queue[1:]
+	}
+	m.provider.mu.Unlock()
 
 	if response == nil {
 		// Default response if none configured
@@ -163,18 +179,23 @@ func (m *MockChatModel) Chat(ctx context.Context, messages []*ChatMessage, optio
 // ChatStream sends a chat request and returns a standard Go iterator for streaming responses.
 func (m *MockChatModel) ChatStream(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) iter.Seq[*ChatMessage] {
 	return func(yield func(*ChatMessage) bool) {
-		// Record tool responses from incoming messages
+		// Record all messages and tool responses from incoming messages
 		m.provider.mu.Lock()
-		for _, msg := range messages {
+		messageCopy := make([]*ChatMessage, len(messages))
+		for i, msg := range messages {
+			messageCopy[i] = msg
 			for _, resp := range msg.GetToolResponses() {
 				m.provider.RecordedToolResponses = append(m.provider.RecordedToolResponses, *resp)
 			}
 		}
-		m.provider.mu.Unlock()
+		m.provider.RecordedMessages = append(m.provider.RecordedMessages, messageCopy)
 
-		m.provider.mu.RLock()
-		response := m.provider.chatResponses[m.model]
-		m.provider.mu.RUnlock()
+		var response *MockChatResponse
+		if queue := m.provider.chatResponseQue[m.model]; len(queue) > 0 {
+			response = queue[0]
+			m.provider.chatResponseQue[m.model] = queue[1:]
+		}
+		m.provider.mu.Unlock()
 
 		var fragments []*ChatMessage
 

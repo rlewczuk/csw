@@ -9,6 +9,9 @@ import (
 // MockSessionOutputHandler is a mock implementation of SessionOutputHandler that keeps all output in memory.
 // It is used for testing and capturing output from agent operations.
 type MockSessionOutputHandler struct {
+	// ThinkingChunks stores all thinking chunks received via AddThinkingChunk.
+	ThinkingChunks []string
+
 	// MarkdownChunks stores all markdown chunks received via AddMarkdownChunk.
 	MarkdownChunks []string
 
@@ -40,6 +43,7 @@ type MockSessionOutputHandler struct {
 // NewMockSessionOutputHandler creates a new MockSessionOutputHandler.
 func NewMockSessionOutputHandler() *MockSessionOutputHandler {
 	return &MockSessionOutputHandler{
+		ThinkingChunks:        make([]string, 0),
 		MarkdownChunks:        make([]string, 0),
 		ToolCallStarts:        make([]*tool.ToolCall, 0),
 		ToolCallDetails:       make([]*tool.ToolCall, 0),
@@ -64,6 +68,13 @@ func (h *MockSessionOutputHandler) OnPermissionQuery(query *tool.ToolPermissions
 // WaitForPermissionQuery blocks until OnPermissionQuery is called.
 func (h *MockSessionOutputHandler) WaitForPermissionQuery() {
 	<-h.permissionQueryCalled
+}
+
+// AddThinkingChunk records a thinking chunk.
+func (h *MockSessionOutputHandler) AddThinkingChunk(thinking string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.ThinkingChunks = append(h.ThinkingChunks, thinking)
 }
 
 // AddMarkdownChunk records a markdown chunk.
@@ -111,6 +122,7 @@ func (h *MockSessionOutputHandler) WaitForRunFinished() {
 func (h *MockSessionOutputHandler) Reset() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.ThinkingChunks = make([]string, 0)
 	h.MarkdownChunks = make([]string, 0)
 	h.ToolCallStarts = make([]*tool.ToolCall, 0)
 	h.ToolCallDetails = make([]*tool.ToolCall, 0)

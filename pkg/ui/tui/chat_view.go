@@ -21,6 +21,7 @@ type chatMessage struct {
 	id        string
 	role      string
 	content   string
+	thinking  string
 	toolCalls []*toolCallWidget
 }
 
@@ -230,6 +231,7 @@ func (v *TChatView) UpdateMessage(msg *ui.ChatMessageUI) error {
 			if (msg.Id != "" && m.id == msg.Id) || (msg.Id == "" && m.role == string(msg.Role) && len(m.content) == 0) {
 				// Update content (replace, not append - presenter sends accumulated text)
 				m.content = msg.Text
+				m.thinking = msg.Thinking
 
 				// Update tool calls
 				m.toolCalls = make([]*toolCallWidget, 0, len(msg.Tools))
@@ -427,6 +429,7 @@ func (v *TChatView) addMessageInternal(msg *ui.ChatMessageUI) {
 		id:        msg.Id,
 		role:      string(msg.Role),
 		content:   msg.Text,
+		thinking:  msg.Thinking,
 		toolCalls: make([]*toolCallWidget, 0),
 	}
 
@@ -459,6 +462,12 @@ func (v *TChatView) updateMarkdownContentInternal() {
 				sb.WriteString(msg.content)
 			}
 			sb.WriteString("\n")
+
+			if msg.thinking != "" {
+				sb.WriteString("\n*")
+				sb.WriteString(msg.thinking)
+				sb.WriteString("*\n")
+			}
 
 			for _, toolCall := range msg.toolCalls {
 				sb.WriteString(toolCall.toMarkdown())
