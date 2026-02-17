@@ -228,11 +228,11 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		Input:           items,
 		Tools:           convertToolsToResponses(tools),
 		Stream:          false,
-		MaxOutputTokens: DefaultContextLengthLimit,
+		MaxOutputTokens: DefaultMaxTokens,
 	}
 
-	if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
-		chatReq.MaxOutputTokens = m.client.config.ContextLengthLimit
+	if m.client.config != nil && m.client.config.MaxTokens > 0 {
+		chatReq.MaxOutputTokens = m.client.config.MaxTokens
 	}
 
 	if effectiveOptions != nil {
@@ -335,11 +335,11 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			Input:           items,
 			Tools:           convertToolsToResponses(tools),
 			Stream:          true,
-			MaxOutputTokens: DefaultContextLengthLimit,
+			MaxOutputTokens: DefaultMaxTokens,
 		}
 
-		if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
-			chatReq.MaxOutputTokens = m.client.config.ContextLengthLimit
+		if m.client.config != nil && m.client.config.MaxTokens > 0 {
+			chatReq.MaxOutputTokens = m.client.config.MaxTokens
 		}
 
 		if effectiveOptions != nil {

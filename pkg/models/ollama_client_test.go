@@ -1108,14 +1108,14 @@ func TestOllamaClient_Logging(t *testing.T) {
 	})
 }
 
-func TestOllamaClient_ContextLengthLimit(t *testing.T) {
-	t.Run("Chat method uses ContextLengthLimit as num_predict", func(t *testing.T) {
+func TestOllamaClient_MaxTokens(t *testing.T) {
+	t.Run("Chat method uses MaxTokens as num_predict", func(t *testing.T) {
 		mock := testutil.NewMockHTTPServer()
 		defer mock.Close()
 
 		client, err := NewOllamaClient(&conf.ModelProviderConfig{
-			URL:                mock.URL(),
-			ContextLengthLimit: 2048,
+			URL:       mock.URL(),
+			MaxTokens: 2048,
 		})
 		require.NoError(t, err)
 
@@ -1143,13 +1143,13 @@ func TestOllamaClient_ContextLengthLimit(t *testing.T) {
 		assert.Equal(t, 2048, chatReq.Options.NumPredict)
 	})
 
-	t.Run("ChatStream method uses ContextLengthLimit as num_predict", func(t *testing.T) {
+	t.Run("ChatStream method uses MaxTokens as num_predict", func(t *testing.T) {
 		mock := testutil.NewMockHTTPServer()
 		defer mock.Close()
 
 		client, err := NewOllamaClient(&conf.ModelProviderConfig{
-			URL:                mock.URL(),
-			ContextLengthLimit: 4096,
+			URL:       mock.URL(),
+			MaxTokens: 4096,
 		})
 		require.NoError(t, err)
 
@@ -1182,13 +1182,13 @@ func TestOllamaClient_ContextLengthLimit(t *testing.T) {
 		assert.Equal(t, 4096, chatReq.Options.NumPredict)
 	})
 
-	t.Run("Chat method uses default num_predict when ContextLengthLimit is zero", func(t *testing.T) {
+	t.Run("Chat method uses default num_predict when MaxTokens is zero", func(t *testing.T) {
 		mock := testutil.NewMockHTTPServer()
 		defer mock.Close()
 
 		client, err := NewOllamaClient(&conf.ModelProviderConfig{
-			URL:                mock.URL(),
-			ContextLengthLimit: 0,
+			URL:       mock.URL(),
+			MaxTokens: 0,
 		})
 		require.NoError(t, err)
 
@@ -1213,16 +1213,16 @@ func TestOllamaClient_ContextLengthLimit(t *testing.T) {
 		err = json.Unmarshal(reqs[0].Body, &chatReq)
 		require.NoError(t, err)
 		require.NotNil(t, chatReq.Options)
-		assert.Equal(t, DefaultContextLengthLimit, chatReq.Options.NumPredict)
+		assert.Equal(t, DefaultMaxTokens, chatReq.Options.NumPredict)
 	})
 
-	t.Run("Chat method sets num_predict with options when ContextLengthLimit is set", func(t *testing.T) {
+	t.Run("Chat method sets num_predict with options when MaxTokens is set", func(t *testing.T) {
 		mock := testutil.NewMockHTTPServer()
 		defer mock.Close()
 
 		client, err := NewOllamaClient(&conf.ModelProviderConfig{
-			URL:                mock.URL(),
-			ContextLengthLimit: 1024,
+			URL:       mock.URL(),
+			MaxTokens: 1024,
 		})
 		require.NoError(t, err)
 

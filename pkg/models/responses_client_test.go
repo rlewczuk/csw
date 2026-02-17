@@ -386,15 +386,15 @@ func TestResponsesClient_Logging(t *testing.T) {
 	})
 }
 
-func TestResponsesClient_ContextLengthLimit(t *testing.T) {
-	t.Run("Chat method uses ContextLengthLimit as max_output_tokens", func(t *testing.T) {
+func TestResponsesClient_MaxTokens(t *testing.T) {
+	t.Run("Chat method uses MaxTokens as max_output_tokens", func(t *testing.T) {
 		mock := testutil.NewMockHTTPServer()
 		defer mock.Close()
 
 		client, err := NewResponsesClient(&conf.ModelProviderConfig{
-			URL:                mock.URL(),
-			APIKey:             "test-key",
-			ContextLengthLimit: 2048,
+			URL:       mock.URL(),
+			APIKey:    "test-key",
+			MaxTokens: 2048,
 		})
 		require.NoError(t, err)
 
