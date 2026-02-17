@@ -890,6 +890,85 @@ func TestOpenAIClient_ToolCalling(t *testing.T) {
 	})
 }
 
+func TestOpenAIClient_ToolChoice(t *testing.T) {
+	t.Run("chat includes tool_choice when tools provided", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL: mock.URL(),
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-toolchoice","object":"chat.completion","created":1640000000,"model":"test-model","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "use tool"),
+		}
+		tools := []tool.ToolInfo{
+			{
+				Name:        "ping",
+				Description: "Ping tool",
+				Schema:      tool.NewToolSchema(),
+			},
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, tools)
+		require.NoError(t, err)
+
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq OpenaiChatCompletionRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+
+		assert.Equal(t, "auto", chatReq.ToolChoice)
+	})
+
+	t.Run("chat stream includes tool_choice when tools provided", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL: mock.URL(),
+		})
+		require.NoError(t, err)
+
+		mock.AddStreamingResponse("/chat/completions", "POST", true,
+			`data: {"id":"chatcmpl-toolchoice-stream","object":"chat.completion.chunk","created":1640000000,"model":"test-model","choices":[{"index":0,"delta":{"role":"assistant","content":"ok"}}]}`,
+			`data: {"id":"chatcmpl-toolchoice-stream","object":"chat.completion.chunk","created":1640000001,"model":"test-model","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
+			"data: [DONE]",
+		)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleUser, "use tool"),
+		}
+		tools := []tool.ToolInfo{
+			{
+				Name:        "ping",
+				Description: "Ping tool",
+				Schema:      tool.NewToolSchema(),
+			},
+		}
+
+		iterator := chatModel.ChatStream(context.Background(), messages, nil, tools)
+		for range iterator {
+		}
+
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+
+		var chatReq OpenaiChatCompletionRequest
+		err = json.Unmarshal(reqs[0].Body, &chatReq)
+		require.NoError(t, err)
+
+		assert.Equal(t, "auto", chatReq.ToolChoice)
+	})
+}
+
 func TestOpenAIClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint not found", func(t *testing.T) {
 		client, err := NewOpenAIClient(&conf.ModelProviderConfig{

@@ -474,11 +474,18 @@ type PropertySchema struct {
 
 	// Required lists the required properties (used when Type is "object").
 	Required []string `json:"required,omitempty"`
+
+	// AdditionalProperties when false, disallows extra properties not in the schema.
+	// This is used for nested object schemas.
+	AdditionalProperties *bool `json:"additionalProperties,omitempty"`
 }
 
 // ToolSchema defines the JSON Schema for tool arguments.
 // It follows the JSON Schema object type specification used by LLM APIs.
 type ToolSchema struct {
+	// Schema identifies the JSON Schema version.
+	Schema string `json:"$schema,omitempty"`
+
 	// Type is always "object" for tool argument schemas.
 	Type SchemaType `json:"type"`
 
@@ -499,6 +506,7 @@ type ToolSchema struct {
 // NewToolSchema creates a new ToolSchema with the object type preset.
 func NewToolSchema() ToolSchema {
 	return ToolSchema{
+		Schema:               "https://json-schema.org/draft/2020-12/schema",
 		Type:                 SchemaTypeObject,
 		Properties:           make(map[string]PropertySchema),
 		AdditionalProperties: false,

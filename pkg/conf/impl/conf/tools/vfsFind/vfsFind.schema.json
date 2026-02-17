@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Searches for files matching a glob pattern within a directory tree. If query is empty, returns all files.",
   "type": "object",
   "properties": {
@@ -12,5 +13,6 @@
       "default": true
     }
   },
-  "required": []
+  "required": [],
+  "additionalProperties": false
 }

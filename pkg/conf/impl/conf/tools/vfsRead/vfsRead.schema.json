@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Reads a file from the local filesystem. You can access any file directly by using this tool.",
   "type": "object",
   "properties": {
@@ -15,5 +16,6 @@
       "description": "The number of lines to skip before reading. Defaults to 0 if not provided."
     }
   },
-  "required": ["path"]
+  "required": ["path"],
+  "additionalProperties": false
 }
