@@ -543,6 +543,91 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 	})
 }
 
+func TestSweSession_NetworkErrorRetry(t *testing.T) {
+	t.Run("retries on network error using exponential backoff", func(t *testing.T) {
+		mockProvider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+
+		networkErr := &models.NetworkError{
+			Message:     "connection refused",
+			IsRetryable: true,
+		}
+
+		mockProvider.NetworkError = networkErr
+		networkErrorCount := 1
+		mockProvider.NetworkErrorCount = &networkErrorCount
+		mockProvider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 5 * time.Millisecond}
+
+		successResponse := &models.MockChatResponse{
+			Response: &models.ChatMessage{
+				Role: models.ChatRoleAssistant,
+				Parts: []models.ChatMessagePart{
+					{Text: "Success after retry!"},
+				},
+			},
+		}
+		mockProvider.SetChatResponse("test-model", successResponse)
+
+		fixture := newSweSystemFixture(t, "You are a helpful assistant.", func(c *sweSystemFixtureConfig) {
+			c.modelProviders = map[string]models.ModelProvider{"mock": mockProvider}
+		})
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
+		require.NoError(t, err)
+
+		session.streaming = false
+
+		session.UserPrompt("Hello")
+
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		err = session.Run(ctx)
+		cancel()
+
+		assert.NoError(t, err, "Session should complete successfully after retry")
+		assert.Equal(t, 2, len(mockProvider.RecordedMessages), "Should have made 2 LLM calls (1 network error + 1 success)")
+
+		if len(mockHandler.RateLimitErrors) > 0 {
+			t.Logf("Network retry notifications received: %v", mockHandler.RateLimitErrors)
+		}
+	})
+
+	t.Run("fails after max retries exceeded for network error", func(t *testing.T) {
+		mockProvider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+
+		networkErr := &models.NetworkError{
+			Message:     "connection refused",
+			IsRetryable: true,
+		}
+
+		mockProvider.NetworkError = networkErr
+		networkErrorCount := 2
+		mockProvider.NetworkErrorCount = &networkErrorCount
+		mockProvider.Config = &conf.ModelProviderConfig{
+			MaxRetries:            1,
+			RateLimitBackoffScale: 5 * time.Millisecond,
+		}
+
+		fixture := newSweSystemFixture(t, "You are a helpful assistant.", func(c *sweSystemFixtureConfig) {
+			c.modelProviders = map[string]models.ModelProvider{"mock": mockProvider}
+		})
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
+		require.NoError(t, err)
+
+		session.streaming = false
+
+		session.UserPrompt("Hello")
+
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+		err = session.Run(ctx)
+		cancel()
+
+		require.Error(t, err, "Session should fail after max retries")
+		assert.Contains(t, err.Error(), "network error")
+	})
+}
+
 // TestSessionVFSMoveToolIntegration tests the vfsMove tool integration with the session.
 // This test exposes a known bug where either tool call result or its ID are not
 // propagated back to the LLM properly.

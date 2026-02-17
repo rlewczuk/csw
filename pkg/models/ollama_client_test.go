@@ -658,8 +658,12 @@ func TestOllamaClient_ErrorHandling(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = client.ListModels()
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, ErrEndpointUnavailable)
+		require.Error(t, err)
+		// Network errors are now wrapped in NetworkError for retry support
+		var networkErr *NetworkError
+		if assert.True(t, errors.As(err, &networkErr), "Should be a NetworkError, got: %v", err) {
+			assert.True(t, networkErr.IsRetryable, "Network error should be retryable")
+		}
 	})
 }
 

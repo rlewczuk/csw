@@ -254,7 +254,7 @@ func (s *SweSession) runStreamingChat(ctx context.Context, chatModel models.Chat
 // runNonStreamingChat executes a non-streaming chat request and returns the response.
 func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.ChatModel, tools []tool.ToolInfo, chatOptions *models.ChatOptions) (*models.ChatMessage, error) {
 	maxRetries := s.maxRetries()
-	backoffScale := time.Second
+	backoffScale := models.DefaultRetryBackoffScale
 	if configProvider, ok := s.provider.(interface {
 		GetConfig() *conf.ModelProviderConfig
 	}); ok {
@@ -320,7 +320,42 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 			continue
 		}
 
-		// Not a rate limit error, return immediately
+		// Check if this is a retryable network error
+		var networkErr *models.NetworkError
+		if errors.As(err, &networkErr) && networkErr.IsRetryable {
+			if s.logger != nil {
+				s.logger.Warn("network_error", "error", err, "attempt", attempt)
+			}
+
+			// Notify the UI about network retry
+			if s.outputHandler != nil {
+				s.outputHandler.OnRateLimitError(0) // Use 0 to indicate exponential backoff
+			}
+
+			// If we've exhausted retries, return the error
+			if attempt >= maxRetries {
+				return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: network error after %d retries: %w", maxRetries, err)
+			}
+
+			// Calculate backoff time using exponential backoff: 1s, 2s, 4s, 8s, etc.
+			backoffSeconds := int(math.Pow(2, float64(attempt)))
+			backoffDuration := time.Duration(backoffSeconds) * backoffScale
+
+			if s.logger != nil {
+				s.logger.Info("retrying_after_network_error", "backoff_duration", backoffDuration, "attempt", attempt+1, "max_retries", maxRetries)
+			}
+
+			// Wait for backoff duration
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(backoffDuration):
+				// Continue to next retry
+			}
+			continue
+		}
+
+		// Not a retryable error, return immediately
 		if s.logger != nil {
 			s.logger.Error("chat_non_streaming_error", "error", err)
 		}
@@ -677,8 +712,8 @@ func buildSessionToolRegistry(systemTools *tool.ToolRegistry, vfsImpl vfs.VFS, l
 	return registry
 }
 
-// maxRetries returns the maximum number of retries for rate limit errors.
-// Returns default value of 3 if not configured.
+// maxRetries returns the maximum number of retries for rate limit/network errors.
+// Returns default value from models.DefaultMaxRetries if not configured.
 func (s *SweSession) maxRetries() int {
 	if configProvider, ok := s.provider.(interface {
 		GetConfig() *conf.ModelProviderConfig
@@ -688,5 +723,5 @@ func (s *SweSession) maxRetries() int {
 			return config.MaxRetries
 		}
 	}
-	return 3
+	return models.DefaultMaxRetries
 }
