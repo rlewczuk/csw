@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"errors"
 	"iter"
 	"log/slog"
 	"time"
@@ -17,57 +16,6 @@ const (
 	// DefaultRetryBackoffScale is the default backoff duration scale for retries.
 	DefaultRetryBackoffScale = 10 * time.Second
 )
-
-var (
-	ErrEndpointNotFound    = errors.New("endpoint or host not found (either 404 or not host not in DNS)")
-	ErrEndpointUnavailable = errors.New("endpoint is unavailable (network error, host not responding, or 5xx error)")
-	ErrPermissionDenied    = errors.New("permission denied (eg. missing API key)")
-	ErrRateExceeded        = errors.New("rate exceeded")
-	ErrTooManyInputTokens  = errors.New("too many input tokens (i.e. exceeding context length)")
-	ErrToBeContinued       = errors.New("to be continued (i.e. generated tokens limit reached)")
-	ErrNetworkError        = errors.New("network error")
-)
-
-// RateLimitError represents a rate limit (429) error with retry information.
-type RateLimitError struct {
-	// RetryAfterSeconds is the estimated time in seconds when the request can be retried.
-	// This is typically parsed from the Retry-After header or API response.
-	// A value of 0 means the retry time is unknown and exponential backoff should be used.
-	RetryAfterSeconds int
-	// Message contains the error message from the API
-	Message string
-}
-
-func (e *RateLimitError) Error() string {
-	if e.Message != "" {
-		return e.Message
-	}
-	return "rate exceeded"
-}
-
-func (e *RateLimitError) Unwrap() error {
-	return ErrRateExceeded
-}
-
-// NetworkError represents a network error that can be retried.
-// It is compatible with RateLimitError handling in session retry logic.
-type NetworkError struct {
-	// Message contains the error message describing the network error.
-	Message string
-	// IsRetryable indicates whether this error can be retried.
-	IsRetryable bool
-}
-
-func (e *NetworkError) Error() string {
-	if e.Message != "" {
-		return e.Message
-	}
-	return "network error"
-}
-
-func (e *NetworkError) Unwrap() error {
-	return ErrNetworkError
-}
 
 type ModelType string
 

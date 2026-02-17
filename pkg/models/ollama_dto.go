@@ -1,14 +1,5 @@
 package models
 
-import (
-	"errors"
-)
-
-var (
-	// ErrInvalidInput is returned when input format is invalid
-	ErrInvalidInput = errors.New("invalid input format: expected string or []string")
-)
-
 // OllamaChatRequest represents the request structure for /api/chat endpoint
 type OllamaChatRequest struct {
 	Model     string              `json:"model"`                // Required: model name

@@ -1,16 +1,11 @@
 package models
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/codesnort/codesnort-swe/pkg/conf"
-)
-
-var (
-	ErrProviderNotFound = errors.New("provider not found")
 )
 
 // ProviderRegistry manages a collection of model providers.
