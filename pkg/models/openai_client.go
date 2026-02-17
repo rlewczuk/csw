@@ -21,7 +21,7 @@ import (
 )
 
 // DefaultMaxTokens is the default maximum number of tokens to generate in the response.
-const DefaultMaxTokens = 131072
+const DefaultMaxTokens = 32000
 
 // OpenAIClient is a client for interacting with OpenAI-compatible API
 type OpenAIClient struct {
