@@ -579,27 +579,64 @@ func (m *OllamaEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 	return embedResp.Embeddings[0], nil
 }
 
-// handleHTTPError converts HTTP errors to appropriate model errors
+// handleHTTPError converts HTTP errors to appropriate model errors.
+// Network errors that can be retried are wrapped in NetworkError.
 func (c *OllamaClient) handleHTTPError(err error) error {
 	if err == nil {
 		return nil
 	}
 
+	// Check for DNS errors first
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		// Temporary DNS errors (like server misbehaving) should be retried
+		if dnsErr.IsTemporary || dnsErr.IsNotFound {
+			// IsNotFound means the host doesn't exist - this should NOT be retried
+			if dnsErr.IsNotFound && !dnsErr.IsTemporary {
+				return fmt.Errorf("%w: %v", ErrEndpointNotFound, err)
+			}
+			// Temporary DNS issues should be retried
+			return &NetworkError{
+				Message:     fmt.Sprintf("temporary DNS error: %v", err),
+				IsRetryable: true,
+			}
+		}
+		// Other DNS errors (like server misbehaving) should be retried
+		return &NetworkError{
+			Message:     fmt.Sprintf("DNS error: %v", err),
+			IsRetryable: true,
+		}
+	}
+
 	// Check for network errors
 	var netErr net.Error
 	if errors.As(err, &netErr) {
-		if netErr.Timeout() {
-			return fmt.Errorf("%w: %v", ErrEndpointUnavailable, err)
+		// Timeout and temporary errors can be retried
+		if netErr.Timeout() || netErr.Temporary() {
+			return &NetworkError{
+				Message:     fmt.Sprintf("network timeout: %v", err),
+				IsRetryable: true,
+			}
 		}
-		return fmt.Errorf("%w: %v", ErrEndpointUnavailable, err)
+		// Connection refused and other network errors can also be retried
+		return &NetworkError{
+			Message:     fmt.Sprintf("network error: %v", err),
+			IsRetryable: true,
+		}
 	}
 
-	// Check for DNS errors
-	var dnsErr *net.DNSError
-	if errors.As(err, &dnsErr) {
-		return fmt.Errorf("%w: %v", ErrEndpointNotFound, err)
+	// Check for connection refused errors (can be retried)
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		if opErr.Op == "dial" || opErr.Op == "read" || opErr.Op == "write" {
+			return &NetworkError{
+				Message:     fmt.Sprintf("connection error: %v", err),
+				IsRetryable: true,
+			}
+		}
 	}
 
+	// For other errors, wrap as endpoint unavailable (not retryable by default)
 	return fmt.Errorf("%w: %v", ErrEndpointUnavailable, err)
 }
 

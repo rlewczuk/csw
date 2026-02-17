@@ -32,6 +32,12 @@ type MockClient struct {
 	// RateLimitErrorCount limits how many rate limit errors to return.
 	// If nil, the mock returns the error on every request.
 	RateLimitErrorCount *int
+	// NetworkError configures the mock to return a network error
+	// If set, the mock will return this error for every request
+	NetworkError *NetworkError
+	// NetworkErrorCount limits how many network errors to return.
+	// If nil, the mock returns the error on every request.
+	NetworkErrorCount *int
 }
 
 // MockChatResponse holds the configuration for mock chat responses.
@@ -173,6 +179,21 @@ func (m *MockChatModel) Chat(ctx context.Context, messages []*ChatMessage, optio
 			*rateLimitCount = *rateLimitCount - 1
 			m.provider.mu.Unlock()
 			return nil, rateLimitErr
+		}
+	}
+
+	// Check for network error
+	networkErr := m.provider.NetworkError
+	networkErrCount := m.provider.NetworkErrorCount
+	if networkErr != nil {
+		if networkErrCount == nil {
+			m.provider.mu.Unlock()
+			return nil, networkErr
+		}
+		if *networkErrCount > 0 {
+			*networkErrCount = *networkErrCount - 1
+			m.provider.mu.Unlock()
+			return nil, networkErr
 		}
 	}
 	m.provider.mu.Unlock()
