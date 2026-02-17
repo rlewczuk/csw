@@ -18,6 +18,26 @@ var (
 	ErrToBeContinued       = errors.New("to be continued (i.e. generated tokens limit reached)")
 )
 
+type RateLimitError struct {
+	// RetryAfterSeconds is the estimated time in seconds when the request can be retried.
+	// This is typically parsed from the Retry-After header or API response.
+	// A value of 0 means the retry time is unknown and exponential backoff should be used.
+	RetryAfterSeconds int
+	// Message contains the error message from the API
+	Message string
+}
+
+func (e *RateLimitError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return "rate exceeded"
+}
+
+func (e *RateLimitError) Unwrap() error {
+	return ErrRateExceeded
+}
+
 type ModelType string
 
 const (

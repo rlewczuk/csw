@@ -101,6 +101,12 @@ type ModelProviderConfig struct {
 	Verbose bool `json:"verbose,omitempty" yaml:"verbose,omitempty"`
 	// Headers contains optional headers to send with provider requests
 	Headers map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
+	// MaxRetries is the maximum number of retries for rate limit (429) errors
+	// Defaults to 3 if not specified
+	MaxRetries int `json:"max_retries,omitempty" yaml:"max_retries,omitempty"`
+	// RateLimitBackoffScale is the base duration to scale rate limit backoff delays.
+	// Defaults to 1s when unset or invalid.
+	RateLimitBackoffScale time.Duration `json:"rate_limit_backoff_scale,omitempty" yaml:"rate_limit_backoff_scale,omitempty"`
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for ModelProviderConfig.
@@ -109,8 +115,9 @@ func (c *ModelProviderConfig) UnmarshalJSON(data []byte) error {
 	// Define a temporary struct with string fields for durations
 	type Alias ModelProviderConfig
 	aux := &struct {
-		ConnectTimeout string `json:"connect_timeout,omitempty"`
-		RequestTimeout string `json:"request_timeout,omitempty"`
+		ConnectTimeout        string `json:"connect_timeout,omitempty"`
+		RequestTimeout        string `json:"request_timeout,omitempty"`
+		RateLimitBackoffScale string `json:"rate_limit_backoff_scale,omitempty"`
 		*Alias
 	}{
 		Alias: (*Alias)(c),
@@ -135,6 +142,14 @@ func (c *ModelProviderConfig) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("ModelProviderConfig.UnmarshalJSON(): invalid request_timeout: %w", err)
 		}
 		c.RequestTimeout = d
+	}
+
+	if aux.RateLimitBackoffScale != "" {
+		d, err := time.ParseDuration(aux.RateLimitBackoffScale)
+		if err != nil {
+			return fmt.Errorf("ModelProviderConfig.UnmarshalJSON(): invalid rate_limit_backoff_scale: %w", err)
+		}
+		c.RateLimitBackoffScale = d
 	}
 
 	return nil

@@ -2,8 +2,10 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -220,6 +222,7 @@ func (s *SweSession) runStreamingChat(ctx context.Context, chatModel models.Chat
 	}
 
 	fragmentCount := 0
+	var lastErr error
 	for fragment := range stream {
 		fragmentCount++
 		if s.logger != nil {
@@ -227,16 +230,18 @@ func (s *SweSession) runStreamingChat(ctx context.Context, chatModel models.Chat
 		}
 		// Merge the fragment parts into the accumulated response
 		responseMsg.Parts = append(responseMsg.Parts, fragment.Parts...)
-	}
-
-	if s.logger != nil {
-		s.logger.Debug("stream_iteration_complete", "fragment_count", fragmentCount, "num_parts", len(responseMsg.Parts))
+		lastErr = nil
 	}
 
 	// Check if we got an empty response
 	if fragmentCount == 0 {
 		if s.logger != nil {
 			s.logger.Warn("stream_returned_no_fragments", "num_messages", len(s.messages), "num_tools", len(tools))
+		}
+		// Empty stream could indicate a rate limit error that was swallowed during streaming
+		// Return a meaningful error
+		if lastErr != nil {
+			return nil, lastErr
 		}
 		return nil, fmt.Errorf("SweSession.runStreamingChat() [session.go]: stream returned no fragments - this usually indicates a silent error in the model provider")
 	}
@@ -248,26 +253,81 @@ func (s *SweSession) runStreamingChat(ctx context.Context, chatModel models.Chat
 
 // runNonStreamingChat executes a non-streaming chat request and returns the response.
 func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.ChatModel, tools []tool.ToolInfo, chatOptions *models.ChatOptions) (*models.ChatMessage, error) {
-	if s.logger != nil {
-		s.logger.Debug("chat_non_streaming_request", "num_messages", len(s.messages), "num_tools", len(tools))
+	maxRetries := s.maxRetries()
+	backoffScale := time.Second
+	if configProvider, ok := s.provider.(interface {
+		GetConfig() *conf.ModelProviderConfig
+	}); ok {
+		config := configProvider.GetConfig()
+		if config != nil && config.RateLimitBackoffScale > 0 {
+			backoffScale = config.RateLimitBackoffScale
+		}
 	}
 
-	// Use non-streaming chat API
-	responseMsg, err := chatModel.Chat(ctx, s.messages, chatOptions, tools)
-	if err != nil {
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if s.logger != nil {
+			s.logger.Debug("chat_non_streaming_request", "num_messages", len(s.messages), "num_tools", len(tools), "attempt", attempt)
+		}
+
+		// Use non-streaming chat API
+		responseMsg, err := chatModel.Chat(ctx, s.messages, chatOptions, tools)
+		if err == nil {
+			if s.logger != nil {
+				s.logger.Debug("chat_non_streaming_complete", "num_parts", len(responseMsg.Parts))
+			}
+
+			s.emitAssistantParts(responseMsg.Parts, false)
+
+			return responseMsg, nil
+		}
+
+		// Check if this is a rate limit error
+		var rateLimitErr *models.RateLimitError
+		if errors.As(err, &rateLimitErr) {
+			if s.logger != nil {
+				s.logger.Warn("rate_limit_error", "error", err, "retry_after", rateLimitErr.RetryAfterSeconds, "attempt", attempt)
+			}
+
+			// Notify the UI about rate limit
+			if s.outputHandler != nil {
+				s.outputHandler.OnRateLimitError(rateLimitErr.RetryAfterSeconds)
+			}
+
+			// If we've exhausted retries, return the error
+			if attempt >= maxRetries {
+				return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: rate limit exceeded after %d retries: %w", maxRetries, err)
+			}
+
+			// Calculate backoff time
+			backoffSeconds := rateLimitErr.RetryAfterSeconds
+			if backoffSeconds == 0 {
+				// Use exponential backoff: 1s, 2s, 4s, 8s, etc.
+				backoffSeconds = int(math.Pow(2, float64(attempt)))
+			}
+			backoffDuration := time.Duration(backoffSeconds) * backoffScale
+
+			if s.logger != nil {
+				s.logger.Info("retrying_after_rate_limit", "backoff_duration", backoffDuration, "attempt", attempt+1, "max_retries", maxRetries)
+			}
+
+			// Wait for backoff duration
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(backoffDuration):
+				// Continue to next retry
+			}
+			continue
+		}
+
+		// Not a rate limit error, return immediately
 		if s.logger != nil {
 			s.logger.Error("chat_non_streaming_error", "error", err)
 		}
 		return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: chat request failed: %w", err)
 	}
 
-	if s.logger != nil {
-		s.logger.Debug("chat_non_streaming_complete", "num_parts", len(responseMsg.Parts))
-	}
-
-	s.emitAssistantParts(responseMsg.Parts, false)
-
-	return responseMsg, nil
+	return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: chat request failed after %d retries", maxRetries)
 }
 
 // executeToolCalls executes the given tool calls and appends the results to the conversation.
@@ -615,4 +675,18 @@ func buildSessionToolRegistry(systemTools *tool.ToolRegistry, vfsImpl vfs.VFS, l
 	registry.ApplyLogger(logger)
 
 	return registry
+}
+
+// maxRetries returns the maximum number of retries for rate limit errors.
+// Returns default value of 3 if not configured.
+func (s *SweSession) maxRetries() int {
+	if configProvider, ok := s.provider.(interface {
+		GetConfig() *conf.ModelProviderConfig
+	}); ok {
+		config := configProvider.GetConfig()
+		if config != nil && config.MaxRetries > 0 {
+			return config.MaxRetries
+		}
+	}
+	return 3
 }

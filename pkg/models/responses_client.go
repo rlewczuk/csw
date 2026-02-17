@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -281,7 +282,7 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		logVerboseResponseFromBytes(resp, bodyBytes)
 	}
 
-	if err := m.client.checkStatusCode(resp); err != nil {
+	if err := m.client.checkStatusCodeWithBody(resp, bodyBytes); err != nil {
 		if effectiveOptions != nil && effectiveOptions.Logger != nil {
 			logHTTPErrorResponse(effectiveOptions.Logger, resp, bodyBytes)
 		}
@@ -554,24 +555,38 @@ func (c *ResponsesClient) handleHTTPError(err error) error {
 
 // checkStatusCode checks the HTTP status code and returns appropriate errors.
 func (c *ResponsesClient) checkStatusCode(resp *http.Response) error {
+	return c.checkStatusCodeWithBody(resp, nil)
+}
+
+// checkStatusCodeWithBody checks the HTTP status code and returns appropriate errors.
+// bodyBytes can be provided if the body has already been read (for error message extraction).
+func (c *ResponsesClient) checkStatusCodeWithBody(resp *http.Response, bodyBytes []byte) error {
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return nil
 	case http.StatusNotFound:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", ErrEndpointNotFound, string(body))
+		if bodyBytes == nil {
+			bodyBytes, _ = io.ReadAll(resp.Body)
+		}
+		return fmt.Errorf("%w: %s", ErrEndpointNotFound, string(bodyBytes))
 	case http.StatusUnauthorized, http.StatusForbidden:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", ErrPermissionDenied, string(body))
+		if bodyBytes == nil {
+			bodyBytes, _ = io.ReadAll(resp.Body)
+		}
+		return fmt.Errorf("%w: %s", ErrPermissionDenied, string(bodyBytes))
 	case http.StatusTooManyRequests:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", ErrRateExceeded, string(body))
+		if bodyBytes == nil {
+			bodyBytes, _ = io.ReadAll(resp.Body)
+		}
+		return c.handleRateLimitErrorWithBody(resp, bodyBytes)
 	case http.StatusBadRequest:
-		body, _ := io.ReadAll(resp.Body)
-		bodyStr := string(body)
+		if bodyBytes == nil {
+			bodyBytes, _ = io.ReadAll(resp.Body)
+		}
+		bodyStr := string(bodyBytes)
 
 		var errResp OpenaiErrorResponse
-		if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error != nil {
+		if err := json.Unmarshal(bodyBytes, &errResp); err == nil && errResp.Error != nil {
 			if strings.Contains(strings.ToLower(errResp.Error.Message), "context length") ||
 				strings.Contains(strings.ToLower(errResp.Error.Message), "too many tokens") ||
 				strings.Contains(strings.ToLower(errResp.Error.Message), "maximum context length") {
@@ -587,11 +602,49 @@ func (c *ResponsesClient) checkStatusCode(resp *http.Response) error {
 		return fmt.Errorf("bad request: %s", bodyStr)
 	case http.StatusInternalServerError, http.StatusBadGateway,
 		http.StatusServiceUnavailable, http.StatusGatewayTimeout:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: %s", ErrEndpointUnavailable, string(body))
+		if bodyBytes == nil {
+			bodyBytes, _ = io.ReadAll(resp.Body)
+		}
+		return fmt.Errorf("%w: %s", ErrEndpointUnavailable, string(bodyBytes))
 	default:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
+		if bodyBytes == nil {
+			bodyBytes, _ = io.ReadAll(resp.Body)
+		}
+		return fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+}
+
+// handleRateLimitError handles rate limit (429) errors and extracts retry information.
+func (c *ResponsesClient) handleRateLimitError(resp *http.Response) error {
+	body, _ := io.ReadAll(resp.Body)
+	return c.handleRateLimitErrorWithBody(resp, body)
+}
+
+// handleRateLimitErrorWithBody handles rate limit (429) errors and extracts retry information.
+func (c *ResponsesClient) handleRateLimitErrorWithBody(resp *http.Response, bodyBytes []byte) error {
+	bodyStr := string(bodyBytes)
+
+	retryAfter := 0
+
+	// Try to parse Retry-After header
+	if retryAfterHeader := resp.Header.Get("Retry-After"); retryAfterHeader != "" {
+		if seconds, err := strconv.Atoi(retryAfterHeader); err == nil {
+			retryAfter = seconds
+		}
+	}
+
+	// Try to parse error response for retry information
+	var errResp OpenaiErrorResponse
+	if json.Unmarshal(bodyBytes, &errResp) == nil && errResp.Error != nil {
+		return &RateLimitError{
+			RetryAfterSeconds: retryAfter,
+			Message:           errResp.Error.Message,
+		}
+	}
+
+	return &RateLimitError{
+		RetryAfterSeconds: retryAfter,
+		Message:           bodyStr,
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
@@ -17,12 +18,20 @@ type MockClient struct {
 	chatResponseQue map[string][]*MockChatResponse
 	embedResponses  map[string][]float64
 	mu              sync.RWMutex
+	// Config holds provider configuration for this mock.
+	Config *conf.ModelProviderConfig
 	// RecordedToolCalls stores tool calls received from the LLM during tests
 	RecordedToolCalls []tool.ToolCall
 	// RecordedToolResponses stores tool responses sent to the LLM during tests
 	RecordedToolResponses []tool.ToolResponse
 	// RecordedMessages stores all messages sent to the mock provider during tests
 	RecordedMessages [][]*ChatMessage
+	// RateLimitError configures the mock to return a rate limit error
+	// If set, the mock will return this error for every request
+	RateLimitError *RateLimitError
+	// RateLimitErrorCount limits how many rate limit errors to return.
+	// If nil, the mock returns the error on every request.
+	RateLimitErrorCount *int
 }
 
 // MockChatResponse holds the configuration for mock chat responses.
@@ -99,6 +108,13 @@ func (p *MockClient) ListModels() ([]ModelInfo, error) {
 	return p.models, nil
 }
 
+// GetConfig returns the provider configuration for this mock client.
+func (p *MockClient) GetConfig() *conf.ModelProviderConfig {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.Config
+}
+
 // ChatModel returns a MockChatModel implementation for the given model and options.
 func (p *MockClient) ChatModel(model string, options *ChatOptions) ChatModel {
 	return &MockChatModel{
@@ -142,8 +158,27 @@ func (m *MockChatModel) Chat(ctx context.Context, messages []*ChatMessage, optio
 		}
 	}
 	m.provider.RecordedMessages = append(m.provider.RecordedMessages, messageCopy)
+	m.provider.mu.Unlock()
+
+	// Check for rate limit error
+	m.provider.mu.Lock()
+	rateLimitErr := m.provider.RateLimitError
+	rateLimitCount := m.provider.RateLimitErrorCount
+	if rateLimitErr != nil {
+		if rateLimitCount == nil {
+			m.provider.mu.Unlock()
+			return nil, rateLimitErr
+		}
+		if *rateLimitCount > 0 {
+			*rateLimitCount = *rateLimitCount - 1
+			m.provider.mu.Unlock()
+			return nil, rateLimitErr
+		}
+	}
+	m.provider.mu.Unlock()
 
 	var response *MockChatResponse
+	m.provider.mu.Lock()
 	if queue := m.provider.chatResponseQue[m.model]; len(queue) > 0 {
 		response = queue[0]
 		m.provider.chatResponseQue[m.model] = queue[1:]
@@ -189,6 +224,23 @@ func (m *MockChatModel) ChatStream(ctx context.Context, messages []*ChatMessage,
 			}
 		}
 		m.provider.RecordedMessages = append(m.provider.RecordedMessages, messageCopy)
+		m.provider.mu.Unlock()
+
+		// Check for rate limit error
+		m.provider.mu.Lock()
+		rateLimitErr := m.provider.RateLimitError
+		rateLimitCount := m.provider.RateLimitErrorCount
+		if rateLimitErr != nil {
+			if rateLimitCount == nil {
+				m.provider.mu.Unlock()
+				return
+			}
+			if *rateLimitCount > 0 {
+				*rateLimitCount = *rateLimitCount - 1
+				m.provider.mu.Unlock()
+				return
+			}
+		}
 
 		var response *MockChatResponse
 		if queue := m.provider.chatResponseQue[m.model]; len(queue) > 0 {
