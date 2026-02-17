@@ -20,8 +20,8 @@ import (
 	"github.com/codesnort/codesnort-swe/pkg/tool"
 )
 
-// DefaultContextLengthLimit is the default maximum number of tokens for context length.
-const DefaultContextLengthLimit = 131072
+// DefaultMaxTokens is the default maximum number of tokens to generate in the response.
+const DefaultMaxTokens = 131072
 
 // OpenAIClient is a client for interacting with OpenAI-compatible API
 type OpenAIClient struct {
@@ -230,15 +230,15 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 		Messages:  openaiMessages,
 		Stream:    false,
 		Tools:     convertToolsToOpenAI(tools),
-		MaxTokens: DefaultContextLengthLimit,
+		MaxTokens: DefaultMaxTokens,
 	}
 	if len(tools) > 0 {
 		chatReq.ToolChoice = "auto"
 	}
 
-	// Apply config ContextLengthLimit as MaxTokens if set
-	if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
-		chatReq.MaxTokens = m.client.config.ContextLengthLimit
+	// Apply config MaxTokens if set
+	if m.client.config != nil && m.client.config.MaxTokens > 0 {
+		chatReq.MaxTokens = m.client.config.MaxTokens
 	}
 
 	// Apply options if provided
@@ -359,15 +359,15 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 				IncludeUsage: true,
 			},
 			Tools:     convertToolsToOpenAI(tools),
-			MaxTokens: DefaultContextLengthLimit,
+			MaxTokens: DefaultMaxTokens,
 		}
 		if len(tools) > 0 {
 			chatReq.ToolChoice = "auto"
 		}
 
-		// Apply config ContextLengthLimit as MaxTokens if set
-		if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
-			chatReq.MaxTokens = m.client.config.ContextLengthLimit
+		// Apply config MaxTokens if set
+		if m.client.config != nil && m.client.config.MaxTokens > 0 {
+			chatReq.MaxTokens = m.client.config.MaxTokens
 		}
 
 		// Apply options if provided

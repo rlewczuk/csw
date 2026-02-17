@@ -87,8 +87,8 @@ type ModelProviderConfig struct {
 	DefaultTopP float32 `json:"default_top_p,omitempty" yaml:"default_top_p,omitempty"`
 	// DefaultTopK is the default top_k for chat completions
 	DefaultTopK int `json:"default_top_k,omitempty" yaml:"default_top_k,omitempty"`
-	// ContextLengthLimit is the maximum context length in tokens
-	ContextLengthLimit int `json:"context_length_limit,omitempty" yaml:"context_length_limit,omitempty"`
+	// MaxTokens is the maximum number of tokens to generate in the response
+	MaxTokens int `json:"max_tokens,omitempty" yaml:"max_tokens,omitempty"`
 	// Tags is a list of tags for the provider (deprecated, use ModelTags instead)
 	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty"`
 	// ModelTags contains model-to-tag mappings specific to this provider.

@@ -1178,15 +1178,15 @@ func TestConvertToAnthropicMessageWithMixedContent(t *testing.T) {
 	})
 }
 
-func TestAnthropicClient_ContextLengthLimit(t *testing.T) {
-	t.Run("Chat method uses ContextLengthLimit as max_tokens", func(t *testing.T) {
+func TestAnthropicClient_MaxTokens(t *testing.T) {
+	t.Run("Chat method uses MaxTokens as max_tokens", func(t *testing.T) {
 		mock := testutil.NewMockHTTPServer()
 		defer mock.Close()
 
 		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
-			URL:                mock.URL(),
-			APIKey:             "test-key",
-			ContextLengthLimit: 2048,
+			URL:       mock.URL(),
+			APIKey:    "test-key",
+			MaxTokens: 2048,
 		})
 		require.NoError(t, err)
 
@@ -1213,14 +1213,14 @@ func TestAnthropicClient_ContextLengthLimit(t *testing.T) {
 		assert.Equal(t, 2048, chatReq.MaxTokens)
 	})
 
-	t.Run("ChatStream method uses ContextLengthLimit as max_tokens", func(t *testing.T) {
+	t.Run("ChatStream method uses MaxTokens as max_tokens", func(t *testing.T) {
 		mock := testutil.NewMockHTTPServer()
 		defer mock.Close()
 
 		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
-			URL:                mock.URL(),
-			APIKey:             "test-key",
-			ContextLengthLimit: 4096,
+			URL:       mock.URL(),
+			APIKey:    "test-key",
+			MaxTokens: 4096,
 		})
 		require.NoError(t, err)
 
@@ -1254,14 +1254,14 @@ func TestAnthropicClient_ContextLengthLimit(t *testing.T) {
 		assert.Equal(t, 4096, chatReq.MaxTokens)
 	})
 
-	t.Run("Chat method uses default max_tokens when ContextLengthLimit is zero", func(t *testing.T) {
+	t.Run("Chat method uses default max_tokens when MaxTokens is zero", func(t *testing.T) {
 		mock := testutil.NewMockHTTPServer()
 		defer mock.Close()
 
 		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
-			URL:                mock.URL(),
-			APIKey:             "test-key",
-			ContextLengthLimit: 0,
+			URL:       mock.URL(),
+			APIKey:    "test-key",
+			MaxTokens: 0,
 		})
 		require.NoError(t, err)
 
@@ -1285,17 +1285,17 @@ func TestAnthropicClient_ContextLengthLimit(t *testing.T) {
 		var chatReq AnthropicMessagesRequest
 		err = json.Unmarshal(reqs[0].Body, &chatReq)
 		require.NoError(t, err)
-		assert.Equal(t, DefaultContextLengthLimit, chatReq.MaxTokens)
+		assert.Equal(t, DefaultMaxTokens, chatReq.MaxTokens)
 	})
 
-	t.Run("ChatStream method uses default max_tokens when ContextLengthLimit is zero", func(t *testing.T) {
+	t.Run("ChatStream method uses default max_tokens when MaxTokens is zero", func(t *testing.T) {
 		mock := testutil.NewMockHTTPServer()
 		defer mock.Close()
 
 		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
-			URL:                mock.URL(),
-			APIKey:             "test-key",
-			ContextLengthLimit: 0,
+			URL:       mock.URL(),
+			APIKey:    "test-key",
+			MaxTokens: 0,
 		})
 		require.NoError(t, err)
 
@@ -1326,7 +1326,7 @@ func TestAnthropicClient_ContextLengthLimit(t *testing.T) {
 		var chatReq AnthropicMessagesRequest
 		err = json.Unmarshal(reqs[0].Body, &chatReq)
 		require.NoError(t, err)
-		assert.Equal(t, DefaultContextLengthLimit, chatReq.MaxTokens)
+		assert.Equal(t, DefaultMaxTokens, chatReq.MaxTokens)
 	})
 }
 

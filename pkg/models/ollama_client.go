@@ -253,17 +253,17 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 		}
 	}
 
-	// Apply default ContextLengthLimit as NumPredict, or override with config if set
-	if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
+	// Apply default MaxTokens as NumPredict, or override with config if set
+	if m.client.config != nil && m.client.config.MaxTokens > 0 {
 		if chatReq.Options == nil {
 			chatReq.Options = &OllamaModelOptions{}
 		}
-		chatReq.Options.NumPredict = m.client.config.ContextLengthLimit
+		chatReq.Options.NumPredict = m.client.config.MaxTokens
 	} else {
 		if chatReq.Options == nil {
 			chatReq.Options = &OllamaModelOptions{}
 		}
-		chatReq.Options.NumPredict = DefaultContextLengthLimit
+		chatReq.Options.NumPredict = DefaultMaxTokens
 	}
 
 	url := m.client.baseURL + "/api/chat"
@@ -402,17 +402,17 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 			}
 		}
 
-		// Apply default ContextLengthLimit as NumPredict, or override with config if set
-		if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
+		// Apply default MaxTokens as NumPredict, or override with config if set
+		if m.client.config != nil && m.client.config.MaxTokens > 0 {
 			if chatReq.Options == nil {
 				chatReq.Options = &OllamaModelOptions{}
 			}
-			chatReq.Options.NumPredict = m.client.config.ContextLengthLimit
+			chatReq.Options.NumPredict = m.client.config.MaxTokens
 		} else {
 			if chatReq.Options == nil {
 				chatReq.Options = &OllamaModelOptions{}
 			}
-			chatReq.Options.NumPredict = DefaultContextLengthLimit
+			chatReq.Options.NumPredict = DefaultMaxTokens
 		}
 
 		url := m.client.baseURL + "/api/chat"

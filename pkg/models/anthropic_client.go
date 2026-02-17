@@ -245,14 +245,14 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	chatReq := AnthropicMessagesRequest{
 		Model:     m.model,
 		Messages:  anthropicMessages,
-		MaxTokens: DefaultContextLengthLimit,
+		MaxTokens: DefaultMaxTokens,
 		Stream:    false,
 		Tools:     convertToolsToAnthropic(tools),
 	}
 
-	// Apply config ContextLengthLimit as MaxTokens if set
-	if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
-		chatReq.MaxTokens = m.client.config.ContextLengthLimit
+	// Apply config MaxTokens if set
+	if m.client.config != nil && m.client.config.MaxTokens > 0 {
+		chatReq.MaxTokens = m.client.config.MaxTokens
 	}
 
 	// Add system prompt if present
@@ -385,14 +385,14 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		chatReq := AnthropicMessagesRequest{
 			Model:     m.model,
 			Messages:  anthropicMessages,
-			MaxTokens: DefaultContextLengthLimit,
+			MaxTokens: DefaultMaxTokens,
 			Stream:    true,
 			Tools:     convertToolsToAnthropic(tools),
 		}
 
-		// Apply config ContextLengthLimit as MaxTokens if set
-		if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
-			chatReq.MaxTokens = m.client.config.ContextLengthLimit
+		// Apply config MaxTokens if set
+		if m.client.config != nil && m.client.config.MaxTokens > 0 {
+			chatReq.MaxTokens = m.client.config.MaxTokens
 		}
 
 		if systemPrompt != "" {
