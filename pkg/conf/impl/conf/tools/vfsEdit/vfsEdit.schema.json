@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Performs exact string replacements in files.",
   "type": "object",
   "properties": {
@@ -19,5 +20,6 @@
       "description": "Replace all occurrences of oldString (default false)."
     }
   },
-  "required": ["path", "oldString", "newString"]
+  "required": ["path", "oldString", "newString"],
+  "additionalProperties": false
 }

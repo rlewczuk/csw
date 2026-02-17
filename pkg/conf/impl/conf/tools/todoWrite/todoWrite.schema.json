@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Updates the todo list with the provided array of todo items. This replaces the entire list.",
   "type": "object",
   "properties": {
@@ -27,9 +28,11 @@
             "enum": ["low", "medium", "high"]
           }
         },
-        "required": ["id", "content", "status", "priority"]
+        "required": ["id", "content", "status", "priority"],
+        "additionalProperties": false
       }
     }
   },
-  "required": ["todos"]
+  "required": ["todos"],
+  "additionalProperties": false
 }

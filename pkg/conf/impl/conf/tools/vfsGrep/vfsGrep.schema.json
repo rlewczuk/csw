@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Searches for files containing a given pattern in a VFS.",
   "type": "object",
   "properties": {
@@ -19,5 +20,6 @@
       "description": "The maximum number of matches to return. Defaults to 100 if not provided."
     }
   },
-  "required": ["pattern"]
+  "required": ["pattern"],
+  "additionalProperties": false
 }

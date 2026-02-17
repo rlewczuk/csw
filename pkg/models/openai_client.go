@@ -232,6 +232,9 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 		Tools:     convertToolsToOpenAI(tools),
 		MaxTokens: DefaultContextLengthLimit,
 	}
+	if len(tools) > 0 {
+		chatReq.ToolChoice = "auto"
+	}
 
 	// Apply config ContextLengthLimit as MaxTokens if set
 	if m.client.config != nil && m.client.config.ContextLengthLimit > 0 {
@@ -357,6 +360,9 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 			},
 			Tools:     convertToolsToOpenAI(tools),
 			MaxTokens: DefaultContextLengthLimit,
+		}
+		if len(tools) > 0 {
+			chatReq.ToolChoice = "auto"
 		}
 
 		// Apply config ContextLengthLimit as MaxTokens if set

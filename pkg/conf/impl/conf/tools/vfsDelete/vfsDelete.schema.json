@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Deletes a file or directory at the specified path.",
   "type": "object",
   "properties": {
@@ -7,5 +8,6 @@
       "description": "The absolute path to the file or directory to delete."
     }
   },
-  "required": ["path"]
+  "required": ["path"],
+  "additionalProperties": false
 }

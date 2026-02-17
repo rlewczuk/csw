@@ -434,6 +434,18 @@ func parseToolDescription(toolName string, schemaContent string) (tool.ToolInfo,
 func convertJSONSchemaToToolSchema(schemaData map[string]any) (tool.ToolSchema, error) {
 	schema := tool.NewToolSchema()
 
+	if schemaValue, ok := schemaData["$schema"].(string); ok && schemaValue != "" {
+		schema.Schema = schemaValue
+	}
+
+	if schemaType, ok := schemaData["type"].(string); ok && schemaType != "" {
+		schema.Type = tool.SchemaType(schemaType)
+	}
+
+	if additionalProps, ok := schemaData["additionalProperties"].(bool); ok {
+		schema.AdditionalProperties = additionalProps
+	}
+
 	// Get properties
 	properties, ok := schemaData["properties"].(map[string]any)
 	if !ok {
@@ -531,6 +543,11 @@ func convertPropertySchema(propData map[string]any) (tool.PropertySchema, error)
 				propSchema.Required = append(propSchema.Required, rStr)
 			}
 		}
+	}
+
+	// AdditionalProperties (for object type)
+	if additionalProps, ok := propData["additionalProperties"].(bool); ok {
+		propSchema.AdditionalProperties = &additionalProps
 	}
 
 	return propSchema, nil
