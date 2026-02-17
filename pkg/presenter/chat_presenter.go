@@ -327,6 +327,16 @@ func (p *ChatPresenter) RunFinished(err error) {
 	p.mu.Unlock()
 }
 
+// OnRateLimitError is called when the session encounters a rate limit error.
+// Implements core.SessionThreadOutput.
+// Currently this is a no-op as rate limit errors are handled with retry in the session.
+// The UI is notified via RunFinished if all retries are exhausted.
+func (p *ChatPresenter) OnRateLimitError(retryAfterSeconds int) {
+	// Rate limit is handled with automatic retry in the session.
+	// If the UI needs to display this, it would be done through RunFinished
+	// when all retries are exhausted.
+}
+
 // buildChatSession converts a SweSession to a ui.ChatSessionUI.
 func (p *ChatPresenter) buildChatSession(session *core.SweSession) *ui.ChatSessionUI {
 	chatSession := &ui.ChatSessionUI{

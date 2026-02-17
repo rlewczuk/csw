@@ -30,6 +30,11 @@ type MockSessionOutputHandler struct {
 	// permissionQueryCalled is a channel that is signalled when OnPermissionQuery is called.
 	permissionQueryCalled chan struct{}
 
+	// RateLimitErrors stores all rate limit errors received via OnRateLimitError.
+	RateLimitErrors []int
+	// rateLimitErrorCalled is a channel that is signalled when OnRateLimitError is called.
+	rateLimitErrorCalled chan struct{}
+
 	// RunFinishedError stores the error from RunFinished call.
 	RunFinishedError error
 
@@ -50,6 +55,7 @@ func NewMockSessionOutputHandler() *MockSessionOutputHandler {
 		ToolCallResults:       make([]*tool.ToolResponse, 0),
 		PermissionQueries:     make([]*tool.ToolPermissionsQuery, 0),
 		permissionQueryCalled: make(chan struct{}, 10),
+		rateLimitErrorCalled:  make(chan struct{}, 10),
 		runFinishedCalled:     make(chan struct{}),
 	}
 }
@@ -68,6 +74,22 @@ func (h *MockSessionOutputHandler) OnPermissionQuery(query *tool.ToolPermissions
 // WaitForPermissionQuery blocks until OnPermissionQuery is called.
 func (h *MockSessionOutputHandler) WaitForPermissionQuery() {
 	<-h.permissionQueryCalled
+}
+
+// OnRateLimitError records a rate limit error.
+func (h *MockSessionOutputHandler) OnRateLimitError(retryAfterSeconds int) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.RateLimitErrors = append(h.RateLimitErrors, retryAfterSeconds)
+	select {
+	case h.rateLimitErrorCalled <- struct{}{}:
+	default:
+	}
+}
+
+// WaitForRateLimitError blocks until OnRateLimitError is called.
+func (h *MockSessionOutputHandler) WaitForRateLimitError() {
+	<-h.rateLimitErrorCalled
 }
 
 // AddThinkingChunk records a thinking chunk.
@@ -127,6 +149,7 @@ func (h *MockSessionOutputHandler) Reset() {
 	h.ToolCallStarts = make([]*tool.ToolCall, 0)
 	h.ToolCallDetails = make([]*tool.ToolCall, 0)
 	h.ToolCallResults = make([]*tool.ToolResponse, 0)
+	h.RateLimitErrors = make([]int, 0)
 	h.RunFinishedError = nil
 	h.runFinishedCalled = make(chan struct{})
 }

@@ -53,6 +53,11 @@ type SessionThreadOutput interface {
 
 	// OnPermissionQuery is called when the session encounters a permission query.
 	OnPermissionQuery(query *tool.ToolPermissionsQuery)
+
+	// OnRateLimitError is called when the session encounters a rate limit error.
+	// retryAfterSeconds is the estimated time in seconds when the request can be retried.
+	// If retryAfterSeconds is 0, exponential backoff should be used.
+	OnRateLimitError(retryAfterSeconds int)
 }
 
 // SessionThread manages a session thread with input and context management.

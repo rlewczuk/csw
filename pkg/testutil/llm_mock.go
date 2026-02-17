@@ -45,6 +45,7 @@ type mockResponse struct {
 	closeAfter  bool          // whether to close stream after current chunks
 	waitCh      chan struct{} // channel to signal new chunks available
 	statusCode  int           // HTTP status code (default: 200)
+	headers     http.Header   // custom response headers
 }
 
 // NewMockHTTPServer creates a new mock HTTP server.
@@ -105,6 +106,29 @@ func (m *MockHTTPServer) AddRestResponseWithStatus(path, method, response string
 	})
 }
 
+// AddRestResponseWithStatusAndHeaders adds a response with custom status code and headers.
+func (m *MockHTTPServer) AddRestResponseWithStatusAndHeaders(path, method, response string, statusCode int, headers http.Header) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.responses[path] == nil {
+		m.responses[path] = make(map[string]*responseQueue)
+	}
+
+	if m.responses[path][method] == nil {
+		m.responses[path][method] = &responseQueue{
+			queue: []*mockResponse{},
+		}
+	}
+
+	m.responses[path][method].queue = append(m.responses[path][method].queue, &mockResponse{
+		isStreaming: false,
+		body:        response,
+		statusCode:  statusCode,
+		headers:     headers,
+	})
+}
+
 // AddStreamingResponse adds a streaming response for a specific REST endpoint.
 // If called again on the same path and method, it appends new chunks to the existing stream.
 func (m *MockHTTPServer) AddStreamingResponse(path, method string, closeAfter bool, responses ...string) {
@@ -162,6 +186,12 @@ func (m *MockHTTPServer) HandleRequest(w http.ResponseWriter, r *http.Request) {
 
 	if !resp.isStreaming {
 		w.Header().Set("Content-Type", "application/json")
+		// Set custom headers if provided
+		for key, values := range resp.headers {
+			for _, value := range values {
+				w.Header().Add(key, value)
+			}
+		}
 		statusCode := resp.statusCode
 		if statusCode == 0 {
 			statusCode = http.StatusOK

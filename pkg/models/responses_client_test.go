@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -598,4 +600,75 @@ func TestResponsesClient_OptionsHeadersStream(t *testing.T) {
 	assert.Equal(t, "config-value", request.Header.Get("X-Config-Header"))
 	assert.Equal(t, "options-value", request.Header.Get("X-Options-Header"))
 	assert.Empty(t, request.Header.Get("X-Api-Key"), "api-key header should NOT be set from options")
+}
+
+func TestResponsesClient_RateLimitError(t *testing.T) {
+	t.Run("returns rate limit error with retry-after header", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    mock.URL(),
+			APIKey: "test-key",
+		})
+		require.NoError(t, err)
+
+		headers := http.Header{}
+		headers.Set("Retry-After", "60")
+		mock.AddRestResponseWithStatusAndHeaders("/responses", "POST", `{"error":{"message":"Rate limit exceeded","type":"rate_limit_error"}}`, http.StatusTooManyRequests, headers)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.Error(t, err)
+
+		var rateLimitErr *RateLimitError
+		assert.True(t, errors.As(err, &rateLimitErr))
+		assert.Equal(t, 60, rateLimitErr.RetryAfterSeconds)
+		assert.Contains(t, rateLimitErr.Error(), "Rate limit exceeded")
+	})
+
+	t.Run("returns rate limit error without retry-after header", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    mock.URL(),
+			APIKey: "test-key",
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponseWithStatus("/responses", "POST", `rate limit exceeded`, http.StatusTooManyRequests)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.Error(t, err)
+
+		var rateLimitErr *RateLimitError
+		assert.True(t, errors.As(err, &rateLimitErr))
+		assert.Equal(t, 0, rateLimitErr.RetryAfterSeconds)
+	})
+
+	t.Run("wraps underlying error with ErrRateExceeded", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    mock.URL(),
+			APIKey: "test-key",
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponseWithStatus("/responses", "POST", "rate limit exceeded", http.StatusTooManyRequests)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, ErrRateExceeded))
+	})
 }

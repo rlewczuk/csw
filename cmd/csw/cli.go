@@ -248,6 +248,12 @@ func (h *cliOutputHandler) OnPermissionQuery(query *tool.ToolPermissionsQuery) {
 	h.delegate.OnPermissionQuery(query)
 }
 
+func (h *cliOutputHandler) OnRateLimitError(retryAfterSeconds int) {
+	if h.delegate != nil {
+		h.delegate.OnRateLimitError(retryAfterSeconds)
+	}
+}
+
 func (h *cliOutputHandler) RunFinished(err error) {
 	h.delegate.RunFinished(err)
 	// Signal completion
