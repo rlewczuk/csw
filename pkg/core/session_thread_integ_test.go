@@ -1,3 +1,5 @@
+// session_thread_integ_test.go contains integration tests for session thread management
+// including initialization, tool selection, and thread safety.
 package core
 
 import (
