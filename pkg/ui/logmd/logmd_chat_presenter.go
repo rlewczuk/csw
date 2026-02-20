@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/ui"
+	"github.com/rlewczuk/csw/pkg/ui"
 )
 
 // LogmdChatPresenter wraps an IChatPresenter and logs all method calls to a markdown file.

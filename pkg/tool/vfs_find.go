@@ -1,7 +1,7 @@
 package tool
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
+	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // VFSFindTool implements the vfsFind tool.

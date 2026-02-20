@@ -4,8 +4,8 @@ package testfixture
 import (
 	"testing"
 
-	coretestfixture "github.com/codesnort/codesnort-swe/pkg/core/testfixture"
-	presentertestfixture "github.com/codesnort/codesnort-swe/pkg/presenter/testfixture"
+	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
+	presentertestfixture "github.com/rlewczuk/csw/pkg/presenter/testfixture"
 )
 
 // CliFixture provides shared setup for CLI integration tests.

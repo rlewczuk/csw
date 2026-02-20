@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv"
 )
 
 // FlexDirection represents the direction of the flex layout (horizontal or vertical).

@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/tool"
 )
 
 // ResponsesClient is a client for interacting with Open Responses-compatible APIs.

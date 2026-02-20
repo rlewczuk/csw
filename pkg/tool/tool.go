@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/conf"
 )
 
 // ToolValue represents a value that can be passed as an argument to a tool or returned as a result.

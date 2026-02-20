@@ -5,15 +5,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
-	"github.com/codesnort/codesnort-swe/pkg/core"
-	"github.com/codesnort/codesnort-swe/pkg/logging"
-	"github.com/codesnort/codesnort-swe/pkg/lsp"
-	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/runner"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
+	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/conf/impl"
+	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/logging"
+	"github.com/rlewczuk/csw/pkg/lsp"
+	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/runner"
+	"github.com/rlewczuk/csw/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // BuildSystemParams contains inputs for constructing a SweSystem.

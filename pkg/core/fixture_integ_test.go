@@ -3,13 +3,13 @@ package core
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/codesnort/codesnort-swe/pkg/logging"
-	"github.com/codesnort/codesnort-swe/pkg/lsp"
-	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/testutil"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
+	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/logging"
+	"github.com/rlewczuk/csw/pkg/lsp"
+	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/testutil"
+	"github.com/rlewczuk/csw/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 type sweSystemFixture struct {

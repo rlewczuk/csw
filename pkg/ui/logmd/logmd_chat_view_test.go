@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/ui"
-	"github.com/codesnort/codesnort-swe/pkg/ui/mock"
+	"github.com/rlewczuk/csw/pkg/ui"
+	"github.com/rlewczuk/csw/pkg/ui/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

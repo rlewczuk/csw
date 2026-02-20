@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/codesnort/codesnort-swe/pkg/lsp"
-	"github.com/codesnort/codesnort-swe/pkg/runner"
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
+	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/lsp"
+	"github.com/rlewczuk/csw/pkg/runner"
+	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // ToolRegistry implements a registry for tools that can be registered and retrieved by name.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/codesnort/codesnort-swe/pkg/lsp"
+	"github.com/rlewczuk/csw/pkg/lsp"
 )
 
 // ExampleClient demonstrates how to use the LSP client.

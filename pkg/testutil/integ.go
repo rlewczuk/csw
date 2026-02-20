@@ -2,7 +2,7 @@
 package testutil
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/testutil/cfg"
+	"github.com/rlewczuk/csw/pkg/testutil/cfg"
 )
 
 // IntegCfgDir returns the absolute path to the _integ directory at project root.

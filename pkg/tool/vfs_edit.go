@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/codesnort/codesnort-swe/pkg/lsp"
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
+	"github.com/rlewczuk/csw/pkg/lsp"
+	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // VFSEditTool implements the vfsEdit tool.

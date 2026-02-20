@@ -3,7 +3,7 @@ package tui
 import (
 	"unicode"
 
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv"
 )
 
 // IInputBox is an interface for input box widgets that allow text input.

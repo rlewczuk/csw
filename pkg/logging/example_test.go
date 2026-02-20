@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/codesnort/codesnort-swe/pkg/logging"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/logging"
+	"github.com/rlewczuk/csw/pkg/tool"
 )
 
 // ExampleSetLogsDirectory demonstrates how to configure the logging directory

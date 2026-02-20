@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/conf"
 )
 
 // ModelTagRegistry manages model tag assignments from global and provider-specific sources.

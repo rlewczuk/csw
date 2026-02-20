@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/tui"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/util"
+	"github.com/rlewczuk/csw/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv/tui"
+	"github.com/rlewczuk/csw/pkg/gtv/util"
 )
 
 // DefaultMarkdownViewFactory is the default implementation of MarkdownViewFactory

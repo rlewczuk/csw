@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv"
 )
 
 // ScreenRenderer renders a screen buffer to a terminal using ANSI escape sequences.

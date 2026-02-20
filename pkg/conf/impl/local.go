@@ -34,8 +34,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
 	"github.com/fsnotify/fsnotify"
+	"github.com/rlewczuk/csw/pkg/conf"
 	"gopkg.in/yaml.v3"
 )
 

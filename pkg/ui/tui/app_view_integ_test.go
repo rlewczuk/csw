@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	coretestfixture "github.com/codesnort/codesnort-swe/pkg/core/testfixture"
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/tui"
-	"github.com/codesnort/codesnort-swe/pkg/ui/tui/testfixture"
+	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
+	"github.com/rlewczuk/csw/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv/tio"
+	"github.com/rlewczuk/csw/pkg/gtv/tui"
+	"github.com/rlewczuk/csw/pkg/ui/tui/testfixture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

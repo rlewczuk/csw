@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/tui"
-	"github.com/codesnort/codesnort-swe/pkg/ui"
+	"github.com/rlewczuk/csw/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv/tui"
+	"github.com/rlewczuk/csw/pkg/ui"
 )
 
 const (

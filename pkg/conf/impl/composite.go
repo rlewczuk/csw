@@ -32,7 +32,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/conf"
 )
 
 // CompositeConfigStore implements conf.ConfigStore interface for multiple configuration sources.

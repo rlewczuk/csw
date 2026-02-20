@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv"
 )
 
 // ILayout is an interface for layout widgets that manage children.

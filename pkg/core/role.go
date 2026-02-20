@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/conf"
 )
 
 // AgentRoleRegistry manages agent role configurations loaded from a ConfigStore.

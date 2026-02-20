@@ -8,11 +8,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/core"
-	coretestfixture "github.com/codesnort/codesnort-swe/pkg/core/testfixture"
-	"github.com/codesnort/codesnort-swe/pkg/presenter"
-	"github.com/codesnort/codesnort-swe/pkg/ui"
-	"github.com/codesnort/codesnort-swe/pkg/ui/logmd"
+	"github.com/rlewczuk/csw/pkg/core"
+	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
+	"github.com/rlewczuk/csw/pkg/presenter"
+	"github.com/rlewczuk/csw/pkg/ui"
+	"github.com/rlewczuk/csw/pkg/ui/logmd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -1,7 +1,7 @@
 package tio
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv"
 )
 
 // MockInputEventReader is a mock implementation of InputEventReader for testing.

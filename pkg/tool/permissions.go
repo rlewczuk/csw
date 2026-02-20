@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/codesnort/codesnort-swe/pkg/shared"
+	"github.com/rlewczuk/csw/pkg/shared"
 )
 
 const (

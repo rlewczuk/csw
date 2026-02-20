@@ -3,7 +3,7 @@ package tui
 import (
 	"sort"
 
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv"
 )
 
 // IZAxisLayout is an interface for Z-axis layout widgets that stack children in Z-order.

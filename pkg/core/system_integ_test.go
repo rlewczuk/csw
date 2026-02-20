@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/testutil"
+	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

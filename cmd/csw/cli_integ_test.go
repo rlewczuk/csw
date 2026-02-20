@@ -4,8 +4,8 @@ import (
 	"sync"
 	"testing"
 
-	coretestfixture "github.com/codesnort/codesnort-swe/pkg/core/testfixture"
-	"github.com/codesnort/codesnort-swe/pkg/ui"
+	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
+	"github.com/rlewczuk/csw/pkg/ui"
 )
 
 // cli_integ_test.go contains shared test fixtures and mock implementations

@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv"
 )
 
 // MenuItemHandler is a callback function that is called when a menu item is selected.

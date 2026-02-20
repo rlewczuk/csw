@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

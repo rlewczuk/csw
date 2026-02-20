@@ -3,7 +3,7 @@ package testutil
 import (
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/tool"
 )
 
 // MockSessionOutputHandler is a mock implementation of SessionOutputHandler that keeps all output in memory.

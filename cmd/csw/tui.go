@@ -7,12 +7,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
-	gtvtui "github.com/codesnort/codesnort-swe/pkg/gtv/tui"
-	"github.com/codesnort/codesnort-swe/pkg/logging"
-	"github.com/codesnort/codesnort-swe/pkg/presenter"
-	"github.com/codesnort/codesnort-swe/pkg/ui/tui"
+	"github.com/rlewczuk/csw/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv/tio"
+	gtvtui "github.com/rlewczuk/csw/pkg/gtv/tui"
+	"github.com/rlewczuk/csw/pkg/logging"
+	"github.com/rlewczuk/csw/pkg/presenter"
+	"github.com/rlewczuk/csw/pkg/ui/tui"
 )
 
 func runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo string, saveSession, logLLMRequests bool) error {

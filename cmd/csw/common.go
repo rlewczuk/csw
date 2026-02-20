@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
-	"github.com/codesnort/codesnort-swe/pkg/models"
+	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/conf/impl"
+	"github.com/rlewczuk/csw/pkg/models"
 )
 
 // ConfigScope represents the scope of configuration (global or local).

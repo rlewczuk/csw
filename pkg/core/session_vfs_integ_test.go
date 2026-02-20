@@ -5,8 +5,8 @@ package core
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/testutil"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/testutil"
+	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

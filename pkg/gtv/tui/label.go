@@ -1,8 +1,8 @@
 package tui
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/util"
+	"github.com/rlewczuk/csw/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv/util"
 )
 
 // ILabel is an interface for label widgets that display text on the screen.

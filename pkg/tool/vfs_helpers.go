@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/codesnort/codesnort-swe/pkg/lsp"
+	"github.com/rlewczuk/csw/pkg/lsp"
 )
 
 // DiagnosticWithURI wraps a diagnostic with its file URI for proper grouping.

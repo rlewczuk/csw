@@ -1,4 +1,4 @@
-module github.com/codesnort/codesnort-swe
+module github.com/rlewczuk/csw
 
 go 1.25.5
 

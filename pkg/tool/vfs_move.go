@@ -3,7 +3,7 @@ package tool
 import (
 	"fmt"
 
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
+	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // VFSMoveTool implements the vfsMove tool.

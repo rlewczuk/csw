@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/tool"
 )
 
 // DefaultMaxTokens is the default maximum number of tokens to generate in the response.
