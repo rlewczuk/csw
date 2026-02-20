@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/ui"
+	"github.com/rlewczuk/csw/pkg/ui"
 )
 
 // CliChatView is a simple text-based chat view that prints to stdout and reads from stdin.

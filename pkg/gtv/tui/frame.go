@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv"
 )
 
 // BorderStyle defines the style of the frame border

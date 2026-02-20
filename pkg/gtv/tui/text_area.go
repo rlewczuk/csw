@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv"
 )
 
 // ITextArea is an interface for text area widgets that allow multi-line text input.

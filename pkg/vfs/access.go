@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/conf"
 )
 
 // PermissionError is returned when an operation requires permission.

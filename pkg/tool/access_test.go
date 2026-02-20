@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/stretchr/testify/assert"
 )
 

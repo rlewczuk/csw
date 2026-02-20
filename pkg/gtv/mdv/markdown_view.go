@@ -1,8 +1,8 @@
 package mdv
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/tui"
+	"github.com/rlewczuk/csw/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv/tui"
 )
 
 // MarkdownViewFactory is a factory for creating markdown widgets.

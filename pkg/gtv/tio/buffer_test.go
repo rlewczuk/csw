@@ -3,7 +3,7 @@ package tio
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

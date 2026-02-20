@@ -10,13 +10,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/core"
-	"github.com/codesnort/codesnort-swe/pkg/logging"
-	"github.com/codesnort/codesnort-swe/pkg/presenter"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
-	"github.com/codesnort/codesnort-swe/pkg/ui"
-	"github.com/codesnort/codesnort-swe/pkg/ui/cli"
-	"github.com/codesnort/codesnort-swe/pkg/ui/logmd"
+	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/logging"
+	"github.com/rlewczuk/csw/pkg/presenter"
+	"github.com/rlewczuk/csw/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/ui"
+	"github.com/rlewczuk/csw/pkg/ui/cli"
+	"github.com/rlewczuk/csw/pkg/ui/logmd"
 	"github.com/spf13/cobra"
 )
 

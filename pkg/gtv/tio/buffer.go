@@ -3,7 +3,7 @@ package tio
 import (
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv"
 )
 
 // listener represents a registered event listener with its event queue

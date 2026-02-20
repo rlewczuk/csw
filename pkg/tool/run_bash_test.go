@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/codesnort/codesnort-swe/pkg/runner"
+	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -467,12 +467,12 @@ func TestRunBashTool_Render(t *testing.T) {
 	tool := NewRunBashTool(mockRunner, nil)
 
 	tests := []struct {
-		name           string
-		args           *ToolCall
-		wantSummary    string
-		wantDetails    string
-		wantInSummary  string
-		wantInDetails  string
+		name          string
+		args          *ToolCall
+		wantSummary   string
+		wantDetails   string
+		wantInSummary string
+		wantInDetails string
 	}{
 		{
 			name: "basic command",

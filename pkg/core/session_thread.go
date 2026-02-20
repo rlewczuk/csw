@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/tool"
 )
 
 // SessionThreadInput is an interface for handling input to the session.

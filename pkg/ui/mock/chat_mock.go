@@ -1,7 +1,7 @@
 package mock
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/ui"
+	"github.com/rlewczuk/csw/pkg/ui"
 )
 
 // MockChatView implements ui.IChatView interface for testing purposes.

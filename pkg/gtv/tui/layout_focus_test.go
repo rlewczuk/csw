@@ -3,9 +3,9 @@ package tui_test
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/tui"
+	"github.com/rlewczuk/csw/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv/tio"
+	"github.com/rlewczuk/csw/pkg/gtv/tui"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,22 +58,19 @@ func TestLayout_FocusManagement_DefaultTabOrder(t *testing.T) {
 		tui.WithText("Input 1"),
 		tui.WithRectangle(5, 5, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	inputBox2 := tui.NewInputBox(
 		layout,
 		tui.WithText("Input 2"),
 		tui.WithRectangle(10, 10, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	inputBox3 := tui.NewInputBox(
 		layout,
 		tui.WithText("Input 3"),
 		tui.WithRectangle(15, 15, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 
 	// Create application with the layout as main widget
 	app := tui.NewApplication(layout, screen)
@@ -132,22 +129,19 @@ func TestLayout_FocusManagement_CustomTabOrder(t *testing.T) {
 		tui.WithText("Input 1"),
 		tui.WithRectangle(5, 5, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	inputBox2 := tui.NewInputBox(
 		layout,
 		tui.WithText("Input 2"),
 		tui.WithRectangle(10, 10, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	inputBox3 := tui.NewInputBox(
 		layout,
 		tui.WithText("Input 3"),
 		tui.WithRectangle(15, 15, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 
 	// Set custom tab order (reverse of default)
 	layout.SetTabOrder([]tui.IWidget{inputBox3, inputBox2, inputBox1})
@@ -225,22 +219,19 @@ func TestLayout_FocusManagement_MouseClick(t *testing.T) {
 		tui.WithText("Input 1"),
 		tui.WithRectangle(5, 5, 10, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	inputBox2 := tui.NewInputBox(
 		layout,
 		tui.WithText("Input 2"),
 		tui.WithRectangle(20, 10, 10, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	inputBox3 := tui.NewInputBox(
 		layout,
 		tui.WithText("Input 3"),
 		tui.WithRectangle(35, 15, 10, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 
 	// Create application with the layout as main widget
 	app := tui.NewApplication(layout, screen)
@@ -326,22 +317,19 @@ func TestLayout_FocusManagement_SetTabOrderResetsFocus(t *testing.T) {
 		tui.WithText("Input 1"),
 		tui.WithRectangle(5, 5, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	inputBox2 := tui.NewInputBox(
 		layout,
 		tui.WithText("Input 2"),
 		tui.WithRectangle(10, 10, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	inputBox3 := tui.NewInputBox(
 		layout,
 		tui.WithText("Input 3"),
 		tui.WithRectangle(15, 15, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 
 	// Create application with the layout as main widget
 	app := tui.NewApplication(layout, screen)
@@ -386,22 +374,19 @@ func TestLayout_FocusManagement_SetTabOrderEmpty(t *testing.T) {
 		tui.WithText("Input 1"),
 		tui.WithRectangle(5, 5, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	inputBox2 := tui.NewInputBox(
 		layout,
 		tui.WithText("Input 2"),
 		tui.WithRectangle(10, 10, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	inputBox3 := tui.NewInputBox(
 		layout,
 		tui.WithText("Input 3"),
 		tui.WithRectangle(15, 15, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 
 	// Set custom tab order (reverse)
 	layout.SetTabOrder([]tui.IWidget{inputBox3, inputBox2, inputBox1})
@@ -510,16 +495,14 @@ func TestLayout_FocusManagement_MixedFocusableAndNonFocusable(t *testing.T) {
 		tui.WithText("Input 1"),
 		tui.WithRectangle(5, 7, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	label2 := tui.NewLabel(layout, "Label 2", gtv.TRect{X: 5, Y: 9, W: 10, H: 1}, gtv.Attrs(0))
 	inputBox2 := tui.NewInputBox(
 		layout,
 		tui.WithText("Input 2"),
 		tui.WithRectangle(5, 11, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	label3 := tui.NewLabel(layout, "Label 3", gtv.TRect{X: 5, Y: 13, W: 10, H: 1}, gtv.Attrs(0))
 
 	// Create application with the layout as main widget
@@ -578,8 +561,7 @@ func TestLayout_FocusManagement_MouseClickOnNonFocusable(t *testing.T) {
 		tui.WithText("Input 1"),
 		tui.WithRectangle(5, 10, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	label2 := tui.NewLabel(layout, "Label 2", gtv.TRect{X: 5, Y: 15, W: 10, H: 1}, gtv.Attrs(0))
 
 	// Create application with the layout as main widget
@@ -623,16 +605,14 @@ func TestLayout_FocusManagement_CustomTabOrderWithNonFocusable(t *testing.T) {
 		tui.WithText("Input 1"),
 		tui.WithRectangle(10, 10, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 	label2 := tui.NewLabel(layout, "Label 2", gtv.TRect{X: 15, Y: 15, W: 0, H: 0}, gtv.Attrs(0))
 	inputBox2 := tui.NewInputBox(
 		layout,
 		tui.WithText("Input 2"),
 		tui.WithRectangle(20, 20, 20, 1),
 		tui.WithAttrs(gtv.Attrs(0)),
-		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse),
-	))
+		tui.WithFocusedAttrs(gtv.Attrs(gtv.AttrReverse)))
 
 	// Set custom tab order including non-focusable widgets
 	// The layout should filter out non-focusable ones

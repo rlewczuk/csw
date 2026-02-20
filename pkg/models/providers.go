@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/conf"
 )
 
 // ProviderRegistry manages a collection of model providers.

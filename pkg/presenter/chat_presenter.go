@@ -3,10 +3,10 @@ package presenter
 import (
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/core"
-	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
-	"github.com/codesnort/codesnort-swe/pkg/ui"
+	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/ui"
 )
 
 // ChatPresenter implements ui.IChatPresenter and core.SessionThreadOutput.

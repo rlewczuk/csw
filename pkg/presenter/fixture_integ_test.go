@@ -3,7 +3,7 @@ package presenter
 import (
 	"testing"
 
-	coretestfixture "github.com/codesnort/codesnort-swe/pkg/core/testfixture"
+	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
 )
 
 func newPresenterFixture(t *testing.T) *coretestfixture.SweSystemFixture {

@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf/impl"
-	"github.com/codesnort/codesnort-swe/pkg/core"
-	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
+	"github.com/rlewczuk/csw/pkg/conf/impl"
+	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

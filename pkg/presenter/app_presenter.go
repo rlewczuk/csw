@@ -3,8 +3,8 @@ package presenter
 import (
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/core"
-	"github.com/codesnort/codesnort-swe/pkg/ui"
+	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/ui"
 )
 
 // AppPresenter implements ui.IAppPresenter.

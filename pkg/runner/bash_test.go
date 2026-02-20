@@ -179,7 +179,7 @@ func TestBashRunner_LongRunningCommand(t *testing.T) {
 	runner := NewBashRunner(tmpDir, 2*time.Second)
 
 	start := time.Now()
-	output, exitCode, err := runner.RunCommand("sleep 0.5 && echo 'done'")
+	output, exitCode, err := runner.RunCommand("sleep 0.05 && echo 'done'")
 	duration := time.Since(start)
 
 	require.NoError(t, err)
@@ -343,7 +343,7 @@ func TestBashRunner_RunCommandWithOptions_Timeout(t *testing.T) {
 	assert.Contains(t, output, "done")
 
 	// Test with custom timeout that should fail
-	options.Timeout = 100 * time.Millisecond
+	options.Timeout = 10 * time.Millisecond
 	output, exitCode, err = runner.RunCommandWithOptions("sleep 5", options)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "timed out")

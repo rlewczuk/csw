@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/ui"
+	"github.com/rlewczuk/csw/pkg/ui"
 )
 
 // LogmdChatView wraps an IChatView and logs all session activity to a markdown file.

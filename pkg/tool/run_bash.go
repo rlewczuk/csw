@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/codesnort/codesnort-swe/pkg/runner"
+	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/runner"
 )
 
 // RunCommandError represents a permission error for running commands.

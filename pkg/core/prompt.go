@@ -11,9 +11,9 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/codesnort/codesnort-swe/pkg/conf"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
-	"github.com/codesnort/codesnort-swe/pkg/vfs"
+	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // PromptGenerator generates a prompt for the given tags, role and state.

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/tool"
 )
 
 // Default retry configuration constants.

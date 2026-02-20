@@ -4,9 +4,9 @@ package testfixture
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/core"
-	coretestfixture "github.com/codesnort/codesnort-swe/pkg/core/testfixture"
-	"github.com/codesnort/codesnort-swe/pkg/presenter"
+	"github.com/rlewczuk/csw/pkg/core"
+	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
+	"github.com/rlewczuk/csw/pkg/presenter"
 )
 
 // PresenterFixture provides shared setup for presenter integration tests.

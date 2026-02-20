@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codesnort/codesnort-swe/pkg/testutil/cfg"
+	"github.com/rlewczuk/csw/pkg/testutil/cfg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

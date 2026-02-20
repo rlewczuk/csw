@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/ui"
+	"github.com/rlewczuk/csw/pkg/ui"
 )
 
 func TestMockChatView_Init(t *testing.T) {

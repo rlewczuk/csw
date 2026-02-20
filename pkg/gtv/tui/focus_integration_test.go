@@ -3,9 +3,9 @@ package tui_test
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/tui"
+	"github.com/rlewczuk/csw/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv/tio"
+	"github.com/rlewczuk/csw/pkg/gtv/tui"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,8 +30,7 @@ func TestFocusIntegration_MouseClickBetweenInputBoxAndButton(t *testing.T) {
 		tui.WithText(""),
 		tui.WithRectangle(10, 5, 30, 1),
 		tui.WithAttrs(normalAttrs),
-		tui.WithFocusedAttrs(focusedAttrs,
-	),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	inputBox2 := tui.NewInputBox(
@@ -39,8 +38,7 @@ func TestFocusIntegration_MouseClickBetweenInputBoxAndButton(t *testing.T) {
 		tui.WithText(""),
 		tui.WithRectangle(10, 10, 30, 1),
 		tui.WithAttrs(normalAttrs),
-		tui.WithFocusedAttrs(focusedAttrs,
-	),
+		tui.WithFocusedAttrs(focusedAttrs),
 	)
 
 	buttonPressed := false

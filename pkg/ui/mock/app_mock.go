@@ -1,7 +1,7 @@
 package mock
 
 import (
-	"github.com/codesnort/codesnort-swe/pkg/ui"
+	"github.com/rlewczuk/csw/pkg/ui"
 )
 
 // MockAppView implements ui.IAppView interface for testing purposes.

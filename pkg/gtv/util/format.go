@@ -1,6 +1,6 @@
 package util
 
-import "github.com/codesnort/codesnort-swe/pkg/gtv"
+import "github.com/rlewczuk/csw/pkg/gtv"
 
 // marker represents an active formatting marker on the stack
 type marker struct {

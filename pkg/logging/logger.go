@@ -37,8 +37,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/codesnort/codesnort-swe/pkg/models"
-	"github.com/codesnort/codesnort-swe/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/tool"
 )
 
 // LogType represents the type of session log

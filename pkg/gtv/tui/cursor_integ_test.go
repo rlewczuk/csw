@@ -3,9 +3,9 @@ package tui_test
 import (
 	"testing"
 
-	"github.com/codesnort/codesnort-swe/pkg/gtv"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/tio"
-	"github.com/codesnort/codesnort-swe/pkg/gtv/tui"
+	"github.com/rlewczuk/csw/pkg/gtv"
+	"github.com/rlewczuk/csw/pkg/gtv/tio"
+	"github.com/rlewczuk/csw/pkg/gtv/tui"
 	"github.com/stretchr/testify/assert"
 )
 
