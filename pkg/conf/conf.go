@@ -126,6 +126,8 @@ type ModelProviderConfig struct {
 	// AuthMode specifies the authentication mode for the provider.
 	// Possible values: "none", "api_key" (default), "oauth2".
 	AuthMode AuthMode `json:"auth_mode,omitempty" yaml:"auth_mode,omitempty"`
+	// AuthURL is the OAuth2 authorization endpoint URL for browser-based authentication.
+	AuthURL string `json:"auth_url,omitempty" yaml:"auth_url,omitempty"`
 	// TokenURL is the OAuth2 token endpoint URL for token renewal.
 	TokenURL string `json:"token_url,omitempty" yaml:"token_url,omitempty"`
 	// ClientID is the OAuth2 client identifier.

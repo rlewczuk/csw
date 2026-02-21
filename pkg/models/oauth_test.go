@@ -1,7 +1,14 @@
 package models
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"net"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -222,4 +229,261 @@ func TestIsOAuth2Provider(t *testing.T) {
 	t.Run("returns false for nil config", func(t *testing.T) {
 		assert.False(t, IsOAuth2Provider(nil))
 	})
+}
+
+func TestGenerateOAuthPKCECodes(t *testing.T) {
+	codes, err := GenerateOAuthPKCECodes()
+	require.NoError(t, err)
+	require.NotNil(t, codes)
+
+	assert.NotEmpty(t, codes.Verifier)
+	assert.NotEmpty(t, codes.Challenge)
+	assert.NotContains(t, codes.Verifier, "=")
+	assert.NotContains(t, codes.Challenge, "=")
+
+	hash := sha256.Sum256([]byte(codes.Verifier))
+	expectedChallenge := base64.RawURLEncoding.EncodeToString(hash[:])
+	assert.Equal(t, expectedChallenge, codes.Challenge)
+}
+
+func TestGenerateOAuthState(t *testing.T) {
+	state, err := GenerateOAuthState()
+	require.NoError(t, err)
+	assert.NotEmpty(t, state)
+	assert.NotContains(t, state, "=")
+
+	decoded, decodeErr := base64.RawURLEncoding.DecodeString(state)
+	require.NoError(t, decodeErr)
+	assert.NotEmpty(t, decoded)
+}
+
+func TestBuildAuthorizationURL(t *testing.T) {
+	t.Run("builds URL with required and extra params", func(t *testing.T) {
+		config := &conf.ModelProviderConfig{
+			AuthURL:  "https://auth.example.com/oauth/authorize",
+			ClientID: "client-123",
+		}
+
+		result, err := BuildAuthorizationURL(
+			config,
+			"http://localhost:11435/auth/callback",
+			"state-123",
+			"challenge-123",
+			DefaultOAuthScope,
+			map[string]string{
+				"originator":                 "opencode",
+				"id_token_add_organizations": "true",
+			},
+		)
+		require.NoError(t, err)
+
+		parsed, err := url.Parse(result)
+		require.NoError(t, err)
+
+		query := parsed.Query()
+		assert.Equal(t, "code", query.Get("response_type"))
+		assert.Equal(t, "client-123", query.Get("client_id"))
+		assert.Equal(t, "http://localhost:11435/auth/callback", query.Get("redirect_uri"))
+		assert.Equal(t, "state-123", query.Get("state"))
+		assert.Equal(t, "challenge-123", query.Get("code_challenge"))
+		assert.Equal(t, OAuthCodeChallengeMethodS256, query.Get("code_challenge_method"))
+		assert.Equal(t, DefaultOAuthScope, query.Get("scope"))
+		assert.Equal(t, "opencode", query.Get("originator"))
+		assert.Equal(t, "true", query.Get("id_token_add_organizations"))
+	})
+
+	t.Run("uses default scope when scope is empty", func(t *testing.T) {
+		config := &conf.ModelProviderConfig{
+			AuthURL:  "https://auth.example.com/oauth/authorize",
+			ClientID: "client-123",
+		}
+
+		result, err := BuildAuthorizationURL(config, "http://localhost/callback", "state", "challenge", "", nil)
+		require.NoError(t, err)
+
+		parsed, err := url.Parse(result)
+		require.NoError(t, err)
+		assert.Equal(t, DefaultOAuthScope, parsed.Query().Get("scope"))
+	})
+
+	t.Run("returns validation errors", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			config  *conf.ModelProviderConfig
+			wantErr string
+		}{
+			{name: "nil config", config: nil, wantErr: "config cannot be nil"},
+			{name: "missing auth URL", config: &conf.ModelProviderConfig{ClientID: "id"}, wantErr: "AuthURL is required"},
+			{name: "missing client ID", config: &conf.ModelProviderConfig{AuthURL: "https://auth.example.com"}, wantErr: "ClientID is required"},
+		}
+
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				_, err := BuildAuthorizationURL(tc.config, "http://localhost/callback", "state", "challenge", DefaultOAuthScope, nil)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+			})
+		}
+	})
+}
+
+func TestExchangeAuthorizationCode(t *testing.T) {
+	t.Run("successfully exchanges code for tokens", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		mock.AddRestResponse("/oauth/token", "POST", `{"access_token":"new-access-token","refresh_token":"new-refresh-token","expires_in":3600}`)
+
+		config := &conf.ModelProviderConfig{
+			TokenURL: "" + mock.URL() + "/oauth/token",
+			ClientID: "test-client-id",
+		}
+
+		resp, err := ExchangeAuthorizationCode(config, mock.Client(), "auth-code", "http://localhost:11435/auth/callback", "verifier")
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, "new-access-token", resp.AccessToken)
+		assert.Equal(t, "new-refresh-token", resp.RefreshToken)
+
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 1)
+		body := string(reqs[0].Body)
+		assert.True(t, strings.Contains(body, "grant_type=authorization_code"))
+		assert.True(t, strings.Contains(body, "code=auth-code"))
+		assert.True(t, strings.Contains(body, "client_id=test-client-id"))
+		assert.True(t, strings.Contains(body, "code_verifier=verifier"))
+	})
+
+	t.Run("returns validation errors", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			config     *conf.ModelProviderConfig
+			code       string
+			redirect   string
+			verifier   string
+			wantErrMsg string
+		}{
+			{name: "nil config", config: nil, code: "code", redirect: "http://localhost/callback", verifier: "verifier", wantErrMsg: "config cannot be nil"},
+			{name: "missing token url", config: &conf.ModelProviderConfig{ClientID: "id"}, code: "code", redirect: "http://localhost/callback", verifier: "verifier", wantErrMsg: "TokenURL is required"},
+			{name: "missing client id", config: &conf.ModelProviderConfig{TokenURL: "https://example.com/token"}, code: "code", redirect: "http://localhost/callback", verifier: "verifier", wantErrMsg: "ClientID is required"},
+			{name: "missing code", config: &conf.ModelProviderConfig{TokenURL: "https://example.com/token", ClientID: "id"}, redirect: "http://localhost/callback", verifier: "verifier", wantErrMsg: "code is required"},
+			{name: "missing redirect", config: &conf.ModelProviderConfig{TokenURL: "https://example.com/token", ClientID: "id"}, code: "code", verifier: "verifier", wantErrMsg: "redirectURI is required"},
+			{name: "missing verifier", config: &conf.ModelProviderConfig{TokenURL: "https://example.com/token", ClientID: "id"}, code: "code", redirect: "http://localhost/callback", wantErrMsg: "codeVerifier is required"},
+		}
+
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				_, err := ExchangeAuthorizationCode(tc.config, http.DefaultClient, tc.code, tc.redirect, tc.verifier)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErrMsg)
+			})
+		}
+	})
+
+	t.Run("returns error for non-OK status", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		mock.AddRestResponseWithStatus("/oauth/token", "POST", `{"error":"invalid_grant"}`, http.StatusBadRequest)
+
+		config := &conf.ModelProviderConfig{
+			TokenURL: mock.URL() + "/oauth/token",
+			ClientID: "test-client-id",
+		}
+
+		_, err := ExchangeAuthorizationCode(config, mock.Client(), "bad-code", "http://localhost/callback", "verifier")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "token exchange failed with status 400")
+	})
+}
+
+func TestWaitForOAuthCallback(t *testing.T) {
+	t.Run("returns callback code and state", func(t *testing.T) {
+		port := findFreePort(t)
+		listenAddress := "127.0.0.1:" + port
+		callbackPath := "/auth/callback"
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		resultCh := make(chan *OAuthCallback, 1)
+		errCh := make(chan error, 1)
+		go func() {
+			result, err := WaitForOAuthCallback(ctx, listenAddress, callbackPath)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			resultCh <- result
+		}()
+
+		callbackURL := "http://localhost:" + port + callbackPath + "?code=test-code&state=test-state"
+		sendCallbackRequestWithRetry(t, callbackURL)
+
+		select {
+		case result := <-resultCh:
+			require.NotNil(t, result)
+			assert.Equal(t, "test-code", result.Code)
+			assert.Equal(t, "test-state", result.State)
+		case err := <-errCh:
+			require.NoError(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("TestWaitForOAuthCallback() [oauth_test.go]: timeout waiting for callback result")
+		}
+	})
+
+	t.Run("returns error when oauth callback includes error", func(t *testing.T) {
+		port := findFreePort(t)
+		listenAddress := "127.0.0.1:" + port
+		callbackPath := "/auth/callback"
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		errCh := make(chan error, 1)
+		go func() {
+			_, err := WaitForOAuthCallback(ctx, listenAddress, callbackPath)
+			errCh <- err
+		}()
+
+		callbackURL := "http://localhost:" + port + callbackPath + "?error=access_denied&error_description=user%20cancelled"
+		sendCallbackRequestWithRetry(t, callbackURL)
+
+		select {
+		case err := <-errCh:
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "oauth callback error")
+		case <-time.After(5 * time.Second):
+			t.Fatalf("TestWaitForOAuthCallback() [oauth_test.go]: timeout waiting for callback error")
+		}
+	})
+}
+
+func sendCallbackRequestWithRetry(t *testing.T, callbackURL string) {
+	t.Helper()
+
+	var lastErr error
+	for i := 0; i < 50; i++ {
+		resp, err := http.Get(callbackURL)
+		if err == nil {
+			_ = resp.Body.Close()
+			return
+		}
+		lastErr = err
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	require.NoError(t, lastErr)
+}
+
+func findFreePort(t *testing.T) string {
+	t.Helper()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listener.Close()
+
+	addr, ok := listener.Addr().(*net.TCPAddr)
+	require.True(t, ok)
+	return strconv.Itoa(addr.Port)
 }
