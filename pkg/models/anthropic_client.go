@@ -139,6 +139,25 @@ func (c *AnthropicClient) applyConfiguredHeaders(req *http.Request) {
 	}
 }
 
+func (c *AnthropicClient) applyConfiguredQueryParams(req *http.Request) {
+	if c == nil || c.config == nil || len(c.config.QueryParams) == 0 || req.URL == nil {
+		return
+	}
+
+	query := req.URL.Query()
+	for key, value := range c.config.QueryParams {
+		if key == "" || value == "" {
+			continue
+		}
+		if query.Get(key) != "" {
+			continue
+		}
+		query.Set(key, value)
+	}
+
+	req.URL.RawQuery = query.Encode()
+}
+
 // ChatModel returns a ChatModel implementation for the given model and options
 func (c *AnthropicClient) ChatModel(model string, options *ChatOptions) ChatModel {
 	// Merge config verbose flag with provided options
@@ -181,6 +200,7 @@ func (c *AnthropicClient) ListModels() ([]ModelInfo, error) {
 	req.Header.Set("anthropic-version", c.apiVersion)
 	setUserAgentHeader(req)
 	c.applyConfiguredHeaders(req)
+	c.applyConfiguredQueryParams(req)
 	applyOptionsHeaders(req, nil)
 
 	logVerboseRequest(req, nil, c.verbose)
@@ -304,6 +324,7 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	req.Header.Set("anthropic-version", m.client.apiVersion)
 	setUserAgentHeader(req)
 	m.client.applyConfiguredHeaders(req)
+	m.client.applyConfiguredQueryParams(req)
 	applyOptionsHeaders(req, effectiveOptions)
 
 	// Print verbose request output if enabled
@@ -445,6 +466,7 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		req.Header.Set("anthropic-version", m.client.apiVersion)
 		setUserAgentHeader(req)
 		m.client.applyConfiguredHeaders(req)
+		m.client.applyConfiguredQueryParams(req)
 		applyOptionsHeaders(req, effectiveOptions)
 
 		// Print verbose request output if enabled

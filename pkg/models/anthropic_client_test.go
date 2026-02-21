@@ -1493,3 +1493,172 @@ func TestAnthropicClient_OptionsHeadersStream(t *testing.T) {
 	assert.Equal(t, "options-value", request.Header.Get("X-Options-Header"))
 	assert.Empty(t, request.Header.Get("Authorization"), "authorization header should NOT be set from options")
 }
+
+func TestAnthropicClient_QueryParams(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "test-key",
+		QueryParams: map[string]string{
+			"beta": "tools-2024-04-04",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/v1/models", "GET", `{"data":[{"id":"claude-test","created_at":"2024-01-01T00:00:00Z","display_name":"Claude Test","type":"model"}]}`)
+
+	_, err = client.ListModels()
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Contains(t, request.Query, "beta=tools-2024-04-04")
+}
+
+func TestAnthropicClient_QueryParamsChat(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "test-key",
+		QueryParams: map[string]string{
+			"beta": "tools-2024-04-04",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_test","type":"message","role":"assistant","content":[{"type":"text","text":"Hello"}],"model":"test-model","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`)
+
+	chatModel := client.ChatModel("test-model", nil)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hello"),
+	}
+
+	_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Contains(t, request.Query, "beta=tools-2024-04-04")
+}
+
+func TestAnthropicClient_QueryParamsChatStream(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "test-key",
+		QueryParams: map[string]string{
+			"beta": "tools-2024-04-04",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddStreamingResponse("/v1/messages", "POST", true,
+		`event: message_start`+"\n"+`data: {"type":"message_start","message":{"id":"msg_stream","type":"message","role":"assistant","content":[],"model":"test-model","usage":{"input_tokens":10,"output_tokens":0}}}`,
+		`event: content_block_start`+"\n"+`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
+		`event: content_block_delta`+"\n"+`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}`,
+		`event: message_stop`+"\n"+`data: {"type":"message_stop"}`,
+	)
+
+	chatModel := client.ChatModel("test-model", nil)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hi"),
+	}
+
+	iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+	for range iterator {
+	}
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Contains(t, request.Query, "beta=tools-2024-04-04")
+}
+
+func TestAnthropicClient_QueryParamsDoesNotOverrideExisting(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "test-key",
+		QueryParams: map[string]string{
+			"existing-param": "from-config",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/v1/models", "GET", `{"data":[]}`)
+
+	_, err = client.ListModels()
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	// The config query param should be present
+	assert.Contains(t, request.Query, "existing-param=from-config")
+}
+
+func TestAnthropicClient_QueryParamsEmptyOrNil(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	// Test with nil QueryParams
+	client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+		URL:         mock.URL(),
+		APIKey:      "test-key",
+		QueryParams: nil,
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/v1/models", "GET", `{"data":[]}`)
+
+	_, err = client.ListModels()
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	// Query should be empty when no params are set
+	assert.Empty(t, request.Query)
+}
+
+func TestAnthropicClient_QueryParamsEmptyValues(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewAnthropicClient(&conf.ModelProviderConfig{
+		URL:    mock.URL(),
+		APIKey: "test-key",
+		QueryParams: map[string]string{
+			"":          "value-with-empty-key",
+			"valid-key": "",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/v1/models", "GET", `{"data":[]}`)
+
+	_, err = client.ListModels()
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	// Empty keys and values should be skipped
+	assert.Empty(t, request.Query, "empty keys and values should not be added to query")
+}
