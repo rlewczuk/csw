@@ -648,10 +648,51 @@ func (s *LocalConfigStore) SaveModelProviderConfig(config *conf.ModelProviderCon
 		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to create models directory: %w", err)
 	}
 
-	providerPath := filepath.Join(modelsDir, config.Name+".json")
-	data, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to marshal config: %w", err)
+	yamlPath := filepath.Join(modelsDir, config.Name+".yaml")
+	ymlPath := filepath.Join(modelsDir, config.Name+".yml")
+	jsonPath := filepath.Join(modelsDir, config.Name+".json")
+
+	providerPath := jsonPath
+	marshalYAML := false
+	if _, err := os.Stat(yamlPath); err == nil {
+		providerPath = yamlPath
+		marshalYAML = true
+	} else if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to stat %s: %w", yamlPath, err)
+	} else if _, err := os.Stat(ymlPath); err == nil {
+		providerPath = ymlPath
+		marshalYAML = true
+	} else if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to stat %s: %w", ymlPath, err)
+	} else if _, err := os.Stat(jsonPath); err == nil {
+		providerPath = jsonPath
+		marshalYAML = false
+	} else if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to stat %s: %w", jsonPath, err)
+	}
+
+	if existingData, err := os.ReadFile(providerPath); err == nil {
+		if err := os.WriteFile(providerPath+".bkp", existingData, 0644); err != nil {
+			return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to create backup file: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to read existing config file: %w", err)
+	}
+
+	var (
+		data []byte
+		err  error
+	)
+	if marshalYAML {
+		data, err = yaml.Marshal(config)
+		if err != nil {
+			return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to marshal config as yaml: %w", err)
+		}
+	} else {
+		data, err = json.MarshalIndent(config, "", "  ")
+		if err != nil {
+			return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to marshal config as json: %w", err)
+		}
 	}
 
 	if err := os.WriteFile(providerPath, data, 0644); err != nil {
