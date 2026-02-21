@@ -466,6 +466,165 @@ func TestResponsesClient_RequestHeadersAndSessionID(t *testing.T) {
 	assert.True(t, foundDeveloper, "expected developer role in request input")
 }
 
+func TestResponsesClient_ChatRequiresInstructions(t *testing.T) {
+	t.Run("chat request includes instructions when only user message is provided", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/responses", r.URL.Path)
+
+			var chatReq ResponsesCreateRequest
+			err := json.NewDecoder(r.Body).Decode(&chatReq)
+			require.NoError(t, err)
+
+			if strings.TrimSpace(chatReq.Instructions) == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				_, writeErr := w.Write([]byte(`{"detail":"Instructions are required"}`))
+				require.NoError(t, writeErr)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_, writeErr := w.Write([]byte(`{"id":"resp_ok","object":"response","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}]}`))
+			require.NoError(t, writeErr)
+		}))
+		defer server.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    server.URL,
+			APIKey: "test-key",
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+	})
+}
+
+func TestResponsesClient_ChatSetsStoreFalse(t *testing.T) {
+	t.Run("chat request sets store to false", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/responses", r.URL.Path)
+
+			var chatReq ResponsesCreateRequest
+			err := json.NewDecoder(r.Body).Decode(&chatReq)
+			require.NoError(t, err)
+
+			if chatReq.Store == nil || *chatReq.Store {
+				w.WriteHeader(http.StatusBadRequest)
+				_, writeErr := w.Write([]byte(`{"detail":"Store must be set to false"}`))
+				require.NoError(t, writeErr)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_, writeErr := w.Write([]byte(`{"id":"resp_ok","object":"response","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}]}`))
+			require.NoError(t, writeErr)
+		}))
+		defer server.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    server.URL,
+			APIKey: "test-key",
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+	})
+}
+
+func TestResponsesClient_CodexCompatibility(t *testing.T) {
+	t.Run("Chat uses streaming and omits max_output_tokens for codex endpoint", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/backend-api/codex/responses", r.URL.Path)
+
+			var payload map[string]any
+			err := json.NewDecoder(r.Body).Decode(&payload)
+			require.NoError(t, err)
+
+			streamValue, ok := payload["stream"].(bool)
+			if !ok || !streamValue {
+				w.WriteHeader(http.StatusBadRequest)
+				_, writeErr := w.Write([]byte(`{"detail":"Stream must be set to true"}`))
+				require.NoError(t, writeErr)
+				return
+			}
+
+			if _, exists := payload["max_output_tokens"]; exists {
+				w.WriteHeader(http.StatusBadRequest)
+				_, writeErr := w.Write([]byte(`{"detail":"Unsupported parameter: max_output_tokens"}`))
+				require.NoError(t, writeErr)
+				return
+			}
+
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, writeErr := w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\n"))
+			require.NoError(t, writeErr)
+			_, writeErr = w.Write([]byte("data: [DONE]\n\n"))
+			require.NoError(t, writeErr)
+		}))
+		defer server.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    server.URL + "/backend-api/codex",
+			APIKey: "test-key",
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel("gpt-5.2-codex", nil)
+		messages := []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}
+
+		response, err := chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		assert.Equal(t, "ok", response.GetText())
+	})
+
+	t.Run("ChatStream omits max_output_tokens for codex endpoint", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/backend-api/codex/responses", r.URL.Path)
+
+			var payload map[string]any
+			err := json.NewDecoder(r.Body).Decode(&payload)
+			require.NoError(t, err)
+
+			streamValue, ok := payload["stream"].(bool)
+			require.True(t, ok)
+			assert.True(t, streamValue)
+			_, exists := payload["max_output_tokens"]
+			assert.False(t, exists)
+
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, writeErr := w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\n"))
+			require.NoError(t, writeErr)
+			_, writeErr = w.Write([]byte("data: [DONE]\n\n"))
+			require.NoError(t, writeErr)
+		}))
+		defer server.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    server.URL + "/backend-api/codex",
+			APIKey: "test-key",
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel("gpt-5.2-codex", nil)
+		messages := []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}
+
+		var gotText strings.Builder
+		for fragment := range chatModel.ChatStream(context.Background(), messages, nil, nil) {
+			gotText.WriteString(fragment.GetText())
+		}
+
+		assert.Equal(t, "ok", gotText.String())
+	})
+}
+
 func TestResponsesClient_EmbeddingModel(t *testing.T) {
 	tc := getResponsesTestClient(t)
 	defer tc.Close()
@@ -994,7 +1153,7 @@ func TestResponsesClient_QueryParams(t *testing.T) {
 			APIKey: "test-key",
 			QueryParams: map[string]string{
 				"client_version": "0.1.0",
-				"custom_param": "test-value",
+				"custom_param":   "test-value",
 			},
 		})
 		require.NoError(t, err)

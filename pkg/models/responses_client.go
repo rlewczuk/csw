@@ -24,6 +24,9 @@ import (
 // Default token refresh safety margin - refresh token 5 minutes before expiry.
 const defaultTokenRefreshMargin = 5 * time.Minute
 
+// defaultResponsesInstructions is used when no explicit instructions are provided.
+const defaultResponsesInstructions string = "You are a helpful assistant."
+
 // ResponsesClient is a client for interacting with Open Responses-compatible APIs.
 type ResponsesClient struct {
 	baseURL    string
@@ -365,15 +368,26 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		return nil, err
 	}
 
+	store := false
+	useCodexCompatibility := usesCodexCompatibilityEndpoint(m.client.baseURL)
+	maxOutputTokens := DefaultMaxTokens
+	stream := false
+	if useCodexCompatibility {
+		maxOutputTokens = 0
+		stream = true
+	}
+
 	chatReq := ResponsesCreateRequest{
 		Model:           m.model,
 		Input:           items,
+		Store:           &store,
+		Instructions:    buildResponsesInstructions(messages),
 		Tools:           convertToolsToResponses(tools),
-		Stream:          false,
-		MaxOutputTokens: DefaultMaxTokens,
+		Stream:          stream,
+		MaxOutputTokens: maxOutputTokens,
 	}
 
-	if m.client.config != nil && m.client.config.MaxTokens > 0 {
+	if !useCodexCompatibility && m.client.config != nil && m.client.config.MaxTokens > 0 {
 		chatReq.MaxOutputTokens = m.client.config.MaxTokens
 	}
 
@@ -435,6 +449,14 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		return nil, err
 	}
 
+	if chatReq.Stream {
+		result, err := convertFromResponsesStreamBody(bodyBytes)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
 	var chatResp ResponsesResponse
 	if err := json.Unmarshal(bodyBytes, &chatResp); err != nil {
 		return nil, fmt.Errorf("ResponsesChatModel.Chat() [responses_client.go]: failed to decode response: %w", err)
@@ -476,15 +498,24 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			return
 		}
 
+		store := false
+		useCodexCompatibility := usesCodexCompatibilityEndpoint(m.client.baseURL)
+		maxOutputTokens := DefaultMaxTokens
+		if useCodexCompatibility {
+			maxOutputTokens = 0
+		}
+
 		chatReq := ResponsesCreateRequest{
 			Model:           m.model,
 			Input:           items,
+			Store:           &store,
+			Instructions:    buildResponsesInstructions(messages),
 			Tools:           convertToolsToResponses(tools),
 			Stream:          true,
-			MaxOutputTokens: DefaultMaxTokens,
+			MaxOutputTokens: maxOutputTokens,
 		}
 
-		if m.client.config != nil && m.client.config.MaxTokens > 0 {
+		if !useCodexCompatibility && m.client.config != nil && m.client.config.MaxTokens > 0 {
 			chatReq.MaxOutputTokens = m.client.config.MaxTokens
 		}
 
@@ -913,6 +944,120 @@ func convertToResponsesItems(messages []*ChatMessage) ([]ResponsesItem, error) {
 	}
 
 	return items, nil
+}
+
+// buildResponsesInstructions returns request instructions from system/developer messages.
+func buildResponsesInstructions(messages []*ChatMessage) string {
+	instructions := make([]string, 0)
+
+	for _, msg := range messages {
+		if msg == nil {
+			continue
+		}
+		if msg.Role != ChatRoleSystem && msg.Role != ChatRoleDeveloper {
+			continue
+		}
+
+		for _, part := range msg.Parts {
+			if strings.TrimSpace(part.Text) == "" {
+				continue
+			}
+			instructions = append(instructions, part.Text)
+		}
+	}
+
+	if len(instructions) == 0 {
+		return defaultResponsesInstructions
+	}
+
+	return strings.Join(instructions, "\n\n")
+}
+
+// usesCodexCompatibilityEndpoint returns true when backend uses ChatGPT Codex quirks.
+func usesCodexCompatibilityEndpoint(baseURL string) bool {
+	return strings.Contains(strings.ToLower(baseURL), "/backend-api/codex")
+}
+
+// convertFromResponsesStreamBody converts SSE response body into ChatMessage.
+func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
+	result := &ChatMessage{
+		Role:  ChatRoleAssistant,
+		Parts: []ChatMessagePart{},
+	}
+
+	toolCallsInProgress := make(map[string]*responsesToolCallInProgress)
+	scanner := bufio.NewScanner(bytes.NewReader(bodyBytes))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" || strings.HasPrefix(line, "event: ") {
+			continue
+		}
+		if strings.TrimSpace(line) == "data: [DONE]" {
+			break
+		}
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+
+		data := strings.TrimPrefix(line, "data: ")
+		if strings.TrimSpace(data) == "[DONE]" {
+			break
+		}
+
+		var event ResponsesStreamEvent
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			continue
+		}
+
+		switch event.Type {
+		case "response.output_text.delta":
+			if event.Delta != "" {
+				result.Parts = append(result.Parts, ChatMessagePart{Text: event.Delta})
+			}
+		case "response.output_item.added":
+			if event.Item != nil && event.Item.Type == "function_call" {
+				toolCallsInProgress[event.Item.ID] = &responsesToolCallInProgress{
+					CallID: event.Item.CallID,
+					Name:   event.Item.Name,
+				}
+			}
+		case "response.function_call_arguments.delta":
+			if event.ItemID == "" {
+				continue
+			}
+			tc := toolCallsInProgress[event.ItemID]
+			if tc == nil {
+				continue
+			}
+			tc.Arguments += event.Delta
+		case "response.function_call_arguments.done":
+			if event.ItemID == "" {
+				continue
+			}
+			tc := toolCallsInProgress[event.ItemID]
+			if tc == nil {
+				continue
+			}
+			if event.Arguments != "" {
+				tc.Arguments = event.Arguments
+			}
+			toolCall := responsesToolCallFromStream(tc)
+			if toolCall != nil {
+				result.Parts = append(result.Parts, ChatMessagePart{ToolCall: toolCall})
+			}
+			delete(toolCallsInProgress, event.ItemID)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("convertFromResponsesStreamBody() [responses_client.go]: failed to scan stream body: %w", err)
+	}
+
+	if len(result.Parts) == 0 {
+		return nil, fmt.Errorf("convertFromResponsesStreamBody() [responses_client.go]: no usable output items in response")
+	}
+
+	return result, nil
 }
 
 func convertFromResponsesOutput(items []ResponsesItem) (*ChatMessage, error) {
