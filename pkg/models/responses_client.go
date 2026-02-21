@@ -14,11 +14,15 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/tool"
 )
+
+// Default token refresh safety margin - refresh token 5 minutes before expiry.
+const defaultTokenRefreshMargin = 5 * time.Minute
 
 // ResponsesClient is a client for interacting with Open Responses-compatible APIs.
 type ResponsesClient struct {
@@ -26,6 +30,13 @@ type ResponsesClient struct {
 	httpClient *http.Client
 	apiKey     string
 	config     *conf.ModelProviderConfig
+	// tokenExpiry is the expiration time of the current access token.
+	tokenExpiry time.Time
+	// tokenMu protects concurrent access to apiKey and tokenExpiry.
+	tokenMu sync.RWMutex
+	// configUpdater is an optional callback for persisting configuration changes
+	// (e.g., updated refresh tokens after OAuth2 token renewal).
+	configUpdater ConfigUpdater
 }
 
 // ResponsesChatModel is a chat model implementation for Responses API.
@@ -82,12 +93,21 @@ func NewResponsesClient(config *conf.ModelProviderConfig) (*ResponsesClient, err
 		Transport: transport,
 	}
 
-	return &ResponsesClient{
+	client := &ResponsesClient{
 		baseURL:    strings.TrimSuffix(config.URL, "/"),
 		httpClient: httpClient,
 		apiKey:     apiKey,
 		config:     config,
-	}, nil
+	}
+
+	if IsOAuth2Provider(config) && apiKey != "" {
+		expiry, err := ExtractJWTExpiry(apiKey)
+		if err == nil {
+			client.tokenExpiry = expiry
+		}
+	}
+
+	return client, nil
 }
 
 // NewResponsesClientWithHTTPClient creates a new Responses client with a custom HTTP client.
@@ -113,6 +133,90 @@ func NewResponsesClientWithHTTPClient(baseURL string, httpClient *http.Client) (
 // Returns nil if client was created without config (e.g., in tests).
 func (c *ResponsesClient) GetConfig() *conf.ModelProviderConfig {
 	return c.config
+}
+
+// SetConfigUpdater sets a callback function that will be called to persist
+// configuration changes (e.g., updated API keys or refresh tokens after OAuth2
+// token renewal). This method should be called after creating the client if
+// configuration persistence is needed.
+func (c *ResponsesClient) SetConfigUpdater(updater ConfigUpdater) {
+	c.configUpdater = updater
+}
+
+// RefreshTokenIfNeeded checks if the OAuth2 access token needs to be refreshed
+// and refreshes it if necessary. It returns an error if the refresh fails.
+// For non-OAuth2 providers, this method does nothing and returns nil.
+// If a ConfigUpdater is set and the token is refreshed successfully, the
+// updated configuration (including new refresh token if provided) will be
+// persisted using the ConfigUpdater callback.
+func (c *ResponsesClient) RefreshTokenIfNeeded() error {
+	if !IsOAuth2Provider(c.config) {
+		return nil
+	}
+
+	c.tokenMu.RLock()
+	expiry := c.tokenExpiry
+	c.tokenMu.RUnlock()
+
+	// Check if token is expired or about to expire
+	if !IsTokenExpired(expiry, defaultTokenRefreshMargin) {
+		return nil
+	}
+
+	// Need to refresh - upgrade to write lock
+	c.tokenMu.Lock()
+	defer c.tokenMu.Unlock()
+
+	// Double-check after acquiring write lock
+	if !IsTokenExpired(c.tokenExpiry, defaultTokenRefreshMargin) {
+		return nil
+	}
+
+	// Refresh the token
+	resp, err := RenewToken(c.config, c.httpClient)
+	if err != nil {
+		return fmt.Errorf("ResponsesClient.RefreshTokenIfNeeded() [responses_client.go]: %w", err)
+	}
+
+	// Update the API key and expiry
+	c.apiKey = resp.AccessToken
+	c.tokenExpiry = CalculateTokenExpiry(resp.ExpiresIn)
+
+	// Update the stored access token
+	needsPersist := false
+	if c.config != nil {
+		c.config.APIKey = resp.AccessToken
+		needsPersist = true
+	}
+
+	// Update the refresh token if a new one was provided
+	if resp.RefreshToken != "" && c.config != nil {
+		c.config.RefreshToken = resp.RefreshToken
+		needsPersist = true
+	}
+
+	// Persist the configuration if a ConfigUpdater is set and changes were made
+	if needsPersist && c.configUpdater != nil {
+		if err := c.configUpdater(c.config); err != nil {
+			// Log the error but don't fail the token refresh
+			// The in-memory config is still updated correctly
+			fmt.Fprintf(os.Stderr, "WARNING: ResponsesClient.RefreshTokenIfNeeded() [responses_client.go]: failed to persist config: %v\n", err)
+		}
+	}
+
+	return nil
+}
+
+// GetAccessToken returns the current access token, refreshing it if necessary.
+// For non-OAuth2 providers, it returns the static API key.
+func (c *ResponsesClient) GetAccessToken() (string, error) {
+	if err := c.RefreshTokenIfNeeded(); err != nil {
+		return "", err
+	}
+
+	c.tokenMu.RLock()
+	defer c.tokenMu.RUnlock()
+	return c.apiKey, nil
 }
 
 func (c *ResponsesClient) applyConfiguredHeaders(req *http.Request) {
@@ -167,8 +271,12 @@ func (c *ResponsesClient) ListModels() ([]ModelInfo, error) {
 		return nil, fmt.Errorf("ResponsesClient.ListModels() [responses_client.go]: failed to create request: %w", err)
 	}
 
-	if c.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	token, err := c.GetAccessToken()
+	if err != nil {
+		return nil, err
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	setUserAgentHeader(req)
 	c.applyConfiguredHeaders(req)
@@ -255,8 +363,12 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		return nil, fmt.Errorf("ResponsesChatModel.Chat() [responses_client.go]: failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if m.client.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
+	token, err := m.client.GetAccessToken()
+	if err != nil {
+		return nil, err
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	setUserAgentHeader(req)
 	m.client.applyConfiguredHeaders(req)
@@ -365,8 +477,13 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "text/event-stream")
-		if m.client.apiKey != "" {
-			req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
+		token, err := m.client.GetAccessToken()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: ResponsesChatModel.ChatStream() [responses_client.go]: failed to get access token: %v\n", err)
+			return
+		}
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
 		}
 		setUserAgentHeader(req)
 		m.client.applyConfiguredHeaders(req)

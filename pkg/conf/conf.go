@@ -16,6 +16,18 @@ const (
 	AccessAsk   AccessFlag = "ask"
 )
 
+// AuthMode represents the authentication mode for a model provider.
+type AuthMode string
+
+const (
+	// AuthModeNone indicates no authentication is required.
+	AuthModeNone AuthMode = "none"
+	// AuthModeAPIKey indicates API key authentication.
+	AuthModeAPIKey AuthMode = "api_key"
+	// AuthModeOAuth2 indicates OAuth2 authentication with token renewal.
+	AuthModeOAuth2 AuthMode = "oauth2"
+)
+
 type FileAccess struct {
 	Read   AccessFlag `json:"read" yaml:"read"`
 	Write  AccessFlag `json:"write" yaml:"write"`
@@ -109,6 +121,17 @@ type ModelProviderConfig struct {
 	// RateLimitBackoffScale is the base duration to scale rate limit backoff delays.
 	// Defaults to 1s when unset or invalid.
 	RateLimitBackoffScale time.Duration `json:"rate_limit_backoff_scale,omitempty" yaml:"rate_limit_backoff_scale,omitempty"`
+	// AuthMode specifies the authentication mode for the provider.
+	// Possible values: "none", "api_key" (default), "oauth2".
+	AuthMode AuthMode `json:"auth_mode,omitempty" yaml:"auth_mode,omitempty"`
+	// TokenURL is the OAuth2 token endpoint URL for token renewal.
+	TokenURL string `json:"token_url,omitempty" yaml:"token_url,omitempty"`
+	// ClientID is the OAuth2 client identifier.
+	ClientID string `json:"client_id,omitempty" yaml:"client_id,omitempty"`
+	// ClientSecret is the OAuth2 client secret (optional for some providers).
+	ClientSecret string `json:"client_secret,omitempty" yaml:"client_secret,omitempty"`
+	// RefreshToken is the OAuth2 refresh token used to obtain new access tokens.
+	RefreshToken string `json:"refresh_token,omitempty" yaml:"refresh_token,omitempty"`
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for ModelProviderConfig.

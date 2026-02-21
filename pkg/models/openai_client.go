@@ -14,6 +14,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
@@ -29,6 +30,12 @@ type OpenAIClient struct {
 	httpClient *http.Client
 	apiKey     string
 	config     *conf.ModelProviderConfig
+	// tokenExpiry is the expiration time of the current access token.
+	tokenExpiry time.Time
+	// tokenMu protects concurrent access to apiKey and tokenExpiry.
+	tokenMu sync.RWMutex
+	// configUpdater is an optional callback for persisting configuration changes.
+	configUpdater ConfigUpdater
 }
 
 // OpenAIChatModel is a chat model implementation for OpenAI
@@ -81,12 +88,21 @@ func NewOpenAIClient(config *conf.ModelProviderConfig) (*OpenAIClient, error) {
 		Transport: transport,
 	}
 
-	return &OpenAIClient{
+	client := &OpenAIClient{
 		baseURL:    strings.TrimSuffix(config.URL, "/"),
 		httpClient: httpClient,
 		apiKey:     apiKey,
 		config:     config,
-	}, nil
+	}
+
+	if IsOAuth2Provider(config) && apiKey != "" {
+		expiry, err := ExtractJWTExpiry(apiKey)
+		if err == nil {
+			client.tokenExpiry = expiry
+		}
+	}
+
+	return client, nil
 }
 
 // NewOpenAIClientWithHTTPClient creates a new OpenAI-compatible client with a custom HTTP client.
@@ -112,6 +128,75 @@ func NewOpenAIClientWithHTTPClient(baseURL string, httpClient *http.Client) (*Op
 // Returns nil if client was created without config (e.g., in tests).
 func (c *OpenAIClient) GetConfig() *conf.ModelProviderConfig {
 	return c.config
+}
+
+// SetConfigUpdater sets a callback function that will be called to persist
+// configuration changes after OAuth2 token renewal.
+func (c *OpenAIClient) SetConfigUpdater(updater ConfigUpdater) {
+	c.configUpdater = updater
+}
+
+// RefreshTokenIfNeeded checks if the OAuth2 access token needs to be refreshed
+// and refreshes it if necessary. It returns an error if the refresh fails.
+// For non-OAuth2 providers, this method does nothing and returns nil.
+func (c *OpenAIClient) RefreshTokenIfNeeded() error {
+	if !IsOAuth2Provider(c.config) {
+		return nil
+	}
+
+	c.tokenMu.RLock()
+	expiry := c.tokenExpiry
+	c.tokenMu.RUnlock()
+
+	if !IsTokenExpired(expiry, defaultTokenRefreshMargin) {
+		return nil
+	}
+
+	c.tokenMu.Lock()
+	defer c.tokenMu.Unlock()
+
+	if !IsTokenExpired(c.tokenExpiry, defaultTokenRefreshMargin) {
+		return nil
+	}
+
+	resp, err := RenewToken(c.config, c.httpClient)
+	if err != nil {
+		return fmt.Errorf("OpenAIClient.RefreshTokenIfNeeded() [openai_client.go]: %w", err)
+	}
+
+	c.apiKey = resp.AccessToken
+	c.tokenExpiry = CalculateTokenExpiry(resp.ExpiresIn)
+
+	needsPersist := false
+	if c.config != nil {
+		c.config.APIKey = resp.AccessToken
+		needsPersist = true
+	}
+
+	if resp.RefreshToken != "" && c.config != nil {
+		c.config.RefreshToken = resp.RefreshToken
+		needsPersist = true
+	}
+
+	if needsPersist && c.configUpdater != nil {
+		if err := c.configUpdater(c.config); err != nil {
+			fmt.Fprintf(os.Stderr, "WARNING: OpenAIClient.RefreshTokenIfNeeded() [openai_client.go]: failed to persist config: %v\n", err)
+		}
+	}
+
+	return nil
+}
+
+// GetAccessToken returns the current access token, refreshing it if necessary.
+// For non-OAuth2 providers, it returns the static API key.
+func (c *OpenAIClient) GetAccessToken() (string, error) {
+	if err := c.RefreshTokenIfNeeded(); err != nil {
+		return "", err
+	}
+
+	c.tokenMu.RLock()
+	defer c.tokenMu.RUnlock()
+	return c.apiKey, nil
 }
 
 func (c *OpenAIClient) applyConfiguredHeaders(req *http.Request) {
@@ -167,7 +252,13 @@ func (c *OpenAIClient) ListModels() ([]ModelInfo, error) {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	token, err := c.GetAccessToken()
+	if err != nil {
+		return nil, err
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	setUserAgentHeader(req)
 	c.applyConfiguredHeaders(req)
 	applyOptionsHeaders(req, nil)
@@ -260,7 +351,13 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
+	token, err := m.client.GetAccessToken()
+	if err != nil {
+		return nil, err
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	setUserAgentHeader(req)
 	m.client.applyConfiguredHeaders(req)
 	applyOptionsHeaders(req, effectiveOptions)
@@ -391,7 +488,14 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 			return
 		}
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
+		token, err := m.client.GetAccessToken()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: OpenAIChatModel.ChatStream() [openai_client.go]: failed to get access token: %v\n", err)
+			return
+		}
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
 		req.Header.Set("Accept", "text/event-stream")
 		setUserAgentHeader(req)
 		m.client.applyConfiguredHeaders(req)
@@ -652,7 +756,13 @@ func (m *OpenAIEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+m.client.apiKey)
+	token, err := m.client.GetAccessToken()
+	if err != nil {
+		return nil, err
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	setUserAgentHeader(req)
 	m.client.applyConfiguredHeaders(req)
 	applyOptionsHeaders(req, nil)

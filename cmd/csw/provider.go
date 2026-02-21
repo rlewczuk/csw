@@ -305,6 +305,20 @@ func providerTestCommand(scope *ConfigScope) *cobra.Command {
 				return fmt.Errorf("providerTestCommand() [provider.go]: failed to create provider: %w", err)
 			}
 
+			if updaterTarget, ok := provider.(interface{ SetConfigUpdater(models.ConfigUpdater) }); ok {
+				store, closeFn, err := findWritableStoreForProvider(providerName)
+				if err != nil {
+					return err
+				}
+				if store != nil {
+					if closeFn != nil {
+						defer closeFn()
+					}
+					updater := models.NewConfigUpdater(store, providerName)
+					updaterTarget.SetConfigUpdater(updater.Update())
+				}
+			}
+
 			// Create chat options with verbose flag
 			options := &models.ChatOptions{
 				Verbose: verbose,
@@ -629,4 +643,54 @@ func outputModelsList(modelsList []modelEntry) error {
 	}
 
 	return nil
+}
+
+func findWritableStoreForProvider(providerName string) (conf.WritableConfigStore, func() error, error) {
+	localStore, err := GetConfigStore(ConfigScopeLocal)
+	if err != nil {
+		return nil, nil, fmt.Errorf("findWritableStoreForProvider() [provider.go]: failed to open local config store: %w", err)
+	}
+	localConfigs, err := localStore.GetModelProviderConfigs()
+	if err != nil {
+		if closer, ok := localStore.(interface{ Close() error }); ok {
+			_ = closer.Close()
+		}
+		return nil, nil, fmt.Errorf("findWritableStoreForProvider() [provider.go]: failed to load local provider configs: %w", err)
+	}
+	if _, exists := localConfigs[providerName]; exists {
+		return localStore, func() error {
+			if closer, ok := localStore.(interface{ Close() error }); ok {
+				return closer.Close()
+			}
+			return nil
+		}, nil
+	}
+	if closer, ok := localStore.(interface{ Close() error }); ok {
+		_ = closer.Close()
+	}
+
+	globalStore, err := GetConfigStore(ConfigScopeGlobal)
+	if err != nil {
+		return nil, nil, fmt.Errorf("findWritableStoreForProvider() [provider.go]: failed to open global config store: %w", err)
+	}
+	globalConfigs, err := globalStore.GetModelProviderConfigs()
+	if err != nil {
+		if closer, ok := globalStore.(interface{ Close() error }); ok {
+			_ = closer.Close()
+		}
+		return nil, nil, fmt.Errorf("findWritableStoreForProvider() [provider.go]: failed to load global provider configs: %w", err)
+	}
+	if _, exists := globalConfigs[providerName]; exists {
+		return globalStore, func() error {
+			if closer, ok := globalStore.(interface{ Close() error }); ok {
+				return closer.Close()
+			}
+			return nil
+		}, nil
+	}
+	if closer, ok := globalStore.(interface{ Close() error }); ok {
+		_ = closer.Close()
+	}
+
+	return nil, nil, nil
 }
