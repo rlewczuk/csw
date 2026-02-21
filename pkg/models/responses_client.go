@@ -37,6 +37,8 @@ type ResponsesClient struct {
 	// configUpdater is an optional callback for persisting configuration changes
 	// (e.g., updated refresh tokens after OAuth2 token renewal).
 	configUpdater ConfigUpdater
+	// verbose enables logging of HTTP requests and responses.
+	verbose bool
 }
 
 // ResponsesChatModel is a chat model implementation for Responses API.
@@ -141,6 +143,11 @@ func (c *ResponsesClient) GetConfig() *conf.ModelProviderConfig {
 // configuration persistence is needed.
 func (c *ResponsesClient) SetConfigUpdater(updater ConfigUpdater) {
 	c.configUpdater = updater
+}
+
+// SetVerbose enables or disables verbose logging for HTTP requests and responses.
+func (c *ResponsesClient) SetVerbose(verbose bool) {
+	c.verbose = verbose
 }
 
 // RefreshTokenIfNeeded checks if the OAuth2 access token needs to be refreshed
@@ -282,18 +289,25 @@ func (c *ResponsesClient) ListModels() ([]ModelInfo, error) {
 	c.applyConfiguredHeaders(req)
 	applyOptionsHeaders(req, nil)
 
+	logVerboseRequest(req, nil, c.verbose)
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, c.handleHTTPError(err)
 	}
 	defer resp.Body.Close()
 
+	bodyBytes, err := logVerboseResponse(resp, c.verbose)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := c.checkStatusCode(resp); err != nil {
 		return nil, err
 	}
 
 	var response OpenaiModelList
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	if err := json.Unmarshal(bodyBytes, &response); err != nil {
 		return nil, fmt.Errorf("ResponsesClient.ListModels() [responses_client.go]: failed to decode response: %w", err)
 	}
 

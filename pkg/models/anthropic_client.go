@@ -27,6 +27,8 @@ type AnthropicClient struct {
 	apiKey     string
 	apiVersion string
 	config     *conf.ModelProviderConfig
+	// verbose enables logging of HTTP requests and responses.
+	verbose bool
 }
 
 // AnthropicChatModel is a chat model implementation for Anthropic
@@ -116,6 +118,11 @@ func (c *AnthropicClient) GetConfig() *conf.ModelProviderConfig {
 	return c.config
 }
 
+// SetVerbose enables or disables verbose logging for HTTP requests and responses.
+func (c *AnthropicClient) SetVerbose(verbose bool) {
+	c.verbose = verbose
+}
+
 func (c *AnthropicClient) applyConfiguredHeaders(req *http.Request) {
 	if c == nil || c.config == nil || len(c.config.Headers) == 0 {
 		return
@@ -176,18 +183,25 @@ func (c *AnthropicClient) ListModels() ([]ModelInfo, error) {
 	c.applyConfiguredHeaders(req)
 	applyOptionsHeaders(req, nil)
 
+	logVerboseRequest(req, nil, c.verbose)
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, c.handleHTTPError(err)
 	}
 	defer resp.Body.Close()
 
+	bodyBytes, err := logVerboseResponse(resp, c.verbose)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := c.checkStatusCode(resp); err != nil {
 		return nil, err
 	}
 
 	var response AnthropicModelsListResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	if err := json.Unmarshal(bodyBytes, &response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 

@@ -138,6 +138,11 @@ func (p *MockClient) EmbeddingModel(model string) EmbeddingModel {
 	}
 }
 
+// SetVerbose is a no-op for the mock client as it doesn't make HTTP requests.
+func (p *MockClient) SetVerbose(verbose bool) {
+	// No-op: Mock client doesn't make HTTP requests
+}
+
 // MockChatModel implements models.ChatModel interface for testing purposes.
 type MockChatModel struct {
 	provider *MockClient
