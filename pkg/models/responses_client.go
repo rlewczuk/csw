@@ -885,6 +885,12 @@ func convertToResponsesItems(messages []*ChatMessage) ([]ResponsesItem, error) {
 			continue
 		}
 
+		// Skip system messages - they are extracted into Instructions field instead
+		// The codex API does not allow system messages in the input array
+		if msg.Role == ChatRoleSystem {
+			continue
+		}
+
 		var contentParts []ResponsesContent
 		var toolCalls []*tool.ToolCall
 		var toolResponses []*tool.ToolResponse
