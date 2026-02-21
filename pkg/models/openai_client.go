@@ -371,6 +371,10 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 		chatReq.Temperature = float64(effectiveOptions.Temperature)
 		chatReq.TopP = float64(effectiveOptions.TopP)
 		// Note: OpenAI API doesn't have TopK parameter
+		// Add reasoning/thinking configuration if set
+		if effectiveOptions.Thinking != "" {
+			chatReq.ReasoningEffort = mapThinkingToReasoningEffort(effectiveOptions.Thinking)
+		}
 	}
 
 	url := m.client.baseURL + "/chat/completions"
@@ -507,6 +511,10 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 			chatReq.Temperature = float64(effectiveOptions.Temperature)
 			chatReq.TopP = float64(effectiveOptions.TopP)
 			// Note: OpenAI API doesn't have TopK parameter
+			// Add reasoning/thinking configuration if set
+			if effectiveOptions.Thinking != "" {
+				chatReq.ReasoningEffort = mapThinkingToReasoningEffort(effectiveOptions.Thinking)
+			}
 		}
 
 		url := m.client.baseURL + "/chat/completions"
@@ -1083,6 +1091,28 @@ func convertFromOpenAIMessage(msg *OpenaiChatCompletionMessage) *ChatMessage {
 	return &ChatMessage{
 		Role:  ChatRole(msg.Role),
 		Parts: parts,
+	}
+}
+
+// mapThinkingToReasoningEffort maps a thinking mode string to OpenAI's reasoning_effort value.
+// OpenAI supports "low", "medium", "high" for reasoning effort on o1 models.
+// If thinking is "true", defaults to "medium". If "false" or empty, returns empty string.
+func mapThinkingToReasoningEffort(thinking string) string {
+	if thinking == "" || thinking == "false" {
+		return ""
+	}
+
+	switch thinking {
+	case "low", "medium", "high":
+		return thinking
+	case "true":
+		return "medium"
+	case "xhigh":
+		// OpenAI doesn't have xhigh, map to high
+		return "high"
+	default:
+		// For unknown values, return as-is and let the API handle it
+		return thinking
 	}
 }
 

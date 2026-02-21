@@ -306,6 +306,10 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		if effectiveOptions.TopK > 0 {
 			chatReq.TopK = effectiveOptions.TopK
 		}
+		// Add thinking configuration if set
+		if effectiveOptions.Thinking != "" {
+			chatReq.Thinking = buildAnthropicThinking(effectiveOptions.Thinking, chatReq.MaxTokens)
+		}
 	}
 
 	url := m.client.baseURL + "/v1/messages"
@@ -445,6 +449,10 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			}
 			if effectiveOptions.TopK > 0 {
 				chatReq.TopK = effectiveOptions.TopK
+			}
+			// Add thinking configuration if set
+			if effectiveOptions.Thinking != "" {
+				chatReq.Thinking = buildAnthropicThinking(effectiveOptions.Thinking, chatReq.MaxTokens)
 			}
 		}
 
@@ -862,6 +870,50 @@ func convertFromAnthropicResponse(content []AnthropicResponseContent) *ChatMessa
 	return &ChatMessage{
 		Role:  ChatRoleAssistant,
 		Parts: parts,
+	}
+}
+
+// buildAnthropicThinking creates an AnthropicThinking struct from a thinking mode string.
+// Anthropic Claude 3.7+ supports thinking with a budget of tokens.
+// For effort-based values (low, medium, high, xhigh), maps to appropriate budget ratios.
+// For boolean values: "true" enables thinking, "false" or empty returns nil.
+func buildAnthropicThinking(thinking string, maxTokens int) *AnthropicThinking {
+	if thinking == "" || thinking == "false" {
+		return nil
+	}
+
+	// Calculate budget based on effort level
+	// Budget is the number of tokens allocated for thinking
+	var budgetRatio float64
+	switch thinking {
+	case "low":
+		budgetRatio = 0.1 // 10% of max tokens
+	case "medium":
+		budgetRatio = 0.2 // 20% of max tokens
+	case "high":
+		budgetRatio = 0.3 // 30% of max tokens
+	case "xhigh":
+		budgetRatio = 0.4 // 40% of max tokens
+	case "true":
+		budgetRatio = 0.2 // Default to medium (20%)
+	default:
+		// For unknown values, default to medium
+		budgetRatio = 0.2
+	}
+
+	budgetTokens := int(float64(maxTokens) * budgetRatio)
+	// Ensure minimum budget of 1024 tokens as per Anthropic API requirements
+	if budgetTokens < 1024 {
+		budgetTokens = 1024
+	}
+	// Ensure budget doesn't exceed max tokens
+	if budgetTokens >= maxTokens {
+		budgetTokens = maxTokens - 1
+	}
+
+	return &AnthropicThinking{
+		Type:         "enabled",
+		BudgetTokens: budgetTokens,
 	}
 }
 

@@ -6,6 +6,7 @@ type OpenaiChatCompletionRequest struct {
 	Messages         []OpenaiChatCompletionMessage `json:"messages"`                    // Required: messages of the chat
 	FrequencyPenalty float64                       `json:"frequency_penalty,omitempty"` // Optional: -2.0 to 2.0
 	PresencePenalty  float64                       `json:"presence_penalty,omitempty"`  // Optional: -2.0 to 2.0
+	ReasoningEffort  string                        `json:"reasoning_effort,omitempty"`  // Optional: reasoning effort for o1 models (low, medium, high)
 	ResponseFormat   *OpenaiResponseFormat         `json:"response_format,omitempty"`   // Optional: JSON mode
 	Seed             int                           `json:"seed,omitempty"`              // Optional: for reproducible outputs
 	Stop             []string                      `json:"stop,omitempty"`              // Optional: stop sequences

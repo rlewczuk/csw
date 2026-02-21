@@ -33,6 +33,7 @@ func CliCommand() *cobra.Command {
 		cliSaveSession    bool
 		cliLogLLMRequests bool
 		cliLSPServer      string
+		cliThinking       string
 	)
 
 	cmd := &cobra.Command{
@@ -66,7 +67,7 @@ func CliCommand() *cobra.Command {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
 			}
 
-			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer)
+			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer, cliThinking)
 		},
 	}
 
@@ -81,11 +82,12 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliSaveSession, "save-session", false, "Save session conversation to session.md in session log directory")
 	cmd.Flags().BoolVar(&cliLogLLMRequests, "log-llm-requests", false, "Log LLM requests and responses")
 	cmd.Flags().StringVar(&cliLSPServer, "lsp-server", "", "Path to LSP server binary (empty to disable LSP)")
+	cmd.Flags().StringVar(&cliThinking, "thinking", "", "Thinking/reasoning mode: low, medium, high, xhigh (effort-based) or true/false (boolean)")
 
 	return cmd
 }
 
-func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer string) error {
+func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking string) error {
 	startTime := time.Now()
 	ctx := context.Background()
 
@@ -96,6 +98,7 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 		RoleName:       roleName,
 		LSPServer:      lspServer,
 		LogLLMRequests: logLLMRequests,
+		Thinking:       thinking,
 	})
 	if err != nil {
 		return err

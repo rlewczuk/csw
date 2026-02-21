@@ -42,6 +42,7 @@ const (
 	ChatRoleUser      ChatRole = "user"
 )
 
+// ChatOptions contains options for chat requests.
 type ChatOptions struct {
 	Temperature float32
 	TopP        float32
@@ -50,6 +51,13 @@ type ChatOptions struct {
 	Logger      *slog.Logger
 	SessionID   string
 	Headers     map[string]string
+	// Thinking controls the thinking/reasoning mode for LLM requests.
+	// For providers supporting effort levels (like OpenAI Responses API),
+	// use values like "low", "medium", "high", "xhigh".
+	// For providers with boolean thinking (like Anthropic extended thinking),
+	// use "true" or "false".
+	// If empty, no thinking parameters are sent to the LLM.
+	Thinking string
 }
 
 // ChatMessagePart represents a part of a chat message. A message can contain text, tool calls, or tool responses.

@@ -24,6 +24,10 @@ type BuildSystemParams struct {
 	RoleName       string
 	LSPServer      string
 	LogLLMRequests bool
+	// Thinking controls the thinking/reasoning mode for LLM requests.
+	// Values like "low", "medium", "high", "xhigh" for effort-based thinking,
+	// or "true"/"false" for boolean thinking modes.
+	Thinking string
 }
 
 // BuildSystemResult contains outputs from building a SweSystem.
@@ -154,6 +158,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		LogBaseDir:      logsDir,
 		WorkDir:         workDir,
 		LogLLMRequests:  params.LogLLMRequests,
+		Thinking:        params.Thinking,
 	}
 
 	result = BuildSystemResult{
