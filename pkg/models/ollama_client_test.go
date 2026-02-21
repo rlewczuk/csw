@@ -1413,3 +1413,190 @@ func TestOllamaClient_OptionsHeadersStream(t *testing.T) {
 	assert.Equal(t, "options-value", request.Header.Get("X-Options-Header"))
 	assert.Empty(t, request.Header.Get("X-Api-Key"), "api-key header should NOT be set from options")
 }
+
+func TestOllamaClient_QueryParams(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewOllamaClient(&conf.ModelProviderConfig{
+		URL: mock.URL(),
+		QueryParams: map[string]string{
+			"api-version": "2024-01-01",
+			"deployment":  "my-deployment",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/api/tags", "GET", `{"models":[{"name":"test-model","model":"test-model","modified_at":"2024-01-01T00:00:00Z","size":1000000000,"details":{"family":"llama"}}]}`)
+
+	_, err = client.ListModels()
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Contains(t, request.Query, "api-version=2024-01-01")
+	assert.Contains(t, request.Query, "deployment=my-deployment")
+}
+
+func TestOllamaClient_QueryParamsChat(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewOllamaClient(&conf.ModelProviderConfig{
+		URL: mock.URL(),
+		QueryParams: map[string]string{
+			"api-version": "2024-01-01",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/api/chat", "POST", `{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello"},"done":true,"done_reason":"stop"}`)
+
+	chatModel := client.ChatModel("test-model", nil)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hello"),
+	}
+
+	_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Contains(t, request.Query, "api-version=2024-01-01")
+}
+
+func TestOllamaClient_QueryParamsChatStream(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewOllamaClient(&conf.ModelProviderConfig{
+		URL: mock.URL(),
+		QueryParams: map[string]string{
+			"stream-format": "json",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddStreamingResponse("/api/chat", "POST", true,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hi"},"done":true,"done_reason":"stop"}`,
+	)
+
+	chatModel := client.ChatModel("test-model", nil)
+	messages := []*ChatMessage{
+		NewTextMessage(ChatRoleUser, "Hi"),
+	}
+
+	iterator := chatModel.ChatStream(context.Background(), messages, nil, nil)
+	for range iterator {
+	}
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Contains(t, request.Query, "stream-format=json")
+}
+
+func TestOllamaClient_QueryParamsEmbed(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewOllamaClient(&conf.ModelProviderConfig{
+		URL: mock.URL(),
+		QueryParams: map[string]string{
+			"api-version": "2024-01-01",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/api/embed", "POST", `{"model":"test-model","embeddings":[[0.1,0.2,0.3]]}`)
+
+	embedModel := client.EmbeddingModel("test-model")
+	_, err = embedModel.Embed(context.Background(), "Hello")
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	assert.Contains(t, request.Query, "api-version=2024-01-01")
+}
+
+func TestOllamaClient_QueryParamsDoesNotOverrideExisting(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewOllamaClient(&conf.ModelProviderConfig{
+		URL: mock.URL(),
+		QueryParams: map[string]string{
+			"existing-param": "from-config",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/api/tags", "GET", `{"models":[]}`)
+
+	_, err = client.ListModels()
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	// The config query param should be present
+	assert.Contains(t, request.Query, "existing-param=from-config")
+}
+
+func TestOllamaClient_QueryParamsEmptyOrNil(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	// Test with nil QueryParams
+	client, err := NewOllamaClient(&conf.ModelProviderConfig{
+		URL:         mock.URL(),
+		QueryParams: nil,
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/api/tags", "GET", `{"models":[]}`)
+
+	_, err = client.ListModels()
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	// Query should be empty when no params are set
+	assert.Empty(t, request.Query)
+}
+
+func TestOllamaClient_QueryParamsEmptyValues(t *testing.T) {
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+
+	client, err := NewOllamaClient(&conf.ModelProviderConfig{
+		URL: mock.URL(),
+		QueryParams: map[string]string{
+			"":          "value-with-empty-key",
+			"valid-key": "",
+		},
+	})
+	require.NoError(t, err)
+
+	mock.AddRestResponse("/api/tags", "GET", `{"models":[]}`)
+
+	_, err = client.ListModels()
+	require.NoError(t, err)
+
+	reqs := mock.GetRequests()
+	require.Len(t, reqs, 1)
+	request := reqs[0]
+
+	// Empty keys and values should be skipped
+	assert.Empty(t, request.Query, "empty keys and values should not be added to query")
+}

@@ -20,6 +20,7 @@ type MockHTTPServer struct {
 type CapturedRequest struct {
 	Method string
 	Path   string
+	Query  string
 	Body   []byte
 	Header http.Header
 }
@@ -163,6 +164,7 @@ func (m *MockHTTPServer) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	m.requests = append(m.requests, CapturedRequest{
 		Method: r.Method,
 		Path:   r.URL.Path,
+		Query:  r.URL.RawQuery,
 		Body:   body,
 		Header: r.Header,
 	})

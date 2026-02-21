@@ -129,6 +129,25 @@ func (c *OllamaClient) applyConfiguredHeaders(req *http.Request) {
 	}
 }
 
+func (c *OllamaClient) applyConfiguredQueryParams(req *http.Request) {
+	if c == nil || c.config == nil || len(c.config.QueryParams) == 0 || req.URL == nil {
+		return
+	}
+
+	query := req.URL.Query()
+	for key, value := range c.config.QueryParams {
+		if key == "" || value == "" {
+			continue
+		}
+		if query.Get(key) != "" {
+			continue
+		}
+		query.Set(key, value)
+	}
+
+	req.URL.RawQuery = query.Encode()
+}
+
 func applyOptionsHeaders(req *http.Request, options *ChatOptions) {
 	if options == nil || len(options.Headers) == 0 {
 		return
@@ -189,6 +208,7 @@ func (c *OllamaClient) ListModels() ([]ModelInfo, error) {
 	}
 	setUserAgentHeader(req)
 	c.applyConfiguredHeaders(req)
+	c.applyConfiguredQueryParams(req)
 	applyOptionsHeaders(req, nil)
 
 	logVerboseRequest(req, nil, c.verbose)
@@ -294,6 +314,7 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	req.Header.Set("Content-Type", "application/json")
 	setUserAgentHeader(req)
 	m.client.applyConfiguredHeaders(req)
+	m.client.applyConfiguredQueryParams(req)
 	applyOptionsHeaders(req, effectiveOptions)
 
 	// Print verbose request output if enabled
@@ -445,6 +466,7 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 		req.Header.Set("Content-Type", "application/json")
 		setUserAgentHeader(req)
 		m.client.applyConfiguredHeaders(req)
+		m.client.applyConfiguredQueryParams(req)
 		applyOptionsHeaders(req, effectiveOptions)
 
 		// Print verbose request output if enabled
@@ -569,6 +591,7 @@ func (m *OllamaEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 	req.Header.Set("Content-Type", "application/json")
 	setUserAgentHeader(req)
 	m.client.applyConfiguredHeaders(req)
+	m.client.applyConfiguredQueryParams(req)
 	applyOptionsHeaders(req, nil)
 
 	resp, err := m.client.httpClient.Do(req)
