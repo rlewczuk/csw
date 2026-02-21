@@ -397,6 +397,10 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		if effectiveOptions.SessionID != "" {
 			chatReq.PromptCacheKey = effectiveOptions.SessionID
 		}
+		// Add reasoning/thinking configuration if set
+		if effectiveOptions.Thinking != "" {
+			chatReq.Reasoning = buildResponsesReasoning(effectiveOptions.Thinking)
+		}
 	}
 
 	url := m.client.baseURL + "/responses"
@@ -524,6 +528,10 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			chatReq.TopP = float64(effectiveOptions.TopP)
 			if effectiveOptions.SessionID != "" {
 				chatReq.PromptCacheKey = effectiveOptions.SessionID
+			}
+			// Add reasoning/thinking configuration if set
+			if effectiveOptions.Thinking != "" {
+				chatReq.Reasoning = buildResponsesReasoning(effectiveOptions.Thinking)
 			}
 		}
 
@@ -976,6 +984,35 @@ func buildResponsesInstructions(messages []*ChatMessage) string {
 // usesCodexCompatibilityEndpoint returns true when backend uses ChatGPT Codex quirks.
 func usesCodexCompatibilityEndpoint(baseURL string) bool {
 	return strings.Contains(strings.ToLower(baseURL), "/backend-api/codex")
+}
+
+// buildResponsesReasoning creates a ResponsesReasoning struct from a thinking mode string.
+// For effort-based thinking (low, medium, high, xhigh), it sets the Effort field.
+// For boolean thinking (true), it sets a default effort level.
+// If thinking is empty or "false", returns nil.
+func buildResponsesReasoning(thinking string) *ResponsesReasoning {
+	if thinking == "" || thinking == "false" {
+		return nil
+	}
+
+	// Map of valid effort values for OpenAI Responses API
+	switch thinking {
+	case "low", "medium", "high", "xhigh":
+		return &ResponsesReasoning{
+			Effort: thinking,
+		}
+	case "true":
+		// Default to medium effort when boolean true is specified
+		return &ResponsesReasoning{
+			Effort: "medium",
+		}
+	default:
+		// For any other value, try to use it as an effort level
+		// This allows for future extensibility
+		return &ResponsesReasoning{
+			Effort: thinking,
+		}
+	}
 }
 
 // convertFromResponsesStreamBody converts SSE response body into ChatMessage.

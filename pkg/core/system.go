@@ -68,6 +68,11 @@ type SweSystem struct {
 
 	// LogLLMRequests enables logging of LLM requests and responses
 	LogLLMRequests bool
+
+	// Thinking controls the thinking/reasoning mode for LLM requests.
+	// Values like "low", "medium", "high", "xhigh" for effort-based thinking,
+	// or "true"/"false" for boolean thinking modes.
+	Thinking string
 }
 
 func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) (*SweSession, error) {
