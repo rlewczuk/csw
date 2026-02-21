@@ -387,7 +387,9 @@ func providerTestCommand(scope *ConfigScope) *cobra.Command {
 }
 
 func providerModelsCommand(useJSON *bool) *cobra.Command {
-	return &cobra.Command{
+	var verbose bool
+
+	cmd := &cobra.Command{
 		Use:   "models [<provider>]",
 		Short: "List models for a provider or all providers",
 		Args:  cobra.MaximumNArgs(1),
@@ -429,6 +431,9 @@ func providerModelsCommand(useJSON *bool) *cobra.Command {
 					continue
 				}
 
+				// Enable verbose logging if requested
+				provider.SetVerbose(verbose)
+
 				modelInfos, err := provider.ListModels()
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Warning: failed to list models for provider %s: %v\n", providerName, err)
@@ -451,6 +456,10 @@ func providerModelsCommand(useJSON *bool) *cobra.Command {
 			return outputModelsList(modelsList)
 		},
 	}
+
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "Print raw request and response headers")
+
+	return cmd
 }
 
 // Helper functions

@@ -115,6 +115,8 @@ type ModelProviderConfig struct {
 	Verbose bool `json:"verbose,omitempty" yaml:"verbose,omitempty"`
 	// Headers contains optional headers to send with provider requests
 	Headers map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
+	// QueryParams contains optional query parameters to send with provider requests.
+	QueryParams map[string]string `json:"query_params,omitempty" yaml:"query_params,omitempty"`
 	// MaxRetries is the maximum number of retries for rate limit (429) errors
 	// Defaults to 3 if not specified
 	MaxRetries int `json:"max_retries,omitempty" yaml:"max_retries,omitempty"`

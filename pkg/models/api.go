@@ -176,4 +176,7 @@ type ModelProvider interface {
 
 	// EmbeddingModel returns an EmbeddingModel implementation for the given model.
 	EmbeddingModel(model string) EmbeddingModel
+
+	// SetVerbose enables or disables verbose logging for HTTP requests and responses.
+	SetVerbose(verbose bool)
 }

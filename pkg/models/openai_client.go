@@ -36,6 +36,8 @@ type OpenAIClient struct {
 	tokenMu sync.RWMutex
 	// configUpdater is an optional callback for persisting configuration changes.
 	configUpdater ConfigUpdater
+	// verbose enables logging of HTTP requests and responses.
+	verbose bool
 }
 
 // OpenAIChatModel is a chat model implementation for OpenAI
@@ -136,6 +138,11 @@ func (c *OpenAIClient) SetConfigUpdater(updater ConfigUpdater) {
 	c.configUpdater = updater
 }
 
+// SetVerbose enables or disables verbose logging for HTTP requests and responses.
+func (c *OpenAIClient) SetVerbose(verbose bool) {
+	c.verbose = verbose
+}
+
 // RefreshTokenIfNeeded checks if the OAuth2 access token needs to be refreshed
 // and refreshes it if necessary. It returns an error if the refresh fails.
 // For non-OAuth2 providers, this method does nothing and returns nil.
@@ -215,6 +222,25 @@ func (c *OpenAIClient) applyConfiguredHeaders(req *http.Request) {
 	}
 }
 
+func (c *OpenAIClient) applyConfiguredQueryParams(req *http.Request) {
+	if c == nil || c.config == nil || len(c.config.QueryParams) == 0 || req.URL == nil {
+		return
+	}
+
+	query := req.URL.Query()
+	for key, value := range c.config.QueryParams {
+		if key == "" || value == "" {
+			continue
+		}
+		if query.Get(key) != "" {
+			continue
+		}
+		query.Set(key, value)
+	}
+
+	req.URL.RawQuery = query.Encode()
+}
+
 // ChatModel returns a ChatModel implementation for the given model and options
 func (c *OpenAIClient) ChatModel(model string, options *ChatOptions) ChatModel {
 	// Merge config verbose flag with provided options
@@ -259,9 +285,12 @@ func (c *OpenAIClient) ListModels() ([]ModelInfo, error) {
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
+	c.applyConfiguredQueryParams(req)
 	setUserAgentHeader(req)
 	c.applyConfiguredHeaders(req)
 	applyOptionsHeaders(req, nil)
+
+	logVerboseRequest(req, nil, c.verbose)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -269,12 +298,17 @@ func (c *OpenAIClient) ListModels() ([]ModelInfo, error) {
 	}
 	defer resp.Body.Close()
 
+	bodyBytes, err := logVerboseResponse(resp, c.verbose)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := c.checkStatusCode(resp); err != nil {
 		return nil, err
 	}
 
 	var response OpenaiModelList
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	if err := json.Unmarshal(bodyBytes, &response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
@@ -358,6 +392,7 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
+	m.client.applyConfiguredQueryParams(req)
 	setUserAgentHeader(req)
 	m.client.applyConfiguredHeaders(req)
 	applyOptionsHeaders(req, effectiveOptions)
@@ -497,6 +532,7 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 			req.Header.Set("Authorization", "Bearer "+token)
 		}
 		req.Header.Set("Accept", "text/event-stream")
+		m.client.applyConfiguredQueryParams(req)
 		setUserAgentHeader(req)
 		m.client.applyConfiguredHeaders(req)
 		applyOptionsHeaders(req, effectiveOptions)
@@ -763,6 +799,7 @@ func (m *OpenAIEmbeddingModel) Embed(ctx context.Context, input string) ([]float
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
+	m.client.applyConfiguredQueryParams(req)
 	setUserAgentHeader(req)
 	m.client.applyConfiguredHeaders(req)
 	applyOptionsHeaders(req, nil)
