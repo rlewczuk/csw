@@ -242,6 +242,25 @@ func (c *ResponsesClient) applyConfiguredHeaders(req *http.Request) {
 	}
 }
 
+func (c *ResponsesClient) applyConfiguredQueryParams(req *http.Request) {
+	if c == nil || c.config == nil || len(c.config.QueryParams) == 0 || req.URL == nil {
+		return
+	}
+
+	query := req.URL.Query()
+	for key, value := range c.config.QueryParams {
+		if key == "" || value == "" {
+			continue
+		}
+		if query.Get(key) != "" {
+			continue
+		}
+		query.Set(key, value)
+	}
+
+	req.URL.RawQuery = query.Encode()
+}
+
 // ChatModel returns a ChatModel implementation for the given model and options.
 func (c *ResponsesClient) ChatModel(model string, options *ChatOptions) ChatModel {
 	mergedOptions := options
@@ -285,6 +304,7 @@ func (c *ResponsesClient) ListModels() ([]ModelInfo, error) {
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
+	c.applyConfiguredQueryParams(req)
 	setUserAgentHeader(req)
 	c.applyConfiguredHeaders(req)
 	applyOptionsHeaders(req, nil)

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -946,5 +947,60 @@ func TestResponsesClient_OAuthTokenRenewal(t *testing.T) {
 		// Verify second updater is used (for non-OAuth2 this won't be called)
 		// This test just verifies the setter works
 		assert.NotNil(t, client.configUpdater)
+	})
+}
+
+func TestResponsesClient_QueryParams(t *testing.T) {
+	t.Run("list models includes configured query params", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/models", r.URL.Path)
+			assert.Equal(t, "0.1.0", r.URL.Query().Get("client_version"))
+
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"data":[{"id":"test-model","object":"model","created":1640000000,"owned_by":"openai"}]}`))
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    server.URL,
+			APIKey: "test-key",
+			QueryParams: map[string]string{
+				"client_version": "0.1.0",
+			},
+		})
+		require.NoError(t, err)
+
+		models, err := client.ListModels()
+		require.NoError(t, err)
+		require.Len(t, models, 1)
+		assert.Equal(t, "test-model", models[0].Name)
+	})
+
+	t.Run("list models includes multiple query params", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/models", r.URL.Path)
+			assert.Equal(t, "0.1.0", r.URL.Query().Get("client_version"))
+			assert.Equal(t, "test-value", r.URL.Query().Get("custom_param"))
+
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"data":[{"id":"test-model","object":"model","created":1640000000,"owned_by":"openai"}]}`))
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    server.URL,
+			APIKey: "test-key",
+			QueryParams: map[string]string{
+				"client_version": "0.1.0",
+				"custom_param": "test-value",
+			},
+		})
+		require.NoError(t, err)
+
+		models, err := client.ListModels()
+		require.NoError(t, err)
+		require.Len(t, models, 1)
 	})
 }
