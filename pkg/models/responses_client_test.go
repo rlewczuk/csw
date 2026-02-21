@@ -625,6 +625,132 @@ func TestResponsesClient_CodexCompatibility(t *testing.T) {
 	})
 }
 
+func TestResponsesClient_SystemMessageInInstructions(t *testing.T) {
+	t.Run("system message is placed in instructions and not in input items", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/responses", r.URL.Path)
+
+			var chatReq ResponsesCreateRequest
+			err := json.NewDecoder(r.Body).Decode(&chatReq)
+			require.NoError(t, err)
+
+			// Verify instructions contain the system message
+			assert.Contains(t, chatReq.Instructions, "You are a helpful coding assistant")
+
+			// Verify no system role in input items
+			for _, item := range chatReq.Input {
+				assert.NotEqual(t, "system", item.Role, "system messages should not be in input items")
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_, writeErr := w.Write([]byte(`{"id":"resp_ok","object":"response","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}]}`))
+			require.NoError(t, writeErr)
+		}))
+		defer server.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    server.URL,
+			APIKey: "test-key",
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleSystem, "You are a helpful coding assistant"),
+			NewTextMessage(ChatRoleUser, "Hello"),
+		}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+	})
+
+	t.Run("system message is placed in instructions for codex endpoint", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/backend-api/codex/responses", r.URL.Path)
+
+			var chatReq ResponsesCreateRequest
+			err := json.NewDecoder(r.Body).Decode(&chatReq)
+			require.NoError(t, err)
+
+			// Verify instructions contain the system message
+			assert.Contains(t, chatReq.Instructions, "You are a helpful coding assistant")
+
+			// Verify no system role in input items
+			for _, item := range chatReq.Input {
+				assert.NotEqual(t, "system", item.Role, "system messages should not be in input items")
+			}
+
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, writeErr := w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\n"))
+			require.NoError(t, writeErr)
+			_, writeErr = w.Write([]byte("data: [DONE]\n\n"))
+			require.NoError(t, writeErr)
+		}))
+		defer server.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    server.URL + "/backend-api/codex",
+			APIKey: "test-key",
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel("gpt-5.2-codex", nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleSystem, "You are a helpful coding assistant"),
+			NewTextMessage(ChatRoleUser, "Hello"),
+		}
+
+		response, err := chatModel.Chat(context.Background(), messages, nil, nil)
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		assert.Equal(t, "ok", response.GetText())
+	})
+
+	t.Run("system message is placed in instructions for ChatStream", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/backend-api/codex/responses", r.URL.Path)
+
+			var chatReq ResponsesCreateRequest
+			err := json.NewDecoder(r.Body).Decode(&chatReq)
+			require.NoError(t, err)
+
+			// Verify instructions contain the system message
+			assert.Contains(t, chatReq.Instructions, "You are a helpful coding assistant")
+
+			// Verify no system role in input items
+			for _, item := range chatReq.Input {
+				assert.NotEqual(t, "system", item.Role, "system messages should not be in input items")
+			}
+
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, writeErr := w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\n"))
+			require.NoError(t, writeErr)
+			_, writeErr = w.Write([]byte("data: [DONE]\n\n"))
+			require.NoError(t, writeErr)
+		}))
+		defer server.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    server.URL + "/backend-api/codex",
+			APIKey: "test-key",
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel("gpt-5.2-codex", nil)
+		messages := []*ChatMessage{
+			NewTextMessage(ChatRoleSystem, "You are a helpful coding assistant"),
+			NewTextMessage(ChatRoleUser, "Hello"),
+		}
+
+		var gotText strings.Builder
+		for fragment := range chatModel.ChatStream(context.Background(), messages, nil, nil) {
+			gotText.WriteString(fragment.GetText())
+		}
+
+		assert.Equal(t, "ok", gotText.String())
+	})
+}
+
 func TestResponsesClient_EmbeddingModel(t *testing.T) {
 	tc := getResponsesTestClient(t)
 	defer tc.Close()
