@@ -146,9 +146,16 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 
+	globalConfig, err := configStore.GetGlobalConfig()
+	if err != nil {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to load global config: %w", err)
+	}
+
 	sweSystem := &core.SweSystem{
 		ModelProviders:  modelProviders,
 		ModelTags:       modelTagRegistry,
+		ToolSelection:   globalConfig.ToolSelection,
 		PromptGenerator: promptGenerator,
 		Tools:           toolRegistry,
 		VFS:             localVFS,

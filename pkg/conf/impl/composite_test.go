@@ -261,7 +261,17 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 	global1 := `{
 		"model_tags": [
 			{"model": "gpt-.*", "tag": "openai"}
-		]
+		],
+		"tool_selection": {
+			"default": {
+				"runBash": false
+			},
+			"tags": {
+				"safe": {
+					"disable": ["vfsDelete"]
+				}
+			}
+		}
 	}`
 	require.NoError(t, os.WriteFile(filepath.Join(dir1, "global.json"), []byte(global1), 0644))
 
@@ -269,7 +279,18 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 	global2 := `{
 		"model_tags": [
 			{"model": "claude-.*", "tag": "anthropic"}
-		]
+		],
+		"tool_selection": {
+			"default": {
+				"runBash": true,
+				"vfsEdit": false
+			},
+			"tags": {
+				"safe": {
+					"enable": ["vfsRead"]
+				}
+			}
+		}
 	}`
 	require.NoError(t, os.WriteFile(filepath.Join(dir2, "global.json"), []byte(global2), 0644))
 
@@ -288,6 +309,16 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 	assert.Equal(t, "openai", globalConfig.ModelTags[0].Tag)
 	assert.Equal(t, "claude-.*", globalConfig.ModelTags[1].Model)
 	assert.Equal(t, "anthropic", globalConfig.ModelTags[1].Tag)
+
+	// Verify tool selection defaults are merged and later sources override earlier ones
+	assert.Equal(t, true, globalConfig.ToolSelection.Default["runBash"])
+	assert.Equal(t, false, globalConfig.ToolSelection.Default["vfsEdit"])
+
+	// Verify per-tag rule from later source overrides earlier one
+	safeRule, exists := globalConfig.ToolSelection.Tags["safe"]
+	require.True(t, exists)
+	assert.ElementsMatch(t, []string{"vfsRead"}, safeRule.Enable)
+	assert.Empty(t, safeRule.Disable)
 }
 
 func TestCompositeConfigStore_Caching(t *testing.T) {

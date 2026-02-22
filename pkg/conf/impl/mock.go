@@ -100,8 +100,22 @@ func (m *MockConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 		ModelTags:       make([]conf.ModelTagMapping, len(m.globalConfig.ModelTags)),
 		DefaultProvider: m.globalConfig.DefaultProvider,
 		DefaultRole:     m.globalConfig.DefaultRole,
+		ToolSelection: conf.ToolSelectionConfig{
+			Default: make(map[string]bool, len(m.globalConfig.ToolSelection.Default)),
+			Tags:    make(map[string]conf.ToolTagSelectionRule, len(m.globalConfig.ToolSelection.Tags)),
+		},
 	}
 	copy(config.ModelTags, m.globalConfig.ModelTags)
+	for toolName, enabled := range m.globalConfig.ToolSelection.Default {
+		config.ToolSelection.Default[toolName] = enabled
+	}
+	for tag, rule := range m.globalConfig.ToolSelection.Tags {
+		copiedRule := conf.ToolTagSelectionRule{
+			Enable:  append([]string{}, rule.Enable...),
+			Disable: append([]string{}, rule.Disable...),
+		}
+		config.ToolSelection.Tags[tag] = copiedRule
+	}
 
 	return config, nil
 }

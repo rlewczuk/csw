@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
@@ -111,6 +112,99 @@ func TestToolRegistry_ExecuteNotFound(t *testing.T) {
 	assert.True(t, response.Done)
 	assert.Equal(t, 0, response.Result.Len())
 	assert.Contains(t, response.Error.Error(), "tool not found: nonexistent")
+}
+
+func TestToolRegistry_FilterByModelTags(t *testing.T) {
+	tests := []struct {
+		name       string
+		tags       []string
+		selection  conf.ToolSelectionConfig
+		expected   []string
+	}{
+		{
+			name: "default rules without tags",
+			tags: nil,
+			selection: conf.ToolSelectionConfig{
+				Default: map[string]bool{
+					"vfsRead": true,
+					"runBash": false,
+				},
+			},
+			expected: []string{"vfsRead"},
+		},
+		{
+			name: "tag enables disabled by default tool",
+			tags: []string{"bash-enabled"},
+			selection: conf.ToolSelectionConfig{
+				Default: map[string]bool{
+					"vfsRead": true,
+					"runBash": false,
+				},
+				Tags: map[string]conf.ToolTagSelectionRule{
+					"bash-enabled": {
+						Enable: []string{"runBash"},
+					},
+				},
+			},
+			expected: []string{"runBash", "vfsRead"},
+		},
+		{
+			name: "tag disables enabled by default tool",
+			tags: []string{"safe"},
+			selection: conf.ToolSelectionConfig{
+				Default: map[string]bool{
+					"vfsRead": true,
+					"runBash": true,
+				},
+				Tags: map[string]conf.ToolTagSelectionRule{
+					"safe": {
+						Disable: []string{"runBash"},
+					},
+				},
+			},
+			expected: []string{"vfsRead"},
+		},
+		{
+			name: "later tags override earlier tags",
+			tags: []string{"enable-bash", "disable-bash"},
+			selection: conf.ToolSelectionConfig{
+				Default: map[string]bool{
+					"runBash": false,
+					"vfsRead": false,
+				},
+				Tags: map[string]conf.ToolTagSelectionRule{
+					"enable-bash": {
+						Enable: []string{"runBash"},
+					},
+					"disable-bash": {
+						Disable: []string{"runBash"},
+					},
+				},
+			},
+			expected: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := NewToolRegistry()
+			registry.Register("vfsRead", &MockTool{name: "read"})
+			registry.Register("runBash", &MockTool{name: "bash"})
+
+			filtered := registry.FilterByModelTags(tt.tags, tt.selection)
+			require.NotNil(t, filtered)
+
+			names := filtered.List()
+			assert.ElementsMatch(t, tt.expected, names)
+		})
+	}
+}
+
+func TestToolRegistry_FilterByModelTags_NilRegistry(t *testing.T) {
+	var registry *ToolRegistry
+
+	filtered := registry.FilterByModelTags(nil, conf.ToolSelectionConfig{})
+	assert.Nil(t, filtered)
 }
 
 func TestRegisterVFSTools(t *testing.T) {

@@ -77,6 +77,23 @@ type ModelTagMapping struct {
 	Compiled *regexp.Regexp
 }
 
+// ToolTagSelectionRule defines tool selection overrides for a specific model tag.
+type ToolTagSelectionRule struct {
+	// Enable contains tool names that should be enabled for this tag.
+	Enable []string `json:"enable,omitempty" yaml:"enable,omitempty"`
+	// Disable contains tool names that should be disabled for this tag.
+	Disable []string `json:"disable,omitempty" yaml:"disable,omitempty"`
+}
+
+// ToolSelectionConfig defines tool availability rules across model tags.
+type ToolSelectionConfig struct {
+	// Default defines default availability of tools for all models.
+	// Key is tool name, value true means enabled and false means disabled.
+	Default map[string]bool `json:"default,omitempty" yaml:"default,omitempty"`
+	// Tags defines per-tag tool overrides.
+	Tags map[string]ToolTagSelectionRule `json:"tags,omitempty" yaml:"tags,omitempty"`
+}
+
 // ModelProviderConfig represents common configuration for model providers.
 type ModelProviderConfig struct {
 	// Type specifies the provider type (e.g., "ollama", "openai", "anthropic")
@@ -188,6 +205,8 @@ func (c *ModelProviderConfig) UnmarshalJSON(data []byte) error {
 type GlobalConfig struct {
 	// ModelTags contains global model-to-tag mappings
 	ModelTags []ModelTagMapping `json:"model_tags,omitempty" yaml:"model_tags,omitempty"`
+	// ToolSelection defines model tag based tool selection rules.
+	ToolSelection ToolSelectionConfig `json:"tool_selection,omitempty" yaml:"tool_selection,omitempty"`
 	// DefaultProvider is the name of the default model provider to use
 	DefaultProvider string `json:"default_provider,omitempty" yaml:"default_provider,omitempty"`
 	// DefaultRole is the name of the default agent role to use

@@ -430,7 +430,22 @@ func (s *SweSession) SetModel(modelStr string) error {
 	s.provider = provider
 	s.providerName = providerName
 	s.model = modelName
+	s.applyModelTagToolSelection()
+	if s.role != nil && s.role.ToolsAccess != nil {
+		s.Tools = wrapToolsWithAccessControl(s.Tools, s.role.ToolsAccess)
+	}
 	return nil
+}
+
+// applyModelTagToolSelection rebuilds tools and applies model-tag based tool selection rules.
+func (s *SweSession) applyModelTagToolSelection() {
+	baseTools := buildSessionToolRegistry(s.system.Tools, s.VFS, s.LSP, s)
+	if s.system.ModelTags == nil {
+		s.Tools = baseTools.FilterByModelTags(nil, s.system.ToolSelection)
+		return
+	}
+	tags := s.system.ModelTags.GetTagsForModel(s.providerName, s.model)
+	s.Tools = baseTools.FilterByModelTags(tags, s.system.ToolSelection)
 }
 
 // SetRole changes the agent role for this session.
@@ -459,8 +474,8 @@ func (s *SweSession) SetRole(roleName string) error {
 		s.VFS = s.system.VFS
 	}
 
-	// Rebuild tools with the session's VFS and role
-	s.Tools = buildSessionToolRegistry(s.system.Tools, s.VFS, s.LSP, s)
+	// Rebuild tools with the session's VFS and role and apply model-tag selection
+	s.applyModelTagToolSelection()
 
 	// Create a new tool registry with access-controlled tools if needed
 	if role.ToolsAccess != nil {

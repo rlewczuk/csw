@@ -69,6 +69,16 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 			{Model: "^claude-.*", Tag: "anthropic"},
 			{Model: "^gpt-.*", Tag: "openai"},
 		},
+		ToolSelection: conf.ToolSelectionConfig{
+			Default: map[string]bool{
+				"runBash": false,
+			},
+			Tags: map[string]conf.ToolTagSelectionRule{
+				"safe": {
+					Enable: []string{"vfsRead"},
+				},
+			},
+		},
 	}
 	globalData, err := json.MarshalIndent(globalConfig, "", "  ")
 	require.NoError(t, err)
@@ -85,6 +95,10 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 	assert.Len(t, config.ModelTags, 2)
 	assert.Equal(t, "^claude-.*", config.ModelTags[0].Model)
 	assert.Equal(t, "anthropic", config.ModelTags[0].Tag)
+	assert.Equal(t, false, config.ToolSelection.Default["runBash"])
+	safeRule, exists := config.ToolSelection.Tags["safe"]
+	require.True(t, exists)
+	assert.ElementsMatch(t, []string{"vfsRead"}, safeRule.Enable)
 
 	// Test LastGlobalConfigUpdate
 	updateTime, err := store.LastGlobalConfigUpdate()
