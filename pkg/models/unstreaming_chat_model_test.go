@@ -392,13 +392,12 @@ func TestUnstreamingChatModel_Chat_ContextCancellation(t *testing.T) {
 		NewTextMessage(ChatRoleUser, "test"),
 	}
 
-	// When context is cancelled, the stream should yield no fragments
-	// and Chat should return an empty message
+	// When context is cancelled, wrapped Chat should return context cancellation error
 	response, err := unstreaming.Chat(ctx, messages, nil, nil)
 
-	require.NoError(t, err)
-	require.NotNil(t, response)
-	assert.Empty(t, response.GetText())
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Nil(t, response)
 }
 
 // TestUnstreamingChatModel_Chat_PreservesOptionsAndTools verifies that Chat
@@ -613,4 +612,34 @@ func TestUnstreamingChatModel_ChatStream_EarlyBreak(t *testing.T) {
 	}
 
 	assert.Equal(t, 1, fragmentCount)
+}
+
+// TestUnstreamingChatModel_Chat_AggregatesTextPartsFromDirectChatResponse verifies
+// that text chunks returned by wrapped Chat() are merged into a single text part.
+func TestUnstreamingChatModel_Chat_AggregatesTextPartsFromDirectChatResponse(t *testing.T) {
+	provider := NewMockProvider([]ModelInfo{})
+
+	provider.SetChatResponse("wrapped-model", &MockChatResponse{
+		Response: &ChatMessage{
+			Role: ChatRoleAssistant,
+			Parts: []ChatMessagePart{
+				{Text: "clean"},
+				{Text: ".sh"},
+				{Text: " &&"},
+				{Text: " go"},
+				{Text: " test"},
+			},
+		},
+	})
+
+	wrapped := provider.ChatModel("wrapped-model", nil)
+	unstreaming := NewUnstreamingChatModel(wrapped)
+
+	response, err := unstreaming.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "test")}, nil, nil)
+
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	assert.Equal(t, "clean.sh && go test", response.GetText())
+	require.Len(t, response.Parts, 1)
+	assert.Equal(t, "clean.sh && go test", response.Parts[0].Text)
 }

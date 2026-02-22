@@ -227,20 +227,12 @@ type cliOutputHandler struct {
 	done     chan error
 }
 
-func (h *cliOutputHandler) AddThinkingChunk(thinking string) {
-	h.delegate.AddThinkingChunk(thinking)
+func (h *cliOutputHandler) AddAssistantMessage(text string, thinking string) {
+	h.delegate.AddAssistantMessage(text, thinking)
 }
 
-func (h *cliOutputHandler) AddMarkdownChunk(markdown string) {
-	h.delegate.AddMarkdownChunk(markdown)
-}
-
-func (h *cliOutputHandler) AddToolCallStart(call *tool.ToolCall) {
-	h.delegate.AddToolCallStart(call)
-}
-
-func (h *cliOutputHandler) AddToolCallDetails(call *tool.ToolCall) {
-	h.delegate.AddToolCallDetails(call)
+func (h *cliOutputHandler) AddToolCall(call *tool.ToolCall) {
+	h.delegate.AddToolCall(call)
 }
 
 func (h *cliOutputHandler) AddToolCallResult(result *tool.ToolResponse) {

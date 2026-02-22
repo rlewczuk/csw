@@ -26,54 +26,63 @@ func (u *UnstreamingChatModel) ChatStream(ctx context.Context, messages []*ChatM
 	return u.wrapped.ChatStream(ctx, messages, options, tools)
 }
 
-// Chat calls the wrapped model's ChatStream method and concatenates all fragments
-// into a single message. Text parts and reasoning content from assistant messages
-// are concatenated into single parts, while tool calls and other parts are preserved as-is.
+// Chat calls the wrapped model's Chat method to perform synchronous communication.
+// If a model returns an empty response without error, it falls back to collecting
+// fragments from ChatStream.
 func (u *UnstreamingChatModel) Chat(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) (*ChatMessage, error) {
-	var role ChatRole
-	var allText strings.Builder
-	var allReasoning strings.Builder
-	var otherParts []ChatMessagePart
+	response, err := u.wrapped.Chat(ctx, messages, options, tools)
+	if err != nil {
+		return nil, err
+	}
+	if response != nil {
+		return aggregateAssistantMessage(response.Role, response.Parts), nil
+	}
 
+	var role ChatRole
+	allParts := make([]ChatMessagePart, 0)
 	for fragment := range u.wrapped.ChatStream(ctx, messages, options, tools) {
+		if fragment == nil {
+			continue
+		}
 		if role == "" && fragment.Role != "" {
 			role = fragment.Role
 		}
-		for _, part := range fragment.Parts {
-			if part.ToolCall != nil {
-				// Tool call parts are preserved as-is
-				otherParts = append(otherParts, part)
-			} else if part.ToolResponse != nil {
-				// Tool response parts are preserved as-is
-				otherParts = append(otherParts, part)
-			} else {
-				// Text part (possibly with ReasoningContent) - concatenate text and reasoning
-				allText.WriteString(part.Text)
-				if part.ReasoningContent != "" {
-					allReasoning.WriteString(part.ReasoningContent)
-				}
-			}
+		allParts = append(allParts, fragment.Parts...)
+	}
+
+	return aggregateAssistantMessage(role, allParts), nil
+}
+
+// aggregateAssistantMessage collapses text and reasoning chunks into single parts while
+// preserving tool call and tool response parts.
+func aggregateAssistantMessage(role ChatRole, parts []ChatMessagePart) *ChatMessage {
+	if role == "" {
+		role = ChatRoleAssistant
+	}
+
+	var allText strings.Builder
+	var allReasoning strings.Builder
+	otherParts := make([]ChatMessagePart, 0)
+
+	for _, part := range parts {
+		if part.ToolCall != nil || part.ToolResponse != nil {
+			otherParts = append(otherParts, part)
+			continue
+		}
+		allText.WriteString(part.Text)
+		if part.ReasoningContent != "" {
+			allReasoning.WriteString(part.ReasoningContent)
 		}
 	}
 
-	// Build result: concatenated text first, then other parts (tool calls, tool responses)
-	result := &ChatMessage{
-		Role:  role,
-		Parts: nil,
-	}
-	if role == "" {
-		result.Role = ChatRoleAssistant
-	}
-
+	result := &ChatMessage{Role: role}
 	if allText.Len() > 0 {
 		result.Parts = append(result.Parts, ChatMessagePart{Text: allText.String()})
 	}
 	result.Parts = append(result.Parts, otherParts...)
-
-	// Add concatenated reasoning content at the end if present
 	if allReasoning.Len() > 0 {
 		result.Parts = append(result.Parts, ChatMessagePart{ReasoningContent: allReasoning.String()})
 	}
 
-	return result, nil
+	return result
 }

@@ -95,18 +95,6 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		return nil, fmt.Errorf("SweSystem.NewSession() [system.go]: provider not found: %s", providerName)
 	}
 
-	// Determine streaming mode from provider config
-	// Default to true for backward compatibility
-	streaming := true
-	if configProvider, ok := provider.(interface {
-		GetConfig() *conf.ModelProviderConfig
-	}); ok {
-		config := configProvider.GetConfig()
-		if config != nil && config.Streaming != nil {
-			streaming = *config.Streaming
-		}
-	}
-
 	sessionID := shared.GenerateUUIDv7()
 
 	// Create session logger
@@ -148,7 +136,6 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 		todoList:      make([]tool.TodoItem, 0),
 		logger:        sessionLogger,
 		llmLogger:     llmLogger,
-		streaming:     streaming,
 	}
 
 	// Log session creation

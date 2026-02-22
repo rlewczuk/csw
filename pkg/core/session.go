@@ -35,7 +35,6 @@ type SweSession struct {
 	todoMu        sync.Mutex
 	logger        *slog.Logger
 	llmLogger     *slog.Logger
-	streaming     bool
 	// pendingPermissionToolCall stores the tool call that was blocked by a permission query
 	// This is used to re-execute the tool after permission is granted
 	pendingPermissionToolCalls []*tool.ToolCall
@@ -62,7 +61,7 @@ func (s *SweSession) Run(ctx context.Context) error {
 
 	chatOptions := s.buildChatOptions()
 
-	chatModel := s.provider.ChatModel(s.model, chatOptions)
+	chatModel := models.NewUnstreamingChatModel(s.provider.ChatModel(s.model, chatOptions))
 
 	// Build tools list using PromptGenerator.GetToolInfo()
 	tools := []tool.ToolInfo{}
@@ -117,18 +116,7 @@ func (s *SweSession) Run(ctx context.Context) error {
 			}
 		}
 
-		// Use streaming or non-streaming API based on session configuration
-		var responseMsg *models.ChatMessage
-		var err error
-
-		if s.streaming {
-			// Use streaming chat API
-			responseMsg, err = s.runStreamingChat(ctx, chatModel, tools, chatOptions)
-		} else {
-			// Use non-streaming chat API
-			responseMsg, err = s.runNonStreamingChat(ctx, chatModel, tools, chatOptions)
-		}
-
+		responseMsg, err := s.runNonStreamingChat(ctx, chatModel, tools, chatOptions)
 		if err != nil {
 			return err
 		}
@@ -164,92 +152,29 @@ func (s *SweSession) buildChatOptions() *models.ChatOptions {
 	}
 }
 
-func (s *SweSession) emitAssistantParts(parts []models.ChatMessagePart, streaming bool) {
-	if s.outputHandler == nil {
+func (s *SweSession) emitAssistantMessage(responseMsg *models.ChatMessage) {
+	if s.outputHandler == nil || responseMsg == nil {
 		return
 	}
 
-	var seenToolCalls map[string]bool
-	if streaming {
-		seenToolCalls = make(map[string]bool)
-	}
-
-	for _, part := range parts {
-		if part.ReasoningContent != "" {
-			s.outputHandler.AddThinkingChunk(part.ReasoningContent)
-			if s.logger != nil {
-				s.logger.Debug("assistant_thinking_chunk", "chunk", part.ReasoningContent)
-			}
-		}
+	var textBuilder strings.Builder
+	var thinkingBuilder strings.Builder
+	for _, part := range responseMsg.Parts {
 		if part.Text != "" {
-			s.outputHandler.AddMarkdownChunk(part.Text)
-			if s.logger != nil {
-				s.logger.Debug("assistant_output_chunk", "chunk", part.Text)
-			}
+			textBuilder.WriteString(part.Text)
 		}
+		if part.ReasoningContent != "" {
+			thinkingBuilder.WriteString(part.ReasoningContent)
+		}
+	}
+
+	s.outputHandler.AddAssistantMessage(textBuilder.String(), thinkingBuilder.String())
+	for _, part := range responseMsg.Parts {
 		if part.ToolCall != nil {
-			if streaming {
-				if !seenToolCalls[part.ToolCall.ID] {
-					s.outputHandler.AddToolCallStart(part.ToolCall)
-					seenToolCalls[part.ToolCall.ID] = true
-					logging.LogToolCall(s.logger, part.ToolCall)
-				}
-				s.outputHandler.AddToolCallDetails(part.ToolCall)
-			} else {
-				s.outputHandler.AddToolCallStart(part.ToolCall)
-				s.outputHandler.AddToolCallDetails(part.ToolCall)
-				logging.LogToolCall(s.logger, part.ToolCall)
-			}
+			s.outputHandler.AddToolCall(part.ToolCall)
+			logging.LogToolCall(s.logger, part.ToolCall)
 		}
 	}
-}
-
-// runStreamingChat executes a streaming chat request and returns the accumulated response.
-func (s *SweSession) runStreamingChat(ctx context.Context, chatModel models.ChatModel, tools []tool.ToolInfo, chatOptions *models.ChatOptions) (*models.ChatMessage, error) {
-	stream := chatModel.ChatStream(ctx, s.messages, chatOptions, tools)
-
-	if s.logger != nil {
-		s.logger.Debug("chat_stream_created", "num_messages", len(s.messages), "num_tools", len(tools))
-	}
-
-	// Accumulate the response from the stream
-	responseMsg := &models.ChatMessage{
-		Role:  models.ChatRoleAssistant,
-		Parts: []models.ChatMessagePart{},
-	}
-
-	if s.logger != nil {
-		s.logger.Debug("starting_stream_iteration")
-	}
-
-	fragmentCount := 0
-	var lastErr error
-	for fragment := range stream {
-		fragmentCount++
-		if s.logger != nil {
-			s.logger.Debug("stream_fragment_received", "fragment_num", fragmentCount, "num_parts", len(fragment.Parts))
-		}
-		// Merge the fragment parts into the accumulated response
-		responseMsg.Parts = append(responseMsg.Parts, fragment.Parts...)
-		lastErr = nil
-	}
-
-	// Check if we got an empty response
-	if fragmentCount == 0 {
-		if s.logger != nil {
-			s.logger.Warn("stream_returned_no_fragments", "num_messages", len(s.messages), "num_tools", len(tools))
-		}
-		// Empty stream could indicate a rate limit error that was swallowed during streaming
-		// Return a meaningful error
-		if lastErr != nil {
-			return nil, lastErr
-		}
-		return nil, fmt.Errorf("SweSession.runStreamingChat() [session.go]: stream returned no fragments - this usually indicates a silent error in the model provider")
-	}
-
-	s.emitAssistantParts(responseMsg.Parts, true)
-
-	return responseMsg, nil
 }
 
 // runNonStreamingChat executes a non-streaming chat request and returns the response.
@@ -277,7 +202,7 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 				s.logger.Debug("chat_non_streaming_complete", "num_parts", len(responseMsg.Parts))
 			}
 
-			s.emitAssistantParts(responseMsg.Parts, false)
+			s.emitAssistantMessage(responseMsg)
 
 			return responseMsg, nil
 		}

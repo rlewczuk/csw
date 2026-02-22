@@ -225,16 +225,58 @@ func (m *MockChatModel) Chat(ctx context.Context, messages []*ChatMessage, optio
 		return nil, response.Error
 	}
 
-	// Record tool calls from response
-	if response.Response != nil {
-		m.provider.mu.Lock()
-		for _, call := range response.Response.GetToolCalls() {
-			m.provider.RecordedToolCalls = append(m.provider.RecordedToolCalls, *call)
+	result := response.Response
+	if result == nil && len(response.StreamFragments) > 0 {
+		var role ChatRole
+		var combinedText strings.Builder
+		var combinedReasoning strings.Builder
+		parts := make([]ChatMessagePart, 0)
+		for _, fragment := range response.StreamFragments {
+			if role == "" && fragment != nil && fragment.Role != "" {
+				role = fragment.Role
+			}
+			if fragment == nil {
+				continue
+			}
+			for _, part := range fragment.Parts {
+				if part.ToolCall != nil || part.ToolResponse != nil {
+					parts = append(parts, part)
+					continue
+				}
+				combinedText.WriteString(part.Text)
+				if part.ReasoningContent != "" {
+					combinedReasoning.WriteString(part.ReasoningContent)
+				}
+			}
 		}
-		m.provider.mu.Unlock()
+		if role == "" {
+			role = ChatRoleAssistant
+		}
+		result = &ChatMessage{Role: role}
+		if combinedText.Len() > 0 {
+			result.Parts = append(result.Parts, ChatMessagePart{Text: combinedText.String()})
+		}
+		result.Parts = append(result.Parts, parts...)
+		if combinedReasoning.Len() > 0 {
+			result.Parts = append(result.Parts, ChatMessagePart{ReasoningContent: combinedReasoning.String()})
+		}
 	}
 
-	return response.Response, nil
+	if result == nil {
+		result = &ChatMessage{
+			Role: ChatRoleAssistant,
+			Parts: []ChatMessagePart{{Text: ""}},
+		}
+	}
+
+	// Record tool calls from response
+	m.provider.mu.Lock()
+	for _, call := range result.GetToolCalls() {
+		m.provider.RecordedToolCalls = append(m.provider.RecordedToolCalls, *call)
+	}
+	m.provider.mu.Unlock()
+
+	return result, nil
 }
 
 // ChatStream sends a chat request and returns a standard Go iterator for streaming responses.

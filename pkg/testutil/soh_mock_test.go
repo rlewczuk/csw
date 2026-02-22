@@ -12,67 +12,39 @@ func TestMockSessionOutputHandler(t *testing.T) {
 	t.Run("new handler is empty", func(t *testing.T) {
 		handler := NewMockSessionOutputHandler()
 		require.NotNil(t, handler)
-		assert.Empty(t, handler.ThinkingChunks)
-		assert.Empty(t, handler.MarkdownChunks)
-		assert.Empty(t, handler.ToolCallStarts)
-		assert.Empty(t, handler.ToolCallDetails)
+		assert.Empty(t, handler.AssistantMessages)
+		assert.Empty(t, handler.ToolCalls)
 		assert.Empty(t, handler.ToolCallResults)
 	})
 
-	t.Run("records thinking chunks", func(t *testing.T) {
+	t.Run("records assistant messages", func(t *testing.T) {
 		handler := NewMockSessionOutputHandler()
-		handler.AddThinkingChunk("Let me think...")
-		handler.AddThinkingChunk(" And more thoughts.")
+		handler.AddAssistantMessage("Hello", "thinking")
+		handler.AddAssistantMessage("World", "")
 
-		assert.Len(t, handler.ThinkingChunks, 2)
-		assert.Equal(t, "Let me think...", handler.ThinkingChunks[0])
-		assert.Equal(t, " And more thoughts.", handler.ThinkingChunks[1])
+		assert.Len(t, handler.AssistantMessages, 2)
+		assert.Equal(t, "Hello", handler.AssistantMessages[0].Text)
+		assert.Equal(t, "thinking", handler.AssistantMessages[0].Thinking)
+		assert.Equal(t, "World", handler.AssistantMessages[1].Text)
 	})
 
-	t.Run("records markdown chunks", func(t *testing.T) {
-		handler := NewMockSessionOutputHandler()
-		handler.AddMarkdownChunk("Hello ")
-		handler.AddMarkdownChunk("World")
-
-		assert.Len(t, handler.MarkdownChunks, 2)
-		assert.Equal(t, "Hello ", handler.MarkdownChunks[0])
-		assert.Equal(t, "World", handler.MarkdownChunks[1])
-	})
-
-	t.Run("records tool call starts", func(t *testing.T) {
+	t.Run("records tool calls", func(t *testing.T) {
 		handler := NewMockSessionOutputHandler()
 		call1 := &tool.ToolCall{ID: "1", Function: "test.tool"}
 		call2 := &tool.ToolCall{ID: "2", Function: "another.tool"}
 
-		handler.AddToolCallStart(call1)
-		handler.AddToolCallStart(call2)
+		handler.AddToolCall(call1)
+		handler.AddToolCall(call2)
 
-		assert.Len(t, handler.ToolCallStarts, 2)
-		assert.Equal(t, "1", handler.ToolCallStarts[0].ID)
-		assert.Equal(t, "2", handler.ToolCallStarts[1].ID)
-	})
-
-	t.Run("records tool call details", func(t *testing.T) {
-		handler := NewMockSessionOutputHandler()
-		call := &tool.ToolCall{ID: "1", Function: "test.tool"}
-
-		// Multiple calls for the same tool (streaming)
-		handler.AddToolCallDetails(call)
-		handler.AddToolCallDetails(call)
-
-		assert.Len(t, handler.ToolCallDetails, 2)
-		assert.Equal(t, "1", handler.ToolCallDetails[0].ID)
-		assert.Equal(t, "1", handler.ToolCallDetails[1].ID)
+		assert.Len(t, handler.ToolCalls, 2)
+		assert.Equal(t, "1", handler.ToolCalls[0].ID)
+		assert.Equal(t, "2", handler.ToolCalls[1].ID)
 	})
 
 	t.Run("records tool call results", func(t *testing.T) {
 		handler := NewMockSessionOutputHandler()
 		call := &tool.ToolCall{ID: "1", Function: "test.tool"}
-		result := &tool.ToolResponse{
-			Call:   call,
-			Result: tool.NewToolValue("success"),
-			Done:   true,
-		}
+		result := &tool.ToolResponse{Call: call, Result: tool.NewToolValue("success"), Done: true}
 
 		handler.AddToolCallResult(result)
 
@@ -83,20 +55,14 @@ func TestMockSessionOutputHandler(t *testing.T) {
 
 	t.Run("reset clears all data", func(t *testing.T) {
 		handler := NewMockSessionOutputHandler()
-		handler.AddThinkingChunk("thinking...")
-		handler.AddMarkdownChunk("test")
-		handler.AddToolCallStart(&tool.ToolCall{ID: "1"})
-		handler.AddToolCallDetails(&tool.ToolCall{ID: "1"})
-		handler.AddToolCallResult(&tool.ToolResponse{
-			Call: &tool.ToolCall{ID: "1"},
-		})
+		handler.AddAssistantMessage("test", "")
+		handler.AddToolCall(&tool.ToolCall{ID: "1"})
+		handler.AddToolCallResult(&tool.ToolResponse{Call: &tool.ToolCall{ID: "1"}})
 
 		handler.Reset()
 
-		assert.Empty(t, handler.ThinkingChunks)
-		assert.Empty(t, handler.MarkdownChunks)
-		assert.Empty(t, handler.ToolCallStarts)
-		assert.Empty(t, handler.ToolCallDetails)
+		assert.Empty(t, handler.AssistantMessages)
+		assert.Empty(t, handler.ToolCalls)
 		assert.Empty(t, handler.ToolCallResults)
 	})
 }
