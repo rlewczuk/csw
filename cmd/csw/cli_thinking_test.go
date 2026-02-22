@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/models"
@@ -83,6 +84,23 @@ func TestCliThinkingFlagParsing(t *testing.T) {
 			assert.Equal(t, tt.expectedValue, capturedThinking)
 		})
 	}
+}
+
+// TestCliRuntimeErrorDoesNotPrintUsage tests that runtime command errors don't print usage text.
+func TestCliRuntimeErrorDoesNotPrintUsage(t *testing.T) {
+	cmd := CliCommand()
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	cmd.SetArgs([]string{"   "})
+
+	err := cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "prompt cannot be empty")
+	assert.NotContains(t, stderr.String(), "Usage:")
+	assert.NotContains(t, stdout.String(), "Usage:")
 }
 
 // TestThinkingModeValidation tests the validation of thinking mode values
