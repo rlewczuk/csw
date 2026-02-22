@@ -42,6 +42,10 @@ func CliCommand() *cobra.Command {
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Suppress usage for runtime errors from command execution.
+			// Argument/flag parsing errors happen before RunE and still show usage.
+			cmd.SilenceUsage = true
+
 			prompt := args[0]
 
 			// Read prompt from file if it starts with @
