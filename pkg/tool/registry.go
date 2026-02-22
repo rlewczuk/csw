@@ -148,6 +148,12 @@ func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS, lspClient lsp.LSP
 	}
 	registry.Register("vfsEdit", editTool)
 
+	patchTool := NewVFSPatchTool(vfsImpl, lspClient)
+	if logger != nil {
+		patchTool.SetLogger(logger)
+	}
+	registry.Register("vfsPatch", patchTool)
+
 	registry.Register("vfsDelete", NewVFSDeleteTool(vfsImpl))
 	registry.Register("vfsMove", NewVFSMoveTool(vfsImpl))
 	registry.Register("vfsFind", NewVFSFindTool(vfsImpl))

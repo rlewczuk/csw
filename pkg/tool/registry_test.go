@@ -116,10 +116,10 @@ func TestToolRegistry_ExecuteNotFound(t *testing.T) {
 
 func TestToolRegistry_FilterByModelTags(t *testing.T) {
 	tests := []struct {
-		name       string
-		tags       []string
-		selection  conf.ToolSelectionConfig
-		expected   []string
+		name      string
+		tags      []string
+		selection conf.ToolSelectionConfig
+		expected  []string
 	}{
 		{
 			name: "default rules without tags",
@@ -214,7 +214,7 @@ func TestRegisterVFSTools(t *testing.T) {
 	RegisterVFSTools(registry, mockVFS, nil, nil)
 
 	// Test that all VFS tools are registered
-	vfsTools := []string{"vfsRead", "vfsWrite", "vfsEdit", "vfsDelete", "vfsMove", "vfsFind", "vfsGrep"}
+	vfsTools := []string{"vfsRead", "vfsWrite", "vfsEdit", "vfsPatch", "vfsDelete", "vfsMove", "vfsFind", "vfsGrep"}
 
 	for _, toolName := range vfsTools {
 		tool, err := registry.Get(toolName)
