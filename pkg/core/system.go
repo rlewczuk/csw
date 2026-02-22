@@ -28,6 +28,9 @@ type SweSystem struct {
 	// Model tag registry for assigning tags to models
 	ModelTags *models.ModelTagRegistry
 
+	// ToolSelection defines model tag based tool availability rules.
+	ToolSelection conf.ToolSelectionConfig
+
 	// Prompt generator
 	PromptGenerator PromptGenerator
 
@@ -144,7 +147,7 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 	}
 
 	// Build session tools registry (system tools + VFS + session-specific)
-	session.Tools = buildSessionToolRegistry(s.Tools, session.VFS, session.LSP, session)
+	session.applyModelTagToolSelection()
 
 	// Set default role automatically using fallback chain:
 	// 1. Global config default role

@@ -3,13 +3,13 @@ package main
 import (
 	"fmt"
 	"os"
-	"regexp"
 	"sort"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/spf13/cobra"
 )
 
@@ -364,61 +364,12 @@ func outputSystemPrompt(store conf.ConfigStore, roleConfig *conf.AgentRoleConfig
 		providerName := parts[0]
 		actualModelName := parts[1]
 
-		// Get provider configs to access model tags
-		providerConfigs, err := store.GetModelProviderConfigs()
+		providerRegistry := models.NewProviderRegistry(store)
+		modelTagRegistry, err := CreateModelTagRegistry(store, providerRegistry)
 		if err != nil {
-			return fmt.Errorf("outputSystemPrompt() [role.go]: failed to get provider configs: %w", err)
+			return fmt.Errorf("outputSystemPrompt() [role.go]: failed to build model tag registry: %w", err)
 		}
-
-		providerConfig, exists := providerConfigs[providerName]
-		if !exists {
-			return fmt.Errorf("outputSystemPrompt() [role.go]: provider not found: %s", providerName)
-		}
-
-		// Get global config for global model tags
-		globalConfig, err := store.GetGlobalConfig()
-		if err != nil {
-			return fmt.Errorf("outputSystemPrompt() [role.go]: failed to get global config: %w", err)
-		}
-
-		// Match tags from both global and provider-specific mappings
-		tagSet := make(map[string]bool)
-
-		// Match against global mappings
-		for _, mapping := range globalConfig.ModelTags {
-			if mapping.Compiled == nil {
-				// Compile if not already compiled
-				compiled, err := compileModelTagPattern(mapping.Model)
-				if err != nil {
-					continue
-				}
-				mapping.Compiled = compiled
-			}
-			if mapping.Compiled.MatchString(actualModelName) {
-				tagSet[mapping.Tag] = true
-			}
-		}
-
-		// Match against provider-specific mappings
-		for _, mapping := range providerConfig.ModelTags {
-			if mapping.Compiled == nil {
-				// Compile if not already compiled
-				compiled, err := compileModelTagPattern(mapping.Model)
-				if err != nil {
-					continue
-				}
-				mapping.Compiled = compiled
-			}
-			if mapping.Compiled.MatchString(actualModelName) {
-				tagSet[mapping.Tag] = true
-			}
-		}
-
-		// Convert set to slice
-		tags = make([]string, 0, len(tagSet))
-		for tag := range tagSet {
-			tags = append(tags, tag)
-		}
+		tags = modelTagRegistry.GetTagsForModel(providerName, actualModelName)
 	} else {
 		// No model specified, use empty tags (will include "all" fragments)
 		tags = []string{}
@@ -444,10 +395,4 @@ func outputSystemPrompt(store conf.ConfigStore, roleConfig *conf.AgentRoleConfig
 	return nil
 }
 
-func compileModelTagPattern(pattern string) (*regexp.Regexp, error) {
-	compiled, err := regexp.Compile(pattern)
-	if err != nil {
-		return nil, fmt.Errorf("compileModelTagPattern() [role.go]: invalid regexp %q: %w", pattern, err)
-	}
-	return compiled, nil
-}
+

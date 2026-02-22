@@ -5,6 +5,8 @@ package core
 import (
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -92,6 +94,32 @@ func TestSessionToolSelection(t *testing.T) {
 		// Should also have system tools like VFS tools
 		assert.Contains(t, sessionToolNames, "vfsRead")
 		assert.Contains(t, sessionToolNames, "vfsWrite")
+	})
+
+	t.Run("model tags apply tool selection for session tools", func(t *testing.T) {
+		system.ModelTags = models.NewModelTagRegistry()
+		err := system.ModelTags.SetGlobalMappings([]conf.ModelTagMapping{{Model: "devstral-.*", Tag: "limited"}})
+		require.NoError(t, err)
+		system.ToolSelection = conf.ToolSelectionConfig{
+			Default: map[string]bool{"runBash": true, "vfsRead": true},
+			Tags: map[string]conf.ToolTagSelectionRule{
+				"limited": {Disable: []string{"runBash"}},
+			},
+		}
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		controller := NewSessionThread(system, mockHandler)
+
+		err = controller.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := controller.GetSession()
+		require.NotNil(t, session)
+
+		names := session.Tools.List()
+		assert.Contains(t, names, "vfsRead")
+		assert.NotContains(t, names, "runBash")
+		assert.Contains(t, names, "todoRead")
 	})
 }
 

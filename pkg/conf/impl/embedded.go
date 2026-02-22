@@ -82,8 +82,22 @@ func (s *EmbeddedConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 		ModelTags:       make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
 		DefaultProvider: s.globalConfig.DefaultProvider,
 		DefaultRole:     s.globalConfig.DefaultRole,
+		ToolSelection: conf.ToolSelectionConfig{
+			Default: make(map[string]bool, len(s.globalConfig.ToolSelection.Default)),
+			Tags:    make(map[string]conf.ToolTagSelectionRule, len(s.globalConfig.ToolSelection.Tags)),
+		},
 	}
 	copy(config.ModelTags, s.globalConfig.ModelTags)
+	for toolName, enabled := range s.globalConfig.ToolSelection.Default {
+		config.ToolSelection.Default[toolName] = enabled
+	}
+	for tag, rule := range s.globalConfig.ToolSelection.Tags {
+		copiedRule := conf.ToolTagSelectionRule{
+			Enable:  append([]string{}, rule.Enable...),
+			Disable: append([]string{}, rule.Disable...),
+		}
+		config.ToolSelection.Tags[tag] = copiedRule
+	}
 
 	return config, nil
 }

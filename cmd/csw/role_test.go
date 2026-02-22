@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
@@ -422,6 +424,14 @@ func TestOutputSystemPromptJSON(t *testing.T) {
 	err = json.Unmarshal([]byte(output), &result)
 	assert.NoError(t, err, "output should be valid JSON")
 	assert.Contains(t, result, "system_prompt", "JSON should contain system_prompt field")
+}
+
+func compileModelTagPattern(pattern string) (*regexp.Regexp, error) {
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("compileModelTagPattern() [role.go]: invalid regexp %q: %w", pattern, err)
+	}
+	return compiled, nil
 }
 
 func TestCompileModelTagPattern(t *testing.T) {

@@ -3,6 +3,7 @@ package tool
 import (
 	"fmt"
 	"log/slog"
+	"slices"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/lsp"
@@ -70,6 +71,47 @@ func (r *ToolRegistry) ApplyLogger(logger *slog.Logger) {
 			setter.SetLogger(logger)
 		}
 	}
+}
+
+// FilterByModelTags returns a new registry with tools enabled for the provided model tags.
+// Tool availability is determined by default rules first and then per-tag overrides.
+func (r *ToolRegistry) FilterByModelTags(tags []string, selection conf.ToolSelectionConfig) *ToolRegistry {
+	if r == nil {
+		return nil
+	}
+
+	filtered := NewToolRegistry()
+	for _, name := range r.List() {
+		enabled := true
+		if defaultEnabled, hasDefault := selection.Default[name]; hasDefault {
+			enabled = defaultEnabled
+		}
+
+		for _, tag := range tags {
+			rule, ok := selection.Tags[tag]
+			if !ok {
+				continue
+			}
+			if slices.Contains(rule.Enable, name) {
+				enabled = true
+			}
+			if slices.Contains(rule.Disable, name) {
+				enabled = false
+			}
+		}
+
+		if !enabled {
+			continue
+		}
+
+		toolInstance, err := r.Get(name)
+		if err != nil {
+			continue
+		}
+		filtered.Register(name, toolInstance)
+	}
+
+	return filtered
 }
 
 // Execute executes the tool with the given function name and arguments.

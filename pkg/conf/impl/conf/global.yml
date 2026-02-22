@@ -3,6 +3,8 @@ model_tags:
     tag: "anthropic"
   - model: "^gpt-.*"
     tag: "openai"
+  - model: ".*codex.*"
+    tag: "codex"
   - model: "^kimi.*"
     tag: "kimi"
   - model: "^moonshot.*"
