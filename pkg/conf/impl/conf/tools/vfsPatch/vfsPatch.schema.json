@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Applies a codex-compatible patch to files.",
+  "type": "object",
+  "properties": {
+    "patchText": {
+      "type": "string",
+      "description": "The full patch text that describes all changes to be made"
+    }
+  },
+  "required": ["patchText"],
+  "additionalProperties": false
+}

@@ -206,6 +206,68 @@ func TestSessionLSPIntegration(t *testing.T) {
 		assert.Contains(t, validation, "Error [1:1] expected 'package', found 'EOF'")
 	})
 
+	t.Run("VFS patch tool uses LSP for validation", func(t *testing.T) {
+		testPath := "patch.go"
+		err := vfsInstance.WriteFile(testPath, []byte("package main\n\nfunc main() {}\n"))
+		require.NoError(t, err)
+
+		absPath, err := filepath.Abs(testPath)
+		require.NoError(t, err)
+		uri := "file://" + filepath.ToSlash(absPath)
+		mockLSP.SetDiagnostics(uri, []lsp.Diagnostic{
+			{
+				Range: lsp.Range{
+					Start: lsp.Position{Line: 2, Character: 16},
+					End:   lsp.Position{Line: 2, Character: 19},
+				},
+				Severity: lsp.SeverityError,
+				Message:  "undefined: bad",
+			},
+		})
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		controller := NewSessionThread(system, mockHandler)
+
+		err = controller.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := controller.GetSession()
+
+		testRoleConfig := conf.AgentRoleConfig{
+			Name:        "test",
+			Description: "Test role",
+		}
+		configStore := impl.NewMockConfigStore()
+		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+			"test": &testRoleConfig,
+		})
+		roleRegistry := NewAgentRoleRegistry(configStore)
+		system.Roles = roleRegistry
+		err = session.SetRole("test")
+		require.NoError(t, err)
+
+		patchTool, err := session.Tools.Get("vfsPatch")
+		require.NoError(t, err)
+
+		response := patchTool.Execute(&tool.ToolCall{
+			ID:       "test-patch-lsp",
+			Function: "vfsPatch",
+			Arguments: tool.NewToolValue(map[string]any{
+				"patchText": "*** Begin Patch\n*** Update File: patch.go\n@@\n-func main() {}\n+func main() { bad() }\n*** End Patch",
+			}),
+		})
+
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+		content := response.Result.Get("content").AsString()
+		assert.Contains(t, content, "Success. Updated the following files:")
+		assert.Contains(t, content, "M patch.go")
+		assert.Contains(t, content, "LSP errors detected in patch.go, please fix:")
+		assert.Contains(t, content, "<diagnostics file=\"patch.go\">")
+		assert.Contains(t, content, "Error[3:17] undefined: bad")
+		assert.Contains(t, content, "</diagnostics>")
+	})
+
 	t.Run("session works without LSP when LSP is nil", func(t *testing.T) {
 		fixtureNoLSP := newSweSystemFixture(t, "You are skilled software developer.")
 		systemNoLSP := fixtureNoLSP.system
