@@ -77,16 +77,14 @@ func TestAgentCoreInitializationAndSimpleProgramGen(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Verify UI handler captured the events
-		// Should have at least one tool call start
-		assert.NotEmpty(t, mockHandler.ToolCallStarts, "should have captured tool call start")
-		// Should have tool call details
-		assert.NotEmpty(t, mockHandler.ToolCallDetails, "should have captured tool call details")
+		// Should have at least one tool call
+		assert.NotEmpty(t, mockHandler.ToolCalls, "should have captured tool call")
 		// Should have tool call result
 		assert.NotEmpty(t, mockHandler.ToolCallResults, "should have captured tool call result")
 		assert.Equal(t, "vfsWrite", mockHandler.ToolCallResults[0].Call.Function)
-		// Should have markdown chunks from the final response
-		assert.NotEmpty(t, mockHandler.MarkdownChunks, "should have captured markdown chunks")
-		assert.Contains(t, mockHandler.MarkdownChunks, "File created successfully.")
+		// Should have assistant message from the final response
+		assert.NotEmpty(t, mockHandler.AssistantMessages, "should have captured assistant messages")
+		assert.Contains(t, mockHandler.AssistantMessages[len(mockHandler.AssistantMessages)-1].Text, "File created successfully.")
 	})
 }
 
@@ -389,71 +387,38 @@ func TestSweSystemShutdown(t *testing.T) {
 }
 
 func TestSystemStreamingConfiguration(t *testing.T) {
-	t.Run("session uses streaming from provider config", func(t *testing.T) {
-		fixture := newSweSystemFixture(t, "You are a test assistant.")
-		system := fixture.system
-		mockServer := fixture.server
-
-		// Create provider with streaming enabled
-		streamingEnabled := true
-		config := &conf.ModelProviderConfig{
-			Type:      "ollama",
-			Name:      "ollama",
-			URL:       mockServer.URL(),
-			Streaming: &streamingEnabled,
+	t.Run("session creation does not depend on provider streaming config", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			streaming *bool
+		}{
+			{name: "streaming enabled", streaming: func() *bool { v := true; return &v }()},
+			{name: "streaming disabled", streaming: func() *bool { v := false; return &v }()},
+			{name: "streaming not configured", streaming: nil},
 		}
-		client, err := models.NewOllamaClient(config)
-		require.NoError(t, err)
-		system.ModelProviders = map[string]models.ModelProvider{"ollama": client}
 
-		mockHandler := testutil.NewMockSessionOutputHandler()
-		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
-		require.NoError(t, err)
-		assert.True(t, session.streaming)
-	})
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				fixture := newSweSystemFixture(t, "You are a test assistant.")
+				system := fixture.system
+				mockServer := fixture.server
 
-	t.Run("session uses non-streaming from provider config", func(t *testing.T) {
-		fixture := newSweSystemFixture(t, "You are a test assistant.")
-		system := fixture.system
-		mockServer := fixture.server
+				config := &conf.ModelProviderConfig{
+					Type:      "ollama",
+					Name:      "ollama",
+					URL:       mockServer.URL(),
+					Streaming: tc.streaming,
+				}
+				client, err := models.NewOllamaClient(config)
+				require.NoError(t, err)
+				system.ModelProviders = map[string]models.ModelProvider{"ollama": client}
 
-		// Create provider with streaming disabled
-		streamingDisabled := false
-		config := &conf.ModelProviderConfig{
-			Type:      "ollama",
-			Name:      "ollama",
-			URL:       mockServer.URL(),
-			Streaming: &streamingDisabled,
+				mockHandler := testutil.NewMockSessionOutputHandler()
+				session, err := system.NewSession("ollama/test-model:latest", mockHandler)
+				require.NoError(t, err)
+				assert.NotNil(t, session)
+			})
 		}
-		client, err := models.NewOllamaClient(config)
-		require.NoError(t, err)
-		system.ModelProviders = map[string]models.ModelProvider{"ollama": client}
-
-		mockHandler := testutil.NewMockSessionOutputHandler()
-		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
-		require.NoError(t, err)
-		assert.False(t, session.streaming)
-	})
-
-	t.Run("session defaults to streaming when not configured", func(t *testing.T) {
-		fixture := newSweSystemFixture(t, "You are a test assistant.")
-		system := fixture.system
-		mockServer := fixture.server
-
-		// Create provider without streaming config
-		config := &conf.ModelProviderConfig{
-			Type: "ollama",
-			Name: "ollama",
-			URL:  mockServer.URL(),
-		}
-		client, err := models.NewOllamaClient(config)
-		require.NoError(t, err)
-		system.ModelProviders = map[string]models.ModelProvider{"ollama": client}
-
-		mockHandler := testutil.NewMockSessionOutputHandler()
-		session, err := system.NewSession("ollama/test-model:latest", mockHandler)
-		require.NoError(t, err)
-		assert.True(t, session.streaming, "Should default to streaming mode for backward compatibility")
 	})
 }
 

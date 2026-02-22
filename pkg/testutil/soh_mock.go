@@ -6,52 +6,44 @@ import (
 	"github.com/rlewczuk/csw/pkg/tool"
 )
 
+// AssistantMessageRecord stores assistant output captured from session output handler.
+type AssistantMessageRecord struct {
+	Text     string
+	Thinking string
+}
+
 // MockSessionOutputHandler is a mock implementation of SessionOutputHandler that keeps all output in memory.
 // It is used for testing and capturing output from agent operations.
 type MockSessionOutputHandler struct {
-	// ThinkingChunks stores all thinking chunks received via AddThinkingChunk.
-	ThinkingChunks []string
+	// AssistantMessages stores assistant outputs received via AddAssistantMessage.
+	AssistantMessages []AssistantMessageRecord
 
-	// MarkdownChunks stores all markdown chunks received via AddMarkdownChunk.
-	MarkdownChunks []string
-
-	// ToolCallStarts stores all tool calls received via AddToolCallStart.
-	ToolCallStarts []*tool.ToolCall
-
-	// ToolCallDetails stores all tool calls received via AddToolCallDetails.
-	// Multiple entries may exist for the same tool call as it's being parsed.
-	ToolCallDetails []*tool.ToolCall
+	// ToolCalls stores all tool calls received via AddToolCall.
+	ToolCalls []*tool.ToolCall
 
 	// ToolCallResults stores all tool responses received via AddToolCallResult.
 	ToolCallResults []*tool.ToolResponse
 
 	// PermissionQueries stores all permission queries received via OnPermissionQuery.
 	PermissionQueries []*tool.ToolPermissionsQuery
-	// permissionQueryCalled is a channel that is signalled when OnPermissionQuery is called.
 	permissionQueryCalled chan struct{}
 
 	// RateLimitErrors stores all rate limit errors received via OnRateLimitError.
 	RateLimitErrors []int
-	// rateLimitErrorCalled is a channel that is signalled when OnRateLimitError is called.
 	rateLimitErrorCalled chan struct{}
 
 	// RunFinishedError stores the error from RunFinished call.
 	RunFinishedError error
-
-	// runFinishedCalled is a channel that is closed when RunFinished is called.
 	runFinishedCalled chan struct{}
 
-	// mu protects access to fields.
 	mu sync.Mutex
 }
 
 // NewMockSessionOutputHandler creates a new MockSessionOutputHandler.
 func NewMockSessionOutputHandler() *MockSessionOutputHandler {
 	return &MockSessionOutputHandler{
-		ThinkingChunks:        make([]string, 0),
-		MarkdownChunks:        make([]string, 0),
-		ToolCallStarts:        make([]*tool.ToolCall, 0),
-		ToolCallDetails:       make([]*tool.ToolCall, 0),
+		AssistantMessages:      make([]AssistantMessageRecord, 0),
+		ToolCalls:             make([]*tool.ToolCall, 0),
 		ToolCallResults:       make([]*tool.ToolResponse, 0),
 		PermissionQueries:     make([]*tool.ToolPermissionsQuery, 0),
 		permissionQueryCalled: make(chan struct{}, 10),
@@ -72,9 +64,7 @@ func (h *MockSessionOutputHandler) OnPermissionQuery(query *tool.ToolPermissions
 }
 
 // WaitForPermissionQuery blocks until OnPermissionQuery is called.
-func (h *MockSessionOutputHandler) WaitForPermissionQuery() {
-	<-h.permissionQueryCalled
-}
+func (h *MockSessionOutputHandler) WaitForPermissionQuery() { <-h.permissionQueryCalled }
 
 // OnRateLimitError records a rate limit error.
 func (h *MockSessionOutputHandler) OnRateLimitError(retryAfterSeconds int) {
@@ -88,36 +78,20 @@ func (h *MockSessionOutputHandler) OnRateLimitError(retryAfterSeconds int) {
 }
 
 // WaitForRateLimitError blocks until OnRateLimitError is called.
-func (h *MockSessionOutputHandler) WaitForRateLimitError() {
-	<-h.rateLimitErrorCalled
-}
+func (h *MockSessionOutputHandler) WaitForRateLimitError() { <-h.rateLimitErrorCalled }
 
-// AddThinkingChunk records a thinking chunk.
-func (h *MockSessionOutputHandler) AddThinkingChunk(thinking string) {
+// AddAssistantMessage records a full assistant output.
+func (h *MockSessionOutputHandler) AddAssistantMessage(text string, thinking string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.ThinkingChunks = append(h.ThinkingChunks, thinking)
+	h.AssistantMessages = append(h.AssistantMessages, AssistantMessageRecord{Text: text, Thinking: thinking})
 }
 
-// AddMarkdownChunk records a markdown chunk.
-func (h *MockSessionOutputHandler) AddMarkdownChunk(markdown string) {
+// AddToolCall records a tool call.
+func (h *MockSessionOutputHandler) AddToolCall(call *tool.ToolCall) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.MarkdownChunks = append(h.MarkdownChunks, markdown)
-}
-
-// AddToolCallStart records a tool call start event.
-func (h *MockSessionOutputHandler) AddToolCallStart(call *tool.ToolCall) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.ToolCallStarts = append(h.ToolCallStarts, call)
-}
-
-// AddToolCallDetails records tool call details.
-func (h *MockSessionOutputHandler) AddToolCallDetails(call *tool.ToolCall) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.ToolCallDetails = append(h.ToolCallDetails, call)
+	h.ToolCalls = append(h.ToolCalls, call)
 }
 
 // AddToolCallResult records a tool call result.
@@ -136,18 +110,14 @@ func (h *MockSessionOutputHandler) RunFinished(err error) {
 }
 
 // WaitForRunFinished blocks until RunFinished is called.
-func (h *MockSessionOutputHandler) WaitForRunFinished() {
-	<-h.runFinishedCalled
-}
+func (h *MockSessionOutputHandler) WaitForRunFinished() { <-h.runFinishedCalled }
 
 // Reset clears all recorded output data.
 func (h *MockSessionOutputHandler) Reset() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.ThinkingChunks = make([]string, 0)
-	h.MarkdownChunks = make([]string, 0)
-	h.ToolCallStarts = make([]*tool.ToolCall, 0)
-	h.ToolCallDetails = make([]*tool.ToolCall, 0)
+	h.AssistantMessages = make([]AssistantMessageRecord, 0)
+	h.ToolCalls = make([]*tool.ToolCall, 0)
 	h.ToolCallResults = make([]*tool.ToolResponse, 0)
 	h.RateLimitErrors = make([]int, 0)
 	h.RunFinishedError = nil

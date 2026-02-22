@@ -16,32 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSessionStreamingModeDefault(t *testing.T) {
-	fixture := newSweSystemFixture(t, "You are skilled software developer.")
-	system := fixture.system
-
-	// Create provider config WITHOUT streaming field (should default to true)
-	config := &conf.ModelProviderConfig{
-		Type: "ollama",
-		Name: "ollama",
-		URL:  fixture.server.URL(),
-	}
-
-	client, err := models.NewOllamaClient(config)
-	require.NoError(t, err)
-	system.ModelProviders = map[string]models.ModelProvider{"ollama": client}
-
-	t.Run("streaming defaults to true", func(t *testing.T) {
-		mockHandler := testutil.NewMockSessionOutputHandler()
-		session, err := system.NewSession("ollama/devstral-small-2:latest", mockHandler)
-		require.NoError(t, err)
-		assert.NotNil(t, session)
-
-		// Verify streaming mode defaults to true
-		assert.True(t, session.streaming)
-	})
-}
-
 // TestSessionSystemPrompt tests that system prompt is correctly set when creating
 // a session with default role and when changing roles.
 func TestSessionSystemPrompt(t *testing.T) {
@@ -162,7 +136,6 @@ func TestSessionLLMLoggerUsage(t *testing.T) {
 		mockServer.AddRestResponse("/api/chat", "POST", `{"model":"test-model:latest","message":{"role":"assistant","content":"Hello!"},"done":true}`)
 
 		// Set session to non-streaming mode
-		session.streaming = false
 
 		// Add a user message
 		session.UserPrompt("Hi there")
@@ -172,7 +145,8 @@ func TestSessionLLMLoggerUsage(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the response was processed
-		assert.Contains(t, mockHandler.MarkdownChunks, "Hello!")
+		assert.NotEmpty(t, mockHandler.AssistantMessages)
+		assert.Contains(t, mockHandler.AssistantMessages[len(mockHandler.AssistantMessages)-1].Text, "Hello!")
 	})
 
 	t.Run("runStreamingChat uses llmLogger when enabled", func(t *testing.T) {
@@ -193,9 +167,6 @@ func TestSessionLLMLoggerUsage(t *testing.T) {
 			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":"!"},"done":true,"done_reason":"stop"}`,
 		)
 
-		// Ensure session is in streaming mode
-		session.streaming = true
-
 		// Add a user message
 		session.UserPrompt("Hi there")
 
@@ -204,8 +175,8 @@ func TestSessionLLMLoggerUsage(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the response was processed
-		assert.Contains(t, mockHandler.MarkdownChunks, "Hello")
-		assert.Contains(t, mockHandler.MarkdownChunks, "!")
+		assert.NotEmpty(t, mockHandler.AssistantMessages)
+		assert.Contains(t, mockHandler.AssistantMessages[len(mockHandler.AssistantMessages)-1].Text, "Hello!")
 	})
 
 	t.Run("runNonStreamingChat works without llmLogger", func(t *testing.T) {
@@ -224,7 +195,6 @@ func TestSessionLLMLoggerUsage(t *testing.T) {
 		mockServer.AddRestResponse("/api/chat", "POST", `{"model":"test-model:latest","message":{"role":"assistant","content":"Hello!"},"done":true}`)
 
 		// Set session to non-streaming mode
-		session.streaming = false
 
 		// Add a user message
 		session.UserPrompt("Hi there")
@@ -234,7 +204,8 @@ func TestSessionLLMLoggerUsage(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the response was processed
-		assert.Contains(t, mockHandler.MarkdownChunks, "Hello!")
+		assert.NotEmpty(t, mockHandler.AssistantMessages)
+		assert.Contains(t, mockHandler.AssistantMessages[len(mockHandler.AssistantMessages)-1].Text, "Hello!")
 	})
 
 	t.Run("runStreamingChat works without llmLogger", func(t *testing.T) {
@@ -255,9 +226,6 @@ func TestSessionLLMLoggerUsage(t *testing.T) {
 			`{"model":"test-model:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":"!"},"done":true,"done_reason":"stop"}`,
 		)
 
-		// Ensure session is in streaming mode
-		session.streaming = true
-
 		// Add a user message
 		session.UserPrompt("Hi there")
 
@@ -266,13 +234,52 @@ func TestSessionLLMLoggerUsage(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the response was processed
-		assert.Contains(t, mockHandler.MarkdownChunks, "Hello")
-		assert.Contains(t, mockHandler.MarkdownChunks, "!")
+		assert.NotEmpty(t, mockHandler.AssistantMessages)
+		assert.Contains(t, mockHandler.AssistantMessages[len(mockHandler.AssistantMessages)-1].Text, "Hello!")
 	})
 }
 
 // TestSessionReasoningContent tests that reasoning content from previous messages
 // is properly included in subsequent LLM calls.
+
+// TestSessionRun_EmitsSingleMarkdownChunkForFragmentedResponse verifies that session
+// emits one concatenated markdown chunk in non-streaming mode even when provider Chat()
+// returns multiple text parts.
+func TestSessionRun_EmitsSingleMarkdownChunkForFragmentedResponse(t *testing.T) {
+	fixture := newSweSystemFixture(t, "You are a helpful assistant.")
+	system := fixture.system
+
+	mockProvider := models.NewMockProvider([]models.ModelInfo{
+		{Name: "test-model", Model: "test-model"},
+	})
+	mockProvider.SetChatResponse("test-model", &models.MockChatResponse{
+		Response: &models.ChatMessage{
+			Role: models.ChatRoleAssistant,
+			Parts: []models.ChatMessagePart{
+				{Text: "clean"},
+				{Text: ".sh"},
+				{Text: " &&"},
+				{Text: " go"},
+				{Text: " test"},
+			},
+		},
+	})
+	system.ModelProviders = map[string]models.ModelProvider{"mock": mockProvider}
+
+	mockHandler := testutil.NewMockSessionOutputHandler()
+	session, err := system.NewSession("mock/test-model", mockHandler)
+	require.NoError(t, err)
+
+	err = session.UserPrompt("run tests")
+	require.NoError(t, err)
+
+	err = session.Run(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, mockHandler.AssistantMessages, 1)
+	assert.Equal(t, "clean.sh && go test", mockHandler.AssistantMessages[0].Text)
+}
+
 func TestSessionReasoningContent(t *testing.T) {
 	fixture := newSweSystemFixture(t, "You are a helpful assistant.")
 	system := fixture.system
@@ -320,7 +327,6 @@ func TestSessionReasoningContent(t *testing.T) {
 		session, err := system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
 
-		session.streaming = false
 
 		session.UserPrompt("Read the file test.txt")
 
@@ -380,7 +386,6 @@ func TestSessionReasoningContent(t *testing.T) {
 		session, err := system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
 
-		session.streaming = false
 
 		session.UserPrompt("Say hello")
 
@@ -446,7 +451,6 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
 
-		session.streaming = false
 
 		session.UserPrompt("Hello")
 
@@ -494,7 +498,6 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
 
-		session.streaming = false
 
 		session.UserPrompt("Hello")
 
@@ -530,7 +533,6 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
 
-		session.streaming = false
 
 		session.UserPrompt("Hello")
 
@@ -575,7 +577,6 @@ func TestSweSession_NetworkErrorRetry(t *testing.T) {
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
 
-		session.streaming = false
 
 		session.UserPrompt("Hello")
 
@@ -615,7 +616,6 @@ func TestSweSession_NetworkErrorRetry(t *testing.T) {
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
 
-		session.streaming = false
 
 		session.UserPrompt("Hello")
 
@@ -674,7 +674,6 @@ func TestSessionVFSMoveToolIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Disable streaming for simpler test flow
-		session.streaming = false
 
 		// Add a user message to trigger the conversation
 		session.UserPrompt("Please rename oldname.txt to newname.txt")
@@ -752,7 +751,6 @@ func TestSessionVFSMoveToolIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Disable streaming for simpler test flow
-		session.streaming = false
 
 		// Add a user message to trigger the conversation
 		session.UserPrompt("Please rename the file")
