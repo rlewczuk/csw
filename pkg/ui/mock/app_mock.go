@@ -10,9 +10,16 @@ type MockAppView struct {
 	// Recorded calls
 	ShowChatCalls     []ui.IChatPresenter
 	ShowSettingsCalls int
+	ShowMessageCalls  []MockAppMessageCall
 
 	// MockChatView to return from ShowChat
 	chatView *MockChatView
+}
+
+// MockAppMessageCall stores one ShowMessage invocation.
+type MockAppMessageCall struct {
+	Message string
+	Type    ui.MessageType
 }
 
 // NewMockAppView creates a new MockAppView instance.
@@ -33,10 +40,19 @@ func (m *MockAppView) ShowSettings() {
 	m.ShowSettingsCalls++
 }
 
+// ShowMessage stores a user-facing message call.
+func (m *MockAppView) ShowMessage(message string, messageType ui.MessageType) {
+	m.ShowMessageCalls = append(m.ShowMessageCalls, MockAppMessageCall{
+		Message: message,
+		Type:    messageType,
+	})
+}
+
 // Reset clears all recorded calls.
 func (m *MockAppView) Reset() {
 	m.ShowChatCalls = nil
 	m.ShowSettingsCalls = 0
+	m.ShowMessageCalls = nil
 	m.chatView.Reset()
 }
 
