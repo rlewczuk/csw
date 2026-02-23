@@ -289,12 +289,17 @@ func (g *GitVCS) MergeBranches(into string, from string) error {
 	wt, hasWorktree := g.worktrees[into]
 	g.mutex.RUnlock()
 
+	currentPrimaryBranch, err := g.currentBranchInWorktree(g.path)
+	if err != nil {
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
+	}
+
 	mergePath := g.path
 	cleanup := func() {}
 
-	if hasWorktree {
+	if hasWorktree && currentPrimaryBranch != into {
 		mergePath = wt.path
-	} else {
+	} else if currentPrimaryBranch != into {
 		tempWorktreePath := filepath.Join(g.worktreesPath, ".merge-"+strings.ReplaceAll(into, "/", "_"))
 		if err := os.RemoveAll(tempWorktreePath); err != nil {
 			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
@@ -313,7 +318,7 @@ func (g *GitVCS) MergeBranches(into string, from string) error {
 	}
 	defer cleanup()
 
-	if err := g.runGitInWorktree(mergePath, "merge", "--no-ff", from, "-m", fmt.Sprintf("Merge branch '%s' into %s", from, into)); err != nil {
+	if err := g.runGitInWorktree(mergePath, "merge", from); err != nil {
 		errText := err.Error()
 		if strings.Contains(errText, "CONFLICT") || strings.Contains(errText, "would be overwritten by merge") {
 			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w: %w", err, ErrMergeConflict)
@@ -322,6 +327,15 @@ func (g *GitVCS) MergeBranches(into string, from string) error {
 	}
 
 	return nil
+}
+
+func (g *GitVCS) currentBranchInWorktree(worktreePath string) (string, error) {
+	branchOutput, err := g.runGitOutputInWorktree(worktreePath, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return "", fmt.Errorf("GitVCS.currentBranchInWorktree() [git.go]: %w", err)
+	}
+
+	return strings.TrimSpace(branchOutput), nil
 }
 
 // Path returns the repository path
