@@ -53,9 +53,9 @@ func setupGitRepoFixture(t *testing.T) *GitTestFixture {
 	})
 	require.NoError(t, err, "Failed to create initial commit")
 
-	// Create the GitRepo with worktrees directory
+	// Create the GitVCS with worktrees directory
 	gitRepo, err := NewGitRepo(tempDir, worktreesDir, nil)
-	require.NoError(t, err, "Failed to create GitRepo")
+	require.NoError(t, err, "Failed to create GitVCS")
 
 	return &GitTestFixture{
 		Root:   tempDir,
@@ -85,9 +85,9 @@ func (f *GitTestFixture) Cleanup() {
 	}
 }
 
-// runTestWithBothRepos runs a test function with both GitRepo and MockRepo
+// runTestWithBothRepos runs a test function with both GitVCS and MockRepo
 func runTestWithBothRepos(t *testing.T, testFunc func(*testing.T, *GitTestFixture)) {
-	t.Run("GitRepo", func(t *testing.T) {
+	t.Run("GitVCS", func(t *testing.T) {
 		fixture := setupGitRepoFixture(t)
 		defer fixture.Cleanup()
 		testFunc(t, fixture)
@@ -156,7 +156,7 @@ func TestGetWorktree(t *testing.T) {
 			if fixture.IsMock {
 				vfs, err = fixture.Repo.GetWorktree("main")
 			} else {
-				// For GitRepo, use master or main depending on what's available
+				// For GitVCS, use master or main depending on what's available
 				vfs, err = fixture.Repo.GetWorktree("master")
 				if err != nil {
 					vfs, err = fixture.Repo.GetWorktree("main")
@@ -312,7 +312,7 @@ func TestDeleteBranch(t *testing.T) {
 	})
 
 	t.Run("DeleteOnlyBranch", func(t *testing.T) {
-		// This test is only for MockRepo since GitRepo has different behavior
+		// This test is only for MockRepo since GitVCS has different behavior
 		t.Run("MockRepo", func(t *testing.T) {
 			fixture := setupMockRepoFixture(t)
 			defer fixture.Cleanup()
@@ -379,7 +379,7 @@ func TestListBranches(t *testing.T) {
 
 func TestCommitWorktree(t *testing.T) {
 	t.Run("CommitChanges", func(t *testing.T) {
-		// This test is only for MockRepo since GitRepo requires more setup
+		// This test is only for MockRepo since GitVCS requires more setup
 		t.Run("MockRepo", func(t *testing.T) {
 			fixture := setupMockRepoFixture(t)
 			defer fixture.Cleanup()
@@ -459,7 +459,7 @@ func TestMergeBranches(t *testing.T) {
 }
 
 func TestRepoInterfaceCompliance(t *testing.T) {
-	// This test ensures GitRepo and MockRepo implement the VCS interface
-	var _ VCS = (*GitRepo)(nil)
+	// This test ensures GitVCS and MockRepo implement the VCS interface
+	var _ VCS = (*GitVCS)(nil)
 	var _ VCS = (*MockRepo)(nil)
 }
