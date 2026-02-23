@@ -58,12 +58,7 @@ func prepareSessionVFS(workDir string, worktreeBranch string, hidePatterns []str
 	var selectedVCS vfs.VCS = nullVCS
 
 	if worktreeBranch != "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to resolve user home directory: %w", err)
-		}
-
-		worktreesRoot := filepath.Join(homeDir, ".cswdata", "worktrees")
+		worktreesRoot := filepath.Join(workDir, ".cswdata", "work")
 		gitRepo, err := vfs.NewGitRepo(workDir, worktreesRoot, hidePatterns)
 		if err != nil {
 			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create GitVCS: %w", err)
