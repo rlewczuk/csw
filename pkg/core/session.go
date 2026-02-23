@@ -1075,6 +1075,176 @@ func (s *SweSession) llmRetryMaxBackoffSeconds() int {
 	return defaultLLMRetryMaxBackoffSeconds
 }
 
+// HasPendingWork returns true when the session has pending work that can be resumed
+// without adding a new user message.
+func (s *SweSession) HasPendingWork() bool {
+	if s == nil {
+		return false
+	}
+
+	if len(s.pendingPermissionToolCalls) > 0 || len(s.pendingToolResponses) > 0 {
+		return true
+	}
+
+	if len(s.messages) == 0 {
+		return false
+	}
+
+	last := s.messages[len(s.messages)-1]
+	if last == nil {
+		return false
+	}
+
+	if last.Role == models.ChatRoleUser {
+		return true
+	}
+
+	if last.Role == models.ChatRoleAssistant && len(last.GetToolCalls()) > 0 {
+		return true
+	}
+
+	return false
+}
+
+func restoreSessionFromPersistedState(system *SweSystem, state persistedSessionState, outputHandler SessionThreadOutput) (*SweSession, error) {
+	if strings.TrimSpace(state.SessionID) == "" {
+		return nil, fmt.Errorf("restoreSessionFromPersistedState() [session.go]: missing session_id in persisted state")
+	}
+
+	provider, ok := system.ModelProviders[state.ProviderName]
+	if !ok {
+		return nil, fmt.Errorf("restoreSessionFromPersistedState() [session.go]: provider not found: %s", state.ProviderName)
+	}
+
+	sessionLogger := logging.GetSessionLogger(state.SessionID, logging.LogTypeSession)
+
+	var llmLogger *slog.Logger
+	if system.LogLLMRequests {
+		llmLogger = logging.GetSessionLogger(state.SessionID, logging.LogTypeLLM)
+	}
+
+	session := &SweSession{
+		id:            state.SessionID,
+		system:        system,
+		provider:      provider,
+		providerName:  state.ProviderName,
+		model:         state.Model,
+		messages:      make([]*models.ChatMessage, 0, len(state.Messages)),
+		role:          nil,
+		VFS:           system.VFS,
+		LSP:           system.LSP,
+		Tools:         nil,
+		outputHandler: outputHandler,
+		workDir:       state.WorkDir,
+		todoList:      make([]tool.TodoItem, len(state.TodoList)),
+		logger:        sessionLogger,
+		llmLogger:     llmLogger,
+	}
+
+	copy(session.todoList, state.TodoList)
+
+	session.applyModelTagToolSelection()
+
+	if strings.TrimSpace(state.RoleName) != "" {
+		role, roleOK := system.Roles.Get(state.RoleName)
+		if !roleOK {
+			return nil, fmt.Errorf("restoreSessionFromPersistedState() [session.go]: role not found: %s", state.RoleName)
+		}
+
+		session.role = &role
+
+		if role.VFSPrivileges != nil {
+			session.VFS = vfs.NewAccessControlVFS(system.VFS, role.VFSPrivileges)
+		} else {
+			session.VFS = system.VFS
+		}
+
+		session.applyModelTagToolSelection()
+		if role.ToolsAccess != nil {
+			session.Tools = wrapToolsWithAccessControl(session.Tools, role.ToolsAccess)
+		}
+	}
+
+	for _, persistedMsg := range state.Messages {
+		message, err := deserializeChatMessage(persistedMsg)
+		if err != nil {
+			return nil, fmt.Errorf("restoreSessionFromPersistedState() [session.go]: failed to deserialize message: %w", err)
+		}
+		session.messages = append(session.messages, message)
+	}
+
+	session.pendingPermissionToolCalls = make([]*tool.ToolCall, 0, len(state.PendingPermissionToolCalls))
+	for _, pendingCall := range state.PendingPermissionToolCalls {
+		copiedCall := pendingCall
+		session.pendingPermissionToolCalls = append(session.pendingPermissionToolCalls, &copiedCall)
+	}
+
+	session.pendingToolResponses = make([]*tool.ToolResponse, 0, len(state.PendingToolResponses))
+	for _, pendingResponse := range state.PendingToolResponses {
+		response, err := deserializeToolResponse(pendingResponse)
+		if err != nil {
+			return nil, fmt.Errorf("restoreSessionFromPersistedState() [session.go]: failed to deserialize pending tool response: %w", err)
+		}
+		session.pendingToolResponses = append(session.pendingToolResponses, response)
+	}
+
+	session.loadedAgentFiles = make(map[string]struct{}, len(state.LoadedAgentFiles))
+	for _, path := range state.LoadedAgentFiles {
+		session.loadedAgentFiles[path] = struct{}{}
+	}
+
+	return session, nil
+}
+
+func deserializeChatMessage(persisted persistedChatMessage) (*models.ChatMessage, error) {
+	message := &models.ChatMessage{
+		Role:  models.ChatRole(persisted.Role),
+		Parts: make([]models.ChatMessagePart, 0, len(persisted.Parts)),
+	}
+
+	for _, persistedPart := range persisted.Parts {
+		part := models.ChatMessagePart{
+			Text:             persistedPart.Text,
+			ReasoningContent: persistedPart.ReasoningContent,
+		}
+
+		if persistedPart.ToolCall != nil {
+			callCopy := *persistedPart.ToolCall
+			part.ToolCall = &callCopy
+		}
+
+		if persistedPart.ToolResponse != nil {
+			toolResponse, err := deserializeToolResponse(*persistedPart.ToolResponse)
+			if err != nil {
+				return nil, fmt.Errorf("deserializeChatMessage() [session.go]: failed to deserialize tool response: %w", err)
+			}
+			part.ToolResponse = toolResponse
+		}
+
+		message.Parts = append(message.Parts, part)
+	}
+
+	return message, nil
+}
+
+func deserializeToolResponse(persisted persistedToolResponse) (*tool.ToolResponse, error) {
+	response := &tool.ToolResponse{
+		Result: persisted.Result,
+		Done:   persisted.Done,
+	}
+
+	if persisted.Call != nil {
+		callCopy := *persisted.Call
+		response.Call = &callCopy
+	}
+
+	if strings.TrimSpace(persisted.Error) != "" {
+		response.Error = errors.New(persisted.Error)
+	}
+
+	return response, nil
+}
+
 // isTemporaryLLMError returns true when an LLM error indicates temporary condition.
 func isTemporaryLLMError(err error) bool {
 	if err == nil {
