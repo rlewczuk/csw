@@ -14,7 +14,7 @@ import (
 // GitTestFixture provides test fixtures for git repository tests
 type GitTestFixture struct {
 	Root   string
-	Repo   Repo
+	Repo   VCS
 	IsMock bool
 }
 
@@ -105,7 +105,7 @@ func TestNewGitRepo(t *testing.T) {
 		fixture := setupGitRepoFixture(t)
 		defer fixture.Cleanup()
 
-		assert.NotNil(t, fixture.Repo, "Expected non-nil Repo")
+		assert.NotNil(t, fixture.Repo, "Expected non-nil VCS")
 	})
 
 	t.Run("NonExistentDirectory", func(t *testing.T) {
@@ -459,7 +459,7 @@ func TestMergeBranches(t *testing.T) {
 }
 
 func TestRepoInterfaceCompliance(t *testing.T) {
-	// This test ensures GitRepo and MockRepo implement the Repo interface
-	var _ Repo = (*GitRepo)(nil)
-	var _ Repo = (*MockRepo)(nil)
+	// This test ensures GitRepo and MockRepo implement the VCS interface
+	var _ VCS = (*GitRepo)(nil)
+	var _ VCS = (*MockRepo)(nil)
 }

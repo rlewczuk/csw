@@ -13,7 +13,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-// GitRepo implements the Repo interface for git repositories.
+// GitRepo implements the VCS interface for git repositories.
 // It uses go-git library for git operations and manages worktrees for branches.
 type GitRepo struct {
 	path          string

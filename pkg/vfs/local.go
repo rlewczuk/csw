@@ -11,7 +11,7 @@ import (
 // It provides sandboxed access to files within a root directory.
 type LocalVFS struct {
 	root   string
-	repo   Repo
+	repo   VCS
 	filter GlobFilter
 }
 
@@ -23,7 +23,7 @@ func (l *LocalVFS) WorktreePath() string {
 	return l.root
 }
 
-func (l *LocalVFS) GetRepo() Repo {
+func (l *LocalVFS) GetRepo() VCS {
 	return l.repo
 }
 

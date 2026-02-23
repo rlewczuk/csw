@@ -32,7 +32,7 @@ func (m *MockVFS) WorktreePath() string {
 	return "/path/to/worktree"
 }
 
-func (m *MockVFS) GetRepo() Repo {
+func (m *MockVFS) GetRepo() VCS {
 	return nil // TODO to be implemented
 }
 
@@ -530,7 +530,7 @@ type commitInfo struct {
 	files   map[string][]byte
 }
 
-// MockRepo implements the Repo interface with an in-memory git-like repository.
+// MockRepo implements the VCS interface with an in-memory git-like repository.
 // It emulates git behavior using branches and worktrees stored in memory.
 type MockRepo struct {
 	branches  map[string]*branchState
