@@ -11,6 +11,7 @@ var (
 	ErrNotImplemented   = errors.New("not implemented")
 	ErrInvalidPath      = errors.New("invalid path")
 	ErrAskPermission    = errors.New("ask permission")
+	ErrNoChangesToCommit = errors.New("no changes to commit")
 )
 
 // VFS represents virtual filesystem. It encapsulates access to local and remote files and directories,
