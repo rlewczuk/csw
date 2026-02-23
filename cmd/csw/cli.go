@@ -195,8 +195,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 		// Create mutex for thread-safe writes
 		mu := &sync.Mutex{}
 
-		// Wrap view and presenter with logging wrappers
-		cliView = logmd.NewLogmdChatView(baseCliView, sessionFile, mu)
+		// Wrap presenter with logging wrapper
 		chatPresenter = logmd.NewLogmdChatPresenter(basePresenter, sessionFile, mu)
 	}
 
