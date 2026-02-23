@@ -37,10 +37,11 @@ func CliCommand() *cobra.Command {
 		cliLogLLMRequests bool
 		cliLSPServer      string
 		cliThinking       string
+		cliCommitMessage  string
 	)
 
 	cmd := &cobra.Command{
-		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] \"prompt\"",
+		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] \"prompt\"",
 		Short: "Start a CLI chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.ExactArgs(1),
@@ -74,7 +75,7 @@ func CliCommand() *cobra.Command {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
 			}
 
-			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliWorktree, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer, cliThinking)
+			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliWorktree, cliCommitMessage, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer, cliThinking)
 		},
 	}
 
@@ -83,6 +84,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliRole, "role", "developer", "Agent role name")
 	cmd.Flags().StringVar(&cliWorkDir, "workdir", "", "Working directory (default: current directory)")
 	cmd.Flags().StringVar(&cliWorktree, "worktree", "", "Create and use a git worktree for this session on a feature branch")
+	cmd.Flags().StringVar(&cliCommitMessage, "commit-message", "", "Custom commit message template, e.g. '[{{ .Branch }}] {{ .Message }}'")
 	cmd.Flags().BoolVar(&cliAllowAllPerms, "allow-all-permissions", false, "Allow all permissions without asking")
 	cmd.Flags().BoolVar(&cliInteractive, "interactive", false, "Enable interactive mode (allows user to respond to agent questions)")
 	cmd.Flags().StringVar(&cliConfigPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
@@ -95,7 +97,7 @@ func CliCommand() *cobra.Command {
 	return cmd
 }
 
-func runCLI(prompt, modelName, roleName, workDir, worktreeBranch, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking string) error {
+func runCLI(prompt, modelName, roleName, workDir, worktreeBranch, commitMessageTemplate, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking string) error {
 	startTime := time.Now()
 	ctx := context.Background()
 
@@ -127,12 +129,8 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch, configPath str
 	}
 
 	session := thread.GetSession()
-	var sessionID string
-	if session != nil {
-		sessionID = session.ID()
-	}
 
-	defer finalizeWorktreeSession(buildResult.VCS, buildResult.WorktreeBranch, sessionID, time.Now(), os.Stderr)
+	defer finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, commitMessageTemplate, sweSystem, session, os.Stderr)
 
 	// Determine session file path if session saving is enabled
 	var sessionFilePath string
@@ -238,16 +236,20 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch, configPath str
 	return nil
 }
 
-func buildWorktreeCommitMessage(branch string, sessionID string, timestamp time.Time) string {
-	return fmt.Sprintf("csw: worktree session commit branch=%s session=%s timestamp=%s", branch, sessionID, timestamp.UTC().Format(time.RFC3339))
-}
-
-func finalizeWorktreeSession(vcs vfs.VCS, worktreeBranch string, sessionID string, timestamp time.Time, stderr io.Writer) {
+func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, commitMessageTemplate string, sweSystem *core.SweSystem, session *core.SweSession, stderr io.Writer) {
 	if worktreeBranch == "" || vcs == nil {
 		return
 	}
 
-	commitMessage := buildWorktreeCommitMessage(worktreeBranch, sessionID, timestamp)
+	commitMessage, err := generateWorktreeCommitMessage(ctx, sweSystem, session, worktreeBranch, commitMessageTemplate)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "worktree commit message generation failed: %v\n", err)
+		if dropErr := vcs.DropWorktree(worktreeBranch); dropErr != nil {
+			_, _ = fmt.Fprintf(stderr, "worktree cleanup failed: %v\n", dropErr)
+		}
+		return
+	}
+
 	if commitErr := vcs.CommitWorktree(worktreeBranch, commitMessage); commitErr != nil && !errors.Is(commitErr, vfs.ErrNoChangesToCommit) {
 		_, _ = fmt.Fprintf(stderr, "worktree commit failed: %v\n", commitErr)
 	}
