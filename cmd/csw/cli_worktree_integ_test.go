@@ -71,7 +71,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			system, session, mockVCS := newFinalizeWorktreeFixture(t, tt.llmMessage)
 			if tt.removeSystemTemplate {
-				require.NoError(t, system.VFS.DeleteFile(commitPromptSystemPath, false, true))
+				require.NoError(t, system.VFS.DeleteFile(CommitPromptSystemPath, false, true))
 			}
 
 			var stderr bytes.Buffer
@@ -110,9 +110,9 @@ func newFinalizeWorktreeFixture(t *testing.T, llmMessage string) (*core.SweSyste
 	})
 
 	mockVFS := vfs.NewMockVFS()
-	require.NoError(t, mockVFS.WriteFile(commitPromptSystemPath, []byte("system prompt")))
-	require.NoError(t, mockVFS.WriteFile(commitPromptPromptPath, []byte("{{- range .Messages }}{{ . }}\n{{- end }}")))
-	require.NoError(t, mockVFS.WriteFile(commitPromptMessagePath, []byte("[{{ .Branch }}] {{ .Message }}")))
+	require.NoError(t, mockVFS.WriteFile(CommitPromptSystemPath, []byte("system prompt")))
+	require.NoError(t, mockVFS.WriteFile(CommitPromptPromptPath, []byte("{{- range .Messages }}{{ . }}\n{{- end }}")))
+	require.NoError(t, mockVFS.WriteFile(CommitPromptMessagePath, []byte("[{{ .Branch }}] {{ .Message }}")))
 
 	system := &core.SweSystem{
 		ModelProviders: map[string]models.ModelProvider{"mock": provider},
