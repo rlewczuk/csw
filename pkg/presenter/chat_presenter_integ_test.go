@@ -365,6 +365,41 @@ func TestChatPresenter_MoveToBottom(t *testing.T) {
 	})
 }
 
+func TestChatPresenter_ShowMessageAndRetryPrompt(t *testing.T) {
+	fixture := newPresenterFixture(t)
+	system := fixture.System
+
+	t.Run("show message forwards to app view", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		thread := core.NewSessionThread(system, mockHandler)
+		presenter := NewChatPresenter(system, thread)
+
+		appView := mock.NewMockAppView()
+		presenter.SetAppView(appView)
+
+		presenter.ShowMessage("temporary failure", "error")
+
+		require.Len(t, appView.ShowMessageCalls, 1)
+		assert.Equal(t, "temporary failure", appView.ShowMessageCalls[0].Message)
+		assert.Equal(t, ui.MessageTypeError, appView.ShowMessageCalls[0].Type)
+	})
+
+	t.Run("should retry after failure uses app retry prompt", func(t *testing.T) {
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		thread := core.NewSessionThread(system, mockHandler)
+		presenter := NewChatPresenter(system, thread)
+
+		appView := mock.NewMockAppView()
+		appView.AskRetryResult = true
+		presenter.SetAppView(appView)
+
+		shouldRetry := presenter.ShouldRetryAfterFailure("retry?")
+		assert.True(t, shouldRetry)
+		require.Len(t, appView.AskRetryCalls, 1)
+		assert.Equal(t, "retry?", appView.AskRetryCalls[0])
+	})
+}
+
 func TestChatPresenter_PermissionFlow(t *testing.T) {
 	fixture := newPresenterFixture(t)
 	system := fixture.System

@@ -65,6 +65,7 @@ func (p *AppPresenter) NewSession() error {
 	// Create ChatPresenter for this session
 	// This will set the presenter as the output handler for the thread
 	chatPresenter := NewChatPresenter(system, thread)
+	chatPresenter.SetAppView(view)
 
 	if view != nil {
 		// Show the chat view with the presenter
@@ -95,6 +96,7 @@ func (p *AppPresenter) OpenSession(id string) error {
 	// Create ChatPresenter for this session
 	// This will set the presenter as the output handler for the thread
 	chatPresenter := NewChatPresenter(system, thread)
+	chatPresenter.SetAppView(view)
 
 	if view != nil {
 		// Show the chat view with the presenter

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/models"
@@ -36,6 +37,7 @@ type sweSystemFixtureConfig struct {
 	logBaseDir       string
 	logLLMRequests   *bool
 	registerVFSTools bool
+	globalConfig     *conf.GlobalConfig
 }
 
 func newSweSystemFixture(t *testing.T, prompt string, opts ...sweSystemFixtureOption) *sweSystemFixture {
@@ -97,6 +99,21 @@ func newSweSystemFixture(t *testing.T, prompt string, opts ...sweSystemFixtureOp
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		WorkDir:              config.workDir,
 		LogBaseDir:           config.logBaseDir,
+	}
+	if config.globalConfig != nil {
+		cfgStore := impl.NewMockConfigStore()
+		cfgStore.SetGlobalConfig(config.globalConfig)
+		if config.configStore != nil {
+			if roles, err := config.configStore.GetAgentRoleConfigs(); err == nil {
+				cfgStore.SetAgentRoleConfigs(roles)
+			}
+			if providers, err := config.configStore.GetModelProviderConfigs(); err == nil {
+				cfgStore.SetModelProviderConfigs(providers)
+			}
+		}
+		system.ConfigStore = cfgStore
+	} else {
+		system.ConfigStore = config.configStore
 	}
 	if config.logLLMRequests != nil {
 		system.LogLLMRequests = *config.logLLMRequests
@@ -201,5 +218,11 @@ func withLogLLMRequests(enabled bool) sweSystemFixtureOption {
 func withoutVFSTools() sweSystemFixtureOption {
 	return func(config *sweSystemFixtureConfig) {
 		config.registerVFSTools = false
+	}
+}
+
+func withGlobalConfig(globalConfig *conf.GlobalConfig) sweSystemFixtureOption {
+	return func(config *sweSystemFixtureConfig) {
+		config.globalConfig = globalConfig
 	}
 }
