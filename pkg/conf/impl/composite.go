@@ -25,7 +25,9 @@
 package impl
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -246,6 +248,32 @@ func (c *CompositeConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.agentRoleConfigsUpdate, nil
+}
+
+// GetAgentConfigFile returns agent config file from the highest-priority source.
+// Later stores override earlier ones.
+func (c *CompositeConfigStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	var lastErr error
+
+	for i := len(c.stores) - 1; i >= 0; i-- {
+		data, err := c.stores[i].GetAgentConfigFile(subdir, filename)
+		if err == nil {
+			return data, nil
+		}
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		lastErr = err
+	}
+
+	if lastErr != nil {
+		return nil, fmt.Errorf("CompositeConfigStore.GetAgentConfigFile() [composite.go]: failed to read agent/%s/%s: %w", subdir, filename, lastErr)
+	}
+
+	return nil, fmt.Errorf("CompositeConfigStore.GetAgentConfigFile() [composite.go]: file not found in any config store: agent/%s/%s", subdir, filename)
 }
 
 // refresh reloads all configurations from all sources and merges them.

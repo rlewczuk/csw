@@ -230,6 +230,10 @@ type ConfigStore interface {
 
 	// LastGlobalConfigUpdate returns timestamp of last update of global config
 	LastGlobalConfigUpdate() (time.Time, error)
+
+	// GetAgentConfigFile returns file content from agent configuration namespace.
+	// The expected virtual location is conf/agent/<subdir>/<filename>.
+	GetAgentConfigFile(subdir, filename string) ([]byte, error)
 }
 
 // WritableConfigStore extends ConfigStore with write operations.

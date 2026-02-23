@@ -220,6 +220,33 @@ func (s *LocalConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
 	return s.agentRoleConfigsUpdate, nil
 }
 
+// GetAgentConfigFile returns file content from local agent/<subdir>/<filename>.
+func (s *LocalConfigStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
+	if filename == "" {
+		return nil, fmt.Errorf("LocalConfigStore.GetAgentConfigFile() [local.go]: filename cannot be empty")
+	}
+
+	if filepath.Base(filename) != filename {
+		return nil, fmt.Errorf("LocalConfigStore.GetAgentConfigFile() [local.go]: filename cannot contain path separators")
+	}
+
+	cleanSubdir := filepath.Clean(subdir)
+	if cleanSubdir == "." {
+		cleanSubdir = ""
+	}
+	if cleanSubdir != "" && (filepath.IsAbs(cleanSubdir) || cleanSubdir == ".." || strings.HasPrefix(cleanSubdir, "../")) {
+		return nil, fmt.Errorf("LocalConfigStore.GetAgentConfigFile() [local.go]: invalid subdir: %s", subdir)
+	}
+
+	path := filepath.Join(s.configDir, "agent", cleanSubdir, filename)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("LocalConfigStore.GetAgentConfigFile() [local.go]: failed to read %s: %w", path, err)
+	}
+
+	return data, nil
+}
+
 // loadAllConfig loads all configuration from disk.
 func (s *LocalConfigStore) loadAllConfig() error {
 	if err := s.loadGlobalConfig(); err != nil {

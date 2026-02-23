@@ -70,7 +70,7 @@ func GetCompositeConfigStore() (conf.ConfigStore, error) {
 	}
 
 	// Build config path hierarchy matching main.go
-	configPathStr := "@DEFAULTS:./.csw/config:" + filepath.Join(homeDir, ".config", "csw")
+	configPathStr := "@DEFAULTS:" + filepath.Join(homeDir, ".config", "csw") + ":./.csw/config"
 
 	store, err := impl.NewCompositeConfigStore(cwd, configPathStr)
 	if err != nil {
@@ -89,7 +89,7 @@ func BuildConfigPath(customConfigPath string) (string, error) {
 	}
 
 	// Start with default hierarchy
-	configPathStr := "@DEFAULTS:./.csw/config:" + filepath.Join(homeDir, ".config", "csw")
+	configPathStr := "@DEFAULTS:" + filepath.Join(homeDir, ".config", "csw") + ":./.csw/config"
 
 	// Validate and append custom config paths if provided
 	if customConfigPath != "" {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"testing"
 
+	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/vfs"
@@ -31,7 +32,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 		worktreeBranch       string
 		customTemplate       string
 		llmMessage           string
-		removeSystemTemplate bool
+		omitSystemTemplate   bool
 		expectCommit         bool
 		expectedMessage      string
 		expectStderr         string
@@ -55,7 +56,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 			name:                 "generation error skips commit and logs error",
 			worktreeBranch:       "feature/error",
 			llmMessage:           "irrelevant",
-			removeSystemTemplate: true,
+			omitSystemTemplate:   true,
 			expectCommit:         false,
 			expectStderr:         "worktree commit message generation failed",
 		},
@@ -69,10 +70,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			system, session, mockVCS := newFinalizeWorktreeFixture(t, tt.llmMessage)
-			if tt.removeSystemTemplate {
-				require.NoError(t, system.VFS.DeleteFile(CommitPromptSystemPath, false, true))
-			}
+			system, session, mockVCS := newFinalizeWorktreeFixture(t, tt.llmMessage, !tt.omitSystemTemplate)
 
 			var stderr bytes.Buffer
 			finalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.customTemplate, system, session, &stderr)
@@ -101,7 +99,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 	}
 }
 
-func newFinalizeWorktreeFixture(t *testing.T, llmMessage string) (*core.SweSystem, *core.SweSession, *vfs.MockVCS) {
+func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTemplate bool) (*core.SweSystem, *core.SweSession, *vfs.MockVCS) {
 	t.Helper()
 
 	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
@@ -109,14 +107,16 @@ func newFinalizeWorktreeFixture(t *testing.T, llmMessage string) (*core.SweSyste
 		Response: models.NewTextMessage(models.ChatRoleAssistant, llmMessage),
 	})
 
-	mockVFS := vfs.NewMockVFS()
-	require.NoError(t, mockVFS.WriteFile(CommitPromptSystemPath, []byte("system prompt")))
-	require.NoError(t, mockVFS.WriteFile(CommitPromptPromptPath, []byte("{{- range .Messages }}{{ . }}\n{{- end }}")))
-	require.NoError(t, mockVFS.WriteFile(CommitPromptMessagePath, []byte("[{{ .Branch }}] {{ .Message }}")))
+	configStore := confimpl.NewMockConfigStore()
+	if includeSystemTemplate {
+		configStore.SetAgentConfigFile("commit", "system.md", []byte("system prompt"))
+	}
+	configStore.SetAgentConfigFile("commit", "prompt.md", []byte("{{- range .Messages }}{{ . }}\n{{- end }}"))
+	configStore.SetAgentConfigFile("commit", "message.md", []byte("[{{ .Branch }}] {{ .Message }}"))
 
 	system := &core.SweSystem{
 		ModelProviders: map[string]models.ModelProvider{"mock": provider},
-		VFS:            mockVFS,
+		ConfigStore:    configStore,
 	}
 
 	session, err := system.NewSession("mock/test-model", nil)

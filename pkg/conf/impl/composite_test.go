@@ -580,6 +580,62 @@ func TestCompositeConfigStore_ConcurrentAccess(t *testing.T) {
 	}
 }
 
+func TestCompositeConfigStore_GetAgentConfigFile(t *testing.T) {
+	t.Run("uses highest-priority source", func(t *testing.T) {
+		embeddedStore := NewMockConfigStore()
+		globalStore := NewMockConfigStore()
+		localStore := NewMockConfigStore()
+
+		embeddedStore.SetAgentConfigFile("commit", "system.md", []byte("embedded"))
+		globalStore.SetAgentConfigFile("commit", "system.md", []byte("global"))
+		localStore.SetAgentConfigFile("commit", "system.md", []byte("local"))
+
+		composite := &CompositeConfigStore{
+			stores:             []conf.ConfigStore{embeddedStore, globalStore, localStore},
+			storeGlobalUpdates: make([]time.Time, 3),
+			storeModelUpdates:  make([]time.Time, 3),
+			storeRoleUpdates:   make([]time.Time, 3),
+		}
+
+		data, err := composite.GetAgentConfigFile("commit", "system.md")
+		require.NoError(t, err)
+		assert.Equal(t, "local", string(data))
+	})
+
+	t.Run("falls back when higher-priority source missing", func(t *testing.T) {
+		embeddedStore := NewMockConfigStore()
+		globalStore := NewMockConfigStore()
+		localStore := NewMockConfigStore()
+
+		embeddedStore.SetAgentConfigFile("commit", "system.md", []byte("embedded"))
+		globalStore.SetAgentConfigFile("commit", "system.md", []byte("global"))
+
+		composite := &CompositeConfigStore{
+			stores:             []conf.ConfigStore{embeddedStore, globalStore, localStore},
+			storeGlobalUpdates: make([]time.Time, 3),
+			storeModelUpdates:  make([]time.Time, 3),
+			storeRoleUpdates:   make([]time.Time, 3),
+		}
+
+		data, err := composite.GetAgentConfigFile("commit", "system.md")
+		require.NoError(t, err)
+		assert.Equal(t, "global", string(data))
+	})
+
+	t.Run("returns error when file missing in all sources", func(t *testing.T) {
+		composite := &CompositeConfigStore{
+			stores:             []conf.ConfigStore{NewMockConfigStore(), NewMockConfigStore()},
+			storeGlobalUpdates: make([]time.Time, 2),
+			storeModelUpdates:  make([]time.Time, 2),
+			storeRoleUpdates:   make([]time.Time, 2),
+		}
+
+		_, err := composite.GetAgentConfigFile("commit", "system.md")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "file not found in any config store")
+	})
+}
+
 func TestCompositeConfigStore_PromptFragmentsMerging(t *testing.T) {
 	// Create mock stores with different prompt fragments
 	store1 := NewMockConfigStore()

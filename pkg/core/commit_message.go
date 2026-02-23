@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
 )
 
@@ -21,18 +22,9 @@ type CommitMessageTemplateData struct {
 	Message string
 }
 
-// CommitPromptPaths contains paths to commit prompt template files.
-type CommitPromptPaths struct {
-	SystemPath  string
-	PromptPath  string
-	MessagePath string
-}
-
 // GenerateCommitMessage generates a short commit message using the active chat model.
-// The paths parameter specifies VFS paths to the system prompt, user prompt template,
-// and message template files.
-// If customMessageTemplate is non-empty, it overrides the message template from paths.
-func GenerateCommitMessage(ctx context.Context, sweSystem *SweSystem, session *SweSession, paths CommitPromptPaths, branch string, customMessageTemplate string) (string, error) {
+// If customMessageTemplate is non-empty, it overrides the configured message template.
+func GenerateCommitMessage(ctx context.Context, sweSystem *SweSystem, session *SweSession, branch string, customMessageTemplate string) (string, error) {
 	if sweSystem == nil {
 		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: sweSystem cannot be nil")
 	}
@@ -41,11 +33,11 @@ func GenerateCommitMessage(ctx context.Context, sweSystem *SweSystem, session *S
 		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: session cannot be nil")
 	}
 
-	if sweSystem.VFS == nil {
-		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: sweSystem VFS cannot be nil")
+	if sweSystem.ConfigStore == nil {
+		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: sweSystem config store cannot be nil")
 	}
 
-	systemPrompt, promptTemplate, messageTemplate, err := LoadCommitPromptTemplates(sweSystem.VFS, paths)
+	systemPrompt, promptTemplate, messageTemplate, err := LoadCommitPromptTemplates(sweSystem.ConfigStore)
 	if err != nil {
 		return "", err
 	}
@@ -95,19 +87,19 @@ func GenerateCommitMessage(ctx context.Context, sweSystem *SweSystem, session *S
 	return strings.TrimSpace(finalMessage), nil
 }
 
-// LoadCommitPromptTemplates loads commit prompt templates from the VFS.
-func LoadCommitPromptTemplates(vfs interface{ ReadFile(path string) ([]byte, error) }, paths CommitPromptPaths) (string, string, string, error) {
-	systemPromptBytes, err := vfs.ReadFile(paths.SystemPath)
+// LoadCommitPromptTemplates loads commit prompt templates from configuration store.
+func LoadCommitPromptTemplates(configStore conf.ConfigStore) (string, string, string, error) {
+	systemPromptBytes, err := configStore.GetAgentConfigFile("commit", "system.md")
 	if err != nil {
-		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: failed to read %s: %w", paths.SystemPath, err)
+		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: failed to read commit/system.md: %w", err)
 	}
-	promptTemplateBytes, err := vfs.ReadFile(paths.PromptPath)
+	promptTemplateBytes, err := configStore.GetAgentConfigFile("commit", "prompt.md")
 	if err != nil {
-		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: failed to read %s: %w", paths.PromptPath, err)
+		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: failed to read commit/prompt.md: %w", err)
 	}
-	messageTemplateBytes, err := vfs.ReadFile(paths.MessagePath)
+	messageTemplateBytes, err := configStore.GetAgentConfigFile("commit", "message.md")
 	if err != nil {
-		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: failed to read %s: %w", paths.MessagePath, err)
+		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: failed to read commit/message.md: %w", err)
 	}
 
 	return string(systemPromptBytes), string(promptTemplateBytes), string(messageTemplateBytes), nil

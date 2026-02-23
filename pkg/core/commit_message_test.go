@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
-	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,13 +48,7 @@ func TestGenerateCommitMessage(t *testing.T) {
 			err = session.UserPrompt("Add tests and integrate into worktree commit flow")
 			require.NoError(t, err)
 
-			paths := CommitPromptPaths{
-				SystemPath:  "system.md",
-				PromptPath:  "prompt.md",
-				MessagePath: "message.md",
-			}
-
-			message, err := GenerateCommitMessage(context.Background(), sweSystem, session, paths, tt.branch, tt.customTemplate)
+			message, err := GenerateCommitMessage(context.Background(), sweSystem, session, tt.branch, tt.customTemplate)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, message)
 
@@ -80,12 +74,22 @@ func TestGenerateCommitMessageErrors(t *testing.T) {
 			name: "fails when template file is missing",
 			setupSystem: func(t *testing.T) (*SweSystem, *SweSession) {
 				model := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
-				system := &SweSystem{ModelProviders: map[string]models.ModelProvider{"mock": model}, VFS: vfs.NewMockVFS()}
+				store := confimpl.NewMockConfigStore()
+				system := &SweSystem{ModelProviders: map[string]models.ModelProvider{"mock": model}, ConfigStore: store}
 				session, err := system.NewSession("mock/test-model", nil)
 				require.NoError(t, err)
 				return system, session
 			},
-			expectedErrSub: "system.md",
+			expectedErrSub: "commit/system.md",
+		},
+		{
+			name: "fails when config store is missing",
+			setupSystem: func(t *testing.T) (*SweSystem, *SweSession) {
+				system, session, _ := newCommitMessageTestSystem(t, "ignored")
+				system.ConfigStore = nil
+				return system, session
+			},
+			expectedErrSub: "config store cannot be nil",
 		},
 		{
 			name: "fails when generated message is empty",
@@ -100,12 +104,7 @@ func TestGenerateCommitMessageErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			system, session := tt.setupSystem(t)
-			paths := CommitPromptPaths{
-				SystemPath:  "system.md",
-				PromptPath:  "prompt.md",
-				MessagePath: "message.md",
-			}
-			_, err := GenerateCommitMessage(context.Background(), system, session, paths, "feature/test", "")
+			_, err := GenerateCommitMessage(context.Background(), system, session, "feature/test", "")
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.expectedErrSub)
 		})
@@ -120,14 +119,14 @@ func newCommitMessageTestSystem(t *testing.T, llmResponse string) (*SweSystem, *
 		Response: models.NewTextMessage(models.ChatRoleAssistant, llmResponse),
 	})
 
-	mockVFS := vfs.NewMockVFS()
-	require.NoError(t, mockVFS.WriteFile("system.md", []byte("system prompt")))
-	require.NoError(t, mockVFS.WriteFile("prompt.md", []byte("messages:\n{{- range .Messages }}\n- {{ . }}\n{{- end }}")))
-	require.NoError(t, mockVFS.WriteFile("message.md", []byte("[{{ .Branch }}] {{ .Message }}")))
+	store := confimpl.NewMockConfigStore()
+	store.SetAgentConfigFile("commit", "system.md", []byte("system prompt"))
+	store.SetAgentConfigFile("commit", "prompt.md", []byte("messages:\n{{- range .Messages }}\n- {{ . }}\n{{- end }}"))
+	store.SetAgentConfigFile("commit", "message.md", []byte("[{{ .Branch }}] {{ .Message }}"))
 
 	system := &SweSystem{
 		ModelProviders: map[string]models.ModelProvider{"mock": model},
-		VFS:            mockVFS,
+		ConfigStore:    store,
 	}
 
 	session, err := system.NewSession("mock/test-model", nil)

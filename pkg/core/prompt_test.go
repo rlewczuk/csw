@@ -523,6 +523,10 @@ func (m *mockConfigStore) LastGlobalConfigUpdate() (time.Time, error) {
 	return time.Time{}, nil
 }
 
+func (m *mockConfigStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
+	return nil, nil
+}
+
 func TestConfPromptGenerator_GetAgentFiles(t *testing.T) {
 	tests := []struct {
 		name           string
