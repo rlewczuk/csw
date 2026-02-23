@@ -304,11 +304,11 @@ func (v *CliChatView) renderMessage(msg *ui.ChatMessageUI) {
 // Must be called with mu locked.
 func (v *CliChatView) renderAssistantMessage(msg *ui.ChatMessageUI) {
 	if msg.Thinking != "" {
-		fmt.Fprintf(v.output, "\n*%s*", msg.Thinking)
+		fmt.Fprintf(v.output, "\n*%s*\n", msg.Thinking)
 	}
 
 	if msg.Text != "" {
-		fmt.Fprintf(v.output, "\nAssistant: %s", msg.Text)
+		fmt.Fprintf(v.output, "\nAssistant: %s\n", msg.Text)
 	}
 
 	for _, tool := range msg.Tools {
