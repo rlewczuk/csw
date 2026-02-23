@@ -9,6 +9,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestEmbeddedConfigStore_GetAgentConfigFile(t *testing.T) {
+	store, err := NewEmbeddedConfigStore()
+	require.NoError(t, err)
+
+	t.Run("reads embedded commit template", func(t *testing.T) {
+		data, err := store.GetAgentConfigFile("commit", "system.md")
+		require.NoError(t, err)
+		assert.NotEmpty(t, data)
+	})
+
+	t.Run("returns error when file missing", func(t *testing.T) {
+		_, err := store.GetAgentConfigFile("commit", "missing.md")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read")
+	})
+}
+
 func TestNewEmbeddedConfigStore(t *testing.T) {
 	store, err := NewEmbeddedConfigStore()
 	require.NoError(t, err)

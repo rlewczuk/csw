@@ -51,6 +51,10 @@ func (m *mockWritableStore) LastGlobalConfigUpdate() (time.Time, error) {
 	return time.Time{}, nil
 }
 
+func (m *mockWritableStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
+	return nil, nil
+}
+
 func (m *mockWritableStore) SaveModelProviderConfig(config *conf.ModelProviderConfig) error {
 	m.saveCalled = true
 	if m.saveError != nil {

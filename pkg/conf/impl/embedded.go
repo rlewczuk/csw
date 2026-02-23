@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -180,6 +181,33 @@ func (s *EmbeddedConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleC
 // For embedded configuration, this always returns a constant timestamp.
 func (s *EmbeddedConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
 	return embeddedTimestamp, nil
+}
+
+// GetAgentConfigFile returns file content from embedded conf/agent/<subdir>/<filename>.
+func (s *EmbeddedConfigStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
+	if filename == "" {
+		return nil, fmt.Errorf("EmbeddedConfigStore.GetAgentConfigFile() [embedded.go]: filename cannot be empty")
+	}
+
+	if filepath.Base(filename) != filename {
+		return nil, fmt.Errorf("EmbeddedConfigStore.GetAgentConfigFile() [embedded.go]: filename cannot contain path separators")
+	}
+
+	cleanSubdir := filepath.Clean(subdir)
+	if cleanSubdir == "." {
+		cleanSubdir = ""
+	}
+	if cleanSubdir != "" && (filepath.IsAbs(cleanSubdir) || cleanSubdir == ".." || strings.HasPrefix(cleanSubdir, "../")) {
+		return nil, fmt.Errorf("EmbeddedConfigStore.GetAgentConfigFile() [embedded.go]: invalid subdir: %s", subdir)
+	}
+
+	path := filepath.Join("conf", "agent", cleanSubdir, filename)
+	data, err := embeddedConfigFS.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("EmbeddedConfigStore.GetAgentConfigFile() [embedded.go]: failed to read %s: %w", path, err)
+	}
+
+	return data, nil
 }
 
 // loadAllConfig loads all configuration from the embedded filesystem.

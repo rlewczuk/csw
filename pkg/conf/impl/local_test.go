@@ -399,6 +399,33 @@ func TestLocalConfigStore_EmptyName(t *testing.T) {
 	})
 }
 
+func TestLocalConfigStore_GetAgentConfigFile(t *testing.T) {
+	t.Run("reads file from agent namespace", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "agent", "commit"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "agent", "commit", "system.md"), []byte("local-system"), 0o644))
+
+		store, err := NewLocalConfigStore(tmpDir)
+		require.NoError(t, err)
+		defer store.Close()
+
+		data, err := store.GetAgentConfigFile("commit", "system.md")
+		require.NoError(t, err)
+		assert.Equal(t, "local-system", string(data))
+	})
+
+	t.Run("returns error for missing file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		store, err := NewLocalConfigStore(tmpDir)
+		require.NoError(t, err)
+		defer store.Close()
+
+		_, err = store.GetAgentConfigFile("commit", "missing.md")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read")
+	})
+}
+
 func TestLocalConfigStore_FileWatching_GlobalConfig(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "test-config-*")
 	require.NoError(t, err)

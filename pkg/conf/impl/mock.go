@@ -2,6 +2,8 @@
 package impl
 
 import (
+	"fmt"
+	"io/fs"
 	"sync"
 	"time"
 
@@ -19,6 +21,7 @@ type MockConfigStore struct {
 	modelProviderConfigsUpdate time.Time
 	agentRoleConfigs           map[string]*conf.AgentRoleConfig
 	agentRoleConfigsUpdate     time.Time
+	agentConfigFiles           map[string][]byte
 
 	// Error injection for testing
 	GetGlobalConfigErr                error
@@ -27,6 +30,7 @@ type MockConfigStore struct {
 	LastGlobalConfigUpdateErr         error
 	LastModelProviderConfigsUpdateErr error
 	LastAgentRoleConfigsUpdateErr     error
+	GetAgentConfigFileErr             error
 }
 
 // NewMockConfigStore creates a new MockConfigStore with empty configuration.
@@ -38,7 +42,18 @@ func NewMockConfigStore() *MockConfigStore {
 		modelProviderConfigsUpdate: time.Now(),
 		agentRoleConfigs:           make(map[string]*conf.AgentRoleConfig),
 		agentRoleConfigsUpdate:     time.Now(),
+		agentConfigFiles:           make(map[string][]byte),
 	}
+}
+
+// SetAgentConfigFile sets agent config file content for tests.
+func (m *MockConfigStore) SetAgentConfigFile(subdir, filename string, data []byte) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := subdir + "/" + filename
+	copyData := make([]byte, len(data))
+	copy(copyData, data)
+	m.agentConfigFiles[key] = copyData
 }
 
 // SetGlobalConfig sets the global configuration and updates the timestamp.
@@ -218,4 +233,24 @@ func (m *MockConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
 	}
 
 	return m.agentRoleConfigsUpdate, nil
+}
+
+// GetAgentConfigFile returns configured agent config file content.
+func (m *MockConfigStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m.GetAgentConfigFileErr != nil {
+		return nil, m.GetAgentConfigFileErr
+	}
+
+	key := subdir + "/" + filename
+	data, ok := m.agentConfigFiles[key]
+	if !ok {
+		return nil, fmt.Errorf("MockConfigStore.GetAgentConfigFile() [mock.go]: file not found: agent/%s/%s: %w", subdir, filename, fs.ErrNotExist)
+	}
+
+	copyData := make([]byte, len(data))
+	copy(copyData, data)
+	return copyData, nil
 }
