@@ -161,6 +161,12 @@ func withModelProvider(provider models.ModelProvider) sweSystemFixtureOption {
 	}
 }
 
+func withPromptGenerator(generator PromptGenerator) sweSystemFixtureOption {
+	return func(config *sweSystemFixtureConfig) {
+		config.promptGenerator = generator
+	}
+}
+
 func withProviderName(name string) sweSystemFixtureOption {
 	return func(config *sweSystemFixtureConfig) {
 		config.providerName = name
