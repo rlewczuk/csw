@@ -8,6 +8,7 @@ import (
 	"net"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -359,20 +360,21 @@ func (s *SweSession) buildAdditionalAgentMessages(toolCall *tool.ToolCall, respo
 
 	messages := make([]*models.ChatMessage, 0)
 	for _, dir := range uniqueStrings(dirs) {
-		msg, err := s.buildAdditionalAgentMessageForDir(dir)
+		dirMessages, err := s.buildAdditionalAgentMessageForDir(dir)
 		if err != nil {
 			return nil, err
 		}
-		if msg != nil {
-			messages = append(messages, msg)
+		if len(dirMessages) > 0 {
+			messages = append(messages, dirMessages...)
 		}
 	}
 
 	return messages, nil
 }
 
-// buildAdditionalAgentMessageForDir creates a user message from AGENTS.md in the provided directory if not loaded yet.
-func (s *SweSession) buildAdditionalAgentMessageForDir(dir string) (*models.ChatMessage, error) {
+// buildAdditionalAgentMessageForDir creates user messages from AGENTS.md files in the
+// provided directory and its parent directories if not loaded yet.
+func (s *SweSession) buildAdditionalAgentMessageForDir(dir string) ([]*models.ChatMessage, error) {
 	rootPath := ""
 	if s.VFS != nil {
 		rootPath = s.VFS.WorktreePath()
@@ -382,7 +384,7 @@ func (s *SweSession) buildAdditionalAgentMessageForDir(dir string) (*models.Chat
 	}
 	workDirAbs, err := filepath.Abs(rootPath)
 	if err != nil {
-		return nil, fmt.Errorf("buildAdditionalAgentMessageForDir() [session.go]: failed to resolve root path %q: %w", rootPath, err)
+		return nil, fmt.Errorf("SweSession.buildAdditionalAgentMessageForDir() [session.go]: failed to resolve root path %q: %w", rootPath, err)
 	}
 
 	resolvedDir := dir
@@ -394,38 +396,57 @@ func (s *SweSession) buildAdditionalAgentMessageForDir(dir string) (*models.Chat
 	}
 	resolvedDir, err = filepath.Abs(resolvedDir)
 	if err != nil {
-		return nil, fmt.Errorf("buildAdditionalAgentMessageForDir() [session.go]: failed to resolve dir %q: %w", dir, err)
+		return nil, fmt.Errorf("SweSession.buildAdditionalAgentMessageForDir() [session.go]: failed to resolve dir %q: %w", dir, err)
 	}
 
 	relDir, err := filepath.Rel(workDirAbs, resolvedDir)
 	if err != nil {
-		return nil, fmt.Errorf("buildAdditionalAgentMessageForDir() [session.go]: failed to get relative dir for %q: %w", resolvedDir, err)
+		return nil, fmt.Errorf("SweSession.buildAdditionalAgentMessageForDir() [session.go]: failed to get relative dir for %q: %w", resolvedDir, err)
 	}
 	if relDir == "." || relDir == "" || strings.HasPrefix(relDir, "..") || filepath.IsAbs(relDir) {
 		return nil, nil
 	}
 
-	agentsPath := filepath.Join(relDir, "AGENTS.md")
 	if s.loadedAgentFiles == nil {
 		s.loadedAgentFiles = make(map[string]struct{})
-	}
-	if _, loaded := s.loadedAgentFiles[agentsPath]; loaded {
-		return nil, nil
 	}
 
 	files, err := s.system.PromptGenerator.GetAgentFiles(relDir)
 	if err != nil {
-		return nil, fmt.Errorf("buildAdditionalAgentMessageForDir() [session.go]: failed to get agent files for %q: %w", relDir, err)
+		return nil, fmt.Errorf("SweSession.buildAdditionalAgentMessageForDir() [session.go]: failed to get agent files for %q: %w", relDir, err)
 	}
-
-	content, ok := files[agentsPath]
-	if !ok {
+	if len(files) == 0 {
 		return nil, nil
 	}
 
-	s.loadedAgentFiles[agentsPath] = struct{}{}
-	wrapped := "<system>\n" + content + "\n</system>"
-	return models.NewTextMessage(models.ChatRoleUser, wrapped), nil
+	paths := make([]string, 0, len(files))
+	for path := range files {
+		paths = append(paths, path)
+	}
+	sort.Slice(paths, func(i, j int) bool {
+		depthI := strings.Count(filepath.Clean(paths[i]), string(filepath.Separator))
+		depthJ := strings.Count(filepath.Clean(paths[j]), string(filepath.Separator))
+		if depthI != depthJ {
+			return depthI > depthJ
+		}
+		return paths[i] < paths[j]
+	})
+
+	messages := make([]*models.ChatMessage, 0, len(paths))
+	for _, agentsPath := range paths {
+		if _, loaded := s.loadedAgentFiles[agentsPath]; loaded {
+			continue
+		}
+		s.loadedAgentFiles[agentsPath] = struct{}{}
+		wrapped := "<system>\n" + files[agentsPath] + "\n</system>"
+		messages = append(messages, models.NewTextMessage(models.ChatRoleUser, wrapped))
+	}
+
+	if len(messages) == 0 {
+		return nil, nil
+	}
+
+	return messages, nil
 }
 
 // parseDirsFromGrepResult extracts directories from vfsGrep result content.

@@ -549,6 +549,22 @@ func TestConfPromptGenerator_GetAgentFiles(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "includes AGENTS.md from parent directories excluding root",
+			setupVFS: func(v *vfs.MockVFS) {
+				require.NoError(t, v.WriteFile("foo/AGENTS.md", []byte("# Foo Instructions")))
+				require.NoError(t, v.WriteFile("foo/bar/AGENTS.md", []byte("# Bar Instructions")))
+				require.NoError(t, v.WriteFile("foo/bar/baz/AGENTS.md", []byte("# Baz Instructions")))
+				require.NoError(t, v.WriteFile("AGENTS.md", []byte("# Root Instructions")))
+			},
+			dir: "foo/bar/baz",
+			wantFiles: map[string]string{
+				"foo/AGENTS.md":         "# Foo Instructions",
+				"foo/bar/AGENTS.md":     "# Bar Instructions",
+				"foo/bar/baz/AGENTS.md": "# Baz Instructions",
+			},
+			wantErr: false,
+		},
+		{
 			name: "AGENTS.md does not exist in directory",
 			setupVFS: func(v *vfs.MockVFS) {
 				// Don't create any files
@@ -558,16 +574,14 @@ func TestConfPromptGenerator_GetAgentFiles(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name: "AGENTS.md exists at root",
+			name: "project root AGENTS.md is excluded",
 			setupVFS: func(v *vfs.MockVFS) {
 				err := v.WriteFile("AGENTS.md", []byte("# Root Agent Instructions"))
 				require.NoError(t, err)
 			},
-			dir: ".",
-			wantFiles: map[string]string{
-				"AGENTS.md": "# Root Agent Instructions",
-			},
-			wantErr: false,
+			dir:       ".",
+			wantFiles: map[string]string{},
+			wantErr:   false,
 		},
 		{
 			name: "nested directory with AGENTS.md",

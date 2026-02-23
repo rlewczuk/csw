@@ -553,8 +553,11 @@ func convertPropertySchema(propData map[string]any) (tool.PropertySchema, error)
 	return propSchema, nil
 }
 
-// GetAgentFiles returns a map of additional agent instruction files from the given directory relative to project root.
-// It reads AGENTS.md file from the given directory and returns it.
+// GetAgentFiles returns additional agent instruction files from the given directory
+// and its parent directories relative to project root.
+//
+// The search includes AGENTS.md in the given directory and each parent directory,
+// and excludes project root AGENTS.md.
 // Returns a map with file paths as keys and content as values.
 func (g *ConfPromptGenerator) GetAgentFiles(dir string) (map[string]string, error) {
 	if g.vfs == nil {
@@ -563,21 +566,33 @@ func (g *ConfPromptGenerator) GetAgentFiles(dir string) (map[string]string, erro
 
 	result := make(map[string]string)
 
-	// Construct path to AGENTS.md in the given directory
-	agentsPath := filepath.Join(dir, "AGENTS.md")
-
-	// Try to read the file
-	content, err := g.vfs.ReadFile(agentsPath)
-	if err != nil {
-		// If file doesn't exist, that's okay - just return empty map
-		if errors.Is(err, vfs.ErrFileNotFound) {
-			return result, nil
-		}
-		return nil, fmt.Errorf("GetAgentFiles() [prompt.go]: failed to read %s: %w", agentsPath, err)
+	cleanDir := filepath.Clean(strings.TrimSpace(dir))
+	if cleanDir == "" {
+		cleanDir = "."
 	}
 
-	// Add the content to result
-	result[agentsPath] = string(content)
+	if cleanDir == "." {
+		return result, nil
+	}
+
+	for current := cleanDir; current != "." && current != ""; current = filepath.Dir(current) {
+		agentsPath := filepath.Join(current, "AGENTS.md")
+		content, err := g.vfs.ReadFile(agentsPath)
+		if err != nil {
+			if errors.Is(err, vfs.ErrFileNotFound) {
+				if filepath.Dir(current) == current {
+					break
+				}
+				continue
+			}
+			return nil, fmt.Errorf("GetAgentFiles() [prompt.go]: failed to read %s: %w", agentsPath, err)
+		}
+		result[agentsPath] = string(content)
+
+		if filepath.Dir(current) == current {
+			break
+		}
+	}
 
 	return result, nil
 }
