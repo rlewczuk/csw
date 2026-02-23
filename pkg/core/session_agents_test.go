@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -26,15 +27,24 @@ func (g *sessionAgentTestPromptGenerator) GetToolInfo(tags []string, toolName st
 
 func (g *sessionAgentTestPromptGenerator) GetAgentFiles(dir string) (map[string]string, error) {
 	result := make(map[string]string)
-	path := filepath.Join(dir, "AGENTS.md")
-	content, err := g.vfs.ReadFile(path)
-	if err != nil {
-		if strings.Contains(err.Error(), vfs.ErrFileNotFound.Error()) {
-			return result, nil
+	for current := filepath.Clean(dir); current != "." && current != ""; current = filepath.Dir(current) {
+		path := filepath.Join(current, "AGENTS.md")
+		content, err := g.vfs.ReadFile(path)
+		if err != nil {
+			if errors.Is(err, vfs.ErrFileNotFound) {
+				if filepath.Dir(current) == current {
+					break
+				}
+				continue
+			}
+			return nil, err
 		}
-		return nil, err
+		result[path] = string(content)
+
+		if filepath.Dir(current) == current {
+			break
+		}
 	}
-	result[path] = string(content)
 	return result, nil
 }
 
@@ -54,7 +64,11 @@ func TestParseDirsFromGrepResult(t *testing.T) {
 
 func TestBuildAdditionalAgentMessageForDir(t *testing.T) {
 	mockVFS := vfs.NewMockVFS()
-	require.NoError(t, mockVFS.WriteFile("src/AGENTS.md", []byte("subdir instructions")))
+	require.NoError(t, mockVFS.WriteFile("pkg/AGENTS.md", []byte("pkg instructions")))
+	require.NoError(t, mockVFS.WriteFile("pkg/foo/AGENTS.md", []byte("foo instructions")))
+	require.NoError(t, mockVFS.WriteFile("pkg/foo/bar/AGENTS.md", []byte("bar instructions")))
+	require.NoError(t, mockVFS.WriteFile("pkg/foo/baz/AGENTS.md", []byte("baz instructions")))
+	require.NoError(t, mockVFS.WriteFile("AGENTS.md", []byte("root instructions")))
 
 	session := &SweSession{
 		system: &SweSystem{
@@ -64,21 +78,52 @@ func TestBuildAdditionalAgentMessageForDir(t *testing.T) {
 		workDir: ".",
 	}
 
-	t.Run("loads message once for directory", func(t *testing.T) {
-		msg, err := session.buildAdditionalAgentMessageForDir("src")
+	t.Run("loads messages for directory and parents excluding root", func(t *testing.T) {
+		msgs, err := session.buildAdditionalAgentMessageForDir("pkg/foo/bar")
 		require.NoError(t, err)
-		require.NotNil(t, msg)
-		assert.Contains(t, msg.GetText(), "<system>")
-		assert.Contains(t, msg.GetText(), "subdir instructions")
+		require.Len(t, msgs, 3)
 
-		nextMsg, err := session.buildAdditionalAgentMessageForDir("src")
+		joined := strings.Builder{}
+		for _, msg := range msgs {
+			joined.WriteString(msg.GetText())
+			joined.WriteString("\n")
+			assert.Contains(t, msg.GetText(), "<system>")
+			assert.Contains(t, msg.GetText(), "</system>")
+		}
+
+		joinedText := joined.String()
+		assert.Contains(t, joinedText, "bar instructions")
+		assert.Contains(t, joinedText, "foo instructions")
+		assert.Contains(t, joinedText, "pkg instructions")
+		assert.NotContains(t, joinedText, "root instructions")
+
+		nextMsgs, err := session.buildAdditionalAgentMessageForDir("pkg/foo/bar")
 		require.NoError(t, err)
-		assert.Nil(t, nextMsg)
+		assert.Nil(t, nextMsgs)
+	})
+
+	t.Run("deduplicates parent files across subsequent directory reads", func(t *testing.T) {
+		freshSession := &SweSession{
+			system: &SweSystem{
+				PromptGenerator: &sessionAgentTestPromptGenerator{vfs: mockVFS},
+			},
+			VFS:     mockVFS,
+			workDir: ".",
+		}
+
+		firstMsgs, err := freshSession.buildAdditionalAgentMessageForDir("pkg/foo/bar")
+		require.NoError(t, err)
+		require.Len(t, firstMsgs, 3)
+
+		secondMsgs, err := freshSession.buildAdditionalAgentMessageForDir("pkg/foo/baz")
+		require.NoError(t, err)
+		require.Len(t, secondMsgs, 1)
+		assert.Contains(t, secondMsgs[0].GetText(), "baz instructions")
 	})
 
 	t.Run("ignores root directory", func(t *testing.T) {
-		msg, err := session.buildAdditionalAgentMessageForDir(".")
+		msgs, err := session.buildAdditionalAgentMessageForDir(".")
 		require.NoError(t, err)
-		assert.Nil(t, msg)
+		assert.Nil(t, msgs)
 	})
 }
