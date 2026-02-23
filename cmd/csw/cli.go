@@ -160,6 +160,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch, commitMessageT
 	// Create chat presenter
 	basePresenter := presenter.NewChatPresenter(sweSystem, thread)
 	appView := cli.NewAppView(os.Stdout)
+	basePresenter.SetAppView(appView)
 
 	// Create CLI chat view
 	baseCliView := cli.NewCliChatView(basePresenter, os.Stdout, os.Stdin, interactive, allowAllPerms)
@@ -270,6 +271,12 @@ func (h *cliOutputHandler) AddAssistantMessage(text string, thinking string) {
 	h.delegate.AddAssistantMessage(text, thinking)
 }
 
+func (h *cliOutputHandler) ShowMessage(message string, messageType string) {
+	if h.delegate != nil {
+		h.delegate.ShowMessage(message, messageType)
+	}
+}
+
 func (h *cliOutputHandler) AddToolCall(call *tool.ToolCall) {
 	h.delegate.AddToolCall(call)
 }
@@ -286,6 +293,13 @@ func (h *cliOutputHandler) OnRateLimitError(retryAfterSeconds int) {
 	if h.delegate != nil {
 		h.delegate.OnRateLimitError(retryAfterSeconds)
 	}
+}
+
+func (h *cliOutputHandler) ShouldRetryAfterFailure(message string) bool {
+	if h.delegate != nil {
+		return h.delegate.ShouldRetryAfterFailure(message)
+	}
+	return false
 }
 
 func (h *cliOutputHandler) RunFinished(err error) {

@@ -25,6 +25,14 @@ type IAppView interface {
 	ShowMessage(message string, messageType MessageType)
 }
 
+// IRetryPromptView extends app view with retry prompt support.
+type IRetryPromptView interface {
+	IAppView
+
+	// AskRetry asks user whether failed operation should be retried.
+	AskRetry(message string) bool
+}
+
 // IAppPresenter is an interface for propagating user input from UI to the app.
 type IAppPresenter interface {
 	// NewSession creates a new chat session

@@ -80,9 +80,11 @@ func (s *EmbeddedConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 
 	// Return a copy to prevent external modification
 	config := &conf.GlobalConfig{
-		ModelTags:       make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
-		DefaultProvider: s.globalConfig.DefaultProvider,
-		DefaultRole:     s.globalConfig.DefaultRole,
+		ModelTags:                 make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
+		DefaultProvider:           s.globalConfig.DefaultProvider,
+		DefaultRole:               s.globalConfig.DefaultRole,
+		LLMRetryMaxAttempts:       s.globalConfig.LLMRetryMaxAttempts,
+		LLMRetryMaxBackoffSeconds: s.globalConfig.LLMRetryMaxBackoffSeconds,
 		ToolSelection: conf.ToolSelectionConfig{
 			Default: make(map[string]bool, len(s.globalConfig.ToolSelection.Default)),
 			Tags:    make(map[string]map[string]bool, len(s.globalConfig.ToolSelection.Tags)),

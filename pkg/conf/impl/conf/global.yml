@@ -23,3 +23,6 @@ tool_selection:
       vfsEdit: false
       vfsWrite: false
       vfsDelete: false
+
+llm_retry_max_attempts: 10
+llm_retry_max_backoff_seconds: 60

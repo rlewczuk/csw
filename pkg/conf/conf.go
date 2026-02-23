@@ -204,6 +204,12 @@ type GlobalConfig struct {
 	DefaultProvider string `json:"default_provider,omitempty" yaml:"default_provider,omitempty"`
 	// DefaultRole is the name of the default agent role to use
 	DefaultRole string `json:"default_role,omitempty" yaml:"default_role,omitempty"`
+	// LLMRetryMaxAttempts is the maximum number of attempts for temporary LLM API failures.
+	// Defaults to 10 when unset or invalid.
+	LLMRetryMaxAttempts int `json:"llm_retry_max_attempts,omitempty" yaml:"llm_retry_max_attempts,omitempty"`
+	// LLMRetryMaxBackoffSeconds caps exponential backoff delay in seconds.
+	// Defaults to 60 when unset or invalid.
+	LLMRetryMaxBackoffSeconds int `json:"llm_retry_max_backoff_seconds,omitempty" yaml:"llm_retry_max_backoff_seconds,omitempty"`
 }
 
 // ConfigStore is an interface for accessing configuration data.

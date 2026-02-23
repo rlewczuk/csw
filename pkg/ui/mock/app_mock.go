@@ -11,6 +11,8 @@ type MockAppView struct {
 	ShowChatCalls     []ui.IChatPresenter
 	ShowSettingsCalls int
 	ShowMessageCalls  []MockAppMessageCall
+	AskRetryCalls     []string
+	AskRetryResult    bool
 
 	// MockChatView to return from ShowChat
 	chatView *MockChatView
@@ -48,11 +50,19 @@ func (m *MockAppView) ShowMessage(message string, messageType ui.MessageType) {
 	})
 }
 
+// AskRetry stores retry prompt and returns configured result.
+func (m *MockAppView) AskRetry(message string) bool {
+	m.AskRetryCalls = append(m.AskRetryCalls, message)
+	return m.AskRetryResult
+}
+
 // Reset clears all recorded calls.
 func (m *MockAppView) Reset() {
 	m.ShowChatCalls = nil
 	m.ShowSettingsCalls = 0
 	m.ShowMessageCalls = nil
+	m.AskRetryCalls = nil
+	m.AskRetryResult = false
 	m.chatView.Reset()
 }
 

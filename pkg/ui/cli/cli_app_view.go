@@ -46,4 +46,12 @@ func (v *CliAppView) ShowMessage(message string, messageType ui.MessageType) {
 	_, _ = fmt.Fprintf(v.output, "%s %s\n", prefix, message)
 }
 
+// AskRetry asks user whether retry should continue after retries are exhausted.
+// In CLI mode this is always false to exit after configured attempts.
+func (v *CliAppView) AskRetry(message string) bool {
+	v.ShowMessage(message, ui.MessageTypeError)
+	return false
+}
+
 var _ ui.IAppView = (*CliAppView)(nil)
+var _ ui.IRetryPromptView = (*CliAppView)(nil)

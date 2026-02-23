@@ -132,9 +132,11 @@ func (c *CompositeConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 
 	// Return a copy to prevent external modification
 	config := &conf.GlobalConfig{
-		DefaultProvider: c.globalConfig.DefaultProvider,
-		DefaultRole:     c.globalConfig.DefaultRole,
-		ModelTags:       make([]conf.ModelTagMapping, len(c.globalConfig.ModelTags)),
+		DefaultProvider:           c.globalConfig.DefaultProvider,
+		DefaultRole:               c.globalConfig.DefaultRole,
+		LLMRetryMaxAttempts:       c.globalConfig.LLMRetryMaxAttempts,
+		LLMRetryMaxBackoffSeconds: c.globalConfig.LLMRetryMaxBackoffSeconds,
+		ModelTags:                 make([]conf.ModelTagMapping, len(c.globalConfig.ModelTags)),
 		ToolSelection: conf.ToolSelectionConfig{
 			Default: make(map[string]bool, len(c.globalConfig.ToolSelection.Default)),
 			Tags:    make(map[string]map[string]bool, len(c.globalConfig.ToolSelection.Tags)),

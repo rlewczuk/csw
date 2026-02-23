@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +16,14 @@ import (
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vfs"
+)
+
+const (
+	defaultLLMRetryMaxAttempts       = 10
+	defaultLLMRetryMaxBackoffSeconds = 60
+	sessionMessageTypeInfo           = "info"
+	sessionMessageTypeWarning        = "warning"
+	sessionMessageTypeError          = "error"
 )
 
 type SweSession struct {
@@ -179,7 +187,8 @@ func (s *SweSession) emitAssistantMessage(responseMsg *models.ChatMessage) {
 
 // runNonStreamingChat executes a non-streaming chat request and returns the response.
 func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.ChatModel, tools []tool.ToolInfo, chatOptions *models.ChatOptions) (*models.ChatMessage, error) {
-	maxRetries := s.maxRetries()
+	maxAttempts := s.llmRetryMaxAttempts()
+	maxBackoffSeconds := s.llmRetryMaxBackoffSeconds()
 	backoffScale := models.DefaultRetryBackoffScale
 	if configProvider, ok := s.provider.(interface {
 		GetConfig() *conf.ModelProviderConfig
@@ -190,105 +199,72 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 		}
 	}
 
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if s.logger != nil {
-			s.logger.Debug("chat_non_streaming_request", "num_messages", len(s.messages), "num_tools", len(tools), "attempt", attempt)
-		}
-
-		// Use non-streaming chat API
-		responseMsg, err := chatModel.Chat(ctx, s.messages, chatOptions, tools)
-		if err == nil {
+	for {
+		for attempt := 1; attempt <= maxAttempts; attempt++ {
 			if s.logger != nil {
-				s.logger.Debug("chat_non_streaming_complete", "num_parts", len(responseMsg.Parts))
+				s.logger.Debug("chat_non_streaming_request", "num_messages", len(s.messages), "num_tools", len(tools), "attempt", attempt)
 			}
 
-			s.emitAssistantMessage(responseMsg)
+			responseMsg, err := chatModel.Chat(ctx, s.messages, chatOptions, tools)
+			if err == nil {
+				if s.logger != nil {
+					s.logger.Debug("chat_non_streaming_complete", "num_parts", len(responseMsg.Parts))
+				}
 
-			return responseMsg, nil
-		}
-
-		// Check if this is a rate limit error
-		var rateLimitErr *models.RateLimitError
-		if errors.As(err, &rateLimitErr) {
-			if s.logger != nil {
-				s.logger.Warn("rate_limit_error", "error", err, "retry_after", rateLimitErr.RetryAfterSeconds, "attempt", attempt)
+				s.emitAssistantMessage(responseMsg)
+				return responseMsg, nil
 			}
 
-			// Notify the UI about rate limit
+			if !isTemporaryLLMError(err) {
+				if s.logger != nil {
+					s.logger.Error("chat_non_streaming_error", "error", err)
+				}
+				return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: chat request failed: %w", err)
+			}
+
+			retryAfterSeconds := 0
+			var rateLimitErr *models.RateLimitError
+			if errors.As(err, &rateLimitErr) {
+				retryAfterSeconds = rateLimitErr.RetryAfterSeconds
+				if s.outputHandler != nil {
+					s.outputHandler.OnRateLimitError(retryAfterSeconds)
+				}
+			}
+
 			if s.outputHandler != nil {
-				s.outputHandler.OnRateLimitError(rateLimitErr.RetryAfterSeconds)
+				s.outputHandler.ShowMessage(fmt.Sprintf("LLM API temporary error (attempt %d/%d): %v", attempt, maxAttempts, err), sessionMessageTypeError)
 			}
 
-			// If we've exhausted retries, return the error
-			if attempt >= maxRetries {
-				return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: rate limit exceeded after %d retries: %w", maxRetries, err)
+			if attempt >= maxAttempts {
+				if s.outputHandler != nil {
+					if s.outputHandler.ShouldRetryAfterFailure(fmt.Sprintf("LLM API request failed after %d attempts: %v", maxAttempts, err)) {
+						s.outputHandler.ShowMessage("Retry requested by user. Starting another retry cycle.", sessionMessageTypeInfo)
+						break
+					}
+				}
+				return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: temporary LLM API failure after %d attempts: %w", maxAttempts, err)
 			}
 
-			// Calculate backoff time
-			backoffSeconds := rateLimitErr.RetryAfterSeconds
-			if backoffSeconds == 0 {
-				// Use exponential backoff: 1s, 2s, 4s, 8s, etc.
-				backoffSeconds = int(math.Pow(2, float64(attempt)))
+			backoffSeconds := retryAfterSeconds
+			if backoffSeconds <= 0 {
+				backoffSeconds = 1 << (attempt - 1)
+			}
+			if backoffSeconds > maxBackoffSeconds {
+				backoffSeconds = maxBackoffSeconds
 			}
 			backoffDuration := time.Duration(backoffSeconds) * backoffScale
 
-			if s.logger != nil {
-				s.logger.Info("retrying_after_rate_limit", "backoff_duration", backoffDuration, "attempt", attempt+1, "max_retries", maxRetries)
+			if s.outputHandler != nil {
+				s.outputHandler.ShowMessage(fmt.Sprintf("Retrying in %s...", backoffDuration.Round(time.Second)), sessionMessageTypeWarning)
 			}
 
-			// Wait for backoff duration
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			case <-time.After(backoffDuration):
-				// Continue to next retry
 			}
-			continue
 		}
-
-		// Check if this is a retryable network error
-		var networkErr *models.NetworkError
-		if errors.As(err, &networkErr) && networkErr.IsRetryable {
-			if s.logger != nil {
-				s.logger.Warn("network_error", "error", err, "attempt", attempt)
-			}
-
-			// Notify the UI about network retry
-			if s.outputHandler != nil {
-				s.outputHandler.OnRateLimitError(0) // Use 0 to indicate exponential backoff
-			}
-
-			// If we've exhausted retries, return the error
-			if attempt >= maxRetries {
-				return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: network error after %d retries: %w", maxRetries, err)
-			}
-
-			// Calculate backoff time using exponential backoff: 1s, 2s, 4s, 8s, etc.
-			backoffSeconds := int(math.Pow(2, float64(attempt)))
-			backoffDuration := time.Duration(backoffSeconds) * backoffScale
-
-			if s.logger != nil {
-				s.logger.Info("retrying_after_network_error", "backoff_duration", backoffDuration, "attempt", attempt+1, "max_retries", maxRetries)
-			}
-
-			// Wait for backoff duration
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(backoffDuration):
-				// Continue to next retry
-			}
-			continue
-		}
-
-		// Not a retryable error, return immediately
-		if s.logger != nil {
-			s.logger.Error("chat_non_streaming_error", "error", err)
-		}
-		return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: chat request failed: %w", err)
 	}
-
-	return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: chat request failed after %d retries", maxRetries)
 }
 
 // executeToolCalls executes the given tool calls and appends the results to the conversation.
@@ -655,14 +631,61 @@ func buildSessionToolRegistry(systemTools *tool.ToolRegistry, vfsImpl vfs.VFS, l
 
 // maxRetries returns the maximum number of retries for rate limit/network errors.
 // Returns default value from models.DefaultMaxRetries if not configured.
-func (s *SweSession) maxRetries() int {
+func (s *SweSession) llmRetryMaxAttempts() int {
+	if s.system != nil && s.system.ConfigStore != nil {
+		globalConfig, err := s.system.ConfigStore.GetGlobalConfig()
+		if err == nil && globalConfig != nil && globalConfig.LLMRetryMaxAttempts > 0 {
+			return globalConfig.LLMRetryMaxAttempts
+		}
+	}
+
 	if configProvider, ok := s.provider.(interface {
 		GetConfig() *conf.ModelProviderConfig
 	}); ok {
 		config := configProvider.GetConfig()
 		if config != nil && config.MaxRetries > 0 {
-			return config.MaxRetries
+			return config.MaxRetries + 1
 		}
 	}
-	return models.DefaultMaxRetries
+
+	return defaultLLMRetryMaxAttempts
+}
+
+// llmRetryMaxBackoffSeconds returns the maximum backoff in seconds for temporary failures.
+func (s *SweSession) llmRetryMaxBackoffSeconds() int {
+	if s.system != nil && s.system.ConfigStore != nil {
+		globalConfig, err := s.system.ConfigStore.GetGlobalConfig()
+		if err == nil && globalConfig != nil && globalConfig.LLMRetryMaxBackoffSeconds > 0 {
+			return globalConfig.LLMRetryMaxBackoffSeconds
+		}
+	}
+	return defaultLLMRetryMaxBackoffSeconds
+}
+
+// isTemporaryLLMError returns true when an LLM error indicates temporary condition.
+func isTemporaryLLMError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var rateLimitErr *models.RateLimitError
+	if errors.As(err, &rateLimitErr) {
+		return true
+	}
+
+	var networkErr *models.NetworkError
+	if errors.As(err, &networkErr) {
+		return networkErr.IsRetryable
+	}
+
+	if errors.Is(err, models.ErrEndpointUnavailable) {
+		return true
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return netErr.Timeout() || netErr.Temporary()
+	}
+
+	return false
 }

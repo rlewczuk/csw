@@ -327,7 +327,6 @@ func TestSessionReasoningContent(t *testing.T) {
 		session, err := system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
 
-
 		session.UserPrompt("Read the file test.txt")
 
 		ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
@@ -386,7 +385,6 @@ func TestSessionReasoningContent(t *testing.T) {
 		session, err := system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
 
-
 		session.UserPrompt("Say hello")
 
 		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
@@ -443,14 +441,14 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 		}
 		mockProvider.SetChatResponse("test-model", successResponse)
 
-		fixture := newSweSystemFixture(t, "You are a helpful assistant.", func(c *sweSystemFixtureConfig) {
-			c.modelProviders = map[string]models.ModelProvider{"mock": mockProvider}
-		})
+		fixture := newSweSystemFixture(t, "You are a helpful assistant.",
+			withModelProviders(map[string]models.ModelProvider{"mock": mockProvider}),
+			withGlobalConfig(&conf.GlobalConfig{LLMRetryMaxAttempts: 2, LLMRetryMaxBackoffSeconds: 1}),
+		)
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
-
 
 		session.UserPrompt("Hello")
 
@@ -490,14 +488,14 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 		}
 		mockProvider.SetChatResponse("test-model", successResponse)
 
-		fixture := newSweSystemFixture(t, "You are a helpful assistant.", func(c *sweSystemFixtureConfig) {
-			c.modelProviders = map[string]models.ModelProvider{"mock": mockProvider}
-		})
+		fixture := newSweSystemFixture(t, "You are a helpful assistant.",
+			withModelProviders(map[string]models.ModelProvider{"mock": mockProvider}),
+			withGlobalConfig(&conf.GlobalConfig{LLMRetryMaxAttempts: 2, LLMRetryMaxBackoffSeconds: 1}),
+		)
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
-
 
 		session.UserPrompt("Hello")
 
@@ -520,19 +518,16 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 		mockProvider.RateLimitError = rateLimitErr
 		rateLimitCount := 2
 		mockProvider.RateLimitErrorCount = &rateLimitCount
-		mockProvider.Config = &conf.ModelProviderConfig{
-			MaxRetries:            1,
-			RateLimitBackoffScale: 5 * time.Millisecond,
-		}
+		mockProvider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 5 * time.Millisecond}
 
-		fixture := newSweSystemFixture(t, "You are a helpful assistant.", func(c *sweSystemFixtureConfig) {
-			c.modelProviders = map[string]models.ModelProvider{"mock": mockProvider}
-		})
+		fixture := newSweSystemFixture(t, "You are a helpful assistant.",
+			withModelProviders(map[string]models.ModelProvider{"mock": mockProvider}),
+			withGlobalConfig(&conf.GlobalConfig{LLMRetryMaxAttempts: 2, LLMRetryMaxBackoffSeconds: 1}),
+		)
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
-
 
 		session.UserPrompt("Hello")
 
@@ -569,14 +564,14 @@ func TestSweSession_NetworkErrorRetry(t *testing.T) {
 		}
 		mockProvider.SetChatResponse("test-model", successResponse)
 
-		fixture := newSweSystemFixture(t, "You are a helpful assistant.", func(c *sweSystemFixtureConfig) {
-			c.modelProviders = map[string]models.ModelProvider{"mock": mockProvider}
-		})
+		fixture := newSweSystemFixture(t, "You are a helpful assistant.",
+			withModelProviders(map[string]models.ModelProvider{"mock": mockProvider}),
+			withGlobalConfig(&conf.GlobalConfig{LLMRetryMaxAttempts: 2, LLMRetryMaxBackoffSeconds: 1}),
+		)
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
-
 
 		session.UserPrompt("Hello")
 
@@ -603,19 +598,16 @@ func TestSweSession_NetworkErrorRetry(t *testing.T) {
 		mockProvider.NetworkError = networkErr
 		networkErrorCount := 2
 		mockProvider.NetworkErrorCount = &networkErrorCount
-		mockProvider.Config = &conf.ModelProviderConfig{
-			MaxRetries:            1,
-			RateLimitBackoffScale: 5 * time.Millisecond,
-		}
+		mockProvider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 5 * time.Millisecond}
 
-		fixture := newSweSystemFixture(t, "You are a helpful assistant.", func(c *sweSystemFixtureConfig) {
-			c.modelProviders = map[string]models.ModelProvider{"mock": mockProvider}
-		})
+		fixture := newSweSystemFixture(t, "You are a helpful assistant.",
+			withModelProviders(map[string]models.ModelProvider{"mock": mockProvider}),
+			withGlobalConfig(&conf.GlobalConfig{LLMRetryMaxAttempts: 2, LLMRetryMaxBackoffSeconds: 1}),
+		)
 
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
-
 
 		session.UserPrompt("Hello")
 
@@ -624,7 +616,7 @@ func TestSweSession_NetworkErrorRetry(t *testing.T) {
 		cancel()
 
 		require.Error(t, err, "Session should fail after max retries")
-		assert.Contains(t, err.Error(), "network error")
+		assert.Contains(t, err.Error(), "temporary LLM API failure")
 	})
 }
 

@@ -112,9 +112,11 @@ func (m *MockConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 
 	// Return a copy
 	config := &conf.GlobalConfig{
-		ModelTags:       make([]conf.ModelTagMapping, len(m.globalConfig.ModelTags)),
-		DefaultProvider: m.globalConfig.DefaultProvider,
-		DefaultRole:     m.globalConfig.DefaultRole,
+		ModelTags:                 make([]conf.ModelTagMapping, len(m.globalConfig.ModelTags)),
+		DefaultProvider:           m.globalConfig.DefaultProvider,
+		DefaultRole:               m.globalConfig.DefaultRole,
+		LLMRetryMaxAttempts:       m.globalConfig.LLMRetryMaxAttempts,
+		LLMRetryMaxBackoffSeconds: m.globalConfig.LLMRetryMaxBackoffSeconds,
 		ToolSelection: conf.ToolSelectionConfig{
 			Default: make(map[string]bool, len(m.globalConfig.ToolSelection.Default)),
 			Tags:    make(map[string]map[string]bool, len(m.globalConfig.ToolSelection.Tags)),

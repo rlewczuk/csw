@@ -25,15 +25,15 @@ type MockSessionOutputHandler struct {
 	ToolCallResults []*tool.ToolResponse
 
 	// PermissionQueries stores all permission queries received via OnPermissionQuery.
-	PermissionQueries []*tool.ToolPermissionsQuery
+	PermissionQueries     []*tool.ToolPermissionsQuery
 	permissionQueryCalled chan struct{}
 
 	// RateLimitErrors stores all rate limit errors received via OnRateLimitError.
-	RateLimitErrors []int
+	RateLimitErrors      []int
 	rateLimitErrorCalled chan struct{}
 
 	// RunFinishedError stores the error from RunFinished call.
-	RunFinishedError error
+	RunFinishedError  error
 	runFinishedCalled chan struct{}
 
 	mu sync.Mutex
@@ -42,7 +42,7 @@ type MockSessionOutputHandler struct {
 // NewMockSessionOutputHandler creates a new MockSessionOutputHandler.
 func NewMockSessionOutputHandler() *MockSessionOutputHandler {
 	return &MockSessionOutputHandler{
-		AssistantMessages:      make([]AssistantMessageRecord, 0),
+		AssistantMessages:     make([]AssistantMessageRecord, 0),
 		ToolCalls:             make([]*tool.ToolCall, 0),
 		ToolCallResults:       make([]*tool.ToolResponse, 0),
 		PermissionQueries:     make([]*tool.ToolPermissionsQuery, 0),
@@ -75,6 +75,18 @@ func (h *MockSessionOutputHandler) OnRateLimitError(retryAfterSeconds int) {
 	case h.rateLimitErrorCalled <- struct{}{}:
 	default:
 	}
+}
+
+// ShowMessage records status message (ignored in this mock).
+func (h *MockSessionOutputHandler) ShowMessage(message string, messageType string) {
+	_ = message
+	_ = messageType
+}
+
+// ShouldRetryAfterFailure returns false in test mock unless explicitly handled by tests.
+func (h *MockSessionOutputHandler) ShouldRetryAfterFailure(message string) bool {
+	_ = message
+	return false
 }
 
 // WaitForRateLimitError blocks until OnRateLimitError is called.

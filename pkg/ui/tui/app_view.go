@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -154,6 +156,18 @@ func (v *TAppView) ShowMessage(message string, messageType ui.MessageType) {
 		_ = messageType
 		return nil
 	}, true, false)
+}
+
+// AskRetry asks user if operation should be retried.
+func (v *TAppView) AskRetry(message string) bool {
+	v.ShowMessage(message+" Retry? (y/N)", ui.MessageTypeWarning)
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return false
+	}
+	answer := strings.ToLower(strings.TrimSpace(input))
+	return answer == "y" || answer == "yes"
 }
 
 // Draw draws the app view on the screen.
