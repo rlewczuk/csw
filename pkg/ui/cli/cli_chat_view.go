@@ -107,9 +107,9 @@ func (v *CliChatView) UpdateMessage(msg *ui.ChatMessageUI) error {
 	// Find and update the message
 	for i, m := range v.messages {
 		if m.Id == msg.Id {
+			prev := m
 			v.messages[i] = msg
-			// Re-render the message
-			v.renderMessage(msg)
+			v.renderUpdatedMessage(prev, msg)
 			return nil
 		}
 	}
@@ -119,17 +119,48 @@ func (v *CliChatView) UpdateMessage(msg *ui.ChatMessageUI) error {
 		for i := len(v.messages) - 1; i >= 0; i-- {
 			m := v.messages[i]
 			if m.Role == msg.Role {
+				prev := m
 				if msg.Id == "" && m.Id != "" {
 					msg.Id = m.Id
 				}
 				v.messages[i] = msg
-				v.renderMessage(msg)
+				v.renderUpdatedMessage(prev, msg)
 				return nil
 			}
 		}
 	}
 
 	return nil
+}
+
+// renderUpdatedMessage renders only changed parts of an updated message.
+// Must be called with mu locked.
+func (v *CliChatView) renderUpdatedMessage(prev *ui.ChatMessageUI, msg *ui.ChatMessageUI) {
+	if msg == nil {
+		return
+	}
+
+	if prev == nil {
+		v.renderMessage(msg)
+		return
+	}
+
+	if msg.Role != ui.ChatRoleAssistant || prev.Role != ui.ChatRoleAssistant {
+		v.renderMessage(msg)
+		return
+	}
+
+	if msg.Thinking != "" && msg.Thinking != prev.Thinking {
+		fmt.Fprintf(v.output, "\n*%s*\n", msg.Thinking)
+	}
+
+	if msg.Text != "" && msg.Text != prev.Text {
+		fmt.Fprintf(v.output, "\nAssistant: %s\n", msg.Text)
+	}
+
+	for _, tool := range msg.Tools {
+		v.renderTool(tool)
+	}
 }
 
 // UpdateTool updates an existing tool in the view.
