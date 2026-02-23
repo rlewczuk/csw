@@ -2,7 +2,7 @@
 //
 // The logging system maintains the following log files:
 //   - .cswdata/logs/csw.jsonl - main log file for general application logs
-//   - .cswdata/logs/sessions/<session_id>/session.jsonl - session-specific logs
+//   - .cswdata/logs/sessions/<session_id>/logs.json - session-specific logs
 //   - .cswdata/logs/sessions/<session_id>/llm.jsonl - raw LLM requests/responses
 //
 // All logs are written in JSONL format (one JSON object per line) using log/slog.
@@ -48,6 +48,14 @@ const (
 	LogTypeSession LogType = "session"
 	LogTypeLLM     LogType = "llm"
 )
+
+// getLogFilename returns the filename for a given log type.
+func getLogFilename(logType LogType) string {
+	if logType == LogTypeSession {
+		return "logs.json"
+	}
+	return string(logType) + ".jsonl"
+}
 
 // writerCloser wraps an io.Writer with a Close method
 type writerCloser struct {
@@ -196,7 +204,7 @@ func SetLogsDirectory(dirPath string, sync bool) error {
 			return fmt.Errorf("SetLogsDirectory() [logger.go]: failed to create session directory: %w", err)
 		}
 
-		logPath := filepath.Join(sessionDir, string(key.logType)+".jsonl")
+		logPath := filepath.Join(sessionDir, getLogFilename(key.logType))
 		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			sessionLoggersMu.Unlock()
@@ -373,7 +381,7 @@ func GetSessionLogger(sessionID string, logType LogType) *slog.Logger {
 			return logger
 		}
 
-		logPath := filepath.Join(sessionDir, string(logType)+".jsonl")
+		logPath := filepath.Join(sessionDir, getLogFilename(logType))
 		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			// Fallback to in-memory logger

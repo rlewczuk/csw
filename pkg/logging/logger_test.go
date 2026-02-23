@@ -83,7 +83,7 @@ func TestSessionLoggerUserInput(t *testing.T) {
 	FlushLogs()
 
 	// Read session log
-	sessionLogPath := filepath.Join(tmpDir, "sessions", sessionID, "session.jsonl")
+	sessionLogPath := filepath.Join(tmpDir, "sessions", sessionID, "logs.json")
 	content, err := os.ReadFile(sessionLogPath)
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "user_messag")
@@ -115,7 +115,7 @@ func TestSessionLoggerToolCall(t *testing.T) {
 	FlushLogs()
 
 	// Read chat log
-	chatLogPath := filepath.Join(tmpDir, "sessions", sessionID, "session.jsonl")
+	chatLogPath := filepath.Join(tmpDir, "sessions", sessionID, "logs.json")
 	chatContent, err := os.ReadFile(chatLogPath)
 	require.NoError(t, err)
 	assert.Contains(t, string(chatContent), "tool_call")
@@ -180,7 +180,7 @@ func TestSessionLoggerAppendMode(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Read session log
-	sessionLogPath := filepath.Join(tmpDir, "sessions", sessionID, "session.jsonl")
+	sessionLogPath := filepath.Join(tmpDir, "sessions", sessionID, "logs.json")
 	content, err := os.ReadFile(sessionLogPath)
 	require.NoError(t, err)
 
@@ -227,7 +227,7 @@ func TestSessionLoggerPermissionQuery(t *testing.T) {
 	FlushLogs()
 
 	// Read session log
-	sessionLogPath := filepath.Join(tmpDir, "sessions", sessionID, "session.jsonl")
+	sessionLogPath := filepath.Join(tmpDir, "sessions", sessionID, "logs.json")
 	content, err := os.ReadFile(sessionLogPath)
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "permission_query")
@@ -256,7 +256,7 @@ func TestLogFormatIsValidJSON(t *testing.T) {
 	FlushLogs()
 
 	// Read session log
-	sessionLogPath := filepath.Join(tmpDir, "sessions", sessionID, "session.jsonl")
+	sessionLogPath := filepath.Join(tmpDir, "sessions", sessionID, "logs.json")
 	content, err := os.ReadFile(sessionLogPath)
 	require.NoError(t, err)
 

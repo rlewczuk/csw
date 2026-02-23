@@ -50,9 +50,9 @@ func TestLogDirectoryStructure(t *testing.T) {
 	assert.True(t, info.IsDir(), "session path should be a directory")
 
 	// Session log files
-	sessionLogPath := filepath.Join(sessionDir, "session.jsonl")
+	sessionLogPath := filepath.Join(sessionDir, "logs.json")
 	_, err = os.Stat(sessionLogPath)
-	assert.NoError(t, err, "session.jsonl should exist at: %s", sessionLogPath)
+	assert.NoError(t, err, "logs.json should exist at: %s", sessionLogPath)
 
 	llmLogPath := filepath.Join(sessionDir, "llm.jsonl")
 	_, err = os.Stat(llmLogPath)
