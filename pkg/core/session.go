@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -49,6 +51,8 @@ type SweSession struct {
 	// pendingToolResponses stores tool responses that were executed before a permission query
 	// so they can be sent together after permissions are granted
 	pendingToolResponses []*tool.ToolResponse
+	// loadedAgentFiles keeps track of AGENTS.md files already injected into context.
+	loadedAgentFiles map[string]struct{}
 }
 
 // Prompt adds user prompt to the conversation and starts processing if processing is not already in progress.
@@ -274,6 +278,7 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 	}
 
 	toolResponses := make([]*tool.ToolResponse, 0, len(toolCalls)+len(s.pendingToolResponses))
+	agentMessages := make([]*models.ChatMessage, 0)
 	if len(s.pendingToolResponses) > 0 {
 		toolResponses = append(toolResponses, s.pendingToolResponses...)
 	}
@@ -306,10 +311,20 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 		toolResponses = append(toolResponses, response)
 		logging.LogToolResult(s.logger, response)
 
+		newAgentMessages, err := s.buildAdditionalAgentMessages(toolCall, response)
+		if err != nil {
+			return fmt.Errorf("SweSession.executeToolCalls() [session.go]: failed to load additional AGENTS.md instructions: %w", err)
+		}
+		agentMessages = append(agentMessages, newAgentMessages...)
+
 		// Notify UI handler about tool result
 		if s.outputHandler != nil {
 			s.outputHandler.AddToolCallResult(response)
 		}
+	}
+
+	if len(agentMessages) > 0 {
+		s.messages = append(s.messages, agentMessages...)
 	}
 
 	// Add tool responses to the conversation
@@ -320,6 +335,130 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 	s.pendingToolResponses = nil
 
 	return nil
+}
+
+// buildAdditionalAgentMessages builds user messages with extra AGENTS.md instructions for vfsRead/vfsGrep tool calls.
+func (s *SweSession) buildAdditionalAgentMessages(toolCall *tool.ToolCall, response *tool.ToolResponse) ([]*models.ChatMessage, error) {
+	if s == nil || s.system == nil || s.system.PromptGenerator == nil || toolCall == nil || response == nil || response.Error != nil {
+		return nil, nil
+	}
+
+	var dirs []string
+	switch toolCall.Function {
+	case "vfsRead":
+		path, ok := toolCall.Arguments.StringOK("path")
+		if !ok || strings.TrimSpace(path) == "" {
+			return nil, nil
+		}
+		dirs = append(dirs, filepath.Dir(path))
+	case "vfsGrep":
+		dirs = append(dirs, parseDirsFromGrepResult(response.Result.Get("content").AsString())...)
+	default:
+		return nil, nil
+	}
+
+	messages := make([]*models.ChatMessage, 0)
+	for _, dir := range uniqueStrings(dirs) {
+		msg, err := s.buildAdditionalAgentMessageForDir(dir)
+		if err != nil {
+			return nil, err
+		}
+		if msg != nil {
+			messages = append(messages, msg)
+		}
+	}
+
+	return messages, nil
+}
+
+// buildAdditionalAgentMessageForDir creates a user message from AGENTS.md in the provided directory if not loaded yet.
+func (s *SweSession) buildAdditionalAgentMessageForDir(dir string) (*models.ChatMessage, error) {
+	rootPath := ""
+	if s.VFS != nil {
+		rootPath = s.VFS.WorktreePath()
+	}
+	if strings.TrimSpace(rootPath) == "" {
+		rootPath = s.workDir
+	}
+	workDirAbs, err := filepath.Abs(rootPath)
+	if err != nil {
+		return nil, fmt.Errorf("buildAdditionalAgentMessageForDir() [session.go]: failed to resolve root path %q: %w", rootPath, err)
+	}
+
+	resolvedDir := dir
+	if strings.TrimSpace(resolvedDir) == "" {
+		resolvedDir = "."
+	}
+	if !filepath.IsAbs(resolvedDir) {
+		resolvedDir = filepath.Join(workDirAbs, resolvedDir)
+	}
+	resolvedDir, err = filepath.Abs(resolvedDir)
+	if err != nil {
+		return nil, fmt.Errorf("buildAdditionalAgentMessageForDir() [session.go]: failed to resolve dir %q: %w", dir, err)
+	}
+
+	relDir, err := filepath.Rel(workDirAbs, resolvedDir)
+	if err != nil {
+		return nil, fmt.Errorf("buildAdditionalAgentMessageForDir() [session.go]: failed to get relative dir for %q: %w", resolvedDir, err)
+	}
+	if relDir == "." || relDir == "" || strings.HasPrefix(relDir, "..") || filepath.IsAbs(relDir) {
+		return nil, nil
+	}
+
+	agentsPath := filepath.Join(relDir, "AGENTS.md")
+	if s.loadedAgentFiles == nil {
+		s.loadedAgentFiles = make(map[string]struct{})
+	}
+	if _, loaded := s.loadedAgentFiles[agentsPath]; loaded {
+		return nil, nil
+	}
+
+	files, err := s.system.PromptGenerator.GetAgentFiles(relDir)
+	if err != nil {
+		return nil, fmt.Errorf("buildAdditionalAgentMessageForDir() [session.go]: failed to get agent files for %q: %w", relDir, err)
+	}
+
+	content, ok := files[agentsPath]
+	if !ok {
+		return nil, nil
+	}
+
+	s.loadedAgentFiles[agentsPath] = struct{}{}
+	wrapped := "<system>\n" + content + "\n</system>"
+	return models.NewTextMessage(models.ChatRoleUser, wrapped), nil
+}
+
+// parseDirsFromGrepResult extracts directories from vfsGrep result content.
+func parseDirsFromGrepResult(content string) []string {
+	lines := strings.Split(content, "\n")
+	dirs := make([]string, 0, len(lines))
+	linePattern := regexp.MustCompile(`^(.+):(\d+)$`)
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "(") || line == "No files found" {
+			continue
+		}
+		matches := linePattern.FindStringSubmatch(line)
+		if len(matches) != 3 {
+			continue
+		}
+		dirs = append(dirs, filepath.Dir(matches[1]))
+	}
+	return dirs
+}
+
+// uniqueStrings returns a deduplicated slice preserving input order.
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }
 
 func (s *SweSession) ChatMessages() []*models.ChatMessage {
