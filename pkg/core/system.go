@@ -180,6 +180,8 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 	s.sessions[session.id] = session
 	s.sessionsMu.Unlock()
 
+	session.persistSessionState()
+
 	return session, nil
 }
 

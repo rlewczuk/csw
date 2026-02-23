@@ -2,10 +2,12 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -56,6 +58,46 @@ type SweSession struct {
 	loadedAgentFiles map[string]struct{}
 }
 
+type persistedToolResponse struct {
+	Call   *tool.ToolCall `json:"call,omitempty"`
+	Error  string         `json:"error,omitempty"`
+	Result tool.ToolValue `json:"result"`
+	Done   bool           `json:"done"`
+}
+
+type persistedChatMessagePart struct {
+	Text             string                 `json:"text,omitempty"`
+	ReasoningContent string                 `json:"reasoning_content,omitempty"`
+	ToolCall         *tool.ToolCall         `json:"tool_call,omitempty"`
+	ToolResponse     *persistedToolResponse `json:"tool_response,omitempty"`
+}
+
+type persistedChatMessage struct {
+	Role  string                     `json:"role"`
+	Parts []persistedChatMessagePart `json:"parts"`
+}
+
+type sessionMessageLogEntry struct {
+	Timestamp string               `json:"timestamp"`
+	Direction string               `json:"direction"`
+	Source    string               `json:"source"`
+	Message   persistedChatMessage `json:"message"`
+}
+
+type persistedSessionState struct {
+	SessionID                  string                  `json:"session_id"`
+	ProviderName               string                  `json:"provider_name"`
+	Model                      string                  `json:"model"`
+	RoleName                   string                  `json:"role_name,omitempty"`
+	WorkDir                    string                  `json:"workdir"`
+	TodoList                   []tool.TodoItem         `json:"todo_list"`
+	Messages                   []persistedChatMessage  `json:"messages"`
+	PendingPermissionToolCalls []tool.ToolCall         `json:"pending_permission_tool_calls"`
+	PendingToolResponses       []persistedToolResponse `json:"pending_tool_responses"`
+	LoadedAgentFiles           []string                `json:"loaded_agent_files"`
+	UpdatedAt                  string                  `json:"updated_at"`
+}
+
 // Prompt adds user prompt to the conversation and starts processing if processing is not already in progress.
 // If processing is already in progress, if will be added at the end of conversation after current LLM request is completed,
 // its tool calls are executed etc. Returns immediately.
@@ -63,7 +105,7 @@ func (s *SweSession) UserPrompt(prompt string) error {
 	if s.logger != nil {
 		s.logger.Info("user_input", "input", prompt)
 	}
-	s.messages = append(s.messages, models.NewTextMessage(models.ChatRoleUser, prompt))
+	s.appendConversationMessage(models.NewTextMessage(models.ChatRoleUser, prompt), "incoming", "user_prompt")
 	return nil
 }
 
@@ -135,7 +177,7 @@ func (s *SweSession) Run(ctx context.Context) error {
 		}
 
 		// Add the response to messages
-		s.messages = append(s.messages, responseMsg)
+		s.appendConversationMessage(responseMsg, "outgoing", "assistant_response")
 
 		// Check if there are any tool calls in the response
 		toolCalls := responseMsg.GetToolCalls()
@@ -306,6 +348,7 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 			// Store executed responses and pending tool calls so we can resume after permission is granted
 			s.pendingToolResponses = toolResponses
 			s.pendingPermissionToolCalls = append([]*tool.ToolCall{toolCall}, toolCalls[i+1:]...)
+			s.persistSessionState()
 			return response.Error
 		}
 
@@ -325,15 +368,18 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 	}
 
 	if len(agentMessages) > 0 {
-		s.messages = append(s.messages, agentMessages...)
+		for _, agentMessage := range agentMessages {
+			s.appendConversationMessage(agentMessage, "incoming", "agent_instructions")
+		}
 	}
 
 	// Add tool responses to the conversation
-	s.messages = append(s.messages, models.NewToolResponseMessage(toolResponses...))
+	s.appendConversationMessage(models.NewToolResponseMessage(toolResponses...), "incoming", "tool_response")
 
 	// Clear pending state since all tools executed successfully
 	s.pendingPermissionToolCalls = nil
 	s.pendingToolResponses = nil
+	s.persistSessionState()
 
 	return nil
 }
@@ -516,6 +562,7 @@ func (s *SweSession) GetState() AgentState {
 // SetWorkDir sets the working directory for this session.
 func (s *SweSession) SetWorkDir(dir string) {
 	s.workDir = dir
+	s.persistSessionState()
 }
 
 // Role returns the current agent role for this session.
@@ -570,6 +617,7 @@ func (s *SweSession) SetModel(modelStr string) error {
 	if s.role != nil && s.role.ToolsAccess != nil {
 		s.Tools = wrapToolsWithAccessControl(s.Tools, s.role.ToolsAccess)
 	}
+	s.persistSessionState()
 	return nil
 }
 
@@ -638,12 +686,20 @@ func (s *SweSession) SetRole(roleName string) error {
 		// Check if there's already a system message
 		if len(s.messages) > 0 && s.messages[0].Role == models.ChatRoleSystem {
 			// Replace the existing system message
-			s.messages[0] = models.NewTextMessage(models.ChatRoleSystem, renderedPrompt)
+			systemMessage := models.NewTextMessage(models.ChatRoleSystem, renderedPrompt)
+			s.messages[0] = systemMessage
+			s.appendMessageLog(systemMessage, "outgoing", "system_prompt")
+			s.persistSessionState()
 		} else {
 			// Insert system message at the beginning
-			s.messages = append([]*models.ChatMessage{models.NewTextMessage(models.ChatRoleSystem, renderedPrompt)}, s.messages...)
+			systemMessage := models.NewTextMessage(models.ChatRoleSystem, renderedPrompt)
+			s.messages = append([]*models.ChatMessage{systemMessage}, s.messages...)
+			s.appendMessageLog(systemMessage, "outgoing", "system_prompt")
+			s.persistSessionState()
 		}
 	}
+
+	s.persistSessionState()
 
 	return nil
 }
@@ -701,6 +757,8 @@ func (s *SweSession) UpdatePermission(query *tool.ToolPermissionsQuery, response
 		}
 	}
 
+	s.persistSessionState()
+
 	return nil
 }
 
@@ -738,10 +796,11 @@ func (s *SweSession) GetTodoList() []tool.TodoItem {
 // SetTodoList replaces the entire todo list with a new list.
 func (s *SweSession) SetTodoList(todos []tool.TodoItem) {
 	s.todoMu.Lock()
-	defer s.todoMu.Unlock()
-
 	s.todoList = make([]tool.TodoItem, len(todos))
 	copy(s.todoList, todos)
+	s.todoMu.Unlock()
+
+	s.persistSessionState()
 }
 
 // CountPendingTodos returns the number of pending or in_progress todos.
@@ -787,6 +846,200 @@ func buildSessionToolRegistry(systemTools *tool.ToolRegistry, vfsImpl vfs.VFS, l
 	registry.ApplyLogger(logger)
 
 	return registry
+}
+
+func (s *SweSession) appendConversationMessage(message *models.ChatMessage, direction string, source string) {
+	if message == nil {
+		return
+	}
+
+	s.messages = append(s.messages, message)
+	s.appendMessageLog(message, direction, source)
+	s.persistSessionState()
+}
+
+func (s *SweSession) appendMessageLog(message *models.ChatMessage, direction string, source string) {
+	if message == nil {
+		return
+	}
+
+	if err := s.appendMessageLogFile(message, direction, source); err != nil {
+		if s.logger != nil {
+			s.logger.Warn("failed_to_persist_message_log", "error", err)
+		}
+	}
+}
+
+func (s *SweSession) appendMessageLogFile(message *models.ChatMessage, direction string, source string) error {
+	sessionLogDir := s.getSessionLogDirectory()
+	if sessionLogDir == "" {
+		return nil
+	}
+
+	if err := os.MkdirAll(sessionLogDir, 0755); err != nil {
+		return fmt.Errorf("SweSession.appendMessageLogFile() [session.go]: failed to create session log directory: %w", err)
+	}
+
+	messagePath := filepath.Join(sessionLogDir, "messages.jsonl")
+	file, err := os.OpenFile(messagePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("SweSession.appendMessageLogFile() [session.go]: failed to open message log file: %w", err)
+	}
+	defer file.Close()
+
+	entry := sessionMessageLogEntry{
+		Timestamp: time.Now().Format(time.RFC3339Nano),
+		Direction: direction,
+		Source:    source,
+		Message:   serializeChatMessage(message),
+	}
+
+	entryJSON, err := json.Marshal(entry)
+	if err != nil {
+		return fmt.Errorf("SweSession.appendMessageLogFile() [session.go]: failed to marshal message log entry: %w", err)
+	}
+
+	if _, err := file.Write(append(entryJSON, '\n')); err != nil {
+		return fmt.Errorf("SweSession.appendMessageLogFile() [session.go]: failed to append message log entry: %w", err)
+	}
+
+	return nil
+}
+
+func (s *SweSession) persistSessionState() {
+	if err := s.persistSessionStateFile(); err != nil {
+		if s.logger != nil {
+			s.logger.Warn("failed_to_persist_session_state", "error", err)
+		}
+	}
+}
+
+func (s *SweSession) persistSessionStateFile() error {
+	sessionLogDir := s.getSessionLogDirectory()
+	if sessionLogDir == "" {
+		return nil
+	}
+
+	if err := os.MkdirAll(sessionLogDir, 0755); err != nil {
+		return fmt.Errorf("SweSession.persistSessionStateFile() [session.go]: failed to create session log directory: %w", err)
+	}
+
+	state := s.buildPersistedSessionState()
+	stateJSON, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return fmt.Errorf("SweSession.persistSessionStateFile() [session.go]: failed to marshal session state: %w", err)
+	}
+
+	tempPath := filepath.Join(sessionLogDir, "session.json.tmp")
+	finalPath := filepath.Join(sessionLogDir, "session.json")
+	if err := os.WriteFile(tempPath, stateJSON, 0644); err != nil {
+		return fmt.Errorf("SweSession.persistSessionStateFile() [session.go]: failed to write temporary session state file: %w", err)
+	}
+
+	if err := os.Rename(tempPath, finalPath); err != nil {
+		return fmt.Errorf("SweSession.persistSessionStateFile() [session.go]: failed to replace session state file: %w", err)
+	}
+
+	return nil
+}
+
+func (s *SweSession) buildPersistedSessionState() persistedSessionState {
+	state := persistedSessionState{
+		SessionID:                  s.id,
+		ProviderName:               s.providerName,
+		Model:                      s.model,
+		WorkDir:                    s.workDir,
+		TodoList:                   s.GetTodoList(),
+		Messages:                   make([]persistedChatMessage, 0, len(s.messages)),
+		PendingPermissionToolCalls: make([]tool.ToolCall, 0, len(s.pendingPermissionToolCalls)),
+		PendingToolResponses:       make([]persistedToolResponse, 0, len(s.pendingToolResponses)),
+		LoadedAgentFiles:           make([]string, 0, len(s.loadedAgentFiles)),
+		UpdatedAt:                  time.Now().Format(time.RFC3339Nano),
+	}
+
+	if s.role != nil {
+		state.RoleName = s.role.Name
+	}
+
+	for _, message := range s.messages {
+		state.Messages = append(state.Messages, serializeChatMessage(message))
+	}
+
+	for _, toolCall := range s.pendingPermissionToolCalls {
+		if toolCall == nil {
+			continue
+		}
+		state.PendingPermissionToolCalls = append(state.PendingPermissionToolCalls, *toolCall)
+	}
+
+	for _, toolResponse := range s.pendingToolResponses {
+		if toolResponse == nil {
+			continue
+		}
+		state.PendingToolResponses = append(state.PendingToolResponses, serializeToolResponse(toolResponse))
+	}
+
+	for path := range s.loadedAgentFiles {
+		state.LoadedAgentFiles = append(state.LoadedAgentFiles, path)
+	}
+	sort.Strings(state.LoadedAgentFiles)
+
+	return state
+}
+
+func (s *SweSession) getSessionLogDirectory() string {
+	if s == nil || s.id == "" {
+		return ""
+	}
+
+	if s.system != nil && s.system.LogBaseDir != "" {
+		return filepath.Join(s.system.LogBaseDir, "sessions", s.id)
+	}
+
+	dir := logging.GetSessionLogDirectory(s.id)
+	if dir != "" {
+		return dir
+	}
+
+	return ""
+}
+
+func serializeChatMessage(message *models.ChatMessage) persistedChatMessage {
+	serialized := persistedChatMessage{
+		Role:  string(message.Role),
+		Parts: make([]persistedChatMessagePart, 0, len(message.Parts)),
+	}
+
+	for _, part := range message.Parts {
+		serializedPart := persistedChatMessagePart{
+			Text:             part.Text,
+			ReasoningContent: part.ReasoningContent,
+			ToolCall:         part.ToolCall,
+		}
+		if part.ToolResponse != nil {
+			serializedToolResponse := serializeToolResponse(part.ToolResponse)
+			serializedPart.ToolResponse = &serializedToolResponse
+		}
+		serialized.Parts = append(serialized.Parts, serializedPart)
+	}
+
+	return serialized
+}
+
+func serializeToolResponse(response *tool.ToolResponse) persistedToolResponse {
+	serialized := persistedToolResponse{
+		Result: response.Result,
+		Done:   response.Done,
+	}
+	if response.Call != nil {
+		serializedCall := *response.Call
+		serialized.Call = &serializedCall
+	}
+	if response.Error != nil {
+		serialized.Error = response.Error.Error()
+	}
+
+	return serialized
 }
 
 // maxRetries returns the maximum number of retries for rate limit/network errors.
