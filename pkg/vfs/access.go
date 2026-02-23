@@ -49,7 +49,7 @@ func (ac *AccessControlVFS) WorktreePath() string {
 	return ac.vfs.WorktreePath()
 }
 
-func (ac *AccessControlVFS) GetRepo() Repo {
+func (ac *AccessControlVFS) GetRepo() VCS {
 	return ac.vfs.GetRepo()
 }
 
