@@ -102,8 +102,8 @@ func TestSessionToolSelection(t *testing.T) {
 		require.NoError(t, err)
 		system.ToolSelection = conf.ToolSelectionConfig{
 			Default: map[string]bool{"runBash": true, "vfsRead": true},
-			Tags: map[string]conf.ToolTagSelectionRule{
-				"limited": {Disable: []string{"runBash"}},
+			Tags: map[string]map[string]bool{
+				"limited": {"runBash": false},
 			},
 		}
 

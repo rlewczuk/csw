@@ -73,9 +73,9 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 			Default: map[string]bool{
 				"runBash": false,
 			},
-			Tags: map[string]conf.ToolTagSelectionRule{
+			Tags: map[string]map[string]bool{
 				"safe": {
-					Enable: []string{"vfsRead"},
+					"vfsRead": true,
 				},
 			},
 		},
@@ -98,7 +98,7 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 	assert.Equal(t, false, config.ToolSelection.Default["runBash"])
 	safeRule, exists := config.ToolSelection.Tags["safe"]
 	require.True(t, exists)
-	assert.ElementsMatch(t, []string{"vfsRead"}, safeRule.Enable)
+	assert.True(t, safeRule["vfsRead"])
 
 	// Test LastGlobalConfigUpdate
 	updateTime, err := store.LastGlobalConfigUpdate()

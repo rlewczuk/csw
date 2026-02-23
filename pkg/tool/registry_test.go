@@ -140,9 +140,9 @@ func TestToolRegistry_FilterByModelTags(t *testing.T) {
 					"vfsRead": true,
 					"runBash": false,
 				},
-				Tags: map[string]conf.ToolTagSelectionRule{
+				Tags: map[string]map[string]bool{
 					"bash-enabled": {
-						Enable: []string{"runBash"},
+						"runBash": true,
 					},
 				},
 			},
@@ -156,9 +156,9 @@ func TestToolRegistry_FilterByModelTags(t *testing.T) {
 					"vfsRead": true,
 					"runBash": true,
 				},
-				Tags: map[string]conf.ToolTagSelectionRule{
+				Tags: map[string]map[string]bool{
 					"safe": {
-						Disable: []string{"runBash"},
+						"runBash": false,
 					},
 				},
 			},
@@ -172,12 +172,12 @@ func TestToolRegistry_FilterByModelTags(t *testing.T) {
 					"runBash": false,
 					"vfsRead": false,
 				},
-				Tags: map[string]conf.ToolTagSelectionRule{
+				Tags: map[string]map[string]bool{
 					"enable-bash": {
-						Enable: []string{"runBash"},
+						"runBash": true,
 					},
 					"disable-bash": {
-						Disable: []string{"runBash"},
+						"runBash": false,
 					},
 				},
 			},

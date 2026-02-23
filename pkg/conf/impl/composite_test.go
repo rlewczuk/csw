@@ -268,7 +268,7 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 			},
 			"tags": {
 				"safe": {
-					"disable": ["vfsDelete"]
+					"vfsDelete": false
 				}
 			}
 		}
@@ -287,7 +287,8 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 			},
 			"tags": {
 				"safe": {
-					"enable": ["vfsRead"]
+					"vfsRead": true,
+					"runBash": false
 				}
 			}
 		}
@@ -317,8 +318,8 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 	// Verify per-tag rule from later source overrides earlier one
 	safeRule, exists := globalConfig.ToolSelection.Tags["safe"]
 	require.True(t, exists)
-	assert.ElementsMatch(t, []string{"vfsRead"}, safeRule.Enable)
-	assert.Empty(t, safeRule.Disable)
+	assert.True(t, safeRule["vfsRead"])
+	assert.False(t, safeRule["runBash"])
 }
 
 func TestCompositeConfigStore_Caching(t *testing.T) {

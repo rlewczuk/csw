@@ -135,19 +135,19 @@ func (c *CompositeConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 		ModelTags:       make([]conf.ModelTagMapping, len(c.globalConfig.ModelTags)),
 		ToolSelection: conf.ToolSelectionConfig{
 			Default: make(map[string]bool, len(c.globalConfig.ToolSelection.Default)),
-			Tags:    make(map[string]conf.ToolTagSelectionRule, len(c.globalConfig.ToolSelection.Tags)),
+			Tags:    make(map[string]map[string]bool, len(c.globalConfig.ToolSelection.Tags)),
 		},
 	}
 	copy(config.ModelTags, c.globalConfig.ModelTags)
 	for toolName, enabled := range c.globalConfig.ToolSelection.Default {
 		config.ToolSelection.Default[toolName] = enabled
 	}
-	for tag, rule := range c.globalConfig.ToolSelection.Tags {
-		copiedRule := conf.ToolTagSelectionRule{
-			Enable:  append([]string{}, rule.Enable...),
-			Disable: append([]string{}, rule.Disable...),
+	for tag, tools := range c.globalConfig.ToolSelection.Tags {
+		copiedTools := make(map[string]bool, len(tools))
+		for toolName, enabled := range tools {
+			copiedTools[toolName] = enabled
 		}
-		config.ToolSelection.Tags[tag] = copiedRule
+		config.ToolSelection.Tags[tag] = copiedTools
 	}
 
 	return config, nil
@@ -324,10 +324,15 @@ func (c *CompositeConfigStore) refreshGlobalConfig() error {
 			merged.ToolSelection.Default[toolName] = enabled
 		}
 		if merged.ToolSelection.Tags == nil {
-			merged.ToolSelection.Tags = make(map[string]conf.ToolTagSelectionRule)
+			merged.ToolSelection.Tags = make(map[string]map[string]bool)
 		}
-		for tag, rule := range config.ToolSelection.Tags {
-			merged.ToolSelection.Tags[tag] = rule
+		for tag, tools := range config.ToolSelection.Tags {
+			if merged.ToolSelection.Tags[tag] == nil {
+				merged.ToolSelection.Tags[tag] = make(map[string]bool)
+			}
+			for toolName, enabled := range tools {
+				merged.ToolSelection.Tags[tag][toolName] = enabled
+			}
 		}
 		// DefaultProvider from later sources overrides earlier ones
 		if config.DefaultProvider != "" {
