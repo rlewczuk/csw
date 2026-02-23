@@ -29,12 +29,6 @@ When you need to generate and run a test script, or generate and use some tempor
   - comment should be compliant with godoc format (eg. start comment with object name)
   - when adding interface, also add godoc comment to each method describing what it is and what it does;
 
-Packages implemented:
-- `pkg/core`: Core agent logic
-- `pkg/models`: Model provider and model interfaces
-- `pkg/tool`: Tool interfaces and implementations
-- `pkg/vfs`: Virtual filesystem interfaces and implementations
-
 Rules regarding implementing tests:
 - Testing: Use table-driven tests with `t.Run()` for subtests
 - Use testify library for assertions, avoid using manual `if` statements
@@ -48,3 +42,22 @@ Rules regarding implementing tests:
 
 Other rules:
 - When generating summary after performing a task, DO NOT save it to file, just put it in chat.
+
+## Code Organization
+
+- `cmd/csw`: Main CLI application (root command, bootstrap, CLI/TUI execution, provider/role/tool config commands).
+- `pkg/conf`: Configuration domain and config-store implementations (local, embedded defaults, composite, mock).
+- `pkg/core`: Session runtime orchestration (`SweSystem`, `SweSession`, threading, prompts, role registry, commit-message generation).
+- `pkg/gtv`: Terminal UI primitives (screen/event contracts, themes, and screen test helpers).
+- `pkg/logging`: Structured logging infrastructure for global/session/LLM logs and test log capture.
+- `pkg/lsp`: LSP abstraction and client implementation with DTOs and in-memory mock.
+- `pkg/models`: Model/provider interfaces, provider registry, concrete provider clients, OAuth helpers, tags, and mocks.
+- `pkg/presenter`: Presenter layer connecting core session output/input with UI interfaces.
+- `pkg/runner`: Command runner abstraction with bash implementation and mock.
+- `pkg/sandbox`: Placeholder for sandbox-related logic (currently no non-test implementation files).
+- `pkg/shared`: Shared utilities (custom patch parsing, file copy helpers, UUIDv7 generation).
+- `pkg/testinteg`: Placeholder for integration-test support code (currently no non-test implementation files).
+- `pkg/testutil`: Reusable test helpers and mocks (session output handler and mock HTTP server).
+- `pkg/tool`: Tool contracts, registry, permissions, and concrete tools (bash, todo, VFS read/write/edit/patch/grep).
+- `pkg/ui`: UI contracts and view models for app/chat presentation flows.
+- `pkg/vfs`: Filesystem and VCS interfaces plus local/git implementations, access control, search/filter, patching, and mocks.
