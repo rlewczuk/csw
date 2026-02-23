@@ -3,9 +3,11 @@ package vfs
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -490,6 +492,79 @@ func TestMergeBranches(t *testing.T) {
 
 		err = repo.MergeBranches(sourceBranch, "feature-conflict")
 		assert.ErrorIs(t, err, ErrMergeConflict)
+	})
+
+	t.Run("GitVCSFastForwardWhenPossible", func(t *testing.T) {
+		fixture := setupGitRepoFixture(t)
+		defer fixture.Cleanup()
+
+		repo, ok := fixture.Repo.(*GitVCS)
+		require.True(t, ok)
+
+		targetBranch := "master"
+		if _, err := repo.GetWorktree(targetBranch); err != nil {
+			targetBranch = "main"
+			_, err = repo.GetWorktree(targetBranch)
+			require.NoError(t, err)
+		}
+
+		err := repo.NewBranch("feature-ff", targetBranch)
+		require.NoError(t, err)
+
+		featureWorktree, err := repo.GetWorktree("feature-ff")
+		require.NoError(t, err)
+
+		err = featureWorktree.WriteFile("feature-fast-forward.txt", []byte("fast-forward\n"))
+		require.NoError(t, err)
+		err = repo.CommitWorktree("feature-ff", "Feature commit for fast-forward")
+		require.NoError(t, err)
+
+		err = repo.MergeBranches(targetBranch, "feature-ff")
+		require.NoError(t, err)
+
+		gitRepo, err := git.PlainOpen(fixture.Root)
+		require.NoError(t, err)
+
+		targetRef, err := gitRepo.Reference(plumbing.NewBranchReferenceName(targetBranch), true)
+		require.NoError(t, err)
+
+		mergedCommit, err := gitRepo.CommitObject(targetRef.Hash())
+		require.NoError(t, err)
+		assert.Len(t, mergedCommit.ParentHashes, 1)
+		assert.Equal(t, "Feature commit for fast-forward", strings.TrimSpace(mergedCommit.Message))
+	})
+
+	t.Run("GitVCSUpdatesCheckedOutFilesAfterMerge", func(t *testing.T) {
+		fixture := setupGitRepoFixture(t)
+		defer fixture.Cleanup()
+
+		repo, ok := fixture.Repo.(*GitVCS)
+		require.True(t, ok)
+
+		targetBranch := "master"
+		if _, err := repo.GetWorktree(targetBranch); err != nil {
+			targetBranch = "main"
+			_, err = repo.GetWorktree(targetBranch)
+			require.NoError(t, err)
+		}
+
+		err := repo.NewBranch("feature-update-files", targetBranch)
+		require.NoError(t, err)
+
+		featureWorktree, err := repo.GetWorktree("feature-update-files")
+		require.NoError(t, err)
+
+		err = featureWorktree.WriteFile("merged-file.txt", []byte("updated after merge\n"))
+		require.NoError(t, err)
+		err = repo.CommitWorktree("feature-update-files", "Add merged file")
+		require.NoError(t, err)
+
+		err = repo.MergeBranches(targetBranch, "feature-update-files")
+		require.NoError(t, err)
+
+		content, err := os.ReadFile(filepath.Join(fixture.Root, "merged-file.txt"))
+		require.NoError(t, err)
+		assert.Equal(t, "updated after merge\n", string(content))
 	})
 }
 
