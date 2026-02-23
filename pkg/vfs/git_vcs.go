@@ -13,9 +13,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-// GitRepo implements the VCS interface for git repositories.
+// GitVCS implements the VCS interface for git repositories.
 // It uses go-git library for git operations and manages worktrees for branches.
-type GitRepo struct {
+type GitVCS struct {
 	path          string
 	worktreesPath string
 	repo          *git.Repository
@@ -31,10 +31,10 @@ type gitWorktree struct {
 	vfs    VFS
 }
 
-// NewGitRepo creates a new GitRepo instance from an existing git repository path.
+// NewGitRepo creates a new GitVCS instance from an existing git repository path.
 // The worktreesPath parameter specifies the directory where worktrees will be created.
 // The hidePatterns parameter specifies glob patterns for files and directories that should be hidden.
-func NewGitRepo(path string, worktreesPath string, hidePatterns []string) (*GitRepo, error) {
+func NewGitRepo(path string, worktreesPath string, hidePatterns []string) (*GitVCS, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", err)
@@ -68,7 +68,7 @@ func NewGitRepo(path string, worktreesPath string, hidePatterns []string) (*GitR
 		return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", err)
 	}
 
-	return &GitRepo{
+	return &GitVCS{
 		path:          absPath,
 		worktreesPath: absWorktreesPath,
 		repo:          repo,
@@ -79,7 +79,7 @@ func NewGitRepo(path string, worktreesPath string, hidePatterns []string) (*GitR
 
 // GetWorktree extracts the worktree for the given branch and returns a VFS instance for it.
 // If worktree is already extracted, it returns the existing VFS instance.
-func (g *GitRepo) GetWorktree(branch string) (VFS, error) {
+func (g *GitVCS) GetWorktree(branch string) (VFS, error) {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
@@ -92,7 +92,7 @@ func (g *GitRepo) GetWorktree(branch string) (VFS, error) {
 	// Branch names with '/' will create nested directories
 	worktreePath := filepath.Join(g.worktreesPath, branch)
 	if err := os.MkdirAll(worktreePath, 0755); err != nil {
-		return nil, fmt.Errorf("GitRepo.GetWorktree() [git.go]: %w", err)
+		return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", err)
 	}
 
 	// Get the branch reference
@@ -104,9 +104,9 @@ func (g *GitRepo) GetWorktree(branch string) (VFS, error) {
 		// Clean up the worktree directory we created
 		os.RemoveAll(worktreePath)
 		if errors.Is(err, plumbing.ErrReferenceNotFound) {
-			return nil, fmt.Errorf("GitRepo.GetWorktree() [git.go]: branch %q not found: %w", branch, ErrFileNotFound)
+			return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: branch %q not found: %w", branch, ErrFileNotFound)
 		}
-		return nil, fmt.Errorf("GitRepo.GetWorktree() [git.go]: %w", err)
+		return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", err)
 	}
 
 	// For go-git, we'll create a worktree by checking out the branch to a separate directory
@@ -121,7 +121,7 @@ func (g *GitRepo) GetWorktree(branch string) (VFS, error) {
 		localVFS, err := NewLocalVFS(g.path, g.hidePatterns)
 		if err != nil {
 			os.RemoveAll(worktreePath)
-			return nil, fmt.Errorf("GitRepo.GetWorktree() [git.go]: %w", err)
+			return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", err)
 		}
 		// Set the repo reference
 		localVFS.repo = g
@@ -136,14 +136,14 @@ func (g *GitRepo) GetWorktree(branch string) (VFS, error) {
 		// Remove any existing content
 		os.RemoveAll(worktreePath)
 		if err := os.MkdirAll(worktreePath, 0755); err != nil {
-			return nil, fmt.Errorf("GitRepo.GetWorktree() [git.go]: %w", err)
+			return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", err)
 		}
 
 		// Create a new worktree by checking out the branch
 		w, err := g.repo.Worktree()
 		if err != nil {
 			os.RemoveAll(worktreePath)
-			return nil, fmt.Errorf("GitRepo.GetWorktree() [git.go]: %w", err)
+			return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", err)
 		}
 
 		// Checkout the branch to the worktree directory
@@ -161,14 +161,14 @@ func (g *GitRepo) GetWorktree(branch string) (VFS, error) {
 			})
 			if err != nil {
 				os.RemoveAll(worktreePath)
-				return nil, fmt.Errorf("GitRepo.GetWorktree() [git.go]: %w", err)
+				return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", err)
 			}
 		}
 
 		localVFS, err := NewLocalVFS(worktreePath, g.hidePatterns)
 		if err != nil {
 			os.RemoveAll(worktreePath)
-			return nil, fmt.Errorf("GitRepo.GetWorktree() [git.go]: %w", err)
+			return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", err)
 		}
 		localVFS.repo = g
 
@@ -184,19 +184,19 @@ func (g *GitRepo) GetWorktree(branch string) (VFS, error) {
 }
 
 // DropWorktree closes and removes the worktree for the given branch.
-func (g *GitRepo) DropWorktree(branch string) error {
+func (g *GitVCS) DropWorktree(branch string) error {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
 	wt, exists := g.worktrees[branch]
 	if !exists {
-		return fmt.Errorf("GitRepo.DropWorktree() [git.go]: worktree for branch %q not found: %w", branch, ErrFileNotFound)
+		return fmt.Errorf("GitVCS.DropWorktree() [git.go]: worktree for branch %q not found: %w", branch, ErrFileNotFound)
 	}
 
 	// Remove the worktree directory if it's not the main repository
 	if wt.path != g.path {
 		if err := os.RemoveAll(wt.path); err != nil {
-			return fmt.Errorf("GitRepo.DropWorktree() [git.go]: %w", err)
+			return fmt.Errorf("GitVCS.DropWorktree() [git.go]: %w", err)
 		}
 	}
 
@@ -205,34 +205,34 @@ func (g *GitRepo) DropWorktree(branch string) error {
 }
 
 // CommitWorktree commits the changes in the worktree for the given branch.
-func (g *GitRepo) CommitWorktree(branch string, message string) error {
+func (g *GitVCS) CommitWorktree(branch string, message string) error {
 	g.mutex.RLock()
 	wt, exists := g.worktrees[branch]
 	g.mutex.RUnlock()
 
 	if !exists {
-		return fmt.Errorf("GitRepo.CommitWorktree() [git.go]: worktree for branch %q not found: %w", branch, ErrFileNotFound)
+		return fmt.Errorf("GitVCS.CommitWorktree() [git.go]: worktree for branch %q not found: %w", branch, ErrFileNotFound)
 	}
 
 	w, err := g.repo.Worktree()
 	if err != nil {
-		return fmt.Errorf("GitRepo.CommitWorktree() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.CommitWorktree() [git.go]: %w", err)
 	}
 
 	// Add all changes
 	_, err = w.Add(".")
 	if err != nil {
-		return fmt.Errorf("GitRepo.CommitWorktree() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.CommitWorktree() [git.go]: %w", err)
 	}
 
 	// Get the status to check if there are changes
 	status, err := w.Status()
 	if err != nil {
-		return fmt.Errorf("GitRepo.CommitWorktree() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.CommitWorktree() [git.go]: %w", err)
 	}
 
 	if status.IsClean() {
-		return fmt.Errorf("GitRepo.CommitWorktree() [git.go]: no changes to commit")
+		return fmt.Errorf("GitVCS.CommitWorktree() [git.go]: no changes to commit")
 	}
 
 	// Commit the changes
@@ -243,14 +243,14 @@ func (g *GitRepo) CommitWorktree(branch string, message string) error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("GitRepo.CommitWorktree() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.CommitWorktree() [git.go]: %w", err)
 	}
 
 	// Update the worktree reference
 	wt.vfs = nil
 	localVFS, err := NewLocalVFS(g.path, g.hidePatterns)
 	if err != nil {
-		return fmt.Errorf("GitRepo.CommitWorktree() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.CommitWorktree() [git.go]: %w", err)
 	}
 	localVFS.repo = g
 	wt.vfs = localVFS
@@ -259,7 +259,7 @@ func (g *GitRepo) CommitWorktree(branch string, message string) error {
 }
 
 // NewBranch creates a new branch from the given branch.
-func (g *GitRepo) NewBranch(name string, from string) error {
+func (g *GitVCS) NewBranch(name string, from string) error {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
@@ -268,9 +268,9 @@ func (g *GitRepo) NewBranch(name string, from string) error {
 	ref, err := g.repo.Reference(fromRef, true)
 	if err != nil {
 		if errors.Is(err, plumbing.ErrReferenceNotFound) {
-			return fmt.Errorf("GitRepo.NewBranch() [git.go]: source branch %q not found: %w", from, ErrFileNotFound)
+			return fmt.Errorf("GitVCS.NewBranch() [git.go]: source branch %q not found: %w", from, ErrFileNotFound)
 		}
-		return fmt.Errorf("GitRepo.NewBranch() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.NewBranch() [git.go]: %w", err)
 	}
 
 	// Create the new branch reference
@@ -279,42 +279,42 @@ func (g *GitRepo) NewBranch(name string, from string) error {
 	// Check if branch already exists
 	_, err = g.repo.Reference(newRef, true)
 	if err == nil {
-		return fmt.Errorf("GitRepo.NewBranch() [git.go]: branch %q already exists: %w", name, ErrFileExists)
+		return fmt.Errorf("GitVCS.NewBranch() [git.go]: branch %q already exists: %w", name, ErrFileExists)
 	}
 
 	// Create the new branch
 	newBranchRef := plumbing.NewHashReference(newRef, ref.Hash())
 	err = g.repo.Storer.SetReference(newBranchRef)
 	if err != nil {
-		return fmt.Errorf("GitRepo.NewBranch() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.NewBranch() [git.go]: %w", err)
 	}
 
 	return nil
 }
 
 // DeleteBranch deletes the given branch.
-func (g *GitRepo) DeleteBranch(name string) error {
+func (g *GitVCS) DeleteBranch(name string) error {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
 	// Cannot delete the current branch
 	head, err := g.repo.Head()
 	if err != nil {
-		return fmt.Errorf("GitRepo.DeleteBranch() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.DeleteBranch() [git.go]: %w", err)
 	}
 
 	branchRef := plumbing.NewBranchReferenceName(name)
 	if head.Name() == branchRef {
-		return fmt.Errorf("GitRepo.DeleteBranch() [git.go]: cannot delete current branch: %w", ErrPermissionDenied)
+		return fmt.Errorf("GitVCS.DeleteBranch() [git.go]: cannot delete current branch: %w", ErrPermissionDenied)
 	}
 
 	// Check if branch exists
 	_, err = g.repo.Reference(branchRef, true)
 	if err != nil {
 		if errors.Is(err, plumbing.ErrReferenceNotFound) {
-			return fmt.Errorf("GitRepo.DeleteBranch() [git.go]: branch %q not found: %w", name, ErrFileNotFound)
+			return fmt.Errorf("GitVCS.DeleteBranch() [git.go]: branch %q not found: %w", name, ErrFileNotFound)
 		}
-		return fmt.Errorf("GitRepo.DeleteBranch() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.DeleteBranch() [git.go]: %w", err)
 	}
 
 	// Remove the worktree if it exists
@@ -328,20 +328,20 @@ func (g *GitRepo) DeleteBranch(name string) error {
 	// Delete the branch reference
 	err = g.repo.Storer.RemoveReference(branchRef)
 	if err != nil {
-		return fmt.Errorf("GitRepo.DeleteBranch() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.DeleteBranch() [git.go]: %w", err)
 	}
 
 	return nil
 }
 
 // ListBranches returns a list of all branches.
-func (g *GitRepo) ListBranches(prefix string) ([]string, error) {
+func (g *GitVCS) ListBranches(prefix string) ([]string, error) {
 	g.mutex.RLock()
 	defer g.mutex.RUnlock()
 
 	branches, err := g.repo.Branches()
 	if err != nil {
-		return nil, fmt.Errorf("GitRepo.ListBranches() [git.go]: %w", err)
+		return nil, fmt.Errorf("GitVCS.ListBranches() [git.go]: %w", err)
 	}
 
 	var result []string
@@ -353,14 +353,14 @@ func (g *GitRepo) ListBranches(prefix string) ([]string, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("GitRepo.ListBranches() [git.go]: %w", err)
+		return nil, fmt.Errorf("GitVCS.ListBranches() [git.go]: %w", err)
 	}
 
 	return result, nil
 }
 
 // MergeBranches merges the given branch into the current branch.
-func (g *GitRepo) MergeBranches(into string, from string) error {
+func (g *GitVCS) MergeBranches(into string, from string) error {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
@@ -371,23 +371,23 @@ func (g *GitRepo) MergeBranches(into string, from string) error {
 	// Check if branches exist
 	intoHash, err := g.repo.ResolveRevision(plumbing.Revision(intoRef))
 	if err != nil {
-		return fmt.Errorf("GitRepo.MergeBranches() [git.go]: target branch %q not found: %w", into, ErrFileNotFound)
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: target branch %q not found: %w", into, ErrFileNotFound)
 	}
 
 	fromHash, err := g.repo.ResolveRevision(plumbing.Revision(fromRef))
 	if err != nil {
-		return fmt.Errorf("GitRepo.MergeBranches() [git.go]: source branch %q not found: %w", from, ErrFileNotFound)
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: source branch %q not found: %w", from, ErrFileNotFound)
 	}
 
 	// Get the commits
 	intoCommit, err := g.repo.CommitObject(*intoHash)
 	if err != nil {
-		return fmt.Errorf("GitRepo.MergeBranches() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 
 	fromCommit, err := g.repo.CommitObject(*fromHash)
 	if err != nil {
-		return fmt.Errorf("GitRepo.MergeBranches() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 
 	// Find common ancestor
@@ -400,7 +400,7 @@ func (g *GitRepo) MergeBranches(into string, from string) error {
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("GitRepo.MergeBranches() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 
 	var commonAncestor *object.Commit
@@ -412,11 +412,11 @@ func (g *GitRepo) MergeBranches(into string, from string) error {
 		return nil
 	})
 	if err != nil && err.Error() != "found" {
-		return fmt.Errorf("GitRepo.MergeBranches() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 
 	if commonAncestor == nil {
-		return fmt.Errorf("GitRepo.MergeBranches() [git.go]: no common ancestor found")
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: no common ancestor found")
 	}
 
 	// Create a merge commit
@@ -436,7 +436,7 @@ func (g *GitRepo) MergeBranches(into string, from string) error {
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("GitRepo.MergeBranches() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 
 	if fromAncestors[intoCommit.Hash] {
@@ -444,7 +444,7 @@ func (g *GitRepo) MergeBranches(into string, from string) error {
 		newRef := plumbing.NewHashReference(intoRef, fromCommit.Hash)
 		err = g.repo.Storer.SetReference(newRef)
 		if err != nil {
-			return fmt.Errorf("GitRepo.MergeBranches() [git.go]: %w", err)
+			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 		}
 		return nil
 	}
@@ -471,25 +471,25 @@ func (g *GitRepo) MergeBranches(into string, from string) error {
 	obj := g.repo.Storer.NewEncodedObject()
 	err = mergeCommit.Encode(obj)
 	if err != nil {
-		return fmt.Errorf("GitRepo.MergeBranches() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 
 	hash, err := g.repo.Storer.SetEncodedObject(obj)
 	if err != nil {
-		return fmt.Errorf("GitRepo.MergeBranches() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 
 	// Update the branch reference
 	newRef := plumbing.NewHashReference(intoRef, hash)
 	err = g.repo.Storer.SetReference(newRef)
 	if err != nil {
-		return fmt.Errorf("GitRepo.MergeBranches() [git.go]: %w", err)
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 
 	return nil
 }
 
 // Path returns the repository path
-func (g *GitRepo) Path() string {
+func (g *GitVCS) Path() string {
 	return g.path
 }
