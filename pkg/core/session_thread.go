@@ -206,6 +206,26 @@ func (c *SessionThread) Resume() error {
 	return nil
 }
 
+// ResumePending resumes the session processing without adding a new user prompt.
+// It can be used to continue pending tool execution after restoring a session.
+func (c *SessionThread) ResumePending() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.session == nil {
+		return fmt.Errorf("SessionThread.ResumePending() [session_thread.go]: session not initialized, call StartSession first")
+	}
+
+	c.paused = false
+	c.resumePending = true
+
+	if !c.sessionRunning {
+		c.startSessionLocked()
+	}
+
+	return nil
+}
+
 // IsPaused returns true if the session is paused.
 func (c *SessionThread) IsPaused() bool {
 	c.mu.Lock()

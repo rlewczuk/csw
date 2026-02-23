@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +22,8 @@ import (
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/spf13/cobra"
 )
+
+var runCLIFunc = runCLI
 
 // CliCommand creates the cli command.
 func CliCommand() *cobra.Command {
@@ -39,22 +42,37 @@ func CliCommand() *cobra.Command {
 		cliThinking       string
 		cliCommitMessage  string
 		cliMerge          bool
+		cliResume         string
+		cliContinue       bool
+		cliForce          bool
 	)
 
 	cmd := &cobra.Command{
-		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--merge] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] \"prompt\"",
+		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--merge] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last>] [--continue] [--force] [\"prompt\"]",
 		Short: "Start a CLI chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Suppress usage for runtime errors from command execution.
 			// Argument/flag parsing errors happen before RunE and still show usage.
 			cmd.SilenceUsage = true
 
-			prompt := args[0]
+			resumeTarget, err := normalizeResumeTarget(cliResume)
+			if err != nil {
+				return err
+			}
+
+			if cliContinue && resumeTarget == "" {
+				resumeTarget = "last"
+			}
+
+			prompt := ""
+			if len(args) == 1 {
+				prompt = args[0]
+			}
 
 			// Read prompt from file if it starts with @
-			if strings.HasPrefix(prompt, "@") {
+			if prompt != "" && strings.HasPrefix(prompt, "@") {
 				promptFile := strings.TrimPrefix(prompt, "@")
 				data, err := os.ReadFile(promptFile)
 				if err != nil {
@@ -70,13 +88,25 @@ func CliCommand() *cobra.Command {
 				prompt = string(data)
 			}
 
-			// Trim whitespace from prompt
-			prompt = strings.TrimSpace(prompt)
-			if prompt == "" {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
+			if prompt != "" {
+				prompt = strings.TrimSpace(prompt)
 			}
 
-			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliWorktree, cliMerge, cliCommitMessage, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer, cliThinking)
+			if resumeTarget == "" {
+				if prompt == "" {
+					return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
+				}
+			}
+
+			if resumeTarget != "" && !cliContinue && prompt != "" {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt requires --continue when --resume is set")
+			}
+
+			if cliContinue && prompt == "" {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty when --continue is set")
+			}
+
+			return runCLIFunc(prompt, cliModel, cliRole, cliWorkDir, cliWorktree, cliMerge, cliCommitMessage, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer, cliThinking, resumeTarget, cliContinue, cliForce)
 		},
 	}
 
@@ -95,11 +125,18 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliLogLLMRequests, "log-llm-requests", false, "Log LLM requests and responses")
 	cmd.Flags().StringVar(&cliLSPServer, "lsp-server", "", "Path to LSP server binary (empty to disable LSP)")
 	cmd.Flags().StringVar(&cliThinking, "thinking", "", "Thinking/reasoning mode: low, medium, high, xhigh (effort-based) or true/false (boolean)")
+	cmd.Flags().StringVar(&cliResume, "resume", "", "Resume session by id (UUID) or 'last'. If value is omitted, resumes last session")
+	cmd.Flags().BoolVar(&cliContinue, "continue", false, "Continue resumed session with a new user message")
+	cmd.Flags().BoolVar(&cliForce, "force", false, "Force resume even when there is no pending work")
+	resumeFlag := cmd.Flags().Lookup("resume")
+	if resumeFlag != nil {
+		resumeFlag.NoOptDefVal = "last"
+	}
 
 	return cmd
 }
 
-func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge bool, commitMessageTemplate, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking string) error {
+func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge bool, commitMessageTemplate, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking, resumeTarget string, continueSession, forceResume bool) error {
 	startTime := time.Now()
 	ctx := context.Background()
 
@@ -126,15 +163,40 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 	modelName = buildResult.ModelName
 	logsDir := buildResult.LogsDir
 
-	// Create session thread
-	thread := core.NewSessionThread(sweSystem, nil)
+	var (
+		thread  *core.SessionThread
+		session *core.SweSession
+	)
 
-	// Start session
-	if err := thread.StartSession(modelName); err != nil {
-		return fmt.Errorf("runCLI() [cli.go]: failed to start session: %w", err)
+	if resumeTarget != "" {
+		if resumeTarget == "last" {
+			session, err = sweSystem.LoadLastSession(nil)
+			if err != nil {
+				return fmt.Errorf("runCLI() [cli.go]: failed to load last session: %w", err)
+			}
+		} else {
+			session, err = sweSystem.LoadSession(resumeTarget, nil)
+			if err != nil {
+				return fmt.Errorf("runCLI() [cli.go]: failed to load session: %w", err)
+			}
+		}
+		thread = core.NewSessionThreadWithSession(sweSystem, session, nil)
+	} else {
+		thread = core.NewSessionThread(sweSystem, nil)
+		if err := thread.StartSession(modelName); err != nil {
+			return fmt.Errorf("runCLI() [cli.go]: failed to start session: %w", err)
+		}
+		session = thread.GetSession()
 	}
 
-	session := thread.GetSession()
+	if session == nil {
+		return fmt.Errorf("runCLI() [cli.go]: session is not available")
+	}
+
+	sessionID := session.ID()
+	defer func() {
+		_, _ = fmt.Fprintf(os.Stdout, "Session ID: %s\n", sessionID)
+	}()
 
 	defer finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, merge, commitMessageTemplate, sweSystem, session, os.Stderr)
 
@@ -153,14 +215,12 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 	}
 
 	// Set role
-	session = thread.GetSession()
-	if session != nil {
+	if resumeTarget == "" {
 		if err := session.SetRole(roleName); err != nil {
 			return fmt.Errorf("runCLI() [cli.go]: failed to set role: %w", err)
 		}
 		// Set working directory
 		session.SetWorkDir(workDir)
-
 	}
 
 	// Create chat presenter
@@ -220,13 +280,31 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 	}
 	thread.SetOutputHandler(wrappedHandler)
 
-	// Send initial prompt
-	userMsg := &ui.ChatMessageUI{
-		Role: ui.ChatRoleUser,
-		Text: prompt,
-	}
-	if err := chatPresenter.SendUserMessage(userMsg); err != nil {
-		return fmt.Errorf("runCLI() [cli.go]: failed to send initial message: %w", err)
+	if resumeTarget != "" {
+		if continueSession {
+			userMsg := &ui.ChatMessageUI{
+				Role: ui.ChatRoleUser,
+				Text: prompt,
+			}
+			if err := chatPresenter.SendUserMessage(userMsg); err != nil {
+				return fmt.Errorf("runCLI() [cli.go]: failed to send continue message: %w", err)
+			}
+		} else {
+			if !forceResume && !session.HasPendingWork() {
+				return fmt.Errorf("runCLI() [cli.go]: resumed session has no pending work (use --continue to add a prompt or --force to run anyway)")
+			}
+			if err := thread.ResumePending(); err != nil {
+				return fmt.Errorf("runCLI() [cli.go]: failed to resume pending work: %w", err)
+			}
+		}
+	} else {
+		userMsg := &ui.ChatMessageUI{
+			Role: ui.ChatRoleUser,
+			Text: prompt,
+		}
+		if err := chatPresenter.SendUserMessage(userMsg); err != nil {
+			return fmt.Errorf("runCLI() [cli.go]: failed to send initial message: %w", err)
+		}
 	}
 
 	// Wait for completion or context cancellation
@@ -241,6 +319,25 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 
 	appView.ShowMessage(fmt.Sprintf("Session completed in %s", time.Since(startTime).Round(time.Second)), ui.MessageTypeInfo)
 	return nil
+}
+
+func normalizeResumeTarget(raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "", nil
+	}
+	value = strings.ToLower(value)
+
+	if value == "last" {
+		return value, nil
+	}
+
+	uuidPattern := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	if !uuidPattern.MatchString(value) {
+		return "", fmt.Errorf("normalizeResumeTarget() [cli.go]: invalid --resume value: %q (expected UUID or 'last')", raw)
+	}
+
+	return value, nil
 }
 
 func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *core.SweSystem, session *core.SweSession, stderr io.Writer) {

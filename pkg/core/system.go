@@ -1,8 +1,12 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/rlewczuk/csw/pkg/conf"
@@ -76,6 +80,93 @@ type SweSystem struct {
 	// Values like "low", "medium", "high", "xhigh" for effort-based thinking,
 	// or "true"/"false" for boolean thinking modes.
 	Thinking string
+}
+
+// LoadSession loads a persisted session from disk and registers it in memory.
+func (s *SweSystem) LoadSession(id string, outputHandler SessionThreadOutput) (*SweSession, error) {
+	s.sessionsMu.Lock()
+	defer s.sessionsMu.Unlock()
+
+	if existing, ok := s.sessions[id]; ok {
+		existing.outputHandler = outputHandler
+		return existing, nil
+	}
+
+	if strings.TrimSpace(id) == "" {
+		return nil, fmt.Errorf("SweSystem.LoadSession() [system.go]: session id cannot be empty")
+	}
+
+	statePath := filepath.Join(s.LogBaseDir, "sessions", id, "session.json")
+	stateBytes, err := os.ReadFile(statePath)
+	if err != nil {
+		return nil, fmt.Errorf("SweSystem.LoadSession() [system.go]: failed to read session state file: %w", err)
+	}
+
+	var state persistedSessionState
+	if err := json.Unmarshal(stateBytes, &state); err != nil {
+		return nil, fmt.Errorf("SweSystem.LoadSession() [system.go]: failed to unmarshal session state: %w", err)
+	}
+
+	session, err := restoreSessionFromPersistedState(s, state, outputHandler)
+	if err != nil {
+		return nil, fmt.Errorf("SweSystem.LoadSession() [system.go]: failed to restore session: %w", err)
+	}
+
+	if s.sessions == nil {
+		s.sessions = make(map[string]*SweSession)
+	}
+	s.sessions[session.ID()] = session
+
+	return session, nil
+}
+
+// LoadLastSession loads the most recently updated persisted session.
+func (s *SweSystem) LoadLastSession(outputHandler SessionThreadOutput) (*SweSession, error) {
+	if strings.TrimSpace(s.LogBaseDir) == "" {
+		return nil, fmt.Errorf("SweSystem.LoadLastSession() [system.go]: LogBaseDir is empty")
+	}
+
+	sessionsRoot := filepath.Join(s.LogBaseDir, "sessions")
+	entries, err := os.ReadDir(sessionsRoot)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("SweSystem.LoadLastSession() [system.go]: no persisted sessions found")
+		}
+		return nil, fmt.Errorf("SweSystem.LoadLastSession() [system.go]: failed to read sessions directory: %w", err)
+	}
+
+	type persistedSessionFile struct {
+		id      string
+		modTime int64
+	}
+
+	latest := persistedSessionFile{}
+	found := false
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		sessionID := entry.Name()
+		statePath := filepath.Join(sessionsRoot, sessionID, "session.json")
+		info, statErr := os.Stat(statePath)
+		if statErr != nil {
+			continue
+		}
+
+		modTime := info.ModTime().UnixNano()
+		if !found || modTime > latest.modTime {
+			latest = persistedSessionFile{id: sessionID, modTime: modTime}
+			found = true
+		}
+	}
+
+	if !found {
+		return nil, fmt.Errorf("SweSystem.LoadLastSession() [system.go]: no persisted sessions found")
+	}
+
+	return s.LoadSession(latest.id, outputHandler)
 }
 
 func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) (*SweSession, error) {
