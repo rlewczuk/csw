@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,6 +36,20 @@ func TestMockAppView_ShowSettings(t *testing.T) {
 	assert.Equal(t, 3, view.ShowSettingsCalls, "expected 3 ShowSettings calls")
 }
 
+// TestMockAppView_ShowMessage tests that ShowMessage records calls correctly.
+func TestMockAppView_ShowMessage(t *testing.T) {
+	view := NewMockAppView()
+
+	view.ShowMessage("hello", ui.MessageTypeInfo)
+	view.ShowMessage("careful", ui.MessageTypeWarning)
+
+	assert.Len(t, view.ShowMessageCalls, 2)
+	assert.Equal(t, "hello", view.ShowMessageCalls[0].Message)
+	assert.Equal(t, ui.MessageTypeInfo, view.ShowMessageCalls[0].Type)
+	assert.Equal(t, "careful", view.ShowMessageCalls[1].Message)
+	assert.Equal(t, ui.MessageTypeWarning, view.ShowMessageCalls[1].Type)
+}
+
 // TestMockAppView_Reset tests that Reset clears all recorded data.
 func TestMockAppView_Reset(t *testing.T) {
 	view := NewMockAppView()
@@ -42,14 +57,17 @@ func TestMockAppView_Reset(t *testing.T) {
 
 	view.ShowChat(chatPresenter)
 	view.ShowSettings()
+	view.ShowMessage("oops", ui.MessageTypeError)
 
 	assert.Len(t, view.ShowChatCalls, 1, "should have 1 ShowChat call before reset")
 	assert.Equal(t, 1, view.ShowSettingsCalls, "should have 1 ShowSettings call before reset")
+	assert.Len(t, view.ShowMessageCalls, 1, "should have 1 ShowMessage call before reset")
 
 	view.Reset()
 
 	assert.Len(t, view.ShowChatCalls, 0, "ShowChatCalls should be empty after reset")
 	assert.Equal(t, 0, view.ShowSettingsCalls, "ShowSettingsCalls should be 0 after reset")
+	assert.Len(t, view.ShowMessageCalls, 0, "ShowMessageCalls should be empty after reset")
 }
 
 // TestMockAppPresenter_NewSession tests that NewSession works correctly.

@@ -159,6 +159,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch, commitMessageT
 
 	// Create chat presenter
 	basePresenter := presenter.NewChatPresenter(sweSystem, thread)
+	appView := cli.NewAppView(os.Stdout)
 
 	// Create CLI chat view
 	baseCliView := cli.NewCliChatView(basePresenter, os.Stdout, os.Stdin, interactive, allowAllPerms)
@@ -232,7 +233,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch, commitMessageT
 		return ctx.Err()
 	}
 
-	fmt.Printf("\nSession completed in %s\n", time.Since(startTime).Round(time.Second))
+	appView.ShowMessage(fmt.Sprintf("Session completed in %s", time.Since(startTime).Round(time.Second)), ui.MessageTypeInfo)
 	return nil
 }
 

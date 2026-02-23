@@ -2,10 +2,12 @@ package tui
 
 import (
 	"testing"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/gtv"
 	"github.com/rlewczuk/csw/pkg/gtv/tio"
 	"github.com/rlewczuk/csw/pkg/gtv/tui"
+	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/ui/mock"
 	"github.com/stretchr/testify/assert"
 )
@@ -372,6 +374,35 @@ func TestAppViewStatusBar(t *testing.T) {
 		statusText := view.renderStatusBarText()
 		assert.Contains(t, statusText, appViewName)
 		assert.Contains(t, statusText, appViewVersion)
+	})
+
+	t.Run("ShowMessage updates status bar immediately", func(t *testing.T) {
+		presenter := mock.NewMockAppPresenter()
+		rect := gtv.TRect{X: 0, Y: 0, W: 80, H: 24}
+		view := NewAppView(nil, rect, presenter)
+
+		view.ShowMessage("hello status", ui.MessageTypeInfo)
+
+		assert.Equal(t, "hello status", view.statusMessage)
+		assert.Contains(t, view.statusBar.GetText(), "hello status")
+	})
+
+	t.Run("ShowMessage clears status after duration", func(t *testing.T) {
+		presenter := mock.NewMockAppPresenter()
+		rect := gtv.TRect{X: 0, Y: 0, W: 80, H: 24}
+		view := NewAppView(nil, rect, presenter)
+
+		oldDuration := appViewMessageDisplayDuration
+		appViewMessageDisplayDuration = 10 * time.Millisecond
+		t.Cleanup(func() {
+			appViewMessageDisplayDuration = oldDuration
+		})
+
+		view.ShowMessage("temporary", ui.MessageTypeWarning)
+		time.Sleep(30 * time.Millisecond)
+
+		assert.Equal(t, "", view.statusMessage)
+		assert.Contains(t, view.statusBar.GetText(), "Ctrl+P/Esc: Menu")
 	})
 }
 

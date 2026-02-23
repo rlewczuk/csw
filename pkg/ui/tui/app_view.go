@@ -3,11 +3,14 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/gtv"
 	"github.com/rlewczuk/csw/pkg/gtv/tui"
 	"github.com/rlewczuk/csw/pkg/ui"
 )
+
+var appViewMessageDisplayDuration = 10 * time.Second
 
 const (
 	appViewName    = "Codesnort SWE"
@@ -31,6 +34,10 @@ type TAppView struct {
 
 	// Status bar label
 	statusBar *tui.TLabel
+
+	statusMessage    string
+	statusMessageSeq uint64
+	statusTimer      *time.Timer
 
 	// Dimensions
 	width  int
@@ -117,6 +124,38 @@ func (v *TAppView) ShowSettings() {
 	// TODO: Implement settings view
 }
 
+// ShowMessage shows a temporary message in the status bar.
+func (v *TAppView) ShowMessage(message string, messageType ui.MessageType) {
+	v.ExecuteOnUiThread(func() any {
+		v.statusMessage = message
+		v.statusMessageSeq++
+		seq := v.statusMessageSeq
+
+		if v.statusTimer != nil {
+			v.statusTimer.Stop()
+			v.statusTimer = nil
+		}
+
+		v.statusBar.SetText(v.renderStatusBarText())
+
+		v.statusTimer = time.AfterFunc(appViewMessageDisplayDuration, func() {
+			v.ExecuteOnUiThread(func() any {
+				if v.statusMessageSeq != seq {
+					return nil
+				}
+
+				v.statusMessage = ""
+				v.statusTimer = nil
+				v.statusBar.SetText(v.renderStatusBarText())
+				return nil
+			}, true, false)
+		})
+
+		_ = messageType
+		return nil
+	}, true, false)
+}
+
 // Draw draws the app view on the screen.
 func (v *TAppView) Draw(screen gtv.IScreenOutput) {
 	// Don't draw if hidden
@@ -180,6 +219,10 @@ func (v *TAppView) HandleEvent(event *tui.TEvent) {
 
 // renderStatusBarText renders the status bar text.
 func (v *TAppView) renderStatusBarText() string {
+	if v.statusMessage != "" {
+		return padStatusBarText(v.statusMessage, v.width)
+	}
+
 	leftText := "Ctrl+P/Esc: Menu"
 	rightText := fmt.Sprintf("%s v%s", appViewName, appViewVersion)
 
@@ -194,7 +237,19 @@ func (v *TAppView) renderStatusBarText() string {
 
 	spacing := strings.Repeat(" ", spacingWidth)
 
-	return leftText + spacing + rightText
+	return padStatusBarText(leftText+spacing+rightText, v.width)
+}
+
+func padStatusBarText(text string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+
+	if len(text) >= width {
+		return text[:width]
+	}
+
+	return text + strings.Repeat(" ", width-len(text))
 }
 
 // showMenu displays the main menu.
