@@ -25,9 +25,6 @@ func TestPrepareSessionVFSWithoutWorktree(t *testing.T) {
 }
 
 func TestPrepareSessionVFSWithWorktreeCreatesBranchAndWorktree(t *testing.T) {
-	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
-
 	repoDir := initTestGitRepository(t)
 
 	repo, selectedVFS, err := prepareSessionVFS(repoDir, "feature/worktree", nil)
@@ -38,7 +35,7 @@ func TestPrepareSessionVFSWithWorktreeCreatesBranchAndWorktree(t *testing.T) {
 	_, isGit := repo.(*vfs.GitVCS)
 	assert.True(t, isGit)
 
-	expectedWorktreePath := filepath.Join(homeDir, ".cswdata", "worktrees", "feature", "worktree")
+	expectedWorktreePath := filepath.Join(repoDir, ".cswdata", "work", "feature", "worktree")
 	assert.Equal(t, expectedWorktreePath, selectedVFS.WorktreePath())
 
 	_, err = selectedVFS.ReadFile("README.md")
@@ -49,11 +46,8 @@ func TestPrepareSessionVFSWithWorktreeCreatesBranchAndWorktree(t *testing.T) {
 }
 
 func TestPrepareSessionVFSRecreatesExistingWorktreePath(t *testing.T) {
-	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
-
 	repoDir := initTestGitRepository(t)
-	stalePath := filepath.Join(homeDir, ".cswdata", "worktrees", "feature-recreate")
+	stalePath := filepath.Join(repoDir, ".cswdata", "work", "feature-recreate")
 	require.NoError(t, os.MkdirAll(stalePath, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(stalePath, "stale.txt"), []byte("stale"), 0644))
 
