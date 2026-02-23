@@ -225,6 +225,19 @@ func SetLogsDirectory(dirPath string, sync bool) error {
 	return nil
 }
 
+// GetSessionLogDirectory returns absolute path to the log directory for a session.
+// Returns empty string when file logging directory is not configured.
+func GetSessionLogDirectory(sessionID string) string {
+	configMu.RLock()
+	defer configMu.RUnlock()
+
+	if logsDirectory == "" {
+		return ""
+	}
+
+	return filepath.Join(logsDirectory, "sessions", sessionID)
+}
+
 // GetGlobalLogger returns the global logger instance.
 // If SetLogsDirectory has not been called, returns a logger that writes to memory.
 func GetGlobalLogger() *slog.Logger {
