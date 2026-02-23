@@ -3,9 +3,9 @@ package core
 import (
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -476,55 +476,23 @@ func TestConfPromptGenerator_GetPrompt_ToolsFiltering(t *testing.T) {
 }
 
 // newMockConfigStoreWithFragments creates a mock config store with test fragment data.
-func newMockConfigStoreWithFragments() *mockConfigStore {
-	return &mockConfigStore{
-		roleConfigs: map[string]*conf.AgentRoleConfig{
-			"all": {
-				Name: "all",
-				PromptFragments: map[string]string{
-					"10-system":                "# All Core Instructions\n\nYou are an AI assistant working in: {{.Info.WorkDir}}",
-					"20-system-anthropic":      "# Anthropic-Specific Instructions\n\nUse Anthropic-specific features.",
-					"20-system-openai":         "# OpenAI-Specific Instructions\n\nUse OpenAI-specific features.",
-					"30-system":                "# General Guidelines\n\nFollow general guidelines.",
-					"40-tools-read":            "# Read Tool Instructions\n\nUse read tool carefully.",
-					"50-tools-write-anthropic": "# Write Tool Instructions (Anthropic)\n\nUse write tool with Anthropic.",
-				},
+func newMockConfigStoreWithFragments() *confimpl.MockConfigStore {
+	store := confimpl.NewMockConfigStore()
+	store.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"all": {
+			Name: "all",
+			PromptFragments: map[string]string{
+				"10-system":                "# All Core Instructions\n\nYou are an AI assistant working in: {{.Info.WorkDir}}",
+				"20-system-anthropic":      "# Anthropic-Specific Instructions\n\nUse Anthropic-specific features.",
+				"20-system-openai":         "# OpenAI-Specific Instructions\n\nUse OpenAI-specific features.",
+				"30-system":                "# General Guidelines\n\nFollow general guidelines.",
+				"40-tools-read":            "# Read Tool Instructions\n\nUse read tool carefully.",
+				"50-tools-write-anthropic": "# Write Tool Instructions (Anthropic)\n\nUse write tool with Anthropic.",
 			},
 		},
-	}
-}
+	})
 
-// mockConfigStore is a simple mock for testing ConfPromptGenerator.
-type mockConfigStore struct {
-	roleConfigs map[string]*conf.AgentRoleConfig
-}
-
-func (m *mockConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelProviderConfig, error) {
-	return nil, nil
-}
-
-func (m *mockConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
-	return time.Time{}, nil
-}
-
-func (m *mockConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfig, error) {
-	return m.roleConfigs, nil
-}
-
-func (m *mockConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
-	return time.Time{}, nil
-}
-
-func (m *mockConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
-	return nil, nil
-}
-
-func (m *mockConfigStore) LastGlobalConfigUpdate() (time.Time, error) {
-	return time.Time{}, nil
-}
-
-func (m *mockConfigStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
-	return nil, nil
+	return store
 }
 
 func TestConfPromptGenerator_GetAgentFiles(t *testing.T) {
