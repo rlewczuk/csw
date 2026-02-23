@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,6 +23,7 @@ type BuildSystemParams struct {
 	ConfigPath     string
 	ModelName      string
 	RoleName       string
+	WorktreeBranch string
 	LSPServer      string
 	LogLLMRequests bool
 	// Thinking controls the thinking/reasoning mode for LLM requests.
@@ -38,6 +40,60 @@ type BuildSystemResult struct {
 	ConfigStore      conf.ConfigStore
 	ProviderRegistry *models.ProviderRegistry
 	LogsDir          string
+	VCS              vfs.VCS
+	WorktreeBranch   string
+}
+
+func prepareSessionVFS(workDir string, worktreeBranch string, hidePatterns []string) (vfs.VCS, vfs.VFS, error) {
+	localVFS, err := vfs.NewLocalVFS(workDir, hidePatterns)
+	if err != nil {
+		return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create local VFS: %w", err)
+	}
+
+	nullVCS, err := vfs.NewNullVFS(localVFS)
+	if err != nil {
+		return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create NullVCS: %w", err)
+	}
+
+	var selectedVCS vfs.VCS = nullVCS
+
+	if worktreeBranch != "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to resolve user home directory: %w", err)
+		}
+
+		worktreesRoot := filepath.Join(homeDir, ".cswdata", "worktrees")
+		gitRepo, err := vfs.NewGitRepo(workDir, worktreesRoot, hidePatterns)
+		if err != nil {
+			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create GitVCS: %w", err)
+		}
+
+		if err := os.RemoveAll(filepath.Join(worktreesRoot, worktreeBranch)); err != nil {
+			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to remove existing worktree path: %w", err)
+		}
+
+		if err := gitRepo.DropWorktree(worktreeBranch); err != nil && !errors.Is(err, vfs.ErrFileNotFound) {
+			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to drop existing worktree: %w", err)
+		}
+
+		if err := gitRepo.DeleteBranch(worktreeBranch); err != nil && !errors.Is(err, vfs.ErrFileNotFound) {
+			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to delete existing worktree branch: %w", err)
+		}
+
+		if err := gitRepo.NewBranch(worktreeBranch, "HEAD"); err != nil {
+			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create worktree branch: %w", err)
+		}
+
+		selectedVCS = gitRepo
+	}
+
+	selectedVFS, err := selectedVCS.GetWorktree(worktreeBranch)
+	if err != nil {
+		return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to get selected worktree: %w", err)
+	}
+
+	return selectedVCS, selectedVFS, nil
 }
 
 // BuildSystem builds a SweSystem and related setup for CLI and TUI.
@@ -102,11 +158,13 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to build hide patterns: %w", err)
 	}
 
-	localVFS, err := vfs.NewLocalVFS(workDir, hidePatterns)
+	selectedVCS, selectedVFS, err := prepareSessionVFS(workDir, params.WorktreeBranch, hidePatterns)
 	if err != nil {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create VFS: %w", err)
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
+
+	effectiveWorkDir := selectedVFS.WorktreePath()
 
 	var lspClient lsp.LSP
 	if params.LSPServer != "" {
@@ -116,7 +174,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		if _, err := os.Stat(params.LSPServer); err != nil {
 			logger.Warn("LSP server binary not found, continuing without LSP", "server", params.LSPServer, "error", err)
 		} else {
-			client, err := lsp.NewClient(params.LSPServer, workDir)
+			client, err := lsp.NewClient(params.LSPServer, effectiveWorkDir)
 			if err != nil {
 				logger.Warn("failed to create LSP client, continuing without LSP", "error", err)
 			} else if err := client.Init(false); err != nil {
@@ -129,12 +187,12 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	}
 
 	toolRegistry := tool.NewToolRegistry()
-	tool.RegisterVFSTools(toolRegistry, localVFS, lspClient, nil)
+	tool.RegisterVFSTools(toolRegistry, selectedVFS, lspClient, nil)
 
-	bashRunner := runner.NewBashRunner(workDir, 0)
+	bashRunner := runner.NewBashRunner(effectiveWorkDir, 0)
 	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges)
 
-	promptGenerator, err := core.NewConfPromptGenerator(configStore, localVFS)
+	promptGenerator, err := core.NewConfPromptGenerator(configStore, selectedVFS)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create prompt generator: %w", err)
@@ -152,29 +210,31 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to load global config: %w", err)
 	}
 
-	sweSystem := &core.SweSystem{
+		sweSystem := &core.SweSystem{
 		ModelProviders:  modelProviders,
 		ModelTags:       modelTagRegistry,
 		ToolSelection:   globalConfig.ToolSelection,
 		PromptGenerator: promptGenerator,
 		Tools:           toolRegistry,
-		VFS:             localVFS,
+		VFS:             selectedVFS,
 		Roles:           roleRegistry,
 		LSP:             lspClient,
 		ConfigStore:     configStore,
 		LogBaseDir:      logsDir,
-		WorkDir:         workDir,
+		WorkDir:         effectiveWorkDir,
 		LogLLMRequests:  params.LogLLMRequests,
 		Thinking:        params.Thinking,
 	}
 
 	result = BuildSystemResult{
-		WorkDir:          workDir,
+		WorkDir:          effectiveWorkDir,
 		RoleConfig:       roleConfig,
 		ModelName:        modelName,
 		ConfigStore:      configStore,
 		ProviderRegistry: providerRegistry,
 		LogsDir:          logsDir,
+		VCS:              selectedVCS,
+		WorktreeBranch:   params.WorktreeBranch,
 	}
 
 	return sweSystem, result, nil

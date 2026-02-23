@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/ui/cli"
 	"github.com/rlewczuk/csw/pkg/ui/logmd"
+	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/spf13/cobra"
 )
 
@@ -26,6 +28,7 @@ func CliCommand() *cobra.Command {
 		cliModel          string
 		cliRole           string
 		cliWorkDir        string
+		cliWorktree       string
 		cliAllowAllPerms  bool
 		cliInteractive    bool
 		cliConfigPath     string
@@ -37,7 +40,7 @@ func CliCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] \"prompt\"",
+		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] \"prompt\"",
 		Short: "Start a CLI chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.ExactArgs(1),
@@ -71,7 +74,7 @@ func CliCommand() *cobra.Command {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
 			}
 
-			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer, cliThinking)
+			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliWorktree, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer, cliThinking)
 		},
 	}
 
@@ -79,6 +82,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliModel, "model", "", "Model name in provider/model format (if not set, uses default provider)")
 	cmd.Flags().StringVar(&cliRole, "role", "developer", "Agent role name")
 	cmd.Flags().StringVar(&cliWorkDir, "workdir", "", "Working directory (default: current directory)")
+	cmd.Flags().StringVar(&cliWorktree, "worktree", "", "Create and use a git worktree for this session on a feature branch")
 	cmd.Flags().BoolVar(&cliAllowAllPerms, "allow-all-permissions", false, "Allow all permissions without asking")
 	cmd.Flags().BoolVar(&cliInteractive, "interactive", false, "Enable interactive mode (allows user to respond to agent questions)")
 	cmd.Flags().StringVar(&cliConfigPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
@@ -91,7 +95,7 @@ func CliCommand() *cobra.Command {
 	return cmd
 }
 
-func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking string) error {
+func runCLI(prompt, modelName, roleName, workDir, worktreeBranch, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking string) error {
 	startTime := time.Now()
 	ctx := context.Background()
 
@@ -100,6 +104,7 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 		ConfigPath:     configPath,
 		ModelName:      modelName,
 		RoleName:       roleName,
+		WorktreeBranch: worktreeBranch,
 		LSPServer:      lspServer,
 		LogLLMRequests: logLLMRequests,
 		Thinking:       thinking,
@@ -121,6 +126,14 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 		return fmt.Errorf("runCLI() [cli.go]: failed to start session: %w", err)
 	}
 
+	session := thread.GetSession()
+	var sessionID string
+	if session != nil {
+		sessionID = session.ID()
+	}
+
+	defer finalizeWorktreeSession(buildResult.VCS, buildResult.WorktreeBranch, sessionID, time.Now(), os.Stderr)
+
 	// Determine session file path if session saving is enabled
 	var sessionFilePath string
 	if saveSessionTo != "" {
@@ -136,7 +149,7 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 	}
 
 	// Set role
-	session := thread.GetSession()
+	session = thread.GetSession()
 	if session != nil {
 		if err := session.SetRole(roleName); err != nil {
 			return fmt.Errorf("runCLI() [cli.go]: failed to set role: %w", err)
@@ -223,6 +236,25 @@ func runCLI(prompt, modelName, roleName, workDir, configPath string, allowAllPer
 
 	fmt.Printf("\nSession completed in %s\n", time.Since(startTime).Round(time.Second))
 	return nil
+}
+
+func buildWorktreeCommitMessage(branch string, sessionID string, timestamp time.Time) string {
+	return fmt.Sprintf("csw: worktree session commit branch=%s session=%s timestamp=%s", branch, sessionID, timestamp.UTC().Format(time.RFC3339))
+}
+
+func finalizeWorktreeSession(vcs vfs.VCS, worktreeBranch string, sessionID string, timestamp time.Time, stderr io.Writer) {
+	if worktreeBranch == "" || vcs == nil {
+		return
+	}
+
+	commitMessage := buildWorktreeCommitMessage(worktreeBranch, sessionID, timestamp)
+	if commitErr := vcs.CommitWorktree(worktreeBranch, commitMessage); commitErr != nil && !errors.Is(commitErr, vfs.ErrNoChangesToCommit) {
+		_, _ = fmt.Fprintf(stderr, "worktree commit failed: %v\n", commitErr)
+	}
+
+	if dropErr := vcs.DropWorktree(worktreeBranch); dropErr != nil {
+		_, _ = fmt.Fprintf(stderr, "worktree cleanup failed: %v\n", dropErr)
+	}
 }
 
 // cliOutputHandler wraps a SessionThreadOutput to track when processing is done.
