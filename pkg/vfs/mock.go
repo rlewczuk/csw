@@ -536,14 +536,24 @@ type MockVCSCommitCall struct {
 	Message string
 }
 
+// MockVCSMergeCall stores information about a MergeBranches invocation.
+type MockVCSMergeCall struct {
+	Into string
+	From string
+}
+
 // MockVCS is a lightweight VCS test double backed by MockVFS.
 type MockVCS struct {
 	mutex       sync.RWMutex
 	worktrees   map[string]VFS
 	commitCalls []MockVCSCommitCall
 	dropCalls   []string
+	mergeCalls  []MockVCSMergeCall
+	deleteCalls []string
 	commitErr   error
 	dropErr     error
+	mergeErr    error
+	deleteErr   error
 }
 
 // NewMockVCS creates a new MockVCS with an optional base VFS.
@@ -571,6 +581,20 @@ func (m *MockVCS) SetDropError(err error) {
 	m.dropErr = err
 }
 
+// SetMergeError configures MergeBranches to return the provided error.
+func (m *MockVCS) SetMergeError(err error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.mergeErr = err
+}
+
+// SetDeleteError configures DeleteBranch to return the provided error.
+func (m *MockVCS) SetDeleteError(err error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.deleteErr = err
+}
+
 // GetCommitCalls returns all recorded commit calls.
 func (m *MockVCS) GetCommitCalls() []MockVCSCommitCall {
 	m.mutex.RLock()
@@ -586,6 +610,24 @@ func (m *MockVCS) GetDropCalls() []string {
 	defer m.mutex.RUnlock()
 	calls := make([]string, len(m.dropCalls))
 	copy(calls, m.dropCalls)
+	return calls
+}
+
+// GetMergeCalls returns all recorded merge calls.
+func (m *MockVCS) GetMergeCalls() []MockVCSMergeCall {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	calls := make([]MockVCSMergeCall, len(m.mergeCalls))
+	copy(calls, m.mergeCalls)
+	return calls
+}
+
+// GetDeleteCalls returns all recorded delete calls.
+func (m *MockVCS) GetDeleteCalls() []string {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	calls := make([]string, len(m.deleteCalls))
+	copy(calls, m.deleteCalls)
 	return calls
 }
 
@@ -632,6 +674,12 @@ func (m *MockVCS) NewBranch(name string, from string) error {
 
 // DeleteBranch is a no-op for MockVCS.
 func (m *MockVCS) DeleteBranch(name string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.deleteCalls = append(m.deleteCalls, name)
+	if m.deleteErr != nil {
+		return m.deleteErr
+	}
 	return nil
 }
 
@@ -650,6 +698,12 @@ func (m *MockVCS) ListBranches(prefix string) ([]string, error) {
 
 // MergeBranches is a no-op for MockVCS.
 func (m *MockVCS) MergeBranches(into string, from string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.mergeCalls = append(m.mergeCalls, MockVCSMergeCall{Into: into, From: from})
+	if m.mergeErr != nil {
+		return m.mergeErr
+	}
 	return nil
 }
 
