@@ -77,21 +77,14 @@ type ModelTagMapping struct {
 	Compiled *regexp.Regexp
 }
 
-// ToolTagSelectionRule defines tool selection overrides for a specific model tag.
-type ToolTagSelectionRule struct {
-	// Enable contains tool names that should be enabled for this tag.
-	Enable []string `json:"enable,omitempty" yaml:"enable,omitempty"`
-	// Disable contains tool names that should be disabled for this tag.
-	Disable []string `json:"disable,omitempty" yaml:"disable,omitempty"`
-}
-
 // ToolSelectionConfig defines tool availability rules across model tags.
 type ToolSelectionConfig struct {
 	// Default defines default availability of tools for all models.
 	// Key is tool name, value true means enabled and false means disabled.
 	Default map[string]bool `json:"default,omitempty" yaml:"default,omitempty"`
 	// Tags defines per-tag tool overrides.
-	Tags map[string]ToolTagSelectionRule `json:"tags,omitempty" yaml:"tags,omitempty"`
+	// Key is tag name, value is a map of tool name to enabled status (true/false).
+	Tags map[string]map[string]bool `json:"tags,omitempty" yaml:"tags,omitempty"`
 }
 
 // ModelProviderConfig represents common configuration for model providers.

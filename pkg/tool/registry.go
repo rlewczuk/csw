@@ -3,7 +3,6 @@ package tool
 import (
 	"fmt"
 	"log/slog"
-	"slices"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/lsp"
@@ -88,15 +87,12 @@ func (r *ToolRegistry) FilterByModelTags(tags []string, selection conf.ToolSelec
 		}
 
 		for _, tag := range tags {
-			rule, ok := selection.Tags[tag]
+			tagTools, ok := selection.Tags[tag]
 			if !ok {
 				continue
 			}
-			if slices.Contains(rule.Enable, name) {
-				enabled = true
-			}
-			if slices.Contains(rule.Disable, name) {
-				enabled = false
+			if toolEnabled, hasTool := tagTools[name]; hasTool {
+				enabled = toolEnabled
 			}
 		}
 
