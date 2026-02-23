@@ -2,100 +2,127 @@ package main
 
 import (
 	"bytes"
-	"errors"
+	"context"
 	"testing"
-	"time"
 
+	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCliWorktreeFlagDefinition(t *testing.T) {
+func TestCliWorktreeAndCommitMessageFlagsDefinition(t *testing.T) {
 	cmd := CliCommand()
-	flag := cmd.Flags().Lookup("worktree")
-	require.NotNil(t, flag)
-	assert.Equal(t, "", flag.DefValue)
-	assert.Equal(t, "string", flag.Value.Type())
+
+	worktreeFlag := cmd.Flags().Lookup("worktree")
+	require.NotNil(t, worktreeFlag)
+	assert.Equal(t, "", worktreeFlag.DefValue)
+
+	commitMessageFlag := cmd.Flags().Lookup("commit-message")
+	require.NotNil(t, commitMessageFlag)
+	assert.Equal(t, "", commitMessageFlag.DefValue)
+	assert.Equal(t, "string", commitMessageFlag.Value.Type())
 }
 
 func TestFinalizeWorktreeSession(t *testing.T) {
 	tests := []struct {
-		name             string
-		worktreeBranch   string
-		commitErr        error
-		expectCommitCall bool
-		expectDropCall   bool
-		expectStderr     string
+		name                 string
+		worktreeBranch       string
+		customTemplate       string
+		llmMessage           string
+		removeSystemTemplate bool
+		expectCommit         bool
+		expectedMessage      string
+		expectStderr         string
 	}{
 		{
-			name:             "commit and drop worktree",
-			worktreeBranch:   "feature/test",
-			expectCommitCall: true,
-			expectDropCall:   true,
+			name:            "commits generated message and drops worktree",
+			worktreeBranch:  "feature/default",
+			llmMessage:      "implement commit generator using llm and prompts",
+			expectCommit:    true,
+			expectedMessage: "[feature/default] implement commit generator using llm and prompts",
 		},
 		{
-			name:             "no changes to commit still drops worktree",
-			worktreeBranch:   "feature/no-changes",
-			commitErr:        vfs.ErrNoChangesToCommit,
-			expectCommitCall: true,
-			expectDropCall:   true,
+			name:            "uses custom commit template",
+			worktreeBranch:  "feature/custom",
+			customTemplate:  "branch={{ .Branch }} | {{ .Message }}",
+			llmMessage:      "add custom template option",
+			expectCommit:    true,
+			expectedMessage: "branch=feature/custom | add custom template option",
 		},
 		{
-			name:             "commit error is logged and worktree is still dropped",
-			worktreeBranch:   "feature/error",
-			commitErr:        errors.New("commit failed"),
-			expectCommitCall: true,
-			expectDropCall:   true,
-			expectStderr:     "worktree commit failed",
+			name:                 "generation error skips commit and logs error",
+			worktreeBranch:       "feature/error",
+			llmMessage:           "irrelevant",
+			removeSystemTemplate: true,
+			expectCommit:         false,
+			expectStderr:         "worktree commit message generation failed",
 		},
 		{
-			name:             "no worktree branch skips finalization",
-			worktreeBranch:   "",
-			expectCommitCall: false,
-			expectDropCall:   false,
+			name:           "no branch skips finalization",
+			worktreeBranch: "",
+			llmMessage:     "ignored",
+			expectCommit:   false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockVCS := vfs.NewMockVCS(vfs.NewMockVFS())
-			mockVCS.SetCommitError(tt.commitErr)
+			system, session, mockVCS := newFinalizeWorktreeFixture(t, tt.llmMessage)
+			if tt.removeSystemTemplate {
+				require.NoError(t, system.VFS.DeleteFile(commitPromptSystemPath, false, true))
+			}
 
 			var stderr bytes.Buffer
-			timestamp := time.Date(2026, 2, 23, 10, 30, 0, 0, time.UTC)
-			finalizeWorktreeSession(mockVCS, tt.worktreeBranch, "session-123", timestamp, &stderr)
+			finalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.customTemplate, system, session, &stderr)
 
 			commitCalls := mockVCS.GetCommitCalls()
-			if tt.expectCommitCall {
+			if tt.expectCommit {
 				require.Len(t, commitCalls, 1)
 				assert.Equal(t, tt.worktreeBranch, commitCalls[0].Branch)
-				assert.Equal(t, buildWorktreeCommitMessage(tt.worktreeBranch, "session-123", timestamp), commitCalls[0].Message)
+				assert.Equal(t, tt.expectedMessage, commitCalls[0].Message)
 			} else {
-				assert.Len(t, commitCalls, 0)
+				assert.Empty(t, commitCalls)
 			}
 
 			dropCalls := mockVCS.GetDropCalls()
-			if tt.expectDropCall {
+			if tt.worktreeBranch == "" {
+				assert.Empty(t, dropCalls)
+			} else {
 				require.Len(t, dropCalls, 1)
 				assert.Equal(t, tt.worktreeBranch, dropCalls[0])
-			} else {
-				assert.Len(t, dropCalls, 0)
 			}
 
 			if tt.expectStderr != "" {
 				assert.Contains(t, stderr.String(), tt.expectStderr)
-			} else {
-				assert.NotContains(t, stderr.String(), "worktree commit failed")
 			}
 		})
 	}
 }
 
-func TestBuildWorktreeCommitMessage(t *testing.T) {
-	timestamp := time.Date(2026, 2, 23, 10, 45, 0, 0, time.UTC)
-	msg := buildWorktreeCommitMessage("feature/branch", "session-1", timestamp)
-	assert.Contains(t, msg, "branch=feature/branch")
-	assert.Contains(t, msg, "session=session-1")
-	assert.Contains(t, msg, "timestamp=2026-02-23T10:45:00Z")
+func newFinalizeWorktreeFixture(t *testing.T, llmMessage string) (*core.SweSystem, *core.SweSession, *vfs.MockVCS) {
+	t.Helper()
+
+	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+	provider.SetChatResponse("test-model", &models.MockChatResponse{
+		Response: models.NewTextMessage(models.ChatRoleAssistant, llmMessage),
+	})
+
+	mockVFS := vfs.NewMockVFS()
+	require.NoError(t, mockVFS.WriteFile(commitPromptSystemPath, []byte("system prompt")))
+	require.NoError(t, mockVFS.WriteFile(commitPromptPromptPath, []byte("{{- range .Messages }}{{ . }}\n{{- end }}")))
+	require.NoError(t, mockVFS.WriteFile(commitPromptMessagePath, []byte("[{{ .Branch }}] {{ .Message }}")))
+
+	system := &core.SweSystem{
+		ModelProviders: map[string]models.ModelProvider{"mock": provider},
+		VFS:            mockVFS,
+	}
+
+	session, err := system.NewSession("mock/test-model", nil)
+	require.NoError(t, err)
+	require.NoError(t, session.UserPrompt("Implement commit message workflow"))
+
+	mockVCS := vfs.NewMockVCS(vfs.NewMockVFS())
+	return system, session, mockVCS
 }
