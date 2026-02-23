@@ -456,6 +456,41 @@ func TestMergeBranches(t *testing.T) {
 			assert.ErrorIs(t, err, ErrFileNotFound)
 		})
 	})
+
+	t.Run("GitVCSMergeConflict", func(t *testing.T) {
+		fixture := setupGitRepoFixture(t)
+		defer fixture.Cleanup()
+
+		repo, ok := fixture.Repo.(*GitVCS)
+		require.True(t, ok)
+
+		sourceBranch := "master"
+		if _, err := repo.GetWorktree(sourceBranch); err != nil {
+			sourceBranch = "main"
+			_, err = repo.GetWorktree(sourceBranch)
+			require.NoError(t, err)
+		}
+
+		err := repo.NewBranch("feature-conflict", sourceBranch)
+		require.NoError(t, err)
+
+		mainWorktree, err := repo.GetWorktree(sourceBranch)
+		require.NoError(t, err)
+		err = mainWorktree.WriteFile("README.md", []byte("main branch content\n"))
+		require.NoError(t, err)
+		err = repo.CommitWorktree(sourceBranch, "Update readme on main")
+		require.NoError(t, err)
+
+		featureWorktree, err := repo.GetWorktree("feature-conflict")
+		require.NoError(t, err)
+		err = featureWorktree.WriteFile("README.md", []byte("feature branch content\n"))
+		require.NoError(t, err)
+		err = repo.CommitWorktree("feature-conflict", "Update readme on feature")
+		require.NoError(t, err)
+
+		err = repo.MergeBranches(sourceBranch, "feature-conflict")
+		assert.ErrorIs(t, err, ErrMergeConflict)
+	})
 }
 
 func TestRepoInterfaceCompliance(t *testing.T) {

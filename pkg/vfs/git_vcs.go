@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 // GitVCS implements the VCS interface for git repositories.
@@ -278,128 +277,47 @@ func (g *GitVCS) ListBranches(prefix string) ([]string, error) {
 
 // MergeBranches merges the given branch into the current branch.
 func (g *GitVCS) MergeBranches(into string, from string) error {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
-	// Get references for both branches
-	intoRef := plumbing.NewBranchReferenceName(into)
-	fromRef := plumbing.NewBranchReferenceName(from)
-
-	// Check if branches exist
-	intoHash, err := g.repo.ResolveRevision(plumbing.Revision(intoRef))
-	if err != nil {
+	if _, err := g.repo.ResolveRevision(plumbing.Revision(plumbing.NewBranchReferenceName(into))); err != nil {
 		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: target branch %q not found: %w", into, ErrFileNotFound)
 	}
 
-	fromHash, err := g.repo.ResolveRevision(plumbing.Revision(fromRef))
-	if err != nil {
+	if _, err := g.repo.ResolveRevision(plumbing.Revision(plumbing.NewBranchReferenceName(from))); err != nil {
 		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: source branch %q not found: %w", from, ErrFileNotFound)
 	}
 
-	// Get the commits
-	intoCommit, err := g.repo.CommitObject(*intoHash)
-	if err != nil {
-		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
-	}
+	g.mutex.RLock()
+	wt, hasWorktree := g.worktrees[into]
+	g.mutex.RUnlock()
 
-	fromCommit, err := g.repo.CommitObject(*fromHash)
-	if err != nil {
-		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
-	}
+	mergePath := g.path
+	cleanup := func() {}
 
-	// Find common ancestor
-	intoIter := object.NewCommitPreorderIter(intoCommit, nil, nil)
-	fromIter := object.NewCommitPreorderIter(fromCommit, nil, nil)
-
-	intoAncestors := make(map[plumbing.Hash]bool)
-	err = intoIter.ForEach(func(c *object.Commit) error {
-		intoAncestors[c.Hash] = true
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
-	}
-
-	var commonAncestor *object.Commit
-	err = fromIter.ForEach(func(c *object.Commit) error {
-		if intoAncestors[c.Hash] {
-			commonAncestor = c
-			return errors.New("found")
-		}
-		return nil
-	})
-	if err != nil && err.Error() != "found" {
-		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
-	}
-
-	if commonAncestor == nil {
-		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: no common ancestor found")
-	}
-
-	// Create a merge commit
-	// For simplicity, we'll do a fast-forward merge if possible
-	// Otherwise, create a merge commit
-
-	// Check if fast-forward is possible
-	if intoAncestors[fromCommit.Hash] {
-		// Already merged
-		return nil
-	}
-
-	// Check if fast-forward is possible (from is descendant of into)
-	fromAncestors := make(map[plumbing.Hash]bool)
-	err = fromIter.ForEach(func(c *object.Commit) error {
-		fromAncestors[c.Hash] = true
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
-	}
-
-	if fromAncestors[intoCommit.Hash] {
-		// Fast-forward: move into to from
-		newRef := plumbing.NewHashReference(intoRef, fromCommit.Hash)
-		err = g.repo.Storer.SetReference(newRef)
-		if err != nil {
+	if hasWorktree {
+		mergePath = wt.path
+	} else {
+		tempWorktreePath := filepath.Join(g.worktreesPath, ".merge-"+strings.ReplaceAll(into, "/", "_"))
+		if err := os.RemoveAll(tempWorktreePath); err != nil {
 			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 		}
-		return nil
+		if err := os.MkdirAll(filepath.Dir(tempWorktreePath), 0755); err != nil {
+			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
+		}
+		if err := g.runGit("worktree", "add", "--force", tempWorktreePath, into); err != nil {
+			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
+		}
+		mergePath = tempWorktreePath
+		cleanup = func() {
+			_ = g.runGit("worktree", "remove", "--force", tempWorktreePath)
+			_ = os.RemoveAll(tempWorktreePath)
+		}
 	}
+	defer cleanup()
 
-	// Create a merge commit
-	mergeCommit := &object.Commit{
-		Author: object.Signature{
-			Name:  "CodeSnort",
-			Email: "codesnort@example.com",
-		},
-		Committer: object.Signature{
-			Name:  "CodeSnort",
-			Email: "codesnort@example.com",
-		},
-		Message:  fmt.Sprintf("Merge branch '%s' into %s", from, into),
-		TreeHash: fromCommit.TreeHash,
-		ParentHashes: []plumbing.Hash{
-			intoCommit.Hash,
-			fromCommit.Hash,
-		},
-	}
-
-	// Store the commit
-	obj := g.repo.Storer.NewEncodedObject()
-	err = mergeCommit.Encode(obj)
-	if err != nil {
-		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
-	}
-
-	hash, err := g.repo.Storer.SetEncodedObject(obj)
-	if err != nil {
-		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
-	}
-
-	// Update the branch reference
-	newRef := plumbing.NewHashReference(intoRef, hash)
-	err = g.repo.Storer.SetReference(newRef)
-	if err != nil {
+	if err := g.runGitInWorktree(mergePath, "merge", "--no-ff", from, "-m", fmt.Sprintf("Merge branch '%s' into %s", from, into)); err != nil {
+		errText := err.Error()
+		if strings.Contains(errText, "CONFLICT") || strings.Contains(errText, "would be overwritten by merge") {
+			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w: %w", err, ErrMergeConflict)
+		}
 		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 

@@ -3,15 +3,16 @@ package vfs
 import "errors"
 
 var (
-	ErrFileNotFound     = errors.New("file not found")
-	ErrFileExists       = errors.New("file already exists")
-	ErrNotADir          = errors.New("not a directory")
-	ErrNotAFile         = errors.New("not a file")
-	ErrPermissionDenied = errors.New("permission denied")
-	ErrNotImplemented   = errors.New("not implemented")
-	ErrInvalidPath      = errors.New("invalid path")
-	ErrAskPermission    = errors.New("ask permission")
+	ErrFileNotFound      = errors.New("file not found")
+	ErrFileExists        = errors.New("file already exists")
+	ErrNotADir           = errors.New("not a directory")
+	ErrNotAFile          = errors.New("not a file")
+	ErrPermissionDenied  = errors.New("permission denied")
+	ErrNotImplemented    = errors.New("not implemented")
+	ErrInvalidPath       = errors.New("invalid path")
+	ErrAskPermission     = errors.New("ask permission")
 	ErrNoChangesToCommit = errors.New("no changes to commit")
+	ErrMergeConflict     = errors.New("merge conflict")
 )
 
 // VFS represents virtual filesystem. It encapsulates access to local and remote files and directories,

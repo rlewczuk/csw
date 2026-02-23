@@ -38,10 +38,11 @@ func CliCommand() *cobra.Command {
 		cliLSPServer      string
 		cliThinking       string
 		cliCommitMessage  string
+		cliMerge          bool
 	)
 
 	cmd := &cobra.Command{
-		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] \"prompt\"",
+		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--merge] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] \"prompt\"",
 		Short: "Start a CLI chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.ExactArgs(1),
@@ -75,7 +76,7 @@ func CliCommand() *cobra.Command {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
 			}
 
-			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliWorktree, cliCommitMessage, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer, cliThinking)
+			return runCLI(prompt, cliModel, cliRole, cliWorkDir, cliWorktree, cliMerge, cliCommitMessage, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer, cliThinking)
 		},
 	}
 
@@ -84,6 +85,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliRole, "role", "developer", "Agent role name")
 	cmd.Flags().StringVar(&cliWorkDir, "workdir", "", "Working directory (default: current directory)")
 	cmd.Flags().StringVar(&cliWorktree, "worktree", "", "Create and use a git worktree for this session on a feature branch")
+	cmd.Flags().BoolVar(&cliMerge, "merge", false, "Merge the feature worktree branch into main after commit")
 	cmd.Flags().StringVar(&cliCommitMessage, "commit-message", "", "Custom commit message template, e.g. '[{{ .Branch }}] {{ .Message }}'")
 	cmd.Flags().BoolVar(&cliAllowAllPerms, "allow-all-permissions", false, "Allow all permissions without asking")
 	cmd.Flags().BoolVar(&cliInteractive, "interactive", false, "Enable interactive mode (allows user to respond to agent questions)")
@@ -97,9 +99,13 @@ func CliCommand() *cobra.Command {
 	return cmd
 }
 
-func runCLI(prompt, modelName, roleName, workDir, worktreeBranch, commitMessageTemplate, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking string) error {
+func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge bool, commitMessageTemplate, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking string) error {
 	startTime := time.Now()
 	ctx := context.Background()
+
+	if merge && worktreeBranch == "" {
+		return fmt.Errorf("runCLI() [cli.go]: --merge requires --worktree")
+	}
 
 	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
 		WorkDir:        workDir,
@@ -130,7 +136,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch, commitMessageT
 
 	session := thread.GetSession()
 
-	defer finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, commitMessageTemplate, sweSystem, session, os.Stderr)
+	defer finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, merge, commitMessageTemplate, sweSystem, session, os.Stderr)
 
 	// Determine session file path if session saving is enabled
 	var sessionFilePath string
@@ -238,7 +244,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch, commitMessageT
 	return nil
 }
 
-func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, commitMessageTemplate string, sweSystem *core.SweSystem, session *core.SweSession, stderr io.Writer) {
+func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *core.SweSystem, session *core.SweSession, stderr io.Writer) {
 	if worktreeBranch == "" || vcs == nil {
 		return
 	}
@@ -254,10 +260,36 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 
 	if commitErr := vcs.CommitWorktree(worktreeBranch, commitMessage); commitErr != nil && !errors.Is(commitErr, vfs.ErrNoChangesToCommit) {
 		_, _ = fmt.Fprintf(stderr, "worktree commit failed: %v\n", commitErr)
+		if merge {
+			_, _ = fmt.Fprintln(stderr, "merge skipped because commit failed. Resolve issues and merge manually.")
+			return
+		}
+	}
+
+	if merge {
+		mergeErr := vcs.MergeBranches("main", worktreeBranch)
+		if mergeErr != nil {
+			if errors.Is(mergeErr, vfs.ErrMergeConflict) {
+				_, _ = fmt.Fprintf(stderr, "automatic merge failed due to conflicts: %v\n", mergeErr)
+				_, _ = fmt.Fprintf(stderr, "resolve conflicts manually and merge branch '%s' into main.\n", worktreeBranch)
+				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual conflict resolution.")
+				return
+			}
+
+			_, _ = fmt.Fprintf(stderr, "automatic merge failed: %v\n", mergeErr)
+			_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
+			return
+		}
 	}
 
 	if dropErr := vcs.DropWorktree(worktreeBranch); dropErr != nil {
 		_, _ = fmt.Fprintf(stderr, "worktree cleanup failed: %v\n", dropErr)
+	}
+
+	if merge {
+		if deleteErr := vcs.DeleteBranch(worktreeBranch); deleteErr != nil {
+			_, _ = fmt.Fprintf(stderr, "feature branch cleanup failed: %v\n", deleteErr)
+		}
 	}
 }
 

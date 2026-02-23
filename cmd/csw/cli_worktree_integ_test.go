@@ -24,41 +24,78 @@ func TestCliWorktreeAndCommitMessageFlagsDefinition(t *testing.T) {
 	require.NotNil(t, commitMessageFlag)
 	assert.Equal(t, "", commitMessageFlag.DefValue)
 	assert.Equal(t, "string", commitMessageFlag.Value.Type())
+
+	mergeFlag := cmd.Flags().Lookup("merge")
+	require.NotNil(t, mergeFlag)
+	assert.Equal(t, "false", mergeFlag.DefValue)
+	assert.Equal(t, "bool", mergeFlag.Value.Type())
 }
 
 func TestFinalizeWorktreeSession(t *testing.T) {
 	tests := []struct {
-		name                 string
-		worktreeBranch       string
-		customTemplate       string
-		llmMessage           string
-		omitSystemTemplate   bool
-		expectCommit         bool
-		expectedMessage      string
-		expectStderr         string
+		name               string
+		worktreeBranch     string
+		merge              bool
+		customTemplate     string
+		llmMessage         string
+		omitSystemTemplate bool
+		mergeErr           error
+		expectCommit       bool
+		expectMerge        bool
+		expectDeleteBranch bool
+		expectDropWorktree bool
+		expectedMessage    string
+		expectStderr       string
 	}{
 		{
-			name:            "commits generated message and drops worktree",
-			worktreeBranch:  "feature/default",
-			llmMessage:      "implement commit generator using llm and prompts",
-			expectCommit:    true,
-			expectedMessage: "[feature/default] implement commit generator using llm and prompts",
+			name:               "commits generated message and drops worktree",
+			worktreeBranch:     "feature/default",
+			llmMessage:         "implement commit generator using llm and prompts",
+			expectCommit:       true,
+			expectDropWorktree: true,
+			expectedMessage:    "[feature/default] implement commit generator using llm and prompts",
 		},
 		{
-			name:            "uses custom commit template",
-			worktreeBranch:  "feature/custom",
-			customTemplate:  "branch={{ .Branch }} | {{ .Message }}",
-			llmMessage:      "add custom template option",
-			expectCommit:    true,
-			expectedMessage: "branch=feature/custom | add custom template option",
+			name:               "merges branch and cleans up",
+			worktreeBranch:     "feature/merge",
+			merge:              true,
+			llmMessage:         "add automatic merge workflow",
+			expectCommit:       true,
+			expectMerge:        true,
+			expectDeleteBranch: true,
+			expectDropWorktree: true,
+			expectedMessage:    "[feature/merge] add automatic merge workflow",
 		},
 		{
-			name:                 "generation error skips commit and logs error",
-			worktreeBranch:       "feature/error",
-			llmMessage:           "irrelevant",
-			omitSystemTemplate:   true,
-			expectCommit:         false,
-			expectStderr:         "worktree commit message generation failed",
+			name:               "merge conflict keeps worktree and branch",
+			worktreeBranch:     "feature/conflict",
+			merge:              true,
+			llmMessage:         "trigger conflict",
+			mergeErr:           vfs.ErrMergeConflict,
+			expectCommit:       true,
+			expectMerge:        true,
+			expectDeleteBranch: false,
+			expectDropWorktree: false,
+			expectedMessage:    "[feature/conflict] trigger conflict",
+			expectStderr:       "automatic merge failed due to conflicts",
+		},
+		{
+			name:               "uses custom commit template",
+			worktreeBranch:     "feature/custom",
+			customTemplate:     "branch={{ .Branch }} | {{ .Message }}",
+			llmMessage:         "add custom template option",
+			expectCommit:       true,
+			expectDropWorktree: true,
+			expectedMessage:    "branch=feature/custom | add custom template option",
+		},
+		{
+			name:               "generation error skips commit and logs error",
+			worktreeBranch:     "feature/error",
+			llmMessage:         "irrelevant",
+			omitSystemTemplate: true,
+			expectCommit:       false,
+			expectDropWorktree: true,
+			expectStderr:       "worktree commit message generation failed",
 		},
 		{
 			name:           "no branch skips finalization",
@@ -71,9 +108,12 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			system, session, mockVCS := newFinalizeWorktreeFixture(t, tt.llmMessage, !tt.omitSystemTemplate)
+			if tt.mergeErr != nil {
+				mockVCS.SetMergeError(tt.mergeErr)
+			}
 
 			var stderr bytes.Buffer
-			finalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.customTemplate, system, session, &stderr)
+			finalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.merge, tt.customTemplate, system, session, &stderr)
 
 			commitCalls := mockVCS.GetCommitCalls()
 			if tt.expectCommit {
@@ -85,11 +125,28 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 			}
 
 			dropCalls := mockVCS.GetDropCalls()
-			if tt.worktreeBranch == "" {
+			if !tt.expectDropWorktree {
 				assert.Empty(t, dropCalls)
 			} else {
 				require.Len(t, dropCalls, 1)
 				assert.Equal(t, tt.worktreeBranch, dropCalls[0])
+			}
+
+			mergeCalls := mockVCS.GetMergeCalls()
+			if !tt.expectMerge {
+				assert.Empty(t, mergeCalls)
+			} else {
+				require.Len(t, mergeCalls, 1)
+				assert.Equal(t, "main", mergeCalls[0].Into)
+				assert.Equal(t, tt.worktreeBranch, mergeCalls[0].From)
+			}
+
+			deleteCalls := mockVCS.GetDeleteCalls()
+			if !tt.expectDeleteBranch {
+				assert.Empty(t, deleteCalls)
+			} else {
+				require.Len(t, deleteCalls, 1)
+				assert.Equal(t, tt.worktreeBranch, deleteCalls[0])
 			}
 
 			if tt.expectStderr != "" {
