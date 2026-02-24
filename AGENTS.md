@@ -38,7 +38,9 @@ Rules regarding implementing tests:
   - `vfs.VFS` test double is implemented in `pkg/vfs/mock.go`;
   - `models.ModelProvider` test double is implemented in `pkg/models/mock/mock.go`;
 - always run tests with timeout of 60 seconds;
+  - but when running integration tests, extend duration to 300 seconds;
 - prefer writing test exposing issue being solved before fixing it;
+- when asked to make integration test conditional based on `_integ/xxx.enabled` file, always use `TestEnabled` function from `pkg/testutil/cfg/integ.go`, never implement it manually;
 
 Other rules:
 - When generating summary after performing a task, DO NOT save it to file, just put it in chat.
