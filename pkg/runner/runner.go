@@ -1,6 +1,9 @@
 package runner
 
-import "time"
+import (
+	"io"
+	"time"
+)
 
 // CommandOptions holds optional parameters for running commands.
 type CommandOptions struct {
@@ -18,4 +21,20 @@ type CommandRunner interface {
 	RunCommand(command string) (string, int, error)
 	// RunCommandWithOptions runs the given command with options and returns the output and exit code.
 	RunCommandWithOptions(command string, options CommandOptions) (string, int, error)
+}
+
+// ContainerConfig contains configuration for the ContainerRunner runner.
+// It is used to create a new ContainerRunner runner.
+type ContainerConfig struct {
+	// ImageName is the name of the container image to use.
+	ImageName string
+	// MountDirs is a map of host directories to mount in the container.
+	// Keys are paths in the container, values are paths on the host.
+	MountDirs map[string]string
+}
+
+// ContainerRunner is a command runner that runs commands in a container.
+type ContainerRunner interface {
+	io.Closer
+	CommandRunner
 }
