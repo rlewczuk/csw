@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"syscall"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/conf/impl"
@@ -192,7 +193,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	cleanupFn := func() {}
 
 	if params.ContainerImage != "" {
-		uid, gid, err := resolveCurrentUserIDs()
+		uid, gid, err := resolveCurrentUserIDs(effectiveWorkDir)
 		if err != nil {
 			logging.FlushLogs()
 			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve current user ids: %w", err)
@@ -204,7 +205,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 			MountDirs:      map[string]string{effectiveWorkDir: effectiveWorkDir},
 			UID:            uid,
 			GID:            gid,
-			ReadOnlyMounts: true,
+			ReadOnlyMounts: false,
 		})
 		if err != nil {
 			logging.FlushLogs()
@@ -271,7 +272,19 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	return sweSystem, result, nil
 }
 
-func resolveCurrentUserIDs() (int, int, error) {
+func resolveCurrentUserIDs(workDir string) (int, int, error) {
+	if workDir != "" {
+		fileInfo, err := os.Stat(workDir)
+		if err == nil {
+			stat, ok := fileInfo.Sys().(*syscall.Stat_t)
+			if !ok {
+				return 0, 0, fmt.Errorf("resolveCurrentUserIDs() [bootstrap.go]: failed to read stat info for workdir: %s", workDir)
+			}
+
+			return int(stat.Uid), int(stat.Gid), nil
+		}
+	}
+
 	currentUser, err := user.Current()
 	if err != nil {
 		return 0, 0, fmt.Errorf("resolveCurrentUserIDs() [bootstrap.go]: failed to get current user: %w", err)
