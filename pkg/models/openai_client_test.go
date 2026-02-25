@@ -973,33 +973,30 @@ func TestOpenAIClient_ToolChoice(t *testing.T) {
 
 func TestOpenAIClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint not found", func(t *testing.T) {
-		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
-			URL:            "http://localhost:11434/v1/nonexistent",
-			ConnectTimeout: connectOpenAITimeout,
-			RequestTimeout: testOpenAITimeout,
-		})
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		mock.AddRestResponseWithStatus("/models", "GET", `{"error":{"message":"not found"}}`, 404)
+
+		client, err := NewOpenAIClientWithHTTPClient(mock.URL(), mock.Client())
 		require.NoError(t, err)
 
 		_, err = client.ListModels()
-		assert.Error(t, err)
 		assert.ErrorIs(t, err, ErrEndpointNotFound)
 	})
 
 	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
-			URL:            "http://nonexistent-host:11434/v1",
-			ConnectTimeout: 1 * time.Second,
-			RequestTimeout: 2 * time.Second,
-		})
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		mock.AddRestResponseWithStatus("/models", "GET", `{"error":{"message":"unavailable"}}`, 503)
+
+		client, err := NewOpenAIClientWithHTTPClient(mock.URL(), mock.Client())
 		require.NoError(t, err)
 
 		_, err = client.ListModels()
 		require.Error(t, err)
-		// Network errors are now wrapped in NetworkError for retry support
-		var networkErr *NetworkError
-		if assert.True(t, errors.As(err, &networkErr), "Should be a NetworkError, got: %v", err) {
-			assert.True(t, networkErr.IsRetryable, "Network error should be retryable")
-		}
+		assert.ErrorIs(t, err, ErrEndpointUnavailable)
 	})
 }
 
