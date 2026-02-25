@@ -327,3 +327,94 @@ func TestContainerRunnerEmptyImageName(t *testing.T) {
 	require.Error(t, err, "Expected error for empty image name")
 	assert.Contains(t, err.Error(), "image name cannot be empty")
 }
+
+// TestContainerRunnerWithUIDGID tests that commands run as specified UID/GID.
+func TestContainerRunnerWithUIDGID(t *testing.T) {
+	if !shouldRunContainerTests(t) {
+		t.Skip("Skipping container integration test (runc.enabled or all.enabled not set to 'yes')")
+	}
+
+	// Create container with specific UID/GID
+	runner, err := NewContainerRunner(ContainerConfig{
+		ImageName: "busybox:latest",
+		UID:       1000,
+		GID:       1000,
+	})
+	require.NoError(t, err, "Failed to create container runner")
+	defer runner.Close()
+
+	// Verify command runs as UID 1000
+	output, exitCode, err := runner.RunCommand("id -u")
+	require.NoError(t, err, "Failed to run command")
+	assert.Equal(t, 0, exitCode)
+	assert.Contains(t, strings.TrimSpace(output), "1000")
+
+	// Verify command runs as GID 1000
+	output, exitCode, err = runner.RunCommand("id -g")
+	require.NoError(t, err, "Failed to run command")
+	assert.Equal(t, 0, exitCode)
+	assert.Contains(t, strings.TrimSpace(output), "1000")
+}
+
+// TestContainerRunnerWithUIDGIDHomeDirWritable tests that home directory is writable by non-root user.
+func TestContainerRunnerWithUIDGIDHomeDirWritable(t *testing.T) {
+	if !shouldRunContainerTests(t) {
+		t.Skip("Skipping container integration test (runc.enabled or all.enabled not set to 'yes')")
+	}
+
+	projectRoot := getProjectRoot(t)
+
+	// Ensure tmp directory exists
+	tmpDir := filepath.Join(projectRoot, "tmp")
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		t.Fatalf("Failed to create tmp directory: %v", err)
+	}
+
+	// Create a test directory that simulates a user's home directory structure
+	testDir := cfg.MkTempDir(t, projectRoot, "container_homedir_test_*")
+	containerPath := testDir // Mount at same path
+
+	// Create container with specific UID/GID and mount at same path
+	runner, err := NewContainerRunner(ContainerConfig{
+		ImageName: "busybox:latest",
+		Workdir:   containerPath,
+		MountDirs: map[string]string{
+			containerPath: testDir,
+		},
+		UID:            1000,
+		GID:            1000,
+		ReadOnlyMounts: false,
+	})
+	require.NoError(t, err, "Failed to create container runner")
+	defer runner.Close()
+
+	// Verify the parent directory of workdir (simulating home dir) is writable
+	// by creating a file in the parent directory
+	parentDir := filepath.Dir(containerPath)
+	testFilePath := filepath.Join(parentDir, "test_write.txt")
+
+	output, exitCode, err := runner.RunCommand(fmt.Sprintf("touch %q && echo 'success' > %q && cat %q", testFilePath, testFilePath, testFilePath))
+	require.NoError(t, err, "Failed to write to parent directory")
+	assert.Equal(t, 0, exitCode)
+	assert.Contains(t, strings.TrimSpace(output), "success")
+}
+
+// TestContainerRunnerWithoutUIDGID runs as root by default.
+func TestContainerRunnerWithoutUIDGID(t *testing.T) {
+	if !shouldRunContainerTests(t) {
+		t.Skip("Skipping container integration test (runc.enabled or all.enabled not set to 'yes')")
+	}
+
+	// Create container without UID/GID (should run as root)
+	runner, err := NewContainerRunner(ContainerConfig{
+		ImageName: "busybox:latest",
+	})
+	require.NoError(t, err, "Failed to create container runner")
+	defer runner.Close()
+
+	// Verify command runs as root (UID 0)
+	output, exitCode, err := runner.RunCommand("id -u")
+	require.NoError(t, err, "Failed to run command")
+	assert.Equal(t, 0, exitCode)
+	assert.Contains(t, strings.TrimSpace(output), "0")
+}
