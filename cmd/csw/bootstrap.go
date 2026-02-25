@@ -46,6 +46,8 @@ type BuildSystemResult struct {
 	LogsDir          string
 	VCS              vfs.VCS
 	WorktreeBranch   string
+	LSPStarted       bool
+	LSPWorkDir       string
 	Cleanup          func()
 }
 
@@ -266,6 +268,8 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		LogsDir:          logsDir,
 		VCS:              selectedVCS,
 		WorktreeBranch:   params.WorktreeBranch,
+		LSPStarted:       lspClient != nil,
+		LSPWorkDir:       effectiveWorkDir,
 		Cleanup:          cleanupFn,
 	}
 

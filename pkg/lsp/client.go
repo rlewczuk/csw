@@ -199,9 +199,9 @@ func (c *Client) TouchAndValidate(path string, sync bool) ([]Diagnostic, error) 
 		return nil, fmt.Errorf("Client.TouchAndValidate: client not initialized")
 	}
 
-	absPath, err := filepath.Abs(path)
+	absPath, err := c.resolvePath(path)
 	if err != nil {
-		return nil, fmt.Errorf("Client.TouchAndValidate: failed to get absolute path: %w", err)
+		return nil, fmt.Errorf("Client.TouchAndValidate: failed to resolve path: %w", err)
 	}
 
 	uri := pathToURI(absPath)
@@ -292,9 +292,9 @@ func (c *Client) FindDefinition(loc CursorLocation) ([]Location, error) {
 		return nil, fmt.Errorf("Client.FindDefinition: client not initialized")
 	}
 
-	absPath, err := filepath.Abs(loc.Path)
+	absPath, err := c.resolvePath(loc.Path)
 	if err != nil {
-		return nil, fmt.Errorf("Client.FindDefinition: failed to get absolute path: %w", err)
+		return nil, fmt.Errorf("Client.FindDefinition: failed to resolve path: %w", err)
 	}
 
 	uri := pathToURI(absPath)
@@ -323,9 +323,9 @@ func (c *Client) FindReferences(loc CursorLocation) ([]Location, error) {
 		return nil, fmt.Errorf("Client.FindReferences: client not initialized")
 	}
 
-	absPath, err := filepath.Abs(loc.Path)
+	absPath, err := c.resolvePath(loc.Path)
 	if err != nil {
-		return nil, fmt.Errorf("Client.FindReferences: failed to get absolute path: %w", err)
+		return nil, fmt.Errorf("Client.FindReferences: failed to resolve path: %w", err)
 	}
 
 	uri := pathToURI(absPath)
@@ -357,9 +357,9 @@ func (c *Client) Hover(loc CursorLocation) (string, string, error) {
 		return "", "", fmt.Errorf("Client.Hover: client not initialized")
 	}
 
-	absPath, err := filepath.Abs(loc.Path)
+	absPath, err := c.resolvePath(loc.Path)
 	if err != nil {
-		return "", "", fmt.Errorf("Client.Hover: failed to get absolute path: %w", err)
+		return "", "", fmt.Errorf("Client.Hover: failed to resolve path: %w", err)
 	}
 
 	uri := pathToURI(absPath)
@@ -467,9 +467,9 @@ func (c *Client) DocumentSymbols(path string) ([]DocumentSymbol, error) {
 		return nil, fmt.Errorf("Client.DocumentSymbols: client not initialized")
 	}
 
-	absPath, err := filepath.Abs(path)
+	absPath, err := c.resolvePath(path)
 	if err != nil {
-		return nil, fmt.Errorf("Client.DocumentSymbols: failed to get absolute path: %w", err)
+		return nil, fmt.Errorf("Client.DocumentSymbols: failed to resolve path: %w", err)
 	}
 
 	uri := pathToURI(absPath)
@@ -510,9 +510,9 @@ func (c *Client) CallHierarchy(loc CursorLocation) ([]CallHierarchyItem, error) 
 		return nil, fmt.Errorf("Client.CallHierarchy: client not initialized")
 	}
 
-	absPath, err := filepath.Abs(loc.Path)
+	absPath, err := c.resolvePath(loc.Path)
 	if err != nil {
-		return nil, fmt.Errorf("Client.CallHierarchy: failed to get absolute path: %w", err)
+		return nil, fmt.Errorf("Client.CallHierarchy: failed to resolve path: %w", err)
 	}
 
 	uri := pathToURI(absPath)
@@ -866,6 +866,29 @@ func pathToURI(path string) string {
 	}
 
 	return "file://" + absPath
+}
+
+// resolvePath resolves path to absolute filesystem path using the client working directory
+// for relative paths.
+func (c *Client) resolvePath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("Client.resolvePath: path is empty")
+	}
+
+	if filepath.IsAbs(path) {
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return "", fmt.Errorf("Client.resolvePath: failed to resolve absolute path: %w", err)
+		}
+		return absPath, nil
+	}
+
+	absPath, err := filepath.Abs(filepath.Join(c.workingDir, path))
+	if err != nil {
+		return "", fmt.Errorf("Client.resolvePath: failed to resolve relative path: %w", err)
+	}
+
+	return absPath, nil
 }
 
 // Helper functions
