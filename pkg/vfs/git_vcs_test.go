@@ -420,6 +420,89 @@ func TestMergeBranches(t *testing.T) {
 		assert.Equal(t, "Feature commit for fast-forward", strings.TrimSpace(mergedCommit.Message))
 	})
 
+	t.Run("GitVCSRebasesWhenFastForwardNotPossible", func(t *testing.T) {
+		fixture := setupGitRepoFixture(t)
+		defer fixture.Cleanup()
+
+		repo, ok := fixture.Repo.(*GitVCS)
+		require.True(t, ok)
+
+		targetBranch := getDefaultBranch(t, fixture)
+
+		err := repo.NewBranch("feature-rebase", targetBranch)
+		require.NoError(t, err)
+
+		targetWorktree, err := repo.GetWorktree(targetBranch)
+		require.NoError(t, err)
+		err = targetWorktree.WriteFile("target-only.txt", []byte("target change\n"))
+		require.NoError(t, err)
+		err = repo.CommitWorktree(targetBranch, "Target branch commit")
+		require.NoError(t, err)
+
+		featureWorktree, err := repo.GetWorktree("feature-rebase")
+		require.NoError(t, err)
+		err = featureWorktree.WriteFile("feature-only.txt", []byte("feature change\n"))
+		require.NoError(t, err)
+		err = repo.CommitWorktree("feature-rebase", "Feature branch commit")
+		require.NoError(t, err)
+
+		err = repo.MergeBranches(targetBranch, "feature-rebase")
+		require.NoError(t, err)
+
+		gitRepo, err := git.PlainOpen(fixture.Root)
+		require.NoError(t, err)
+
+		targetRef, err := gitRepo.Reference(plumbing.NewBranchReferenceName(targetBranch), true)
+		require.NoError(t, err)
+
+		headCommit, err := gitRepo.CommitObject(targetRef.Hash())
+		require.NoError(t, err)
+		assert.Len(t, headCommit.ParentHashes, 1)
+		assert.Equal(t, "Target branch commit", strings.TrimSpace(headCommit.Message))
+
+		featureRef, err := gitRepo.Reference(plumbing.NewBranchReferenceName("feature-rebase"), true)
+		require.NoError(t, err)
+		assert.Equal(t, featureRef.Hash(), headCommit.ParentHashes[0])
+
+		targetContent, err := os.ReadFile(filepath.Join(fixture.Root, "target-only.txt"))
+		require.NoError(t, err)
+		assert.Equal(t, "target change\n", string(targetContent))
+
+		featureContent, err := os.ReadFile(filepath.Join(fixture.Root, "feature-only.txt"))
+		require.NoError(t, err)
+		assert.Equal(t, "feature change\n", string(featureContent))
+	})
+
+	t.Run("GitVCSFallsBackToMergeWhenRebaseFails", func(t *testing.T) {
+		fixture := setupGitRepoFixture(t)
+		defer fixture.Cleanup()
+
+		repo, ok := fixture.Repo.(*GitVCS)
+		require.True(t, ok)
+
+		targetBranch := getDefaultBranch(t, fixture)
+
+		err := repo.NewBranch("feature-rebase-fail", targetBranch)
+		require.NoError(t, err)
+
+		targetWorktree, err := repo.GetWorktree(targetBranch)
+		require.NoError(t, err)
+		err = targetWorktree.WriteFile("conflict.txt", []byte("target content\n"))
+		require.NoError(t, err)
+		err = repo.CommitWorktree(targetBranch, "Target conflict commit")
+		require.NoError(t, err)
+
+		featureWorktree, err := repo.GetWorktree("feature-rebase-fail")
+		require.NoError(t, err)
+		err = featureWorktree.WriteFile("conflict.txt", []byte("feature content\n"))
+		require.NoError(t, err)
+		err = repo.CommitWorktree("feature-rebase-fail", "Feature conflict commit")
+		require.NoError(t, err)
+
+		err = repo.MergeBranches(targetBranch, "feature-rebase-fail")
+		assert.ErrorIs(t, err, ErrMergeConflict)
+	})
+
 	t.Run("GitVCSUpdatesCheckedOutFilesAfterMerge", func(t *testing.T) {
 		fixture := setupGitRepoFixture(t)
 		defer fixture.Cleanup()
