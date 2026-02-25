@@ -118,7 +118,7 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 				runCLIFunc = originalRun
 			})
 
-			runCLIFunc = func(prompt, modelName, roleName, workDir, worktreeBranch string, merge bool, commitMessageTemplate, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking, resumeTarget string, continueSession, forceResume bool) error {
+			runCLIFunc = func(prompt, modelName, roleName, workDir, worktreeBranch string, merge bool, containerImage, commitMessageTemplate, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking, resumeTarget string, continueSession, forceResume bool) error {
 				capturedCall = fmt.Sprintf("prompt=%s,resume=%s,continue=%t,force=%t", prompt, resumeTarget, continueSession, forceResume)
 				return nil
 			}

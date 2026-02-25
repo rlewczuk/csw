@@ -28,9 +28,17 @@ type CommandRunner interface {
 type ContainerConfig struct {
 	// ImageName is the name of the container image to use.
 	ImageName string
+	// Workdir is the default working directory for command execution.
+	Workdir string
 	// MountDirs is a map of host directories to mount in the container.
 	// Keys are paths in the container, values are paths on the host.
 	MountDirs map[string]string
+	// UID is the user ID used when running commands inside the container.
+	UID int
+	// GID is the group ID used when running commands inside the container.
+	GID int
+	// ReadOnlyMounts controls whether bind mounts are mounted read-only.
+	ReadOnlyMounts bool
 }
 
 // ContainerRunner is a command runner that runs commands in a container.

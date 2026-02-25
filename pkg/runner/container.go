@@ -14,11 +14,11 @@ import (
 
 // containerRunner implements the ContainerRunner interface using testcontainers.
 type containerRunner struct {
-	mu       sync.Mutex
+	mu        sync.Mutex
 	container testcontainers.Container
-	ctx      context.Context
-	cancel   context.CancelFunc
-	closed   bool
+	ctx       context.Context
+	cancel    context.CancelFunc
+	closed    bool
 }
 
 // NewContainerRunner creates a new ContainerRunner instance.
@@ -27,6 +27,14 @@ type containerRunner struct {
 func NewContainerRunner(config ContainerConfig) (ContainerRunner, error) {
 	if config.ImageName == "" {
 		return nil, fmt.Errorf("NewContainerRunner() [container.go]: image name cannot be empty")
+	}
+
+	if config.UID < 0 {
+		return nil, fmt.Errorf("NewContainerRunner() [container.go]: UID cannot be negative")
+	}
+
+	if config.GID < 0 {
+		return nil, fmt.Errorf("NewContainerRunner() [container.go]: GID cannot be negative")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -38,10 +46,23 @@ func NewContainerRunner(config ContainerConfig) (ContainerRunner, error) {
 		Cmd:        []string{"tail", "-f", "/dev/null"},
 		WaitingFor: wait.ForExec([]string{"echo", "ready"}),
 	}
+	if config.Workdir != "" {
+		req.WorkingDir = config.Workdir
+	}
+
+	if config.UID > 0 && config.GID > 0 {
+		req.User = fmt.Sprintf("%d:%d", config.UID, config.GID)
+	}
 
 	// Add mount directories
 	for containerPath, hostPath := range config.MountDirs {
-		req.Mounts = append(req.Mounts, testcontainers.BindMount(hostPath, testcontainers.ContainerMountTarget(containerPath)))
+		req.Mounts = append(req.Mounts, testcontainers.ContainerMount{
+			Source: testcontainers.DockerBindMountSource{
+				HostPath: hostPath,
+			},
+			Target: testcontainers.ContainerMountTarget(containerPath),
+			ReadOnly: config.ReadOnlyMounts,
+		})
 	}
 
 	// Create and start container
@@ -92,8 +113,13 @@ func (r *containerRunner) RunCommandWithOptions(command string, options CommandO
 
 	// Build the command - if workdir is specified, wrap with cd
 	var cmd []string
-	if options.Workdir != "" {
-		cmd = []string{"/bin/sh", "-c", fmt.Sprintf("cd %s && %s", options.Workdir, command)}
+	workDir := options.Workdir
+	if workDir == "" {
+		workDir = "."
+}
+
+	if workDir != "" {
+		cmd = []string{"/bin/sh", "-c", fmt.Sprintf("cd %q && %s", workDir, command)}
 	} else {
 		cmd = []string{"/bin/sh", "-c", command}
 	}
@@ -125,7 +151,6 @@ func (r *containerRunner) RunCommandWithOptions(command string, options CommandO
 
 	return output.String(), exitCode, nil
 }
-
 // Close stops and removes the container.
 // It is safe to call Close multiple times.
 func (r *containerRunner) Close() error {
