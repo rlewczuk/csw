@@ -18,81 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSessionPersistenceMessagesJSONL(t *testing.T) {
-	t.Run("appends incoming and outgoing messages in jsonl format", func(t *testing.T) {
-		tmpDir := filepath.Join("../../tmp", "session_persistence", t.Name())
-		require.NoError(t, os.MkdirAll(tmpDir, 0755))
-		defer os.RemoveAll(tmpDir)
-
-		configStore := impl.NewMockConfigStore()
-		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
-			"developer": {
-				Name:        "developer",
-				Description: "dev",
-			},
-		})
-		roles := NewAgentRoleRegistry(configStore)
-
-		fixture := newSweSystemFixture(t, "You are a helpful assistant.", withLogBaseDir(tmpDir), withRoles(roles), withConfigStore(configStore))
-		system := fixture.system
-		mockServer := fixture.server
-		handler := testutil.NewMockSessionOutputHandler()
-
-		session, err := system.NewSession("ollama/test-model:latest", handler)
-		require.NoError(t, err)
-
-		mockServer.AddRestResponse("/api/chat", "POST", `{"model":"test-model:latest","message":{"role":"assistant","content":"Hello from assistant"},"done":true}`)
-
-		err = session.UserPrompt("Hello from user")
-		require.NoError(t, err)
-		err = session.Run(context.Background())
-		require.NoError(t, err)
-
-		messagesPath := filepath.Join(tmpDir, "sessions", session.ID(), "messages.jsonl")
-		content, err := os.ReadFile(messagesPath)
-		require.NoError(t, err)
-
-		lines := splitJSONLLines(content)
-		require.GreaterOrEqual(t, len(lines), 3)
-
-		var entries []sessionMessageLogEntry
-		for _, line := range lines {
-			var entry sessionMessageLogEntry
-			require.NoError(t, json.Unmarshal([]byte(line), &entry))
-			entries = append(entries, entry)
-		}
-
-		assert.Equal(t, "system_prompt", entries[0].Source)
-		assert.Equal(t, "outgoing", entries[0].Direction)
-		assert.Equal(t, "system", entries[0].Message.Role)
-
-		assert.Equal(t, "incoming", entries[1].Direction)
-		assert.Equal(t, "user_prompt", entries[1].Source)
-		assert.Equal(t, "user", entries[1].Message.Role)
-		assert.Equal(t, "Hello from user", entries[1].Message.Parts[0].Text)
-
-		assert.Equal(t, "outgoing", entries[len(entries)-1].Direction)
-		assert.Equal(t, "assistant_response", entries[len(entries)-1].Source)
-		assert.Equal(t, "assistant", entries[len(entries)-1].Message.Role)
-		assert.Equal(t, "Hello from assistant", entries[len(entries)-1].Message.Parts[0].Text)
-
-		toolCallCount := 0
-		toolResponseCount := 0
-		for _, entry := range entries {
-			for _, part := range entry.Message.Parts {
-				if part.ToolCall != nil {
-					toolCallCount++
-				}
-				if part.ToolResponse != nil {
-					toolResponseCount++
-				}
-			}
-		}
-		assert.Equal(t, 0, toolCallCount)
-		assert.Equal(t, 0, toolResponseCount)
-	})
-}
-
 func TestSessionPersistenceStateJSON(t *testing.T) {
 	t.Run("overwrites session state and includes resumption-critical fields", func(t *testing.T) {
 		tmpDir := filepath.Join("../../tmp", "session_persistence", t.Name())
@@ -223,24 +148,6 @@ func TestSessionPersistenceSerializeChatMessage(t *testing.T) {
 	})
 }
 
-func splitJSONLLines(content []byte) []string {
-	raw := string(content)
-	lines := make([]string, 0)
-	start := 0
-	for i := 0; i < len(raw); i++ {
-		if raw[i] == '\n' {
-			if i > start {
-				lines = append(lines, raw[start:i])
-			}
-			start = i + 1
-		}
-	}
-	if start < len(raw) {
-		lines = append(lines, raw[start:])
-	}
-	return lines
-}
-
 func TestSessionPersistenceStateRoleOptional(t *testing.T) {
 	t.Run("stores empty role name when no role is set", func(t *testing.T) {
 		session := &SweSession{
@@ -258,7 +165,7 @@ func TestSessionPersistenceStateRoleOptional(t *testing.T) {
 }
 
 func TestSessionPersistenceSessionJSONAlwaysLatest(t *testing.T) {
-	t.Run("session.json stores latest message snapshot while messages.jsonl appends all events", func(t *testing.T) {
+	t.Run("session.json stores latest message snapshot", func(t *testing.T) {
 		tmpDir := filepath.Join("../../tmp", "session_persistence", t.Name())
 		require.NoError(t, os.MkdirAll(tmpDir, 0755))
 		defer os.RemoveAll(tmpDir)
@@ -298,12 +205,6 @@ func TestSessionPersistenceSessionJSONAlwaysLatest(t *testing.T) {
 		lastMessage := state.Messages[len(state.Messages)-1]
 		assert.Equal(t, "assistant", lastMessage.Role)
 		assert.Equal(t, "Second response", lastMessage.Parts[0].Text)
-
-		messagesPath := filepath.Join(tmpDir, "sessions", session.ID(), "messages.jsonl")
-		content, err := os.ReadFile(messagesPath)
-		require.NoError(t, err)
-		lines := splitJSONLLines(content)
-		assert.GreaterOrEqual(t, len(lines), 5)
 	})
 }
 

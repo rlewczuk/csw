@@ -77,13 +77,6 @@ type persistedChatMessage struct {
 	Parts []persistedChatMessagePart `json:"parts"`
 }
 
-type sessionMessageLogEntry struct {
-	Timestamp string               `json:"timestamp"`
-	Direction string               `json:"direction"`
-	Source    string               `json:"source"`
-	Message   persistedChatMessage `json:"message"`
-}
-
 type persistedSessionState struct {
 	SessionID                  string                  `json:"session_id"`
 	ProviderName               string                  `json:"provider_name"`
@@ -688,13 +681,11 @@ func (s *SweSession) SetRole(roleName string) error {
 			// Replace the existing system message
 			systemMessage := models.NewTextMessage(models.ChatRoleSystem, renderedPrompt)
 			s.messages[0] = systemMessage
-			s.appendMessageLog(systemMessage, "outgoing", "system_prompt")
 			s.persistSessionState()
 		} else {
 			// Insert system message at the beginning
 			systemMessage := models.NewTextMessage(models.ChatRoleSystem, renderedPrompt)
 			s.messages = append([]*models.ChatMessage{systemMessage}, s.messages...)
-			s.appendMessageLog(systemMessage, "outgoing", "system_prompt")
 			s.persistSessionState()
 		}
 	}
@@ -854,56 +845,7 @@ func (s *SweSession) appendConversationMessage(message *models.ChatMessage, dire
 	}
 
 	s.messages = append(s.messages, message)
-	s.appendMessageLog(message, direction, source)
 	s.persistSessionState()
-}
-
-func (s *SweSession) appendMessageLog(message *models.ChatMessage, direction string, source string) {
-	if message == nil {
-		return
-	}
-
-	if err := s.appendMessageLogFile(message, direction, source); err != nil {
-		if s.logger != nil {
-			s.logger.Warn("failed_to_persist_message_log", "error", err)
-		}
-	}
-}
-
-func (s *SweSession) appendMessageLogFile(message *models.ChatMessage, direction string, source string) error {
-	sessionLogDir := s.getSessionLogDirectory()
-	if sessionLogDir == "" {
-		return nil
-	}
-
-	if err := os.MkdirAll(sessionLogDir, 0755); err != nil {
-		return fmt.Errorf("SweSession.appendMessageLogFile() [session.go]: failed to create session log directory: %w", err)
-	}
-
-	messagePath := filepath.Join(sessionLogDir, "messages.jsonl")
-	file, err := os.OpenFile(messagePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		return fmt.Errorf("SweSession.appendMessageLogFile() [session.go]: failed to open message log file: %w", err)
-	}
-	defer file.Close()
-
-	entry := sessionMessageLogEntry{
-		Timestamp: time.Now().Format(time.RFC3339Nano),
-		Direction: direction,
-		Source:    source,
-		Message:   serializeChatMessage(message),
-	}
-
-	entryJSON, err := json.Marshal(entry)
-	if err != nil {
-		return fmt.Errorf("SweSession.appendMessageLogFile() [session.go]: failed to marshal message log entry: %w", err)
-	}
-
-	if _, err := file.Write(append(entryJSON, '\n')); err != nil {
-		return fmt.Errorf("SweSession.appendMessageLogFile() [session.go]: failed to append message log entry: %w", err)
-	}
-
-	return nil
 }
 
 func (s *SweSession) persistSessionState() {
