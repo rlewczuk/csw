@@ -12,8 +12,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/logging"
+	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/presenter"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
@@ -24,6 +26,11 @@ import (
 )
 
 var runCLIFunc = runCLI
+
+var newCompositeConfigStoreFunc = impl.NewCompositeConfigStore
+var resolveModelNameFunc = ResolveModelName
+var createProviderMapFunc = CreateProviderMap
+var generateWorktreeBranchNameFunc = core.GenerateWorktreeBranchName
 
 // CliCommand creates the cli command.
 func CliCommand() *cobra.Command {
@@ -149,6 +156,12 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 	if containerImage != "" && resumeTarget != "" {
 		return fmt.Errorf("runCLI() [cli.go]: --container is not supported with --resume")
 	}
+
+	resolvedWorktreeBranch, err := resolveWorktreeBranchName(ctx, prompt, modelName, workDir, configPath, worktreeBranch)
+	if err != nil {
+		return fmt.Errorf("runCLI() [cli.go]: failed to resolve worktree branch: %w", err)
+	}
+	worktreeBranch = resolvedWorktreeBranch
 
 	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
 		WorkDir:        workDir,
@@ -353,6 +366,59 @@ func normalizeResumeTarget(raw string) (string, error) {
 	}
 
 	return value, nil
+}
+
+func resolveWorktreeBranchName(ctx context.Context, prompt, modelName, workDir, configPath, worktreeBranch string) (string, error) {
+	if worktreeBranch == "" || !strings.HasSuffix(worktreeBranch, "%") {
+		return worktreeBranch, nil
+	}
+
+	if strings.TrimSpace(prompt) == "" {
+		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: --worktree ending with %% requires non-empty prompt")
+	}
+
+	prefix := strings.TrimSuffix(worktreeBranch, "%")
+	resolvedWorkDir, err := ResolveWorkDir(workDir)
+	if err != nil {
+		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to resolve work directory: %w", err)
+	}
+
+	configPathStr, err := BuildConfigPath(configPath)
+	if err != nil {
+		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to build config path: %w", err)
+	}
+
+	configStore, err := newCompositeConfigStoreFunc(resolvedWorkDir, configPathStr)
+	if err != nil {
+		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to create config store: %w", err)
+	}
+
+	providerRegistry := models.NewProviderRegistry(configStore)
+	if len(providerRegistry.List()) == 0 {
+		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: no model providers found in config")
+	}
+
+	resolvedModelName, err := resolveModelNameFunc(modelName, configStore, providerRegistry)
+	if err != nil {
+		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to resolve model name: %w", err)
+	}
+
+	modelProviders, err := createProviderMapFunc(providerRegistry)
+	if err != nil {
+		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to create provider map: %w", err)
+	}
+
+	sweSystem := &core.SweSystem{
+		ModelProviders: modelProviders,
+		ConfigStore:    configStore,
+	}
+
+	branchSuffix, err := generateWorktreeBranchNameFunc(ctx, sweSystem, resolvedModelName, prompt)
+	if err != nil {
+		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to generate branch name: %w", err)
+	}
+
+	return prefix + branchSuffix, nil
 }
 
 func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *core.SweSystem, session *core.SweSession, stderr io.Writer) {
