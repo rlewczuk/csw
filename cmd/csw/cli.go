@@ -170,6 +170,13 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 	workDir = buildResult.WorkDir
 	modelName = buildResult.ModelName
 	logsDir := buildResult.LogsDir
+	if lspServer != "" {
+		lspStatus := "disabled"
+		if buildResult.LSPStarted {
+			lspStatus = "started"
+		}
+		cli.NewAppView(os.Stdout).ShowMessage(fmt.Sprintf("LSP %s (workdir: %s)", lspStatus, buildResult.LSPWorkDir), ui.MessageTypeInfo)
+	}
 
 	var (
 		thread  *core.SessionThread
