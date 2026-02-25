@@ -22,6 +22,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// CLIParams holds all parameters for runCLI.
+type CLIParams struct {
+	Prompt               string
+	ModelName            string
+	RoleName             string
+	WorkDir              string
+	WorktreeBranch       string
+	Merge                bool
+	ContainerImage       string
+	CommitMessageTemplate string
+	ConfigPath           string
+	AllowAllPerms        bool
+	Interactive          bool
+	SaveSessionTo        string
+	SaveSession          bool
+	LogLLMRequests       bool
+	LSPServer            string
+	Thinking             string
+	ResumeTarget         string
+	ContinueSession      bool
+	ForceResume          bool
+}
+
 var runCLIFunc = runCLI
 
 var newCompositeConfigStoreFunc = impl.NewCompositeConfigStore
@@ -111,7 +134,27 @@ func CliCommand() *cobra.Command {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty when --continue is set")
 			}
 
-			return runCLIFunc(prompt, cliModel, cliRole, cliWorkDir, cliWorktree, cliMerge, cliContainer, cliCommitMessage, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer, cliThinking, resumeTarget, cliContinue, cliForce)
+			return runCLIFunc(&CLIParams{
+				Prompt:               prompt,
+				ModelName:            cliModel,
+				RoleName:             cliRole,
+				WorkDir:              cliWorkDir,
+				WorktreeBranch:       cliWorktree,
+				Merge:                cliMerge,
+				ContainerImage:       cliContainer,
+				CommitMessageTemplate: cliCommitMessage,
+				ConfigPath:           cliConfigPath,
+				AllowAllPerms:        cliAllowAllPerms,
+				Interactive:          cliInteractive,
+				SaveSessionTo:        cliSaveSessionTo,
+				SaveSession:          cliSaveSession,
+				LogLLMRequests:       cliLogLLMRequests,
+				LSPServer:            cliLSPServer,
+				Thinking:             cliThinking,
+				ResumeTarget:         resumeTarget,
+				ContinueSession:      cliContinue,
+				ForceResume:          cliForce,
+			})
 		},
 	}
 
@@ -142,34 +185,34 @@ func CliCommand() *cobra.Command {
 	return cmd
 }
 
-func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge bool, containerImage, commitMessageTemplate, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking, resumeTarget string, continueSession, forceResume bool) error {
+func runCLI(params *CLIParams) error {
 	startTime := time.Now()
 	ctx := context.Background()
 
-	if merge && worktreeBranch == "" {
+	if params.Merge && params.WorktreeBranch == "" {
 		return fmt.Errorf("runCLI() [cli.go]: --merge requires --worktree")
 	}
 
-	if containerImage != "" && resumeTarget != "" {
+	if params.ContainerImage != "" && params.ResumeTarget != "" {
 		return fmt.Errorf("runCLI() [cli.go]: --container is not supported with --resume")
 	}
 
-	resolvedWorktreeBranch, err := resolveWorktreeBranchName(ctx, prompt, modelName, workDir, configPath, worktreeBranch)
+	resolvedWorktreeBranch, err := resolveWorktreeBranchName(ctx, params.Prompt, params.ModelName, params.WorkDir, params.ConfigPath, params.WorktreeBranch)
 	if err != nil {
 		return fmt.Errorf("runCLI() [cli.go]: failed to resolve worktree branch: %w", err)
 	}
-	worktreeBranch = resolvedWorktreeBranch
+	params.WorktreeBranch = resolvedWorktreeBranch
 
 	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
-		WorkDir:        workDir,
-		ConfigPath:     configPath,
-		ModelName:      modelName,
-		RoleName:       roleName,
-		WorktreeBranch: worktreeBranch,
-		ContainerImage: containerImage,
-		LSPServer:      lspServer,
-		LogLLMRequests: logLLMRequests,
-		Thinking:       thinking,
+		WorkDir:        params.WorkDir,
+		ConfigPath:     params.ConfigPath,
+		ModelName:      params.ModelName,
+		RoleName:       params.RoleName,
+		WorktreeBranch: params.WorktreeBranch,
+		ContainerImage: params.ContainerImage,
+		LSPServer:      params.LSPServer,
+		LogLLMRequests: params.LogLLMRequests,
+		Thinking:       params.Thinking,
 	})
 	if err != nil {
 		return err
@@ -177,9 +220,9 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 	defer buildResult.Cleanup()
 	defer logging.FlushLogs()
 
-	workDir = buildResult.WorkDir
-	modelName = buildResult.ModelName
-	if lspServer != "" {
+	params.WorkDir = buildResult.WorkDir
+	params.ModelName = buildResult.ModelName
+	if params.LSPServer != "" {
 		lspStatus := "disabled"
 		if buildResult.LSPStarted {
 			lspStatus = "started"
@@ -192,14 +235,14 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 		session *core.SweSession
 	)
 
-	if resumeTarget != "" {
-		if resumeTarget == "last" {
+	if params.ResumeTarget != "" {
+		if params.ResumeTarget == "last" {
 			session, err = sweSystem.LoadLastSession(nil)
 			if err != nil {
 				return fmt.Errorf("runCLI() [cli.go]: failed to load last session: %w", err)
 			}
 		} else {
-			session, err = sweSystem.LoadSession(resumeTarget, nil)
+			session, err = sweSystem.LoadSession(params.ResumeTarget, nil)
 			if err != nil {
 				return fmt.Errorf("runCLI() [cli.go]: failed to load session: %w", err)
 			}
@@ -207,7 +250,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 		thread = core.NewSessionThreadWithSession(sweSystem, session, nil)
 	} else {
 		thread = core.NewSessionThread(sweSystem, nil)
-		if err := thread.StartSession(modelName); err != nil {
+		if err := thread.StartSession(params.ModelName); err != nil {
 			return fmt.Errorf("runCLI() [cli.go]: failed to start session: %w", err)
 		}
 		session = thread.GetSession()
@@ -222,15 +265,15 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 		_, _ = fmt.Fprintf(os.Stdout, "Session ID: %s\n", sessionID)
 	}()
 
-	defer finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, merge, commitMessageTemplate, sweSystem, session, os.Stderr)
+	defer finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr)
 
 	// Set role
-	if resumeTarget == "" {
-		if err := session.SetRole(roleName); err != nil {
+	if params.ResumeTarget == "" {
+		if err := session.SetRole(params.RoleName); err != nil {
 			return fmt.Errorf("runCLI() [cli.go]: failed to set role: %w", err)
 		}
 		// Set working directory
-		session.SetWorkDir(workDir)
+		session.SetWorkDir(params.WorkDir)
 	}
 
 	// Create chat presenter
@@ -239,7 +282,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 	basePresenter.SetAppView(appView)
 
 	// Create CLI chat view
-	baseCliView := cli.NewCliChatView(basePresenter, os.Stdout, os.Stdin, interactive, allowAllPerms)
+	baseCliView := cli.NewCliChatView(basePresenter, os.Stdout, os.Stdin, params.Interactive, params.AllowAllPerms)
 
 	// Set view on presenter
 	if err := basePresenter.SetView(baseCliView); err != nil {
@@ -247,7 +290,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 	}
 
 	// If interactive, start reading input
-	if interactive {
+	if params.Interactive {
 		baseCliView.StartReadingInput()
 	}
 
@@ -262,17 +305,17 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 	}
 	thread.SetOutputHandler(wrappedHandler)
 
-	if resumeTarget != "" {
-		if continueSession {
+	if params.ResumeTarget != "" {
+		if params.ContinueSession {
 			userMsg := &ui.ChatMessageUI{
 				Role: ui.ChatRoleUser,
-				Text: prompt,
+				Text: params.Prompt,
 			}
 			if err := basePresenter.SendUserMessage(userMsg); err != nil {
 				return fmt.Errorf("runCLI() [cli.go]: failed to send continue message: %w", err)
 			}
 		} else {
-			if !forceResume && !session.HasPendingWork() {
+			if !params.ForceResume && !session.HasPendingWork() {
 				return fmt.Errorf("runCLI() [cli.go]: resumed session has no pending work (use --continue to add a prompt or --force to run anyway)")
 			}
 			if err := thread.ResumePending(); err != nil {
@@ -282,7 +325,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 	} else {
 		userMsg := &ui.ChatMessageUI{
 			Role: ui.ChatRoleUser,
-			Text: prompt,
+			Text: params.Prompt,
 		}
 		if err := basePresenter.SendUserMessage(userMsg); err != nil {
 			return fmt.Errorf("runCLI() [cli.go]: failed to send initial message: %w", err)
