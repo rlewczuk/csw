@@ -1144,79 +1144,9 @@ func TestMockVCS_ListWorktrees(t *testing.T) {
 	})
 }
 
-// TestMockRepo_ListWorktrees tests the ListWorktrees method on MockRepo.
-func TestMockRepo_ListWorktrees(t *testing.T) {
-	t.Run("empty", func(t *testing.T) {
-		repo := NewMockRepo()
-		worktrees, err := repo.ListWorktrees()
-		require.NoError(t, err)
-		assert.Empty(t, worktrees)
-	})
-
-	t.Run("with worktrees", func(t *testing.T) {
-		repo := NewMockRepo()
-
-		// Create a branch and get its worktree
-		err := repo.NewBranch("feature-branch", "main")
-		require.NoError(t, err)
-
-		_, err = repo.GetWorktree("feature-branch")
-		require.NoError(t, err)
-
-		worktrees, err := repo.ListWorktrees()
-		require.NoError(t, err)
-		assert.Len(t, worktrees, 1)
-		assert.Equal(t, "feature-branch", worktrees[0])
-	})
-
-	t.Run("multiple worktrees", func(t *testing.T) {
-		repo := NewMockRepo()
-
-		// Create branches and get their worktrees
-		err := repo.NewBranch("feature-1", "main")
-		require.NoError(t, err)
-		err = repo.NewBranch("feature-2", "main")
-		require.NoError(t, err)
-
-		_, _ = repo.GetWorktree("feature-1")
-		_, _ = repo.GetWorktree("feature-2")
-
-		worktrees, err := repo.ListWorktrees()
-		require.NoError(t, err)
-		assert.Len(t, worktrees, 2)
-
-		// Check that both branches are in the list
-		worktreeMap := make(map[string]bool)
-		for _, wt := range worktrees {
-			worktreeMap[wt] = true
-		}
-		assert.True(t, worktreeMap["feature-1"])
-		assert.True(t, worktreeMap["feature-2"])
-	})
-
-	t.Run("after drop", func(t *testing.T) {
-		repo := NewMockRepo()
-
-		// Create a branch and get its worktree
-		err := repo.NewBranch("feature-branch", "main")
-		require.NoError(t, err)
-		_, err = repo.GetWorktree("feature-branch")
-		require.NoError(t, err)
-
-		// Drop the worktree
-		err = repo.DropWorktree("feature-branch")
-		require.NoError(t, err)
-
-		worktrees, err := repo.ListWorktrees()
-		require.NoError(t, err)
-		assert.Empty(t, worktrees)
-	})
-}
-
 // TestVCSInterfaceCompliance verifies that all VCS implementations implement the interface.
 func TestVCSInterfaceCompliance(t *testing.T) {
 	var _ VCS = (*NullVCS)(nil)
 	var _ VCS = (*MockVCS)(nil)
-	var _ VCS = (*MockRepo)(nil)
 	// Note: GitVCS requires a real git repository, so we can't easily test it here
 }

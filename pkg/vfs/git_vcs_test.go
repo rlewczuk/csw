@@ -15,9 +15,8 @@ import (
 
 // GitTestFixture provides test fixtures for git repository tests
 type GitTestFixture struct {
-	Root   string
-	Repo   VCS
-	IsMock bool
+	Root string
+	Repo VCS
 }
 
 // setupGitRepoFixture creates a temporary git repository for testing
@@ -60,23 +59,8 @@ func setupGitRepoFixture(t *testing.T) *GitTestFixture {
 	require.NoError(t, err, "Failed to create GitVCS")
 
 	return &GitTestFixture{
-		Root:   tempDir,
-		Repo:   gitRepo,
-		IsMock: false,
-	}
-}
-
-// setupMockRepoFixture creates a mock repository for testing
-func setupMockRepoFixture(t *testing.T) *GitTestFixture {
-	t.Helper()
-
-	mockRepo := NewMockRepo()
-	require.NotNil(t, mockRepo, "Failed to create MockRepo")
-
-	return &GitTestFixture{
-		Root:   "",
-		Repo:   mockRepo,
-		IsMock: true,
+		Root: tempDir,
+		Repo: gitRepo,
 	}
 }
 
@@ -87,19 +71,29 @@ func (f *GitTestFixture) Cleanup() {
 	}
 }
 
-// runTestWithBothRepos runs a test function with both GitVCS and MockRepo
-func runTestWithBothRepos(t *testing.T, testFunc func(*testing.T, *GitTestFixture)) {
+// runTestWithGitVCS runs a test function with GitVCS only
+func runTestWithGitVCS(t *testing.T, testFunc func(*testing.T, *GitTestFixture)) {
 	t.Run("GitVCS", func(t *testing.T) {
 		fixture := setupGitRepoFixture(t)
 		defer fixture.Cleanup()
 		testFunc(t, fixture)
 	})
+}
 
-	t.Run("MockRepo", func(t *testing.T) {
-		fixture := setupMockRepoFixture(t)
-		defer fixture.Cleanup()
-		testFunc(t, fixture)
-	})
+// getDefaultBranch returns the default branch name (master or main)
+func getDefaultBranch(t *testing.T, fixture *GitTestFixture) string {
+	// Try master first
+	_, err := fixture.Repo.GetWorktree("master")
+	if err == nil {
+		return "master"
+	}
+	// Try main
+	_, err = fixture.Repo.GetWorktree("main")
+	if err == nil {
+		return "main"
+	}
+	t.Fatal("Neither master nor main branch found")
+	return ""
 }
 
 func TestNewGitRepo(t *testing.T) {
@@ -135,71 +129,30 @@ func TestNewGitRepo(t *testing.T) {
 	})
 }
 
-func TestNewMockRepo(t *testing.T) {
-	t.Run("CreateMockRepo", func(t *testing.T) {
-		repo := NewMockRepo()
-		assert.NotNil(t, repo, "Expected non-nil MockRepo")
-		assert.NotNil(t, repo.branches, "Expected branches map to be initialized")
-		assert.NotNil(t, repo.worktrees, "Expected worktrees map to be initialized")
-
-		// Should have a default "main" branch
-		branches, err := repo.ListBranches("")
-		require.NoError(t, err)
-		assert.Contains(t, branches, "main", "Expected main branch to exist")
-	})
-}
-
 func TestGetWorktree(t *testing.T) {
 	t.Run("GetExistingBranch", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
-			var vfs VFS
-			var err error
-
-			if fixture.IsMock {
-				vfs, err = fixture.Repo.GetWorktree("main")
-			} else {
-				// For GitVCS, use master or main depending on what's available
-				vfs, err = fixture.Repo.GetWorktree("master")
-				if err != nil {
-					vfs, err = fixture.Repo.GetWorktree("main")
-				}
-			}
-
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
+			branch := getDefaultBranch(t, fixture)
+			vfs, err := fixture.Repo.GetWorktree(branch)
 			require.NoError(t, err, "Failed to get worktree")
 			assert.NotNil(t, vfs, "Expected non-nil VFS")
 		})
 	})
 
 	t.Run("GetWorktreeTwiceReturnsSame", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
-			var vfs1, vfs2 VFS
-			var err error
-
-			if fixture.IsMock {
-				vfs1, err = fixture.Repo.GetWorktree("main")
-				require.NoError(t, err)
-				vfs2, err = fixture.Repo.GetWorktree("main")
-				require.NoError(t, err)
-			} else {
-				vfs1, err = fixture.Repo.GetWorktree("master")
-				if err != nil {
-					vfs1, err = fixture.Repo.GetWorktree("main")
-				}
-				require.NoError(t, err)
-
-				vfs2, err = fixture.Repo.GetWorktree("master")
-				if err != nil {
-					vfs2, err = fixture.Repo.GetWorktree("main")
-				}
-				require.NoError(t, err)
-			}
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
+			branch := getDefaultBranch(t, fixture)
+			vfs1, err := fixture.Repo.GetWorktree(branch)
+			require.NoError(t, err)
+			vfs2, err := fixture.Repo.GetWorktree(branch)
+			require.NoError(t, err)
 
 			assert.Equal(t, vfs1, vfs2, "Expected same VFS instance for same branch")
 		})
 	})
 
 	t.Run("GetNonExistentBranch", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			_, err := fixture.Repo.GetWorktree("nonexistent-branch")
 			assert.ErrorIs(t, err, ErrFileNotFound)
 		})
@@ -208,26 +161,20 @@ func TestGetWorktree(t *testing.T) {
 
 func TestDropWorktree(t *testing.T) {
 	t.Run("DropExistingWorktree", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
-			// First get a worktree
-			var branchName string
-			if fixture.IsMock {
-				branchName = "main"
-			} else {
-				branchName = "master"
-			}
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
+			branch := getDefaultBranch(t, fixture)
 
-			_, err := fixture.Repo.GetWorktree(branchName)
+			_, err := fixture.Repo.GetWorktree(branch)
 			require.NoError(t, err, "Failed to get worktree")
 
 			// Now drop it
-			err = fixture.Repo.DropWorktree(branchName)
+			err = fixture.Repo.DropWorktree(branch)
 			require.NoError(t, err, "Failed to drop worktree")
 		})
 	})
 
 	t.Run("DropNonExistentWorktree", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			err := fixture.Repo.DropWorktree("nonexistent-worktree")
 			assert.ErrorIs(t, err, ErrFileNotFound)
 		})
@@ -236,13 +183,8 @@ func TestDropWorktree(t *testing.T) {
 
 func TestNewBranch(t *testing.T) {
 	t.Run("CreateNewBranch", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
-			var sourceBranch string
-			if fixture.IsMock {
-				sourceBranch = "main"
-			} else {
-				sourceBranch = "master"
-			}
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
+			sourceBranch := getDefaultBranch(t, fixture)
 
 			err := fixture.Repo.NewBranch("feature-branch", sourceBranch)
 			require.NoError(t, err, "Failed to create new branch")
@@ -255,20 +197,15 @@ func TestNewBranch(t *testing.T) {
 	})
 
 	t.Run("CreateBranchFromNonExistent", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			err := fixture.Repo.NewBranch("new-branch", "nonexistent")
 			assert.ErrorIs(t, err, ErrFileNotFound)
 		})
 	})
 
 	t.Run("CreateDuplicateBranch", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
-			var sourceBranch string
-			if fixture.IsMock {
-				sourceBranch = "main"
-			} else {
-				sourceBranch = "master"
-			}
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
+			sourceBranch := getDefaultBranch(t, fixture)
 
 			// Create a branch first
 			err := fixture.Repo.NewBranch("duplicate-branch", sourceBranch)
@@ -283,13 +220,8 @@ func TestNewBranch(t *testing.T) {
 
 func TestDeleteBranch(t *testing.T) {
 	t.Run("DeleteExistingBranch", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
-			var sourceBranch string
-			if fixture.IsMock {
-				sourceBranch = "main"
-			} else {
-				sourceBranch = "master"
-			}
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
+			sourceBranch := getDefaultBranch(t, fixture)
 
 			// Create a branch first
 			err := fixture.Repo.NewBranch("delete-me", sourceBranch)
@@ -307,34 +239,17 @@ func TestDeleteBranch(t *testing.T) {
 	})
 
 	t.Run("DeleteNonExistentBranch", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			err := fixture.Repo.DeleteBranch("nonexistent-branch")
 			assert.ErrorIs(t, err, ErrFileNotFound)
-		})
-	})
-
-	t.Run("DeleteOnlyBranch", func(t *testing.T) {
-		// This test is only for MockRepo since GitVCS has different behavior
-		t.Run("MockRepo", func(t *testing.T) {
-			fixture := setupMockRepoFixture(t)
-			defer fixture.Cleanup()
-
-			// Try to delete the only branch (main)
-			err := fixture.Repo.DeleteBranch("main")
-			assert.ErrorIs(t, err, ErrPermissionDenied)
 		})
 	})
 }
 
 func TestListBranches(t *testing.T) {
 	t.Run("ListAllBranches", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
-			var sourceBranch string
-			if fixture.IsMock {
-				sourceBranch = "main"
-			} else {
-				sourceBranch = "master"
-			}
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
+			sourceBranch := getDefaultBranch(t, fixture)
 
 			// Create some branches
 			err := fixture.Repo.NewBranch("feature-1", sourceBranch)
@@ -352,13 +267,8 @@ func TestListBranches(t *testing.T) {
 	})
 
 	t.Run("ListBranchesWithPrefix", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
-			var sourceBranch string
-			if fixture.IsMock {
-				sourceBranch = "main"
-			} else {
-				sourceBranch = "master"
-			}
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
+			sourceBranch := getDefaultBranch(t, fixture)
 
 			// Create branches with different prefixes
 			err := fixture.Repo.NewBranch("feature/login", sourceBranch)
@@ -380,28 +290,8 @@ func TestListBranches(t *testing.T) {
 }
 
 func TestCommitWorktree(t *testing.T) {
-	t.Run("CommitChanges", func(t *testing.T) {
-		// This test is only for MockRepo since GitVCS requires more setup
-		t.Run("MockRepo", func(t *testing.T) {
-			fixture := setupMockRepoFixture(t)
-			defer fixture.Cleanup()
-
-			// Get worktree
-			vfs, err := fixture.Repo.GetWorktree("main")
-			require.NoError(t, err)
-
-			// Make some changes
-			err = vfs.WriteFile("newfile.txt", []byte("new content"))
-			require.NoError(t, err)
-
-			// Commit
-			err = fixture.Repo.CommitWorktree("main", "Add new file")
-			require.NoError(t, err)
-		})
-	})
-
 	t.Run("CommitNonExistentWorktree", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			err := fixture.Repo.CommitWorktree("nonexistent", "message")
 			assert.ErrorIs(t, err, ErrFileNotFound)
 		})
@@ -410,13 +300,8 @@ func TestCommitWorktree(t *testing.T) {
 
 func TestMergeBranches(t *testing.T) {
 	t.Run("MergeBranches", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
-			var sourceBranch string
-			if fixture.IsMock {
-				sourceBranch = "main"
-			} else {
-				sourceBranch = "master"
-			}
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
+			sourceBranch := getDefaultBranch(t, fixture)
 
 			// Create a source branch
 			err := fixture.Repo.NewBranch("source-branch", sourceBranch)
@@ -429,13 +314,8 @@ func TestMergeBranches(t *testing.T) {
 	})
 
 	t.Run("MergeNonExistentSource", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
-			var targetBranch string
-			if fixture.IsMock {
-				targetBranch = "main"
-			} else {
-				targetBranch = "master"
-			}
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
+			targetBranch := getDefaultBranch(t, fixture)
 
 			err := fixture.Repo.MergeBranches(targetBranch, "nonexistent")
 			assert.ErrorIs(t, err, ErrFileNotFound)
@@ -443,13 +323,8 @@ func TestMergeBranches(t *testing.T) {
 	})
 
 	t.Run("MergeNonExistentTarget", func(t *testing.T) {
-		runTestWithBothRepos(t, func(t *testing.T, fixture *GitTestFixture) {
-			var sourceBranch string
-			if fixture.IsMock {
-				sourceBranch = "main"
-			} else {
-				sourceBranch = "master"
-			}
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
+			sourceBranch := getDefaultBranch(t, fixture)
 
 			err := fixture.Repo.NewBranch("source-branch2", sourceBranch)
 			require.NoError(t, err)
@@ -466,12 +341,7 @@ func TestMergeBranches(t *testing.T) {
 		repo, ok := fixture.Repo.(*GitVCS)
 		require.True(t, ok)
 
-		sourceBranch := "master"
-		if _, err := repo.GetWorktree(sourceBranch); err != nil {
-			sourceBranch = "main"
-			_, err = repo.GetWorktree(sourceBranch)
-			require.NoError(t, err)
-		}
+		sourceBranch := getDefaultBranch(t, fixture)
 
 		err := repo.NewBranch("feature-conflict", sourceBranch)
 		require.NoError(t, err)
@@ -501,12 +371,7 @@ func TestMergeBranches(t *testing.T) {
 		repo, ok := fixture.Repo.(*GitVCS)
 		require.True(t, ok)
 
-		targetBranch := "master"
-		if _, err := repo.GetWorktree(targetBranch); err != nil {
-			targetBranch = "main"
-			_, err = repo.GetWorktree(targetBranch)
-			require.NoError(t, err)
-		}
+		targetBranch := getDefaultBranch(t, fixture)
 
 		err := repo.NewBranch("feature-ff", targetBranch)
 		require.NoError(t, err)
@@ -541,12 +406,7 @@ func TestMergeBranches(t *testing.T) {
 		repo, ok := fixture.Repo.(*GitVCS)
 		require.True(t, ok)
 
-		targetBranch := "master"
-		if _, err := repo.GetWorktree(targetBranch); err != nil {
-			targetBranch = "main"
-			_, err = repo.GetWorktree(targetBranch)
-			require.NoError(t, err)
-		}
+		targetBranch := getDefaultBranch(t, fixture)
 
 		err := repo.NewBranch("feature-update-files", targetBranch)
 		require.NoError(t, err)
@@ -569,7 +429,7 @@ func TestMergeBranches(t *testing.T) {
 }
 
 func TestRepoInterfaceCompliance(t *testing.T) {
-	// This test ensures GitVCS and MockRepo implement the VCS interface
+	// This test ensures GitVCS and MockVCS implement the VCS interface
 	var _ VCS = (*GitVCS)(nil)
-	var _ VCS = (*MockRepo)(nil)
+	var _ VCS = (*MockVCS)(nil)
 }

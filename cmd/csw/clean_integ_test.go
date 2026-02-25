@@ -160,32 +160,6 @@ func TestListWorktrees(t *testing.T) {
 	})
 }
 
-// TestMockRepo_ListWorktrees tests the ListWorktrees method on MockRepo.
-func TestMockRepo_ListWorktrees(t *testing.T) {
-	t.Run("empty", func(t *testing.T) {
-		repo := vfs.NewMockRepo()
-		worktrees, err := repo.ListWorktrees()
-		require.NoError(t, err)
-		assert.Empty(t, worktrees)
-	})
-
-	t.Run("with worktrees", func(t *testing.T) {
-		repo := vfs.NewMockRepo()
-
-		// Create a branch and get its worktree
-		err := repo.NewBranch("feature-branch", "main")
-		require.NoError(t, err)
-
-		_, err = repo.GetWorktree("feature-branch")
-		require.NoError(t, err)
-
-		worktrees, err := repo.ListWorktrees()
-		require.NoError(t, err)
-		assert.Len(t, worktrees, 1)
-		assert.Equal(t, "feature-branch", worktrees[0])
-	})
-}
-
 // TestNullVCS_ListWorktrees tests that NullVCS returns empty list.
 func TestNullVCS_ListWorktrees(t *testing.T) {
 	mockVFS := vfs.NewMockVFS()
