@@ -49,6 +49,7 @@ func main() {
 	// Add subcommands
 	rootCmd.AddCommand(ConfCommand())
 	rootCmd.AddCommand(CliCommand())
+	rootCmd.AddCommand(CleanCommand())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

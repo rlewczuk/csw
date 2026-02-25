@@ -221,6 +221,17 @@ func TestNullVCS_ListBranches(t *testing.T) {
 	}
 }
 
+func TestNullVCS_ListWorktrees(t *testing.T) {
+	mockVFS := NewMockVFS()
+	nullVCS, err := NewNullVFS(mockVFS)
+	require.NoError(t, err)
+
+	// NullVCS should always return empty list since it doesn't support worktrees
+	worktrees, err := nullVCS.ListWorktrees()
+	require.NoError(t, err)
+	assert.Empty(t, worktrees)
+}
+
 func TestNullVCS_MergeBranches(t *testing.T) {
 	mockVFS := NewMockVFS()
 	nullVCS, err := NewNullVFS(mockVFS)

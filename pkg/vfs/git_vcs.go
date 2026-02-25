@@ -275,6 +275,30 @@ func (g *GitVCS) ListBranches(prefix string) ([]string, error) {
 	return result, nil
 }
 
+// ListWorktrees returns a list of all worktree branch names that are currently extracted.
+func (g *GitVCS) ListWorktrees() ([]string, error) {
+	g.mutex.RLock()
+	defer g.mutex.RUnlock()
+
+	// Read the worktrees directory to find extracted worktrees
+	entries, err := os.ReadDir(g.worktreesPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("GitVCS.ListWorktrees() [git.go]: %w", err)
+	}
+
+	var result []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			result = append(result, entry.Name())
+		}
+	}
+
+	return result, nil
+}
+
 // MergeBranches merges the given branch into the current branch.
 func (g *GitVCS) MergeBranches(into string, from string) error {
 	if _, err := g.repo.ResolveRevision(plumbing.Revision(plumbing.NewBranchReferenceName(into))); err != nil {

@@ -22,6 +22,9 @@ type VCS interface {
 	// ListBranches returns a list of all branches. Default branch is first in the list.
 	ListBranches(prefix string) ([]string, error)
 
+	// ListWorktrees returns a list of all worktree branch names that are currently extracted.
+	ListWorktrees() ([]string, error)
+
 	// MergeBranches merges the given branch into the current branch.
 	MergeBranches(into string, from string) error
 }
