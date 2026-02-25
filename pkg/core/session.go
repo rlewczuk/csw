@@ -367,14 +367,14 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 		}
 	}
 
+	// Add tool responses to the conversation
+	s.appendConversationMessage(models.NewToolResponseMessage(toolResponses...), "incoming", "tool_response")
+
 	if len(agentMessages) > 0 {
 		for _, agentMessage := range agentMessages {
 			s.appendConversationMessage(agentMessage, "incoming", "agent_instructions")
 		}
 	}
-
-	// Add tool responses to the conversation
-	s.appendConversationMessage(models.NewToolResponseMessage(toolResponses...), "incoming", "tool_response")
 
 	// Clear pending state since all tools executed successfully
 	s.pendingPermissionToolCalls = nil
