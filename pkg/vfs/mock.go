@@ -696,6 +696,19 @@ func (m *MockVCS) ListBranches(prefix string) ([]string, error) {
 	return result, nil
 }
 
+// ListWorktrees returns the list of worktree branches.
+func (m *MockVCS) ListWorktrees() ([]string, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	result := make([]string, 0, len(m.worktrees))
+	for branch := range m.worktrees {
+		if branch != "" { // Skip the empty string entry (base VFS)
+			result = append(result, branch)
+		}
+	}
+	return result, nil
+}
+
 // MergeBranches is a no-op for MockVCS.
 func (m *MockVCS) MergeBranches(into string, from string) error {
 	m.mutex.Lock()
@@ -898,6 +911,18 @@ func (m *MockRepo) ListBranches(prefix string) ([]string, error) {
 		}
 	}
 
+	return result, nil
+}
+
+// ListWorktrees returns a list of all worktree branch names that are currently extracted.
+func (m *MockRepo) ListWorktrees() ([]string, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	result := make([]string, 0, len(m.worktrees))
+	for branch := range m.worktrees {
+		result = append(result, branch)
+	}
 	return result, nil
 }
 

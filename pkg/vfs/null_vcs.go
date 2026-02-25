@@ -44,6 +44,12 @@ func (n *NullVCS) ListBranches(prefix string) ([]string, error) {
 	return []string{"main"}, nil
 }
 
+// ListWorktrees returns a list of all worktree branch names.
+// For NullVCS, it always returns an empty list since there are no worktrees.
+func (n *NullVCS) ListWorktrees() ([]string, error) {
+	return []string{}, nil
+}
+
 // MergeBranches has no effect for NullVCS.
 func (n *NullVCS) MergeBranches(into string, from string) error {
 	return nil
