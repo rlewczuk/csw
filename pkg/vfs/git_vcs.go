@@ -333,7 +333,7 @@ func (g *GitVCS) MergeBranches(into string, from string) error {
 	mergePath := g.path
 	cleanup := func() {}
 
-	if hasWorktree && currentPrimaryBranch != into {
+	if hasWorktree {
 		mergePath = wt.path
 	} else if currentPrimaryBranch != into {
 		tempWorktreePath := filepath.Join(g.worktreesPath, ".merge-"+strings.ReplaceAll(into, "/", "_"))
@@ -354,22 +354,24 @@ func (g *GitVCS) MergeBranches(into string, from string) error {
 	}
 	defer cleanup()
 
-	if err := g.runGitInWorktree(mergePath, "merge", "--ff-only", from); err == nil {
-		return nil
-	}
+	if err := g.runGitInWorktree(mergePath, "merge", "--ff-only", from); err != nil {
+		if err := g.runGitInWorktree(mergePath, "rebase", from); err != nil {
+			_ = g.runGitInWorktree(mergePath, "rebase", "--abort")
 
-	if err := g.runGitInWorktree(mergePath, "rebase", from); err == nil {
-		return nil
-	}
-
-	_ = g.runGitInWorktree(mergePath, "rebase", "--abort")
-
-	if err := g.runGitInWorktree(mergePath, "merge", from); err != nil {
-		errText := err.Error()
-		if strings.Contains(errText, "CONFLICT") || strings.Contains(errText, "would be overwritten by merge") {
-			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w: %w", err, ErrMergeConflict)
+			if err := g.runGitInWorktree(mergePath, "merge", from); err != nil {
+				errText := err.Error()
+				if strings.Contains(errText, "CONFLICT") || strings.Contains(errText, "would be overwritten by merge") {
+					return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w: %w", err, ErrMergeConflict)
+				}
+				return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
+			}
 		}
-		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
+	}
+
+	if mergePath != g.path && currentPrimaryBranch == into {
+		if err := g.runGitInWorktree(g.path, "reset", "--hard", into); err != nil {
+			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
+		}
 	}
 
 	return nil
@@ -391,6 +393,7 @@ func (g *GitVCS) Path() string {
 
 func (g *GitVCS) runGit(args ...string) error {
 	cmd := exec.Command("git", append([]string{"-C", g.path}, args...)...)
+	cmd.Env = g.gitCommandEnv()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("GitVCS.runGit() [git.go]: %w: %s", err, strings.TrimSpace(string(output)))
@@ -400,6 +403,7 @@ func (g *GitVCS) runGit(args ...string) error {
 
 func (g *GitVCS) runGitInWorktree(worktreePath string, args ...string) error {
 	cmd := exec.Command("git", append([]string{"-C", worktreePath}, args...)...)
+	cmd.Env = g.gitCommandEnv()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("GitVCS.runGitInWorktree() [git.go]: %w: %s", err, strings.TrimSpace(string(output)))
@@ -409,6 +413,7 @@ func (g *GitVCS) runGitInWorktree(worktreePath string, args ...string) error {
 
 func (g *GitVCS) runGitOutputInWorktree(worktreePath string, args ...string) (string, error) {
 	cmd := exec.Command("git", append([]string{"-C", worktreePath}, args...)...)
+	cmd.Env = g.gitCommandEnv()
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -417,4 +422,25 @@ func (g *GitVCS) runGitOutputInWorktree(worktreePath string, args ...string) (st
 		return "", fmt.Errorf("GitVCS.runGitOutputInWorktree() [git.go]: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	return stdout.String(), nil
+}
+
+// gitCommandEnv returns environment variables with default identity for git commits.
+func (g *GitVCS) gitCommandEnv() []string {
+	env := os.Environ()
+	env = appendIfEnvMissing(env, "GIT_AUTHOR_NAME", "CSW")
+	env = appendIfEnvMissing(env, "GIT_AUTHOR_EMAIL", "csw@example.com")
+	env = appendIfEnvMissing(env, "GIT_COMMITTER_NAME", "CSW")
+	env = appendIfEnvMissing(env, "GIT_COMMITTER_EMAIL", "csw@example.com")
+	return env
+}
+
+// appendIfEnvMissing appends a key-value env pair only when key does not exist.
+func appendIfEnvMissing(env []string, key string, value string) []string {
+	prefix := key + "="
+	for _, item := range env {
+		if strings.HasPrefix(item, prefix) {
+			return env
+		}
+	}
+	return append(env, prefix+value)
 }

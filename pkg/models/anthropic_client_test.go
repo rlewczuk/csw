@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"strings"
 	"testing"
@@ -799,21 +798,17 @@ func TestAnthropicClient_ToolCallingStream(t *testing.T) {
 
 func TestAnthropicClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		client, err := NewAnthropicClient(&conf.ModelProviderConfig{
-			URL:            "http://nonexistent-host:11434",
-			APIKey:         "test-key",
-			ConnectTimeout: 1 * time.Second,
-			RequestTimeout: 2 * time.Second,
-		})
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		mock.AddRestResponseWithStatus("/v1/models", "GET", `{"error":"unavailable"}`, 503)
+
+		client, err := NewAnthropicClientWithHTTPClient(mock.URL(), mock.Client())
 		require.NoError(t, err)
 
 		_, err = client.ListModels()
 		require.Error(t, err)
-		// Network errors are now wrapped in NetworkError for retry support
-		var networkErr *NetworkError
-		if assert.True(t, errors.As(err, &networkErr), "Should be a NetworkError, got: %v", err) {
-			assert.True(t, networkErr.IsRetryable, "Network error should be retryable")
-		}
+		assert.ErrorIs(t, err, ErrEndpointUnavailable)
 	})
 }
 
