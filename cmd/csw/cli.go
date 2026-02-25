@@ -42,13 +42,14 @@ func CliCommand() *cobra.Command {
 		cliThinking       string
 		cliCommitMessage  string
 		cliMerge          bool
+		cliContainer      string
 		cliResume         string
 		cliContinue       bool
 		cliForce          bool
 	)
 
 	cmd := &cobra.Command{
-		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--merge] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last>] [--continue] [--force] [\"prompt\"]",
+		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--merge] [--container <container-image>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last>] [--continue] [--force] [\"prompt\"]",
 		Short: "Start a CLI chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.MaximumNArgs(1),
@@ -106,7 +107,7 @@ func CliCommand() *cobra.Command {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty when --continue is set")
 			}
 
-			return runCLIFunc(prompt, cliModel, cliRole, cliWorkDir, cliWorktree, cliMerge, cliCommitMessage, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer, cliThinking, resumeTarget, cliContinue, cliForce)
+			return runCLIFunc(prompt, cliModel, cliRole, cliWorkDir, cliWorktree, cliMerge, cliContainer, cliCommitMessage, cliConfigPath, cliAllowAllPerms, cliInteractive, cliSaveSessionTo, cliSaveSession, cliLogLLMRequests, cliLSPServer, cliThinking, resumeTarget, cliContinue, cliForce)
 		},
 	}
 
@@ -116,6 +117,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliWorkDir, "workdir", "", "Working directory (default: current directory)")
 	cmd.Flags().StringVar(&cliWorktree, "worktree", "", "Create and use a git worktree for this session on a feature branch")
 	cmd.Flags().BoolVar(&cliMerge, "merge", false, "Merge the feature worktree branch into main after commit")
+	cmd.Flags().StringVar(&cliContainer, "container", "", "Container image for running bash commands in container mode")
 	cmd.Flags().StringVar(&cliCommitMessage, "commit-message", "", "Custom commit message template, e.g. '[{{ .Branch }}] {{ .Message }}'")
 	cmd.Flags().BoolVar(&cliAllowAllPerms, "allow-all-permissions", false, "Allow all permissions without asking")
 	cmd.Flags().BoolVar(&cliInteractive, "interactive", false, "Enable interactive mode (allows user to respond to agent questions)")
@@ -136,12 +138,16 @@ func CliCommand() *cobra.Command {
 	return cmd
 }
 
-func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge bool, commitMessageTemplate, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking, resumeTarget string, continueSession, forceResume bool) error {
+func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge bool, containerImage, commitMessageTemplate, configPath string, allowAllPerms, interactive bool, saveSessionTo string, saveSession, logLLMRequests bool, lspServer, thinking, resumeTarget string, continueSession, forceResume bool) error {
 	startTime := time.Now()
 	ctx := context.Background()
 
 	if merge && worktreeBranch == "" {
 		return fmt.Errorf("runCLI() [cli.go]: --merge requires --worktree")
+	}
+
+	if containerImage != "" && resumeTarget != "" {
+		return fmt.Errorf("runCLI() [cli.go]: --container is not supported with --resume")
 	}
 
 	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
@@ -150,6 +156,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 		ModelName:      modelName,
 		RoleName:       roleName,
 		WorktreeBranch: worktreeBranch,
+		ContainerImage: containerImage,
 		LSPServer:      lspServer,
 		LogLLMRequests: logLLMRequests,
 		Thinking:       thinking,
@@ -157,6 +164,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 	if err != nil {
 		return err
 	}
+	defer buildResult.Cleanup()
 	defer logging.FlushLogs()
 
 	workDir = buildResult.WorkDir

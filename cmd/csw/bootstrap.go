@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/conf/impl"
@@ -24,6 +26,7 @@ type BuildSystemParams struct {
 	ModelName      string
 	RoleName       string
 	WorktreeBranch string
+	ContainerImage string
 	LSPServer      string
 	LogLLMRequests bool
 	// Thinking controls the thinking/reasoning mode for LLM requests.
@@ -42,6 +45,7 @@ type BuildSystemResult struct {
 	LogsDir          string
 	VCS              vfs.VCS
 	WorktreeBranch   string
+	Cleanup          func()
 }
 
 func prepareSessionVFS(workDir string, worktreeBranch string, hidePatterns []string) (vfs.VCS, vfs.VFS, error) {
@@ -184,7 +188,38 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	toolRegistry := tool.NewToolRegistry()
 	tool.RegisterVFSTools(toolRegistry, selectedVFS, lspClient, nil)
 
-	bashRunner := runner.NewBashRunner(effectiveWorkDir, 0)
+	bashRunner := runner.CommandRunner(runner.NewBashRunner(effectiveWorkDir, 0))
+	cleanupFn := func() {}
+
+	if params.ContainerImage != "" {
+		uid, gid, err := resolveCurrentUserIDs()
+		if err != nil {
+			logging.FlushLogs()
+			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve current user ids: %w", err)
+		}
+
+		containerRunner, err := runner.NewContainerRunner(runner.ContainerConfig{
+			ImageName:      params.ContainerImage,
+			Workdir:        effectiveWorkDir,
+			MountDirs:      map[string]string{effectiveWorkDir: effectiveWorkDir},
+			UID:            uid,
+			GID:            gid,
+			ReadOnlyMounts: true,
+		})
+		if err != nil {
+			logging.FlushLogs()
+			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create container runner: %w", err)
+		}
+
+		bashRunner = containerRunner
+		cleanupFn = func() {
+			if closeErr := containerRunner.Close(); closeErr != nil {
+				logger := logging.GetGlobalLogger()
+				logger.Warn("failed to close container runner", "error", closeErr)
+			}
+		}
+	}
+
 	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges)
 
 	promptGenerator, err := core.NewConfPromptGenerator(configStore, selectedVFS)
@@ -230,7 +265,27 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		LogsDir:          logsDir,
 		VCS:              selectedVCS,
 		WorktreeBranch:   params.WorktreeBranch,
+		Cleanup:          cleanupFn,
 	}
 
 	return sweSystem, result, nil
+}
+
+func resolveCurrentUserIDs() (int, int, error) {
+	currentUser, err := user.Current()
+	if err != nil {
+		return 0, 0, fmt.Errorf("resolveCurrentUserIDs() [bootstrap.go]: failed to get current user: %w", err)
+	}
+
+	uid, err := strconv.Atoi(currentUser.Uid)
+	if err != nil {
+		return 0, 0, fmt.Errorf("resolveCurrentUserIDs() [bootstrap.go]: failed to parse uid: %w", err)
+	}
+
+	gid, err := strconv.Atoi(currentUser.Gid)
+	if err != nil {
+		return 0, 0, fmt.Errorf("resolveCurrentUserIDs() [bootstrap.go]: failed to parse gid: %w", err)
+	}
+
+	return uid, gid, nil
 }
