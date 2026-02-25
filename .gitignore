@@ -13,3 +13,4 @@ tmp/
 .cswdata/
 *.exe
 .claude/
+.config/
