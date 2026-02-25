@@ -19,6 +19,16 @@ func TestEmbeddedConfigStore_GetAgentConfigFile(t *testing.T) {
 		assert.NotEmpty(t, data)
 	})
 
+	t.Run("reads embedded worktree templates", func(t *testing.T) {
+		systemData, err := store.GetAgentConfigFile("worktree", "system.md")
+		require.NoError(t, err)
+		assert.NotEmpty(t, systemData)
+
+		messageData, err := store.GetAgentConfigFile("worktree", "message.md")
+		require.NoError(t, err)
+		assert.NotEmpty(t, messageData)
+	})
+
 	t.Run("returns error when file missing", func(t *testing.T) {
 		_, err := store.GetAgentConfigFile("commit", "missing.md")
 		require.Error(t, err)

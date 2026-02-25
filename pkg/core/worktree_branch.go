@@ -1,0 +1,142 @@
+package core
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"strings"
+	"text/template"
+
+	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/models"
+)
+
+// WorktreeBranchPromptData contains data for rendering worktree branch prompt templates.
+type WorktreeBranchPromptData struct {
+	Input string
+}
+
+// GenerateWorktreeBranchName generates a symbolic worktree branch suffix using the active chat model.
+func GenerateWorktreeBranchName(ctx context.Context, sweSystem *SweSystem, model string, inputPrompt string) (string, error) {
+	if sweSystem == nil {
+		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: sweSystem cannot be nil")
+	}
+
+	if sweSystem.ConfigStore == nil {
+		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: sweSystem config store cannot be nil")
+	}
+
+	providerName, modelName, err := parseProviderModel(model)
+	if err != nil {
+		return "", err
+	}
+
+	provider, ok := sweSystem.ModelProviders[providerName]
+	if !ok {
+		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: provider not found: %s", providerName)
+	}
+
+	systemPrompt, messageTemplate, err := LoadWorktreeBranchPromptTemplates(sweSystem.ConfigStore)
+	if err != nil {
+		return "", err
+	}
+
+	userPrompt, err := RenderWorktreeBranchPrompt(messageTemplate, WorktreeBranchPromptData{Input: inputPrompt})
+	if err != nil {
+		return "", err
+	}
+
+	chatModel := provider.ChatModel(modelName, nil)
+	response, err := chatModel.Chat(ctx, []*models.ChatMessage{
+		models.NewTextMessage(models.ChatRoleSystem, systemPrompt),
+		models.NewTextMessage(models.ChatRoleUser, userPrompt),
+	}, nil, nil)
+	if err != nil {
+		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: failed to generate branch name: %w", err)
+	}
+
+	branch := NormalizeWorktreeBranchSymbolicName(response.GetText())
+	if branch == "" {
+		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: generated branch name is empty")
+	}
+
+	return branch, nil
+}
+
+// LoadWorktreeBranchPromptTemplates loads worktree branch prompts from configuration store.
+func LoadWorktreeBranchPromptTemplates(configStore conf.ConfigStore) (string, string, error) {
+	systemPromptBytes, err := configStore.GetAgentConfigFile("worktree", "system.md")
+	if err != nil {
+		return "", "", fmt.Errorf("LoadWorktreeBranchPromptTemplates() [worktree_branch.go]: failed to read worktree/system.md: %w", err)
+	}
+
+	messageTemplateBytes, err := configStore.GetAgentConfigFile("worktree", "message.md")
+	if err != nil {
+		return "", "", fmt.Errorf("LoadWorktreeBranchPromptTemplates() [worktree_branch.go]: failed to read worktree/message.md: %w", err)
+	}
+
+	return string(systemPromptBytes), string(messageTemplateBytes), nil
+}
+
+// RenderWorktreeBranchPrompt renders a worktree branch prompt template with the given data.
+func RenderWorktreeBranchPrompt(templateText string, data any) (string, error) {
+	tmpl, err := template.New("worktree-branch-prompt").Parse(templateText)
+	if err != nil {
+		return "", fmt.Errorf("RenderWorktreeBranchPrompt() [worktree_branch.go]: failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("RenderWorktreeBranchPrompt() [worktree_branch.go]: failed to execute template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+// NormalizeWorktreeBranchSymbolicName converts raw model output into a branch-safe symbolic name.
+func NormalizeWorktreeBranchSymbolicName(input string) string {
+	raw := strings.ToLower(strings.TrimSpace(input))
+	if raw == "" {
+		return ""
+	}
+
+	var builder strings.Builder
+	lastDash := false
+	for _, r := range raw {
+		isAlphaNum := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+		if isAlphaNum {
+			builder.WriteRune(r)
+			lastDash = false
+			continue
+		}
+
+		if builder.Len() == 0 || lastDash {
+			continue
+		}
+
+		builder.WriteByte('-')
+		lastDash = true
+	}
+
+	normalized := strings.Trim(builder.String(), "-")
+	if len(normalized) > 20 {
+		normalized = strings.Trim(normalized[:20], "-")
+	}
+
+	return normalized
+}
+
+func parseProviderModel(model string) (string, string, error) {
+	for i, c := range model {
+		if c == '/' {
+			providerName := model[:i]
+			modelName := model[i+1:]
+			if providerName == "" || modelName == "" {
+				break
+			}
+			return providerName, modelName, nil
+		}
+	}
+
+	return "", "", fmt.Errorf("parseProviderModel() [worktree_branch.go]: invalid model format, expected 'provider/model', got '%s'", model)
+}
