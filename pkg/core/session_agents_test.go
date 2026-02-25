@@ -2,11 +2,14 @@ package core
 
 import (
 	"errors"
+	"io"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
@@ -126,4 +129,47 @@ func TestBuildAdditionalAgentMessageForDir(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, msgs)
 	})
+}
+
+func TestExecuteToolCalls_AppendsAgentInstructionsAfterToolResponse(t *testing.T) {
+	mockVFS := vfs.NewMockVFS()
+	require.NoError(t, mockVFS.WriteFile("pkg/foo/test.go", []byte("package foo\n")))
+	require.NoError(t, mockVFS.WriteFile("pkg/foo/AGENTS.md", []byte("follow foo instructions")))
+
+	session := &SweSession{
+		system: &SweSystem{
+			PromptGenerator: &sessionAgentTestPromptGenerator{vfs: mockVFS},
+			Tools:           tool.NewToolRegistry(),
+		},
+		VFS:     mockVFS,
+		workDir: ".",
+		logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	session.Tools = buildSessionToolRegistry(session.system.Tools, session.VFS, nil, session)
+
+	call := &tool.ToolCall{
+		ID:       "vfsRead:0",
+		Function: "vfsRead",
+		Arguments: tool.NewToolValue(map[string]any{
+			"path": "pkg/foo/test.go",
+		}),
+	}
+	session.messages = append(session.messages, models.NewToolCallMessage(call))
+
+	err := session.executeToolCalls([]*tool.ToolCall{call})
+	require.NoError(t, err)
+
+	require.Len(t, session.messages, 3)
+
+	toolResponseMessage := session.messages[1]
+	require.Equal(t, models.ChatRoleUser, toolResponseMessage.Role)
+	require.Len(t, toolResponseMessage.Parts, 1)
+	require.NotNil(t, toolResponseMessage.Parts[0].ToolResponse)
+	assert.Contains(t, toolResponseMessage.Parts[0].ToolResponse.Result.Get("content").AsString(), "package foo")
+
+	agentInstructionMessage := session.messages[2]
+	require.Equal(t, models.ChatRoleUser, agentInstructionMessage.Role)
+	assert.Contains(t, agentInstructionMessage.GetText(), "<system>")
+	assert.Contains(t, agentInstructionMessage.GetText(), "follow foo instructions")
+	assert.Contains(t, agentInstructionMessage.GetText(), "</system>")
 }
