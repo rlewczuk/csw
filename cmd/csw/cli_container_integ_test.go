@@ -43,27 +43,15 @@ func TestCLIContainerModeRunBashBusybox(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := runCLI(
-		"Run a shell command",
-		"ollama/test-model",
-		"developer",
-		tmpProjectDir,
-		"",
-		false,
-		"busybox:latest",
-		"",
-		filepath.Join(tmpProjectDir, ".csw", "config"),
-		true,
-		false,
-		"",
-		false,
-		false,
-		"",
-		"",
-		"",
-		false,
-		false,
-	)
+	err := runCLI(&CLIParams{
+		Prompt:         "Run a shell command",
+		ModelName:      "ollama/test-model",
+		RoleName:       "developer",
+		WorkDir:        tmpProjectDir,
+		AllowAllPerms:  true,
+		ContainerImage: "busybox:latest",
+		ConfigPath:     filepath.Join(tmpProjectDir, ".csw", "config"),
+	})
 	require.NoError(t, err)
 
 	requests := mockServer.GetRequests()
