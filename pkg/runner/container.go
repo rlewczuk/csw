@@ -5,10 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/testcontainers/testcontainers-go"
+	tcexec "github.com/testcontainers/testcontainers-go/exec"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
@@ -19,6 +21,8 @@ type containerRunner struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	closed    bool
+	uid       int
+	gid       int
 }
 
 // NewContainerRunner creates a new ContainerRunner instance.
@@ -39,7 +43,7 @@ func NewContainerRunner(config ContainerConfig) (ContainerRunner, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Build container request
+	// Build container request - always start as root to allow chown
 	req := testcontainers.ContainerRequest{
 		Image: config.ImageName,
 		// Keep container running - we'll execute commands in it
@@ -48,10 +52,6 @@ func NewContainerRunner(config ContainerConfig) (ContainerRunner, error) {
 	}
 	if config.Workdir != "" {
 		req.WorkingDir = config.Workdir
-	}
-
-	if config.UID > 0 && config.GID > 0 {
-		req.User = fmt.Sprintf("%d:%d", config.UID, config.GID)
 	}
 
 	// Add mount directories
@@ -75,11 +75,44 @@ func NewContainerRunner(config ContainerConfig) (ContainerRunner, error) {
 		return nil, fmt.Errorf("NewContainerRunner() [container.go]: failed to create container: %w", err)
 	}
 
+	// If UID/GID are specified, chown the home directory to allow non-root user to write
+	if config.UID > 0 && config.GID > 0 {
+		// Determine the home directory to chown based on workdir
+		homeDir := "/root"
+		if config.Workdir != "" {
+			// Get the parent directory of workdir (typically the user's home dir)
+			parentDir := filepath.Dir(config.Workdir)
+			if parentDir != "/" && parentDir != "." {
+				homeDir = parentDir
+			}
+		}
+
+		// Run chown as root to change ownership of the home directory
+		chownCmd := []string{"chown", "-R", fmt.Sprintf("%d:%d", config.UID, config.GID), homeDir}
+		exitCode, reader, err := c.Exec(ctx, chownCmd)
+		if err != nil || exitCode != 0 {
+			// Read any error output
+			var output bytes.Buffer
+			if reader != nil {
+				_, _ = io.Copy(&output, reader)
+			}
+			// Terminate container on error
+			_ = c.Terminate(ctx)
+			cancel()
+			if err != nil {
+				return nil, fmt.Errorf("NewContainerRunner() [container.go]: failed to chown home directory: %w", err)
+			}
+			return nil, fmt.Errorf("NewContainerRunner() [container.go]: chown failed with exit code %d: %s", exitCode, output.String())
+		}
+	}
+
 	return &containerRunner{
 		container: c,
 		ctx:       ctx,
 		cancel:    cancel,
 		closed:    false,
+		uid:       config.UID,
+		gid:       config.GID,
 	}, nil
 }
 
@@ -124,8 +157,14 @@ func (r *containerRunner) RunCommandWithOptions(command string, options CommandO
 		cmd = []string{"/bin/sh", "-c", command}
 	}
 
+	// Build exec options - run as specified user if UID/GID are set
+	var execOpts []tcexec.ProcessOption
+	if r.uid > 0 && r.gid > 0 {
+		execOpts = append(execOpts, tcexec.WithUser(fmt.Sprintf("%d:%d", r.uid, r.gid)))
+	}
+
 	// Execute command in container
-	exitCode, reader, err := r.container.Exec(ctx, cmd)
+	exitCode, reader, err := r.container.Exec(ctx, cmd, execOpts...)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return "", 124, fmt.Errorf("ContainerRunner.RunCommandWithOptions() [container.go]: command timed out after %v", timeout)
