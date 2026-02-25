@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf/impl"
@@ -20,7 +18,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/ui/cli"
-	"github.com/rlewczuk/csw/pkg/ui/logmd"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/spf13/cobra"
 )
@@ -130,7 +127,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliInteractive, "interactive", false, "Enable interactive mode (allows user to respond to agent questions)")
 	cmd.Flags().StringVar(&cliConfigPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
 	cmd.Flags().StringVar(&cliSaveSessionTo, "save-session-to", "", "Save session conversation to specified markdown file")
-	cmd.Flags().BoolVar(&cliSaveSession, "save-session", false, "Save session conversation to session.md in session log directory")
+	cmd.Flags().BoolVar(&cliSaveSession, "save-session", false, "Save session conversation")
 	cmd.Flags().BoolVar(&cliLogLLMRequests, "log-llm-requests", false, "Log LLM requests and responses")
 	cmd.Flags().StringVar(&cliLSPServer, "lsp-server", "", "Path to LSP server binary (empty to disable LSP)")
 	cmd.Flags().StringVar(&cliThinking, "thinking", "", "Thinking/reasoning mode: low, medium, high, xhigh (effort-based) or true/false (boolean)")
@@ -182,7 +179,6 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 
 	workDir = buildResult.WorkDir
 	modelName = buildResult.ModelName
-	logsDir := buildResult.LogsDir
 	if lspServer != "" {
 		lspStatus := "disabled"
 		if buildResult.LSPStarted {
@@ -228,20 +224,6 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 
 	defer finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, merge, commitMessageTemplate, sweSystem, session, os.Stderr)
 
-	// Determine session file path if session saving is enabled
-	var sessionFilePath string
-	if saveSessionTo != "" {
-		sessionFilePath = saveSessionTo
-	} else if saveSession {
-		// Get session ID and create path
-		session := thread.GetSession()
-		if session != nil {
-			sessionID := session.ID()
-			sessionLogDir := filepath.Join(logsDir, "sessions", sessionID)
-			sessionFilePath = filepath.Join(sessionLogDir, "session.md")
-		}
-	}
-
 	// Set role
 	if resumeTarget == "" {
 		if err := session.SetRole(roleName); err != nil {
@@ -259,36 +241,8 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 	// Create CLI chat view
 	baseCliView := cli.NewCliChatView(basePresenter, os.Stdout, os.Stdin, interactive, allowAllPerms)
 
-	// These will be the potentially wrapped versions used for output handling
-	var chatPresenter ui.IChatPresenter = basePresenter
-	var cliView ui.IChatView = baseCliView
-
-	// Wrap with session logging if enabled
-	var sessionFile *os.File
-	if sessionFilePath != "" {
-		// Ensure directory exists
-		sessionDir := filepath.Dir(sessionFilePath)
-		if err := os.MkdirAll(sessionDir, 0755); err != nil {
-			return fmt.Errorf("runCLI() [cli.go]: failed to create session directory: %w", err)
-		}
-
-		// Create session file
-		var err error
-		sessionFile, err = os.Create(sessionFilePath)
-		if err != nil {
-			return fmt.Errorf("runCLI() [cli.go]: failed to create session file: %w", err)
-		}
-		defer sessionFile.Close()
-
-		// Create mutex for thread-safe writes
-		mu := &sync.Mutex{}
-
-		// Wrap presenter with logging wrapper
-		chatPresenter = logmd.NewLogmdChatPresenter(basePresenter, sessionFile, mu)
-	}
-
 	// Set view on presenter
-	if err := chatPresenter.SetView(cliView); err != nil {
+	if err := basePresenter.SetView(baseCliView); err != nil {
 		return fmt.Errorf("runCLI() [cli.go]: failed to set view: %w", err)
 	}
 
@@ -314,7 +268,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 				Role: ui.ChatRoleUser,
 				Text: prompt,
 			}
-			if err := chatPresenter.SendUserMessage(userMsg); err != nil {
+			if err := basePresenter.SendUserMessage(userMsg); err != nil {
 				return fmt.Errorf("runCLI() [cli.go]: failed to send continue message: %w", err)
 			}
 		} else {
@@ -330,7 +284,7 @@ func runCLI(prompt, modelName, roleName, workDir, worktreeBranch string, merge b
 			Role: ui.ChatRoleUser,
 			Text: prompt,
 		}
-		if err := chatPresenter.SendUserMessage(userMsg); err != nil {
+		if err := basePresenter.SendUserMessage(userMsg); err != nil {
 			return fmt.Errorf("runCLI() [cli.go]: failed to send initial message: %w", err)
 		}
 	}
