@@ -43,7 +43,7 @@ func main() {
 	rootCmd.Flags().StringVar(&roleName, "role", "developer", "Agent role name")
 	rootCmd.Flags().StringVar(&lspServer, "lsp-server", "gopls", "Path to LSP server binary (empty to disable LSP)")
 	rootCmd.Flags().StringVar(&saveSessionTo, "save-session-to", "", "Save session conversation to specified markdown file")
-	rootCmd.Flags().BoolVar(&saveSession, "save-session", false, "Save session conversation to session.md in session log directory")
+	rootCmd.Flags().BoolVar(&saveSession, "save-session", false, "Save session conversation")
 	rootCmd.Flags().BoolVar(&logLLMRequests, "log-llm-requests", false, "Log LLM requests and responses")
 
 	// Add subcommands
