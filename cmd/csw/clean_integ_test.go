@@ -34,11 +34,16 @@ func TestCleanCommand_SingleWorktree(t *testing.T) {
 	err = cleanSingleWorktree(mockVCS, "feature-2", output)
 	require.NoError(t, err)
 	assert.Contains(t, output.String(), "Cleaned up worktree: feature-2")
+	assert.Contains(t, output.String(), "Deleted branch: feature-2")
 
 	// Verify worktree was removed
 	worktrees, err = mockVCS.ListWorktrees()
 	require.NoError(t, err)
 	assert.Len(t, worktrees, 2)
+
+	// Verify DeleteBranch was called
+	deleteCalls := mockVCS.GetDeleteCalls()
+	assert.Contains(t, deleteCalls, "feature-2")
 
 	// Verify the remaining worktrees
 	remainingMap := make(map[string]bool)
@@ -86,6 +91,13 @@ func TestCleanCommand_AllWorktrees(t *testing.T) {
 	worktrees, err = mockVCS.ListWorktrees()
 	require.NoError(t, err)
 	assert.Len(t, worktrees, 0)
+
+	// Verify DeleteBranch was called for all branches
+	deleteCalls := mockVCS.GetDeleteCalls()
+	assert.Len(t, deleteCalls, 3)
+	assert.Contains(t, deleteCalls, "feature-a")
+	assert.Contains(t, deleteCalls, "feature-b")
+	assert.Contains(t, deleteCalls, "feature-c")
 }
 
 // TestCleanCommand_AllWorktrees_Empty tests cleaning up when no worktrees exist.
@@ -130,6 +142,24 @@ func TestCleanCommand_DropWorktreeError(t *testing.T) {
 	err := cleanSingleWorktree(mockVCS, "feature-error", output)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to drop worktree")
+}
+
+// TestCleanCommand_DeleteBranchError tests warning when deleting branch fails.
+func TestCleanCommand_DeleteBranchError(t *testing.T) {
+	mockVCS := vfs.NewMockVCS(nil)
+
+	// Add a worktree
+	_, _ = mockVCS.GetWorktree("feature-delete-error")
+
+	// Set up error for deleting branch
+	mockVCS.SetDeleteError(os.ErrPermission)
+
+	output := &bytes.Buffer{}
+	err := cleanSingleWorktree(mockVCS, "feature-delete-error", output)
+	require.NoError(t, err) // Should not return error, just log warning
+	assert.Contains(t, output.String(), "Cleaned up worktree: feature-delete-error")
+	assert.Contains(t, output.String(), "Warning:")
+	assert.Contains(t, output.String(), "failed to delete branch")
 }
 
 // TestListWorktrees tests the ListWorktrees method on MockVCS.

@@ -118,6 +118,13 @@ func cleanSingleWorktree(vcs vfs.VCS, branchName string, output io.Writer) error
 		return fmt.Errorf("cleanSingleWorktree() [clean.go]: failed to drop worktree: %w", err)
 	}
 
+	// Delete the branch
+	if err := vcs.DeleteBranch(branchName); err != nil {
+		fmt.Fprintf(output, "Warning: failed to delete branch %q: %v\n", branchName, err)
+	} else {
+		fmt.Fprintf(output, "Deleted branch: %s\n", branchName)
+	}
+
 	fmt.Fprintf(output, "Cleaned up worktree: %s\n", branchName)
 	return nil
 }
@@ -141,6 +148,12 @@ func cleanAllWorktrees(vcs vfs.VCS, output io.Writer) error {
 			continue
 		}
 		fmt.Fprintf(output, "Cleaned up worktree: %s\n", branchName)
+
+		if err := vcs.DeleteBranch(branchName); err != nil {
+			fmt.Fprintf(output, "Warning: failed to delete branch %q: %v\n", branchName, err)
+		} else {
+			fmt.Fprintf(output, "Deleted branch: %s\n", branchName)
+		}
 		cleaned++
 	}
 
