@@ -138,15 +138,27 @@ func (g *GitVCS) DropWorktree(branch string) error {
 	defer g.mutex.Unlock()
 
 	wt, exists := g.worktrees[branch]
-	if !exists {
-		return fmt.Errorf("GitVCS.DropWorktree() [git.go]: worktree for branch %q not found: %w", branch, ErrFileNotFound)
+	worktreePath := filepath.Join(g.worktreesPath, branch)
+	if exists {
+		worktreePath = wt.path
+	} else {
+		worktreeInfo, err := os.Stat(worktreePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("GitVCS.DropWorktree() [git.go]: worktree for branch %q not found: %w", branch, ErrFileNotFound)
+			}
+			return fmt.Errorf("GitVCS.DropWorktree() [git.go]: %w", err)
+		}
+		if !worktreeInfo.IsDir() {
+			return fmt.Errorf("GitVCS.DropWorktree() [git.go]: worktree for branch %q not found: %w", branch, ErrFileNotFound)
+		}
 	}
 
-	if err := g.runGit("worktree", "remove", "--force", wt.path); err != nil {
+	if err := g.runGit("worktree", "remove", "--force", worktreePath); err != nil {
 		return fmt.Errorf("GitVCS.DropWorktree() [git.go]: %w", err)
 	}
 
-	if err := os.RemoveAll(wt.path); err != nil {
+	if err := os.RemoveAll(worktreePath); err != nil {
 		return fmt.Errorf("GitVCS.DropWorktree() [git.go]: %w", err)
 	}
 

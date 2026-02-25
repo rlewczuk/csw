@@ -15,8 +15,9 @@ import (
 
 // GitTestFixture provides test fixtures for git repository tests
 type GitTestFixture struct {
-	Root string
-	Repo VCS
+	Root         string
+	WorktreesDir string
+	Repo         VCS
 }
 
 // setupGitRepoFixture creates a temporary git repository for testing
@@ -59,8 +60,9 @@ func setupGitRepoFixture(t *testing.T) *GitTestFixture {
 	require.NoError(t, err, "Failed to create GitVCS")
 
 	return &GitTestFixture{
-		Root: tempDir,
-		Repo: gitRepo,
+		Root:         tempDir,
+		WorktreesDir: worktreesDir,
+		Repo:         gitRepo,
 	}
 }
 
@@ -177,6 +179,25 @@ func TestDropWorktree(t *testing.T) {
 		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			err := fixture.Repo.DropWorktree("nonexistent-worktree")
 			assert.ErrorIs(t, err, ErrFileNotFound)
+		})
+	})
+
+	t.Run("DropWorktreeFromFreshInstance", func(t *testing.T) {
+		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
+			baseBranch := getDefaultBranch(t, fixture)
+			worktreeBranch := "feature-clean"
+
+			err := fixture.Repo.NewBranch(worktreeBranch, baseBranch)
+			require.NoError(t, err)
+
+			_, err = fixture.Repo.GetWorktree(worktreeBranch)
+			require.NoError(t, err)
+
+			freshRepo, err := NewGitRepo(fixture.Root, fixture.WorktreesDir, nil)
+			require.NoError(t, err)
+
+			err = freshRepo.DropWorktree(worktreeBranch)
+			require.NoError(t, err)
 		})
 	})
 }
