@@ -418,3 +418,25 @@ func TestContainerRunnerWithoutUIDGID(t *testing.T) {
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, strings.TrimSpace(output), "0")
 }
+
+// TestContainerRunnerEnv verifies configured environment variables are available in container commands.
+func TestContainerRunnerEnv(t *testing.T) {
+	if !shouldRunContainerTests(t) {
+		t.Skip("Skipping container integration test (runc.enabled or all.enabled not set to 'yes')")
+	}
+
+	runner, err := NewContainerRunner(ContainerConfig{
+		ImageName: "busybox:latest",
+		Env: map[string]string{
+			"GIT_AUTHOR_NAME":  "Test User",
+			"GIT_AUTHOR_EMAIL": "test@example.com",
+		},
+	})
+	require.NoError(t, err, "Failed to create container runner")
+	defer runner.Close()
+
+	output, exitCode, err := runner.RunCommand("printf '%s|%s' \"$GIT_AUTHOR_NAME\" \"$GIT_AUTHOR_EMAIL\"")
+	require.NoError(t, err, "Failed to run command")
+	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, "Test User|test@example.com", strings.TrimSpace(output))
+}

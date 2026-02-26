@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,6 +24,7 @@ type containerRunner struct {
 	closed    bool
 	uid       int
 	gid       int
+	env       map[string]string
 }
 
 // NewContainerRunner creates a new ContainerRunner instance.
@@ -60,7 +62,7 @@ func NewContainerRunner(config ContainerConfig) (ContainerRunner, error) {
 			Source: testcontainers.DockerBindMountSource{
 				HostPath: hostPath,
 			},
-			Target: testcontainers.ContainerMountTarget(containerPath),
+			Target:   testcontainers.ContainerMountTarget(containerPath),
 			ReadOnly: config.ReadOnlyMounts,
 		})
 	}
@@ -113,6 +115,7 @@ func NewContainerRunner(config ContainerConfig) (ContainerRunner, error) {
 		closed:    false,
 		uid:       config.UID,
 		gid:       config.GID,
+		env:       copyEnvMap(config.Env),
 	}, nil
 }
 
@@ -149,12 +152,17 @@ func (r *containerRunner) RunCommandWithOptions(command string, options CommandO
 	workDir := options.Workdir
 	if workDir == "" {
 		workDir = "."
-}
+	}
+
+	commandWithEnv := command
+	if len(r.env) > 0 {
+		commandWithEnv = buildExportPrefix(r.env) + command
+	}
 
 	if workDir != "" {
-		cmd = []string{"/bin/sh", "-c", fmt.Sprintf("cd %q && %s", workDir, command)}
+		cmd = []string{"/bin/sh", "-c", fmt.Sprintf("cd %q && %s", workDir, commandWithEnv)}
 	} else {
-		cmd = []string{"/bin/sh", "-c", command}
+		cmd = []string{"/bin/sh", "-c", commandWithEnv}
 	}
 
 	// Build exec options - run as specified user if UID/GID are set
@@ -190,6 +198,7 @@ func (r *containerRunner) RunCommandWithOptions(command string, options CommandO
 
 	return output.String(), exitCode, nil
 }
+
 // Close stops and removes the container.
 // It is safe to call Close multiple times.
 func (r *containerRunner) Close() error {
@@ -217,6 +226,39 @@ func (r *containerRunner) Close() error {
 	}
 
 	return nil
+}
+
+// copyEnvMap creates a shallow copy of environment map.
+func copyEnvMap(env map[string]string) map[string]string {
+	if len(env) == 0 {
+		return nil
+	}
+
+	cloned := make(map[string]string, len(env))
+	for key, value := range env {
+		cloned[key] = value
+	}
+
+	return cloned
+}
+
+// buildExportPrefix builds shell-safe export prefix for command execution.
+func buildExportPrefix(env map[string]string) string {
+	if len(env) == 0 {
+		return ""
+	}
+
+	lines := make([]string, 0, len(env))
+	for key, value := range env {
+		lines = append(lines, fmt.Sprintf("export %s=%s;", key, shellSingleQuote(value)))
+	}
+
+	return strings.Join(lines, " ") + " "
+}
+
+// shellSingleQuote single-quotes a value for shell export assignment.
+func shellSingleQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 var _ ContainerRunner = (*containerRunner)(nil)

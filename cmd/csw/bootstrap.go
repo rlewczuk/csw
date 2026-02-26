@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/rlewczuk/csw/pkg/conf"
@@ -19,6 +21,19 @@ import (
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
+
+const (
+	// defaultGitAuthorName is used in container mode when git identity cannot be resolved.
+	defaultGitAuthorName = "CSW"
+	// defaultGitAuthorEmail is used in container mode when git identity cannot be resolved.
+	defaultGitAuthorEmail = "csw@example.com"
+)
+
+// gitLookPathFunc resolves executable path for git and can be overridden in tests.
+var gitLookPathFunc = exec.LookPath
+
+// gitConfigValueFunc resolves git config values and can be overridden in tests.
+var gitConfigValueFunc = readGitConfigValue
 
 // BuildSystemParams contains inputs for constructing a SweSystem.
 type BuildSystemParams struct {
@@ -201,12 +216,15 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve current user ids: %w", err)
 		}
 
+		gitAuthorName, gitAuthorEmail := resolveContainerGitAuthorIdentity()
+
 		containerRunner, err := runner.NewContainerRunner(runner.ContainerConfig{
 			ImageName:      params.ContainerImage,
 			Workdir:        effectiveWorkDir,
 			MountDirs:      map[string]string{effectiveWorkDir: effectiveWorkDir},
 			UID:            uid,
 			GID:            gid,
+			Env:            map[string]string{"GIT_AUTHOR_NAME": gitAuthorName, "GIT_AUTHOR_EMAIL": gitAuthorEmail},
 			ReadOnlyMounts: false,
 		})
 		if err != nil {
@@ -243,7 +261,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to load global config: %w", err)
 	}
 
-		sweSystem := &core.SweSystem{
+	sweSystem := &core.SweSystem{
 		ModelProviders:  modelProviders,
 		ModelTags:       modelTagRegistry,
 		ToolSelection:   globalConfig.ToolSelection,
@@ -305,4 +323,38 @@ func resolveCurrentUserIDs(workDir string) (int, int, error) {
 	}
 
 	return uid, gid, nil
+}
+
+// resolveContainerGitAuthorIdentity returns git author identity for container mode.
+// It uses host git config values when git is available, otherwise default fallback values.
+func resolveContainerGitAuthorIdentity() (string, string) {
+	name := defaultGitAuthorName
+	email := defaultGitAuthorEmail
+
+	if _, err := gitLookPathFunc("git"); err != nil {
+		return name, email
+	}
+
+	resolvedName, err := gitConfigValueFunc("user.name")
+	if err == nil && resolvedName != "" {
+		name = resolvedName
+	}
+
+	resolvedEmail, err := gitConfigValueFunc("user.email")
+	if err == nil && resolvedEmail != "" {
+		email = resolvedEmail
+	}
+
+	return name, email
+}
+
+// readGitConfigValue reads a single git configuration key from host git config.
+func readGitConfigValue(key string) (string, error) {
+	cmd := exec.Command("git", "config", "--get", key)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("readGitConfigValue() [bootstrap.go]: failed to read git config key %q: %w", key, err)
+	}
+
+	return strings.TrimSpace(string(output)), nil
 }
