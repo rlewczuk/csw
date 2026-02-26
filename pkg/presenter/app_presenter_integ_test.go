@@ -250,14 +250,11 @@ func TestAppPresenter_Integration(t *testing.T) {
 		err = chatPresenter.SendUserMessage(userMsg)
 		require.NoError(t, err)
 
-		// Wait for processing
-		time.Sleep(100 * time.Millisecond)
-
-		// Verify messages were added to view
-		chatView := mockView.ShowChatCalls[0].(*ChatPresenter).view
-		if mockChatView, ok := chatView.(*mock.MockChatView); ok {
-			assert.GreaterOrEqual(t, len(mockChatView.AddMessageCalls), 2)
-		}
+		require.Eventually(t, func() bool {
+			chatView := mockView.ShowChatCalls[0].(*ChatPresenter).view
+			mockChatView, ok := chatView.(*mock.MockChatView)
+			return ok && len(mockChatView.AddMessageCalls) >= 2
+		}, 60*time.Millisecond, 1*time.Millisecond)
 	})
 
 	t.Run("create session with tool call", func(t *testing.T) {
@@ -295,13 +292,10 @@ func TestAppPresenter_Integration(t *testing.T) {
 		err = chatPresenter.SendUserMessage(userMsg)
 		require.NoError(t, err)
 
-		// Wait for processing
-		time.Sleep(15 * time.Millisecond)
-
-		// Verify file was created
-		content, err := vfsInstance.ReadFile("test.txt")
-		assert.NoError(t, err)
-		assert.Contains(t, string(content), "Test content")
+		require.Eventually(t, func() bool {
+			content, readErr := vfsInstance.ReadFile("test.txt")
+			return readErr == nil && string(content) == "Test content"
+		}, 100*time.Millisecond, 1*time.Millisecond)
 	})
 
 	t.Run("reopen session and continue conversation", func(t *testing.T) {
@@ -329,9 +323,6 @@ func TestAppPresenter_Integration(t *testing.T) {
 		}
 		err = chatPresenter1.SendUserMessage(userMsg1)
 		require.NoError(t, err)
-
-		// Wait for processing
-		time.Sleep(10 * time.Millisecond)
 
 		// Get session ID
 		sessions := system.ListSessions()
@@ -364,15 +355,12 @@ func TestAppPresenter_Integration(t *testing.T) {
 		err = chatPresenter2.SendUserMessage(userMsg2)
 		require.NoError(t, err)
 
-		// Wait for processing
-		time.Sleep(10 * time.Millisecond)
-
-		// Verify the session has both messages in history
-		session, err := system.GetSession(sessionID)
-		require.NoError(t, err)
-		messages := session.ChatMessages()
-
-		// Should have: system prompt, first user msg, first assistant msg, second user msg, second assistant msg
-		assert.GreaterOrEqual(t, len(messages), 4)
+		require.Eventually(t, func() bool {
+			session, sessionErr := system.GetSession(sessionID)
+			if sessionErr != nil {
+				return false
+			}
+			return len(session.ChatMessages()) >= 4
+		}, 60*time.Millisecond, 1*time.Millisecond)
 	})
 }

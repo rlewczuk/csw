@@ -321,6 +321,8 @@ func TestCommitWorktree(t *testing.T) {
 
 func TestMergeBranches(t *testing.T) {
 	t.Run("MergeBranches", func(t *testing.T) {
+		t.Parallel()
+
 		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			sourceBranch := getDefaultBranch(t, fixture)
 
@@ -335,6 +337,8 @@ func TestMergeBranches(t *testing.T) {
 	})
 
 	t.Run("MergeNonExistentSource", func(t *testing.T) {
+		t.Parallel()
+
 		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			targetBranch := getDefaultBranch(t, fixture)
 
@@ -344,6 +348,8 @@ func TestMergeBranches(t *testing.T) {
 	})
 
 	t.Run("MergeNonExistentTarget", func(t *testing.T) {
+		t.Parallel()
+
 		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			sourceBranch := getDefaultBranch(t, fixture)
 
@@ -356,6 +362,8 @@ func TestMergeBranches(t *testing.T) {
 	})
 
 	t.Run("GitVCSMergeConflict", func(t *testing.T) {
+		t.Parallel()
+
 		fixture := setupGitRepoFixture(t)
 		defer fixture.Cleanup()
 
@@ -386,6 +394,8 @@ func TestMergeBranches(t *testing.T) {
 	})
 
 	t.Run("GitVCSFastForwardWhenPossible", func(t *testing.T) {
+		t.Parallel()
+
 		fixture := setupGitRepoFixture(t)
 		defer fixture.Cleanup()
 
@@ -421,6 +431,8 @@ func TestMergeBranches(t *testing.T) {
 	})
 
 	t.Run("GitVCSRebasesWhenFastForwardNotPossible", func(t *testing.T) {
+		t.Parallel()
+
 		fixture := setupGitRepoFixture(t)
 		defer fixture.Cleanup()
 
@@ -474,6 +486,8 @@ func TestMergeBranches(t *testing.T) {
 	})
 
 	t.Run("GitVCSFallsBackToMergeWhenRebaseFails", func(t *testing.T) {
+		t.Parallel()
+
 		fixture := setupGitRepoFixture(t)
 		defer fixture.Cleanup()
 
@@ -504,6 +518,8 @@ func TestMergeBranches(t *testing.T) {
 	})
 
 	t.Run("GitVCSUpdatesCheckedOutFilesAfterMerge", func(t *testing.T) {
+		t.Parallel()
+
 		fixture := setupGitRepoFixture(t)
 		defer fixture.Cleanup()
 

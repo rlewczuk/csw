@@ -76,8 +76,8 @@ func TestBashRunner_RunCommand(t *testing.T) {
 		},
 		{
 			name:         "command timeout",
-			command:      "sleep 10",
-			timeout:      100 * time.Millisecond,
+			command:      "sleep 1",
+			timeout:      20 * time.Millisecond,
 			wantExitCode: 124,
 			wantErr:      true,
 			errContains:  "command timed out",
@@ -337,7 +337,7 @@ func TestBashRunner_RunCommandWithOptions_Timeout(t *testing.T) {
 		Timeout: 2 * time.Second,
 	}
 
-	output, exitCode, err := runner.RunCommandWithOptions("sleep 0.1 && echo 'done'", options)
+	output, exitCode, err := runner.RunCommandWithOptions("sleep 0.01 && echo 'done'", options)
 	require.NoError(t, err)
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, output, "done")
@@ -406,7 +406,7 @@ func TestBashRunner_RunCommandWithOptions_OverrideDefaults(t *testing.T) {
 	// Override both with options
 	options := CommandOptions{
 		Workdir: subDir,
-		Timeout: 1 * time.Second,
+		Timeout: 20 * time.Millisecond,
 	}
 
 	// This should use the subdirectory, not tmpDir
@@ -415,12 +415,12 @@ func TestBashRunner_RunCommandWithOptions_OverrideDefaults(t *testing.T) {
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, strings.TrimSpace(output), "subdir")
 
-	// This should timeout in 1 second, not 10
+	// This should timeout quickly based on options, not runner defaults
 	start := time.Now()
 	_, exitCode, err = runner.RunCommandWithOptions("sleep 5", options)
 	duration := time.Since(start)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "timed out")
 	assert.Equal(t, 124, exitCode)
-	assert.Less(t, duration, 2*time.Second)
+	assert.Less(t, duration, 300*time.Millisecond)
 }
