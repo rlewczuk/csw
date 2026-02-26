@@ -188,6 +188,7 @@ func CliCommand() *cobra.Command {
 func runCLI(params *CLIParams) error {
 	startTime := time.Now()
 	ctx := context.Background()
+	appView := cli.NewAppView(os.Stdout)
 
 	if params.Merge && params.WorktreeBranch == "" {
 		return fmt.Errorf("runCLI() [cli.go]: --merge requires --worktree")
@@ -202,6 +203,9 @@ func runCLI(params *CLIParams) error {
 		return fmt.Errorf("runCLI() [cli.go]: failed to resolve worktree branch: %w", err)
 	}
 	params.WorktreeBranch = resolvedWorktreeBranch
+	if params.WorktreeBranch != "" {
+		appView.ShowMessage(fmt.Sprintf("Worktree branch: %s", params.WorktreeBranch), ui.MessageTypeInfo)
+	}
 
 	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
 		WorkDir:        params.WorkDir,
@@ -227,7 +231,7 @@ func runCLI(params *CLIParams) error {
 		if buildResult.LSPStarted {
 			lspStatus = "started"
 		}
-		cli.NewAppView(os.Stdout).ShowMessage(fmt.Sprintf("LSP %s (workdir: %s)", lspStatus, buildResult.LSPWorkDir), ui.MessageTypeInfo)
+		appView.ShowMessage(fmt.Sprintf("LSP %s (workdir: %s)", lspStatus, buildResult.LSPWorkDir), ui.MessageTypeInfo)
 	}
 
 	var (
@@ -278,7 +282,6 @@ func runCLI(params *CLIParams) error {
 
 	// Create chat presenter
 	basePresenter := presenter.NewChatPresenter(sweSystem, thread)
-	appView := cli.NewAppView(os.Stdout)
 	basePresenter.SetAppView(appView)
 
 	// Create CLI chat view
