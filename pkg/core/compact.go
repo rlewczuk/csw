@@ -405,6 +405,9 @@ func compactMessagesStep6DropOldMessagesPreservingUserAndCompactedWithLimit(mess
 		if msg == nil {
 			continue
 		}
+		if msg.Role == models.ChatRoleSystem {
+			continue
+		}
 		if compactMessageIsCompactedFileContent(msg) {
 			continue
 		}
@@ -796,8 +799,8 @@ func compactMessageIsExplicitUserText(msg *models.ChatMessage) bool {
 		return false
 	}
 
-	if strings.HasPrefix(text, "<system>") && strings.HasSuffix(text, "</system>") {
-		return false
+	if strings.Contains(text, "<system>") {
+		return true
 	}
 
 	return true
