@@ -332,6 +332,27 @@ func TestOpenAIClient_ChatModel(t *testing.T) {
 	})
 }
 
+func TestOpenAIClient_ChatTokenUsage(t *testing.T) {
+	tc := getOpenAITestClient(t)
+	defer tc.Close()
+
+	if tc.Mock == nil {
+		t.Skip("Skipping token usage assertions against real provider")
+	}
+
+	tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-usage","object":"chat.completion","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":7,"total_tokens":19}}`)
+
+	chatModel := tc.Client.ChatModel(testOpenAIModelName, nil)
+	resp, err := chatModel.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "hi")}, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.TokenUsage)
+	assert.Equal(t, 12, resp.TokenUsage.InputTokens)
+	assert.Equal(t, 7, resp.TokenUsage.OutputTokens)
+	assert.Equal(t, 19, resp.TokenUsage.TotalTokens)
+	assert.Equal(t, 19, resp.ContextLengthTokens)
+}
+
 func TestOpenAIClient_ChatModelStream(t *testing.T) {
 	tc := getOpenAITestClient(t)
 	defer tc.Close()

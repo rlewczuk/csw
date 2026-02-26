@@ -24,25 +24,25 @@ import (
 
 // CLIParams holds all parameters for runCLI.
 type CLIParams struct {
-	Prompt               string
-	ModelName            string
-	RoleName             string
-	WorkDir              string
-	WorktreeBranch       string
-	Merge                bool
-	ContainerImage       string
+	Prompt                string
+	ModelName             string
+	RoleName              string
+	WorkDir               string
+	WorktreeBranch        string
+	Merge                 bool
+	ContainerImage        string
 	CommitMessageTemplate string
-	ConfigPath           string
-	AllowAllPerms        bool
-	Interactive          bool
-	SaveSessionTo        string
-	SaveSession          bool
-	LogLLMRequests       bool
-	LSPServer            string
-	Thinking             string
-	ResumeTarget         string
-	ContinueSession      bool
-	ForceResume          bool
+	ConfigPath            string
+	AllowAllPerms         bool
+	Interactive           bool
+	SaveSessionTo         string
+	SaveSession           bool
+	LogLLMRequests        bool
+	LSPServer             string
+	Thinking              string
+	ResumeTarget          string
+	ContinueSession       bool
+	ForceResume           bool
 }
 
 var runCLIFunc = runCLI
@@ -135,25 +135,25 @@ func CliCommand() *cobra.Command {
 			}
 
 			return runCLIFunc(&CLIParams{
-				Prompt:               prompt,
-				ModelName:            cliModel,
-				RoleName:             cliRole,
-				WorkDir:              cliWorkDir,
-				WorktreeBranch:       cliWorktree,
-				Merge:                cliMerge,
-				ContainerImage:       cliContainer,
+				Prompt:                prompt,
+				ModelName:             cliModel,
+				RoleName:              cliRole,
+				WorkDir:               cliWorkDir,
+				WorktreeBranch:        cliWorktree,
+				Merge:                 cliMerge,
+				ContainerImage:        cliContainer,
 				CommitMessageTemplate: cliCommitMessage,
-				ConfigPath:           cliConfigPath,
-				AllowAllPerms:        cliAllowAllPerms,
-				Interactive:          cliInteractive,
-				SaveSessionTo:        cliSaveSessionTo,
-				SaveSession:          cliSaveSession,
-				LogLLMRequests:       cliLogLLMRequests,
-				LSPServer:            cliLSPServer,
-				Thinking:             cliThinking,
-				ResumeTarget:         resumeTarget,
-				ContinueSession:      cliContinue,
-				ForceResume:          cliForce,
+				ConfigPath:            cliConfigPath,
+				AllowAllPerms:         cliAllowAllPerms,
+				Interactive:           cliInteractive,
+				SaveSessionTo:         cliSaveSessionTo,
+				SaveSession:           cliSaveSession,
+				LogLLMRequests:        cliLogLLMRequests,
+				LSPServer:             cliLSPServer,
+				Thinking:              cliThinking,
+				ResumeTarget:          resumeTarget,
+				ContinueSession:       cliContinue,
+				ForceResume:           cliForce,
 			})
 		},
 	}
@@ -342,8 +342,25 @@ func runCLI(params *CLIParams) error {
 		return ctx.Err()
 	}
 
-	appView.ShowMessage(fmt.Sprintf("Session completed in %s", time.Since(startTime).Round(time.Second)), ui.MessageTypeInfo)
+	appView.ShowMessage(buildSessionSummaryMessage(time.Since(startTime), session), ui.MessageTypeInfo)
 	return nil
+}
+
+func buildSessionSummaryMessage(duration time.Duration, session *core.SweSession) string {
+	base := fmt.Sprintf("Session completed in %s", duration.Round(time.Second))
+	if session == nil {
+		return base
+	}
+
+	usage := session.TokenUsage()
+	return fmt.Sprintf(
+		"%s | tokens(input=%d, output=%d, total=%d) | context=%d",
+		base,
+		usage.InputTokens,
+		usage.OutputTokens,
+		usage.TotalTokens,
+		session.ContextLengthTokens(),
+	)
 }
 
 func normalizeResumeTarget(raw string) (string, error) {

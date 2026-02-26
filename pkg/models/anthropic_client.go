@@ -381,6 +381,12 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 
 	// Convert response to ChatMessage
 	result := convertFromAnthropicResponse(chatResp.Content)
+	result.TokenUsage = &TokenUsage{
+		InputTokens:  chatResp.Usage.InputTokens,
+		OutputTokens: chatResp.Usage.OutputTokens,
+		TotalTokens:  chatResp.Usage.InputTokens + chatResp.Usage.OutputTokens,
+	}
+	result.ContextLengthTokens = result.TokenUsage.TotalTokens
 	return result, nil
 }
 
@@ -507,6 +513,8 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 
 		// Create scanner for SSE and stream responses
 		scanner := bufio.NewScanner(resp.Body)
+		usage := TokenUsage{}
+		contextLength := 0
 
 		for scanner.Scan() {
 			// Check if context is cancelled
@@ -590,11 +598,37 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 					// Note: Anthropic may stream tool input as partial_json
 					// For now, we only return complete tool_use blocks from content_block_start
 				case "message_delta":
+					if event.Usage != nil {
+						usage.InputTokens += event.Usage.InputTokens
+						usage.OutputTokens += event.Usage.OutputTokens
+						usage.TotalTokens += event.Usage.InputTokens + event.Usage.OutputTokens
+						if usage.TotalTokens > 0 {
+							contextLength = usage.TotalTokens
+						}
+					}
 					// Check for stop reason
 					if event.Delta != nil && event.Delta.StopReason != "" {
+						if usage.TotalTokens > 0 {
+							usageMsg := &ChatMessage{Role: ChatRoleAssistant}
+							usageCopy := usage
+							usageMsg.TokenUsage = &usageCopy
+							usageMsg.ContextLengthTokens = contextLength
+							if !yield(usageMsg) {
+								return
+							}
+						}
 						return
 					}
 				case "message_stop":
+					if usage.TotalTokens > 0 {
+						usageMsg := &ChatMessage{Role: ChatRoleAssistant}
+						usageCopy := usage
+						usageMsg.TokenUsage = &usageCopy
+						usageMsg.ContextLengthTokens = contextLength
+						if !yield(usageMsg) {
+							return
+						}
+					}
 					if effectiveOptions != nil && effectiveOptions.Verbose {
 						fmt.Println("=== End of Streaming Response ===")
 						fmt.Println()

@@ -75,6 +75,8 @@ func TestSweSystemLoadSessionResumption(t *testing.T) {
 		assert.Equal(t, session.ID(), loadedSession.ID())
 		assert.Equal(t, "ollama", loadedSession.ProviderName())
 		assert.Equal(t, "test-model:latest", loadedSession.Model())
+		assert.Equal(t, models.TokenUsage{}, loadedSession.TokenUsage())
+		assert.Equal(t, 0, loadedSession.ContextLengthTokens())
 		assert.True(t, loadedSession.HasPendingWork())
 
 		thread := NewSessionThreadWithSession(system, loadedSession, resumedHandler)

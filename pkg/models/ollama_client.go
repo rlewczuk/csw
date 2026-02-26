@@ -391,6 +391,18 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 
 	// Convert response to models.ChatMessage
 	result := convertFromOllamaMessage(mergedMessage)
+	inputTokens := lastChatResp.PromptEvalCount
+	outputTokens := lastChatResp.EvalCount
+	totalTokens := 0
+	if inputTokens > 0 || outputTokens > 0 {
+		totalTokens = inputTokens + outputTokens
+		result.TokenUsage = &TokenUsage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  totalTokens,
+		}
+		result.ContextLengthTokens = totalTokens
+	}
 	return result, nil
 }
 
@@ -499,6 +511,8 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 
 		// Create decoder and stream responses
 		decoder := json.NewDecoder(resp.Body)
+		usage := TokenUsage{}
+		contextLength := 0
 		for {
 			// Check if context is cancelled
 			select {
@@ -534,11 +548,31 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 				logHTTPResponseChunk(effectiveOptions.Logger, chatResp)
 			}
 
+			if chatResp.PromptEvalCount > 0 {
+				usage.InputTokens += chatResp.PromptEvalCount
+			}
+			if chatResp.EvalCount > 0 {
+				usage.OutputTokens += chatResp.EvalCount
+			}
+			if usage.InputTokens > 0 || usage.OutputTokens > 0 {
+				usage.TotalTokens = usage.InputTokens + usage.OutputTokens
+				contextLength = usage.TotalTokens
+			}
+
 			// Convert the streamed message to ChatMessage
 			result := convertFromOllamaMessage(chatResp.Message)
 
 			// Check if this is the final message
 			if chatResp.Done {
+				if usage.TotalTokens > 0 {
+					usageMsg := &ChatMessage{Role: ChatRoleAssistant}
+					usageCopy := usage
+					usageMsg.TokenUsage = &usageCopy
+					usageMsg.ContextLengthTokens = contextLength
+					if !yield(usageMsg) {
+						return
+					}
+				}
 				if effectiveOptions != nil && effectiveOptions.Verbose {
 					fmt.Println("=== End of Streaming Response ===")
 					fmt.Println()

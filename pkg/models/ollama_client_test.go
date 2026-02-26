@@ -318,6 +318,27 @@ func TestOllamaClient_ChatModel(t *testing.T) {
 	})
 }
 
+func TestOllamaClient_ChatTokenUsage(t *testing.T) {
+	tc := getOllamaTestClient(t)
+	defer tc.Close()
+
+	if tc.Mock == nil {
+		t.Skip("Skipping token usage assertions against real provider")
+	}
+
+	tc.Mock.AddRestResponse("/api/chat", "POST", `{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"ok"},"done":true,"prompt_eval_count":11,"eval_count":9}`)
+
+	chatModel := tc.Client.ChatModel(testOllamaModelName, nil)
+	resp, err := chatModel.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "hi")}, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.TokenUsage)
+	assert.Equal(t, 11, resp.TokenUsage.InputTokens)
+	assert.Equal(t, 9, resp.TokenUsage.OutputTokens)
+	assert.Equal(t, 20, resp.TokenUsage.TotalTokens)
+	assert.Equal(t, 20, resp.ContextLengthTokens)
+}
+
 func TestOllamaClient_ChatModelStream(t *testing.T) {
 	tc := getOllamaTestClient(t)
 	defer tc.Close()

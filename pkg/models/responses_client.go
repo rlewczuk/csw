@@ -474,6 +474,18 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	if err != nil {
 		return nil, err
 	}
+	if chatResp.Usage != nil {
+		total := chatResp.Usage.TotalTokens
+		if total <= 0 {
+			total = chatResp.Usage.InputTokens + chatResp.Usage.OutputTokens
+		}
+		result.TokenUsage = &TokenUsage{
+			InputTokens:  chatResp.Usage.InputTokens,
+			OutputTokens: chatResp.Usage.OutputTokens,
+			TotalTokens:  total,
+		}
+		result.ContextLengthTokens = total
+	}
 
 	return result, nil
 }
@@ -587,6 +599,8 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 
 		scanner := bufio.NewScanner(resp.Body)
 		toolCallsInProgress := make(map[string]*responsesToolCallInProgress)
+		usage := TokenUsage{}
+		contextLength := 0
 
 		for scanner.Scan() {
 			select {
@@ -636,6 +650,19 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 
 			if effectiveOptions != nil && effectiveOptions.Logger != nil {
 				logHTTPResponseChunk(effectiveOptions.Logger, event)
+			}
+
+			if event.Response != nil && event.Response.Usage != nil {
+				usage.InputTokens += event.Response.Usage.InputTokens
+				usage.OutputTokens += event.Response.Usage.OutputTokens
+				if event.Response.Usage.TotalTokens > 0 {
+					usage.TotalTokens += event.Response.Usage.TotalTokens
+				} else {
+					usage.TotalTokens += event.Response.Usage.InputTokens + event.Response.Usage.OutputTokens
+				}
+				if usage.TotalTokens > 0 {
+					contextLength = usage.TotalTokens
+				}
 			}
 
 			switch event.Type {
@@ -689,6 +716,16 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 					}
 				}
 				delete(toolCallsInProgress, event.ItemID)
+			case "response.completed":
+				if usage.TotalTokens > 0 {
+					usageMsg := &ChatMessage{Role: ChatRoleAssistant}
+					usageCopy := usage
+					usageMsg.TokenUsage = &usageCopy
+					usageMsg.ContextLengthTokens = contextLength
+					if !yield(usageMsg) {
+						return
+					}
+				}
 			}
 		}
 	}
@@ -1098,6 +1135,41 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 
 	if len(result.Parts) == 0 {
 		return nil, fmt.Errorf("convertFromResponsesStreamBody() [responses_client.go]: no usable output items in response")
+	}
+
+	var finalUsage TokenUsage
+	contextLength := 0
+	scanner = bufio.NewScanner(bytes.NewReader(bodyBytes))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		data := strings.TrimPrefix(line, "data: ")
+		if strings.TrimSpace(data) == "[DONE]" {
+			break
+		}
+		var event ResponsesStreamEvent
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			continue
+		}
+		if event.Response != nil && event.Response.Usage != nil {
+			finalUsage.InputTokens += event.Response.Usage.InputTokens
+			finalUsage.OutputTokens += event.Response.Usage.OutputTokens
+			if event.Response.Usage.TotalTokens > 0 {
+				finalUsage.TotalTokens += event.Response.Usage.TotalTokens
+			} else {
+				finalUsage.TotalTokens += event.Response.Usage.InputTokens + event.Response.Usage.OutputTokens
+			}
+			if finalUsage.TotalTokens > 0 {
+				contextLength = finalUsage.TotalTokens
+			}
+		}
+	}
+	if finalUsage.TotalTokens > 0 {
+		usageCopy := finalUsage
+		result.TokenUsage = &usageCopy
+		result.ContextLengthTokens = contextLength
 	}
 
 	return result, nil
