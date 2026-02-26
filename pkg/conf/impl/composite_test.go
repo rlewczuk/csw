@@ -263,6 +263,12 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 			{"model": "gpt-.*", "tag": "openai"}
 		],
 		"context_compaction_threshold": 0.7,
+		"container": {
+			"enabled": true,
+			"image": "alpine:latest",
+			"mounts": ["/tmp:/mnt/tmp"],
+			"env": ["FOO=bar"]
+		},
 		"tool_selection": {
 			"default": {
 				"runBash": false
@@ -282,6 +288,11 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 			{"model": "claude-.*", "tag": "anthropic"}
 		],
 		"context_compaction_threshold": 0.9,
+		"container": {
+			"image": "busybox:latest",
+			"mounts": ["/var:/mnt/var"],
+			"env": ["BAR=baz"]
+		},
 		"tool_selection": {
 			"default": {
 				"runBash": true,
@@ -317,6 +328,10 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 	assert.Equal(t, true, globalConfig.ToolSelection.Default["runBash"])
 	assert.Equal(t, false, globalConfig.ToolSelection.Default["vfsEdit"])
 	assert.Equal(t, 0.9, globalConfig.ContextCompactionThreshold)
+	assert.True(t, globalConfig.Container.Enabled)
+	assert.Equal(t, "busybox:latest", globalConfig.Container.Image)
+	assert.Equal(t, []string{"/var:/mnt/var"}, globalConfig.Container.Mounts)
+	assert.Equal(t, []string{"BAR=baz"}, globalConfig.Container.Env)
 
 	// Verify per-tag rule from later source overrides earlier one
 	safeRule, exists := globalConfig.ToolSelection.Tags["safe"]

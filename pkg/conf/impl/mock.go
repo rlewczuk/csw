@@ -113,16 +113,24 @@ func (m *MockConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 	// Return a copy
 	config := &conf.GlobalConfig{
 		ContextCompactionThreshold: m.globalConfig.ContextCompactionThreshold,
-		ModelTags:                 make([]conf.ModelTagMapping, len(m.globalConfig.ModelTags)),
-		DefaultProvider:           m.globalConfig.DefaultProvider,
-		DefaultRole:               m.globalConfig.DefaultRole,
-		LLMRetryMaxAttempts:       m.globalConfig.LLMRetryMaxAttempts,
-		LLMRetryMaxBackoffSeconds: m.globalConfig.LLMRetryMaxBackoffSeconds,
+		ModelTags:                  make([]conf.ModelTagMapping, len(m.globalConfig.ModelTags)),
+		DefaultProvider:            m.globalConfig.DefaultProvider,
+		DefaultRole:                m.globalConfig.DefaultRole,
+		LLMRetryMaxAttempts:        m.globalConfig.LLMRetryMaxAttempts,
+		LLMRetryMaxBackoffSeconds:  m.globalConfig.LLMRetryMaxBackoffSeconds,
+		Container: conf.ContainerConfig{
+			Mounts:  make([]string, len(m.globalConfig.Container.Mounts)),
+			Env:     make([]string, len(m.globalConfig.Container.Env)),
+			Image:   m.globalConfig.Container.Image,
+			Enabled: m.globalConfig.Container.Enabled,
+		},
 		ToolSelection: conf.ToolSelectionConfig{
 			Default: make(map[string]bool, len(m.globalConfig.ToolSelection.Default)),
 			Tags:    make(map[string]map[string]bool, len(m.globalConfig.ToolSelection.Tags)),
 		},
 	}
+	copy(config.Container.Mounts, m.globalConfig.Container.Mounts)
+	copy(config.Container.Env, m.globalConfig.Container.Env)
 	copy(config.ModelTags, m.globalConfig.ModelTags)
 	for toolName, enabled := range m.globalConfig.ToolSelection.Default {
 		config.ToolSelection.Default[toolName] = enabled

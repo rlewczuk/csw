@@ -133,16 +133,24 @@ func (c *CompositeConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 	// Return a copy to prevent external modification
 	config := &conf.GlobalConfig{
 		ContextCompactionThreshold: c.globalConfig.ContextCompactionThreshold,
-		DefaultProvider:           c.globalConfig.DefaultProvider,
-		DefaultRole:               c.globalConfig.DefaultRole,
-		LLMRetryMaxAttempts:       c.globalConfig.LLMRetryMaxAttempts,
-		LLMRetryMaxBackoffSeconds: c.globalConfig.LLMRetryMaxBackoffSeconds,
-		ModelTags:                 make([]conf.ModelTagMapping, len(c.globalConfig.ModelTags)),
+		DefaultProvider:            c.globalConfig.DefaultProvider,
+		DefaultRole:                c.globalConfig.DefaultRole,
+		LLMRetryMaxAttempts:        c.globalConfig.LLMRetryMaxAttempts,
+		LLMRetryMaxBackoffSeconds:  c.globalConfig.LLMRetryMaxBackoffSeconds,
+		Container: conf.ContainerConfig{
+			Mounts:  make([]string, len(c.globalConfig.Container.Mounts)),
+			Env:     make([]string, len(c.globalConfig.Container.Env)),
+			Image:   c.globalConfig.Container.Image,
+			Enabled: c.globalConfig.Container.Enabled,
+		},
+		ModelTags: make([]conf.ModelTagMapping, len(c.globalConfig.ModelTags)),
 		ToolSelection: conf.ToolSelectionConfig{
 			Default: make(map[string]bool, len(c.globalConfig.ToolSelection.Default)),
 			Tags:    make(map[string]map[string]bool, len(c.globalConfig.ToolSelection.Tags)),
 		},
 	}
+	copy(config.Container.Mounts, c.globalConfig.Container.Mounts)
+	copy(config.Container.Env, c.globalConfig.Container.Env)
 	copy(config.ModelTags, c.globalConfig.ModelTags)
 	for toolName, enabled := range c.globalConfig.ToolSelection.Default {
 		config.ToolSelection.Default[toolName] = enabled
@@ -376,6 +384,18 @@ func (c *CompositeConfigStore) refreshGlobalConfig() error {
 		// DefaultRole from later sources overrides earlier ones
 		if config.DefaultRole != "" {
 			merged.DefaultRole = config.DefaultRole
+		}
+		if len(config.Container.Mounts) > 0 {
+			merged.Container.Mounts = append([]string(nil), config.Container.Mounts...)
+		}
+		if len(config.Container.Env) > 0 {
+			merged.Container.Env = append([]string(nil), config.Container.Env...)
+		}
+		if config.Container.Image != "" {
+			merged.Container.Image = config.Container.Image
+		}
+		if config.Container.Enabled {
+			merged.Container.Enabled = true
 		}
 
 		// Track update time
