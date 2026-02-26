@@ -646,6 +646,17 @@ func TestResponsesClient_CodexCompatibility(t *testing.T) {
 	})
 }
 
+func TestConvertFromResponsesStreamBody_ExtendsScannerBufferForLargeTokens(t *testing.T) {
+	longDelta := strings.Repeat("a", 70*1024)
+	body := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"" + longDelta + "\"}\n\n" +
+		"data: [DONE]\n\n"
+
+	message, err := convertFromResponsesStreamBody([]byte(body))
+	require.NoError(t, err)
+	require.NotNil(t, message)
+	assert.Equal(t, longDelta, message.GetText())
+}
+
 func TestResponsesClient_SystemMessageInInstructions(t *testing.T) {
 	t.Run("system message is placed in instructions and not in input items", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
