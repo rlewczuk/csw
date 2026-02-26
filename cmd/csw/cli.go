@@ -279,6 +279,7 @@ func runCLI(params *CLIParams) error {
 	if session == nil {
 		return fmt.Errorf("runCLI() [cli.go]: session is not available")
 	}
+	appView.SetSessionLogger(logging.GetSessionLogger(session.ID(), logging.LogTypeSession))
 
 	sessionID := session.ID()
 	defer func() {
