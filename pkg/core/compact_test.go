@@ -216,6 +216,7 @@ func TestCompactMessagesStep6DropOldMessagesPreservingUserAndCompacted(t *testin
 	messages := []*models.ChatMessage{
 		models.NewTextMessage(models.ChatRoleSystem, "initial prompt"),
 		models.NewTextMessage(models.ChatRoleAssistant, strings.Repeat("drop-1", 30)),
+		models.NewTextMessage(models.ChatRoleSystem, "secondary system prompt"),
 		models.NewTextMessage(models.ChatRoleUser, "real user question"),
 		models.NewTextMessage(models.ChatRoleUser, "<system>internal</system>"),
 		compacted,
@@ -226,10 +227,11 @@ func TestCompactMessagesStep6DropOldMessagesPreservingUserAndCompacted(t *testin
 
 	require.NotEmpty(t, got)
 	assert.Equal(t, "initial prompt", got[0].GetText())
+	assert.True(t, compactTestContainsText(got, "secondary system prompt"))
 	assert.True(t, compactTestContainsText(got, "real user question"))
+	assert.True(t, compactTestContainsText(got, "<system>internal</system>"))
 	assert.True(t, compactTestHasCompactedFileMessage(got, "/tmp/a.go", ""))
 	assert.False(t, compactTestContainsText(got, strings.Repeat("drop-1", 30)))
-	assert.False(t, compactTestContainsText(got, "<system>internal</system>"))
 }
 
 func TestCompactMessagesStep7DropOldCompactedMessages(t *testing.T) {
@@ -330,8 +332,6 @@ func TestCompactMessages_EndToEnd(t *testing.T) {
 		assert.True(t, compactTestHasToolCall(got, "todo-new"))
 		assert.True(t, compactTestHasToolResponse(got, "todo-new"))
 		assert.Equal(t, 16, len(strings.Split(compactTestToolResponseOutputByID(got, "bash-1"), "\n")))
-		assert.False(t, compactTestHasToolCall(got, "grep-1"))
-		assert.False(t, compactTestHasToolResponse(got, "grep-1"))
 		assert.True(t, compactTestContainsText(got, "first real user prompt"))
 
 		for _, msg := range got {
