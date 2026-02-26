@@ -2,6 +2,7 @@ package vfs
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -96,6 +97,16 @@ func getDefaultBranch(t *testing.T, fixture *GitTestFixture) string {
 	}
 	t.Fatal("Neither master nor main branch found")
 	return ""
+}
+
+// runGitCommand executes git with the provided arguments in a repository path.
+func runGitCommand(repoPath string, args ...string) (string, error) {
+	cmd := exec.Command("git", append([]string{"-C", repoPath}, args...)...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
 }
 
 func TestNewGitRepo(t *testing.T) {
@@ -430,7 +441,7 @@ func TestMergeBranches(t *testing.T) {
 		assert.Equal(t, "Feature commit for fast-forward", strings.TrimSpace(mergedCommit.Message))
 	})
 
-	t.Run("GitVCSRebasesWhenFastForwardNotPossible", func(t *testing.T) {
+	t.Run("GitVCSRebasesSourceThenFastForwardsWhenFastForwardNotPossible", func(t *testing.T) {
 		t.Parallel()
 
 		fixture := setupGitRepoFixture(t)
@@ -470,11 +481,12 @@ func TestMergeBranches(t *testing.T) {
 		headCommit, err := gitRepo.CommitObject(targetRef.Hash())
 		require.NoError(t, err)
 		assert.Len(t, headCommit.ParentHashes, 1)
-		assert.Equal(t, "Target branch commit", strings.TrimSpace(headCommit.Message))
+		assert.Equal(t, "Feature branch commit", strings.TrimSpace(headCommit.Message))
 
-		featureRef, err := gitRepo.Reference(plumbing.NewBranchReferenceName("feature-rebase"), true)
+		targetCommitHashOutput, err := runGitCommand(fixture.Root, "rev-list", "--max-count=1", "--grep", "^Target branch commit$", targetBranch)
 		require.NoError(t, err)
-		assert.Equal(t, featureRef.Hash(), headCommit.ParentHashes[0])
+		targetCommitHash := plumbing.NewHash(strings.TrimSpace(targetCommitHashOutput))
+		assert.Equal(t, targetCommitHash, headCommit.ParentHashes[0])
 
 		targetContent, err := os.ReadFile(filepath.Join(fixture.Root, "target-only.txt"))
 		require.NoError(t, err)
@@ -485,7 +497,7 @@ func TestMergeBranches(t *testing.T) {
 		assert.Equal(t, "feature change\n", string(featureContent))
 	})
 
-	t.Run("GitVCSFallsBackToMergeWhenRebaseFails", func(t *testing.T) {
+	t.Run("GitVCSReturnsMergeConflictWhenRebaseFails", func(t *testing.T) {
 		t.Parallel()
 
 		fixture := setupGitRepoFixture(t)
