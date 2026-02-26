@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/conf/impl"
@@ -49,6 +50,8 @@ type BuildSystemParams struct {
 	// Values like "low", "medium", "high", "xhigh" for effort-based thinking,
 	// or "true"/"false" for boolean thinking modes.
 	Thinking string
+	// BashRunTimeout sets default timeout for runBash tool command execution.
+	BashRunTimeout time.Duration
 }
 
 // BuildSystemResult contains outputs from building a SweSystem.
@@ -206,7 +209,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	toolRegistry := tool.NewToolRegistry()
 	tool.RegisterVFSTools(toolRegistry, selectedVFS, lspClient, nil)
 
-	bashRunner := runner.CommandRunner(runner.NewBashRunner(effectiveWorkDir, 0))
+	bashRunner := runner.CommandRunner(runner.NewBashRunner(effectiveWorkDir, params.BashRunTimeout))
 	cleanupFn := func() {}
 
 	if params.ContainerImage != "" {
@@ -241,7 +244,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		}
 	}
 
-	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges)
+	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, params.BashRunTimeout)
 
 	promptGenerator, err := core.NewConfPromptGenerator(configStore, selectedVFS)
 	if err != nil {

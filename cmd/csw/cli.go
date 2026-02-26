@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,7 +44,10 @@ type CLIParams struct {
 	ResumeTarget          string
 	ContinueSession       bool
 	ForceResume           bool
+	BashRunTimeout        time.Duration
 }
+
+const defaultBashRunTimeout = 120 * time.Second
 
 var runCLIFunc = runCLI
 
@@ -73,6 +77,7 @@ func CliCommand() *cobra.Command {
 		cliResume         string
 		cliContinue       bool
 		cliForce          bool
+		cliBashRunTimeout string
 	)
 
 	cmd := &cobra.Command{
@@ -134,6 +139,11 @@ func CliCommand() *cobra.Command {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty when --continue is set")
 			}
 
+			bashRunTimeout, err := parseBashRunTimeout(cliBashRunTimeout)
+			if err != nil {
+				return err
+			}
+
 			return runCLIFunc(&CLIParams{
 				Prompt:                prompt,
 				ModelName:             cliModel,
@@ -154,6 +164,7 @@ func CliCommand() *cobra.Command {
 				ResumeTarget:          resumeTarget,
 				ContinueSession:       cliContinue,
 				ForceResume:           cliForce,
+				BashRunTimeout:        bashRunTimeout,
 			})
 		},
 	}
@@ -177,6 +188,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliResume, "resume", "", "Resume session by id (UUID) or 'last'. If value is omitted, resumes last session")
 	cmd.Flags().BoolVar(&cliContinue, "continue", false, "Continue resumed session with a new user message")
 	cmd.Flags().BoolVar(&cliForce, "force", false, "Force resume even when there is no pending work")
+	cmd.Flags().StringVar(&cliBashRunTimeout, "bash-run-timeout", "120", "Default runBash command timeout (duration; plain number means seconds)")
 	resumeFlag := cmd.Flags().Lookup("resume")
 	if resumeFlag != nil {
 		resumeFlag.NoOptDefVal = "last"
@@ -189,6 +201,9 @@ func runCLI(params *CLIParams) error {
 	startTime := time.Now()
 	ctx := context.Background()
 	appView := cli.NewAppView(os.Stdout)
+	if params.BashRunTimeout <= 0 {
+		params.BashRunTimeout = defaultBashRunTimeout
+	}
 
 	if params.Merge && params.WorktreeBranch == "" {
 		return fmt.Errorf("runCLI() [cli.go]: --merge requires --worktree")
@@ -207,7 +222,7 @@ func runCLI(params *CLIParams) error {
 		appView.ShowMessage(fmt.Sprintf("Worktree branch: %s", params.WorktreeBranch), ui.MessageTypeInfo)
 	}
 
-	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
+		sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
 		WorkDir:        params.WorkDir,
 		ConfigPath:     params.ConfigPath,
 		ModelName:      params.ModelName,
@@ -217,6 +232,7 @@ func runCLI(params *CLIParams) error {
 		LSPServer:      params.LSPServer,
 		LogLLMRequests: params.LogLLMRequests,
 		Thinking:       params.Thinking,
+		BashRunTimeout: params.BashRunTimeout,
 	})
 	if err != nil {
 		return err
@@ -347,6 +363,28 @@ func runCLI(params *CLIParams) error {
 
 	appView.ShowMessage(buildSessionSummaryMessage(time.Since(startTime), session), ui.MessageTypeInfo)
 	return nil
+}
+
+func parseBashRunTimeout(value string) (time.Duration, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return defaultBashRunTimeout, nil
+	}
+
+	if _, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
+		trimmed += "s"
+	}
+
+	parsed, err := time.ParseDuration(trimmed)
+	if err != nil {
+		return 0, fmt.Errorf("parseBashRunTimeout() [cli.go]: invalid --bash-run-timeout value %q: %w", value, err)
+	}
+
+	if parsed <= 0 {
+		return 0, fmt.Errorf("parseBashRunTimeout() [cli.go]: --bash-run-timeout must be positive, got %q", value)
+	}
+
+	return parsed, nil
 }
 
 func buildSessionSummaryMessage(duration time.Duration, session *core.SweSession) string {

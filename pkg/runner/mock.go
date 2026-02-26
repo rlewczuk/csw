@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"sync"
+	"time"
 )
 
 // CommandExecution represents a single command execution record.
@@ -11,6 +12,8 @@ type CommandExecution struct {
 	Output   string
 	ExitCode int
 	Error    error
+	Workdir  string
+	Timeout  time.Duration
 }
 
 // MockRunner implements the CommandRunner interface for testing.
@@ -87,6 +90,8 @@ func (m *MockRunner) RunCommandWithOptions(command string, options CommandOption
 		Output:   exec.Output,
 		ExitCode: exec.ExitCode,
 		Error:    exec.Error,
+		Workdir:  options.Workdir,
+		Timeout:  options.Timeout,
 	})
 
 	return exec.Output, exec.ExitCode, exec.Error

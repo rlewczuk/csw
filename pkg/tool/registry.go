@@ -3,6 +3,7 @@ package tool
 import (
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/lsp"
@@ -157,8 +158,8 @@ func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS, lspClient lsp.LSP
 }
 
 // RegisterRunBashTool registers the runBash tool with the given CommandRunner and privileges.
-func RegisterRunBashTool(registry *ToolRegistry, r runner.CommandRunner, privileges map[string]conf.AccessFlag) {
-	registry.Register("runBash", NewRunBashTool(r, privileges))
+func RegisterRunBashTool(registry *ToolRegistry, r runner.CommandRunner, privileges map[string]conf.AccessFlag, defaultTimeout time.Duration) {
+	registry.Register("runBash", NewRunBashTool(r, privileges, defaultTimeout))
 }
 
 // Render returns a string representation of the tool call.
