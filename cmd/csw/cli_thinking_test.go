@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"testing"
+	"time"
 
+	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -151,4 +153,21 @@ func TestChatOptionsThinkingField(t *testing.T) {
 
 	opts3 := &models.ChatOptions{}
 	assert.Equal(t, "", opts3.Thinking)
+}
+
+func TestBuildSessionSummaryMessage(t *testing.T) {
+	t.Run("includes token and context stats", func(t *testing.T) {
+		session := &core.SweSession{}
+		assert.Equal(t,
+			"Session completed in 5s | tokens(input=0, output=0, total=0) | context=0",
+			buildSessionSummaryMessage(5*time.Second, session),
+		)
+	})
+
+	t.Run("nil session returns base summary", func(t *testing.T) {
+		assert.Equal(t,
+			"Session completed in 5s",
+			buildSessionSummaryMessage(5*time.Second, nil),
+		)
+	})
 }

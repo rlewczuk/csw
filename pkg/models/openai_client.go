@@ -457,6 +457,14 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 
 	// Convert response to models.ChatMessage
 	result := convertFromOpenAIMessage(choice.Message)
+	if chatResp.Usage != nil {
+		result.TokenUsage = &TokenUsage{
+			InputTokens:  chatResp.Usage.PromptTokens,
+			OutputTokens: chatResp.Usage.CompletionTokens,
+			TotalTokens:  chatResp.Usage.TotalTokens,
+		}
+		result.ContextLengthTokens = chatResp.Usage.TotalTokens
+	}
 	return result, nil
 }
 
@@ -580,6 +588,9 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 		toolCallsInProgress := make(map[int]*OpenaiToolCall)
 		// Track accumulated reasoning content
 		var accumulatedReasoningContent string
+		usage := TokenUsage{}
+		hasUsage := false
+		contextLength := 0
 
 		for scanner.Scan() {
 			// Check if context is cancelled
@@ -623,6 +634,15 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 				// Log each chunk using structured logger if available
 				if effectiveOptions != nil && effectiveOptions.Logger != nil {
 					logHTTPResponseChunk(effectiveOptions.Logger, chatResp)
+				}
+				if chatResp.Usage != nil {
+					hasUsage = true
+					usage.InputTokens += chatResp.Usage.PromptTokens
+					usage.OutputTokens += chatResp.Usage.CompletionTokens
+					usage.TotalTokens += chatResp.Usage.TotalTokens
+					if chatResp.Usage.TotalTokens > 0 {
+						contextLength = chatResp.Usage.TotalTokens
+					}
 				}
 
 				if len(chatResp.Choices) == 0 {
@@ -691,6 +711,15 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 							if !yield(result) {
 								return
 							}
+						}
+					}
+					if hasUsage {
+						usageMsg := &ChatMessage{Role: ChatRoleAssistant}
+						usageCopy := usage
+						usageMsg.TokenUsage = &usageCopy
+						usageMsg.ContextLengthTokens = contextLength
+						if !yield(usageMsg) {
+							return
 						}
 					}
 					return

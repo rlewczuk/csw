@@ -67,6 +67,8 @@ func TestSessionPersistenceStateJSON(t *testing.T) {
 			models.NewTextMessage(models.ChatRoleUser, "resume me"),
 			models.NewTextMessage(models.ChatRoleAssistant, "ready"),
 		)
+		session.tokenUsage = models.TokenUsage{InputTokens: 3, OutputTokens: 5, TotalTokens: 8}
+		session.contextLength = 8
 
 		session.persistSessionState()
 
@@ -92,6 +94,8 @@ func TestSessionPersistenceStateJSON(t *testing.T) {
 		assert.Equal(t, "ok", state.PendingToolResponses[0].Result.Get("output").AsString())
 		assert.True(t, strings.Contains(state.PendingToolResponses[0].Error, "permission required"))
 		assert.Equal(t, []string{"AGENTS.md"}, state.LoadedAgentFiles)
+		assert.Equal(t, 8, state.TokenUsage.TotalTokens)
+		assert.Equal(t, 8, state.ContextLengthTokens)
 		assert.NotEmpty(t, state.UpdatedAt)
 
 		session.SetTodoList([]tool.TodoItem{{

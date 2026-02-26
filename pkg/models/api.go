@@ -60,6 +60,13 @@ type ChatOptions struct {
 	Thinking string
 }
 
+// TokenUsage contains token accounting returned by an LLM provider.
+type TokenUsage struct {
+	InputTokens  int
+	OutputTokens int
+	TotalTokens  int
+}
+
 // ChatMessagePart represents a part of a chat message. A message can contain text, tool calls, or tool responses.
 type ChatMessagePart struct {
 	// Text contains text content (if this part is text)
@@ -79,6 +86,11 @@ type ChatMessage struct {
 	Role ChatRole
 	// Parts of the message - can contain text, tool calls, or tool responses.
 	Parts []ChatMessagePart
+	// TokenUsage contains token accounting for this response, when provided by the backend.
+	TokenUsage *TokenUsage
+	// ContextLengthTokens stores provider-reported context length in tokens.
+	// When unavailable, this value is 0.
+	ContextLengthTokens int
 }
 
 // NewTextMessage creates a new ChatMessage with text content.

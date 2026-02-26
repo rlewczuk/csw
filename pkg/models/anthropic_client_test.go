@@ -308,6 +308,27 @@ func TestAnthropicClient_ChatModel(t *testing.T) {
 	})
 }
 
+func TestAnthropicClient_ChatTokenUsage(t *testing.T) {
+	tc := getAnthropicTestClient(t)
+	defer tc.Close()
+
+	if tc.Mock == nil {
+		t.Skip("Skipping token usage assertions against real provider")
+	}
+
+	tc.Mock.AddRestResponse("/v1/messages", "POST", `{"id":"msg_usage","type":"message","role":"assistant","content":[{"type":"text","text":"ok"}],"model":"claude-sonnet-4-5-20250929","stop_reason":"end_turn","usage":{"input_tokens":18,"output_tokens":6}}`)
+
+	chatModel := tc.Client.ChatModel(testAnthropicModelName, nil)
+	resp, err := chatModel.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "hi")}, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.TokenUsage)
+	assert.Equal(t, 18, resp.TokenUsage.InputTokens)
+	assert.Equal(t, 6, resp.TokenUsage.OutputTokens)
+	assert.Equal(t, 24, resp.TokenUsage.TotalTokens)
+	assert.Equal(t, 24, resp.ContextLengthTokens)
+}
+
 func TestAnthropicClient_ChatModelStream(t *testing.T) {
 	tc := getAnthropicTestClient(t)
 	defer tc.Close()

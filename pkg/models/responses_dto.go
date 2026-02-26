@@ -73,6 +73,7 @@ type ResponsesResponse struct {
 	Text                 *ResponsesTextConfig `json:"text,omitempty"`
 	ToolChoice           interface{}          `json:"tool_choice,omitempty"`
 	Tools                []ResponsesTool      `json:"tools,omitempty"`
+	Usage                *ResponsesUsage      `json:"usage,omitempty"`
 }
 
 // ResponsesStreamEvent represents a streaming event from Responses API.
@@ -89,6 +90,13 @@ type ResponsesStreamEvent struct {
 type ResponsesReasoning struct {
 	Effort  string `json:"effort,omitempty"`
 	Summary string `json:"summary,omitempty"`
+}
+
+// ResponsesUsage represents token usage information returned by Responses API.
+type ResponsesUsage struct {
+	InputTokens  int `json:"input_tokens,omitempty"`
+	OutputTokens int `json:"output_tokens,omitempty"`
+	TotalTokens  int `json:"total_tokens,omitempty"`
 }
 
 // ResponsesTextConfig represents text response configuration.

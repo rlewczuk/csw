@@ -210,6 +210,27 @@ func TestResponsesClient_ChatModel(t *testing.T) {
 	})
 }
 
+func TestResponsesClient_ChatTokenUsage(t *testing.T) {
+	tc := getResponsesTestClient(t)
+	defer tc.Close()
+
+	if tc.Mock == nil {
+		t.Skip("Skipping token usage assertions against real provider")
+	}
+
+	tc.Mock.AddRestResponse("/responses", "POST", `{"id":"resp_usage","object":"response","status":"completed","usage":{"input_tokens":14,"output_tokens":10,"total_tokens":24},"output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}]}`)
+
+	chatModel := tc.Client.ChatModel(getResponsesModelName(), nil)
+	resp, err := chatModel.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "hi")}, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.TokenUsage)
+	assert.Equal(t, 14, resp.TokenUsage.InputTokens)
+	assert.Equal(t, 10, resp.TokenUsage.OutputTokens)
+	assert.Equal(t, 24, resp.TokenUsage.TotalTokens)
+	assert.Equal(t, 24, resp.ContextLengthTokens)
+}
+
 func TestResponsesClient_ChatModelStream(t *testing.T) {
 	tc := getResponsesTestClient(t)
 	defer tc.Close()

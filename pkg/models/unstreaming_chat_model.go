@@ -35,11 +35,17 @@ func (u *UnstreamingChatModel) Chat(ctx context.Context, messages []*ChatMessage
 		return nil, err
 	}
 	if response != nil {
-		return aggregateAssistantMessage(response.Role, response.Parts), nil
+		aggregated := aggregateAssistantMessage(response.Role, response.Parts)
+		aggregated.TokenUsage = response.TokenUsage
+		aggregated.ContextLengthTokens = response.ContextLengthTokens
+		return aggregated, nil
 	}
 
 	var role ChatRole
 	allParts := make([]ChatMessagePart, 0)
+	tokenUsage := &TokenUsage{}
+	hasUsage := false
+	contextLength := 0
 	for fragment := range u.wrapped.ChatStream(ctx, messages, options, tools) {
 		if fragment == nil {
 			continue
@@ -47,10 +53,24 @@ func (u *UnstreamingChatModel) Chat(ctx context.Context, messages []*ChatMessage
 		if role == "" && fragment.Role != "" {
 			role = fragment.Role
 		}
+		if fragment.TokenUsage != nil {
+			hasUsage = true
+			tokenUsage.InputTokens += fragment.TokenUsage.InputTokens
+			tokenUsage.OutputTokens += fragment.TokenUsage.OutputTokens
+			tokenUsage.TotalTokens += fragment.TokenUsage.TotalTokens
+		}
+		if fragment.ContextLengthTokens > 0 {
+			contextLength = fragment.ContextLengthTokens
+		}
 		allParts = append(allParts, fragment.Parts...)
 	}
 
-	return aggregateAssistantMessage(role, allParts), nil
+	result := aggregateAssistantMessage(role, allParts)
+	if hasUsage {
+		result.TokenUsage = tokenUsage
+	}
+	result.ContextLengthTokens = contextLength
+	return result, nil
 }
 
 // aggregateAssistantMessage collapses text and reasoning chunks into single parts while

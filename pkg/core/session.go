@@ -56,6 +56,8 @@ type SweSession struct {
 	pendingToolResponses []*tool.ToolResponse
 	// loadedAgentFiles keeps track of AGENTS.md files already injected into context.
 	loadedAgentFiles map[string]struct{}
+	tokenUsage       models.TokenUsage
+	contextLength    int
 }
 
 type persistedToolResponse struct {
@@ -88,6 +90,8 @@ type persistedSessionState struct {
 	PendingPermissionToolCalls []tool.ToolCall         `json:"pending_permission_tool_calls"`
 	PendingToolResponses       []persistedToolResponse `json:"pending_tool_responses"`
 	LoadedAgentFiles           []string                `json:"loaded_agent_files"`
+	TokenUsage                 models.TokenUsage       `json:"token_usage"`
+	ContextLengthTokens        int                     `json:"context_length_tokens"`
 	UpdatedAt                  string                  `json:"updated_at"`
 }
 
@@ -545,11 +549,23 @@ func (s *SweSession) Model() string {
 func (s *SweSession) GetState() AgentState {
 	return AgentState{
 		Info: AgentStateCommonInfo{
-			WorkDir:     s.workDir,
-			CurrentTime: time.Now().Format(time.RFC3339),
-			AgentName:   "CSW Coding Agent",
+			WorkDir:             s.workDir,
+			CurrentTime:         time.Now().Format(time.RFC3339),
+			AgentName:           "CSW Coding Agent",
+			TokenUsage:          s.tokenUsage,
+			ContextLengthTokens: s.contextLength,
 		},
 	}
+}
+
+// TokenUsage returns aggregated token usage for this session.
+func (s *SweSession) TokenUsage() models.TokenUsage {
+	return s.tokenUsage
+}
+
+// ContextLengthTokens returns latest known context length in tokens.
+func (s *SweSession) ContextLengthTokens() int {
+	return s.contextLength
 }
 
 // SetWorkDir sets the working directory for this session.
@@ -845,7 +861,28 @@ func (s *SweSession) appendConversationMessage(message *models.ChatMessage, dire
 	}
 
 	s.messages = append(s.messages, message)
+	s.applyMessageTokenStats(message)
 	s.persistSessionState()
+}
+
+func (s *SweSession) applyMessageTokenStats(message *models.ChatMessage) {
+	if message == nil {
+		return
+	}
+
+	if message.TokenUsage != nil {
+		s.tokenUsage.InputTokens += message.TokenUsage.InputTokens
+		s.tokenUsage.OutputTokens += message.TokenUsage.OutputTokens
+		s.tokenUsage.TotalTokens += message.TokenUsage.TotalTokens
+	}
+
+	if message.ContextLengthTokens > 0 {
+		s.contextLength = message.ContextLengthTokens
+	}
+
+	if s.tokenUsage.TotalTokens > s.contextLength {
+		s.contextLength = s.tokenUsage.TotalTokens
+	}
 }
 
 func (s *SweSession) persistSessionState() {
@@ -896,6 +933,8 @@ func (s *SweSession) buildPersistedSessionState() persistedSessionState {
 		PendingPermissionToolCalls: make([]tool.ToolCall, 0, len(s.pendingPermissionToolCalls)),
 		PendingToolResponses:       make([]persistedToolResponse, 0, len(s.pendingToolResponses)),
 		LoadedAgentFiles:           make([]string, 0, len(s.loadedAgentFiles)),
+		TokenUsage:                 s.tokenUsage,
+		ContextLengthTokens:        s.contextLength,
 		UpdatedAt:                  time.Now().Format(time.RFC3339Nano),
 	}
 
@@ -1081,6 +1120,8 @@ func restoreSessionFromPersistedState(system *SweSystem, state persistedSessionS
 		todoList:      make([]tool.TodoItem, len(state.TodoList)),
 		logger:        sessionLogger,
 		llmLogger:     llmLogger,
+		tokenUsage:    state.TokenUsage,
+		contextLength: state.ContextLengthTokens,
 	}
 
 	copy(session.todoList, state.TodoList)
