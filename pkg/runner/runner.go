@@ -37,6 +37,12 @@ type ContainerConfig struct {
 	UID int
 	// GID is the group ID used when running commands inside the container.
 	GID int
+	// UserName is the host user name mirrored inside the container.
+	UserName string
+	// GroupName is the host group name mirrored inside the container.
+	GroupName string
+	// HomeDir is the host home directory path mirrored inside the container.
+	HomeDir string
 	// Env is the map of environment variables to set for every command run in the container.
 	Env map[string]string
 	// ReadOnlyMounts controls whether bind mounts are mounted read-only.

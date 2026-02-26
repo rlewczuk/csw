@@ -339,6 +339,9 @@ func TestContainerRunnerWithUIDGID(t *testing.T) {
 		ImageName: "busybox:latest",
 		UID:       1000,
 		GID:       1000,
+		UserName:  "testuser",
+		GroupName: "testgroup",
+		HomeDir:   "/home/testuser",
 	})
 	require.NoError(t, err, "Failed to create container runner")
 	defer runner.Close()
@@ -383,6 +386,9 @@ func TestContainerRunnerWithUIDGIDHomeDirWritable(t *testing.T) {
 		},
 		UID:            1000,
 		GID:            1000,
+		UserName:       "testuser",
+		GroupName:      "testgroup",
+		HomeDir:        filepath.Dir(containerPath),
 		ReadOnlyMounts: false,
 	})
 	require.NoError(t, err, "Failed to create container runner")
