@@ -322,7 +322,8 @@ func (g *GitVCS) MergeBranches(into string, from string) error {
 	}
 
 	g.mutex.RLock()
-	wt, hasWorktree := g.worktrees[into]
+	intoWorktree, hasIntoWorktree := g.worktrees[into]
+	fromWorktree, hasFromWorktree := g.worktrees[from]
 	g.mutex.RUnlock()
 
 	currentPrimaryBranch, err := g.currentBranchInWorktree(g.path)
@@ -330,42 +331,66 @@ func (g *GitVCS) MergeBranches(into string, from string) error {
 		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 
-	mergePath := g.path
-	cleanup := func() {}
-
-	if hasWorktree {
-		mergePath = wt.path
+	intoMergePath := g.path
+	intoCleanup := func() {}
+	if hasIntoWorktree {
+		intoMergePath = intoWorktree.path
 	} else if currentPrimaryBranch != into {
-		tempWorktreePath := filepath.Join(g.worktreesPath, ".merge-"+strings.ReplaceAll(into, "/", "_"))
-		if err := os.RemoveAll(tempWorktreePath); err != nil {
+		tempIntoWorktreePath := filepath.Join(g.worktreesPath, ".merge-into-"+strings.ReplaceAll(into, "/", "_"))
+		if err := os.RemoveAll(tempIntoWorktreePath); err != nil {
 			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 		}
-		if err := os.MkdirAll(filepath.Dir(tempWorktreePath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(tempIntoWorktreePath), 0755); err != nil {
 			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 		}
-		if err := g.runGit("worktree", "add", "--force", tempWorktreePath, into); err != nil {
+		if err := g.runGit("worktree", "add", "--force", tempIntoWorktreePath, into); err != nil {
 			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 		}
-		mergePath = tempWorktreePath
-		cleanup = func() {
-			_ = g.runGit("worktree", "remove", "--force", tempWorktreePath)
-			_ = os.RemoveAll(tempWorktreePath)
+		intoMergePath = tempIntoWorktreePath
+		intoCleanup = func() {
+			_ = g.runGit("worktree", "remove", "--force", tempIntoWorktreePath)
+			_ = os.RemoveAll(tempIntoWorktreePath)
 		}
 	}
-	defer cleanup()
+	defer intoCleanup()
 
-	if err := g.runGitInWorktree(mergePath, "merge", "--ff-only", from); err != nil {
-		if err := g.runGitInWorktree(mergePath, "cherry-pick", into+".."+from); err != nil {
-			errText := err.Error()
-			if strings.Contains(errText, "CONFLICT") || strings.Contains(errText, "would be overwritten by merge") {
-				_ = g.runGitInWorktree(mergePath, "cherry-pick", "--abort")
-				return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w: %w", err, ErrMergeConflict)
-			}
+	fromMergePath := g.path
+	fromCleanup := func() {}
+	if hasFromWorktree {
+		fromMergePath = fromWorktree.path
+	} else if currentPrimaryBranch != from {
+		tempFromWorktreePath := filepath.Join(g.worktreesPath, ".merge-from-"+strings.ReplaceAll(from, "/", "_"))
+		if err := os.RemoveAll(tempFromWorktreePath); err != nil {
 			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 		}
+		if err := os.MkdirAll(filepath.Dir(tempFromWorktreePath), 0755); err != nil {
+			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
+		}
+		if err := g.runGit("worktree", "add", "--force", tempFromWorktreePath, from); err != nil {
+			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
+		}
+		fromMergePath = tempFromWorktreePath
+		fromCleanup = func() {
+			_ = g.runGit("worktree", "remove", "--force", tempFromWorktreePath)
+			_ = os.RemoveAll(tempFromWorktreePath)
+		}
+	}
+	defer fromCleanup()
+
+	if err := g.runGitInWorktree(fromMergePath, "rebase", into); err != nil {
+		errText := err.Error()
+		if strings.Contains(errText, "CONFLICT") || strings.Contains(errText, "would be overwritten by merge") {
+			_ = g.runGitInWorktree(fromMergePath, "rebase", "--abort")
+			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w: %w", err, ErrMergeConflict)
+		}
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 
-	if mergePath != g.path && currentPrimaryBranch == into {
+	if err := g.runGitInWorktree(intoMergePath, "merge", "--ff-only", from); err != nil {
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
+	}
+
+	if intoMergePath != g.path && currentPrimaryBranch == into {
 		if err := g.runGitInWorktree(g.path, "reset", "--hard", into); err != nil {
 			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 		}
