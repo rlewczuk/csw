@@ -1058,6 +1058,33 @@ func buildResponsesReasoning(thinking string) *ResponsesReasoning {
 	}
 }
 
+// scanStreamBodyWithAdaptiveBuffer scans stream body lines and doubles scanner buffer on token-too-long errors.
+func scanStreamBodyWithAdaptiveBuffer(bodyBytes []byte, handleLine func(line string) bool) error {
+	maxTokenSize := bufio.MaxScanTokenSize
+
+	for {
+		scanner := bufio.NewScanner(bytes.NewReader(bodyBytes))
+		scanner.Buffer(make([]byte, 0, maxTokenSize), maxTokenSize)
+
+		for scanner.Scan() {
+			if handleLine(scanner.Text()) {
+				return nil
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			if errors.Is(err, bufio.ErrTooLong) {
+				maxTokenSize *= 2
+				continue
+			}
+
+			return fmt.Errorf("scanStreamBodyWithAdaptiveBuffer() [responses_client.go]: failed to scan stream body: %w", err)
+		}
+
+		return nil
+	}
+}
+
 // convertFromResponsesStreamBody converts SSE response body into ChatMessage.
 func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 	result := &ChatMessage{
@@ -1066,27 +1093,25 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 	}
 
 	toolCallsInProgress := make(map[string]*responsesToolCallInProgress)
-	scanner := bufio.NewScanner(bytes.NewReader(bodyBytes))
-	for scanner.Scan() {
-		line := scanner.Text()
+	err := scanStreamBodyWithAdaptiveBuffer(bodyBytes, func(line string) bool {
 		if line == "" || strings.HasPrefix(line, "event: ") {
-			continue
+			return false
 		}
 		if strings.TrimSpace(line) == "data: [DONE]" {
-			break
+			return true
 		}
 		if !strings.HasPrefix(line, "data: ") {
-			continue
+			return false
 		}
 
 		data := strings.TrimPrefix(line, "data: ")
 		if strings.TrimSpace(data) == "[DONE]" {
-			break
+			return true
 		}
 
 		var event ResponsesStreamEvent
 		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			continue
+			return false
 		}
 
 		switch event.Type {
@@ -1103,20 +1128,20 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 			}
 		case "response.function_call_arguments.delta":
 			if event.ItemID == "" {
-				continue
+				return false
 			}
 			tc := toolCallsInProgress[event.ItemID]
 			if tc == nil {
-				continue
+				return false
 			}
 			tc.Arguments += event.Delta
 		case "response.function_call_arguments.done":
 			if event.ItemID == "" {
-				continue
+				return false
 			}
 			tc := toolCallsInProgress[event.ItemID]
 			if tc == nil {
-				continue
+				return false
 			}
 			if event.Arguments != "" {
 				tc.Arguments = event.Arguments
@@ -1127,9 +1152,10 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 			}
 			delete(toolCallsInProgress, event.ItemID)
 		}
-	}
 
-	if err := scanner.Err(); err != nil {
+		return false
+	})
+	if err != nil {
 		return nil, fmt.Errorf("convertFromResponsesStreamBody() [responses_client.go]: failed to scan stream body: %w", err)
 	}
 
@@ -1139,19 +1165,17 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 
 	var finalUsage TokenUsage
 	contextLength := 0
-	scanner = bufio.NewScanner(bytes.NewReader(bodyBytes))
-	for scanner.Scan() {
-		line := scanner.Text()
+	err = scanStreamBodyWithAdaptiveBuffer(bodyBytes, func(line string) bool {
 		if !strings.HasPrefix(line, "data: ") {
-			continue
+			return false
 		}
 		data := strings.TrimPrefix(line, "data: ")
 		if strings.TrimSpace(data) == "[DONE]" {
-			break
+			return true
 		}
 		var event ResponsesStreamEvent
 		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			continue
+			return false
 		}
 		if event.Response != nil && event.Response.Usage != nil {
 			finalUsage.InputTokens += event.Response.Usage.InputTokens
@@ -1165,6 +1189,11 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 				contextLength = finalUsage.TotalTokens
 			}
 		}
+
+		return false
+	})
+	if err != nil {
+		return nil, fmt.Errorf("convertFromResponsesStreamBody() [responses_client.go]: failed to scan stream body: %w", err)
 	}
 	if finalUsage.TotalTokens > 0 {
 		usageCopy := finalUsage
