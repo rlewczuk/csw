@@ -37,14 +37,17 @@ var gitConfigValueFunc = readGitConfigValue
 
 // BuildSystemParams contains inputs for constructing a SweSystem.
 type BuildSystemParams struct {
-	WorkDir        string
-	ConfigPath     string
-	ModelName      string
-	RoleName       string
-	WorktreeBranch string
-	ContainerImage string
-	LSPServer      string
-	LogLLMRequests bool
+	WorkDir          string
+	ConfigPath       string
+	ModelName        string
+	RoleName         string
+	WorktreeBranch   string
+	ContainerEnabled bool
+	ContainerImage   string
+	ContainerMounts  []string
+	ContainerEnv     []string
+	LSPServer        string
+	LogLLMRequests   bool
 	// Thinking controls the thinking/reasoning mode for LLM requests.
 	// Values like "low", "medium", "high", "xhigh" for effort-based thinking,
 	// or "true"/"false" for boolean thinking modes.
@@ -141,6 +144,12 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create config store: %w", err)
 	}
 
+	globalConfig, err := configStore.GetGlobalConfig()
+	if err != nil {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to load global config: %w", err)
+	}
+
 	providerRegistry := models.NewProviderRegistry(configStore)
 	if len(providerRegistry.List()) == 0 {
 		logging.FlushLogs()
@@ -211,7 +220,13 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	bashRunner := runner.CommandRunner(runner.NewBashRunner(effectiveWorkDir, params.BashRunTimeout))
 	cleanupFn := func() {}
 
-	if params.ContainerImage != "" {
+	containerRuntimeConfig, err := resolveContainerRuntimeConfig(globalConfig, params, effectiveWorkDir)
+	if err != nil {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve container config: %w", err)
+	}
+
+	if containerRuntimeConfig.Enabled {
 		containerUser, err := resolveCurrentUserIdentity()
 		if err != nil {
 			logging.FlushLogs()
@@ -219,17 +234,27 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		}
 
 		gitAuthorName, gitAuthorEmail := resolveContainerGitAuthorIdentity()
+		containerEnv := copyStringMap(containerRuntimeConfig.Env)
+		if containerEnv == nil {
+			containerEnv = make(map[string]string)
+		}
+		if _, exists := containerEnv["GIT_AUTHOR_NAME"]; !exists {
+			containerEnv["GIT_AUTHOR_NAME"] = gitAuthorName
+		}
+		if _, exists := containerEnv["GIT_AUTHOR_EMAIL"]; !exists {
+			containerEnv["GIT_AUTHOR_EMAIL"] = gitAuthorEmail
+		}
 
 		containerRunner, err := runner.NewContainerRunner(runner.ContainerConfig{
-			ImageName:      params.ContainerImage,
+			ImageName:      containerRuntimeConfig.Image,
 			Workdir:        effectiveWorkDir,
-			MountDirs:      map[string]string{effectiveWorkDir: effectiveWorkDir},
+			MountDirs:      containerRuntimeConfig.Mounts,
 			UID:            containerUser.UID,
 			GID:            containerUser.GID,
 			UserName:       containerUser.UserName,
 			GroupName:      containerUser.GroupName,
 			HomeDir:        containerUser.HomeDir,
-			Env:            map[string]string{"GIT_AUTHOR_NAME": gitAuthorName, "GIT_AUTHOR_EMAIL": gitAuthorEmail},
+			Env:            containerEnv,
 			ReadOnlyMounts: false,
 		})
 		if err != nil {
@@ -258,12 +283,6 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
-	}
-
-	globalConfig, err := configStore.GetGlobalConfig()
-	if err != nil {
-		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to load global config: %w", err)
 	}
 
 	sweSystem := &core.SweSystem{
@@ -297,6 +316,109 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	}
 
 	return sweSystem, result, nil
+}
+
+// containerRuntimeConfig describes effective container runtime setup.
+type containerRuntimeConfig struct {
+	Enabled bool
+	Image   string
+	Mounts  map[string]string
+	Env     map[string]string
+}
+
+func resolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params BuildSystemParams, effectiveWorkDir string) (containerRuntimeConfig, error) {
+	var runtimeConfig containerRuntimeConfig
+
+	containerRequested := params.ContainerEnabled || params.ContainerImage != "" || len(params.ContainerMounts) > 0 || len(params.ContainerEnv) > 0
+	runtimeConfig.Enabled = globalConfig.Container.Enabled || containerRequested
+	if !runtimeConfig.Enabled {
+		return runtimeConfig, nil
+	}
+
+	runtimeConfig.Image = strings.TrimSpace(params.ContainerImage)
+	if runtimeConfig.Image == "" {
+		runtimeConfig.Image = strings.TrimSpace(globalConfig.Container.Image)
+	}
+	if runtimeConfig.Image == "" {
+		return runtimeConfig, fmt.Errorf("resolveContainerRuntimeConfig() [bootstrap.go]: container image is required when container mode is enabled")
+	}
+
+	mountSpecs := make([]string, 0, len(globalConfig.Container.Mounts)+len(params.ContainerMounts))
+	mountSpecs = append(mountSpecs, globalConfig.Container.Mounts...)
+	mountSpecs = append(mountSpecs, params.ContainerMounts...)
+	runtimeConfig.Mounts = map[string]string{effectiveWorkDir: effectiveWorkDir}
+	for _, mountSpec := range mountSpecs {
+		hostPath, containerPath, err := parseContainerMountSpec(mountSpec)
+		if err != nil {
+			return runtimeConfig, err
+		}
+		if !filepath.IsAbs(hostPath) {
+			hostPath, err = filepath.Abs(hostPath)
+			if err != nil {
+				return runtimeConfig, fmt.Errorf("resolveContainerRuntimeConfig() [bootstrap.go]: failed to resolve absolute mount host path %q: %w", hostPath, err)
+			}
+		}
+		if _, err := os.Stat(hostPath); err != nil {
+			return runtimeConfig, fmt.Errorf("resolveContainerRuntimeConfig() [bootstrap.go]: invalid mount host path %q: %w", hostPath, err)
+		}
+		runtimeConfig.Mounts[containerPath] = hostPath
+	}
+
+	envSpecs := make([]string, 0, len(globalConfig.Container.Env)+len(params.ContainerEnv))
+	envSpecs = append(envSpecs, globalConfig.Container.Env...)
+	envSpecs = append(envSpecs, params.ContainerEnv...)
+	if len(envSpecs) > 0 {
+		runtimeConfig.Env = make(map[string]string, len(envSpecs))
+		for _, envSpec := range envSpecs {
+			key, value, err := parseContainerEnvSpec(envSpec)
+			if err != nil {
+				return runtimeConfig, err
+			}
+			runtimeConfig.Env[key] = value
+		}
+	}
+
+	return runtimeConfig, nil
+}
+
+func parseContainerMountSpec(mountSpec string) (string, string, error) {
+	parts := strings.SplitN(mountSpec, ":", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("parseContainerMountSpec() [bootstrap.go]: mount must be in host_path:container_path format: %q", mountSpec)
+	}
+	hostPath := strings.TrimSpace(parts[0])
+	containerPath := strings.TrimSpace(parts[1])
+	if hostPath == "" || containerPath == "" {
+		return "", "", fmt.Errorf("parseContainerMountSpec() [bootstrap.go]: mount must be in host_path:container_path format: %q", mountSpec)
+	}
+
+	return hostPath, containerPath, nil
+}
+
+func parseContainerEnvSpec(envSpec string) (string, string, error) {
+	parts := strings.SplitN(envSpec, "=", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("parseContainerEnvSpec() [bootstrap.go]: env must be in KEY=VALUE format: %q", envSpec)
+	}
+	key := strings.TrimSpace(parts[0])
+	if key == "" {
+		return "", "", fmt.Errorf("parseContainerEnvSpec() [bootstrap.go]: env key cannot be empty: %q", envSpec)
+	}
+
+	return key, parts[1], nil
+}
+
+func copyStringMap(values map[string]string) map[string]string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	cloned := make(map[string]string, len(values))
+	for key, value := range values {
+		cloned[key] = value
+	}
+
+	return cloned
 }
 
 // ContainerUserIdentity stores host user identity mirrored in container mode.

@@ -87,6 +87,18 @@ type ToolSelectionConfig struct {
 	Tags map[string]map[string]bool `json:"tags,omitempty" yaml:"tags,omitempty"`
 }
 
+// ContainerConfig defines default container execution settings.
+type ContainerConfig struct {
+	// Mounts defines additional volume mappings in host_path:container_path format.
+	Mounts []string `json:"mounts,omitempty" yaml:"mounts,omitempty"`
+	// Env defines additional environment variables in KEY=VALUE format.
+	Env []string `json:"env,omitempty" yaml:"env,omitempty"`
+	// Image is the default container image used when container mode is enabled.
+	Image string `json:"image,omitempty" yaml:"image,omitempty"`
+	// Enabled enables container mode for all commands by default.
+	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+}
+
 // ModelProviderConfig represents common configuration for model providers.
 type ModelProviderConfig struct {
 	// Type specifies the provider type (e.g., "ollama", "openai", "anthropic")
@@ -213,6 +225,8 @@ type GlobalConfig struct {
 	// LLMRetryMaxBackoffSeconds caps exponential backoff delay in seconds.
 	// Defaults to 60 when unset or invalid.
 	LLMRetryMaxBackoffSeconds int `json:"llm_retry_max_backoff_seconds,omitempty" yaml:"llm_retry_max_backoff_seconds,omitempty"`
+	// Container defines default container execution settings.
+	Container ContainerConfig `json:"container,omitempty" yaml:"container,omitempty"`
 }
 
 // ConfigStore is an interface for accessing configuration data.

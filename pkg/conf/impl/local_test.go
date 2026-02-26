@@ -66,6 +66,12 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 	// Create global.json
 	globalConfig := conf.GlobalConfig{
 		ContextCompactionThreshold: 0.8,
+		Container: conf.ContainerConfig{
+			Enabled: true,
+			Image:   "busybox:latest",
+			Mounts:  []string{"/tmp:/mnt/tmp"},
+			Env:     []string{"TEST_ENV=value"},
+		},
 		ModelTags: []conf.ModelTagMapping{
 			{Model: "^claude-.*", Tag: "anthropic"},
 			{Model: "^gpt-.*", Tag: "openai"},
@@ -98,6 +104,10 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 	assert.Equal(t, "^claude-.*", config.ModelTags[0].Model)
 	assert.Equal(t, "anthropic", config.ModelTags[0].Tag)
 	assert.Equal(t, false, config.ToolSelection.Default["runBash"])
+	assert.True(t, config.Container.Enabled)
+	assert.Equal(t, "busybox:latest", config.Container.Image)
+	assert.Equal(t, []string{"/tmp:/mnt/tmp"}, config.Container.Mounts)
+	assert.Equal(t, []string{"TEST_ENV=value"}, config.Container.Env)
 	safeRule, exists := config.ToolSelection.Tags["safe"]
 	require.True(t, exists)
 	assert.True(t, safeRule["vfsRead"])
