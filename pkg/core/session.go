@@ -1104,7 +1104,8 @@ func writeMessagesJSONL(path string, messages []*models.ChatMessage) error {
 		if message == nil {
 			continue
 		}
-		line, err := json.Marshal(message)
+		serializedMessage := serializeChatMessage(message)
+		line, err := json.Marshal(serializedMessage)
 		if err != nil {
 			return fmt.Errorf("writeMessagesJSONL() [session.go]: failed to marshal chat message: %w", err)
 		}
