@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
@@ -26,15 +27,22 @@ type RunBashTool struct {
 	runner      runner.CommandRunner
 	privileges  map[string]conf.AccessFlag
 	projectRoot string
+	defaultTimeout time.Duration
 }
 
 // NewRunBashTool creates a new RunBashTool instance.
 // runner is the CommandRunner to use for executing commands.
 // privileges is a map of command regex patterns to access flags.
-func NewRunBashTool(r runner.CommandRunner, privileges map[string]conf.AccessFlag) *RunBashTool {
+func NewRunBashTool(r runner.CommandRunner, privileges map[string]conf.AccessFlag, defaultTimeout ...time.Duration) *RunBashTool {
+	timeout := time.Duration(0)
+	if len(defaultTimeout) > 0 {
+		timeout = defaultTimeout[0]
+	}
+
 	return &RunBashTool{
-		runner:     r,
-		privileges: privileges,
+		runner:         r,
+		privileges:     privileges,
+		defaultTimeout: timeout,
 	}
 }
 
@@ -42,11 +50,17 @@ func NewRunBashTool(r runner.CommandRunner, privileges map[string]conf.AccessFla
 // runner is the CommandRunner to use for executing commands.
 // privileges is a map of command regex patterns to access flags.
 // projectRoot is the project root directory for resolving relative paths and checking absolute paths.
-func NewRunBashToolWithRoot(r runner.CommandRunner, privileges map[string]conf.AccessFlag, projectRoot string) *RunBashTool {
+func NewRunBashToolWithRoot(r runner.CommandRunner, privileges map[string]conf.AccessFlag, projectRoot string, defaultTimeout ...time.Duration) *RunBashTool {
+	timeout := time.Duration(0)
+	if len(defaultTimeout) > 0 {
+		timeout = defaultTimeout[0]
+	}
+
 	return &RunBashTool{
-		runner:      r,
-		privileges:  privileges,
-		projectRoot: projectRoot,
+		runner:         r,
+		privileges:     privileges,
+		projectRoot:    projectRoot,
+		defaultTimeout: timeout,
 	}
 }
 
@@ -81,7 +95,7 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 	}
 
 	// Parse optional timeout argument
-	timeout := time.Duration(0)
+	timeout := t.defaultTimeout
 	if timeoutSecs, ok := args.Arguments.IntOK("timeout"); ok {
 		if timeoutSecs <= 0 {
 			return &ToolResponse{
@@ -255,6 +269,23 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 	}
 
 	if err != nil {
+		if isTimeoutError(err) {
+			if limit > 0 {
+				output = truncateOutput(output, limit)
+			}
+
+			errMessage := fmt.Sprintf("command terminated due to timeout: %v", err)
+			if output != "" {
+				errMessage = fmt.Sprintf("%s\nPartial output:\n%s", errMessage, output)
+			}
+
+			return &ToolResponse{
+				Call:  args,
+				Error: fmt.Errorf("RunBashTool.executeCommand() [run.go]: %s", errMessage),
+				Done:  true,
+			}
+		}
+
 		// If there's an error from the runner itself (timeout, etc.), return it
 		return &ToolResponse{
 			Call:  args,
@@ -278,6 +309,14 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 		Result: result,
 		Done:   true,
 	}
+}
+
+func isTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return strings.Contains(strings.ToLower(err.Error()), "timed out")
 }
 
 // Render returns a string representation of the tool call.

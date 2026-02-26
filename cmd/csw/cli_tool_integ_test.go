@@ -34,7 +34,7 @@ func TestRunBashToolIntegration(t *testing.T) {
 	mockRunner.SetDefaultResponse("test output", 0, nil)
 	tool.RegisterRunBashTool(tools, mockRunner, map[string]conf.AccessFlag{
 		"echo .*": conf.AccessAllow,
-	})
+	}, 120*time.Second)
 
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/runner"
@@ -383,6 +384,67 @@ func TestRunBashTool_Execute_WithTimeout(t *testing.T) {
 	assert.Equal(t, "test\n", response.Result.String("output"))
 	assert.Equal(t, int64(0), response.Result.Int("exit_code"))
 	assert.Equal(t, 1, mockRunner.ExecutionCount())
+
+	exec := mockRunner.GetLastExecution()
+	require.NotNil(t, exec)
+	assert.Equal(t, 30*time.Second, exec.Timeout)
+}
+
+func TestRunBashTool_Execute_DefaultTimeoutApplied(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetResponse("echo test", "test\n", 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashTool(mockRunner, privileges, 120*time.Second)
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "echo test",
+		}),
+	}
+
+	response := tool.Execute(&args)
+
+	assert.NoError(t, response.Error)
+	assert.True(t, response.Done)
+	assert.Equal(t, "test\n", response.Result.String("output"))
+
+	exec := mockRunner.GetLastExecution()
+	require.NotNil(t, exec)
+	assert.Equal(t, 120*time.Second, exec.Timeout)
+}
+
+func TestRunBashTool_Execute_TimeoutErrorIncludesPartialOutput(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetResponse("sleep 10", "line1\nline2\nline3\n", 124, fmt.Errorf("command timed out after 2s"))
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashTool(mockRunner, privileges, 2*time.Second)
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "sleep 10",
+			"limit":   int64(2),
+		}),
+	}
+
+	response := tool.Execute(&args)
+
+	assert.Error(t, response.Error)
+	assert.Contains(t, response.Error.Error(), "command terminated due to timeout")
+	assert.Contains(t, response.Error.Error(), "Partial output:")
+	assert.Contains(t, response.Error.Error(), "line1")
+	assert.Contains(t, response.Error.Error(), "line2")
+	assert.Contains(t, response.Error.Error(), "Output is truncated.")
+	assert.True(t, response.Done)
 }
 
 func TestRunBashTool_Execute_WithInvalidTimeout(t *testing.T) {
