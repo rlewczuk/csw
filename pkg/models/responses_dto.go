@@ -94,9 +94,15 @@ type ResponsesReasoning struct {
 
 // ResponsesUsage represents token usage information returned by Responses API.
 type ResponsesUsage struct {
-	InputTokens  int `json:"input_tokens,omitempty"`
-	OutputTokens int `json:"output_tokens,omitempty"`
-	TotalTokens  int `json:"total_tokens,omitempty"`
+	InputTokens        int                         `json:"input_tokens,omitempty"`
+	OutputTokens       int                         `json:"output_tokens,omitempty"`
+	TotalTokens        int                         `json:"total_tokens,omitempty"`
+	InputTokensDetails *ResponsesInputTokenDetails `json:"input_tokens_details,omitempty"`
+}
+
+// ResponsesInputTokenDetails represents details for input tokens.
+type ResponsesInputTokenDetails struct {
+	CachedTokens int `json:"cached_tokens,omitempty"`
 }
 
 // ResponsesTextConfig represents text response configuration.

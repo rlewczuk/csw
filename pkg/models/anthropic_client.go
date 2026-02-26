@@ -382,9 +382,10 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	// Convert response to ChatMessage
 	result := convertFromAnthropicResponse(chatResp.Content)
 	result.TokenUsage = &TokenUsage{
-		InputTokens:  chatResp.Usage.InputTokens,
-		OutputTokens: chatResp.Usage.OutputTokens,
-		TotalTokens:  chatResp.Usage.InputTokens + chatResp.Usage.OutputTokens,
+		InputTokens:          chatResp.Usage.InputTokens,
+		InputNonCachedTokens: chatResp.Usage.InputTokens,
+		OutputTokens:         chatResp.Usage.OutputTokens,
+		TotalTokens:          chatResp.Usage.InputTokens + chatResp.Usage.OutputTokens,
 	}
 	result.ContextLengthTokens = result.TokenUsage.TotalTokens
 	return result, nil
@@ -600,6 +601,7 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 				case "message_delta":
 					if event.Usage != nil {
 						usage.InputTokens += event.Usage.InputTokens
+						usage.InputNonCachedTokens = usage.InputTokens
 						usage.OutputTokens += event.Usage.OutputTokens
 						usage.TotalTokens += event.Usage.InputTokens + event.Usage.OutputTokens
 						if usage.TotalTokens > 0 {

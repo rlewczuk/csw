@@ -334,6 +334,8 @@ func TestOllamaClient_ChatTokenUsage(t *testing.T) {
 	require.NotNil(t, resp)
 	require.NotNil(t, resp.TokenUsage)
 	assert.Equal(t, 11, resp.TokenUsage.InputTokens)
+	assert.Equal(t, 0, resp.TokenUsage.InputCachedTokens)
+	assert.Equal(t, 11, resp.TokenUsage.InputNonCachedTokens)
 	assert.Equal(t, 9, resp.TokenUsage.OutputTokens)
 	assert.Equal(t, 20, resp.TokenUsage.TotalTokens)
 	assert.Equal(t, 20, resp.ContextLengthTokens)

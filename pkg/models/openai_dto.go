@@ -99,9 +99,15 @@ type OpenaiChatCompletionChoice struct {
 
 // OpenaiChatCompletionUsage represents usage information
 type OpenaiChatCompletionUsage struct {
-	PromptTokens     int `json:"prompt_tokens"`     // Required: tokens in prompt
-	CompletionTokens int `json:"completion_tokens"` // Required: tokens in completion
-	TotalTokens      int `json:"total_tokens"`      // Required: total tokens
+	PromptTokens        int                      `json:"prompt_tokens"`                   // Required: tokens in prompt
+	CompletionTokens    int                      `json:"completion_tokens"`               // Required: tokens in completion
+	TotalTokens         int                      `json:"total_tokens"`                    // Required: total tokens
+	PromptTokensDetails *OpenaiPromptTokenDetail `json:"prompt_tokens_details,omitempty"` // Optional: prompt token details
+}
+
+// OpenaiPromptTokenDetail represents details for prompt tokens.
+type OpenaiPromptTokenDetail struct {
+	CachedTokens int `json:"cached_tokens,omitempty"`
 }
 
 // OpenaiEmbeddingRequest represents the request structure for /v1/embeddings endpoint

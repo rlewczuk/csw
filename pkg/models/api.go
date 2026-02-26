@@ -62,9 +62,11 @@ type ChatOptions struct {
 
 // TokenUsage contains token accounting returned by an LLM provider.
 type TokenUsage struct {
-	InputTokens  int
-	OutputTokens int
-	TotalTokens  int
+	InputTokens          int
+	InputCachedTokens    int
+	InputNonCachedTokens int
+	OutputTokens         int
+	TotalTokens          int
 }
 
 // ChatMessagePart represents a part of a chat message. A message can contain text, tool calls, or tool responses.

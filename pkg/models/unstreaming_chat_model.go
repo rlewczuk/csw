@@ -56,6 +56,8 @@ func (u *UnstreamingChatModel) Chat(ctx context.Context, messages []*ChatMessage
 		if fragment.TokenUsage != nil {
 			hasUsage = true
 			tokenUsage.InputTokens += fragment.TokenUsage.InputTokens
+			tokenUsage.InputCachedTokens += fragment.TokenUsage.InputCachedTokens
+			tokenUsage.InputNonCachedTokens += fragment.TokenUsage.InputNonCachedTokens
 			tokenUsage.OutputTokens += fragment.TokenUsage.OutputTokens
 			tokenUsage.TotalTokens += fragment.TokenUsage.TotalTokens
 		}

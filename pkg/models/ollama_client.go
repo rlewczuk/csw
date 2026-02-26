@@ -397,9 +397,10 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	if inputTokens > 0 || outputTokens > 0 {
 		totalTokens = inputTokens + outputTokens
 		result.TokenUsage = &TokenUsage{
-			InputTokens:  inputTokens,
-			OutputTokens: outputTokens,
-			TotalTokens:  totalTokens,
+			InputTokens:          inputTokens,
+			InputNonCachedTokens: inputTokens,
+			OutputTokens:         outputTokens,
+			TotalTokens:          totalTokens,
 		}
 		result.ContextLengthTokens = totalTokens
 	}
@@ -550,6 +551,7 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 
 			if chatResp.PromptEvalCount > 0 {
 				usage.InputTokens += chatResp.PromptEvalCount
+				usage.InputNonCachedTokens = usage.InputTokens
 			}
 			if chatResp.EvalCount > 0 {
 				usage.OutputTokens += chatResp.EvalCount
