@@ -80,6 +80,7 @@ func (s *EmbeddedConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 
 	// Return a copy to prevent external modification
 	config := &conf.GlobalConfig{
+		ContextCompactionThreshold: s.globalConfig.ContextCompactionThreshold,
 		ModelTags:                 make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
 		DefaultProvider:           s.globalConfig.DefaultProvider,
 		DefaultRole:               s.globalConfig.DefaultRole,

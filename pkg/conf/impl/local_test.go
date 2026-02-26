@@ -65,6 +65,7 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 
 	// Create global.json
 	globalConfig := conf.GlobalConfig{
+		ContextCompactionThreshold: 0.8,
 		ModelTags: []conf.ModelTagMapping{
 			{Model: "^claude-.*", Tag: "anthropic"},
 			{Model: "^gpt-.*", Tag: "openai"},
@@ -93,6 +94,7 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 	config, err := store.GetGlobalConfig()
 	require.NoError(t, err)
 	assert.Len(t, config.ModelTags, 2)
+	assert.Equal(t, 0.8, config.ContextCompactionThreshold)
 	assert.Equal(t, "^claude-.*", config.ModelTags[0].Model)
 	assert.Equal(t, "anthropic", config.ModelTags[0].Tag)
 	assert.Equal(t, false, config.ToolSelection.Default["runBash"])

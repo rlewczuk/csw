@@ -213,6 +213,7 @@ func TestSweSystemLoadSessionInvalidState(t *testing.T) {
 			ProviderName: "ollama",
 			Model:        "test-model:latest",
 			WorkDir:      ".",
+			ContextCompactionCount: 3,
 		}
 		stateBytes, err := json.Marshal(state)
 		require.NoError(t, err)

@@ -69,6 +69,7 @@ func TestSessionPersistenceStateJSON(t *testing.T) {
 		)
 		session.tokenUsage = models.TokenUsage{InputTokens: 3, OutputTokens: 5, TotalTokens: 8}
 		session.contextLength = 8
+		session.compactionCount = 2
 
 		session.persistSessionState()
 
@@ -96,6 +97,7 @@ func TestSessionPersistenceStateJSON(t *testing.T) {
 		assert.Equal(t, []string{"AGENTS.md"}, state.LoadedAgentFiles)
 		assert.Equal(t, 8, state.TokenUsage.TotalTokens)
 		assert.Equal(t, 8, state.ContextLengthTokens)
+		assert.Equal(t, 2, state.ContextCompactionCount)
 		assert.NotEmpty(t, state.UpdatedAt)
 
 		session.SetTodoList([]tool.TodoItem{{

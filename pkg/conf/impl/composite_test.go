@@ -262,6 +262,7 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 		"model_tags": [
 			{"model": "gpt-.*", "tag": "openai"}
 		],
+		"context_compaction_threshold": 0.7,
 		"tool_selection": {
 			"default": {
 				"runBash": false
@@ -280,6 +281,7 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 		"model_tags": [
 			{"model": "claude-.*", "tag": "anthropic"}
 		],
+		"context_compaction_threshold": 0.9,
 		"tool_selection": {
 			"default": {
 				"runBash": true,
@@ -314,6 +316,7 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 	// Verify tool selection defaults are merged and later sources override earlier ones
 	assert.Equal(t, true, globalConfig.ToolSelection.Default["runBash"])
 	assert.Equal(t, false, globalConfig.ToolSelection.Default["vfsEdit"])
+	assert.Equal(t, 0.9, globalConfig.ContextCompactionThreshold)
 
 	// Verify per-tag rule from later source overrides earlier one
 	safeRule, exists := globalConfig.ToolSelection.Tags["safe"]

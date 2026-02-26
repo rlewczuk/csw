@@ -154,6 +154,7 @@ func TestLocalConfigStore_SaveGlobalConfig(t *testing.T) {
 	// Create global config
 	globalConfig := &conf.GlobalConfig{
 		DefaultProvider: "test-provider",
+		ContextCompactionThreshold: 0.9,
 		ModelTags: []conf.ModelTagMapping{
 			{Model: "gpt-4", Tag: "large"},
 		},
@@ -171,6 +172,7 @@ func TestLocalConfigStore_SaveGlobalConfig(t *testing.T) {
 	loadedConfig, err := store.GetGlobalConfig()
 	require.NoError(t, err)
 	assert.Equal(t, "test-provider", loadedConfig.DefaultProvider)
+	assert.Equal(t, 0.9, loadedConfig.ContextCompactionThreshold)
 	assert.Len(t, loadedConfig.ModelTags, 1)
 	assert.Equal(t, "gpt-4", loadedConfig.ModelTags[0].Model)
 }

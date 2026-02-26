@@ -116,6 +116,7 @@ func (s *LocalConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 
 	// Return a copy to prevent external modification
 	config := &conf.GlobalConfig{
+		ContextCompactionThreshold: s.globalConfig.ContextCompactionThreshold,
 		DefaultProvider:           s.globalConfig.DefaultProvider,
 		DefaultRole:               s.globalConfig.DefaultRole,
 		LLMRetryMaxAttempts:       s.globalConfig.LLMRetryMaxAttempts,

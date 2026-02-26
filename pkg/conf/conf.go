@@ -200,6 +200,9 @@ type GlobalConfig struct {
 	ModelTags []ModelTagMapping `json:"model_tags,omitempty" yaml:"model_tags,omitempty"`
 	// ToolSelection defines model tag based tool selection rules.
 	ToolSelection ToolSelectionConfig `json:"tool_selection,omitempty" yaml:"tool_selection,omitempty"`
+	// ContextCompactionThreshold defines the ratio of current context length to max context length
+	// at which message compaction is triggered. Defaults to 0.95 when unset or invalid.
+	ContextCompactionThreshold float64 `json:"context_compaction_threshold,omitempty" yaml:"context_compaction_threshold,omitempty"`
 	// DefaultProvider is the name of the default model provider to use
 	DefaultProvider string `json:"default_provider,omitempty" yaml:"default_provider,omitempty"`
 	// DefaultRole is the name of the default agent role to use
