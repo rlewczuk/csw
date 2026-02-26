@@ -355,16 +355,13 @@ func (g *GitVCS) MergeBranches(into string, from string) error {
 	defer cleanup()
 
 	if err := g.runGitInWorktree(mergePath, "merge", "--ff-only", from); err != nil {
-		if err := g.runGitInWorktree(mergePath, "rebase", from); err != nil {
-			_ = g.runGitInWorktree(mergePath, "rebase", "--abort")
-
-			if err := g.runGitInWorktree(mergePath, "merge", from); err != nil {
-				errText := err.Error()
-				if strings.Contains(errText, "CONFLICT") || strings.Contains(errText, "would be overwritten by merge") {
-					return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w: %w", err, ErrMergeConflict)
-				}
-				return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
+		if err := g.runGitInWorktree(mergePath, "cherry-pick", into+".."+from); err != nil {
+			errText := err.Error()
+			if strings.Contains(errText, "CONFLICT") || strings.Contains(errText, "would be overwritten by merge") {
+				_ = g.runGitInWorktree(mergePath, "cherry-pick", "--abort")
+				return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w: %w", err, ErrMergeConflict)
 			}
+			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 		}
 	}
 
