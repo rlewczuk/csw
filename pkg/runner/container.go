@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -43,6 +42,18 @@ func NewContainerRunner(config ContainerConfig) (ContainerRunner, error) {
 		return nil, fmt.Errorf("NewContainerRunner() [container.go]: GID cannot be negative")
 	}
 
+	if config.UID > 0 && config.GID > 0 {
+		if config.UserName == "" {
+			return nil, fmt.Errorf("NewContainerRunner() [container.go]: user name cannot be empty when UID/GID are set")
+		}
+		if config.GroupName == "" {
+			return nil, fmt.Errorf("NewContainerRunner() [container.go]: group name cannot be empty when UID/GID are set")
+		}
+		if config.HomeDir == "" {
+			return nil, fmt.Errorf("NewContainerRunner() [container.go]: home directory cannot be empty when UID/GID are set")
+		}
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Build container request - always start as root to allow chown
@@ -77,21 +88,40 @@ func NewContainerRunner(config ContainerConfig) (ContainerRunner, error) {
 		return nil, fmt.Errorf("NewContainerRunner() [container.go]: failed to create container: %w", err)
 	}
 
-	// If UID/GID are specified, chown the home directory to allow non-root user to write
+	// If UID/GID are specified, mirror host user/group and chown the home directory.
 	if config.UID > 0 && config.GID > 0 {
-		// Determine the home directory to chown based on workdir
-		homeDir := "/root"
-		if config.Workdir != "" {
-			// Get the parent directory of workdir (typically the user's home dir)
-			parentDir := filepath.Dir(config.Workdir)
-			if parentDir != "/" && parentDir != "." {
-				homeDir = parentDir
-			}
-		}
+		createUserScript := fmt.Sprintf(
+			"set -e; \n"+
+				"if command -v getent >/dev/null 2>&1 && getent group %q >/dev/null 2>&1; then :; "+
+				"elif command -v groupadd >/dev/null 2>&1; then groupadd -g %d %q; "+
+				"elif command -v addgroup >/dev/null 2>&1; then addgroup -g %d %q; "+
+				"else echo 'group creation utility not found' >&2; exit 1; fi; \n"+
+				"if command -v id >/dev/null 2>&1 && id -u %q >/dev/null 2>&1; then :; "+
+				"elif command -v useradd >/dev/null 2>&1; then useradd -m -u %d -g %d -d %q -s /bin/sh %q; "+
+				"elif command -v adduser >/dev/null 2>&1; then adduser -D -u %d -G %q -h %q -s /bin/sh %q; "+
+				"else echo 'user creation utility not found' >&2; exit 1; fi; \n"+
+				"mkdir -p %q; chown -R %d:%d %q",
+			config.GroupName,
+			config.GID,
+			config.GroupName,
+			config.GID,
+			config.GroupName,
+			config.UserName,
+			config.UID,
+			config.GID,
+			config.HomeDir,
+			config.UserName,
+			config.UID,
+			config.GroupName,
+			config.HomeDir,
+			config.UserName,
+			config.HomeDir,
+			config.UID,
+			config.GID,
+			config.HomeDir,
+		)
 
-		// Run chown as root to change ownership of the home directory
-		chownCmd := []string{"chown", "-R", fmt.Sprintf("%d:%d", config.UID, config.GID), homeDir}
-		exitCode, reader, err := c.Exec(ctx, chownCmd)
+		exitCode, reader, err := c.Exec(ctx, []string{"/bin/sh", "-c", createUserScript})
 		if err != nil || exitCode != 0 {
 			// Read any error output
 			var output bytes.Buffer
@@ -102,9 +132,9 @@ func NewContainerRunner(config ContainerConfig) (ContainerRunner, error) {
 			_ = c.Terminate(ctx)
 			cancel()
 			if err != nil {
-				return nil, fmt.Errorf("NewContainerRunner() [container.go]: failed to chown home directory: %w", err)
+				return nil, fmt.Errorf("NewContainerRunner() [container.go]: failed to create mapped user and prepare home directory: %w", err)
 			}
-			return nil, fmt.Errorf("NewContainerRunner() [container.go]: chown failed with exit code %d: %s", exitCode, output.String())
+			return nil, fmt.Errorf("NewContainerRunner() [container.go]: create mapped user/home preparation failed with exit code %d: %s", exitCode, output.String())
 		}
 	}
 

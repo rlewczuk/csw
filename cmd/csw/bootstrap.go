@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
@@ -213,10 +212,10 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	cleanupFn := func() {}
 
 	if params.ContainerImage != "" {
-		uid, gid, err := resolveCurrentUserIDs(effectiveWorkDir)
+		containerUser, err := resolveCurrentUserIdentity()
 		if err != nil {
 			logging.FlushLogs()
-			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve current user ids: %w", err)
+			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve current user identity: %w", err)
 		}
 
 		gitAuthorName, gitAuthorEmail := resolveContainerGitAuthorIdentity()
@@ -225,8 +224,11 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 			ImageName:      params.ContainerImage,
 			Workdir:        effectiveWorkDir,
 			MountDirs:      map[string]string{effectiveWorkDir: effectiveWorkDir},
-			UID:            uid,
-			GID:            gid,
+			UID:            containerUser.UID,
+			GID:            containerUser.GID,
+			UserName:       containerUser.UserName,
+			GroupName:      containerUser.GroupName,
+			HomeDir:        containerUser.HomeDir,
 			Env:            map[string]string{"GIT_AUTHOR_NAME": gitAuthorName, "GIT_AUTHOR_EMAIL": gitAuthorEmail},
 			ReadOnlyMounts: false,
 		})
@@ -297,35 +299,57 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	return sweSystem, result, nil
 }
 
-func resolveCurrentUserIDs(workDir string) (int, int, error) {
-	if workDir != "" {
-		fileInfo, err := os.Stat(workDir)
-		if err == nil {
-			stat, ok := fileInfo.Sys().(*syscall.Stat_t)
-			if !ok {
-				return 0, 0, fmt.Errorf("resolveCurrentUserIDs() [bootstrap.go]: failed to read stat info for workdir: %s", workDir)
-			}
+// ContainerUserIdentity stores host user identity mirrored in container mode.
+type ContainerUserIdentity struct {
+	UID       int
+	GID       int
+	UserName  string
+	GroupName string
+	HomeDir   string
+}
 
-			return int(stat.Uid), int(stat.Gid), nil
-		}
-	}
+func resolveCurrentUserIdentity() (ContainerUserIdentity, error) {
+	var identity ContainerUserIdentity
 
 	currentUser, err := user.Current()
 	if err != nil {
-		return 0, 0, fmt.Errorf("resolveCurrentUserIDs() [bootstrap.go]: failed to get current user: %w", err)
+		return identity, fmt.Errorf("resolveCurrentUserIdentity() [bootstrap.go]: failed to get current user: %w", err)
 	}
 
 	uid, err := strconv.Atoi(currentUser.Uid)
 	if err != nil {
-		return 0, 0, fmt.Errorf("resolveCurrentUserIDs() [bootstrap.go]: failed to parse uid: %w", err)
+		return identity, fmt.Errorf("resolveCurrentUserIdentity() [bootstrap.go]: failed to parse uid: %w", err)
 	}
 
 	gid, err := strconv.Atoi(currentUser.Gid)
 	if err != nil {
-		return 0, 0, fmt.Errorf("resolveCurrentUserIDs() [bootstrap.go]: failed to parse gid: %w", err)
+		return identity, fmt.Errorf("resolveCurrentUserIdentity() [bootstrap.go]: failed to parse gid: %w", err)
 	}
 
-	return uid, gid, nil
+	group, err := user.LookupGroupId(currentUser.Gid)
+	if err != nil {
+		return identity, fmt.Errorf("resolveCurrentUserIdentity() [bootstrap.go]: failed to lookup group by gid: %w", err)
+	}
+
+	if currentUser.Username == "" {
+		return identity, fmt.Errorf("resolveCurrentUserIdentity() [bootstrap.go]: current user name is empty")
+	}
+
+	if currentUser.HomeDir == "" {
+		return identity, fmt.Errorf("resolveCurrentUserIdentity() [bootstrap.go]: current user home directory is empty")
+	}
+
+	if group.Name == "" {
+		return identity, fmt.Errorf("resolveCurrentUserIdentity() [bootstrap.go]: current user group name is empty")
+	}
+
+	identity.UID = uid
+	identity.GID = gid
+	identity.UserName = currentUser.Username
+	identity.GroupName = group.Name
+	identity.HomeDir = currentUser.HomeDir
+
+	return identity, nil
 }
 
 // resolveContainerGitAuthorIdentity returns git author identity for container mode.
