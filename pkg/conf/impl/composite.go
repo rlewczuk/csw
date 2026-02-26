@@ -132,6 +132,7 @@ func (c *CompositeConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 
 	// Return a copy to prevent external modification
 	config := &conf.GlobalConfig{
+		ContextCompactionThreshold: c.globalConfig.ContextCompactionThreshold,
 		DefaultProvider:           c.globalConfig.DefaultProvider,
 		DefaultRole:               c.globalConfig.DefaultRole,
 		LLMRetryMaxAttempts:       c.globalConfig.LLMRetryMaxAttempts,
@@ -367,6 +368,10 @@ func (c *CompositeConfigStore) refreshGlobalConfig() error {
 		// DefaultProvider from later sources overrides earlier ones
 		if config.DefaultProvider != "" {
 			merged.DefaultProvider = config.DefaultProvider
+		}
+		// ContextCompactionThreshold from later sources overrides earlier ones
+		if config.ContextCompactionThreshold > 0 {
+			merged.ContextCompactionThreshold = config.ContextCompactionThreshold
 		}
 		// DefaultRole from later sources overrides earlier ones
 		if config.DefaultRole != "" {

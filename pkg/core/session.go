@@ -26,6 +26,7 @@ import (
 const (
 	defaultLLMRetryMaxAttempts       = 10
 	defaultLLMRetryMaxBackoffSeconds = 60
+	defaultContextCompactionThreshold = 0.95
 	sessionMessageTypeInfo           = "info"
 	sessionMessageTypeWarning        = "warning"
 	sessionMessageTypeError          = "error"
@@ -58,6 +59,7 @@ type SweSession struct {
 	loadedAgentFiles map[string]struct{}
 	tokenUsage       models.TokenUsage
 	contextLength    int
+	compactionCount  int
 }
 
 type persistedToolResponse struct {
@@ -92,6 +94,7 @@ type persistedSessionState struct {
 	LoadedAgentFiles           []string                `json:"loaded_agent_files"`
 	TokenUsage                 models.TokenUsage       `json:"token_usage"`
 	ContextLengthTokens        int                     `json:"context_length_tokens"`
+	ContextCompactionCount     int                     `json:"context_compaction_count"`
 	UpdatedAt                  string                  `json:"updated_at"`
 }
 
@@ -140,6 +143,11 @@ func (s *SweSession) Run(ctx context.Context) error {
 		tools = append(tools, toolInfo)
 	}
 
+	var (
+		responseMsg *models.ChatMessage
+		err         error
+	)
+
 	// Keep processing until the assistant doesn't make any tool calls
 	for {
 		// Check if there's a pending tool call from a previous permission query
@@ -168,7 +176,11 @@ func (s *SweSession) Run(ctx context.Context) error {
 			}
 		}
 
-		responseMsg, err := s.runNonStreamingChat(ctx, chatModel, tools, chatOptions)
+		if err := s.maybeCompactContext(); err != nil {
+			return err
+		}
+
+		responseMsg, err = s.runNonStreamingChat(ctx, chatModel, tools, chatOptions)
 		if err != nil {
 			return err
 		}
@@ -935,6 +947,7 @@ func (s *SweSession) buildPersistedSessionState() persistedSessionState {
 		LoadedAgentFiles:           make([]string, 0, len(s.loadedAgentFiles)),
 		TokenUsage:                 s.tokenUsage,
 		ContextLengthTokens:        s.contextLength,
+		ContextCompactionCount:     s.compactionCount,
 		UpdatedAt:                  time.Now().Format(time.RFC3339Nano),
 	}
 
@@ -1005,6 +1018,105 @@ func serializeChatMessage(message *models.ChatMessage) persistedChatMessage {
 	}
 
 	return serialized
+}
+
+func (s *SweSession) maybeCompactContext() error {
+	maxContextLength := s.maxContextLengthLimit()
+	if maxContextLength <= 0 || s.contextLength <= 0 {
+		return nil
+	}
+
+	threshold := s.contextCompactionThreshold()
+	if threshold <= 0 {
+		threshold = defaultContextCompactionThreshold
+	}
+
+	if float64(s.contextLength) <= float64(maxContextLength)*threshold {
+		return nil
+	}
+
+	compactionNumber := s.compactionCount + 1
+	if s.outputHandler != nil {
+		s.outputHandler.ShowMessage("Context is near maximum length. Compacting messages...", sessionMessageTypeInfo)
+	}
+
+	if err := s.persistCompactionMessagesSnapshot("pre", compactionNumber, s.messages); err != nil {
+		return fmt.Errorf("SweSession.maybeCompactContext() [session.go]: failed to persist pre-compaction snapshot: %w", err)
+	}
+
+	compacted := CompactMessages(s.messages)
+	if err := s.persistCompactionMessagesSnapshot("post", compactionNumber, compacted); err != nil {
+		return fmt.Errorf("SweSession.maybeCompactContext() [session.go]: failed to persist post-compaction snapshot: %w", err)
+	}
+
+	s.messages = compacted
+	s.compactionCount = compactionNumber
+	s.persistSessionState()
+
+	return nil
+}
+
+func (s *SweSession) contextCompactionThreshold() float64 {
+	if s.system != nil && s.system.ConfigStore != nil {
+		globalConfig, err := s.system.ConfigStore.GetGlobalConfig()
+		if err == nil && globalConfig != nil && globalConfig.ContextCompactionThreshold > 0 && globalConfig.ContextCompactionThreshold <= 1 {
+			return globalConfig.ContextCompactionThreshold
+		}
+	}
+
+	return defaultContextCompactionThreshold
+}
+
+func (s *SweSession) maxContextLengthLimit() int {
+	if configProvider, ok := s.provider.(interface {
+		GetConfig() *conf.ModelProviderConfig
+	}); ok {
+		providerConfig := configProvider.GetConfig()
+		if providerConfig != nil && providerConfig.ContextLengthLimit > 0 {
+			return providerConfig.ContextLengthLimit
+		}
+	}
+
+	return 0
+}
+
+func (s *SweSession) persistCompactionMessagesSnapshot(phase string, compactionNumber int, messages []*models.ChatMessage) error {
+	sessionLogDir := s.getSessionLogDirectory()
+	if strings.TrimSpace(sessionLogDir) == "" {
+		return nil
+	}
+
+	if err := os.MkdirAll(sessionLogDir, 0755); err != nil {
+		return fmt.Errorf("SweSession.persistCompactionMessagesSnapshot() [session.go]: failed to create session log directory: %w", err)
+	}
+
+	filePath := filepath.Join(sessionLogDir, fmt.Sprintf("messages-%s-%d.jsonl", phase, compactionNumber))
+	if err := writeMessagesJSONL(filePath, messages); err != nil {
+		return fmt.Errorf("SweSession.persistCompactionMessagesSnapshot() [session.go]: failed to write %s snapshot: %w", phase, err)
+	}
+
+	return nil
+}
+
+func writeMessagesJSONL(path string, messages []*models.ChatMessage) error {
+	var builder strings.Builder
+	for _, message := range messages {
+		if message == nil {
+			continue
+		}
+		line, err := json.Marshal(message)
+		if err != nil {
+			return fmt.Errorf("writeMessagesJSONL() [session.go]: failed to marshal chat message: %w", err)
+		}
+		builder.Write(line)
+		builder.WriteByte('\n')
+	}
+
+	if err := os.WriteFile(path, []byte(builder.String()), 0644); err != nil {
+		return fmt.Errorf("writeMessagesJSONL() [session.go]: failed to write jsonl file: %w", err)
+	}
+
+	return nil
 }
 
 func serializeToolResponse(response *tool.ToolResponse) persistedToolResponse {
@@ -1122,6 +1234,7 @@ func restoreSessionFromPersistedState(system *SweSystem, state persistedSessionS
 		llmLogger:     llmLogger,
 		tokenUsage:    state.TokenUsage,
 		contextLength: state.ContextLengthTokens,
+		compactionCount: state.ContextCompactionCount,
 	}
 
 	copy(session.todoList, state.TodoList)

@@ -112,6 +112,7 @@ func (m *MockConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 
 	// Return a copy
 	config := &conf.GlobalConfig{
+		ContextCompactionThreshold: m.globalConfig.ContextCompactionThreshold,
 		ModelTags:                 make([]conf.ModelTagMapping, len(m.globalConfig.ModelTags)),
 		DefaultProvider:           m.globalConfig.DefaultProvider,
 		DefaultRole:               m.globalConfig.DefaultRole,
