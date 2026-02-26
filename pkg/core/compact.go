@@ -80,7 +80,7 @@ func compactMessagesStep1ReplaceFileParts(messages []*models.ChatMessage) []*mod
 				continue
 			}
 
-			partLength := compactMessagePartSummaryLength(part)
+			partLength := compactMessagePartSummaryLengthForFile(part)
 			for path := range pathSet {
 				info := fileToInfo[path]
 				if info == nil {
@@ -451,11 +451,21 @@ func compactMessagesStep7DropOldCompactedMessagesWithLimit(messages []*models.Ch
 		keepFlags[i] = true
 	}
 
+	latestCompactedIndex := -1
+	for i, msg := range cloned {
+		if msg != nil && compactMessageIsCompactedFileContent(msg) {
+			latestCompactedIndex = i
+		}
+	}
+
 	for msgIndex, msg := range cloned {
 		if currentSize <= targetSize {
 			break
 		}
 		if msg == nil || !compactMessageIsCompactedFileContent(msg) {
+			continue
+		}
+		if msgIndex == latestCompactedIndex {
 			continue
 		}
 
@@ -628,6 +638,28 @@ func compactMessagePartSummaryLength(part models.ChatMessagePart) int {
 	if part.ToolResponse != nil {
 		size += compactToolResponseEstimateSize(part.ToolResponse)
 	}
+	return size
+}
+
+func compactMessagePartSummaryLengthForFile(part models.ChatMessagePart) int {
+	size := len(part.Text) + len(part.ReasoningContent)
+	if part.ToolResponse == nil {
+		return size
+	}
+
+	resultObject := part.ToolResponse.Result.Object()
+	if resultObject == nil {
+		return size
+	}
+
+	if contentValue, ok := resultObject["content"]; ok {
+		if content, ok := contentValue.AsStringOK(); ok {
+			size += len(content)
+			return size
+		}
+	}
+
+	size += compactToolResponseEstimateSize(part.ToolResponse)
 	return size
 }
 
