@@ -340,7 +340,7 @@ func TestOpenAIClient_ChatTokenUsage(t *testing.T) {
 		t.Skip("Skipping token usage assertions against real provider")
 	}
 
-	tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-usage","object":"chat.completion","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":7,"total_tokens":19}}`)
+	tc.Mock.AddRestResponse("/chat/completions", "POST", `{"id":"chatcmpl-usage","object":"chat.completion","created":1640000000,"model":"devstral-small-2:latest","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":7,"total_tokens":19,"prompt_tokens_details":{"cached_tokens":5}}}`)
 
 	chatModel := tc.Client.ChatModel(testOpenAIModelName, nil)
 	resp, err := chatModel.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "hi")}, nil, nil)
@@ -348,6 +348,8 @@ func TestOpenAIClient_ChatTokenUsage(t *testing.T) {
 	require.NotNil(t, resp)
 	require.NotNil(t, resp.TokenUsage)
 	assert.Equal(t, 12, resp.TokenUsage.InputTokens)
+	assert.Equal(t, 5, resp.TokenUsage.InputCachedTokens)
+	assert.Equal(t, 7, resp.TokenUsage.InputNonCachedTokens)
 	assert.Equal(t, 7, resp.TokenUsage.OutputTokens)
 	assert.Equal(t, 19, resp.TokenUsage.TotalTokens)
 	assert.Equal(t, 19, resp.ContextLengthTokens)

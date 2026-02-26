@@ -872,16 +872,16 @@ func (s *SweSession) applyMessageTokenStats(message *models.ChatMessage) {
 
 	if message.TokenUsage != nil {
 		s.tokenUsage.InputTokens += message.TokenUsage.InputTokens
+		s.tokenUsage.InputCachedTokens += message.TokenUsage.InputCachedTokens
+		s.tokenUsage.InputNonCachedTokens += message.TokenUsage.InputNonCachedTokens
 		s.tokenUsage.OutputTokens += message.TokenUsage.OutputTokens
 		s.tokenUsage.TotalTokens += message.TokenUsage.TotalTokens
 	}
 
 	if message.ContextLengthTokens > 0 {
 		s.contextLength = message.ContextLengthTokens
-	}
-
-	if s.tokenUsage.TotalTokens > s.contextLength {
-		s.contextLength = s.tokenUsage.TotalTokens
+	} else if message.TokenUsage != nil && message.TokenUsage.TotalTokens > 0 {
+		s.contextLength = message.TokenUsage.TotalTokens
 	}
 }
 

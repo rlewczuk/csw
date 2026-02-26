@@ -357,9 +357,11 @@ func buildSessionSummaryMessage(duration time.Duration, session *core.SweSession
 
 	usage := session.TokenUsage()
 	return fmt.Sprintf(
-		"%s | tokens(input=%d, output=%d, total=%d) | context=%d",
+		"%s | tokens(input=%d[cached=%d,noncached=%d], output=%d, total=%d) | context=%d",
 		base,
 		usage.InputTokens,
+		usage.InputCachedTokens,
+		usage.InputNonCachedTokens,
 		usage.OutputTokens,
 		usage.TotalTokens,
 		session.ContextLengthTokens(),

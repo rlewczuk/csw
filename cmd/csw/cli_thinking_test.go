@@ -159,7 +159,7 @@ func TestBuildSessionSummaryMessage(t *testing.T) {
 	t.Run("includes token and context stats", func(t *testing.T) {
 		session := &core.SweSession{}
 		assert.Equal(t,
-			"Session completed in 5s | tokens(input=0, output=0, total=0) | context=0",
+			"Session completed in 5s | tokens(input=0[cached=0,noncached=0], output=0, total=0) | context=0",
 			buildSessionSummaryMessage(5*time.Second, session),
 		)
 	})

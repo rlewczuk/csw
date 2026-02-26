@@ -458,10 +458,20 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	// Convert response to models.ChatMessage
 	result := convertFromOpenAIMessage(choice.Message)
 	if chatResp.Usage != nil {
+		cachedTokens := 0
+		if chatResp.Usage.PromptTokensDetails != nil {
+			cachedTokens = chatResp.Usage.PromptTokensDetails.CachedTokens
+		}
+		nonCachedTokens := chatResp.Usage.PromptTokens - cachedTokens
+		if nonCachedTokens < 0 {
+			nonCachedTokens = 0
+		}
 		result.TokenUsage = &TokenUsage{
-			InputTokens:  chatResp.Usage.PromptTokens,
-			OutputTokens: chatResp.Usage.CompletionTokens,
-			TotalTokens:  chatResp.Usage.TotalTokens,
+			InputTokens:          chatResp.Usage.PromptTokens,
+			InputCachedTokens:    cachedTokens,
+			InputNonCachedTokens: nonCachedTokens,
+			OutputTokens:         chatResp.Usage.CompletionTokens,
+			TotalTokens:          chatResp.Usage.TotalTokens,
 		}
 		result.ContextLengthTokens = chatResp.Usage.TotalTokens
 	}
@@ -638,6 +648,13 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 				if chatResp.Usage != nil {
 					hasUsage = true
 					usage.InputTokens += chatResp.Usage.PromptTokens
+					if chatResp.Usage.PromptTokensDetails != nil {
+						usage.InputCachedTokens += chatResp.Usage.PromptTokensDetails.CachedTokens
+					}
+					usage.InputNonCachedTokens = usage.InputTokens - usage.InputCachedTokens
+					if usage.InputNonCachedTokens < 0 {
+						usage.InputNonCachedTokens = 0
+					}
 					usage.OutputTokens += chatResp.Usage.CompletionTokens
 					usage.TotalTokens += chatResp.Usage.TotalTokens
 					if chatResp.Usage.TotalTokens > 0 {

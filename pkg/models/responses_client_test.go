@@ -218,7 +218,7 @@ func TestResponsesClient_ChatTokenUsage(t *testing.T) {
 		t.Skip("Skipping token usage assertions against real provider")
 	}
 
-	tc.Mock.AddRestResponse("/responses", "POST", `{"id":"resp_usage","object":"response","status":"completed","usage":{"input_tokens":14,"output_tokens":10,"total_tokens":24},"output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}]}`)
+	tc.Mock.AddRestResponse("/responses", "POST", `{"id":"resp_usage","object":"response","status":"completed","usage":{"input_tokens":14,"output_tokens":10,"total_tokens":24,"input_tokens_details":{"cached_tokens":4}},"output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}]}`)
 
 	chatModel := tc.Client.ChatModel(getResponsesModelName(), nil)
 	resp, err := chatModel.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "hi")}, nil, nil)
@@ -226,6 +226,8 @@ func TestResponsesClient_ChatTokenUsage(t *testing.T) {
 	require.NotNil(t, resp)
 	require.NotNil(t, resp.TokenUsage)
 	assert.Equal(t, 14, resp.TokenUsage.InputTokens)
+	assert.Equal(t, 4, resp.TokenUsage.InputCachedTokens)
+	assert.Equal(t, 10, resp.TokenUsage.InputNonCachedTokens)
 	assert.Equal(t, 10, resp.TokenUsage.OutputTokens)
 	assert.Equal(t, 24, resp.TokenUsage.TotalTokens)
 	assert.Equal(t, 24, resp.ContextLengthTokens)

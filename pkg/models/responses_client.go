@@ -479,10 +479,20 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		if total <= 0 {
 			total = chatResp.Usage.InputTokens + chatResp.Usage.OutputTokens
 		}
+		cachedTokens := 0
+		if chatResp.Usage.InputTokensDetails != nil {
+			cachedTokens = chatResp.Usage.InputTokensDetails.CachedTokens
+		}
+		nonCachedTokens := chatResp.Usage.InputTokens - cachedTokens
+		if nonCachedTokens < 0 {
+			nonCachedTokens = 0
+		}
 		result.TokenUsage = &TokenUsage{
-			InputTokens:  chatResp.Usage.InputTokens,
-			OutputTokens: chatResp.Usage.OutputTokens,
-			TotalTokens:  total,
+			InputTokens:          chatResp.Usage.InputTokens,
+			InputCachedTokens:    cachedTokens,
+			InputNonCachedTokens: nonCachedTokens,
+			OutputTokens:         chatResp.Usage.OutputTokens,
+			TotalTokens:          total,
 		}
 		result.ContextLengthTokens = total
 	}
@@ -654,6 +664,13 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 
 			if event.Response != nil && event.Response.Usage != nil {
 				usage.InputTokens += event.Response.Usage.InputTokens
+				if event.Response.Usage.InputTokensDetails != nil {
+					usage.InputCachedTokens += event.Response.Usage.InputTokensDetails.CachedTokens
+				}
+				usage.InputNonCachedTokens = usage.InputTokens - usage.InputCachedTokens
+				if usage.InputNonCachedTokens < 0 {
+					usage.InputNonCachedTokens = 0
+				}
 				usage.OutputTokens += event.Response.Usage.OutputTokens
 				if event.Response.Usage.TotalTokens > 0 {
 					usage.TotalTokens += event.Response.Usage.TotalTokens
@@ -1179,6 +1196,13 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 		}
 		if event.Response != nil && event.Response.Usage != nil {
 			finalUsage.InputTokens += event.Response.Usage.InputTokens
+			if event.Response.Usage.InputTokensDetails != nil {
+				finalUsage.InputCachedTokens += event.Response.Usage.InputTokensDetails.CachedTokens
+			}
+			finalUsage.InputNonCachedTokens = finalUsage.InputTokens - finalUsage.InputCachedTokens
+			if finalUsage.InputNonCachedTokens < 0 {
+				finalUsage.InputNonCachedTokens = 0
+			}
 			finalUsage.OutputTokens += event.Response.Usage.OutputTokens
 			if event.Response.Usage.TotalTokens > 0 {
 				finalUsage.TotalTokens += event.Response.Usage.TotalTokens

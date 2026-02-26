@@ -324,6 +324,8 @@ func TestAnthropicClient_ChatTokenUsage(t *testing.T) {
 	require.NotNil(t, resp)
 	require.NotNil(t, resp.TokenUsage)
 	assert.Equal(t, 18, resp.TokenUsage.InputTokens)
+	assert.Equal(t, 0, resp.TokenUsage.InputCachedTokens)
+	assert.Equal(t, 18, resp.TokenUsage.InputNonCachedTokens)
 	assert.Equal(t, 6, resp.TokenUsage.OutputTokens)
 	assert.Equal(t, 24, resp.TokenUsage.TotalTokens)
 	assert.Equal(t, 24, resp.ContextLengthTokens)
