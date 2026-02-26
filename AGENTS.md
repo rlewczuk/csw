@@ -41,6 +41,7 @@ Rules regarding implementing tests:
   - but when running integration tests, extend duration to 300 seconds;
 - prefer writing test exposing issue being solved before fixing it;
 - when asked to make integration test conditional based on `_integ/xxx.enabled` file, always use `TestEnabled` function from `pkg/testutil/cfg/integ.go`, never implement it manually;
+- when running tests, set gocache to local tmp dir: `GOCACHE="$PWD/tmp/.gocache" GOMODCACHE="$PWD/tmp/.gomodcache"`
 
 Other rules:
 - When generating summary after performing a task, DO NOT save it to file, just put it in chat.
