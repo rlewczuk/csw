@@ -32,6 +32,7 @@ type CLIParams struct {
 	WorktreeBranch        string
 	Merge                 bool
 	ContainerEnabled      bool
+	ContainerDisabled     bool
 	ContainerImage        string
 	ContainerMounts       []string
 	ContainerEnv          []string
@@ -51,8 +52,6 @@ type CLIParams struct {
 }
 
 const defaultBashRunTimeout = 120 * time.Second
-
-const containerDefaultImageSentinel = "@DEFAULT"
 
 var runCLIFunc = runCLI
 
@@ -78,7 +77,9 @@ func CliCommand() *cobra.Command {
 		cliThinking       string
 		cliCommitMessage  string
 		cliMerge          bool
-		cliContainer      string
+		cliContainerImage string
+		cliContainerOn    bool
+		cliContainerOff   bool
 		cliContainerMount []string
 		cliContainerEnv   []string
 		cliResume         string
@@ -88,7 +89,7 @@ func CliCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--merge] [--container [<container-image>]] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last>] [--continue] [--force] [\"prompt\"]",
+		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last>] [--continue] [--force] [\"prompt\"]",
 		Short: "Start a CLI chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.MaximumNArgs(1),
@@ -151,9 +152,15 @@ func CliCommand() *cobra.Command {
 				return err
 			}
 
-			containerRequested := cmd.Flags().Changed("container") || len(cliContainerMount) > 0 || len(cliContainerEnv) > 0
-			if cliContainer == containerDefaultImageSentinel {
-				cliContainer = ""
+			containerEnabledChanged := cmd.Flags().Changed("container-enabled")
+			containerDisabledChanged := cmd.Flags().Changed("container-disabled")
+			if containerEnabledChanged && containerDisabledChanged {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: --container-enabled and --container-disabled cannot be used together")
+			}
+
+			containerRequested := (containerEnabledChanged && cliContainerOn) || len(cliContainerMount) > 0 || len(cliContainerEnv) > 0
+			if containerRequested && resumeTarget != "" {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: container mode options are not supported with --resume")
 			}
 
 			return runCLIFunc(&CLIParams{
@@ -164,7 +171,8 @@ func CliCommand() *cobra.Command {
 				WorktreeBranch:        cliWorktree,
 				Merge:                 cliMerge,
 				ContainerEnabled:      containerRequested,
-				ContainerImage:        cliContainer,
+				ContainerDisabled:     containerDisabledChanged && cliContainerOff,
+				ContainerImage:        cliContainerImage,
 				ContainerMounts:       cliContainerMount,
 				ContainerEnv:          cliContainerEnv,
 				CommitMessageTemplate: cliCommitMessage,
@@ -190,7 +198,9 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliWorkDir, "workdir", "", "Working directory (default: current directory)")
 	cmd.Flags().StringVar(&cliWorktree, "worktree", "", "Create and use a git worktree for this session on a feature branch")
 	cmd.Flags().BoolVar(&cliMerge, "merge", false, "Merge the feature worktree branch into main after commit")
-	cmd.Flags().StringVar(&cliContainer, "container", "", "Container image for running bash commands in container mode (optional; uses default image from config when omitted)")
+	cmd.Flags().StringVar(&cliContainerImage, "container-image", "", "Container image for running bash commands in container mode")
+	cmd.Flags().BoolVar(&cliContainerOn, "container-enabled", false, "Enable running bash commands in container mode")
+	cmd.Flags().BoolVar(&cliContainerOff, "container-disabled", false, "Disable running bash commands in container mode")
 	cmd.Flags().StringArrayVar(&cliContainerMount, "container-mount", nil, "Additional container mount in host_path:container_path format (repeatable)")
 	cmd.Flags().StringArrayVar(&cliContainerEnv, "container-env", nil, "Additional container env var in KEY=VALUE format (repeatable)")
 	cmd.Flags().StringVar(&cliCommitMessage, "commit-message", "", "Custom commit message template, e.g. '[{{ .Branch }}] {{ .Message }}'")
@@ -210,11 +220,6 @@ func CliCommand() *cobra.Command {
 	if resumeFlag != nil {
 		resumeFlag.NoOptDefVal = "last"
 	}
-	containerFlag := cmd.Flags().Lookup("container")
-	if containerFlag != nil {
-		containerFlag.NoOptDefVal = containerDefaultImageSentinel
-	}
-
 	return cmd
 }
 
@@ -230,8 +235,8 @@ func runCLI(params *CLIParams) error {
 		return fmt.Errorf("runCLI() [cli.go]: --merge requires --worktree")
 	}
 
-	if (params.ContainerEnabled || params.ContainerImage != "" || len(params.ContainerMounts) > 0 || len(params.ContainerEnv) > 0) && params.ResumeTarget != "" {
-		return fmt.Errorf("runCLI() [cli.go]: --container is not supported with --resume")
+	if (params.ContainerEnabled || len(params.ContainerMounts) > 0 || len(params.ContainerEnv) > 0) && params.ResumeTarget != "" {
+		return fmt.Errorf("runCLI() [cli.go]: container mode options are not supported with --resume")
 	}
 
 	resolvedWorktreeBranch, err := resolveWorktreeBranchName(ctx, params.Prompt, params.ModelName, params.WorkDir, params.ConfigPath, params.WorktreeBranch)
@@ -250,6 +255,7 @@ func runCLI(params *CLIParams) error {
 		RoleName:         params.RoleName,
 		WorktreeBranch:   params.WorktreeBranch,
 		ContainerEnabled: params.ContainerEnabled,
+		ContainerDisabled: params.ContainerDisabled,
 		ContainerImage:   params.ContainerImage,
 		ContainerMounts:  params.ContainerMounts,
 		ContainerEnv:     params.ContainerEnv,

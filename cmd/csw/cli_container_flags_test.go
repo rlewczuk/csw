@@ -11,26 +11,26 @@ import (
 
 func TestCLIContainerFlagsPropagation(t *testing.T) {
 	tests := []struct {
-		name                   string
-		args                   []string
-		expectedEnabled        bool
-		expectedImage          string
-		expectedMounts         []string
-		expectedEnv            []string
-		expectError            bool
-		expectedErrorSubstring string
+		name                     string
+		args                     []string
+		expectedEnabled          bool
+		expectedDisabled         bool
+		expectedImage            string
+		expectedMounts           []string
+		expectedEnv              []string
+		expectError              bool
+		expectedErrorSubstring   string
 	}{
 		{
-			name:            "container with explicit image",
-			args:            []string{"--container=busybox:latest", "prompt"},
-			expectedEnabled: true,
+			name:            "container image does not enable mode",
+			args:            []string{"--container-image=busybox:latest", "prompt"},
+			expectedEnabled: false,
 			expectedImage:   "busybox:latest",
 		},
 		{
-			name:            "container without image uses default sentinel",
-			args:            []string{"--container", "prompt"},
+			name:            "container enabled",
+			args:            []string{"--container-enabled", "prompt"},
 			expectedEnabled: true,
-			expectedImage:   "",
 		},
 		{
 			name:            "container mount enables container mode",
@@ -45,10 +45,28 @@ func TestCLIContainerFlagsPropagation(t *testing.T) {
 			expectedEnv:     []string{"KEY=value"},
 		},
 		{
-			name:                   "container rejected with resume",
-			args:                   []string{"--container=busybox:latest", "--resume=last", "--continue", "prompt"},
+			name:                   "container enabled rejected with resume",
+			args:                   []string{"--container-enabled", "--resume=last", "--continue", "prompt"},
 			expectError:            true,
-			expectedErrorSubstring: "--container is not supported with --resume",
+			expectedErrorSubstring: "container mode options are not supported with --resume",
+		},
+		{
+			name:                   "container mount rejected with resume",
+			args:                   []string{"--container-mount=/host:/container", "--resume=last", "--continue", "prompt"},
+			expectError:            true,
+			expectedErrorSubstring: "container mode options are not supported with --resume",
+		},
+		{
+			name:                   "container flags are mutually exclusive",
+			args:                   []string{"--container-enabled", "--container-disabled", "prompt"},
+			expectError:            true,
+			expectedErrorSubstring: "--container-enabled and --container-disabled cannot be used together",
+		},
+		{
+			name:            "container disabled propagates",
+			args:            []string{"--container-disabled", "prompt"},
+			expectedEnabled: false,
+			expectedDisabled: true,
 		},
 	}
 
@@ -64,7 +82,7 @@ func TestCLIContainerFlagsPropagation(t *testing.T) {
 				runCLIFunc = originalRun
 			} else {
 				runCLIFunc = func(params *CLIParams) error {
-					captured = fmt.Sprintf("enabled=%t,image=%s,mounts=%v,env=%v", params.ContainerEnabled, params.ContainerImage, params.ContainerMounts, params.ContainerEnv)
+					captured = fmt.Sprintf("enabled=%t,disabled=%t,image=%s,mounts=%v,env=%v", params.ContainerEnabled, params.ContainerDisabled, params.ContainerImage, params.ContainerMounts, params.ContainerEnv)
 					return nil
 				}
 			}
@@ -85,6 +103,7 @@ func TestCLIContainerFlagsPropagation(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Contains(t, captured, fmt.Sprintf("enabled=%t", tc.expectedEnabled))
+			assert.Contains(t, captured, fmt.Sprintf("disabled=%t", tc.expectedDisabled))
 			assert.Contains(t, captured, fmt.Sprintf("image=%s", tc.expectedImage))
 			assert.Contains(t, captured, fmt.Sprintf("mounts=%v", tc.expectedMounts))
 			assert.Contains(t, captured, fmt.Sprintf("env=%v", tc.expectedEnv))

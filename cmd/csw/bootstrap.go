@@ -43,6 +43,7 @@ type BuildSystemParams struct {
 	RoleName         string
 	WorktreeBranch   string
 	ContainerEnabled bool
+	ContainerDisabled bool
 	ContainerImage   string
 	ContainerMounts  []string
 	ContainerEnv     []string
@@ -329,8 +330,14 @@ type containerRuntimeConfig struct {
 func resolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params BuildSystemParams, effectiveWorkDir string) (containerRuntimeConfig, error) {
 	var runtimeConfig containerRuntimeConfig
 
-	containerRequested := params.ContainerEnabled || params.ContainerImage != "" || len(params.ContainerMounts) > 0 || len(params.ContainerEnv) > 0
-	runtimeConfig.Enabled = globalConfig.Container.Enabled || containerRequested
+	runtimeConfig.Enabled = globalConfig.Container.Enabled
+	if params.ContainerEnabled {
+		runtimeConfig.Enabled = true
+	}
+	if params.ContainerDisabled {
+		runtimeConfig.Enabled = false
+	}
+
 	if !runtimeConfig.Enabled {
 		return runtimeConfig, nil
 	}
