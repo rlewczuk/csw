@@ -101,13 +101,22 @@ func TestResolveContainerRuntimeConfig(t *testing.T) {
 			expectEnvVal:  "global",
 		},
 		{
-			name: "container flag without value uses global image",
+			name: "container enabled uses global image",
 			global: &conf.GlobalConfig{Container: conf.ContainerConfig{
 				Image: "alpine:latest",
 			}},
 			params:        BuildSystemParams{ContainerEnabled: true},
 			expectEnabled: true,
 			expectImage:   "alpine:latest",
+		},
+		{
+			name: "container disabled overrides global enabled",
+			global: &conf.GlobalConfig{Container: conf.ContainerConfig{
+				Enabled: true,
+				Image:   "alpine:latest",
+			}},
+			params:        BuildSystemParams{ContainerDisabled: true},
+			expectEnabled: false,
 		},
 		{
 			name: "cli image overrides global image",
