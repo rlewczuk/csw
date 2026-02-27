@@ -81,17 +81,25 @@ func (s *EmbeddedConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 	// Return a copy to prevent external modification
 	config := &conf.GlobalConfig{
 		ContextCompactionThreshold: s.globalConfig.ContextCompactionThreshold,
-		ModelTags:                 make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
-		DefaultProvider:           s.globalConfig.DefaultProvider,
-		DefaultRole:               s.globalConfig.DefaultRole,
-		LLMRetryMaxAttempts:       s.globalConfig.LLMRetryMaxAttempts,
-		LLMRetryMaxBackoffSeconds: s.globalConfig.LLMRetryMaxBackoffSeconds,
+		ModelTags:                  make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
+		DefaultProvider:            s.globalConfig.DefaultProvider,
+		DefaultRole:                s.globalConfig.DefaultRole,
+		LLMRetryMaxAttempts:        s.globalConfig.LLMRetryMaxAttempts,
+		LLMRetryMaxBackoffSeconds:  s.globalConfig.LLMRetryMaxBackoffSeconds,
+		Container: conf.ContainerConfig{
+			Mounts:  make([]string, len(s.globalConfig.Container.Mounts)),
+			Env:     make([]string, len(s.globalConfig.Container.Env)),
+			Image:   s.globalConfig.Container.Image,
+			Enabled: s.globalConfig.Container.Enabled,
+		},
 		ToolSelection: conf.ToolSelectionConfig{
 			Default: make(map[string]bool, len(s.globalConfig.ToolSelection.Default)),
 			Tags:    make(map[string]map[string]bool, len(s.globalConfig.ToolSelection.Tags)),
 		},
 	}
 	copy(config.ModelTags, s.globalConfig.ModelTags)
+	copy(config.Container.Mounts, s.globalConfig.Container.Mounts)
+	copy(config.Container.Env, s.globalConfig.Container.Env)
 	for toolName, enabled := range s.globalConfig.ToolSelection.Default {
 		config.ToolSelection.Default[toolName] = enabled
 	}

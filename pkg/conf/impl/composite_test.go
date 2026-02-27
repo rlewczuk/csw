@@ -923,3 +923,53 @@ func TestCompositeConfigStore_PromptFragmentsCopyProtection(t *testing.T) {
 	assert.Equal(t, "Original content", configs2["role1"].PromptFragments["fragment1"])
 	assert.NotContains(t, configs2["role1"].PromptFragments, "fragment2")
 }
+
+// TestCompositeConfigStore_ContainerConfigFromGlobalSource tests that container
+// configuration from a global source (like ~/.config/csw) is properly merged
+// when a local source (like .csw/config) doesn't define container properties.
+// This is a regression test for the bug where EmbeddedConfigStore.GetGlobalConfig()
+// didn't copy the Container field.
+func TestCompositeConfigStore_ContainerConfigFromGlobalSource(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalDir := filepath.Join(tmpDir, "global") // like ~/.config/csw
+	localDir := filepath.Join(tmpDir, "local")   // like ./.csw/config
+
+	require.NoError(t, os.MkdirAll(globalDir, 0755))
+	require.NoError(t, os.MkdirAll(localDir, 0755))
+
+	// Global config with full container configuration
+	globalConfig := `{
+		"default_role": "developer",
+		"container": {
+			"image": "golang:1.25-trixie",
+			"enabled": true,
+			"env": ["FOO=bar", "BAZ=qux"],
+			"mounts": ["/tmp:/mnt/tmp"]
+		}
+	}`
+	require.NoError(t, os.WriteFile(filepath.Join(globalDir, "global.json"), []byte(globalConfig), 0644))
+
+	// Local config WITHOUT container section - only has default_role
+	localConfig := `{
+		"default_role": "custom-role"
+	}`
+	require.NoError(t, os.WriteFile(filepath.Join(localDir, "global.json"), []byte(localConfig), 0644))
+
+	// Create composite store (global first, then local - local overrides)
+	configPath := fmt.Sprintf("%s:%s", globalDir, localDir)
+	store, err := NewCompositeConfigStore(tmpDir, configPath)
+	require.NoError(t, err)
+
+	// Get merged global config
+	mergedConfig, err := store.GetGlobalConfig()
+	require.NoError(t, err)
+
+	// Verify container config from global source is preserved
+	assert.True(t, mergedConfig.Container.Enabled, "Container.Enabled should be true from global config")
+	assert.Equal(t, "golang:1.25-trixie", mergedConfig.Container.Image, "Container.Image should be preserved from global config")
+	assert.Equal(t, []string{"FOO=bar", "BAZ=qux"}, mergedConfig.Container.Env, "Container.Env should be preserved from global config")
+	assert.Equal(t, []string{"/tmp:/mnt/tmp"}, mergedConfig.Container.Mounts, "Container.Mounts should be preserved from global config")
+
+	// Verify local config overrides other fields
+	assert.Equal(t, "custom-role", mergedConfig.DefaultRole, "DefaultRole should be overridden by local config")
+}
