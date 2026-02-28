@@ -580,8 +580,8 @@ func TestVFSEditToolRender(t *testing.T) {
 		}
 		oneLiner, full, _ := tool.Render(call)
 
-		// Assert - path should be relative to worktree
-		assert.Equal(t, "edit cmd/csw/main.go", oneLiner)
+		// Assert - path should be relative to worktree with line stats (+1/-1)
+		assert.Equal(t, "edit cmd/csw/main.go (+1/-1)", oneLiner)
 		assert.Contains(t, full, "--- cmd/csw/main.go")
 		assert.Contains(t, full, "+++ cmd/csw/main.go")
 	})
@@ -603,7 +603,7 @@ func TestVFSEditToolRender(t *testing.T) {
 		}
 		oneLiner, _, _ := tool.Render(call)
 
-		// Assert
-		assert.Equal(t, "edit cmd/csw/main.go", oneLiner)
+		// Assert - path should be relative with line stats (+1/-1)
+		assert.Equal(t, "edit cmd/csw/main.go (+1/-1)", oneLiner)
 	})
 }

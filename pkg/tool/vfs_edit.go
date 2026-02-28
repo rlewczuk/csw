@@ -3,6 +3,7 @@ package tool
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/vfs"
@@ -154,7 +155,18 @@ func (t *VFSEditTool) Render(call *ToolCall) (string, string, map[string]string)
 	oldString, _ := call.Arguments.StringOK("oldString")
 	newString, _ := call.Arguments.StringOK("newString")
 	relativePath := makeRelativePath(path, t.vfs)
-	oneLiner := truncateString("edit "+relativePath, 128)
+
+	// Count lines in oldString and newString
+	linesRemoved := strings.Count(oldString, "\n")
+	if oldString != "" && !strings.HasSuffix(oldString, "\n") {
+		linesRemoved++
+	}
+	linesAdded := strings.Count(newString, "\n")
+	if newString != "" && !strings.HasSuffix(newString, "\n") {
+		linesAdded++
+	}
+
+	oneLiner := truncateString(fmt.Sprintf("edit %s (+%d/-%d)", relativePath, linesAdded, linesRemoved), 128)
 	full := oneLiner + "\n\n"
 	// Create unified diff without line numbers
 	full += "--- " + relativePath + "\n"
