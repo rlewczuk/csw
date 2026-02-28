@@ -295,4 +295,28 @@ func TestVFSMoveToolRender(t *testing.T) {
 		// Assert
 		assert.Equal(t, "move cmd/csw/main.go -> cmd/csw/main_renamed.go", oneLiner)
 	})
+
+	t.Run("should render error in oneLiner and full when error is present", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSMoveTool(mockVFS)
+
+		// Execute - simulate error by including error in arguments
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsMove",
+			Arguments: NewToolValue(map[string]any{
+				"path":        "cmd/csw/main.go",
+				"destination": "cmd/csw/main_renamed.go",
+				"error":       "failed to move file: destination already exists",
+			}),
+		}
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - oneLiner should have error as second line
+		assert.Contains(t, oneLiner, "move cmd/csw/main.go -> cmd/csw/main_renamed.go")
+		assert.Contains(t, oneLiner, "failed to move file: destination already exists")
+		// Assert - full should have ERROR: prefix
+		assert.Contains(t, full, "ERROR: failed to move file: destination already exists")
+	})
 }

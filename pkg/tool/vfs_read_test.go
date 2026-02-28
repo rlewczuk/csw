@@ -2,6 +2,7 @@ package tool
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
@@ -509,5 +510,54 @@ func TestVFSReadToolRender(t *testing.T) {
 
 		// Assert - path should remain as-is since it's outside worktree
 		assert.Equal(t, "read /other/path/file.go", oneLiner)
+	})
+
+	t.Run("should render error in oneLiner and full when error is present", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSReadTool(mockVFS, false)
+
+		// Execute - simulate error by including error in arguments
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsRead",
+			Arguments: NewToolValue(map[string]any{
+				"path":  "cmd/csw/main.go",
+				"error": "failed to read file: permission denied",
+			}),
+		}
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - oneLiner should have error as second line
+		assert.Contains(t, oneLiner, "read cmd/csw/main.go")
+		assert.Contains(t, oneLiner, "failed to read file: permission denied")
+		// Assert - full should have ERROR: prefix
+		assert.Contains(t, full, "ERROR: failed to read file: permission denied")
+	})
+
+	t.Run("should convert multiline error to single line in oneLiner", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSReadTool(mockVFS, false)
+
+		// Execute - simulate multiline error
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsRead",
+			Arguments: NewToolValue(map[string]any{
+				"path":  "cmd/csw/main.go",
+				"error": "error line 1\nerror line 2\nerror line 3",
+			}),
+		}
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - oneLiner should have error on single line
+		lines := strings.Split(oneLiner, "\n")
+		assert.Len(t, lines, 2) // First line is operation, second is error
+		assert.Contains(t, lines[1], "error line 1")
+		assert.Contains(t, lines[1], "error line 2")
+		assert.Contains(t, lines[1], "error line 3")
+		// Assert - full should preserve original multiline with ERROR: prefix
+		assert.Contains(t, full, "ERROR: error line 1")
 	})
 }

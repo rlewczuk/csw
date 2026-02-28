@@ -606,4 +606,30 @@ func TestVFSEditToolRender(t *testing.T) {
 		// Assert - path should be relative with line stats (+1/-1)
 		assert.Equal(t, "edit cmd/csw/main.go (+1/-1)", oneLiner)
 	})
+
+	t.Run("should render error in oneLiner and full when error is present", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSEditTool(mockVFS, nil)
+
+		// Execute - simulate error by including error in arguments
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsEdit",
+			Arguments: NewToolValue(map[string]any{
+				"path":      "cmd/csw/main.go",
+				"oldString": "old",
+				"newString": "new",
+				"error":     "failed to edit file: oldString not found",
+			}),
+		}
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - oneLiner should have error as second line
+		assert.Contains(t, oneLiner, "edit cmd/csw/main.go (+1/-1)")
+		assert.Contains(t, oneLiner, "failed to edit file: oldString not found")
+		// Assert - full should have ERROR: prefix and not contain diff
+		assert.Contains(t, full, "ERROR: failed to edit file: oldString not found")
+		assert.NotContains(t, full, "--- cmd/csw/main.go")
+	})
 }

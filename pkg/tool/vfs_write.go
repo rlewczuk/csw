@@ -137,6 +137,17 @@ func (t *VFSWriteTool) Render(call *ToolCall) (string, string, map[string]string
 	relativePath := makeRelativePath(path, t.vfs)
 	oneLiner := truncateString("write "+relativePath, 128)
 	full := oneLiner + "\n\n"
+
+	// Check for error in arguments
+	if errMsg, ok := call.Arguments.StringOK("error"); ok && errMsg != "" {
+		errOneLiner, errFull := formatRenderError(errMsg)
+		// Add error as second line to oneLiner
+		oneLiner = oneLiner + "\n" + errOneLiner
+		// Add error to full output
+		full = full + errFull
+		return oneLiner, full, make(map[string]string)
+	}
+
 	// Try to get content from arguments
 	if content, ok := call.Arguments.StringOK("content"); ok && content != "" {
 		full += content

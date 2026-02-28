@@ -168,6 +168,17 @@ func (t *VFSEditTool) Render(call *ToolCall) (string, string, map[string]string)
 
 	oneLiner := truncateString(fmt.Sprintf("edit %s (+%d/-%d)", relativePath, linesAdded, linesRemoved), 128)
 	full := oneLiner + "\n\n"
+
+	// Check for error in arguments
+	if errMsg, ok := call.Arguments.StringOK("error"); ok && errMsg != "" {
+		errOneLiner, errFull := formatRenderError(errMsg)
+		// Add error as second line to oneLiner
+		oneLiner = oneLiner + "\n" + errOneLiner
+		// Add error to full output
+		full = full + errFull
+		return oneLiner, full, make(map[string]string)
+	}
+
 	// Create unified diff without line numbers
 	full += "--- " + relativePath + "\n"
 	full += "+++ " + relativePath + "\n"

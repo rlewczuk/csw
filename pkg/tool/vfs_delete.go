@@ -54,5 +54,16 @@ func (t *VFSDeleteTool) Render(call *ToolCall) (string, string, map[string]strin
 	relativePath := makeRelativePath(path, t.vfs)
 	oneLiner := truncateString("delete "+relativePath, 128)
 	full := oneLiner
+
+	// Check for error in arguments
+	if errMsg, ok := call.Arguments.StringOK("error"); ok && errMsg != "" {
+		errOneLiner, errFull := formatRenderError(errMsg)
+		// Add error as second line to oneLiner
+		oneLiner = oneLiner + "\n" + errOneLiner
+		// Add error to full output
+		full = full + "\n\n" + errFull
+		return oneLiner, full, make(map[string]string)
+	}
+
 	return oneLiner, full, make(map[string]string)
 }

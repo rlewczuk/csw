@@ -323,4 +323,28 @@ func TestVFSWriteToolRender(t *testing.T) {
 		// Assert
 		assert.Equal(t, "write cmd/csw/main.go", oneLiner)
 	})
+
+	t.Run("should render error in oneLiner and full when error is present", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSWriteTool(mockVFS, nil)
+
+		// Execute - simulate error by including error in arguments
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsWrite",
+			Arguments: NewToolValue(map[string]any{
+				"path":    "cmd/csw/main.go",
+				"content": "package main",
+				"error":   "failed to write file: permission denied",
+			}),
+		}
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - oneLiner should have error as second line
+		assert.Contains(t, oneLiner, "write cmd/csw/main.go")
+		assert.Contains(t, oneLiner, "failed to write file: permission denied")
+		// Assert - full should have ERROR: prefix
+		assert.Contains(t, full, "ERROR: failed to write file: permission denied")
+	})
 }

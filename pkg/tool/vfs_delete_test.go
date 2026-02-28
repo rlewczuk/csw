@@ -219,4 +219,27 @@ func TestVFSDeleteToolRender(t *testing.T) {
 		// Assert
 		assert.Equal(t, "delete cmd/csw/main.go", oneLiner)
 	})
+
+	t.Run("should render error in oneLiner and full when error is present", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSDeleteTool(mockVFS)
+
+		// Execute - simulate error by including error in arguments
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsDelete",
+			Arguments: NewToolValue(map[string]any{
+				"path":  "cmd/csw/main.go",
+				"error": "failed to delete file: file not found",
+			}),
+		}
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - oneLiner should have error as second line
+		assert.Contains(t, oneLiner, "delete cmd/csw/main.go")
+		assert.Contains(t, oneLiner, "failed to delete file: file not found")
+		// Assert - full should have ERROR: prefix
+		assert.Contains(t, full, "ERROR: failed to delete file: file not found")
+	})
 }

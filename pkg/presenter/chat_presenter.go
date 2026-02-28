@@ -224,7 +224,12 @@ func (p *ChatPresenter) AddToolCallResult(result *tool.ToolResponse) {
 				// Get the render result from the tool
 				if p.system != nil && p.system.Tools != nil {
 					if toolImpl, err := p.system.Tools.Get(result.Call.Function); err == nil {
-						summary, details, meta := toolImpl.Render(result.Call)
+						// Pass error information to Render via Arguments if there was an error
+						callForRender := result.Call
+						if result.Error != nil {
+							callForRender = copyToolCallWithError(result.Call, result.Error)
+						}
+						summary, details, meta := toolImpl.Render(callForRender)
 						t.Summary = summary
 						t.Details = details
 						t.Meta = meta
@@ -387,6 +392,29 @@ func formatToolArguments(call *tool.ToolCall) string {
 		}
 	}
 	return ""
+}
+
+// copyToolCallWithError creates a copy of the ToolCall with error information added to Arguments.
+// This allows the Render method to access error information without changing the method signature.
+func copyToolCallWithError(call *tool.ToolCall, err error) *tool.ToolCall {
+	// Create a copy of the call
+	callCopy := &tool.ToolCall{
+		ID:       call.ID,
+		Function: call.Function,
+		Access:   call.Access,
+	}
+
+	// Copy arguments and add error information
+	argsCopy := make(map[string]any)
+	if obj := call.Arguments.Object(); obj != nil {
+		for k, v := range obj {
+			argsCopy[k] = v.Raw()
+		}
+	}
+	argsCopy["error"] = err.Error()
+	callCopy.Arguments = tool.NewToolValue(argsCopy)
+
+	return callCopy
 }
 
 // buildToolProps builds the Props array for a tool state.

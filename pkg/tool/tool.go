@@ -564,6 +564,26 @@ type Tool interface {
 	Render(call *ToolCall) (string, string, map[string]string)
 }
 
+// formatRenderError formats an error for display in Render output.
+// It returns a one-liner version (with newlines converted to spaces) and a full version.
+// The full version includes the ERROR: prefix for clear identification.
+func formatRenderError(errMsg string) (oneLiner, full string) {
+	if errMsg == "" {
+		return "", ""
+	}
+	// Convert to one-liner by replacing newlines with spaces
+	oneLiner = strings.ReplaceAll(errMsg, "\n", " ")
+	oneLiner = strings.ReplaceAll(oneLiner, "\r", "")
+	// Collapse multiple spaces into one
+	for strings.Contains(oneLiner, "  ") {
+		oneLiner = strings.ReplaceAll(oneLiner, "  ", " ")
+	}
+	oneLiner = strings.TrimSpace(oneLiner)
+	// Full version with ERROR: prefix
+	full = "ERROR: " + errMsg
+	return oneLiner, full
+}
+
 // truncateString truncates a string to the specified maximum length,
 // adding an ellipsis in the middle if truncated.
 func truncateString(s string, maxLen int) string {

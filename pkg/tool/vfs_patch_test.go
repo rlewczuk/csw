@@ -310,6 +310,27 @@ func TestVFSPatchToolRender(t *testing.T) {
 
 		assert.Equal(t, "apply patch: A:name.txt(+1)", oneLiner)
 	})
+
+	t.Run("should render error in oneLiner and full when error is present", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSPatchTool(mockVFS, nil)
+
+		oneLiner, full, _ := tool.Render(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsPatch",
+			Arguments: NewToolValue(map[string]any{
+				"patchText": "*** Begin Patch\n*** Add File: test.txt\n+content\n*** End Patch",
+				"error":     "failed to apply patch: file not found",
+			}),
+		})
+
+		// Assert - oneLiner should have error as second line
+		assert.Contains(t, oneLiner, "apply patch:")
+		assert.Contains(t, oneLiner, "failed to apply patch: file not found")
+		// Assert - full should have ERROR: prefix and not contain patch
+		assert.Contains(t, full, "ERROR: failed to apply patch: file not found")
+		assert.NotContains(t, full, "*** Begin Patch")
+	})
 }
 
 func TestVFSPatchToolPermissionQuery(t *testing.T) {
