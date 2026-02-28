@@ -86,7 +86,7 @@ Currently supports cleaning up worktrees:
 func createCleanVCS(workDir string) (vfs.VCS, error) {
 	// Check if this is a git repository
 	worktreesRoot := workDir + "/.cswdata/work"
-	gitRepo, err := vfs.NewGitRepo(workDir, worktreesRoot, nil)
+	gitRepo, err := vfs.NewGitRepo(workDir, worktreesRoot, nil, "", "")
 	if err != nil {
 		return nil, fmt.Errorf("createCleanVCS() [clean.go]: not a git repository: %w", err)
 	}

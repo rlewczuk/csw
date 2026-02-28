@@ -23,6 +23,8 @@ type GitVCS struct {
 	worktrees     map[string]*gitWorktree
 	mutex         sync.RWMutex
 	hidePatterns  []string
+	gitUserName   string
+	gitUserEmail  string
 }
 
 // gitWorktree represents a worktree for a specific branch
@@ -35,7 +37,7 @@ type gitWorktree struct {
 // NewGitRepo creates a new GitVCS instance from an existing git repository path.
 // The worktreesPath parameter specifies the directory where worktrees will be created.
 // The hidePatterns parameter specifies glob patterns for files and directories that should be hidden.
-func NewGitRepo(path string, worktreesPath string, hidePatterns []string) (*GitVCS, error) {
+func NewGitRepo(path string, worktreesPath string, hidePatterns []string, name string, email string) (*GitVCS, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", err)
@@ -75,6 +77,8 @@ func NewGitRepo(path string, worktreesPath string, hidePatterns []string) (*GitV
 		repo:          repo,
 		worktrees:     make(map[string]*gitWorktree),
 		hidePatterns:  hidePatterns,
+		gitUserName:   name,
+		gitUserEmail:  email,
 	}, nil
 }
 
@@ -448,19 +452,30 @@ func (g *GitVCS) runGitOutputInWorktree(worktreePath string, args ...string) (st
 
 // gitCommandEnv returns environment variables with default identity for git commits.
 func (g *GitVCS) gitCommandEnv() []string {
+	gitUserName := g.gitUserName
+	if gitUserName == "" {
+		gitUserName = "CSW"
+	}
+
+	gitUserEmail := g.gitUserEmail
+	if gitUserEmail == "" {
+		gitUserEmail = "csw@example.com"
+	}
+
 	env := os.Environ()
-	env = appendIfEnvMissing(env, "GIT_AUTHOR_NAME", "CSW")
-	env = appendIfEnvMissing(env, "GIT_AUTHOR_EMAIL", "csw@example.com")
-	env = appendIfEnvMissing(env, "GIT_COMMITTER_NAME", "CSW")
-	env = appendIfEnvMissing(env, "GIT_COMMITTER_EMAIL", "csw@example.com")
+	env = upsertEnvValue(env, "GIT_AUTHOR_NAME", gitUserName)
+	env = upsertEnvValue(env, "GIT_AUTHOR_EMAIL", gitUserEmail)
+	env = upsertEnvValue(env, "GIT_COMMITTER_NAME", gitUserName)
+	env = upsertEnvValue(env, "GIT_COMMITTER_EMAIL", gitUserEmail)
 	return env
 }
 
-// appendIfEnvMissing appends a key-value env pair only when key does not exist.
-func appendIfEnvMissing(env []string, key string, value string) []string {
+// upsertEnvValue sets a key-value env pair, replacing any existing key entry.
+func upsertEnvValue(env []string, key string, value string) []string {
 	prefix := key + "="
-	for _, item := range env {
+	for i, item := range env {
 		if strings.HasPrefix(item, prefix) {
+			env[i] = prefix + value
 			return env
 		}
 	}

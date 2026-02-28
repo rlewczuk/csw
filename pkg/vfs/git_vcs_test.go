@@ -24,6 +24,12 @@ type GitTestFixture struct {
 // setupGitRepoFixture creates a temporary git repository for testing
 func setupGitRepoFixture(t *testing.T) *GitTestFixture {
 	t.Helper()
+	return setupGitRepoFixtureWithIdentity(t, "", "")
+}
+
+// setupGitRepoFixtureWithIdentity creates a temporary git repository for testing with explicit git identity.
+func setupGitRepoFixtureWithIdentity(t *testing.T, gitUserName string, gitUserEmail string) *GitTestFixture {
+	t.Helper()
 
 	// Create a temporary directory in project root tmp/
 	tempDir, err := os.MkdirTemp("../../tmp", "git-test-*")
@@ -57,7 +63,7 @@ func setupGitRepoFixture(t *testing.T) *GitTestFixture {
 	require.NoError(t, err, "Failed to create initial commit")
 
 	// Create the GitVCS with worktrees directory
-	gitRepo, err := NewGitRepo(tempDir, worktreesDir, nil)
+	gitRepo, err := NewGitRepo(tempDir, worktreesDir, nil, gitUserName, gitUserEmail)
 	require.NoError(t, err, "Failed to create GitVCS")
 
 	return &GitTestFixture{
@@ -118,7 +124,7 @@ func TestNewGitRepo(t *testing.T) {
 	})
 
 	t.Run("NonExistentDirectory", func(t *testing.T) {
-		_, err := NewGitRepo("/path/that/does/not/exist", "../../tmp/worktrees", nil)
+		_, err := NewGitRepo("/path/that/does/not/exist", "../../tmp/worktrees", nil, "", "")
 		assert.ErrorIs(t, err, ErrFileNotFound)
 	})
 
@@ -127,7 +133,7 @@ func TestNewGitRepo(t *testing.T) {
 		require.NoError(t, err, "Failed to create temp directory")
 		defer os.RemoveAll(tempDir)
 
-		_, err = NewGitRepo(tempDir, "../../tmp/worktrees", nil)
+		_, err = NewGitRepo(tempDir, "../../tmp/worktrees", nil, "", "")
 		assert.ErrorIs(t, err, ErrFileNotFound)
 	})
 
@@ -137,7 +143,7 @@ func TestNewGitRepo(t *testing.T) {
 		defer os.Remove(tempFile.Name())
 		tempFile.Close()
 
-		_, err = NewGitRepo(tempFile.Name(), "../../tmp/worktrees", nil)
+		_, err = NewGitRepo(tempFile.Name(), "../../tmp/worktrees", nil, "", "")
 		assert.ErrorIs(t, err, ErrNotADir)
 	})
 }
@@ -204,7 +210,7 @@ func TestDropWorktree(t *testing.T) {
 			_, err = fixture.Repo.GetWorktree(worktreeBranch)
 			require.NoError(t, err)
 
-			freshRepo, err := NewGitRepo(fixture.Root, fixture.WorktreesDir, nil)
+			freshRepo, err := NewGitRepo(fixture.Root, fixture.WorktreesDir, nil, "", "")
 			require.NoError(t, err)
 
 			err = freshRepo.DropWorktree(worktreeBranch)
@@ -327,6 +333,38 @@ func TestCommitWorktree(t *testing.T) {
 			err := fixture.Repo.CommitWorktree("nonexistent", "message")
 			assert.ErrorIs(t, err, ErrFileNotFound)
 		})
+	})
+
+	t.Run("CommitUsesConfiguredAuthorAndCommitter", func(t *testing.T) {
+		fixture := setupGitRepoFixtureWithIdentity(t, "Configured User", "configured@example.com")
+		defer fixture.Cleanup()
+
+		repo, ok := fixture.Repo.(*GitVCS)
+		require.True(t, ok)
+
+		branch := getDefaultBranch(t, fixture)
+		worktree, err := repo.GetWorktree(branch)
+		require.NoError(t, err)
+
+		err = worktree.WriteFile("identity.txt", []byte("identity check\n"))
+		require.NoError(t, err)
+
+		err = repo.CommitWorktree(branch, "identity commit")
+		require.NoError(t, err)
+
+		gitRepo, err := git.PlainOpen(fixture.Root)
+		require.NoError(t, err)
+
+		head, err := gitRepo.Head()
+		require.NoError(t, err)
+
+		commitObject, err := gitRepo.CommitObject(head.Hash())
+		require.NoError(t, err)
+
+		assert.Equal(t, "Configured User", commitObject.Author.Name)
+		assert.Equal(t, "configured@example.com", commitObject.Author.Email)
+		assert.Equal(t, "Configured User", commitObject.Committer.Name)
+		assert.Equal(t, "configured@example.com", commitObject.Committer.Email)
 	})
 }
 

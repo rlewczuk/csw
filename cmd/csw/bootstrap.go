@@ -43,6 +43,8 @@ type BuildSystemParams struct {
 	ModelName         string
 	RoleName          string
 	WorktreeBranch    string
+	GitUserName       string
+	GitUserEmail      string
 	ContainerEnabled  bool
 	ContainerDisabled bool
 	ContainerImage    string
@@ -73,7 +75,7 @@ type BuildSystemResult struct {
 	Cleanup          func()
 }
 
-func prepareSessionVFS(workDir string, worktreeBranch string, hidePatterns []string) (vfs.VCS, vfs.VFS, error) {
+func prepareSessionVFS(workDir string, worktreeBranch string, hidePatterns []string, gitUserName string, gitUserEmail string) (vfs.VCS, vfs.VFS, error) {
 	localVFS, err := vfs.NewLocalVFS(workDir, hidePatterns)
 	if err != nil {
 		return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create local VFS: %w", err)
@@ -88,7 +90,7 @@ func prepareSessionVFS(workDir string, worktreeBranch string, hidePatterns []str
 
 	if worktreeBranch != "" {
 		worktreesRoot := filepath.Join(workDir, ".cswdata", "work")
-		gitRepo, err := vfs.NewGitRepo(workDir, worktreesRoot, hidePatterns)
+		gitRepo, err := vfs.NewGitRepo(workDir, worktreesRoot, hidePatterns, gitUserName, gitUserEmail)
 		if err != nil {
 			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create GitVCS: %w", err)
 		}
@@ -188,7 +190,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to build hide patterns: %w", err)
 	}
 
-	selectedVCS, selectedVFS, err := prepareSessionVFS(workDir, params.WorktreeBranch, hidePatterns)
+	selectedVCS, selectedVFS, err := prepareSessionVFS(workDir, params.WorktreeBranch, hidePatterns, params.GitUserName, params.GitUserEmail)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)

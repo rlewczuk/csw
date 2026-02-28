@@ -30,6 +30,8 @@ type CLIParams struct {
 	RoleName              string
 	WorkDir               string
 	WorktreeBranch        string
+	GitUserName           string
+	GitUserEmail          string
 	Merge                 bool
 	ContainerEnabled      bool
 	ContainerDisabled     bool
@@ -177,6 +179,8 @@ func CliCommand() *cobra.Command {
 				RoleName:              cliRole,
 				WorkDir:               cliWorkDir,
 				WorktreeBranch:        cliWorktree,
+				GitUserName:           resolveHostGitConfigValue("user.name"),
+				GitUserEmail:          resolveHostGitConfigValue("user.email"),
 				Merge:                 cliMerge,
 				ContainerEnabled:      containerRequested,
 				ContainerDisabled:     containerDisabledChanged && cliContainerOff,
@@ -321,6 +325,8 @@ func runCLI(params *CLIParams) error {
 		ModelName:         params.ModelName,
 		RoleName:          params.RoleName,
 		WorktreeBranch:    params.WorktreeBranch,
+		GitUserName:       params.GitUserName,
+		GitUserEmail:      params.GitUserEmail,
 		ContainerEnabled:  params.ContainerEnabled,
 		ContainerDisabled: params.ContainerDisabled,
 		ContainerImage:    params.ContainerImage,
@@ -521,6 +527,19 @@ func normalizeResumeTarget(raw string) (string, error) {
 	}
 
 	return value, nil
+}
+
+func resolveHostGitConfigValue(key string) string {
+	if _, err := gitLookPathFunc("git"); err != nil {
+		return ""
+	}
+
+	value, err := gitConfigValueFunc(key)
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(value)
 }
 
 func resolveWorktreeBranchName(ctx context.Context, prompt, modelName, workDir, projectConfig, configPath, worktreeBranch string) (string, error) {

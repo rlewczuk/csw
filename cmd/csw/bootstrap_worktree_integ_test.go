@@ -14,7 +14,7 @@ import (
 func TestPrepareSessionVFSWithoutWorktree(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	repo, selectedVFS, err := prepareSessionVFS(tmpDir, "", nil)
+	repo, selectedVFS, err := prepareSessionVFS(tmpDir, "", nil, "", "")
 	require.NoError(t, err)
 	require.NotNil(t, repo)
 	require.NotNil(t, selectedVFS)
@@ -27,7 +27,7 @@ func TestPrepareSessionVFSWithoutWorktree(t *testing.T) {
 func TestPrepareSessionVFSWithWorktreeCreatesBranchAndWorktree(t *testing.T) {
 	repoDir := initTestGitRepository(t)
 
-	repo, selectedVFS, err := prepareSessionVFS(repoDir, "feature/worktree", nil)
+	repo, selectedVFS, err := prepareSessionVFS(repoDir, "feature/worktree", nil, "", "")
 	require.NoError(t, err)
 	require.NotNil(t, repo)
 	require.NotNil(t, selectedVFS)
@@ -51,7 +51,7 @@ func TestPrepareSessionVFSRecreatesExistingWorktreePath(t *testing.T) {
 	require.NoError(t, os.MkdirAll(stalePath, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(stalePath, "stale.txt"), []byte("stale"), 0644))
 
-	_, selectedVFS, err := prepareSessionVFS(repoDir, "feature-recreate", nil)
+	_, selectedVFS, err := prepareSessionVFS(repoDir, "feature-recreate", nil, "", "")
 	require.NoError(t, err)
 	require.NotNil(t, selectedVFS)
 
