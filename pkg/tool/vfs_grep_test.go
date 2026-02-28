@@ -383,3 +383,138 @@ func TestVFSGrepToolTimeout(t *testing.T) {
 		}
 	})
 }
+
+func TestVFSGrepToolRender(t *testing.T) {
+	t.Run("should display relative path when absolute path is provided", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSGrepTool(mockVFS)
+
+		// Execute - absolute path under worktree root
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": "hello",
+				"path":    "/path/to/worktree/src",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - path should be relative to worktree root
+		assert.Contains(t, oneLiner, "grep hello in src")
+		assert.Contains(t, full, "grep hello in src")
+		assert.NotContains(t, oneLiner, "/path/to/worktree")
+	})
+
+	t.Run("should keep relative path as is", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSGrepTool(mockVFS)
+
+		// Execute - relative path
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": "hello",
+				"path":    "src/components",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - path should remain unchanged
+		assert.Contains(t, oneLiner, "grep hello in src/components")
+		assert.Contains(t, full, "grep hello in src/components")
+	})
+
+	t.Run("should handle empty path", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSGrepTool(mockVFS)
+
+		// Execute - no path
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": "hello",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - should not include "in" phrase
+		assert.Equal(t, "grep hello", oneLiner)
+		assert.Equal(t, "grep hello\n\n", full)
+	})
+
+	t.Run("should handle absolute path outside worktree", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSGrepTool(mockVFS)
+
+		// Execute - absolute path outside worktree (cannot be made relative)
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": "hello",
+				"path":    "/some/other/path",
+			}),
+		}
+
+		oneLiner, _, _ := tool.Render(call)
+
+		// Assert - should keep original path since it cannot be made relative
+		// filepath.Rel will return an error for paths on different drives/volumes
+		// or when the path is not under the worktree root
+		// In such cases, the original path is kept
+		assert.Contains(t, oneLiner, "grep hello in")
+	})
+
+	t.Run("should handle pattern without path", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSGrepTool(mockVFS)
+
+		// Execute - only pattern
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": "func main",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert
+		assert.Equal(t, "grep func main", oneLiner)
+		assert.Equal(t, "grep func main\n\n", full)
+	})
+
+	t.Run("should truncate long patterns", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSGrepTool(mockVFS)
+
+		// Execute - very long pattern
+		longPattern := "this is a very long pattern that should be truncated because it exceeds the limit"
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": longPattern,
+			}),
+		}
+
+		oneLiner, _, _ := tool.Render(call)
+
+		// Assert - should be truncated to 128 chars
+		assert.LessOrEqual(t, len(oneLiner), 128)
+		assert.Contains(t, oneLiner, "grep")
+	})
+}

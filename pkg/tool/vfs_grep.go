@@ -2,6 +2,7 @@ package tool
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/rlewczuk/csw/pkg/vfs"
@@ -168,6 +169,15 @@ func formatInt64(n int64) string {
 func (t *VFSGrepTool) Render(call *ToolCall) (string, string, map[string]string) {
 	pattern, _ := call.Arguments.StringOK("pattern")
 	path := call.Arguments.String("path")
+
+	// Convert absolute path to relative path from worktree root
+	if path != "" && filepath.IsAbs(path) {
+		worktreeRoot := t.vfs.WorktreePath()
+		if relPath, err := filepath.Rel(worktreeRoot, path); err == nil {
+			path = relPath
+		}
+	}
+
 	oneLiner := truncateString("grep "+pattern, 128)
 	if path != "" {
 		oneLiner = truncateString("grep "+pattern+" in "+path, 128)
