@@ -565,15 +565,23 @@ type Tool interface {
 }
 
 // truncateString truncates a string to the specified maximum length,
-// adding an ellipsis if truncated.
+// adding an ellipsis in the middle if truncated.
 func truncateString(s string, maxLen int) string {
+	if maxLen <= 0 {
+		return ""
+	}
 	if len(s) <= maxLen {
 		return s
 	}
 	if maxLen <= 3 {
 		return s[:maxLen]
 	}
-	return s[:maxLen-3] + "..."
+	// Remove excess text from the middle, keep beginning and end
+	ellipsis := "..."
+	keepLen := maxLen - len(ellipsis)
+	leftLen := keepLen / 2
+	rightLen := keepLen - leftLen
+	return s[:leftLen] + ellipsis + s[len(s)-rightLen:]
 }
 
 // truncateOutput truncates the output to at most maxLines lines.

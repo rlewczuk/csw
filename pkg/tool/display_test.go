@@ -323,10 +323,16 @@ func TestTruncateString(t *testing.T) {
 			expected: "1234567890",
 		},
 		{
-			name:     "needs truncation",
+			name:     "needs truncation - even maxLen",
 			input:    "this is a very long string that needs to be truncated",
 			maxLen:   20,
-			expected: "this is a very lo...",
+			expected: "this is ...truncated",
+		},
+		{
+			name:     "needs truncation - odd maxLen",
+			input:    "this is a very long string that needs to be truncated",
+			maxLen:   21,
+			expected: "this is a...truncated",
 		},
 		{
 			name:     "maxLen less than ellipsis",
@@ -335,9 +341,81 @@ func TestTruncateString(t *testing.T) {
 			expected: "12",
 		},
 		{
+			name:     "maxLen exactly 3",
+			input:    "12345",
+			maxLen:   3,
+			expected: "123",
+		},
+		{
 			name:     "empty string",
 			input:    "",
 			maxLen:   10,
+			expected: "",
+		},
+		{
+			name:     "maxLen equals string length",
+			input:    "hello",
+			maxLen:   5,
+			expected: "hello",
+		},
+		{
+			name:     "maxLen one more than string length",
+			input:    "hello",
+			maxLen:   6,
+			expected: "hello",
+		},
+		{
+			name:     "maxLen 4 (just above ellipsis threshold)",
+			input:    "12345",
+			maxLen:   4,
+			expected: "...5",
+		},
+		{
+			name:     "maxLen 5 with long string",
+			input:    "hello world",
+			maxLen:   5,
+			expected: "h...d",
+		},
+		{
+			name:     "maxLen 6 with long string",
+			input:    "hello world",
+			maxLen:   6,
+			expected: "h...ld",
+		},
+		{
+			name:     "maxLen 7 with long string",
+			input:    "hello world",
+			maxLen:   7,
+			expected: "he...ld",
+		},
+		{
+			name:     "unicode string truncation",
+			input:    "こんにちは世界、これはテストです",
+			maxLen:   15,
+			expected: "こん...です",
+		},
+		{
+			name:     "single character string",
+			input:    "a",
+			maxLen:   10,
+			expected: "a",
+		},
+		{
+			name:     "maxLen 0",
+			input:    "hello",
+			maxLen:   0,
+			expected: "",
+		},
+		{
+			name:     "maxLen 1",
+			input:    "hello",
+			maxLen:   1,
+			expected: "h",
+		},
+		{
+			name:     "maxLen negative",
+			input:    "hello",
+			maxLen:   -5,
 			expected: "",
 		},
 	}
@@ -346,6 +424,10 @@ func TestTruncateString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := truncateString(tt.input, tt.maxLen)
 			assert.Equal(t, tt.expected, result)
+			// Verify result length does not exceed maxLen (unless maxLen is negative)
+			if tt.maxLen >= 0 {
+				assert.LessOrEqual(t, len(result), tt.maxLen, "Result length should not exceed maxLen")
+			}
 		})
 	}
 }
