@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -465,8 +466,85 @@ func runCLI(params *CLIParams) error {
 		return ctx.Err()
 	}
 
-	appView.ShowMessage(buildSessionSummaryMessage(time.Since(startTime), session), ui.MessageTypeInfo)
+	sessionInfo := buildSessionSummaryMessage(time.Since(startTime), session)
+	if err := saveSessionSummaryMarkdown(buildResult.LogsDir, session, sessionInfo); err != nil {
+		return fmt.Errorf("runCLI() [cli.go]: failed to save session summary: %w", err)
+	}
+
+	appView.ShowMessage(sessionInfo, ui.MessageTypeInfo)
 	return nil
+}
+
+func saveSessionSummaryMarkdown(logsDir string, session *core.SweSession, sessionInfo string) error {
+	if session == nil {
+		return fmt.Errorf("saveSessionSummaryMarkdown() [cli.go]: session is nil")
+	}
+
+	if strings.TrimSpace(logsDir) == "" {
+		return fmt.Errorf("saveSessionSummaryMarkdown() [cli.go]: logsDir is empty")
+	}
+
+	sessionLogDir := filepath.Join(logsDir, "sessions", session.ID())
+	if err := os.MkdirAll(sessionLogDir, 0755); err != nil {
+		return fmt.Errorf("saveSessionSummaryMarkdown() [cli.go]: failed to create session log directory: %w", err)
+	}
+
+	filePath := filepath.Join(sessionLogDir, "summary.md")
+	content := buildSessionSummaryMarkdown(session, sessionInfo)
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("saveSessionSummaryMarkdown() [cli.go]: failed to write summary file: %w", err)
+	}
+
+	return nil
+}
+
+func buildSessionSummaryMarkdown(session *core.SweSession, sessionInfo string) string {
+	summary := strings.TrimSpace(lastAssistantMessageText(session))
+
+	var builder strings.Builder
+	builder.WriteString("# Summary\n\n")
+	builder.WriteString(summary)
+	builder.WriteString("\n\n# Session Info\n\n")
+	builder.WriteString(strings.TrimSpace(sessionInfo))
+	builder.WriteString("\n")
+	builder.WriteString(fmt.Sprintf("Session ID: %s\n", session.ID()))
+
+	return builder.String()
+}
+
+func lastAssistantMessageText(session *core.SweSession) string {
+	if session == nil {
+		return ""
+	}
+
+	messages := session.ChatMessages()
+	for i := len(messages) - 1; i >= 0; i-- {
+		message := messages[i]
+		if message == nil || message.Role != models.ChatRoleAssistant {
+			continue
+		}
+
+		var textBuilder strings.Builder
+		for _, part := range message.Parts {
+			if part.Text != "" {
+				textBuilder.WriteString(part.Text)
+			}
+		}
+
+		if textBuilder.Len() > 0 {
+			return textBuilder.String()
+		}
+
+		for _, part := range message.Parts {
+			if part.ReasoningContent != "" {
+				textBuilder.WriteString(part.ReasoningContent)
+			}
+		}
+
+		return textBuilder.String()
+	}
+
+	return ""
 }
 
 func parseBashRunTimeout(value string) (time.Duration, error) {
