@@ -451,3 +451,63 @@ func TestVFSReadToolPermissionQuery(t *testing.T) {
 		assert.True(t, response.Done)
 	})
 }
+
+func TestVFSReadToolRender(t *testing.T) {
+	t.Run("should render with relative path for absolute path within worktree", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSReadTool(mockVFS, false)
+
+		// Execute - use an absolute path that's within the mock worktree (/path/to/worktree)
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsRead",
+			Arguments: NewToolValue(map[string]any{
+				"path": "/path/to/worktree/cmd/csw/main.go",
+			}),
+		}
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - path should be relative to worktree
+		assert.Equal(t, "read cmd/csw/main.go", oneLiner)
+		assert.Contains(t, full, "read cmd/csw/main.go")
+	})
+
+	t.Run("should render with original path for relative path", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSReadTool(mockVFS, false)
+
+		// Execute
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsRead",
+			Arguments: NewToolValue(map[string]any{
+				"path": "cmd/csw/main.go",
+			}),
+		}
+		oneLiner, _, _ := tool.Render(call)
+
+		// Assert
+		assert.Equal(t, "read cmd/csw/main.go", oneLiner)
+	})
+
+	t.Run("should render with original path for path outside worktree", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSReadTool(mockVFS, false)
+
+		// Execute - use a path outside the worktree
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsRead",
+			Arguments: NewToolValue(map[string]any{
+				"path": "/other/path/file.go",
+			}),
+		}
+		oneLiner, _, _ := tool.Render(call)
+
+		// Assert - path should remain as-is since it's outside worktree
+		assert.Equal(t, "read /other/path/file.go", oneLiner)
+	})
+}

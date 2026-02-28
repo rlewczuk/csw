@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rlewczuk/csw/pkg/lsp"
+	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // DiagnosticWithURI wraps a diagnostic with its file URI for proper grouping.
@@ -191,4 +192,37 @@ func formatLineNumber(num int64) string {
 	}
 
 	return str
+}
+
+// makeRelativePath converts an absolute path to a path relative to the VFS worktree root.
+// If the path is already relative, cannot be made relative, or is outside the worktree,
+// it returns the original path.
+func makeRelativePath(path string, v vfs.VFS) string {
+	if v == nil {
+		return path
+	}
+
+	worktreePath := v.WorktreePath()
+	if worktreePath == "" {
+		return path
+	}
+
+	// If path is already relative, return as-is
+	if !filepath.IsAbs(path) {
+		return path
+	}
+
+	// Try to make the path relative to the worktree root
+	relPath, err := filepath.Rel(worktreePath, path)
+	if err != nil {
+		return path
+	}
+
+	// If the relative path starts with "..", the path is outside the worktree
+	// Return the original absolute path instead
+	if strings.HasPrefix(relPath, "..") {
+		return path
+	}
+
+	return relPath
 }

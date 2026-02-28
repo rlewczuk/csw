@@ -80,7 +80,8 @@ func (t *VFSReadTool) Execute(args *ToolCall) *ToolResponse {
 // Render returns a string representation of the tool call.
 func (t *VFSReadTool) Render(call *ToolCall) (string, string, map[string]string) {
 	path, _ := call.Arguments.StringOK("path")
-	oneLiner := truncateString("read "+path, 128)
+	relativePath := makeRelativePath(path, t.vfs)
+	oneLiner := truncateString("read "+relativePath, 128)
 	full := oneLiner + "\n\n"
 	// Try to get content from result if available
 	if content, ok := call.Arguments.Get("content").AsStringOK(); ok && content != "" {

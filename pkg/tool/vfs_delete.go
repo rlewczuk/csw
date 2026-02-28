@@ -51,7 +51,8 @@ func (t *VFSDeleteTool) Execute(args *ToolCall) *ToolResponse {
 // Render returns a string representation of the tool call.
 func (t *VFSDeleteTool) Render(call *ToolCall) (string, string, map[string]string) {
 	path, _ := call.Arguments.StringOK("path")
-	oneLiner := truncateString("delete "+path, 128)
+	relativePath := makeRelativePath(path, t.vfs)
+	oneLiner := truncateString("delete "+relativePath, 128)
 	full := oneLiner
 	return oneLiner, full, make(map[string]string)
 }

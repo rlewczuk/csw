@@ -153,11 +153,12 @@ func (t *VFSEditTool) Render(call *ToolCall) (string, string, map[string]string)
 	path, _ := call.Arguments.StringOK("path")
 	oldString, _ := call.Arguments.StringOK("oldString")
 	newString, _ := call.Arguments.StringOK("newString")
-	oneLiner := truncateString("edit "+path, 128)
+	relativePath := makeRelativePath(path, t.vfs)
+	oneLiner := truncateString("edit "+relativePath, 128)
 	full := oneLiner + "\n\n"
 	// Create unified diff without line numbers
-	full += "--- " + path + "\n"
-	full += "+++ " + path + "\n"
+	full += "--- " + relativePath + "\n"
+	full += "+++ " + relativePath + "\n"
 	full += "@@ -1 +1 @@\n"
 	full += "-" + oldString + "\n"
 	full += "+" + newString + "\n"

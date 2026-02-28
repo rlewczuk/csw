@@ -73,7 +73,9 @@ func (t *VFSMoveTool) Execute(args *ToolCall) *ToolResponse {
 func (t *VFSMoveTool) Render(call *ToolCall) (string, string, map[string]string) {
 	path, _ := call.Arguments.StringOK("path")
 	destination, _ := call.Arguments.StringOK("destination")
-	oneLiner := truncateString("move "+path+" -> "+destination, 128)
+	relativePath := makeRelativePath(path, t.vfs)
+	relativeDest := makeRelativePath(destination, t.vfs)
+	oneLiner := truncateString("move "+relativePath+" -> "+relativeDest, 128)
 	full := oneLiner
 	return oneLiner, full, make(map[string]string)
 }

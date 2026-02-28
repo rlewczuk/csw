@@ -23,15 +23,15 @@ func TestVFSReadTool_Render(t *testing.T) {
 			name: "basic read",
 			args: &ToolCall{
 				Function:  "vfsRead",
-				Arguments: NewToolValue(map[string]any{"path": "/test/file.go"}),
+				Arguments: NewToolValue(map[string]any{"path": "/path/to/worktree/test/file.go"}),
 			},
-			wantPath: "/test/file.go",
+			wantPath: "test/file.go",
 		},
 		{
 			name: "read with long path",
 			args: &ToolCall{
 				Function:  "vfsRead",
-				Arguments: NewToolValue(map[string]any{"path": "/very/long/path/to/the/file/that/might/exceed/the/limit/if/we/make/it/long/enough/and/add/some/more/characters/to/be/sure/it/is/really/long/file.go"}),
+				Arguments: NewToolValue(map[string]any{"path": "/path/to/worktree/very/long/path/to/the/file/that/might/exceed/the/limit/if/we/make/it/long/enough/and/add/some/more/characters/to/be/sure/it/is/really/long/file.go"}),
 			},
 			wantPath: "...", // Path will be truncated in summary
 		},
@@ -65,9 +65,9 @@ func TestVFSWriteTool_Render(t *testing.T) {
 			name: "basic write",
 			args: &ToolCall{
 				Function:  "vfsWrite",
-				Arguments: NewToolValue(map[string]any{"path": "/test/file.go", "content": "hello world"}),
+				Arguments: NewToolValue(map[string]any{"path": "/path/to/worktree/test/file.go", "content": "hello world"}),
 			},
-			wantPath:    "/test/file.go",
+			wantPath:    "test/file.go",
 			wantContent: "hello world",
 		},
 	}
@@ -100,9 +100,9 @@ func TestVFSDeleteTool_Render(t *testing.T) {
 			name: "basic delete",
 			args: &ToolCall{
 				Function:  "vfsDelete",
-				Arguments: NewToolValue(map[string]any{"path": "/test/file.go"}),
+				Arguments: NewToolValue(map[string]any{"path": "/path/to/worktree/test/file.go"}),
 			},
-			wantPath: "/test/file.go",
+			wantPath: "test/file.go",
 		},
 	}
 
@@ -134,10 +134,10 @@ func TestVFSMoveTool_Render(t *testing.T) {
 			name: "basic move",
 			args: &ToolCall{
 				Function:  "vfsMove",
-				Arguments: NewToolValue(map[string]any{"path": "/test/file.go", "destination": "/test/newfile.go"}),
+				Arguments: NewToolValue(map[string]any{"path": "/path/to/worktree/test/file.go", "destination": "/path/to/worktree/test/newfile.go"}),
 			},
-			wantPath:        "/test/file.go",
-			wantDestination: "/test/newfile.go",
+			wantPath:        "test/file.go",
+			wantDestination: "test/newfile.go",
 		},
 	}
 
@@ -204,9 +204,9 @@ func TestVFSEditTool_Render(t *testing.T) {
 			name: "basic edit",
 			args: &ToolCall{
 				Function:  "vfsEdit",
-				Arguments: NewToolValue(map[string]any{"path": "/test/file.go", "oldString": "foo", "newString": "bar"}),
+				Arguments: NewToolValue(map[string]any{"path": "/path/to/worktree/test/file.go", "oldString": "foo", "newString": "bar"}),
 			},
-			wantPath:   "/test/file.go",
+			wantPath:   "test/file.go",
 			wantOldStr: "foo",
 			wantNewStr: "bar",
 		},
@@ -254,10 +254,10 @@ func TestVFSGrepTool_Render(t *testing.T) {
 			name: "grep with path",
 			args: &ToolCall{
 				Function:  "vfsGrep",
-				Arguments: NewToolValue(map[string]any{"pattern": "hello", "path": "/test"}),
+				Arguments: NewToolValue(map[string]any{"pattern": "hello", "path": "/path/to/worktree/test"}),
 			},
 			wantPattern: "hello",
-			wantPath:    "/test",
+			wantPath:    "test",
 		},
 	}
 

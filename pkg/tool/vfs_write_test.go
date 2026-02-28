@@ -282,3 +282,45 @@ func TestVFSWriteToolWithLSP(t *testing.T) {
 		assert.Equal(t, "hello world", string(content))
 	})
 }
+
+func TestVFSWriteToolRender(t *testing.T) {
+	t.Run("should render with relative path for absolute path within worktree", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSWriteTool(mockVFS, nil)
+
+		// Execute - use an absolute path that's within the mock worktree (/path/to/worktree)
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsWrite",
+			Arguments: NewToolValue(map[string]any{
+				"path":    "/path/to/worktree/cmd/csw/main.go",
+				"content": "package main",
+			}),
+		}
+		oneLiner, _, _ := tool.Render(call)
+
+		// Assert - path should be relative to worktree
+		assert.Equal(t, "write cmd/csw/main.go", oneLiner)
+	})
+
+	t.Run("should render with original path for relative path", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSWriteTool(mockVFS, nil)
+
+		// Execute
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsWrite",
+			Arguments: NewToolValue(map[string]any{
+				"path":    "cmd/csw/main.go",
+				"content": "package main",
+			}),
+		}
+		oneLiner, _, _ := tool.Render(call)
+
+		// Assert
+		assert.Equal(t, "write cmd/csw/main.go", oneLiner)
+	})
+}

@@ -561,3 +561,49 @@ func TestVFSEditToolWithLSP(t *testing.T) {
 		assert.Equal(t, "Edit applied successfully", contentResult)
 	})
 }
+
+func TestVFSEditToolRender(t *testing.T) {
+	t.Run("should render with relative path for absolute path within worktree", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSEditTool(mockVFS, nil)
+
+		// Execute - use an absolute path that's within the mock worktree (/path/to/worktree)
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsEdit",
+			Arguments: NewToolValue(map[string]any{
+				"path":      "/path/to/worktree/cmd/csw/main.go",
+				"oldString": "old",
+				"newString": "new",
+			}),
+		}
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - path should be relative to worktree
+		assert.Equal(t, "edit cmd/csw/main.go", oneLiner)
+		assert.Contains(t, full, "--- cmd/csw/main.go")
+		assert.Contains(t, full, "+++ cmd/csw/main.go")
+	})
+
+	t.Run("should render with original path for relative path", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSEditTool(mockVFS, nil)
+
+		// Execute
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsEdit",
+			Arguments: NewToolValue(map[string]any{
+				"path":      "cmd/csw/main.go",
+				"oldString": "old",
+				"newString": "new",
+			}),
+		}
+		oneLiner, _, _ := tool.Render(call)
+
+		// Assert
+		assert.Equal(t, "edit cmd/csw/main.go", oneLiner)
+	})
+}

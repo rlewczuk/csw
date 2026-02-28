@@ -134,7 +134,8 @@ func (t *VFSWriteTool) Execute(args *ToolCall) *ToolResponse {
 // Render returns a string representation of the tool call.
 func (t *VFSWriteTool) Render(call *ToolCall) (string, string, map[string]string) {
 	path, _ := call.Arguments.StringOK("path")
-	oneLiner := truncateString("write "+path, 128)
+	relativePath := makeRelativePath(path, t.vfs)
+	oneLiner := truncateString("write "+relativePath, 128)
 	full := oneLiner + "\n\n"
 	// Try to get content from arguments
 	if content, ok := call.Arguments.StringOK("content"); ok && content != "" {

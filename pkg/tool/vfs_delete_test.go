@@ -180,3 +180,43 @@ func TestVFSDeleteToolPermissionQuery(t *testing.T) {
 		assert.True(t, response.Done)
 	})
 }
+
+func TestVFSDeleteToolRender(t *testing.T) {
+	t.Run("should render with relative path for absolute path within worktree", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSDeleteTool(mockVFS)
+
+		// Execute - use an absolute path that's within the mock worktree (/path/to/worktree)
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsDelete",
+			Arguments: NewToolValue(map[string]any{
+				"path": "/path/to/worktree/cmd/csw/main.go",
+			}),
+		}
+		oneLiner, _, _ := tool.Render(call)
+
+		// Assert - path should be relative to worktree
+		assert.Equal(t, "delete cmd/csw/main.go", oneLiner)
+	})
+
+	t.Run("should render with original path for relative path", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSDeleteTool(mockVFS)
+
+		// Execute
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsDelete",
+			Arguments: NewToolValue(map[string]any{
+				"path": "cmd/csw/main.go",
+			}),
+		}
+		oneLiner, _, _ := tool.Render(call)
+
+		// Assert
+		assert.Equal(t, "delete cmd/csw/main.go", oneLiner)
+	})
+}

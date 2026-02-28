@@ -254,3 +254,45 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		assert.True(t, response.Done)
 	})
 }
+
+func TestVFSMoveToolRender(t *testing.T) {
+	t.Run("should render with relative paths for absolute paths within worktree", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSMoveTool(mockVFS)
+
+		// Execute - use absolute paths within the mock worktree (/path/to/worktree)
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsMove",
+			Arguments: NewToolValue(map[string]any{
+				"path":        "/path/to/worktree/cmd/csw/main.go",
+				"destination": "/path/to/worktree/cmd/csw/main_renamed.go",
+			}),
+		}
+		oneLiner, _, _ := tool.Render(call)
+
+		// Assert - paths should be relative to worktree
+		assert.Equal(t, "move cmd/csw/main.go -> cmd/csw/main_renamed.go", oneLiner)
+	})
+
+	t.Run("should render with original paths for relative paths", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSMoveTool(mockVFS)
+
+		// Execute
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsMove",
+			Arguments: NewToolValue(map[string]any{
+				"path":        "cmd/csw/main.go",
+				"destination": "cmd/csw/main_renamed.go",
+			}),
+		}
+		oneLiner, _, _ := tool.Render(call)
+
+		// Assert
+		assert.Equal(t, "move cmd/csw/main.go -> cmd/csw/main_renamed.go", oneLiner)
+	})
+}
