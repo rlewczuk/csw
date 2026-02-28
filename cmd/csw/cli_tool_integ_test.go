@@ -134,6 +134,75 @@ func TestRunBashToolIntegration(t *testing.T) {
 	assert.True(t, foundToolList, "should have found a chat request with runBash tool")
 }
 
+// TestWebFetchToolIntegration tests that webFetch tool is properly registered and presented to LLM.
+func TestWebFetchToolIntegration(t *testing.T) {
+	vfsInstance := vfs.NewMockVFS()
+	tools := tool.NewToolRegistry()
+
+	tool.RegisterWebFetchTool(tools, nil)
+
+	tmpDir := t.TempDir()
+	logsDir := filepath.Join(tmpDir, "logs")
+	err := os.MkdirAll(logsDir, 0755)
+	require.NoError(t, err)
+	fixture := newCliSystemFixture(t, "You are a helpful assistant.",
+		coretestfixture.WithVFS(vfsInstance),
+		coretestfixture.WithTools(tools),
+		coretestfixture.WithWorkDir(tmpDir),
+		coretestfixture.WithLogBaseDir(logsDir),
+	)
+	system := fixture.System
+	mockServer := fixture.Server
+
+	mockServer.AddStreamingResponse("/api/chat", "POST", true,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"webFetch is available."},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	thread := core.NewSessionThread(system, nil)
+	err = thread.StartSession("ollama/test-model")
+	require.NoError(t, err)
+
+	basePresenter := presenter.NewChatPresenter(system, thread)
+	baseView := newMockChatView()
+	err = basePresenter.SetView(baseView)
+	require.NoError(t, err)
+
+	thread.SetOutputHandler(basePresenter)
+
+	userMsg := &ui.ChatMessageUI{Role: ui.ChatRoleUser, Text: "Can you fetch a page?"}
+	err = basePresenter.SendUserMessage(userMsg)
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		for {
+			if !thread.IsRunning() {
+				close(done)
+				return
+			}
+		}
+	}()
+	<-done
+
+	toolNames := tools.List()
+	assert.Contains(t, toolNames, "webFetch", "webFetch tool should be registered")
+
+	requests := mockServer.GetRequests()
+	require.GreaterOrEqual(t, len(requests), 1, "should have captured at least one request")
+
+	var foundToolList bool
+	for _, req := range requests {
+		if req.Path == "/api/chat" && req.Method == "POST" {
+			bodyStr := string(req.Body)
+			assert.Contains(t, bodyStr, "webFetch", "LLM request should contain webFetch tool")
+			foundToolList = true
+			break
+		}
+	}
+	assert.True(t, foundToolList, "should have found a chat request with webFetch tool")
+}
+
 // TestCLIVFSToolLogging verifies that VFS write/edit tools log to the session logger.
 func TestCLIVFSToolLogging(t *testing.T) {
 	vfsInstance := vfs.NewMockVFS()

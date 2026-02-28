@@ -223,6 +223,16 @@ func TestRegisterVFSTools(t *testing.T) {
 	}
 }
 
+func TestRegisterWebFetchTool(t *testing.T) {
+	registry := NewToolRegistry()
+
+	RegisterWebFetchTool(registry, nil)
+
+	registeredTool, err := registry.Get("webFetch")
+	require.NoError(t, err)
+	assert.IsType(t, &WebFetchTool{}, registeredTool)
+}
+
 func TestToolRegistry_VFSIntegration(t *testing.T) {
 	registry := NewToolRegistry()
 	mockVFS := vfs.NewMockVFS()

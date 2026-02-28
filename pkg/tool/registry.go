@@ -3,6 +3,7 @@ package tool
 import (
 	"fmt"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
@@ -160,6 +161,11 @@ func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS, lspClient lsp.LSP
 // RegisterRunBashTool registers the runBash tool with the given CommandRunner and privileges.
 func RegisterRunBashTool(registry *ToolRegistry, r runner.CommandRunner, privileges map[string]conf.AccessFlag, defaultTimeout time.Duration) {
 	registry.Register("runBash", NewRunBashTool(r, privileges, defaultTimeout))
+}
+
+// RegisterWebFetchTool registers the webFetch tool with optional custom HTTP client.
+func RegisterWebFetchTool(registry *ToolRegistry, httpClient *http.Client) {
+	registry.Register("webFetch", NewWebFetchTool(httpClient))
 }
 
 // Render returns a string representation of the tool call.

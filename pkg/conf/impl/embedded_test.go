@@ -188,6 +188,9 @@ func TestEmbeddedConfigStore_GetAgentRoleConfigs(t *testing.T) {
 	assert.Contains(t, allRole.ToolFragments, "runBash/runBash.md")
 	assert.Contains(t, allRole.ToolFragments, "runBash/runBash.schema.json")
 	assert.Contains(t, allRole.ToolFragments, "runBash/.tooldir")
+	assert.Contains(t, allRole.ToolFragments, "webFetch/webFetch.md")
+	assert.Contains(t, allRole.ToolFragments, "webFetch/webFetch.schema.json")
+	assert.Contains(t, allRole.ToolFragments, "webFetch/.tooldir")
 }
 
 func TestEmbeddedConfigStore_LastAgentRoleConfigsUpdate(t *testing.T) {

@@ -954,6 +954,7 @@ func TestCompositeConfigStore_ToolFragmentsMerging(t *testing.T) {
 			ToolFragments: map[string]string{
 				"toolA/toolA.md":          "desc1",
 				"toolA/toolA.schema.json": `{"type":"object"}`,
+				"webFetch/webFetch.md":    "fetch from web",
 			},
 		},
 	})
@@ -961,9 +962,10 @@ func TestCompositeConfigStore_ToolFragmentsMerging(t *testing.T) {
 		"all": {
 			Name: "all",
 			ToolFragments: map[string]string{
-				"toolA/toolA.md":          "desc2",
-				"toolA/toolA.schema.json": "",
-				"toolB/toolB.yaml":        "command: echo\n",
+				"toolA/toolA.md":                "desc2",
+				"toolA/toolA.schema.json":       "",
+				"toolB/toolB.yaml":              "command: echo\n",
+				"webFetch/webFetch.schema.json": `{"type":"object"}`,
 			},
 		},
 	})
@@ -984,6 +986,8 @@ func TestCompositeConfigStore_ToolFragmentsMerging(t *testing.T) {
 	assert.Equal(t, "desc2", allRole.ToolFragments["toolA/toolA.md"])
 	assert.NotContains(t, allRole.ToolFragments, "toolA/toolA.schema.json")
 	assert.Equal(t, "command: echo\n", allRole.ToolFragments["toolB/toolB.yaml"])
+	assert.Equal(t, "fetch from web", allRole.ToolFragments["webFetch/webFetch.md"])
+	assert.Equal(t, `{"type":"object"}`, allRole.ToolFragments["webFetch/webFetch.schema.json"])
 }
 
 // TestCompositeConfigStore_ContainerConfigFromGlobalSource tests that container

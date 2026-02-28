@@ -586,3 +586,15 @@ func Convert(w io.Writer, r io.Reader, option *Option) error {
 	fmt.Fprint(w, "\n")
 	return nil
 }
+
+// CovertStr converts HTML string content to Markdown string.
+// It wraps Convert and adapts string input/output to reader/writer API.
+func CovertStr(content string, option *Option) (string, error) {
+	var output bytes.Buffer
+
+	if err := Convert(&output, strings.NewReader(content), option); err != nil {
+		return "", fmt.Errorf("CovertStr() [godown.go]: failed to convert content: %w", err)
+	}
+
+	return output.String(), nil
+}
