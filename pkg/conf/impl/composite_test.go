@@ -263,6 +263,14 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 			{"model": "gpt-.*", "tag": "openai"}
 		],
 		"context_compaction_threshold": 0.7,
+		"defaults": {
+			"model": "provider1/default",
+			"worktree": "feature/base",
+			"merge": true,
+			"log-llm-requests": true,
+			"thinking": "medium",
+			"lsp-server": "source1-lsp"
+		},
 		"container": {
 			"enabled": true,
 			"image": "alpine:latest",
@@ -288,6 +296,12 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 			{"model": "claude-.*", "tag": "anthropic"}
 		],
 		"context_compaction_threshold": 0.9,
+		"defaults": {
+			"model": "provider2/default",
+			"worktree": "feature/override",
+			"thinking": "high",
+			"lsp-server": "source2-lsp"
+		},
 		"container": {
 			"image": "busybox:latest",
 			"mounts": ["/var:/mnt/var"],
@@ -328,6 +342,12 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 	assert.Equal(t, true, globalConfig.ToolSelection.Default["runBash"])
 	assert.Equal(t, false, globalConfig.ToolSelection.Default["vfsEdit"])
 	assert.Equal(t, 0.9, globalConfig.ContextCompactionThreshold)
+	assert.Equal(t, "provider2/default", globalConfig.Defaults.Model)
+	assert.Equal(t, "feature/override", globalConfig.Defaults.Worktree)
+	assert.True(t, globalConfig.Defaults.Merge)
+	assert.True(t, globalConfig.Defaults.LogLLMRequests)
+	assert.Equal(t, "high", globalConfig.Defaults.Thinking)
+	assert.Equal(t, "source2-lsp", globalConfig.Defaults.LSPServer)
 	assert.True(t, globalConfig.Container.Enabled)
 	assert.Equal(t, "busybox:latest", globalConfig.Container.Image)
 	assert.Equal(t, []string{"/var:/mnt/var"}, globalConfig.Container.Mounts)

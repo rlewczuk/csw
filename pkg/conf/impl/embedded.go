@@ -92,6 +92,14 @@ func (s *EmbeddedConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 			Image:   s.globalConfig.Container.Image,
 			Enabled: s.globalConfig.Container.Enabled,
 		},
+		Defaults: conf.CLIDefaultsConfig{
+			Model:          s.globalConfig.Defaults.Model,
+			Worktree:       s.globalConfig.Defaults.Worktree,
+			Merge:          s.globalConfig.Defaults.Merge,
+			LogLLMRequests: s.globalConfig.Defaults.LogLLMRequests,
+			Thinking:       s.globalConfig.Defaults.Thinking,
+			LSPServer:      s.globalConfig.Defaults.LSPServer,
+		},
 		ToolSelection: conf.ToolSelectionConfig{
 			Default: make(map[string]bool, len(s.globalConfig.ToolSelection.Default)),
 			Tags:    make(map[string]map[string]bool, len(s.globalConfig.ToolSelection.Tags)),

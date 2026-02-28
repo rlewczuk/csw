@@ -127,6 +127,14 @@ func (s *LocalConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 			Image:   s.globalConfig.Container.Image,
 			Enabled: s.globalConfig.Container.Enabled,
 		},
+		Defaults: conf.CLIDefaultsConfig{
+			Model:          s.globalConfig.Defaults.Model,
+			Worktree:       s.globalConfig.Defaults.Worktree,
+			Merge:          s.globalConfig.Defaults.Merge,
+			LogLLMRequests: s.globalConfig.Defaults.LogLLMRequests,
+			Thinking:       s.globalConfig.Defaults.Thinking,
+			LSPServer:      s.globalConfig.Defaults.LSPServer,
+		},
 		ModelTags: make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
 		ToolSelection: conf.ToolSelectionConfig{
 			Default: make(map[string]bool, len(s.globalConfig.ToolSelection.Default)),

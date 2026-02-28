@@ -154,6 +154,10 @@ func CliCommand() *cobra.Command {
 				return err
 			}
 
+			if err := applyCLIDefaults(cmd, cliWorkDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer); err != nil {
+				return err
+			}
+
 			containerEnabledChanged := cmd.Flags().Changed("container-enabled")
 			containerDisabledChanged := cmd.Flags().Changed("container-disabled")
 			if containerEnabledChanged && containerDisabledChanged {
@@ -225,6 +229,60 @@ func CliCommand() *cobra.Command {
 		resumeFlag.NoOptDefVal = "last"
 	}
 	return cmd
+}
+
+func applyCLIDefaults(
+	cmd *cobra.Command,
+	workDir string,
+	projectConfig string,
+	configPath string,
+	model *string,
+	worktree *string,
+	merge *bool,
+	logLLMRequests *bool,
+	thinking *string,
+	lspServer *string,
+) error {
+	resolvedWorkDir, err := ResolveWorkDir(workDir)
+	if err != nil {
+		return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to resolve work directory: %w", err)
+	}
+
+	configPathStr, err := BuildConfigPath(projectConfig, configPath)
+	if err != nil {
+		return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to build config path: %w", err)
+	}
+
+	configStore, err := newCompositeConfigStoreFunc(resolvedWorkDir, configPathStr)
+	if err != nil {
+		return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to create config store: %w", err)
+	}
+
+	globalConfig, err := configStore.GetGlobalConfig()
+	if err != nil {
+		return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to load global config: %w", err)
+	}
+
+	if !cmd.Flags().Changed("model") && globalConfig.Defaults.Model != "" {
+		*model = globalConfig.Defaults.Model
+	}
+	if !cmd.Flags().Changed("worktree") && globalConfig.Defaults.Worktree != "" {
+		*worktree = globalConfig.Defaults.Worktree
+	}
+	if !cmd.Flags().Changed("merge") && globalConfig.Defaults.Merge {
+		*merge = true
+	}
+	if !cmd.Flags().Changed("log-llm-requests") && globalConfig.Defaults.LogLLMRequests {
+		*logLLMRequests = true
+	}
+	if !cmd.Flags().Changed("thinking") && globalConfig.Defaults.Thinking != "" {
+		*thinking = globalConfig.Defaults.Thinking
+	}
+	if !cmd.Flags().Changed("lsp-server") && globalConfig.Defaults.LSPServer != "" {
+		*lspServer = globalConfig.Defaults.LSPServer
+	}
+
+	return nil
 }
 
 func runCLI(params *CLIParams) error {

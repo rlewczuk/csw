@@ -99,6 +99,22 @@ type ContainerConfig struct {
 	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 }
 
+// CLIDefaultsConfig defines default values for the cli command flags.
+type CLIDefaultsConfig struct {
+	// Model is the default --model value.
+	Model string `json:"model,omitempty" yaml:"model,omitempty"`
+	// Worktree is the default --worktree value.
+	Worktree string `json:"worktree,omitempty" yaml:"worktree,omitempty"`
+	// Merge is the default --merge value.
+	Merge bool `json:"merge,omitempty" yaml:"merge,omitempty"`
+	// LogLLMRequests is the default --log-llm-requests value.
+	LogLLMRequests bool `json:"log-llm-requests,omitempty" yaml:"log-llm-requests,omitempty"`
+	// Thinking is the default --thinking value.
+	Thinking string `json:"thinking,omitempty" yaml:"thinking,omitempty"`
+	// LSPServer is the default --lsp-server value.
+	LSPServer string `json:"lsp-server,omitempty" yaml:"lsp-server,omitempty"`
+}
+
 // ModelProviderConfig represents common configuration for model providers.
 type ModelProviderConfig struct {
 	// Type specifies the provider type (e.g., "ollama", "openai", "anthropic")
@@ -227,6 +243,8 @@ type GlobalConfig struct {
 	LLMRetryMaxBackoffSeconds int `json:"llm_retry_max_backoff_seconds,omitempty" yaml:"llm_retry_max_backoff_seconds,omitempty"`
 	// Container defines default container execution settings.
 	Container ContainerConfig `json:"container,omitempty" yaml:"container,omitempty"`
+	// Defaults defines default values for cli command flags.
+	Defaults CLIDefaultsConfig `json:"defaults,omitempty" yaml:"defaults,omitempty"`
 }
 
 // ConfigStore is an interface for accessing configuration data.

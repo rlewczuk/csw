@@ -124,6 +124,14 @@ func (m *MockConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 			Image:   m.globalConfig.Container.Image,
 			Enabled: m.globalConfig.Container.Enabled,
 		},
+		Defaults: conf.CLIDefaultsConfig{
+			Model:          m.globalConfig.Defaults.Model,
+			Worktree:       m.globalConfig.Defaults.Worktree,
+			Merge:          m.globalConfig.Defaults.Merge,
+			LogLLMRequests: m.globalConfig.Defaults.LogLLMRequests,
+			Thinking:       m.globalConfig.Defaults.Thinking,
+			LSPServer:      m.globalConfig.Defaults.LSPServer,
+		},
 		ToolSelection: conf.ToolSelectionConfig{
 			Default: make(map[string]bool, len(m.globalConfig.ToolSelection.Default)),
 			Tags:    make(map[string]map[string]bool, len(m.globalConfig.ToolSelection.Tags)),

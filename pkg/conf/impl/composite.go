@@ -143,6 +143,14 @@ func (c *CompositeConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 			Image:   c.globalConfig.Container.Image,
 			Enabled: c.globalConfig.Container.Enabled,
 		},
+		Defaults: conf.CLIDefaultsConfig{
+			Model:          c.globalConfig.Defaults.Model,
+			Worktree:       c.globalConfig.Defaults.Worktree,
+			Merge:          c.globalConfig.Defaults.Merge,
+			LogLLMRequests: c.globalConfig.Defaults.LogLLMRequests,
+			Thinking:       c.globalConfig.Defaults.Thinking,
+			LSPServer:      c.globalConfig.Defaults.LSPServer,
+		},
 		ModelTags: make([]conf.ModelTagMapping, len(c.globalConfig.ModelTags)),
 		ToolSelection: conf.ToolSelectionConfig{
 			Default: make(map[string]bool, len(c.globalConfig.ToolSelection.Default)),
@@ -402,6 +410,24 @@ func (c *CompositeConfigStore) refreshGlobalConfig() error {
 		}
 		if config.Container.Enabled {
 			merged.Container.Enabled = true
+		}
+		if config.Defaults.Model != "" {
+			merged.Defaults.Model = config.Defaults.Model
+		}
+		if config.Defaults.Worktree != "" {
+			merged.Defaults.Worktree = config.Defaults.Worktree
+		}
+		if config.Defaults.Merge {
+			merged.Defaults.Merge = true
+		}
+		if config.Defaults.LogLLMRequests {
+			merged.Defaults.LogLLMRequests = true
+		}
+		if config.Defaults.Thinking != "" {
+			merged.Defaults.Thinking = config.Defaults.Thinking
+		}
+		if config.Defaults.LSPServer != "" {
+			merged.Defaults.LSPServer = config.Defaults.LSPServer
 		}
 
 		// Track update time
