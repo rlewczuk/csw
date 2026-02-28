@@ -924,6 +924,48 @@ func TestCompositeConfigStore_PromptFragmentsCopyProtection(t *testing.T) {
 	assert.NotContains(t, configs2["role1"].PromptFragments, "fragment2")
 }
 
+func TestCompositeConfigStore_ToolFragmentsMerging(t *testing.T) {
+	store1 := NewMockConfigStore()
+	store2 := NewMockConfigStore()
+
+	store1.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"all": {
+			Name: "all",
+			ToolFragments: map[string]string{
+				"toolA/toolA.md":          "desc1",
+				"toolA/toolA.schema.json": `{"type":"object"}`,
+			},
+		},
+	})
+	store2.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"all": {
+			Name: "all",
+			ToolFragments: map[string]string{
+				"toolA/toolA.md":          "desc2",
+				"toolA/toolA.schema.json": "",
+				"toolB/toolB.yaml":        "command: echo\n",
+			},
+		},
+	})
+
+	composite := &CompositeConfigStore{
+		stores:             []conf.ConfigStore{store1, store2},
+		storeGlobalUpdates: make([]time.Time, 2),
+		storeModelUpdates:  make([]time.Time, 2),
+		storeRoleUpdates:   make([]time.Time, 2),
+	}
+
+	require.NoError(t, composite.refresh())
+	roles, err := composite.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	allRole, ok := roles["all"]
+	require.True(t, ok)
+
+	assert.Equal(t, "desc2", allRole.ToolFragments["toolA/toolA.md"])
+	assert.NotContains(t, allRole.ToolFragments, "toolA/toolA.schema.json")
+	assert.Equal(t, "command: echo\n", allRole.ToolFragments["toolB/toolB.yaml"])
+}
+
 // TestCompositeConfigStore_ContainerConfigFromGlobalSource tests that container
 // configuration from a global source (like ~/.config/csw) is properly merged
 // when a local source (like .csw/config) doesn't define container properties.

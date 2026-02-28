@@ -6,6 +6,7 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
+	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -473,6 +474,31 @@ func TestConfPromptGenerator_GetPrompt_ToolsFiltering(t *testing.T) {
 	// Should have core instructions
 	assert.Contains(t, prompt, "All Core Instructions")
 	assert.Contains(t, prompt, "General Guidelines")
+}
+
+func TestConfPromptGenerator_GetToolInfo_SchemaOptional(t *testing.T) {
+	store := confimpl.NewMockConfigStore()
+	store.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"all": {
+			Name: "all",
+			ToolFragments: map[string]string{
+				"custom/custom.md": "Custom description",
+			},
+		},
+	})
+
+	gen, err := NewConfPromptGenerator(store, vfs.NewMockVFS())
+	require.NoError(t, err)
+
+	roleConfigs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	allRole := roleConfigs["all"]
+
+	info, err := gen.GetToolInfo(nil, "custom", allRole, &AgentState{})
+	require.NoError(t, err)
+	assert.Equal(t, "custom", info.Name)
+	assert.Equal(t, "Custom description", strings.TrimSpace(info.Description))
+	assert.Equal(t, tool.SchemaTypeObject, info.Schema.Type)
 }
 
 // newMockConfigStoreWithFragments creates a mock config store with test fragment data.

@@ -16,6 +16,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type roleLimitedToolStub struct{}
+
+func (s *roleLimitedToolStub) Execute(args *tool.ToolCall) *tool.ToolResponse {
+	return &tool.ToolResponse{Call: args, Done: true}
+}
+
+func (s *roleLimitedToolStub) Render(call *tool.ToolCall) (string, string, map[string]string) {
+	return "stub", "stub", map[string]string{}
+}
+
+func (s *roleLimitedToolStub) IsRoleAllowed(roleName string) bool {
+	return roleName == "developer"
+}
+
 type sessionAgentTestPromptGenerator struct {
 	vfs vfs.VFS
 }
@@ -172,4 +186,21 @@ func TestExecuteToolCalls_AppendsAgentInstructionsAfterToolResponse(t *testing.T
 	assert.Contains(t, agentInstructionMessage.GetText(), "<system>")
 	assert.Contains(t, agentInstructionMessage.GetText(), "follow foo instructions")
 	assert.Contains(t, agentInstructionMessage.GetText(), "</system>")
+}
+
+func TestFilterToolsForRole(t *testing.T) {
+	registry := tool.NewToolRegistry()
+	registry.Register("always", &roleLimitedToolStub{})
+	registry.Register("open", tool.NewTodoReadTool(nil))
+
+	dev := &conf.AgentRoleConfig{Name: "developer"}
+	readonly := &conf.AgentRoleConfig{Name: "readonly"}
+
+	devFiltered := filterToolsForRole(registry, dev)
+	assert.Contains(t, devFiltered.List(), "always")
+	assert.Contains(t, devFiltered.List(), "open")
+
+	roFiltered := filterToolsForRole(registry, readonly)
+	assert.NotContains(t, roFiltered.List(), "always")
+	assert.Contains(t, roFiltered.List(), "open")
 }

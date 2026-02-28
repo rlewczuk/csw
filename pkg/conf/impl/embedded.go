@@ -517,6 +517,7 @@ func (s *EmbeddedConfigStore) loadToolFragments() (map[string]string, error) {
 
 		toolName := entry.Name()
 		toolDir := filepath.Join(toolsDir, toolName)
+		fragments[fmt.Sprintf("%s/.tooldir", toolName)] = filepath.Join("conf", "tools", toolName)
 
 		// Read all files in the tool directory
 		toolEntries, err := embeddedConfigFS.ReadDir(toolDir)

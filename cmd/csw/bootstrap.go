@@ -37,18 +37,18 @@ var gitConfigValueFunc = readGitConfigValue
 
 // BuildSystemParams contains inputs for constructing a SweSystem.
 type BuildSystemParams struct {
-	WorkDir          string
-	ConfigPath       string
-	ModelName        string
-	RoleName         string
-	WorktreeBranch   string
-	ContainerEnabled bool
+	WorkDir           string
+	ConfigPath        string
+	ModelName         string
+	RoleName          string
+	WorktreeBranch    string
+	ContainerEnabled  bool
 	ContainerDisabled bool
-	ContainerImage   string
-	ContainerMounts  []string
-	ContainerEnv     []string
-	LSPServer        string
-	LogLLMRequests   bool
+	ContainerImage    string
+	ContainerMounts   []string
+	ContainerEnv      []string
+	LSPServer         string
+	LogLLMRequests    bool
 	// Thinking controls the thinking/reasoning mode for LLM requests.
 	// Values like "low", "medium", "high", "xhigh" for effort-based thinking,
 	// or "true"/"false" for boolean thinking modes.
@@ -273,6 +273,10 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	}
 
 	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, params.BashRunTimeout)
+	if err := tool.RegisterCustomTools(toolRegistry, configStore, effectiveWorkDir, bashRunner); err != nil {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to register custom tools: %w", err)
+	}
 
 	promptGenerator, err := core.NewConfPromptGenerator(configStore, selectedVFS)
 	if err != nil {

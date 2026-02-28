@@ -244,6 +244,12 @@ func (c *CompositeConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRole
 				configCopy.PromptFragments[fk] = fv
 			}
 		}
+		if v.ToolFragments != nil {
+			configCopy.ToolFragments = make(map[string]string, len(v.ToolFragments))
+			for fk, fv := range v.ToolFragments {
+				configCopy.ToolFragments[fk] = fv
+			}
+		}
 		if v.HiddenPatterns != nil {
 			configCopy.HiddenPatterns = make([]string, len(v.HiddenPatterns))
 			copy(configCopy.HiddenPatterns, v.HiddenPatterns)
@@ -482,6 +488,26 @@ func (c *CompositeConfigStore) refreshAgentRoleConfigs() error {
 				configCopy.RunPrivileges = make(map[string]conf.AccessFlag, len(config.RunPrivileges))
 				for k, v := range config.RunPrivileges {
 					configCopy.RunPrivileges[k] = v
+				}
+			}
+
+			if exists && existingConfig.ToolFragments != nil {
+				configCopy.ToolFragments = make(map[string]string, len(existingConfig.ToolFragments))
+				for k, v := range existingConfig.ToolFragments {
+					configCopy.ToolFragments[k] = v
+				}
+			} else {
+				configCopy.ToolFragments = make(map[string]string)
+			}
+
+			if config.ToolFragments != nil {
+				for filename, content := range config.ToolFragments {
+					trimmedContent := strings.TrimSpace(content)
+					if trimmedContent == "" {
+						delete(configCopy.ToolFragments, filename)
+					} else {
+						configCopy.ToolFragments[filename] = content
+					}
 				}
 			}
 

@@ -91,44 +91,36 @@ func toolListCommand() *cobra.Command {
 			// Extract tool names and descriptions from tool fragments
 			tools := make(map[string]string)
 			for key := range toolFragments {
-				// Look for <toolname>.schema.json files to identify tools
-				if strings.HasSuffix(key, ".schema.json") {
-					// Extract tool name from key (e.g., "vfsRead/vfsRead.schema.json" -> "vfsRead")
-					parts := strings.Split(key, "/")
-					if len(parts) != 2 {
+				parts := strings.Split(key, "/")
+				if len(parts) != 2 {
+					continue
+				}
+				toolName := parts[0]
+				fileName := parts[1]
+				if toolName == "" || fileName == "" || strings.HasPrefix(fileName, ".") {
+					continue
+				}
+
+				if !(fileName == toolName+".schema.json" || fileName == toolName+".md" || fileName == toolName+".json" || fileName == toolName+".yaml" || fileName == toolName+".yml") {
+					continue
+				}
+
+				if roleConfig != nil {
+					access, hasAccess := roleConfig.ToolsAccess[toolName]
+					if !hasAccess {
+						access, hasAccess = roleConfig.ToolsAccess["**"]
+					}
+					if !hasAccess || access == conf.AccessDeny {
 						continue
 					}
-					toolName := parts[0]
-					expectedFileName := toolName + ".schema.json"
-					if parts[1] != expectedFileName {
-						continue
-					}
+				}
 
-					// Check if tool is accessible for this role
-					if roleConfig != nil {
-						// Check if role has access to this tool
-						// First check for exact match
-						access, hasAccess := roleConfig.ToolsAccess[toolName]
-						if !hasAccess {
-							// Check for wildcard patterns
-							access, hasAccess = roleConfig.ToolsAccess["**"]
-						}
-						if !hasAccess || access == conf.AccessDeny {
-							continue
-						}
-					}
-
-					// Look for <toolname>.md to get description
-					descKey := toolName + "/" + toolName + ".md"
-					if desc, ok := toolFragments[descKey]; ok {
-						// Use ToolInfo.ShortDescription() to extract first line
-						toolInfo := tool.ToolInfo{
-							Description: desc,
-						}
-						tools[toolName] = toolInfo.ShortDescription()
-					} else {
-						tools[toolName] = ""
-					}
+				descKey := toolName + "/" + toolName + ".md"
+				if desc, ok := toolFragments[descKey]; ok {
+					toolInfo := tool.ToolInfo{Description: desc}
+					tools[toolName] = toolInfo.ShortDescription()
+				} else if _, exists := tools[toolName]; !exists {
+					tools[toolName] = ""
 				}
 			}
 

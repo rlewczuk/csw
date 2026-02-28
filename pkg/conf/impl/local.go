@@ -214,6 +214,12 @@ func (s *LocalConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConf
 				configCopy.PromptFragments[fk] = fv
 			}
 		}
+		if v.ToolFragments != nil {
+			configCopy.ToolFragments = make(map[string]string, len(v.ToolFragments))
+			for fk, fv := range v.ToolFragments {
+				configCopy.ToolFragments[fk] = fv
+			}
+		}
 		if v.HiddenPatterns != nil {
 			configCopy.HiddenPatterns = make([]string, len(v.HiddenPatterns))
 			copy(configCopy.HiddenPatterns, v.HiddenPatterns)
@@ -478,9 +484,14 @@ func (s *LocalConfigStore) loadAgentRoleConfigs() error {
 							if err != nil {
 								return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, err)
 							}
+							toolFragments, err := s.loadToolFragments()
+							if err != nil {
+								return fmt.Errorf("loadAgentRoleConfigs(): failed to load tool fragments: %w", err)
+							}
 							configs["all"] = &conf.AgentRoleConfig{
 								Name:            "all",
 								PromptFragments: promptFragments,
+								ToolFragments:   toolFragments,
 							}
 							continue
 						}
@@ -521,6 +532,12 @@ func (s *LocalConfigStore) loadAgentRoleConfigs() error {
 		}
 		config.PromptFragments = promptFragments
 
+		toolFragments, err := s.loadToolFragments()
+		if err != nil {
+			return fmt.Errorf("loadAgentRoleConfigs(): failed to load tool fragments: %w", err)
+		}
+		config.ToolFragments = toolFragments
+
 		configs[config.Name] = &config
 	}
 
@@ -553,6 +570,51 @@ func (s *LocalConfigStore) loadPromptFragments(roleDir string) (map[string]strin
 		// Use filename without extension as the key
 		fragmentName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
 		fragments[fragmentName] = string(data)
+	}
+
+	return fragments, nil
+}
+
+// loadToolFragments loads all tool description/config files from conf/tools.
+// Returns a map with keys in the form "<tool-name>/<file-name>".
+func (s *LocalConfigStore) loadToolFragments() (map[string]string, error) {
+	fragments := make(map[string]string)
+	toolsDir := filepath.Join(s.configDir, "tools")
+
+	entries, err := os.ReadDir(toolsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fragments, nil
+		}
+		return nil, fmt.Errorf("loadToolFragments(): failed to read tools directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		toolName := entry.Name()
+		toolDir := filepath.Join(toolsDir, toolName)
+		toolEntries, err := os.ReadDir(toolDir)
+		if err != nil {
+			return nil, fmt.Errorf("loadToolFragments(): failed to read tool directory %s: %w", toolDir, err)
+		}
+
+		fragments[fmt.Sprintf("%s/.tooldir", toolName)] = toolDir
+
+		for _, toolEntry := range toolEntries {
+			if toolEntry.IsDir() {
+				continue
+			}
+
+			path := filepath.Join(toolDir, toolEntry.Name())
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return nil, fmt.Errorf("loadToolFragments(): failed to read %s: %w", path, err)
+			}
+			fragments[fmt.Sprintf("%s/%s", toolName, toolEntry.Name())] = string(data)
+		}
 	}
 
 	return fragments, nil
@@ -603,6 +665,26 @@ func (s *LocalConfigStore) setupWatchers() error {
 		}
 	}
 
+	// Watch tools directory and tool subdirectories
+	toolsDir := filepath.Join(s.configDir, "tools")
+	if _, err := os.Stat(toolsDir); err == nil {
+		if err := s.watcher.Add(toolsDir); err != nil {
+			return fmt.Errorf("setupWatchers(): failed to watch tools directory: %w", err)
+		}
+
+		entries, err := os.ReadDir(toolsDir)
+		if err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() {
+					toolDir := filepath.Join(toolsDir, entry.Name())
+					if err := s.watcher.Add(toolDir); err != nil {
+						return fmt.Errorf("setupWatchers(): failed to watch tool directory %s: %w", toolDir, err)
+					}
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -640,6 +722,7 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 	globalJSONPath := filepath.Join(s.configDir, "global.json")
 	modelsDir := filepath.Join(s.configDir, "models")
 	rolesDir := filepath.Join(s.configDir, "roles")
+	toolsDir := filepath.Join(s.configDir, "tools")
 
 	// Check if it's global config file (YAML or JSON)
 	if event.Name == globalYAMLPath || event.Name == globalJSONPath {
@@ -670,6 +753,14 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 		}
 	}
 
+	if filepath.Dir(event.Name) == toolsDir && event.Op&fsnotify.Create != 0 {
+		if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
+			if err := s.watcher.Add(event.Name); err != nil {
+				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to watch new tool directory: %v\n", err)
+			}
+		}
+	}
+
 	// Check if it's in a role directory (config.yaml, config.yml, config.json, or .md file)
 	eventDir := filepath.Dir(event.Name)
 	baseName := filepath.Base(event.Name)
@@ -683,6 +774,13 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 			}
 			return
 		}
+	}
+
+	if filepath.Dir(eventDir) == toolsDir || filepath.Dir(filepath.Dir(eventDir)) == toolsDir {
+		if err := s.loadAgentRoleConfigs(); err != nil {
+			fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload agent role configs after tools change: %v\n", err)
+		}
+		return
 	}
 }
 

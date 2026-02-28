@@ -181,6 +181,13 @@ func TestEmbeddedConfigStore_GetAgentRoleConfigs(t *testing.T) {
 			break
 		}
 	}
+
+	allRole, hasAll := configs["all"]
+	require.True(t, hasAll)
+	require.NotNil(t, allRole.ToolFragments)
+	assert.Contains(t, allRole.ToolFragments, "runBash/runBash.md")
+	assert.Contains(t, allRole.ToolFragments, "runBash/runBash.schema.json")
+	assert.Contains(t, allRole.ToolFragments, "runBash/.tooldir")
 }
 
 func TestEmbeddedConfigStore_LastAgentRoleConfigsUpdate(t *testing.T) {

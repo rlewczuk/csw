@@ -31,8 +31,21 @@ func (r *BashRunner) RunCommand(command string) (string, int, error) {
 
 // RunCommandWithOptions runs the given command with options and returns the output and exit code.
 func (r *BashRunner) RunCommandWithOptions(command string, options CommandOptions) (string, int, error) {
+	stdout, stderr, exitCode, err := r.RunCommandWithOptionsDetailed(command, options)
+	output := stdout
+	if stderr != "" {
+		if output != "" {
+			output += "\n"
+		}
+		output += stderr
+	}
+	return output, exitCode, err
+}
+
+// RunCommandWithOptionsDetailed runs a command and returns stdout/stderr separately.
+func (r *BashRunner) RunCommandWithOptionsDetailed(command string, options CommandOptions) (string, string, int, error) {
 	if command == "" {
-		return "", 1, fmt.Errorf("BashRunner.RunCommandWithOptions() [bash.go]: command cannot be empty")
+		return "", "", 1, fmt.Errorf("BashRunner.RunCommandWithOptionsDetailed() [bash.go]: command cannot be empty")
 	}
 
 	// Determine the working directory to use
@@ -67,30 +80,21 @@ func (r *BashRunner) RunCommandWithOptions(command string, options CommandOption
 
 	err := cmd.Run()
 
-	// Combine stdout and stderr
-	output := stdout.String()
-	if stderr.Len() > 0 {
-		if len(output) > 0 {
-			output += "\n"
-		}
-		output += stderr.String()
-	}
-
 	// Get exit code
 	exitCode := 0
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return output, 124, fmt.Errorf("BashRunner.RunCommandWithOptions() [bash.go]: command timed out after %v", timeout)
+			return stdout.String(), stderr.String(), 124, fmt.Errorf("BashRunner.RunCommandWithOptionsDetailed() [bash.go]: command timed out after %v", timeout)
 		}
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
 			// Other errors (e.g., command not found)
-			return output, 127, fmt.Errorf("BashRunner.RunCommandWithOptions() [bash.go]: %w", err)
+			return stdout.String(), stderr.String(), 127, fmt.Errorf("BashRunner.RunCommandWithOptionsDetailed() [bash.go]: %w", err)
 		}
 	}
 
-	return output, exitCode, nil
+	return stdout.String(), stderr.String(), exitCode, nil
 }
 
 var _ CommandRunner = (*BashRunner)(nil)

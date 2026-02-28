@@ -855,6 +855,31 @@ func TestLocalConfigStore_PromptFragments_Empty(t *testing.T) {
 	assert.Empty(t, test1.PromptFragments)
 }
 
+func TestLocalConfigStore_ToolFragments(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "roles", "all"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "roles", "all", "10-system.md"), []byte("all prompt"), 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "tools", "myTool"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "tools", "myTool", "myTool.md"), []byte("desc"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "tools", "myTool", "myTool.schema.json"), []byte(`{"type":"object"}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "tools", "myTool", "myTool.yaml"), []byte("command: echo hi\n"), 0o644))
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	roles, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	allRole, ok := roles["all"]
+	require.True(t, ok)
+	require.NotNil(t, allRole.ToolFragments)
+
+	assert.Equal(t, "desc", allRole.ToolFragments["myTool/myTool.md"])
+	assert.Equal(t, `{"type":"object"}`, allRole.ToolFragments["myTool/myTool.schema.json"])
+	assert.Equal(t, "command: echo hi\n", allRole.ToolFragments["myTool/myTool.yaml"])
+	assert.Equal(t, filepath.Join(tmpDir, "tools", "myTool"), allRole.ToolFragments["myTool/.tooldir"])
+}
+
 func TestLocalConfigStore_FileWatching_PromptFragments(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "test-config-*")
 	require.NoError(t, err)

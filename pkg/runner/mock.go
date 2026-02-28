@@ -69,11 +69,24 @@ func (m *MockRunner) RunCommand(command string) (string, int, error) {
 
 // RunCommandWithOptions runs the given command with options and returns the output and exit code.
 func (m *MockRunner) RunCommandWithOptions(command string, options CommandOptions) (string, int, error) {
+	stdout, stderr, exitCode, err := m.RunCommandWithOptionsDetailed(command, options)
+	output := stdout
+	if stderr != "" {
+		if output != "" {
+			output += "\n"
+		}
+		output += stderr
+	}
+	return output, exitCode, err
+}
+
+// RunCommandWithOptionsDetailed runs command and returns stdout/stderr separately.
+func (m *MockRunner) RunCommandWithOptionsDetailed(command string, options CommandOptions) (string, string, int, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if command == "" {
-		return "", 1, fmt.Errorf("MockRunner.RunCommandWithOptions() [mock.go]: command cannot be empty")
+		return "", "", 1, fmt.Errorf("MockRunner.RunCommandWithOptionsDetailed() [mock.go]: command cannot be empty")
 	}
 
 	// Check if we have a specific response for this command
@@ -94,7 +107,7 @@ func (m *MockRunner) RunCommandWithOptions(command string, options CommandOption
 		Timeout:  options.Timeout,
 	})
 
-	return exec.Output, exec.ExitCode, exec.Error
+	return exec.Output, "", exec.ExitCode, exec.Error
 }
 
 // GetExecutions returns all recorded command executions.

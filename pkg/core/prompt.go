@@ -366,17 +366,17 @@ func (g *ConfPromptGenerator) GetToolInfo(tags []string, toolName string, role *
 		return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: no tool fragments available")
 	}
 
-	// Look for <toolname>.schema.json
+	toolInfo := tool.ToolInfo{Name: toolName, Schema: tool.NewToolSchema()}
+
+	// Look for optional <toolname>.schema.json
 	schemaKey := fmt.Sprintf("%s/%s.schema.json", toolName, toolName)
 	schemaContent, hasSchema := toolFragments[schemaKey]
-	if !hasSchema {
-		return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: %s.schema.json not found for tool: %s", toolName, toolName)
-	}
-
-	// Parse the schema (description is now in the schema file)
-	toolInfo, err := parseToolDescription(toolName, schemaContent)
-	if err != nil {
-		return tool.ToolInfo{}, err
+	if hasSchema {
+		parsedInfo, parseErr := parseToolDescription(toolName, schemaContent)
+		if parseErr != nil {
+			return tool.ToolInfo{}, parseErr
+		}
+		toolInfo = parsedInfo
 	}
 
 	// Look for detailed description in <toolname>.md

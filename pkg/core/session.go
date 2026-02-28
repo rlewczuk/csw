@@ -24,12 +24,12 @@ import (
 )
 
 const (
-	defaultLLMRetryMaxAttempts       = 10
-	defaultLLMRetryMaxBackoffSeconds = 60
+	defaultLLMRetryMaxAttempts        = 10
+	defaultLLMRetryMaxBackoffSeconds  = 60
 	defaultContextCompactionThreshold = 0.95
-	sessionMessageTypeInfo           = "info"
-	sessionMessageTypeWarning        = "warning"
-	sessionMessageTypeError          = "error"
+	sessionMessageTypeInfo            = "info"
+	sessionMessageTypeWarning         = "warning"
+	sessionMessageTypeError           = "error"
 )
 
 type SweSession struct {
@@ -646,11 +646,11 @@ func (s *SweSession) SetModel(modelStr string) error {
 func (s *SweSession) applyModelTagToolSelection() {
 	baseTools := buildSessionToolRegistry(s.system.Tools, s.VFS, s.LSP, s)
 	if s.system.ModelTags == nil {
-		s.Tools = baseTools.FilterByModelTags(nil, s.system.ToolSelection)
+		s.Tools = filterToolsForRole(baseTools.FilterByModelTags(nil, s.system.ToolSelection), s.role)
 		return
 	}
 	tags := s.system.ModelTags.GetTagsForModel(s.providerName, s.model)
-	s.Tools = baseTools.FilterByModelTags(tags, s.system.ToolSelection)
+	s.Tools = filterToolsForRole(baseTools.FilterByModelTags(tags, s.system.ToolSelection), s.role)
 }
 
 // SetRole changes the agent role for this session.
@@ -799,6 +799,28 @@ func wrapToolsWithAccessControl(registry *tool.ToolRegistry, privileges map[stri
 	}
 
 	return newRegistry
+}
+
+func filterToolsForRole(registry *tool.ToolRegistry, role *conf.AgentRoleConfig) *tool.ToolRegistry {
+	if registry == nil || role == nil {
+		return registry
+	}
+
+	filtered := tool.NewToolRegistry()
+	for _, name := range registry.List() {
+		t, err := registry.Get(name)
+		if err != nil {
+			continue
+		}
+		if restricted, ok := t.(tool.RoleRestrictedTool); ok {
+			if !restricted.IsRoleAllowed(role.Name) {
+				continue
+			}
+		}
+		filtered.Register(name, t)
+	}
+
+	return filtered
 }
 
 // GetTodoList returns a copy of the current todo list.
@@ -1218,23 +1240,23 @@ func restoreSessionFromPersistedState(system *SweSystem, state persistedSessionS
 	}
 
 	session := &SweSession{
-		id:            state.SessionID,
-		system:        system,
-		provider:      provider,
-		providerName:  state.ProviderName,
-		model:         state.Model,
-		messages:      make([]*models.ChatMessage, 0, len(state.Messages)),
-		role:          nil,
-		VFS:           system.VFS,
-		LSP:           system.LSP,
-		Tools:         nil,
-		outputHandler: outputHandler,
-		workDir:       state.WorkDir,
-		todoList:      make([]tool.TodoItem, len(state.TodoList)),
-		logger:        sessionLogger,
-		llmLogger:     llmLogger,
-		tokenUsage:    state.TokenUsage,
-		contextLength: state.ContextLengthTokens,
+		id:              state.SessionID,
+		system:          system,
+		provider:        provider,
+		providerName:    state.ProviderName,
+		model:           state.Model,
+		messages:        make([]*models.ChatMessage, 0, len(state.Messages)),
+		role:            nil,
+		VFS:             system.VFS,
+		LSP:             system.LSP,
+		Tools:           nil,
+		outputHandler:   outputHandler,
+		workDir:         state.WorkDir,
+		todoList:        make([]tool.TodoItem, len(state.TodoList)),
+		logger:          sessionLogger,
+		llmLogger:       llmLogger,
+		tokenUsage:      state.TokenUsage,
+		contextLength:   state.ContextLengthTokens,
 		compactionCount: state.ContextCompactionCount,
 	}
 
