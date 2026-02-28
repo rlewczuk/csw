@@ -53,7 +53,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		// Create CLI view in non-interactive mode
 		output := &bytes.Buffer{}
-		_ = NewCliChatView(chatPresenter, output, nil, false, false)
+		_ = NewCliChatView(chatPresenter, output, nil, false, false, false)
 
 		// Setup LLM response
 		mockServer.AddStreamingResponse("/api/chat", "POST", true,
@@ -91,7 +91,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		// Create CLI view in non-interactive mode
 		output := &bytes.Buffer{}
-		view := NewCliChatView(chatPresenter, output, nil, false, false)
+		view := NewCliChatView(chatPresenter, output, nil, false, false, false)
 		_ = view
 
 		// Setup LLM response with multiple chunks
@@ -124,7 +124,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		presenter := &mockCliPresenter{}
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		// Add a message with a tool call directly
 		msg := &ui.ChatMessageUI{
@@ -173,7 +173,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		// Create CLI view with acceptAllPermissions=true
 		output := &bytes.Buffer{}
-		view := NewCliChatView(chatPresenter, output, nil, false, true)
+		view := NewCliChatView(chatPresenter, output, nil, false, true, false)
 
 		// Verify interactive is false when acceptAllPermissions is true
 		assert.False(t, view.interactive)
@@ -214,7 +214,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		// Create CLI view
 		output := &bytes.Buffer{}
-		view := NewCliChatView(chatPresenter, output, nil, false, false)
+		view := NewCliChatView(chatPresenter, output, nil, false, false, false)
 		_ = view
 
 		// Setup first LLM response

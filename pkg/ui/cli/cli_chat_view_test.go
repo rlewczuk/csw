@@ -17,11 +17,12 @@ func TestCliChatView_NewCliChatView(t *testing.T) {
 		input := strings.NewReader("")
 		presenter := mock.NewMockChatPresenter()
 
-		view := NewCliChatView(presenter, output, input, true, false)
+		view := NewCliChatView(presenter, output, input, true, false, false)
 
 		assert.NotNil(t, view)
 		assert.True(t, view.interactive)
 		assert.False(t, view.acceptAllPermissions)
+		assert.False(t, view.verbose)
 		assert.NotNil(t, view.scanner)
 		assert.Len(t, presenter.SetViewCalls, 1)
 	})
@@ -31,11 +32,12 @@ func TestCliChatView_NewCliChatView(t *testing.T) {
 		input := strings.NewReader("")
 		presenter := mock.NewMockChatPresenter()
 
-		view := NewCliChatView(presenter, output, input, false, false)
+		view := NewCliChatView(presenter, output, input, false, false, false)
 
 		assert.NotNil(t, view)
 		assert.False(t, view.interactive)
 		assert.False(t, view.acceptAllPermissions)
+		assert.False(t, view.verbose)
 		assert.Nil(t, view.scanner)
 		assert.Len(t, presenter.SetViewCalls, 1)
 	})
@@ -45,12 +47,28 @@ func TestCliChatView_NewCliChatView(t *testing.T) {
 		input := strings.NewReader("")
 		presenter := mock.NewMockChatPresenter()
 
-		view := NewCliChatView(presenter, output, input, true, true)
+		view := NewCliChatView(presenter, output, input, true, true, false)
 
 		assert.NotNil(t, view)
 		assert.False(t, view.interactive)
 		assert.True(t, view.acceptAllPermissions)
+		assert.False(t, view.verbose)
 		assert.Nil(t, view.scanner)
+	})
+
+	t.Run("creates view with verbose=true", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		input := strings.NewReader("")
+		presenter := mock.NewMockChatPresenter()
+
+		view := NewCliChatView(presenter, output, input, false, false, true)
+
+		assert.NotNil(t, view)
+		assert.False(t, view.interactive)
+		assert.False(t, view.acceptAllPermissions)
+		assert.True(t, view.verbose)
+		assert.Nil(t, view.scanner)
+		assert.Len(t, presenter.SetViewCalls, 1)
 	})
 }
 
@@ -58,7 +76,7 @@ func TestCliChatView_Init(t *testing.T) {
 	t.Run("initializes with empty session", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		session := &ui.ChatSessionUI{
 			Id:       "test-session",
@@ -75,7 +93,7 @@ func TestCliChatView_Init(t *testing.T) {
 	t.Run("initializes with user and assistant messages", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		session := &ui.ChatSessionUI{
 			Id:    "test-session",
@@ -106,7 +124,7 @@ func TestCliChatView_Init(t *testing.T) {
 	t.Run("initializes with tool calls in final status", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		session := &ui.ChatSessionUI{
 			Id:    "test-session",
@@ -141,7 +159,7 @@ func TestCliChatView_Init(t *testing.T) {
 	t.Run("does not display tools in started or executing status", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		session := &ui.ChatSessionUI{
 			Id:    "test-session",
@@ -183,7 +201,7 @@ func TestCliChatView_AddMessage(t *testing.T) {
 	t.Run("adds user message", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		msg := &ui.ChatMessageUI{
 			Id:   "msg1",
@@ -200,7 +218,7 @@ func TestCliChatView_AddMessage(t *testing.T) {
 	t.Run("does not display tools in executing status", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		msg := &ui.ChatMessageUI{
 			Id:   "msg1",
@@ -229,7 +247,7 @@ func TestCliChatView_AddMessage(t *testing.T) {
 	t.Run("displays tools in succeeded status with Display field", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		msg := &ui.ChatMessageUI{
 			Id:   "msg1",
@@ -259,7 +277,7 @@ func TestCliChatView_AddMessage(t *testing.T) {
 	t.Run("does not render tool when summary is empty", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		msg := &ui.ChatMessageUI{
 			Id:   "msg1",
@@ -286,7 +304,7 @@ func TestCliChatView_UpdateMessage(t *testing.T) {
 	t.Run("updates message by ID", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		// Add initial message
 		msg := &ui.ChatMessageUI{
@@ -316,7 +334,7 @@ func TestCliChatView_UpdateMessage(t *testing.T) {
 	t.Run("updates message by role when ID is empty", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		// Add initial message with empty text
 		msg := &ui.ChatMessageUI{
@@ -344,7 +362,7 @@ func TestCliChatView_UpdateMessage(t *testing.T) {
 	t.Run("assistant updates are rendered as full messages", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		msg := &ui.ChatMessageUI{
 			Id:   "msg1",
@@ -380,7 +398,7 @@ func TestCliChatView_UpdateTool(t *testing.T) {
 	t.Run("updates tool status and displays when in final status", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		// Add message with tool in started state (should not be displayed)
 		msg := &ui.ChatMessageUI{
@@ -417,7 +435,7 @@ func TestCliChatView_UpdateTool(t *testing.T) {
 	t.Run("does not display tool when status is started or executing", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		// Add message with tool
 		msg := &ui.ChatMessageUI{
@@ -455,7 +473,7 @@ func TestCliChatView_ToolRenderOutputOnUpdate(t *testing.T) {
 	t.Run("renders summary once it becomes available", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		msg := &ui.ChatMessageUI{
 			Id:   "msg1",
@@ -491,7 +509,7 @@ func TestCliChatView_MoveToBottom(t *testing.T) {
 	t.Run("is a no-op", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		err := view.MoveToBottom()
 		require.NoError(t, err)
@@ -502,7 +520,7 @@ func TestCliChatView_QueryPermission(t *testing.T) {
 	t.Run("automatically accepts when acceptAllPermissions=true", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, true)
+		view := NewCliChatView(presenter, output, nil, false, true, false)
 
 		query := &ui.PermissionQueryUI{
 			Id:      "perm1",
@@ -521,7 +539,7 @@ func TestCliChatView_QueryPermission(t *testing.T) {
 	t.Run("automatically denies when interactive=false and acceptAllPermissions=false", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		query := &ui.PermissionQueryUI{
 			Id:      "perm1",
@@ -542,7 +560,7 @@ func TestCliChatView_QueryPermission(t *testing.T) {
 		input := strings.NewReader("1\n")
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, input, true, false)
+		view := NewCliChatView(presenter, output, input, true, false, false)
 
 		query := &ui.PermissionQueryUI{
 			Id:      "perm1",
@@ -569,7 +587,7 @@ func TestCliChatView_QueryPermission(t *testing.T) {
 		input := strings.NewReader("0\nCustom response\n")
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, input, true, false)
+		view := NewCliChatView(presenter, output, input, true, false, false)
 
 		query := &ui.PermissionQueryUI{
 			Id:                  "perm1",
@@ -608,7 +626,7 @@ func TestCliChatView_ToolStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			output := &bytes.Buffer{}
 			presenter := mock.NewMockChatPresenter()
-			view := NewCliChatView(presenter, output, nil, false, false)
+			view := NewCliChatView(presenter, output, nil, false, false, false)
 
 			tool := &ui.ToolUI{
 				Id:      "tool1",
@@ -640,7 +658,7 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 	t.Run("tools are not printed multiple times when message is updated", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		// Add initial assistant message with a tool in succeeded status
 		msg := &ui.ChatMessageUI{
@@ -690,7 +708,7 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 	t.Run("tools are printed again only when status changes to final", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		// Add initial assistant message with a tool in started state (not displayed)
 		msg := &ui.ChatMessageUI{
@@ -756,7 +774,7 @@ func TestCliChatView_ToolNotDuplicatedOnMessageUpdate(t *testing.T) {
 	t.Run("multiple message updates do not duplicate tools", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		// Add initial assistant message
 		msg := &ui.ChatMessageUI{
@@ -814,7 +832,7 @@ func TestCliChatView_ToolDisplayField(t *testing.T) {
 	t.Run("uses Display field when available", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		msg := &ui.ChatMessageUI{
 			Id:   "msg1",
@@ -841,7 +859,7 @@ func TestCliChatView_ToolDisplayField(t *testing.T) {
 	t.Run("does not render when Display is empty", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		msg := &ui.ChatMessageUI{
 			Id:   "msg1",
@@ -869,7 +887,7 @@ func TestCliChatView_ThinkingContent(t *testing.T) {
 	t.Run("displays thinking content as italic", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		msg := &ui.ChatMessageUI{
 			Id:       "msg1",
@@ -889,7 +907,7 @@ func TestCliChatView_ThinkingContent(t *testing.T) {
 	t.Run("thinking content updates are rendered as full messages", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		// Initial message with thinking
 		msg := &ui.ChatMessageUI{
@@ -920,7 +938,7 @@ func TestCliChatView_ThinkingContent(t *testing.T) {
 	t.Run("thinking content appears before text content", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		msg := &ui.ChatMessageUI{
 			Id:       "msg1",
@@ -942,7 +960,7 @@ func TestCliChatView_ThinkingContent(t *testing.T) {
 	t.Run("no thinking output when thinking is empty", func(t *testing.T) {
 		output := &bytes.Buffer{}
 		presenter := mock.NewMockChatPresenter()
-		view := NewCliChatView(presenter, output, nil, false, false)
+		view := NewCliChatView(presenter, output, nil, false, false, false)
 
 		msg := &ui.ChatMessageUI{
 			Id:       "msg1",
@@ -957,5 +975,148 @@ func TestCliChatView_ThinkingContent(t *testing.T) {
 		outputStr := output.String()
 		assert.Contains(t, outputStr, "Assistant: Hello!")
 		assert.NotContains(t, outputStr, "**")
+	})
+}
+
+func TestCliChatView_VerboseMode(t *testing.T) {
+	t.Run("displays Details field when verbose=true", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false, true)
+
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Done",
+			Tools: []*ui.ToolUI{
+				{
+					Id:      "tool1",
+					Name:    "vfsRead",
+					Status:  ui.ToolStatusSucceeded,
+					Summary: "Short summary",
+					Details: "Full detailed output with multiple lines\nLine 2\nLine 3",
+				},
+			},
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "✅ Full detailed output with multiple lines")
+		assert.Contains(t, outputStr, "Line 2")
+		assert.Contains(t, outputStr, "Line 3")
+		assert.NotContains(t, outputStr, "Short summary")
+	})
+
+	t.Run("displays Summary field when verbose=false", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false, false)
+
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Done",
+			Tools: []*ui.ToolUI{
+				{
+					Id:      "tool1",
+					Name:    "vfsRead",
+					Status:  ui.ToolStatusSucceeded,
+					Summary: "Short summary",
+					Details: "Full detailed output with multiple lines\nLine 2\nLine 3",
+				},
+			},
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "✅ Short summary")
+		assert.NotContains(t, outputStr, "Line 2")
+		assert.NotContains(t, outputStr, "Full detailed output")
+	})
+
+	t.Run("falls back to Summary when Details is empty in verbose mode", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false, true)
+
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Done",
+			Tools: []*ui.ToolUI{
+				{
+					Id:      "tool1",
+					Name:    "vfsRead",
+					Status:  ui.ToolStatusSucceeded,
+					Summary: "Short summary",
+					// Details is empty
+				},
+			},
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "✅ Short summary")
+	})
+
+	t.Run("falls back to Details when Summary is empty in non-verbose mode", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false, false)
+
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Done",
+			Tools: []*ui.ToolUI{
+				{
+					Id:      "tool1",
+					Name:    "vfsRead",
+					Status:  ui.ToolStatusSucceeded,
+					Summary: "",
+					Details: "Full detailed output",
+				},
+			},
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "✅ Full detailed output")
+	})
+
+	t.Run("verbose mode displays failed tool with Details", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, false, false, true)
+
+		msg := &ui.ChatMessageUI{
+			Id:   "msg1",
+			Role: ui.ChatRoleAssistant,
+			Text: "Failed",
+			Tools: []*ui.ToolUI{
+				{
+					Id:      "tool1",
+					Name:    "vfsRead",
+					Status:  ui.ToolStatusFailed,
+					Summary: "Error: file not found",
+					Details: "ERROR: file not found\nPath: /nonexistent/file.txt\nPlease check the path and try again.",
+				},
+			},
+		}
+
+		err := view.AddMessage(msg)
+		require.NoError(t, err)
+
+		outputStr := output.String()
+		assert.Contains(t, outputStr, "❌ ERROR: file not found")
+		assert.Contains(t, outputStr, "Path: /nonexistent/file.txt")
 	})
 }

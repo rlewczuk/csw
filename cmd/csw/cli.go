@@ -50,6 +50,7 @@ type CLIParams struct {
 	ContinueSession       bool
 	ForceResume           bool
 	BashRunTimeout        time.Duration
+	Verbose               bool
 }
 
 const defaultBashRunTimeout = 120 * time.Second
@@ -88,6 +89,7 @@ func CliCommand() *cobra.Command {
 		cliContinue       bool
 		cliForce          bool
 		cliBashRunTimeout string
+		cliVerbose        bool
 	)
 
 	cmd := &cobra.Command{
@@ -195,6 +197,7 @@ func CliCommand() *cobra.Command {
 				ContinueSession:       cliContinue,
 				ForceResume:           cliForce,
 				BashRunTimeout:        bashRunTimeout,
+				Verbose:               cliVerbose,
 			})
 		},
 	}
@@ -224,6 +227,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliContinue, "continue", false, "Continue resumed session with a new user message")
 	cmd.Flags().BoolVar(&cliForce, "force", false, "Force resume even when there is no pending work")
 	cmd.Flags().StringVar(&cliBashRunTimeout, "bash-run-timeout", "120", "Default runBash command timeout (duration; plain number means seconds)")
+	cmd.Flags().BoolVar(&cliVerbose, "verbose", false, "Display full tool output instead of one-liners")
 	resumeFlag := cmd.Flags().Lookup("resume")
 	if resumeFlag != nil {
 		resumeFlag.NoOptDefVal = "last"
@@ -395,7 +399,7 @@ func runCLI(params *CLIParams) error {
 	basePresenter.SetAppView(appView)
 
 	// Create CLI chat view
-	baseCliView := cli.NewCliChatView(basePresenter, os.Stdout, os.Stdin, params.Interactive, params.AllowAllPerms)
+	baseCliView := cli.NewCliChatView(basePresenter, os.Stdout, os.Stdin, params.Interactive, params.AllowAllPerms, params.Verbose)
 
 	// Set view on presenter
 	if err := basePresenter.SetView(baseCliView); err != nil {

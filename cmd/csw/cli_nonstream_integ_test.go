@@ -55,7 +55,7 @@ func TestCLINonStreamingAssistantMessageNotDuplicated(t *testing.T) {
 
 	chatPresenter := presenter.NewChatPresenter(system, thread)
 	output := &bytes.Buffer{}
-	view := cli.NewCliChatView(chatPresenter, output, nil, false, false)
+	view := cli.NewCliChatView(chatPresenter, output, nil, false, false, false)
 	err = chatPresenter.SetView(view)
 	require.NoError(t, err)
 

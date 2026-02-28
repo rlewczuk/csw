@@ -22,6 +22,9 @@ type CliChatView struct {
 	// acceptAllPermissions controls whether to automatically accept all permissions
 	acceptAllPermissions bool
 
+	// verbose controls whether to display full tool output instead of one-liners
+	verbose bool
+
 	// messages stores all messages for rendering
 	messages []*ui.ChatMessageUI
 
@@ -42,7 +45,8 @@ type CliChatView struct {
 // NewCliChatView creates a new CLI chat view.
 // interactive controls whether to read user input.
 // acceptAllPermissions controls whether to automatically accept all permissions.
-func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Reader, interactive bool, acceptAllPermissions bool) *CliChatView {
+// verbose controls whether to display full tool output instead of one-liners.
+func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Reader, interactive bool, acceptAllPermissions bool, verbose bool) *CliChatView {
 	// acceptAllPermissions implies interactive=false
 	if acceptAllPermissions {
 		interactive = false
@@ -54,6 +58,7 @@ func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Read
 		input:                input,
 		interactive:          interactive,
 		acceptAllPermissions: acceptAllPermissions,
+		verbose:              verbose,
 		messages:             make([]*ui.ChatMessageUI, 0),
 		stopCh:               make(chan struct{}),
 		renderedTools:        make(map[string]string),
@@ -357,8 +362,14 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) bool {
 		return false
 	}
 
-	// Use the Summary field from ToolUI if available, otherwise fall back to Details
+	// In verbose mode, use Details field; otherwise use Summary
 	displayStr := tool.Summary
+	if v.verbose {
+		displayStr = tool.Details
+	}
+	if displayStr == "" {
+		displayStr = tool.Summary
+	}
 	if displayStr == "" {
 		displayStr = tool.Details
 	}
