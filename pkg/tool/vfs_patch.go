@@ -3,6 +3,7 @@ package tool
 import (
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"sort"
 	"strings"
 	"unicode"
@@ -299,12 +300,73 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 // Render returns a string representation of the tool call.
 func (t *VFSPatchTool) Render(call *ToolCall) (string, string, map[string]string) {
 	patchText, _ := call.Arguments.StringOK("patchText")
-	oneLiner := truncateString("apply patch", 128)
+
+	oneLiner := "apply patch"
+	if patchText != "" {
+		parsed, err := shared.ParsePatch(patchText)
+		if err == nil && len(parsed.Hunks) > 0 {
+			oneLiner = renderPatchOneLiner(parsed)
+		}
+	}
+	oneLiner = truncateString(oneLiner, 128)
+
 	full := oneLiner
 	if patchText != "" {
 		full += "\n\n" + patchText
 	}
 	return oneLiner, full, make(map[string]string)
+}
+
+// renderPatchOneLiner generates a one-line summary of patch operations.
+func renderPatchOneLiner(parsed *shared.Patch) string {
+	parts := make([]string, 0, len(parsed.Hunks))
+	for _, h := range parsed.Hunks {
+		switch hunk := h.(type) {
+		case shared.AddFile:
+			name := filepath.Base(hunk.Path)
+			linesAdded := countLines(hunk.Contents)
+			parts = append(parts, fmt.Sprintf("A:%s(+%d)", name, linesAdded))
+		case shared.DeleteFile:
+			name := filepath.Base(hunk.Path)
+			parts = append(parts, fmt.Sprintf("D:%s", name))
+		case shared.UpdateFile:
+			name := filepath.Base(hunk.Path)
+			if hunk.MovePath != "" {
+				targetName := filepath.Base(hunk.MovePath)
+				added, removed := countUpdateLines(hunk.Chunks)
+				parts = append(parts, fmt.Sprintf("M:%s(+%d/-%d)", targetName, added, removed))
+			} else {
+				added, removed := countUpdateLines(hunk.Chunks)
+				parts = append(parts, fmt.Sprintf("U:%s(+%d/-%d)", name, added, removed))
+			}
+		}
+	}
+	return "apply patch: " + strings.Join(parts, " ")
+}
+
+// countLines counts the number of lines in a string.
+func countLines(s string) int {
+	if s == "" {
+		return 0
+	}
+	return strings.Count(s, "\n") + 1
+}
+
+// countUpdateLines counts added and removed lines from update chunks.
+func countUpdateLines(chunks []shared.UpdateFileChunk) (added, removed int) {
+	for _, chunk := range chunks {
+		for _, line := range chunk.NewLines {
+			if line != "" {
+				added++
+			}
+		}
+		for _, line := range chunk.OldLines {
+			if line != "" {
+				removed++
+			}
+		}
+	}
+	return added, removed
 }
 
 type vfsReplacement struct {

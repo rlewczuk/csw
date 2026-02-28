@@ -167,6 +167,151 @@ func TestVFSPatchTool(t *testing.T) {
 	})
 }
 
+func TestVFSPatchToolRender(t *testing.T) {
+	t.Run("should return simple oneliner for empty patch", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSPatchTool(mockVFS, nil)
+
+		oneLiner, full, _ := tool.Render(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsPatch",
+			Arguments: NewToolValue(map[string]any{
+				"patchText": "",
+			}),
+		})
+
+		assert.Equal(t, "apply patch", oneLiner)
+		assert.Equal(t, "apply patch", full)
+	})
+
+	t.Run("should return simple oneliner for invalid patch", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSPatchTool(mockVFS, nil)
+
+		oneLiner, _, _ := tool.Render(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsPatch",
+			Arguments: NewToolValue(map[string]any{
+				"patchText": "not a valid patch",
+			}),
+		})
+
+		assert.Equal(t, "apply patch", oneLiner)
+	})
+
+	t.Run("should show added file with line count", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSPatchTool(mockVFS, nil)
+
+		oneLiner, _, _ := tool.Render(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsPatch",
+			Arguments: NewToolValue(map[string]any{
+				"patchText": "*** Begin Patch\n*** Add File: /path/to/new.txt\n+line1\n+line2\n+line3\n*** End Patch",
+			}),
+		})
+
+		assert.Equal(t, "apply patch: A:new.txt(+3)", oneLiner)
+	})
+
+	t.Run("should show deleted file", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSPatchTool(mockVFS, nil)
+
+		oneLiner, _, _ := tool.Render(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsPatch",
+			Arguments: NewToolValue(map[string]any{
+				"patchText": "*** Begin Patch\n*** Delete File: /path/to/old.txt\n*** End Patch",
+			}),
+		})
+
+		assert.Equal(t, "apply patch: D:old.txt", oneLiner)
+	})
+
+	t.Run("should show updated file with added and removed lines", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSPatchTool(mockVFS, nil)
+
+		oneLiner, _, _ := tool.Render(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsPatch",
+			Arguments: NewToolValue(map[string]any{
+				"patchText": `*** Begin Patch
+*** Update File: /path/to/existing.txt
+@@
+-old line 1
+-old line 2
++new line 1
++new line 2
++new line 3
+*** End Patch`,
+			}),
+		})
+
+		assert.Equal(t, "apply patch: U:existing.txt(+3/-2)", oneLiner)
+	})
+
+	t.Run("should show moved file with M prefix", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSPatchTool(mockVFS, nil)
+
+		oneLiner, _, _ := tool.Render(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsPatch",
+			Arguments: NewToolValue(map[string]any{
+				"patchText": `*** Begin Patch
+*** Update File: /path/to/old.txt
+*** Move to: /path/to/new.txt
+@@
+-old content
++new content
+*** End Patch`,
+			}),
+		})
+
+		assert.Equal(t, "apply patch: M:new.txt(+1/-1)", oneLiner)
+	})
+
+	t.Run("should show multiple files space separated", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSPatchTool(mockVFS, nil)
+
+		oneLiner, _, _ := tool.Render(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsPatch",
+			Arguments: NewToolValue(map[string]any{
+				"patchText": `*** Begin Patch
+*** Add File: new.txt
++line1
+*** Update File: existing.txt
+@@
+-old
++new
+*** Delete File: remove.txt
+*** End Patch`,
+			}),
+		})
+
+		assert.Equal(t, "apply patch: A:new.txt(+1) U:existing.txt(+1/-1) D:remove.txt", oneLiner)
+	})
+
+	t.Run("should use short basename only", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSPatchTool(mockVFS, nil)
+
+		oneLiner, _, _ := tool.Render(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsPatch",
+			Arguments: NewToolValue(map[string]any{
+				"patchText": "*** Begin Patch\n*** Add File: /very/long/path/to/the/file/name.txt\n+content\n*** End Patch",
+			}),
+		})
+
+		assert.Equal(t, "apply patch: A:name.txt(+1)", oneLiner)
+	})
+}
+
 func TestVFSPatchToolPermissionQuery(t *testing.T) {
 	t.Run("should return permission query when read access is ask", func(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
