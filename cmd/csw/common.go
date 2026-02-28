@@ -81,15 +81,33 @@ func GetCompositeConfigStore() (conf.ConfigStore, error) {
 }
 
 // BuildConfigPath builds a config path hierarchy string from the base path and optional custom paths.
-// Returns a string in the format: "@DEFAULTS:./.csw/config:~/.config/csw[:custom-paths]"
-func BuildConfigPath(customConfigPath string) (string, error) {
+// Returns a string in the format: "@DEFAULTS:~/.config/csw:<project-config>[:custom-paths]"
+// If projectConfig is empty, defaults to "./.csw/config".
+func BuildConfigPath(projectConfig, customConfigPath string) (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("BuildConfigPath() [common.go]: failed to get user home directory: %w", err)
 	}
 
+	// Determine project config path
+	projectConfigPath := "./.csw/config"
+	if projectConfig != "" {
+		// Validate project config directory exists and is a directory
+		info, err := os.Stat(projectConfig)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return "", fmt.Errorf("BuildConfigPath() [common.go]: project config directory does not exist: %s", projectConfig)
+			}
+			return "", fmt.Errorf("BuildConfigPath() [common.go]: failed to access project config directory %s: %w", projectConfig, err)
+		}
+		if !info.IsDir() {
+			return "", fmt.Errorf("BuildConfigPath() [common.go]: project config path is not a directory: %s", projectConfig)
+		}
+		projectConfigPath = projectConfig
+	}
+
 	// Start with default hierarchy
-	configPathStr := "@DEFAULTS:" + filepath.Join(homeDir, ".config", "csw") + ":./.csw/config"
+	configPathStr := "@DEFAULTS:" + filepath.Join(homeDir, ".config", "csw") + ":" + projectConfigPath
 
 	// Validate and append custom config paths if provided
 	if customConfigPath != "" {

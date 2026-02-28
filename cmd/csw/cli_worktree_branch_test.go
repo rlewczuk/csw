@@ -96,7 +96,7 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 				return "worktree-cleanup", nil
 			}
 
-			branch, err := resolveWorktreeBranchName(context.Background(), tt.prompt, tt.modelName, "", "", tt.worktree)
+			branch, err := resolveWorktreeBranchName(context.Background(), tt.prompt, tt.modelName, "", "", "", tt.worktree)
 			if tt.expectError != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectError)

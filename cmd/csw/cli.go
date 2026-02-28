@@ -38,6 +38,7 @@ type CLIParams struct {
 	ContainerEnv          []string
 	CommitMessageTemplate string
 	ConfigPath            string
+	ProjectConfig         string
 	AllowAllPerms         bool
 	Interactive           bool
 	SaveSessionTo         string
@@ -70,6 +71,7 @@ func CliCommand() *cobra.Command {
 		cliAllowAllPerms  bool
 		cliInteractive    bool
 		cliConfigPath     string
+		cliProjectConfig  string
 		cliSaveSessionTo  string
 		cliSaveSession    bool
 		cliLogLLMRequests bool
@@ -177,6 +179,7 @@ func CliCommand() *cobra.Command {
 				ContainerEnv:          cliContainerEnv,
 				CommitMessageTemplate: cliCommitMessage,
 				ConfigPath:            cliConfigPath,
+				ProjectConfig:         cliProjectConfig,
 				AllowAllPerms:         cliAllowAllPerms,
 				Interactive:           cliInteractive,
 				SaveSessionTo:         cliSaveSessionTo,
@@ -207,6 +210,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliAllowAllPerms, "allow-all-permissions", false, "Allow all permissions without asking")
 	cmd.Flags().BoolVar(&cliInteractive, "interactive", false, "Enable interactive mode (allows user to respond to agent questions)")
 	cmd.Flags().StringVar(&cliConfigPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
+	cmd.Flags().StringVar(&cliProjectConfig, "project-config", "", "Custom project config directory (default: .csw/config)")
 	cmd.Flags().StringVar(&cliSaveSessionTo, "save-session-to", "", "Save session conversation to specified markdown file")
 	cmd.Flags().BoolVar(&cliSaveSession, "save-session", false, "Save session conversation")
 	cmd.Flags().BoolVar(&cliLogLLMRequests, "log-llm-requests", false, "Log LLM requests and responses")
@@ -239,7 +243,7 @@ func runCLI(params *CLIParams) error {
 		return fmt.Errorf("runCLI() [cli.go]: container mode options are not supported with --resume")
 	}
 
-	resolvedWorktreeBranch, err := resolveWorktreeBranchName(ctx, params.Prompt, params.ModelName, params.WorkDir, params.ConfigPath, params.WorktreeBranch)
+	resolvedWorktreeBranch, err := resolveWorktreeBranchName(ctx, params.Prompt, params.ModelName, params.WorkDir, params.ProjectConfig, params.ConfigPath, params.WorktreeBranch)
 	if err != nil {
 		return fmt.Errorf("runCLI() [cli.go]: failed to resolve worktree branch: %w", err)
 	}
@@ -249,20 +253,21 @@ func runCLI(params *CLIParams) error {
 	}
 
 	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
-		WorkDir:          params.WorkDir,
-		ConfigPath:       params.ConfigPath,
-		ModelName:        params.ModelName,
-		RoleName:         params.RoleName,
-		WorktreeBranch:   params.WorktreeBranch,
-		ContainerEnabled: params.ContainerEnabled,
+		WorkDir:           params.WorkDir,
+		ConfigPath:        params.ConfigPath,
+		ProjectConfig:     params.ProjectConfig,
+		ModelName:         params.ModelName,
+		RoleName:          params.RoleName,
+		WorktreeBranch:    params.WorktreeBranch,
+		ContainerEnabled:  params.ContainerEnabled,
 		ContainerDisabled: params.ContainerDisabled,
-		ContainerImage:   params.ContainerImage,
-		ContainerMounts:  params.ContainerMounts,
-		ContainerEnv:     params.ContainerEnv,
-		LSPServer:        params.LSPServer,
-		LogLLMRequests:   params.LogLLMRequests,
-		Thinking:         params.Thinking,
-		BashRunTimeout:   params.BashRunTimeout,
+		ContainerImage:    params.ContainerImage,
+		ContainerMounts:   params.ContainerMounts,
+		ContainerEnv:      params.ContainerEnv,
+		LSPServer:         params.LSPServer,
+		LogLLMRequests:    params.LogLLMRequests,
+		Thinking:          params.Thinking,
+		BashRunTimeout:    params.BashRunTimeout,
 	})
 	if err != nil {
 		return err
@@ -456,7 +461,7 @@ func normalizeResumeTarget(raw string) (string, error) {
 	return value, nil
 }
 
-func resolveWorktreeBranchName(ctx context.Context, prompt, modelName, workDir, configPath, worktreeBranch string) (string, error) {
+func resolveWorktreeBranchName(ctx context.Context, prompt, modelName, workDir, projectConfig, configPath, worktreeBranch string) (string, error) {
 	if worktreeBranch == "" || !strings.HasSuffix(worktreeBranch, "%") {
 		return worktreeBranch, nil
 	}
@@ -471,7 +476,7 @@ func resolveWorktreeBranchName(ctx context.Context, prompt, modelName, workDir, 
 		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to resolve work directory: %w", err)
 	}
 
-	configPathStr, err := BuildConfigPath(configPath)
+	configPathStr, err := BuildConfigPath(projectConfig, configPath)
 	if err != nil {
 		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to build config path: %w", err)
 	}

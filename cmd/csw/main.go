@@ -9,6 +9,7 @@ import (
 var (
 	modelName      string
 	configPath     string
+	projectConfig  string
 	roleName       string
 	lspServer      string
 	saveSessionTo  string
@@ -33,13 +34,14 @@ func main() {
 				return err
 			}
 
-			return runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo, saveSession, logLLMRequests)
+			return runTUI(workDir, configPath, projectConfig, modelName, roleName, lspServer, saveSessionTo, saveSession, logLLMRequests)
 		},
 	}
 
 	// Define flags
 	rootCmd.Flags().StringVar(&modelName, "model", "", "Model name in provider/model format (if not set, uses default provider)")
 	rootCmd.Flags().StringVar(&configPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
+	rootCmd.Flags().StringVar(&projectConfig, "project-config", "", "Custom project config directory (default: .csw/config)")
 	rootCmd.Flags().StringVar(&roleName, "role", "developer", "Agent role name")
 	rootCmd.Flags().StringVar(&lspServer, "lsp-server", "gopls", "Path to LSP server binary (empty to disable LSP)")
 	rootCmd.Flags().StringVar(&saveSessionTo, "save-session-to", "", "Save session conversation to specified markdown file")

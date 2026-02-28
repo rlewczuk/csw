@@ -15,10 +15,11 @@ import (
 	"github.com/rlewczuk/csw/pkg/ui/tui"
 )
 
-func runTUI(workDir, configPath, modelName, roleName, lspServer, saveSessionTo string, saveSession, logLLMRequests bool) error {
+func runTUI(workDir, configPath, projectConfig, modelName, roleName, lspServer, saveSessionTo string, saveSession, logLLMRequests bool) error {
 	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
 		WorkDir:        workDir,
 		ConfigPath:     configPath,
+		ProjectConfig:  projectConfig,
 		ModelName:      modelName,
 		RoleName:       roleName,
 		LSPServer:      lspServer,

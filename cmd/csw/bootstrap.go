@@ -39,6 +39,7 @@ var gitConfigValueFunc = readGitConfigValue
 type BuildSystemParams struct {
 	WorkDir           string
 	ConfigPath        string
+	ProjectConfig     string
 	ModelName         string
 	RoleName          string
 	WorktreeBranch    string
@@ -133,7 +134,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to initialize logging: %w", err)
 	}
 
-	configPathStr, err := BuildConfigPath(params.ConfigPath)
+	configPathStr, err := BuildConfigPath(params.ProjectConfig, params.ConfigPath)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
