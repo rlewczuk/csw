@@ -187,5 +187,13 @@ func (t *VFSGrepTool) Render(call *ToolCall) (string, string, map[string]string)
 	if content, ok := call.Arguments.Get("content").AsStringOK(); ok && content != "" {
 		full += content
 	}
+
+	// Handle error if present
+	if errMsg, ok := call.Arguments.Get("error").AsStringOK(); ok && errMsg != "" {
+		errOneLiner, errFull := formatRenderError(errMsg)
+		oneLiner += "\n" + errOneLiner
+		full += "\n\n" + errFull
+	}
+
 	return oneLiner, full, make(map[string]string)
 }

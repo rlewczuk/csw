@@ -360,3 +360,101 @@ func TestVFSFindToolPermissionQuery(t *testing.T) {
 		assert.True(t, response.Done)
 	})
 }
+
+func TestVFSFindToolRender(t *testing.T) {
+	t.Run("should render basic find query", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSFindTool(mockVFS)
+
+		// Execute
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsFind",
+			Arguments: NewToolValue(map[string]any{
+				"query": "*.txt",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert
+		assert.Equal(t, "find *.txt", oneLiner)
+		assert.Equal(t, "find *.txt\n\n", full)
+	})
+
+	t.Run("should render with files in output", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSFindTool(mockVFS)
+
+		// Execute
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsFind",
+			Arguments: NewToolValue(map[string]any{
+				"query": "*.txt",
+				"files": []any{"file1.txt", "file2.txt", "dir/file3.txt"},
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert
+		assert.Equal(t, "find *.txt", oneLiner)
+		assert.Contains(t, full, "file1.txt")
+		assert.Contains(t, full, "file2.txt")
+		assert.Contains(t, full, "dir/file3.txt")
+	})
+
+	t.Run("should include error in output when error is present", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSFindTool(mockVFS)
+
+		// Execute - call with error
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsFind",
+			Arguments: NewToolValue(map[string]any{
+				"query": "*.txt",
+				"error": "VFSFindTool.Execute() [vfs_find.go]: permission denied",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - oneliner should contain error on second line
+		assert.Contains(t, oneLiner, "find *.txt")
+		assert.Contains(t, oneLiner, "permission denied")
+		// Assert - full should contain ERROR: prefix
+		assert.Contains(t, full, "find *.txt")
+		assert.Contains(t, full, "ERROR: VFSFindTool.Execute() [vfs_find.go]: permission denied")
+	})
+
+	t.Run("should convert multiline error to single line in oneliner", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSFindTool(mockVFS)
+
+		// Execute - call with multiline error
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsFind",
+			Arguments: NewToolValue(map[string]any{
+				"query": "*.go",
+				"error": "error details:\nline 1\nline 2",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - oneliner should have error on single line (newlines converted to spaces)
+		assert.Contains(t, oneLiner, "find *.go")
+		// Check that oneliner does not contain literal newlines in error portion
+		lines := splitLines(oneLiner)
+		assert.Equal(t, 2, len(lines), "oneliner should have exactly 2 lines")
+		// Assert - full should contain full error with ERROR: prefix
+		assert.Contains(t, full, "ERROR: error details:\nline 1\nline 2")
+	})
+}

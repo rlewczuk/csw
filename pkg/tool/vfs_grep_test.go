@@ -517,4 +517,56 @@ func TestVFSGrepToolRender(t *testing.T) {
 		assert.LessOrEqual(t, len(oneLiner), 128)
 		assert.Contains(t, oneLiner, "grep")
 	})
+
+	t.Run("should include error in output when error is present", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSGrepTool(mockVFS)
+
+		// Execute - call with error
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": "hello",
+				"error":   "VFSGrepTool.Execute() [grep.go]: invalid regex pattern",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - oneliner should contain error on second line
+		assert.Contains(t, oneLiner, "grep hello")
+		assert.Contains(t, oneLiner, "invalid regex pattern")
+		// Assert - full should contain ERROR: prefix
+		assert.Contains(t, full, "grep hello")
+		assert.Contains(t, full, "ERROR: VFSGrepTool.Execute() [grep.go]: invalid regex pattern")
+	})
+
+	t.Run("should convert multiline error to single line in oneliner", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSGrepTool(mockVFS)
+
+		// Execute - call with multiline error
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": "test",
+				"error":   "error on line 1\nerror on line 2\nerror on line 3",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - oneliner should have error on single line (newlines converted to spaces)
+		assert.Contains(t, oneLiner, "grep test")
+		// Check that oneliner does not contain literal newlines in error portion
+		lines := splitLines(oneLiner)
+		assert.Equal(t, 2, len(lines), "oneliner should have exactly 2 lines")
+		assert.NotContains(t, lines[1], "\n")
+		// Assert - full should contain full error with ERROR: prefix
+		assert.Contains(t, full, "ERROR: error on line 1\nerror on line 2\nerror on line 3")
+	})
 }
