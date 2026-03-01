@@ -38,20 +38,14 @@ func (t *WebFetchTool) Execute(args *ToolCall) *ToolResponse {
 		}
 	}
 
-	format, ok := args.Arguments.StringOK("format")
-	if !ok {
-		return &ToolResponse{
-			Call:  args,
-			Error: fmt.Errorf("WebFetchTool.Execute() [web_fetch.go]: missing required argument: format"),
-			Done:  true,
-		}
-	}
-
-	if format != "markdown" && format != "raw" {
-		return &ToolResponse{
-			Call:  args,
-			Error: fmt.Errorf("WebFetchTool.Execute() [web_fetch.go]: invalid format: %s", format),
-			Done:  true,
+	format, hasFormat := args.Arguments.StringOK("format")
+	if hasFormat {
+		if format != "markdown" && format != "raw" {
+			return &ToolResponse{
+				Call:  args,
+				Error: fmt.Errorf("WebFetchTool.Execute() [web_fetch.go]: invalid format: %s", format),
+				Done:  true,
+			}
 		}
 	}
 
@@ -117,6 +111,21 @@ func (t *WebFetchTool) Execute(args *ToolCall) *ToolResponse {
 	content := string(body)
 	contentType := response.Header.Get("Content-Type")
 
+	// Determine format if not provided
+	if !hasFormat {
+		if isHTMLContent(contentType, content) {
+			format = "markdown"
+		} else if isTextualContent(contentType) {
+			format = "raw"
+		} else {
+			return &ToolResponse{
+				Call:  args,
+				Error: fmt.Errorf("WebFetchTool.Execute() [web_fetch.go]: unable to determine format for content type: %s", contentType),
+				Done:  true,
+			}
+		}
+	}
+
 	if format == "markdown" {
 		if !isHTMLContent(contentType, content) {
 			return &ToolResponse{
@@ -171,4 +180,22 @@ func isHTMLContent(contentType string, content string) bool {
 
 	trimmed := strings.TrimSpace(strings.ToLower(content))
 	return strings.HasPrefix(trimmed, "<!doctype html") || strings.HasPrefix(trimmed, "<html")
+}
+
+// isTextualContent checks if the content type represents a textual format.
+func isTextualContent(contentType string) bool {
+	lower := strings.ToLower(contentType)
+	// Check for common textual content types
+	if strings.HasPrefix(lower, "text/") {
+		return true
+	}
+	// Check for JSON and XML variants
+	if strings.Contains(lower, "application/json") ||
+		strings.Contains(lower, "application/xml") ||
+		strings.Contains(lower, "application/javascript") ||
+		strings.Contains(lower, "application/yaml") ||
+		strings.Contains(lower, "application/x-yaml") {
+		return true
+	}
+	return false
 }

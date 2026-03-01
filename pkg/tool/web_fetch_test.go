@@ -25,17 +25,25 @@ func TestWebFetchTool_Execute(t *testing.T) {
 		assert.Contains(t, response.Error.Error(), "missing required argument: url")
 	})
 
-	t.Run("returns error when format is missing", func(t *testing.T) {
+	t.Run("auto-detects format when not provided", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/plain")
+			_, _ = w.Write([]byte("hello"))
+		}))
+		defer server.Close()
+
 		tool := NewWebFetchTool(nil)
 
 		response := tool.Execute(&ToolCall{
 			ID:        "test-id",
 			Function:  "webFetch",
-			Arguments: NewToolValue(map[string]any{"url": "https://example.com"}),
+			Arguments: NewToolValue(map[string]any{"url": server.URL}),
 		})
 
-		require.Error(t, response.Error)
-		assert.Contains(t, response.Error.Error(), "missing required argument: format")
+		// Format is now optional, should auto-detect based on content type
+		require.NoError(t, response.Error)
+		assert.Equal(t, "raw", response.Result.String("format"))
+		assert.Equal(t, "hello", response.Result.String("content"))
 	})
 
 	t.Run("returns error on invalid format", func(t *testing.T) {
@@ -218,6 +226,98 @@ func TestWebFetchTool_Execute(t *testing.T) {
 		assert.True(t,
 			strings.Contains(response.Error.Error(), "Client.Timeout") || strings.Contains(response.Error.Error(), "context deadline exceeded"),
 		)
+	})
+
+	t.Run("defaults to markdown for html content when format not provided", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write([]byte("<html><body><h1>Title</h1><p>Hello</p></body></html>"))
+		}))
+		defer server.Close()
+
+		tool := NewWebFetchTool(nil)
+
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "webFetch",
+			Arguments: NewToolValue(map[string]any{
+				"url": server.URL,
+				// format not provided
+			}),
+		})
+
+		require.NoError(t, response.Error)
+		assert.Equal(t, "markdown", response.Result.String("format"))
+		assert.Contains(t, response.Result.String("content"), "Title")
+		assert.Contains(t, response.Result.String("content"), "Hello")
+	})
+
+	t.Run("defaults to raw for text content when format not provided", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/plain")
+			_, _ = w.Write([]byte("hello raw"))
+		}))
+		defer server.Close()
+
+		tool := NewWebFetchTool(nil)
+
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "webFetch",
+			Arguments: NewToolValue(map[string]any{
+				"url": server.URL,
+				// format not provided
+			}),
+		})
+
+		require.NoError(t, response.Error)
+		assert.Equal(t, "raw", response.Result.String("format"))
+		assert.Equal(t, "hello raw", response.Result.String("content"))
+	})
+
+	t.Run("defaults to raw for json content when format not provided", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"hello":"world"}`))
+		}))
+		defer server.Close()
+
+		tool := NewWebFetchTool(nil)
+
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "webFetch",
+			Arguments: NewToolValue(map[string]any{
+				"url": server.URL,
+				// format not provided
+			}),
+		})
+
+		require.NoError(t, response.Error)
+		assert.Equal(t, "raw", response.Result.String("format"))
+		assert.Equal(t, `{"hello":"world"}`, response.Result.String("content"))
+	})
+
+	t.Run("returns error for non-textual content when format not provided", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/octet-stream")
+			_, _ = w.Write([]byte("binary data"))
+		}))
+		defer server.Close()
+
+		tool := NewWebFetchTool(nil)
+
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "webFetch",
+			Arguments: NewToolValue(map[string]any{
+				"url": server.URL,
+				// format not provided
+			}),
+		})
+
+		require.Error(t, response.Error)
+		assert.Contains(t, response.Error.Error(), "unable to determine format")
 	})
 }
 

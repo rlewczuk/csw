@@ -9,7 +9,7 @@
     },
     "format": {
       "type": "string",
-      "description": "Output format for fetched content. Use 'markdown' to convert HTML to Markdown, or 'raw' to return response body as-is.",
+      "description": "Output format for fetched content. Use 'markdown' to convert HTML to Markdown, or 'raw' to return response body as-is. If not provided, defaults to 'markdown' for HTML content or 'raw' for other textual content types.",
       "enum": [
         "markdown",
         "raw"
@@ -21,8 +21,7 @@
     }
   },
   "required": [
-    "url",
-    "format"
+    "url"
   ],
   "additionalProperties": false
 }
