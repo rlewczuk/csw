@@ -16,8 +16,8 @@ import (
 )
 
 func TestGodown(t *testing.T) {
-	// Get all test files from project dir testdata/godown directory
-	m, err := filepath.Glob("testdata/godown/*.html")
+	// Get all test files from testdata directory
+	m, err := filepath.Glob("testdata/*.html")
 	if err != nil {
 		t.Fatal(err)
 	}
