@@ -578,6 +578,80 @@ func TestRunBashTool_Render(t *testing.T) {
 	}
 }
 
+func TestRunBashTool_Render_WithError(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	tool := NewRunBashTool(mockRunner, nil)
+
+	tests := []struct {
+		name            string
+		args            *ToolCall
+		wantInSummary   string
+		wantInDetails   string
+		wantNotInDetails string
+	}{
+		{
+			name: "error with exit code only",
+			args: &ToolCall{
+				Function:  "runBash",
+				Arguments: NewToolValue(map[string]any{"command": "exit 1", "exit_code": int64(1)}),
+			},
+			wantInSummary: "ERROR: exit code 1",
+			wantInDetails: "ERROR: exit code 1\n",
+		},
+		{
+			name: "error with single line stderr",
+			args: &ToolCall{
+				Function:  "runBash",
+				Arguments: NewToolValue(map[string]any{"command": "cmd", "exit_code": int64(2), "stderr": "permission denied"}),
+			},
+			wantInSummary: "ERROR: exit code 2, permission denied",
+			wantInDetails: "ERROR: exit code 2, permission denied\n",
+		},
+		{
+			name: "error with multi-line stderr - stderr not included",
+			args: &ToolCall{
+				Function:  "runBash",
+				Arguments: NewToolValue(map[string]any{"command": "cmd", "exit_code": int64(3), "stderr": "line1\nline2"}),
+			},
+			wantInSummary: "ERROR: exit code 3",
+			wantInDetails: "ERROR: exit code 3\n",
+			wantNotInDetails: "line1",
+		},
+		{
+			name: "error with output",
+			args: &ToolCall{
+				Function:  "runBash",
+				Arguments: NewToolValue(map[string]any{"command": "cmd", "exit_code": int64(1), "output": "some output"}),
+			},
+			wantInSummary: "ERROR: exit code 1",
+			wantInDetails: "ERROR: exit code 1\nsome output",
+		},
+		{
+			name: "success with exit code 0 - no error prefix",
+			args: &ToolCall{
+				Function:  "runBash",
+				Arguments: NewToolValue(map[string]any{"command": "echo hello", "exit_code": int64(0), "output": "hello"}),
+			},
+			wantInSummary: "bash: echo hello",
+			wantInDetails: "echo hello\n\nhello",
+			wantNotInDetails: "ERROR:",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			summary, details, meta := tool.Render(tt.args)
+			assert.NotEmpty(t, summary, "Summary should not be empty")
+			assert.NotNil(t, meta, "Meta should not be nil")
+			assert.Contains(t, summary, tt.wantInSummary, "Summary should contain expected text")
+			assert.Contains(t, details, tt.wantInDetails, "Details should contain expected text")
+			if tt.wantNotInDetails != "" {
+				assert.NotContains(t, details, tt.wantNotInDetails, "Details should not contain unexpected text")
+			}
+		})
+	}
+}
+
 func TestRunBashTool_Execute_WithLimit_TruncatesOutput(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 	// Create output with 10 lines

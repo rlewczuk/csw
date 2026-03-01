@@ -10,6 +10,7 @@ import (
 type CommandExecution struct {
 	Command  string
 	Output   string
+	Stderr   string
 	ExitCode int
 	Error    error
 	Workdir  string
@@ -31,6 +32,7 @@ func NewMockRunner() *MockRunner {
 		responses:  make(map[string]CommandExecution),
 		defaultRes: CommandExecution{
 			Output:   "",
+			Stderr:   "",
 			ExitCode: 0,
 			Error:    nil,
 		},
@@ -50,6 +52,19 @@ func (m *MockRunner) SetResponse(command string, output string, exitCode int, er
 	}
 }
 
+// SetResponseDetailed sets the response with separate stdout and stderr for a specific command.
+func (m *MockRunner) SetResponseDetailed(command string, stdout string, stderr string, exitCode int, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.responses[command] = CommandExecution{
+		Command:  command,
+		Output:   stdout,
+		ExitCode: exitCode,
+		Error:    err,
+		Stderr:   stderr,
+	}
+}
+
 // SetDefaultResponse sets the default response for commands that don't have a specific response.
 func (m *MockRunner) SetDefaultResponse(output string, exitCode int, err error) {
 	m.mu.Lock()
@@ -57,6 +72,7 @@ func (m *MockRunner) SetDefaultResponse(output string, exitCode int, err error) 
 	m.defaultRes = CommandExecution{
 		Command:  "",
 		Output:   output,
+		Stderr:   "",
 		ExitCode: exitCode,
 		Error:    err,
 	}
@@ -101,13 +117,14 @@ func (m *MockRunner) RunCommandWithOptionsDetailed(command string, options Comma
 	m.executions = append(m.executions, CommandExecution{
 		Command:  command,
 		Output:   exec.Output,
+		Stderr:   exec.Stderr,
 		ExitCode: exec.ExitCode,
 		Error:    exec.Error,
 		Workdir:  options.Workdir,
 		Timeout:  options.Timeout,
 	})
 
-	return exec.Output, "", exec.ExitCode, exec.Error
+	return exec.Output, exec.Stderr, exec.ExitCode, exec.Error
 }
 
 // GetExecutions returns all recorded command executions.

@@ -156,15 +156,28 @@ func (r *containerRunner) RunCommand(command string) (string, int, error) {
 
 // RunCommandWithOptions runs the given command with options in the container and returns the output and exit code.
 func (r *containerRunner) RunCommandWithOptions(command string, options CommandOptions) (string, int, error) {
+	stdout, stderr, exitCode, err := r.RunCommandWithOptionsDetailed(command, options)
+	output := stdout
+	if stderr != "" {
+		if output != "" {
+			output += "\n"
+		}
+		output += stderr
+	}
+	return output, exitCode, err
+}
+
+// RunCommandWithOptionsDetailed runs the given command with options in the container and returns stdout, stderr, exit code, and error separately.
+func (r *containerRunner) RunCommandWithOptionsDetailed(command string, options CommandOptions) (string, string, int, error) {
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
-		return "", 1, fmt.Errorf("ContainerRunner.RunCommandWithOptions() [container.go]: container is closed")
+		return "", "", 1, fmt.Errorf("ContainerRunner.RunCommandWithOptionsDetailed() [container.go]: container is closed")
 	}
 	r.mu.Unlock()
 
 	if command == "" {
-		return "", 1, fmt.Errorf("ContainerRunner.RunCommandWithOptions() [container.go]: command cannot be empty")
+		return "", "", 1, fmt.Errorf("ContainerRunner.RunCommandWithOptionsDetailed() [container.go]: command cannot be empty")
 	}
 
 	// Determine the timeout to use
@@ -205,9 +218,9 @@ func (r *containerRunner) RunCommandWithOptions(command string, options CommandO
 	exitCode, reader, err := r.container.Exec(ctx, cmd, execOpts...)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return "", 124, fmt.Errorf("ContainerRunner.RunCommandWithOptions() [container.go]: command timed out after %v", timeout)
+			return "", "", 124, fmt.Errorf("ContainerRunner.RunCommandWithOptionsDetailed() [container.go]: command timed out after %v", timeout)
 		}
-		return "", 1, fmt.Errorf("ContainerRunner.RunCommandWithOptions() [container.go]: failed to execute command: %w", err)
+		return "", "", 1, fmt.Errorf("ContainerRunner.RunCommandWithOptionsDetailed() [container.go]: failed to execute command: %w", err)
 	}
 
 	// Read output with context awareness
@@ -223,10 +236,11 @@ func (r *containerRunner) RunCommandWithOptions(command string, options CommandO
 		// Output reading completed
 	case <-ctx.Done():
 		// Context timed out
-		return "", 124, fmt.Errorf("ContainerRunner.RunCommandWithOptions() [container.go]: command timed out after %v", timeout)
+		return "", "", 124, fmt.Errorf("ContainerRunner.RunCommandWithOptionsDetailed() [container.go]: command timed out after %v", timeout)
 	}
 
-	return output.String(), exitCode, nil
+	// Container exec combines stdout and stderr, so we return all as stdout
+	return output.String(), "", exitCode, nil
 }
 
 // Close stops and removes the container.

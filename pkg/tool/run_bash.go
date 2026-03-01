@@ -252,20 +252,24 @@ func countWildcards(pattern string) int {
 
 // executeCommand executes the command using the runner.
 func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir string, timeout time.Duration, limit int) *ToolResponse {
-	var output string
+	var stdout, stderr string
 	var exitCode int
 	var err error
 
-	if workdir == "" && timeout == 0 {
-		// Use default method if no options
-		output, exitCode, err = t.runner.RunCommand(command)
-	} else {
-		// Use options method
-		options := runner.CommandOptions{
-			Workdir: workdir,
-			Timeout: timeout,
+	// Use detailed method to get separate stdout and stderr
+	options := runner.CommandOptions{
+		Workdir: workdir,
+		Timeout: timeout,
+	}
+	stdout, stderr, exitCode, err = t.runner.RunCommandWithOptionsDetailed(command, options)
+
+	// Combine stdout and stderr for output field
+	output := stdout
+	if stderr != "" {
+		if output != "" {
+			output += "\n"
 		}
-		output, exitCode, err = t.runner.RunCommandWithOptions(command, options)
+		output += stderr
 	}
 
 	if err != nil {
@@ -299,9 +303,11 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 		output = truncateOutput(output, limit)
 	}
 
-	// Return the output and exit code
+	// Return the output, stderr, and exit code
 	var result ToolValue
 	result.Set("output", output)
+	result.Set("stdout", stdout)
+	result.Set("stderr", stderr)
 	result.Set("exit_code", exitCode)
 
 	return &ToolResponse{
@@ -322,11 +328,33 @@ func isTimeoutError(err error) bool {
 // Render returns a string representation of the tool call.
 func (t *RunBashTool) Render(call *ToolCall) (string, string, map[string]string) {
 	command, _ := call.Arguments.StringOK("command")
+	exitCode := call.Arguments.Int("exit_code")
+	output := call.Arguments.String("output")
+	stderr := call.Arguments.String("stderr")
+
 	oneLiner := truncateString("bash: "+command, 128)
 	full := command + "\n\n"
-	// Try to get output from result if available
-	if output, ok := call.Arguments.Get("output").AsStringOK(); ok && output != "" {
+
+	// Check if there was an error (non-zero exit code)
+	if exitCode != 0 {
+		errorLine := fmt.Sprintf("ERROR: exit code %d", exitCode)
+
+		// Add stderr if it has up to 1 line (no newlines)
+		if stderr != "" && !strings.Contains(stderr, "\n") {
+			errorLine += ", " + stderr
+		}
+
+		// For one-liner, append error info
+		oneLiner = truncateString("bash: "+command+" ("+errorLine+")", 128)
+
+		// For full output, add error line before output
+		full += errorLine + "\n"
+	}
+
+	// Add output if available
+	if output != "" {
 		full += output
 	}
+
 	return oneLiner, full, make(map[string]string)
 }

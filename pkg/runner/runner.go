@@ -21,6 +21,8 @@ type CommandRunner interface {
 	RunCommand(command string) (string, int, error)
 	// RunCommandWithOptions runs the given command with options and returns the output and exit code.
 	RunCommandWithOptions(command string, options CommandOptions) (string, int, error)
+	// RunCommandWithOptionsDetailed runs the given command with options and returns stdout, stderr, exit code, and error separately.
+	RunCommandWithOptionsDetailed(command string, options CommandOptions) (stdout string, stderr string, exitCode int, err error)
 }
 
 // ContainerConfig contains configuration for the ContainerRunner runner.
