@@ -26,7 +26,6 @@ func (e *RunCommandError) Error() string {
 type RunBashTool struct {
 	runner         runner.CommandRunner
 	privileges     map[string]conf.AccessFlag
-	projectRoot    string
 	sessionWorkdir string
 	defaultTimeout time.Duration
 }
@@ -47,23 +46,7 @@ func NewRunBashTool(r runner.CommandRunner, privileges map[string]conf.AccessFla
 	}
 }
 
-// NewRunBashToolWithRoot creates a new RunBashTool instance with a project root.
-// runner is the CommandRunner to use for executing commands.
-// privileges is a map of command regex patterns to access flags.
-// projectRoot is the project root directory for resolving relative paths and checking absolute paths.
-func NewRunBashToolWithRoot(r runner.CommandRunner, privileges map[string]conf.AccessFlag, projectRoot string, defaultTimeout ...time.Duration) *RunBashTool {
-	timeout := time.Duration(0)
-	if len(defaultTimeout) > 0 {
-		timeout = defaultTimeout[0]
-	}
 
-	return &RunBashTool{
-		runner:         r,
-		privileges:     privileges,
-		projectRoot:    projectRoot,
-		defaultTimeout: timeout,
-	}
-}
 
 // NewRunBashToolWithSessionWorkdir creates a new RunBashTool instance with a session workdir.
 // runner is the CommandRunner to use for executing commands.
@@ -104,11 +87,11 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 			// Absolute path requires permission
 			resolvedWorkdir = workdir
 			needsPermission = true
-		} else if t.projectRoot != "" {
-			// Relative path - resolve against project root
-			resolvedWorkdir = filepath.Join(t.projectRoot, workdir)
+		} else if t.sessionWorkdir != "" {
+			// Relative path - resolve against session workdir
+			resolvedWorkdir = filepath.Join(t.sessionWorkdir, workdir)
 		} else {
-			// No project root set, use the provided relative path
+			// No session workdir set, use the provided relative path
 			resolvedWorkdir = workdir
 		}
 	} else if t.sessionWorkdir != "" {

@@ -304,7 +304,7 @@ func TestRunBashTool_Execute_WithRelativeWorkdir(t *testing.T) {
 	privileges := map[string]conf.AccessFlag{
 		".*": conf.AccessAllow,
 	}
-	tool := NewRunBashToolWithRoot(mockRunner, privileges, "/project/root")
+	tool := NewRunBashToolWithSessionWorkdir(mockRunner, privileges, "/project/root")
 
 	args := ToolCall{
 		ID:       "test-id",
@@ -333,7 +333,7 @@ func TestRunBashTool_Execute_WithAbsoluteWorkdir(t *testing.T) {
 	privileges := map[string]conf.AccessFlag{
 		".*": conf.AccessAllow,
 	}
-	tool := NewRunBashToolWithRoot(mockRunner, privileges, "/project/root")
+	tool := NewRunBashToolWithSessionWorkdir(mockRunner, privileges, "/project/root")
 
 	args := ToolCall{
 		ID:       "test-id",
@@ -479,7 +479,7 @@ func TestRunBashTool_Execute_WithWorkdirAndTimeout(t *testing.T) {
 	privileges := map[string]conf.AccessFlag{
 		".*": conf.AccessAllow,
 	}
-	tool := NewRunBashToolWithRoot(mockRunner, privileges, "/project/root")
+	tool := NewRunBashToolWithSessionWorkdir(mockRunner, privileges, "/project/root")
 
 	args := ToolCall{
 		ID:       "test-id",
@@ -813,7 +813,7 @@ func TestRunBashTool_Execute_WithLimitAndOtherOptions(t *testing.T) {
 	privileges := map[string]conf.AccessFlag{
 		".*": conf.AccessAllow,
 	}
-	tool := NewRunBashToolWithRoot(mockRunner, privileges, "/project/root")
+	tool := NewRunBashToolWithSessionWorkdir(mockRunner, privileges, "/project/root")
 
 	args := ToolCall{
 		ID:       "test-id",
@@ -877,10 +877,10 @@ func TestRunBashTool_Execute_WithSessionWorkdir_ExplicitWorkdirOverrides(t *test
 	privileges := map[string]conf.AccessFlag{
 		".*": conf.AccessAllow,
 	}
-	// Use projectRoot to test relative workdir resolution
-	tool := NewRunBashToolWithRoot(mockRunner, privileges, "/session/workdir")
+	// Use sessionWorkdir to test relative workdir resolution
+	tool := NewRunBashToolWithSessionWorkdir(mockRunner, privileges, "/session/workdir")
 
-	// Explicit relative workdir provided - should override session workdir and resolve against project root
+	// Explicit relative workdir provided - should override session workdir and resolve against session workdir
 	args := ToolCall{
 		ID:       "test-id",
 		Function: "runBash",
