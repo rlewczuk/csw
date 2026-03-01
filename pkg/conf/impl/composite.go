@@ -130,48 +130,7 @@ func (c *CompositeConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 		}
 	}
 
-	// Return a copy to prevent external modification
-	config := &conf.GlobalConfig{
-		ContextCompactionThreshold: c.globalConfig.ContextCompactionThreshold,
-		DefaultProvider:            c.globalConfig.DefaultProvider,
-		DefaultRole:                c.globalConfig.DefaultRole,
-		LLMRetryMaxAttempts:        c.globalConfig.LLMRetryMaxAttempts,
-		LLMRetryMaxBackoffSeconds:  c.globalConfig.LLMRetryMaxBackoffSeconds,
-		Container: conf.ContainerConfig{
-			Mounts:  make([]string, len(c.globalConfig.Container.Mounts)),
-			Env:     make([]string, len(c.globalConfig.Container.Env)),
-			Image:   c.globalConfig.Container.Image,
-			Enabled: c.globalConfig.Container.Enabled,
-		},
-		Defaults: conf.CLIDefaultsConfig{
-			Model:          c.globalConfig.Defaults.Model,
-			Worktree:       c.globalConfig.Defaults.Worktree,
-			Merge:          c.globalConfig.Defaults.Merge,
-			LogLLMRequests: c.globalConfig.Defaults.LogLLMRequests,
-			Thinking:       c.globalConfig.Defaults.Thinking,
-			LSPServer:      c.globalConfig.Defaults.LSPServer,
-		},
-		ModelTags: make([]conf.ModelTagMapping, len(c.globalConfig.ModelTags)),
-		ToolSelection: conf.ToolSelectionConfig{
-			Default: make(map[string]bool, len(c.globalConfig.ToolSelection.Default)),
-			Tags:    make(map[string]map[string]bool, len(c.globalConfig.ToolSelection.Tags)),
-		},
-	}
-	copy(config.Container.Mounts, c.globalConfig.Container.Mounts)
-	copy(config.Container.Env, c.globalConfig.Container.Env)
-	copy(config.ModelTags, c.globalConfig.ModelTags)
-	for toolName, enabled := range c.globalConfig.ToolSelection.Default {
-		config.ToolSelection.Default[toolName] = enabled
-	}
-	for tag, tools := range c.globalConfig.ToolSelection.Tags {
-		copiedTools := make(map[string]bool, len(tools))
-		for toolName, enabled := range tools {
-			copiedTools[toolName] = enabled
-		}
-		config.ToolSelection.Tags[tag] = copiedTools
-	}
-
-	return config, nil
+	return c.globalConfig.Clone(), nil
 }
 
 // LastGlobalConfigUpdate returns the timestamp of the most recent global config update.
@@ -193,13 +152,9 @@ func (c *CompositeConfigStore) GetModelProviderConfigs() (map[string]*conf.Model
 		}
 	}
 
-	// Return a copy to prevent external modification
 	configs := make(map[string]*conf.ModelProviderConfig, len(c.modelProviderConfigs))
 	for k, v := range c.modelProviderConfigs {
-		configCopy := *v
-		configCopy.ModelTags = make([]conf.ModelTagMapping, len(v.ModelTags))
-		copy(configCopy.ModelTags, v.ModelTags)
-		configs[k] = &configCopy
+		configs[k] = v.Clone()
 	}
 
 	return configs, nil
@@ -224,45 +179,9 @@ func (c *CompositeConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRole
 		}
 	}
 
-	// Return a copy to prevent external modification
 	configs := make(map[string]*conf.AgentRoleConfig, len(c.agentRoleConfigs))
 	for k, v := range c.agentRoleConfigs {
-		configCopy := *v
-		if v.VFSPrivileges != nil {
-			configCopy.VFSPrivileges = make(map[string]conf.FileAccess, len(v.VFSPrivileges))
-			for pk, pv := range v.VFSPrivileges {
-				configCopy.VFSPrivileges[pk] = pv
-			}
-		}
-		if v.ToolsAccess != nil {
-			configCopy.ToolsAccess = make(map[string]conf.AccessFlag, len(v.ToolsAccess))
-			for tk, tv := range v.ToolsAccess {
-				configCopy.ToolsAccess[tk] = tv
-			}
-		}
-		if v.RunPrivileges != nil {
-			configCopy.RunPrivileges = make(map[string]conf.AccessFlag, len(v.RunPrivileges))
-			for rk, rv := range v.RunPrivileges {
-				configCopy.RunPrivileges[rk] = rv
-			}
-		}
-		if v.PromptFragments != nil {
-			configCopy.PromptFragments = make(map[string]string, len(v.PromptFragments))
-			for fk, fv := range v.PromptFragments {
-				configCopy.PromptFragments[fk] = fv
-			}
-		}
-		if v.ToolFragments != nil {
-			configCopy.ToolFragments = make(map[string]string, len(v.ToolFragments))
-			for fk, fv := range v.ToolFragments {
-				configCopy.ToolFragments[fk] = fv
-			}
-		}
-		if v.HiddenPatterns != nil {
-			configCopy.HiddenPatterns = make([]string, len(v.HiddenPatterns))
-			copy(configCopy.HiddenPatterns, v.HiddenPatterns)
-		}
-		configs[k] = &configCopy
+		configs[k] = v.Clone()
 	}
 
 	return configs, nil
@@ -368,67 +287,7 @@ func (c *CompositeConfigStore) refreshGlobalConfig() error {
 			return fmt.Errorf("CompositeConfigStore.refreshGlobalConfig(): failed to get config from store %d: %w", i, err)
 		}
 
-		// For GlobalConfig, we append ModelTags (they're additive)
-		merged.ModelTags = append(merged.ModelTags, config.ModelTags...)
-		if merged.ToolSelection.Default == nil {
-			merged.ToolSelection.Default = make(map[string]bool)
-		}
-		for toolName, enabled := range config.ToolSelection.Default {
-			merged.ToolSelection.Default[toolName] = enabled
-		}
-		if merged.ToolSelection.Tags == nil {
-			merged.ToolSelection.Tags = make(map[string]map[string]bool)
-		}
-		for tag, tools := range config.ToolSelection.Tags {
-			if merged.ToolSelection.Tags[tag] == nil {
-				merged.ToolSelection.Tags[tag] = make(map[string]bool)
-			}
-			for toolName, enabled := range tools {
-				merged.ToolSelection.Tags[tag][toolName] = enabled
-			}
-		}
-		// DefaultProvider from later sources overrides earlier ones
-		if config.DefaultProvider != "" {
-			merged.DefaultProvider = config.DefaultProvider
-		}
-		// ContextCompactionThreshold from later sources overrides earlier ones
-		if config.ContextCompactionThreshold > 0 {
-			merged.ContextCompactionThreshold = config.ContextCompactionThreshold
-		}
-		// DefaultRole from later sources overrides earlier ones
-		if config.DefaultRole != "" {
-			merged.DefaultRole = config.DefaultRole
-		}
-		if len(config.Container.Mounts) > 0 {
-			merged.Container.Mounts = append([]string(nil), config.Container.Mounts...)
-		}
-		if len(config.Container.Env) > 0 {
-			merged.Container.Env = append([]string(nil), config.Container.Env...)
-		}
-		if config.Container.Image != "" {
-			merged.Container.Image = config.Container.Image
-		}
-		if config.Container.Enabled {
-			merged.Container.Enabled = true
-		}
-		if config.Defaults.Model != "" {
-			merged.Defaults.Model = config.Defaults.Model
-		}
-		if config.Defaults.Worktree != "" {
-			merged.Defaults.Worktree = config.Defaults.Worktree
-		}
-		if config.Defaults.Merge {
-			merged.Defaults.Merge = true
-		}
-		if config.Defaults.LogLLMRequests {
-			merged.Defaults.LogLLMRequests = true
-		}
-		if config.Defaults.Thinking != "" {
-			merged.Defaults.Thinking = config.Defaults.Thinking
-		}
-		if config.Defaults.LSPServer != "" {
-			merged.Defaults.LSPServer = config.Defaults.LSPServer
-		}
+		merged.Merge(config)
 
 		// Track update time
 		lastUpdate, err := store.LastGlobalConfigUpdate()
@@ -458,11 +317,7 @@ func (c *CompositeConfigStore) refreshModelProviderConfigs() error {
 
 		// Merge: later sources override earlier ones entirely (per provider)
 		for name, config := range configs {
-			// Deep copy the config
-			configCopy := *config
-			configCopy.ModelTags = make([]conf.ModelTagMapping, len(config.ModelTags))
-			copy(configCopy.ModelTags, config.ModelTags)
-			merged[name] = &configCopy
+			merged[name] = config.Clone()
 		}
 
 		// Track update time
@@ -491,93 +346,16 @@ func (c *CompositeConfigStore) refreshAgentRoleConfigs() error {
 			return fmt.Errorf("CompositeConfigStore.refreshAgentRoleConfigs(): failed to get configs from store %d: %w", i, err)
 		}
 
-		// Merge: later sources override earlier ones entirely (per role)
+		// Merge: later sources override earlier ones entirely (per role), while
+		// prompt/tool fragments are merged by key and hidden patterns are additive.
 		for name, config := range configs {
-			// Check if we already have this role from a previous source
 			existingConfig, exists := merged[name]
-
-			// Deep copy the config
-			configCopy := *config
-			if config.VFSPrivileges != nil {
-				configCopy.VFSPrivileges = make(map[string]conf.FileAccess, len(config.VFSPrivileges))
-				for k, v := range config.VFSPrivileges {
-					configCopy.VFSPrivileges[k] = v
-				}
-			}
-			if config.ToolsAccess != nil {
-				configCopy.ToolsAccess = make(map[string]conf.AccessFlag, len(config.ToolsAccess))
-				for k, v := range config.ToolsAccess {
-					configCopy.ToolsAccess[k] = v
-				}
-			}
-			if config.RunPrivileges != nil {
-				configCopy.RunPrivileges = make(map[string]conf.AccessFlag, len(config.RunPrivileges))
-				for k, v := range config.RunPrivileges {
-					configCopy.RunPrivileges[k] = v
-				}
+			if !exists {
+				merged[name] = config.Clone()
+				continue
 			}
 
-			if exists && existingConfig.ToolFragments != nil {
-				configCopy.ToolFragments = make(map[string]string, len(existingConfig.ToolFragments))
-				for k, v := range existingConfig.ToolFragments {
-					configCopy.ToolFragments[k] = v
-				}
-			} else {
-				configCopy.ToolFragments = make(map[string]string)
-			}
-
-			if config.ToolFragments != nil {
-				for filename, content := range config.ToolFragments {
-					trimmedContent := strings.TrimSpace(content)
-					if trimmedContent == "" {
-						delete(configCopy.ToolFragments, filename)
-					} else {
-						configCopy.ToolFragments[filename] = content
-					}
-				}
-			}
-
-			// Merge PromptFragments: per-filename from all sources
-			if exists && existingConfig.PromptFragments != nil {
-				// Start with existing fragments
-				configCopy.PromptFragments = make(map[string]string, len(existingConfig.PromptFragments))
-				for k, v := range existingConfig.PromptFragments {
-					configCopy.PromptFragments[k] = v
-				}
-			} else {
-				configCopy.PromptFragments = make(map[string]string)
-			}
-
-			// Merge in new fragments from current source
-			if config.PromptFragments != nil {
-				for filename, content := range config.PromptFragments {
-					// Check if content is empty or only whitespace
-					trimmedContent := strings.TrimSpace(content)
-					if trimmedContent == "" {
-						// Remove the fragment if it exists
-						delete(configCopy.PromptFragments, filename)
-					} else {
-						// Override with new content
-						configCopy.PromptFragments[filename] = content
-					}
-				}
-			}
-
-			// Merge HiddenPatterns: append from all sources
-			if exists && existingConfig.HiddenPatterns != nil {
-				// Start with existing patterns
-				configCopy.HiddenPatterns = make([]string, len(existingConfig.HiddenPatterns))
-				copy(configCopy.HiddenPatterns, existingConfig.HiddenPatterns)
-			} else {
-				configCopy.HiddenPatterns = make([]string, 0)
-			}
-
-			// Append new patterns from current source
-			if config.HiddenPatterns != nil {
-				configCopy.HiddenPatterns = append(configCopy.HiddenPatterns, config.HiddenPatterns...)
-			}
-
-			merged[name] = &configCopy
+			existingConfig.Merge(config)
 		}
 
 		// Track update time
