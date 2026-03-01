@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -466,7 +470,7 @@ func runCLI(params *CLIParams) error {
 		return ctx.Err()
 	}
 
-	sessionInfo := buildSessionSummaryMessage(time.Since(startTime), session)
+	sessionInfo := buildSessionSummaryMessage(time.Since(startTime), session, buildResult)
 	if err := saveSessionSummaryMarkdown(buildResult.LogsDir, session, sessionInfo); err != nil {
 		return fmt.Errorf("runCLI() [cli.go]: failed to save session summary: %w", err)
 	}
@@ -569,14 +573,14 @@ func parseBashRunTimeout(value string) (time.Duration, error) {
 	return parsed, nil
 }
 
-func buildSessionSummaryMessage(duration time.Duration, session *core.SweSession) string {
+func buildSessionSummaryMessage(duration time.Duration, session *core.SweSession, buildResult BuildSystemResult) string {
 	base := fmt.Sprintf("Session completed in %s", duration.Round(time.Second))
 	if session == nil {
 		return base
 	}
 
 	usage := session.TokenUsage()
-	return fmt.Sprintf(
+	primary := fmt.Sprintf(
 		"%s | tokens(input=%d[cached=%d,noncached=%d], output=%d, total=%d) | context=%d",
 		base,
 		usage.InputTokens,
@@ -586,6 +590,80 @@ func buildSessionSummaryMessage(duration time.Duration, session *core.SweSession
 		usage.TotalTokens,
 		session.ContextLengthTokens(),
 	)
+
+	lines := []string{primary}
+	lines = append(lines, fmt.Sprintf("Model: %s", nullValue(session.ModelWithProvider())))
+	lines = append(lines, fmt.Sprintf("Thinking: %s", nullValue(session.ThinkingLevel())))
+	lines = append(lines, fmt.Sprintf("LSP server: %s", nullValue(strings.TrimSpace(buildResult.LSPServer))))
+	lines = append(lines, fmt.Sprintf("Container image: %s", nullValue(strings.TrimSpace(buildResult.ContainerImage))))
+	lines = append(lines, fmt.Sprintf("Roles used: %s", formatList(session.UsedRoles())))
+	lines = append(lines, fmt.Sprintf("Tools used: %s", formatList(session.UsedTools())))
+	lines = append(lines, "")
+	lines = append(lines, "Edited files:")
+	lines = append(lines, formatEditedFilesSummary(buildResult.WorkDirRoot, buildResult.WorkDir))
+
+	return strings.Join(lines, "\n")
+}
+
+func nullValue(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "-"
+	}
+
+	return value
+}
+
+func formatList(values []string) string {
+	if len(values) == 0 {
+		return "-"
+	}
+
+	copyValues := append([]string(nil), values...)
+	sort.Strings(copyValues)
+	return strings.Join(copyValues, ", ")
+}
+
+func formatEditedFilesSummary(workDirRoot string, workDir string) string {
+	cmd := exec.Command("git", "diff", "--numstat")
+	cmd.Dir = chooseGitDiffDir(workDirRoot, workDir)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "-"
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	lines := make([]string, 0)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		parts := strings.Split(line, "\t")
+		if len(parts) != 3 {
+			continue
+		}
+
+		lines = append(lines, fmt.Sprintf("- %s (+%s/-%s)", parts[2], parts[0], parts[1]))
+	}
+
+	if len(lines) == 0 {
+		return "-"
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func chooseGitDiffDir(workDirRoot string, workDir string) string {
+	if strings.TrimSpace(workDirRoot) != "" {
+		return workDirRoot
+	}
+	if strings.TrimSpace(workDir) != "" {
+		return workDir
+	}
+
+	return "."
 }
 
 func normalizeResumeTarget(raw string) (string, error) {

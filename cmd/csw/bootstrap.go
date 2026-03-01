@@ -63,6 +63,7 @@ type BuildSystemParams struct {
 // BuildSystemResult contains outputs from building a SweSystem.
 type BuildSystemResult struct {
 	WorkDir          string
+	WorkDirRoot      string
 	RoleConfig       conf.AgentRoleConfig
 	ModelName        string
 	ConfigStore      conf.ConfigStore
@@ -70,6 +71,8 @@ type BuildSystemResult struct {
 	LogsDir          string
 	VCS              vfs.VCS
 	WorktreeBranch   string
+	LSPServer        string
+	ContainerImage   string
 	LSPStarted       bool
 	LSPWorkDir       string
 	Cleanup          func()
@@ -312,6 +315,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 
 	result = BuildSystemResult{
 		WorkDir:          effectiveWorkDir,
+		WorkDirRoot:      workDir,
 		RoleConfig:       roleConfig,
 		ModelName:        modelName,
 		ConfigStore:      configStore,
@@ -319,6 +323,8 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		LogsDir:          logsDir,
 		VCS:              selectedVCS,
 		WorktreeBranch:   params.WorktreeBranch,
+		LSPServer:        params.LSPServer,
+		ContainerImage:   containerRuntimeConfig.Image,
 		LSPStarted:       lspClient != nil,
 		LSPWorkDir:       effectiveWorkDir,
 		Cleanup:          cleanupFn,

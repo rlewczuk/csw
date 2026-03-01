@@ -38,6 +38,8 @@ type SweSession struct {
 	provider      models.ModelProvider
 	providerName  string
 	model         string
+	rolesUsed     []string
+	toolsUsed     []string
 	messages      []*models.ChatMessage
 	role          *conf.AgentRoleConfig
 	VFS           vfs.VFS
@@ -85,6 +87,8 @@ type persistedSessionState struct {
 	SessionID                  string                  `json:"session_id"`
 	ProviderName               string                  `json:"provider_name"`
 	Model                      string                  `json:"model"`
+	RolesUsed                  []string                `json:"roles_used,omitempty"`
+	ToolsUsed                  []string                `json:"tools_used,omitempty"`
 	RoleName                   string                  `json:"role_name,omitempty"`
 	WorkDir                    string                  `json:"workdir"`
 	TodoList                   []tool.TodoItem         `json:"todo_list"`
@@ -336,6 +340,7 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 	}
 	for i, toolCall := range toolCalls {
 		// Use s.Tools which might have access control wrappers
+		s.toolsUsed = appendUniqueString(s.toolsUsed, toolCall.Function)
 		s.logger.Info("executing_tool_call", "tool", toolCall.Function, "args", toolCall.Arguments)
 		response := s.Tools.Execute(toolCall)
 		s.logger.Info("tool_call_executed", "tool", toolCall.Function, "response", response)
@@ -537,6 +542,21 @@ func uniqueStrings(values []string) []string {
 	return result
 }
 
+func appendUniqueString(values []string, value string) []string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return values
+	}
+
+	for _, existing := range values {
+		if existing == trimmed {
+			return values
+		}
+	}
+
+	return append(values, trimmed)
+}
+
 func (s *SweSession) ChatMessages() []*models.ChatMessage {
 	return s.messages
 }
@@ -555,6 +575,19 @@ func (s *SweSession) SetLogger(logger *slog.Logger) {
 // Model returns the model name (without provider prefix) used for this session.
 func (s *SweSession) Model() string {
 	return s.model
+}
+
+// ModelWithProvider returns the provider-qualified model name used for this session.
+func (s *SweSession) ModelWithProvider() string {
+	if strings.TrimSpace(s.providerName) == "" {
+		return s.model
+	}
+
+	if strings.TrimSpace(s.model) == "" {
+		return s.providerName
+	}
+
+	return s.providerName + "/" + s.model
 }
 
 // GetState returns the current agent state for this session.
@@ -594,6 +627,37 @@ func (s *SweSession) Role() *conf.AgentRoleConfig {
 // ProviderName returns the name of the provider used for this session.
 func (s *SweSession) ProviderName() string {
 	return s.providerName
+}
+
+// ThinkingLevel returns configured thinking level for this session.
+func (s *SweSession) ThinkingLevel() string {
+	if s == nil || s.system == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(s.system.Thinking)
+}
+
+// UsedRoles returns roles used during this session in first-seen order.
+func (s *SweSession) UsedRoles() []string {
+	if s == nil || len(s.rolesUsed) == 0 {
+		return nil
+	}
+
+	result := make([]string, len(s.rolesUsed))
+	copy(result, s.rolesUsed)
+	return result
+}
+
+// UsedTools returns tools used during this session in first-seen order.
+func (s *SweSession) UsedTools() []string {
+	if s == nil || len(s.toolsUsed) == 0 {
+		return nil
+	}
+
+	result := make([]string, len(s.toolsUsed))
+	copy(result, s.toolsUsed)
+	return result
 }
 
 // GetModelTags returns all tags assigned to the current model.
@@ -671,6 +735,7 @@ func (s *SweSession) SetRole(roleName string) error {
 
 	// Store the new role
 	s.role = &role
+	s.rolesUsed = appendUniqueString(s.rolesUsed, role.Name)
 
 	// Wrap VFS with access control based on role privileges
 	if role.VFSPrivileges != nil {
@@ -961,6 +1026,8 @@ func (s *SweSession) buildPersistedSessionState() persistedSessionState {
 		SessionID:                  s.id,
 		ProviderName:               s.providerName,
 		Model:                      s.model,
+		RolesUsed:                  append([]string(nil), s.rolesUsed...),
+		ToolsUsed:                  append([]string(nil), s.toolsUsed...),
 		WorkDir:                    s.workDir,
 		TodoList:                   s.GetTodoList(),
 		Messages:                   make([]persistedChatMessage, 0, len(s.messages)),
@@ -1245,6 +1312,8 @@ func restoreSessionFromPersistedState(system *SweSystem, state persistedSessionS
 		provider:        provider,
 		providerName:    state.ProviderName,
 		model:           state.Model,
+		rolesUsed:       append([]string(nil), state.RolesUsed...),
+		toolsUsed:       append([]string(nil), state.ToolsUsed...),
 		messages:        make([]*models.ChatMessage, 0, len(state.Messages)),
 		role:            nil,
 		VFS:             system.VFS,
@@ -1281,6 +1350,9 @@ func restoreSessionFromPersistedState(system *SweSystem, state persistedSessionS
 		session.applyModelTagToolSelection()
 		if role.ToolsAccess != nil {
 			session.Tools = wrapToolsWithAccessControl(session.Tools, role.ToolsAccess)
+		}
+		if len(session.rolesUsed) == 0 {
+			session.rolesUsed = append(session.rolesUsed, role.Name)
 		}
 	}
 

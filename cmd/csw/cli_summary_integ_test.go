@@ -44,12 +44,8 @@ func TestCLISavesSummaryMarkdown(t *testing.T) {
 	require.NoError(t, err)
 
 	sessionsDir := filepath.Join(tmpProjectDir, ".cswdata", "logs", "sessions")
-	sessionEntries, err := os.ReadDir(sessionsDir)
+	sessionID, summaryPath, err := findLatestSummaryFile(sessionsDir)
 	require.NoError(t, err)
-	require.Len(t, sessionEntries, 1)
-
-	sessionID := sessionEntries[0].Name()
-	summaryPath := filepath.Join(sessionsDir, sessionID, "summary.md")
 	summaryBytes, err := os.ReadFile(summaryPath)
 	require.NoError(t, err)
 	summary := string(summaryBytes)
@@ -57,5 +53,12 @@ func TestCLISavesSummaryMarkdown(t *testing.T) {
 	assert.Contains(t, summary, "# Summary\n\nTask completed successfully.")
 	assert.Contains(t, summary, "# Session Info")
 	assert.Contains(t, summary, "Session completed in ")
+	assert.Contains(t, summary, "Model: ollama/test-model")
+	assert.Contains(t, summary, "Thinking: -")
+	assert.Contains(t, summary, "LSP server: -")
+	assert.Contains(t, summary, "Container image: -")
+	assert.Contains(t, summary, "Roles used: developer")
+	assert.Contains(t, summary, "Tools used: -")
+	assert.Contains(t, summary, "Edited files:\n-")
 	assert.Contains(t, summary, "Session ID: "+sessionID)
 }

@@ -158,16 +158,21 @@ func TestChatOptionsThinkingField(t *testing.T) {
 func TestBuildSessionSummaryMessage(t *testing.T) {
 	t.Run("includes token and context stats", func(t *testing.T) {
 		session := &core.SweSession{}
-		assert.Equal(t,
-			"Session completed in 5s | tokens(input=0[cached=0,noncached=0], output=0, total=0) | context=0",
-			buildSessionSummaryMessage(5*time.Second, session),
-		)
+		summary := buildSessionSummaryMessage(5*time.Second, session, BuildSystemResult{})
+		assert.Contains(t, summary, "Session completed in 5s | tokens(input=0[cached=0,noncached=0], output=0, total=0) | context=0")
+		assert.Contains(t, summary, "Model: -")
+		assert.Contains(t, summary, "Thinking: -")
+		assert.Contains(t, summary, "LSP server: -")
+		assert.Contains(t, summary, "Container image: -")
+		assert.Contains(t, summary, "Roles used: -")
+		assert.Contains(t, summary, "Tools used: -")
+		assert.Contains(t, summary, "Edited files:\n-")
 	})
 
 	t.Run("nil session returns base summary", func(t *testing.T) {
 		assert.Equal(t,
 			"Session completed in 5s",
-			buildSessionSummaryMessage(5*time.Second, nil),
+			buildSessionSummaryMessage(5*time.Second, nil, BuildSystemResult{}),
 		)
 	})
 }
