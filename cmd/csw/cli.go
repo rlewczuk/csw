@@ -85,6 +85,8 @@ func CliCommand() *cobra.Command {
 		cliLogLLMRequests bool
 		cliLSPServer      string
 		cliThinking       string
+		cliGitUser        string
+		cliGitEmail       string
 		cliCommitMessage  string
 		cliMerge          bool
 		cliContainerImage string
@@ -163,7 +165,7 @@ func CliCommand() *cobra.Command {
 				return err
 			}
 
-			if err := applyCLIDefaults(cmd, cliWorkDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer); err != nil {
+			if err := applyCLIDefaults(cmd, cliWorkDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail); err != nil {
 				return err
 			}
 
@@ -184,8 +186,8 @@ func CliCommand() *cobra.Command {
 				RoleName:              cliRole,
 				WorkDir:               cliWorkDir,
 				WorktreeBranch:        cliWorktree,
-				GitUserName:           resolveHostGitConfigValue("user.name"),
-				GitUserEmail:          resolveHostGitConfigValue("user.email"),
+				GitUserName:           resolveGitIdentity(cliGitUser, "user.name"),
+				GitUserEmail:          resolveGitIdentity(cliGitEmail, "user.email"),
 				Merge:                 cliMerge,
 				ContainerEnabled:      containerRequested,
 				ContainerDisabled:     containerDisabledChanged && cliContainerOff,
@@ -232,6 +234,8 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliLogLLMRequests, "log-llm-requests", false, "Log LLM requests and responses")
 	cmd.Flags().StringVar(&cliLSPServer, "lsp-server", "", "Path to LSP server binary (empty to disable LSP)")
 	cmd.Flags().StringVar(&cliThinking, "thinking", "", "Thinking/reasoning mode: low, medium, high, xhigh (effort-based) or true/false (boolean)")
+	cmd.Flags().StringVar(&cliGitUser, "git-user", "", "Git user name for git operations (default: from git config)")
+	cmd.Flags().StringVar(&cliGitEmail, "git-email", "", "Git user email for git operations (default: from git config)")
 	cmd.Flags().StringVar(&cliResume, "resume", "", "Resume session by id (UUID) or 'last'. If value is omitted, resumes last session")
 	cmd.Flags().BoolVar(&cliContinue, "continue", false, "Continue resumed session with a new user message")
 	cmd.Flags().BoolVar(&cliForce, "force", false, "Force resume even when there is no pending work")
@@ -255,6 +259,8 @@ func applyCLIDefaults(
 	logLLMRequests *bool,
 	thinking *string,
 	lspServer *string,
+	gitUser *string,
+	gitEmail *string,
 ) error {
 	resolvedWorkDir, err := ResolveWorkDir(workDir)
 	if err != nil {
@@ -293,6 +299,12 @@ func applyCLIDefaults(
 	}
 	if !cmd.Flags().Changed("lsp-server") && globalConfig.Defaults.LSPServer != "" {
 		*lspServer = globalConfig.Defaults.LSPServer
+	}
+	if !cmd.Flags().Changed("git-user") && globalConfig.Defaults.GitUserName != "" {
+		*gitUser = globalConfig.Defaults.GitUserName
+	}
+	if !cmd.Flags().Changed("git-email") && globalConfig.Defaults.GitUserEmail != "" {
+		*gitEmail = globalConfig.Defaults.GitUserEmail
 	}
 
 	return nil
@@ -696,6 +708,14 @@ func resolveHostGitConfigValue(key string) string {
 	}
 
 	return strings.TrimSpace(value)
+}
+
+// resolveGitIdentity returns the provided value if non-empty, otherwise falls back to host git config.
+func resolveGitIdentity(value, gitConfigKey string) string {
+	if value != "" {
+		return value
+	}
+	return resolveHostGitConfigValue(gitConfigKey)
 }
 
 func resolveWorktreeBranchName(ctx context.Context, prompt, modelName, workDir, projectConfig, configPath, worktreeBranch string) (string, error) {

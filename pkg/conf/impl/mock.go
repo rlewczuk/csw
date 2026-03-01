@@ -131,6 +131,8 @@ func (m *MockConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 			LogLLMRequests: m.globalConfig.Defaults.LogLLMRequests,
 			Thinking:       m.globalConfig.Defaults.Thinking,
 			LSPServer:      m.globalConfig.Defaults.LSPServer,
+			GitUserName:    m.globalConfig.Defaults.GitUserName,
+			GitUserEmail:   m.globalConfig.Defaults.GitUserEmail,
 		},
 		ToolSelection: conf.ToolSelectionConfig{
 			Default: make(map[string]bool, len(m.globalConfig.ToolSelection.Default)),

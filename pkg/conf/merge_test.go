@@ -103,12 +103,16 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		LogLLMRequests: false,
 		Thinking:       "medium",
 		LSPServer:      "first",
+		GitUserName:    "Base User",
+		GitUserEmail:   "base@example.com",
 	}
 	override := CLIDefaultsConfig{
 		Model:          "provider2/model",
 		Merge:          true,
 		LogLLMRequests: true,
 		LSPServer:      "second",
+		GitUserName:    "Override User",
+		GitUserEmail:   "override@example.com",
 	}
 
 	base.MergeFrom(override)
@@ -120,7 +124,49 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		LogLLMRequests: true,
 		Thinking:       "medium",
 		LSPServer:      "second",
+		GitUserName:    "Override User",
+		GitUserEmail:   "override@example.com",
 	}, base)
+}
+
+func TestCLIDefaultsConfig_MergeFrom_GitIdentity(t *testing.T) {
+	tests := []struct {
+		name           string
+		base           CLIDefaultsConfig
+		override       CLIDefaultsConfig
+		expectedName   string
+		expectedEmail  string
+	}{
+		{
+			name:           "override sets git identity",
+			base:           CLIDefaultsConfig{},
+			override:       CLIDefaultsConfig{GitUserName: "New User", GitUserEmail: "new@example.com"},
+			expectedName:   "New User",
+			expectedEmail:  "new@example.com",
+		},
+		{
+			name:           "empty override keeps base git identity",
+			base:           CLIDefaultsConfig{GitUserName: "Base User", GitUserEmail: "base@example.com"},
+			override:       CLIDefaultsConfig{},
+			expectedName:   "Base User",
+			expectedEmail:  "base@example.com",
+		},
+		{
+			name:           "partial override only updates provided fields",
+			base:           CLIDefaultsConfig{GitUserName: "Base User", GitUserEmail: "base@example.com"},
+			override:       CLIDefaultsConfig{GitUserName: "New User"},
+			expectedName:   "New User",
+			expectedEmail:  "base@example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.base.MergeFrom(tt.override)
+			assert.Equal(t, tt.expectedName, tt.base.GitUserName)
+			assert.Equal(t, tt.expectedEmail, tt.base.GitUserEmail)
+		})
+	}
 }
 
 func TestGlobalConfig_Merge(t *testing.T) {

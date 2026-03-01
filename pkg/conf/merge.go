@@ -99,6 +99,12 @@ func (c *CLIDefaultsConfig) MergeFrom(override CLIDefaultsConfig) {
 	if override.LSPServer != "" {
 		c.LSPServer = override.LSPServer
 	}
+	if override.GitUserName != "" {
+		c.GitUserName = override.GitUserName
+	}
+	if override.GitUserEmail != "" {
+		c.GitUserEmail = override.GitUserEmail
+	}
 }
 
 // Clone returns a deep copy of GlobalConfig.

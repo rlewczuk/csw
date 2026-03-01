@@ -113,6 +113,10 @@ type CLIDefaultsConfig struct {
 	Thinking string `json:"thinking,omitempty" yaml:"thinking,omitempty"`
 	// LSPServer is the default --lsp-server value.
 	LSPServer string `json:"lsp-server,omitempty" yaml:"lsp-server,omitempty"`
+	// GitUserName is the default --git-user value for git operations.
+	GitUserName string `json:"git-user,omitempty" yaml:"git-user,omitempty"`
+	// GitUserEmail is the default --git-email value for git operations.
+	GitUserEmail string `json:"git-email,omitempty" yaml:"git-email,omitempty"`
 }
 
 // ModelProviderConfig represents common configuration for model providers.

@@ -21,6 +21,8 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 			LogLLMRequests: true,
 			Thinking:       "high",
 			LSPServer:      "gopls",
+			GitUserName:    "Config User",
+			GitUserEmail:   "config@example.com",
 		},
 	})
 
@@ -38,13 +40,15 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 	captured := ""
 	runCLIFunc = func(params *CLIParams) error {
 		captured = fmt.Sprintf(
-			"model=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s",
+			"model=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s",
 			params.ModelName,
 			params.WorktreeBranch,
 			params.Merge,
 			params.LogLLMRequests,
 			params.Thinking,
 			params.LSPServer,
+			params.GitUserName,
+			params.GitUserEmail,
 		)
 		return nil
 	}
@@ -64,6 +68,8 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 	assert.Contains(t, captured, "log=true")
 	assert.Contains(t, captured, "thinking=high")
 	assert.Contains(t, captured, "lsp=gopls")
+	assert.Contains(t, captured, "gitUser=Config User")
+	assert.Contains(t, captured, "gitEmail=config@example.com")
 }
 
 func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
@@ -76,6 +82,8 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 			LogLLMRequests: true,
 			Thinking:       "high",
 			LSPServer:      "gopls",
+			GitUserName:    "Config User",
+			GitUserEmail:   "config@example.com",
 		},
 	})
 
@@ -93,13 +101,15 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	captured := ""
 	runCLIFunc = func(params *CLIParams) error {
 		captured = fmt.Sprintf(
-			"model=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s",
+			"model=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s",
 			params.ModelName,
 			params.WorktreeBranch,
 			params.Merge,
 			params.LogLLMRequests,
 			params.Thinking,
 			params.LSPServer,
+			params.GitUserName,
+			params.GitUserEmail,
 		)
 		return nil
 	}
@@ -116,6 +126,8 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 		"--log-llm-requests=false",
 		"--thinking=medium",
 		"--lsp-server=custom-lsp",
+		"--git-user=CLI User",
+		"--git-email=cli@example.com",
 		"prompt",
 	})
 
@@ -127,4 +139,6 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	assert.Contains(t, captured, "log=false")
 	assert.Contains(t, captured, "thinking=medium")
 	assert.Contains(t, captured, "lsp=custom-lsp")
+	assert.Contains(t, captured, "gitUser=CLI User")
+	assert.Contains(t, captured, "gitEmail=cli@example.com")
 }
