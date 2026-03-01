@@ -7,9 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -39,27 +36,18 @@ func setupGitRepoFixtureWithIdentity(t *testing.T, gitUserName string, gitUserEm
 	worktreesDir := filepath.Join(tempDir, "worktrees")
 
 	// Initialize a git repository
-	repo, err := git.PlainInit(tempDir, false)
+	_, err = runGitCommand(tempDir, "init")
 	require.NoError(t, err, "Failed to initialize git repository")
-
-	// Create an initial commit
-	w, err := repo.Worktree()
-	require.NoError(t, err, "Failed to get worktree")
 
 	// Create an initial file
 	initialFile := filepath.Join(tempDir, "README.md")
 	err = os.WriteFile(initialFile, []byte("# Initial Commit\n"), 0644)
 	require.NoError(t, err, "Failed to create initial file")
 
-	_, err = w.Add("README.md")
+	_, err = runGitCommand(tempDir, "add", "README.md")
 	require.NoError(t, err, "Failed to add file")
 
-	_, err = w.Commit("Initial commit", &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  "Test",
-			Email: "test@example.com",
-		},
-	})
+	_, err = runGitCommand(tempDir, "commit", "-m", "Initial commit")
 	require.NoError(t, err, "Failed to create initial commit")
 
 	// Create the GitVCS with worktrees directory
@@ -108,11 +96,21 @@ func getDefaultBranch(t *testing.T, fixture *GitTestFixture) string {
 // runGitCommand executes git with the provided arguments in a repository path.
 func runGitCommand(repoPath string, args ...string) (string, error) {
 	cmd := exec.Command("git", append([]string{"-C", repoPath}, args...)...)
+	cmd.Env = gitTestCommandEnv()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err
 	}
 	return string(output), nil
+}
+
+func gitTestCommandEnv() []string {
+	env := os.Environ()
+	env = upsertEnvValue(env, "GIT_AUTHOR_NAME", "Test")
+	env = upsertEnvValue(env, "GIT_AUTHOR_EMAIL", "test@example.com")
+	env = upsertEnvValue(env, "GIT_COMMITTER_NAME", "Test")
+	env = upsertEnvValue(env, "GIT_COMMITTER_EMAIL", "test@example.com")
+	return env
 }
 
 func TestNewGitRepo(t *testing.T) {
@@ -352,19 +350,15 @@ func TestCommitWorktree(t *testing.T) {
 		err = repo.CommitWorktree(branch, "identity commit")
 		require.NoError(t, err)
 
-		gitRepo, err := git.PlainOpen(fixture.Root)
+		commitData, err := runGitCommand(fixture.Root, "log", "-1", "--format=%an%n%ae%n%cn%n%ce")
 		require.NoError(t, err)
+		lines := strings.Split(strings.TrimSpace(commitData), "\n")
+		require.Len(t, lines, 4)
 
-		head, err := gitRepo.Head()
-		require.NoError(t, err)
-
-		commitObject, err := gitRepo.CommitObject(head.Hash())
-		require.NoError(t, err)
-
-		assert.Equal(t, "Configured User", commitObject.Author.Name)
-		assert.Equal(t, "configured@example.com", commitObject.Author.Email)
-		assert.Equal(t, "Configured User", commitObject.Committer.Name)
-		assert.Equal(t, "configured@example.com", commitObject.Committer.Email)
+		assert.Equal(t, "Configured User", lines[0])
+		assert.Equal(t, "configured@example.com", lines[1])
+		assert.Equal(t, "Configured User", lines[2])
+		assert.Equal(t, "configured@example.com", lines[3])
 	})
 }
 
@@ -467,16 +461,14 @@ func TestMergeBranches(t *testing.T) {
 		err = repo.MergeBranches(targetBranch, "feature-ff")
 		require.NoError(t, err)
 
-		gitRepo, err := git.PlainOpen(fixture.Root)
+		parentsLine, err := runGitCommand(fixture.Root, "rev-list", "--parents", "-n", "1", targetBranch)
 		require.NoError(t, err)
+		parentFields := strings.Fields(strings.TrimSpace(parentsLine))
+		require.Len(t, parentFields, 2)
 
-		targetRef, err := gitRepo.Reference(plumbing.NewBranchReferenceName(targetBranch), true)
+		message, err := runGitCommand(fixture.Root, "log", "-1", "--format=%s", targetBranch)
 		require.NoError(t, err)
-
-		mergedCommit, err := gitRepo.CommitObject(targetRef.Hash())
-		require.NoError(t, err)
-		assert.Len(t, mergedCommit.ParentHashes, 1)
-		assert.Equal(t, "Feature commit for fast-forward", strings.TrimSpace(mergedCommit.Message))
+		assert.Equal(t, "Feature commit for fast-forward", strings.TrimSpace(message))
 	})
 
 	t.Run("GitVCSRebasesSourceThenFastForwardsWhenFastForwardNotPossible", func(t *testing.T) {
@@ -510,21 +502,19 @@ func TestMergeBranches(t *testing.T) {
 		err = repo.MergeBranches(targetBranch, "feature-rebase")
 		require.NoError(t, err)
 
-		gitRepo, err := git.PlainOpen(fixture.Root)
+		parentsLine, err := runGitCommand(fixture.Root, "rev-list", "--parents", "-n", "1", targetBranch)
 		require.NoError(t, err)
+		parentFields := strings.Fields(strings.TrimSpace(parentsLine))
+		require.Len(t, parentFields, 2)
 
-		targetRef, err := gitRepo.Reference(plumbing.NewBranchReferenceName(targetBranch), true)
+		headMessage, err := runGitCommand(fixture.Root, "log", "-1", "--format=%s", targetBranch)
 		require.NoError(t, err)
-
-		headCommit, err := gitRepo.CommitObject(targetRef.Hash())
-		require.NoError(t, err)
-		assert.Len(t, headCommit.ParentHashes, 1)
-		assert.Equal(t, "Feature branch commit", strings.TrimSpace(headCommit.Message))
+		assert.Equal(t, "Feature branch commit", strings.TrimSpace(headMessage))
 
 		targetCommitHashOutput, err := runGitCommand(fixture.Root, "rev-list", "--max-count=1", "--grep", "^Target branch commit$", targetBranch)
 		require.NoError(t, err)
-		targetCommitHash := plumbing.NewHash(strings.TrimSpace(targetCommitHashOutput))
-		assert.Equal(t, targetCommitHash, headCommit.ParentHashes[0])
+		targetCommitHash := strings.TrimSpace(targetCommitHashOutput)
+		assert.Equal(t, targetCommitHash, parentFields[1])
 
 		targetContent, err := os.ReadFile(filepath.Join(fixture.Root, "target-only.txt"))
 		require.NoError(t, err)

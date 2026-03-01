@@ -5,7 +5,6 @@ go 1.25.5
 require (
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/go-git/go-git/v5 v5.16.5
 	github.com/mattn/go-runewidth v0.0.20
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
