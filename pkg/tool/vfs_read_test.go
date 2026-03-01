@@ -560,4 +560,71 @@ func TestVFSReadToolRender(t *testing.T) {
 		// Assert - full should preserve original multiline with ERROR: prefix
 		assert.Contains(t, full, "ERROR: error line 1")
 	})
+
+	t.Run("should show correct line count when content is provided in result", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSReadTool(mockVFS, false)
+
+		// First execute the tool to get actual content
+		err := mockVFS.WriteFile("test.txt", []byte("line1\nline2\nline3"))
+		require.NoError(t, err)
+
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsRead",
+			Arguments: NewToolValue(map[string]any{
+				"path": "test.txt",
+			}),
+		})
+		require.NoError(t, response.Error)
+
+		// Simulate what presenter should do: merge result into call arguments for rendering
+		// The bug is that the presenter doesn't do this, so Render shows "0 lines"
+		callWithResult := &ToolCall{
+			ID:       response.Call.ID,
+			Function: response.Call.Function,
+			Arguments: NewToolValue(map[string]any{
+				"path":    "test.txt",
+				"content": response.Result.Get("content").AsString(),
+			}),
+		}
+		oneLiner, full, _ := tool.Render(callWithResult)
+
+		// Assert - should show correct line count (3 lines)
+		assert.Contains(t, oneLiner, "read test.txt (3 lines)")
+		assert.Contains(t, full, "line1")
+		assert.Contains(t, full, "line2")
+		assert.Contains(t, full, "line3")
+	})
+
+	t.Run("should show 0 lines when content is not provided (bug case)", func(t *testing.T) {
+		// This test exposes the bug: when content is not in arguments,
+		// Render shows 0 lines even though Execute returned content.
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSReadTool(mockVFS, false)
+
+		// First execute the tool to get actual content
+		err := mockVFS.WriteFile("test.txt", []byte("line1\nline2\nline3"))
+		require.NoError(t, err)
+
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsRead",
+			Arguments: NewToolValue(map[string]any{
+				"path": "test.txt",
+			}),
+		})
+		require.NoError(t, response.Error)
+
+		// Call Render with original call (without result merged in)
+		// This simulates what currently happens in the presenter
+		oneLiner, _, _ := tool.Render(response.Call)
+
+		// BUG: This shows "0 lines" because content is not in Arguments
+		// After fix, this should still show "0 lines" since we're testing
+		// the current broken behavior to document the issue
+		assert.Contains(t, oneLiner, "read test.txt (0 lines)")
+	})
 }

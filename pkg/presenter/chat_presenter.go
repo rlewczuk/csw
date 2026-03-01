@@ -224,11 +224,8 @@ func (p *ChatPresenter) AddToolCallResult(result *tool.ToolResponse) {
 				// Get the render result from the tool
 				if p.system != nil && p.system.Tools != nil {
 					if toolImpl, err := p.system.Tools.Get(result.Call.Function); err == nil {
-						// Pass error information to Render via Arguments if there was an error
-						callForRender := result.Call
-						if result.Error != nil {
-							callForRender = copyToolCallWithError(result.Call, result.Error)
-						}
+						// Pass result and error information to Render via Arguments
+						callForRender := copyToolCallWithResult(result.Call, result)
 						summary, details, meta := toolImpl.Render(callForRender)
 						t.Summary = summary
 						t.Details = details
@@ -412,6 +409,41 @@ func copyToolCallWithError(call *tool.ToolCall, err error) *tool.ToolCall {
 		}
 	}
 	argsCopy["error"] = err.Error()
+	callCopy.Arguments = tool.NewToolValue(argsCopy)
+
+	return callCopy
+}
+
+// copyToolCallWithResult creates a copy of the ToolCall with result data merged into Arguments.
+// This allows the Render method to access result content without changing the method signature.
+func copyToolCallWithResult(call *tool.ToolCall, result *tool.ToolResponse) *tool.ToolCall {
+	// Create a copy of the call
+	callCopy := &tool.ToolCall{
+		ID:       call.ID,
+		Function: call.Function,
+		Access:   call.Access,
+	}
+
+	// Copy arguments
+	argsCopy := make(map[string]any)
+	if obj := call.Arguments.Object(); obj != nil {
+		for k, v := range obj {
+			argsCopy[k] = v.Raw()
+		}
+	}
+
+	// Merge result data into arguments
+	if obj := result.Result.Object(); obj != nil {
+		for k, v := range obj {
+			argsCopy[k] = v.Raw()
+		}
+	}
+
+	// Add error if present
+	if result.Error != nil {
+		argsCopy["error"] = result.Error.Error()
+	}
+
 	callCopy.Arguments = tool.NewToolValue(argsCopy)
 
 	return callCopy
