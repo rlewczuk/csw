@@ -469,9 +469,9 @@ func TestVFSReadToolRender(t *testing.T) {
 		}
 		oneLiner, full, _ := tool.Render(call)
 
-		// Assert - path should be relative to worktree
-		assert.Equal(t, "read cmd/csw/main.go", oneLiner)
-		assert.Contains(t, full, "read cmd/csw/main.go")
+		// Assert - path should be relative to worktree with line count
+		assert.Equal(t, "read cmd/csw/main.go (0 lines)", oneLiner)
+		assert.Contains(t, full, "read cmd/csw/main.go (0 lines)")
 	})
 
 	t.Run("should render with original path for relative path", func(t *testing.T) {
@@ -490,7 +490,7 @@ func TestVFSReadToolRender(t *testing.T) {
 		oneLiner, _, _ := tool.Render(call)
 
 		// Assert
-		assert.Equal(t, "read cmd/csw/main.go", oneLiner)
+		assert.Equal(t, "read cmd/csw/main.go (0 lines)", oneLiner)
 	})
 
 	t.Run("should render with original path for path outside worktree", func(t *testing.T) {
@@ -508,8 +508,8 @@ func TestVFSReadToolRender(t *testing.T) {
 		}
 		oneLiner, _, _ := tool.Render(call)
 
-		// Assert - path should remain as-is since it's outside worktree
-		assert.Equal(t, "read /other/path/file.go", oneLiner)
+		// Assert - path should remain as-is since it's outside worktree with line count
+		assert.Equal(t, "read /other/path/file.go (0 lines)", oneLiner)
 	})
 
 	t.Run("should render error in oneLiner and full when error is present", func(t *testing.T) {

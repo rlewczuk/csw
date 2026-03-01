@@ -81,11 +81,11 @@ func (t *VFSReadTool) Execute(args *ToolCall) *ToolResponse {
 func (t *VFSReadTool) Render(call *ToolCall) (string, string, map[string]string) {
 	path, _ := call.Arguments.StringOK("path")
 	relativePath := makeRelativePath(path, t.vfs)
-	oneLiner := truncateString("read "+relativePath, 128)
-	full := oneLiner + "\n\n"
 
 	// Check for error in arguments
 	if errMsg, ok := call.Arguments.StringOK("error"); ok && errMsg != "" {
+		oneLiner := truncateString("read "+relativePath, 128)
+		full := oneLiner + "\n\n"
 		errOneLiner, errFull := formatRenderError(errMsg)
 		// Add error as second line to oneLiner
 		oneLiner = oneLiner + "\n" + errOneLiner
@@ -95,7 +95,11 @@ func (t *VFSReadTool) Render(call *ToolCall) (string, string, map[string]string)
 	}
 
 	// Try to get content from result if available
-	if content, ok := call.Arguments.Get("content").AsStringOK(); ok && content != "" {
+	content, _ := call.Arguments.Get("content").AsStringOK()
+	lineCount := countLines(content)
+	oneLiner := truncateString(fmt.Sprintf("read %s (%d lines)", relativePath, lineCount), 128)
+	full := oneLiner + "\n\n"
+	if content != "" {
 		full += content
 	}
 	return oneLiner, full, make(map[string]string)
