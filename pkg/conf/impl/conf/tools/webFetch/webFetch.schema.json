@@ -13,11 +13,13 @@
       "enum": [
         "markdown",
         "raw"
-      ]
+      ],
+      "default": "markdown"
     },
     "timeout": {
       "type": "integer",
-      "description": "Request timeout in seconds. If not specified, defaults to 30 seconds."
+      "description": "Request timeout in seconds. If not specified, defaults to 60 seconds.",
+      "default": 60
     }
   },
   "required": [

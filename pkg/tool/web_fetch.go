@@ -11,7 +11,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/shared/godown"
 )
 
-const defaultWebFetchTimeout = 30 * time.Second
+const defaultWebFetchTimeout = 60 * time.Second
 
 // WebFetchTool implements the webFetch tool for retrieving content from URLs.
 type WebFetchTool struct {
