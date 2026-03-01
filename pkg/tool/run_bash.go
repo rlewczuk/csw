@@ -24,9 +24,10 @@ func (e *RunCommandError) Error() string {
 
 // RunBashTool implements the runBash tool for executing bash commands.
 type RunBashTool struct {
-	runner      runner.CommandRunner
-	privileges  map[string]conf.AccessFlag
-	projectRoot string
+	runner         runner.CommandRunner
+	privileges     map[string]conf.AccessFlag
+	projectRoot    string
+	sessionWorkdir string
 	defaultTimeout time.Duration
 }
 
@@ -64,6 +65,24 @@ func NewRunBashToolWithRoot(r runner.CommandRunner, privileges map[string]conf.A
 	}
 }
 
+// NewRunBashToolWithSessionWorkdir creates a new RunBashTool instance with a session workdir.
+// runner is the CommandRunner to use for executing commands.
+// privileges is a map of command regex patterns to access flags.
+// sessionWorkdir is the default working directory for command execution when workdir is not specified.
+func NewRunBashToolWithSessionWorkdir(r runner.CommandRunner, privileges map[string]conf.AccessFlag, sessionWorkdir string, defaultTimeout ...time.Duration) *RunBashTool {
+	timeout := time.Duration(0)
+	if len(defaultTimeout) > 0 {
+		timeout = defaultTimeout[0]
+	}
+
+	return &RunBashTool{
+		runner:         r,
+		privileges:     privileges,
+		sessionWorkdir: sessionWorkdir,
+		defaultTimeout: timeout,
+	}
+}
+
 // Execute executes the tool with the given arguments and returns the response.
 func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 	command, ok := args.Arguments.StringOK("command")
@@ -92,6 +111,9 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 			// No project root set, use the provided relative path
 			resolvedWorkdir = workdir
 		}
+	} else if t.sessionWorkdir != "" {
+		// If no workdir provided, use session workdir as default
+		resolvedWorkdir = t.sessionWorkdir
 	}
 
 	// Parse optional timeout argument

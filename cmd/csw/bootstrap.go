@@ -275,7 +275,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		}
 	}
 
-	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, params.BashRunTimeout)
+	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, effectiveWorkDir, params.BashRunTimeout)
 	tool.RegisterWebFetchTool(toolRegistry, nil)
 	if err := tool.RegisterCustomTools(toolRegistry, configStore, effectiveWorkDir, bashRunner); err != nil {
 		logging.FlushLogs()

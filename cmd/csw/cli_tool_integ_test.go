@@ -32,11 +32,13 @@ func TestRunBashToolIntegration(t *testing.T) {
 	// Register runBash tool with mock runner
 	mockRunner := runner.NewMockRunner()
 	mockRunner.SetDefaultResponse("test output", 0, nil)
-	tool.RegisterRunBashTool(tools, mockRunner, map[string]conf.AccessFlag{
-		"echo .*": conf.AccessAllow,
-	}, 120*time.Second)
 
 	tmpDir := t.TempDir()
+
+	tool.RegisterRunBashTool(tools, mockRunner, map[string]conf.AccessFlag{
+		"echo .*": conf.AccessAllow,
+	}, tmpDir, 120*time.Second)
+
 	logsDir := filepath.Join(tmpDir, "logs")
 	err = os.MkdirAll(logsDir, 0755)
 	require.NoError(t, err)

@@ -838,3 +838,99 @@ func TestRunBashTool_Execute_WithLimitAndOtherOptions(t *testing.T) {
 	assert.Contains(t, output, "Output is truncated.")
 	assert.Equal(t, 1, mockRunner.ExecutionCount())
 }
+
+func TestRunBashTool_Execute_WithSessionWorkdir_DefaultsToSessionWorkdir(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetResponse("pwd", "/session/workdir\n", 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashToolWithSessionWorkdir(mockRunner, privileges, "/session/workdir")
+
+	// No workdir provided - should default to session workdir
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "pwd",
+		}),
+	}
+
+	response := tool.Execute(&args)
+
+	assert.NoError(t, response.Error)
+	assert.True(t, response.Done)
+	assert.Equal(t, 1, mockRunner.ExecutionCount())
+
+	// Verify the command was executed with the session workdir
+	exec := mockRunner.GetLastExecution()
+	require.NotNil(t, exec)
+	assert.Equal(t, "pwd", exec.Command)
+	assert.Equal(t, "/session/workdir", exec.Workdir)
+}
+
+func TestRunBashTool_Execute_WithSessionWorkdir_ExplicitWorkdirOverrides(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetResponse("pwd", "/session/workdir/explicit\n", 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	// Use projectRoot to test relative workdir resolution
+	tool := NewRunBashToolWithRoot(mockRunner, privileges, "/session/workdir")
+
+	// Explicit relative workdir provided - should override session workdir and resolve against project root
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "pwd",
+			"workdir": "explicit",
+		}),
+	}
+
+	response := tool.Execute(&args)
+
+	assert.NoError(t, response.Error)
+	assert.True(t, response.Done)
+	assert.Equal(t, 1, mockRunner.ExecutionCount())
+
+	// Verify the command was executed with the resolved workdir
+	exec := mockRunner.GetLastExecution()
+	require.NotNil(t, exec)
+	assert.Equal(t, "pwd", exec.Command)
+	assert.Equal(t, "/session/workdir/explicit", exec.Workdir)
+}
+
+func TestRunBashTool_Execute_WithoutSessionWorkdir_NoWorkdirSpecified(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetResponse("pwd", "output\n", 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	// No session workdir set
+	tool := NewRunBashTool(mockRunner, privileges)
+
+	// No workdir provided and no session workdir set
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "pwd",
+		}),
+	}
+
+	response := tool.Execute(&args)
+
+	assert.NoError(t, response.Error)
+	assert.True(t, response.Done)
+	assert.Equal(t, 1, mockRunner.ExecutionCount())
+
+	// Verify the command was executed with empty workdir (runner will use its default)
+	exec := mockRunner.GetLastExecution()
+	require.NotNil(t, exec)
+	assert.Equal(t, "pwd", exec.Command)
+	assert.Equal(t, "", exec.Workdir)
+}
