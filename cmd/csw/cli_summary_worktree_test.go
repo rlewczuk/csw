@@ -35,6 +35,19 @@ func TestFormatEditedFilesSummaryUsesWorktreeDir(t *testing.T) {
 	assert.Contains(t, summary, "test.txt")
 }
 
+// TestFormatEditedFilesSummaryIncludesUntrackedFiles verifies new untracked files are listed.
+func TestFormatEditedFilesSummaryIncludesUntrackedFiles(t *testing.T) {
+	repoDir := t.TempDir()
+	require.NoError(t, runGitInDir(repoDir, "init", "-b", "main"))
+
+	newFile := filepath.Join(repoDir, "new.txt")
+	require.NoError(t, os.WriteFile(newFile, []byte("content\n"), 0644))
+
+	summary := formatEditedFilesSummary(repoDir, repoDir)
+	assert.NotEqual(t, "-", summary)
+	assert.Contains(t, summary, "new.txt (new file)")
+}
+
 func runGitInDir(workDir string, args ...string) error {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = workDir

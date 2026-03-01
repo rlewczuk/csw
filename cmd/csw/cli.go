@@ -636,8 +636,9 @@ func formatList(values []string) string {
 }
 
 func formatEditedFilesSummary(workDirRoot string, workDir string) string {
+	diffDir := chooseGitDiffDir(workDirRoot, workDir)
 	cmd := exec.Command("git", "diff", "--numstat")
-	cmd.Dir = chooseGitDiffDir(workDirRoot, workDir)
+	cmd.Dir = diffDir
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -658,6 +659,20 @@ func formatEditedFilesSummary(workDirRoot string, workDir string) string {
 		}
 
 		lines = append(lines, fmt.Sprintf("- %s (+%s/-%s)", parts[2], parts[0], parts[1]))
+	}
+
+	untrackedCmd := exec.Command("git", "ls-files", "--others", "--exclude-standard")
+	untrackedCmd.Dir = diffDir
+	untrackedOutput, untrackedErr := untrackedCmd.Output()
+	if untrackedErr == nil {
+		untrackedScanner := bufio.NewScanner(bytes.NewReader(untrackedOutput))
+		for untrackedScanner.Scan() {
+			path := strings.TrimSpace(untrackedScanner.Text())
+			if path == "" {
+				continue
+			}
+			lines = append(lines, fmt.Sprintf("- %s (new file)", path))
+		}
 	}
 
 	if len(lines) == 0 {
