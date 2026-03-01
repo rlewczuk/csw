@@ -2,6 +2,18 @@
 
 Codesnort is a software engineering (SWE) agent designed primarily for secure operation in non-interactive mode. It leverages AI capabilities to assist with code development, refactoring, debugging, and other software engineering tasks while maintaining security and safety as core principles.
 
+## Features
+
+- **AI-Powered Code Assistance**: Leverages LLMs to help with development, refactoring, and debugging tasks
+- **Secure Non-Interactive Mode**: Designed for safe automated operation with configurable permissions
+- **Git Worktree Support**: Isolated branch-based sessions with optional auto-merge
+- **Containerized Execution**: Run commands in isolated containers for enhanced security
+- **LSP Integration**: Language Server Protocol support for intelligent code operations
+- **Customizable Roles**: Define roles with specific permissions, tools, and prompt fragments
+- **Custom Tools**: Extend functionality with user-defined tools
+- **Multi-Provider Support**: Works with OpenAI, Ollama, and other providers (including OAuth)
+- **Session Management**: Save, resume, and continue previous sessions
+
 ## Current Status
 
 **Work in Progress**: This project is actively under development and is not yet ready for production use. Features, APIs, and behavior may change significantly as the project evolves. Use at your own risk.
