@@ -656,11 +656,11 @@ func formatEditedFilesSummary(workDirRoot string, workDir string) string {
 }
 
 func chooseGitDiffDir(workDirRoot string, workDir string) string {
-	if strings.TrimSpace(workDirRoot) != "" {
-		return workDirRoot
-	}
 	if strings.TrimSpace(workDir) != "" {
 		return workDir
+	}
+	if strings.TrimSpace(workDirRoot) != "" {
+		return workDirRoot
 	}
 
 	return "."
