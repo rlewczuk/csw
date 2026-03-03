@@ -1,0 +1,12 @@
+model_tags:
+  - model: "^claude-.*"
+    tag: "anthropic"
+reasoning:
+  none: off
+  low: low
+  medium: medium
+  high: high
+  xhigh: max
+tool_call: true
+max_tokens: 8192
+context_length_limit: 200000

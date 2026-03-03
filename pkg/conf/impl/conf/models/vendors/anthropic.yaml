@@ -1,0 +1,7 @@
+type: anthropic
+url: https://api.anthropic.com/v1
+auth_mode: api_key
+headers:
+  anthropic-version: "2023-06-01"
+request_timeout: 300s
+connect_timeout: 30s

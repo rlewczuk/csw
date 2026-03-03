@@ -53,6 +53,9 @@ func TestEmbeddedConfigStore_GetGlobalConfig(t *testing.T) {
 	// Verify global config was loaded (should have model tags from conf/global.json)
 	assert.NotEmpty(t, config.ModelTags)
 	assert.Equal(t, 0.95, config.ContextCompactionThreshold)
+	assert.NotEmpty(t, config.ModelFamilies)
+	assert.NotEmpty(t, config.ModelVendors)
+	assert.NotEmpty(t, config.ModelTemplates)
 
 	// Verify that returned config is a copy (modification doesn't affect cached data)
 	originalLen := len(config.ModelTags)

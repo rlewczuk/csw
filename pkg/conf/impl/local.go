@@ -114,48 +114,7 @@ func (s *LocalConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// Return a copy to prevent external modification
-	config := &conf.GlobalConfig{
-		ContextCompactionThreshold: s.globalConfig.ContextCompactionThreshold,
-		DefaultProvider:            s.globalConfig.DefaultProvider,
-		DefaultRole:                s.globalConfig.DefaultRole,
-		LLMRetryMaxAttempts:        s.globalConfig.LLMRetryMaxAttempts,
-		LLMRetryMaxBackoffSeconds:  s.globalConfig.LLMRetryMaxBackoffSeconds,
-		Container: conf.ContainerConfig{
-			Mounts:  make([]string, len(s.globalConfig.Container.Mounts)),
-			Env:     make([]string, len(s.globalConfig.Container.Env)),
-			Image:   s.globalConfig.Container.Image,
-			Enabled: s.globalConfig.Container.Enabled,
-		},
-		Defaults: conf.CLIDefaultsConfig{
-			Model:          s.globalConfig.Defaults.Model,
-			Worktree:       s.globalConfig.Defaults.Worktree,
-			Merge:          s.globalConfig.Defaults.Merge,
-			LogLLMRequests: s.globalConfig.Defaults.LogLLMRequests,
-			Thinking:       s.globalConfig.Defaults.Thinking,
-			LSPServer:      s.globalConfig.Defaults.LSPServer,
-		},
-		ModelTags: make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
-		ToolSelection: conf.ToolSelectionConfig{
-			Default: make(map[string]bool, len(s.globalConfig.ToolSelection.Default)),
-			Tags:    make(map[string]map[string]bool, len(s.globalConfig.ToolSelection.Tags)),
-		},
-	}
-	copy(config.Container.Mounts, s.globalConfig.Container.Mounts)
-	copy(config.Container.Env, s.globalConfig.Container.Env)
-	copy(config.ModelTags, s.globalConfig.ModelTags)
-	for toolName, enabled := range s.globalConfig.ToolSelection.Default {
-		config.ToolSelection.Default[toolName] = enabled
-	}
-	for tag, tools := range s.globalConfig.ToolSelection.Tags {
-		copiedTools := make(map[string]bool, len(tools))
-		for toolName, enabled := range tools {
-			copiedTools[toolName] = enabled
-		}
-		config.ToolSelection.Tags[tag] = copiedTools
-	}
-
-	return config, nil
+	return s.globalConfig.Clone(), nil
 }
 
 // LastGlobalConfigUpdate returns the timestamp of the last global config update.
@@ -173,10 +132,7 @@ func (s *LocalConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelProv
 	// Return a copy to prevent external modification
 	configs := make(map[string]*conf.ModelProviderConfig, len(s.modelProviderConfigs))
 	for k, v := range s.modelProviderConfigs {
-		configCopy := *v
-		configCopy.ModelTags = make([]conf.ModelTagMapping, len(v.ModelTags))
-		copy(configCopy.ModelTags, v.ModelTags)
-		configs[k] = &configCopy
+		configs[k] = v.Clone()
 	}
 
 	return configs, nil
@@ -277,6 +233,9 @@ func (s *LocalConfigStore) loadAllConfig() error {
 	if err := s.loadGlobalConfig(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load global config: %w", err)
 	}
+	if err := s.loadModelTemplateConfig(); err != nil {
+		return fmt.Errorf("loadAllConfig(): failed to load model template config: %w", err)
+	}
 	if err := s.loadModelProviderConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load model provider configs: %w", err)
 	}
@@ -335,6 +294,114 @@ func (s *LocalConfigStore) loadGlobalConfig() error {
 	s.globalConfigUpdate = time.Now()
 
 	return nil
+}
+
+func (s *LocalConfigStore) loadModelTemplateConfig() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	families, err := s.loadModelProviderConfigMapDir(filepath.Join(s.configDir, "models", "families"))
+	if err != nil {
+		return fmt.Errorf("loadModelTemplateConfig(): failed to load families: %w", err)
+	}
+	vendors, err := s.loadModelProviderConfigMapDir(filepath.Join(s.configDir, "models", "vendors"))
+	if err != nil {
+		return fmt.Errorf("loadModelTemplateConfig(): failed to load vendors: %w", err)
+	}
+	templates, err := s.loadModelTemplateGroupsDir(filepath.Join(s.configDir, "models", "templates"))
+	if err != nil {
+		return fmt.Errorf("loadModelTemplateConfig(): failed to load templates: %w", err)
+	}
+
+	s.globalConfig.ModelFamilies = families
+	s.globalConfig.ModelVendors = vendors
+	s.globalConfig.ModelTemplates = templates
+
+	return nil
+}
+
+func (s *LocalConfigStore) loadModelProviderConfigMapDir(dir string) (map[string]conf.ModelProviderConfig, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]conf.ModelProviderConfig{}, nil
+		}
+		return nil, fmt.Errorf("loadModelProviderConfigMapDir(): failed to read %s: %w", dir, err)
+	}
+
+	result := make(map[string]conf.ModelProviderConfig)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if ext != ".yml" && ext != ".yaml" && ext != ".json" {
+			continue
+		}
+
+		key := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+		path := filepath.Join(dir, entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("loadModelProviderConfigMapDir(): failed to read %s: %w", path, err)
+		}
+
+		var item conf.ModelProviderConfig
+		if ext == ".json" {
+			if err := json.Unmarshal(data, &item); err != nil {
+				return nil, fmt.Errorf("loadModelProviderConfigMapDir(): failed to parse %s: %w", path, err)
+			}
+		} else {
+			if err := yaml.Unmarshal(data, &item); err != nil {
+				return nil, fmt.Errorf("loadModelProviderConfigMapDir(): failed to parse %s: %w", path, err)
+			}
+		}
+		result[key] = item
+	}
+
+	return result, nil
+}
+
+func (s *LocalConfigStore) loadModelTemplateGroupsDir(dir string) (map[string]map[string]conf.ModelProviderConfig, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]map[string]conf.ModelProviderConfig{}, nil
+		}
+		return nil, fmt.Errorf("loadModelTemplateGroupsDir(): failed to read %s: %w", dir, err)
+	}
+
+	result := make(map[string]map[string]conf.ModelProviderConfig)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if ext != ".yml" && ext != ".yaml" && ext != ".json" {
+			continue
+		}
+
+		group := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+		path := filepath.Join(dir, entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("loadModelTemplateGroupsDir(): failed to read %s: %w", path, err)
+		}
+
+		items := make(map[string]conf.ModelProviderConfig)
+		if ext == ".json" {
+			if err := json.Unmarshal(data, &items); err != nil {
+				return nil, fmt.Errorf("loadModelTemplateGroupsDir(): failed to parse %s: %w", path, err)
+			}
+		} else {
+			if err := yaml.Unmarshal(data, &items); err != nil {
+				return nil, fmt.Errorf("loadModelTemplateGroupsDir(): failed to parse %s: %w", path, err)
+			}
+		}
+		result[group] = items
+	}
+
+	return result, nil
 }
 
 // loadModelProviderConfigs loads all model provider configurations from the models directory.
@@ -650,6 +717,15 @@ func (s *LocalConfigStore) setupWatchers() error {
 		if err := s.watcher.Add(modelsDir); err != nil {
 			return fmt.Errorf("setupWatchers(): failed to watch models directory: %w", err)
 		}
+
+		for _, nested := range []string{"families", "vendors", "templates"} {
+			nestedDir := filepath.Join(modelsDir, nested)
+			if _, err := os.Stat(nestedDir); err == nil {
+				if err := s.watcher.Add(nestedDir); err != nil {
+					return fmt.Errorf("setupWatchers(): failed to watch %s directory: %w", nestedDir, err)
+				}
+			}
+		}
 	}
 
 	// Watch roles directory and all role subdirectories
@@ -729,6 +805,9 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 	globalYAMLPath := filepath.Join(s.configDir, "global.yml")
 	globalJSONPath := filepath.Join(s.configDir, "global.json")
 	modelsDir := filepath.Join(s.configDir, "models")
+	modelFamiliesDir := filepath.Join(modelsDir, "families")
+	modelVendorsDir := filepath.Join(modelsDir, "vendors")
+	modelTemplatesDir := filepath.Join(modelsDir, "templates")
 	rolesDir := filepath.Join(s.configDir, "roles")
 	toolsDir := filepath.Join(s.configDir, "tools")
 
@@ -746,6 +825,16 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 		if ext == ".json" || ext == ".yml" || ext == ".yaml" {
 			if err := s.loadModelProviderConfigs(); err != nil {
 				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload model provider configs: %v\n", err)
+			}
+			return
+		}
+	}
+
+	if filepath.Dir(event.Name) == modelFamiliesDir || filepath.Dir(event.Name) == modelVendorsDir || filepath.Dir(event.Name) == modelTemplatesDir {
+		ext := strings.ToLower(filepath.Ext(event.Name))
+		if ext == ".json" || ext == ".yml" || ext == ".yaml" {
+			if err := s.loadModelTemplateConfig(); err != nil {
+				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload model template config: %v\n", err)
 			}
 			return
 		}

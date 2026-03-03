@@ -124,6 +124,37 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 	assert.Equal(t, "anthropic", config2.ModelTags[0].Tag)
 }
 
+func TestLocalConfigStore_ModelTemplateConfig(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "models", "families"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "models", "vendors"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "models", "templates"), 0755))
+
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "families", "openai-gpt.yaml"), []byte("max_tokens: 4096\nmodel_tags:\n  - model: '^gpt'\n    tag: 'openai'\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "vendors", "openai.yaml"), []byte("type: openai\nurl: https://api.openai.com/v1\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "templates", "openai.yaml"), []byte("gpt-4.1:\n  family: openai-gpt\n  max_tokens: 8192\n"), 0644))
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	global, err := store.GetGlobalConfig()
+	require.NoError(t, err)
+
+	_, hasFamily := global.ModelFamilies["openai-gpt"]
+	_, hasVendor := global.ModelVendors["openai"]
+	_, hasTemplateGroup := global.ModelTemplates["openai"]
+	require.True(t, hasFamily)
+	require.True(t, hasVendor)
+	require.True(t, hasTemplateGroup)
+	assert.Equal(t, 4096, global.ModelFamilies["openai-gpt"].MaxTokens)
+	assert.Equal(t, "openai", global.ModelVendors["openai"].Type)
+	assert.Equal(t, 8192, global.ModelTemplates["openai"]["gpt-4.1"].MaxTokens)
+}
+
 func TestLocalConfigStore_ModelProviderConfigs(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "test-config-*")
 	require.NoError(t, err)

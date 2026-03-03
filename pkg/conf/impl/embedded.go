@@ -78,48 +78,7 @@ func (s *EmbeddedConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// Return a copy to prevent external modification
-	config := &conf.GlobalConfig{
-		ContextCompactionThreshold: s.globalConfig.ContextCompactionThreshold,
-		ModelTags:                  make([]conf.ModelTagMapping, len(s.globalConfig.ModelTags)),
-		DefaultProvider:            s.globalConfig.DefaultProvider,
-		DefaultRole:                s.globalConfig.DefaultRole,
-		LLMRetryMaxAttempts:        s.globalConfig.LLMRetryMaxAttempts,
-		LLMRetryMaxBackoffSeconds:  s.globalConfig.LLMRetryMaxBackoffSeconds,
-		Container: conf.ContainerConfig{
-			Mounts:  make([]string, len(s.globalConfig.Container.Mounts)),
-			Env:     make([]string, len(s.globalConfig.Container.Env)),
-			Image:   s.globalConfig.Container.Image,
-			Enabled: s.globalConfig.Container.Enabled,
-		},
-		Defaults: conf.CLIDefaultsConfig{
-			Model:          s.globalConfig.Defaults.Model,
-			Worktree:       s.globalConfig.Defaults.Worktree,
-			Merge:          s.globalConfig.Defaults.Merge,
-			LogLLMRequests: s.globalConfig.Defaults.LogLLMRequests,
-			Thinking:       s.globalConfig.Defaults.Thinking,
-			LSPServer:      s.globalConfig.Defaults.LSPServer,
-		},
-		ToolSelection: conf.ToolSelectionConfig{
-			Default: make(map[string]bool, len(s.globalConfig.ToolSelection.Default)),
-			Tags:    make(map[string]map[string]bool, len(s.globalConfig.ToolSelection.Tags)),
-		},
-	}
-	copy(config.ModelTags, s.globalConfig.ModelTags)
-	copy(config.Container.Mounts, s.globalConfig.Container.Mounts)
-	copy(config.Container.Env, s.globalConfig.Container.Env)
-	for toolName, enabled := range s.globalConfig.ToolSelection.Default {
-		config.ToolSelection.Default[toolName] = enabled
-	}
-	for tag, tools := range s.globalConfig.ToolSelection.Tags {
-		copiedTools := make(map[string]bool, len(tools))
-		for toolName, enabled := range tools {
-			copiedTools[toolName] = enabled
-		}
-		config.ToolSelection.Tags[tag] = copiedTools
-	}
-
-	return config, nil
+	return s.globalConfig.Clone(), nil
 }
 
 // LastGlobalConfigUpdate returns the timestamp of the last global config update.
@@ -136,10 +95,7 @@ func (s *EmbeddedConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelP
 	// Return a copy to prevent external modification
 	configs := make(map[string]*conf.ModelProviderConfig, len(s.modelProviderConfigs))
 	for k, v := range s.modelProviderConfigs {
-		configCopy := *v
-		configCopy.ModelTags = make([]conf.ModelTagMapping, len(v.ModelTags))
-		copy(configCopy.ModelTags, v.ModelTags)
-		configs[k] = &configCopy
+		configs[k] = v.Clone()
 	}
 
 	return configs, nil
@@ -240,6 +196,9 @@ func (s *EmbeddedConfigStore) loadAllConfig() error {
 
 	if err := s.loadGlobalConfig(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load global config: %w", err)
+	}
+	if err := s.loadModelTemplateConfig(); err != nil {
+		return fmt.Errorf("loadAllConfig(): failed to load model template config: %w", err)
 	}
 	if err := s.loadModelProviderConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load model provider configs: %w", err)
@@ -371,6 +330,109 @@ func (s *EmbeddedConfigStore) loadModelProviderConfigs() error {
 
 	s.modelProviderConfigs = configs
 	return nil
+}
+
+func (s *EmbeddedConfigStore) loadModelTemplateConfig() error {
+	families, err := s.loadModelProviderConfigMapDir("conf/models/families")
+	if err != nil {
+		return fmt.Errorf("loadModelTemplateConfig(): failed to load families: %w", err)
+	}
+	vendors, err := s.loadModelProviderConfigMapDir("conf/models/vendors")
+	if err != nil {
+		return fmt.Errorf("loadModelTemplateConfig(): failed to load vendors: %w", err)
+	}
+	templates, err := s.loadModelTemplateGroupsDir("conf/models/templates")
+	if err != nil {
+		return fmt.Errorf("loadModelTemplateConfig(): failed to load templates: %w", err)
+	}
+
+	s.globalConfig.ModelFamilies = families
+	s.globalConfig.ModelVendors = vendors
+	s.globalConfig.ModelTemplates = templates
+
+	return nil
+}
+
+func (s *EmbeddedConfigStore) loadModelProviderConfigMapDir(dir string) (map[string]conf.ModelProviderConfig, error) {
+	entries, err := embeddedConfigFS.ReadDir(dir)
+	if err != nil {
+		if isNotExist(err) {
+			return map[string]conf.ModelProviderConfig{}, nil
+		}
+		return nil, fmt.Errorf("loadModelProviderConfigMapDir(): failed to read %s: %w", dir, err)
+	}
+
+	result := make(map[string]conf.ModelProviderConfig)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if ext != ".yml" && ext != ".yaml" && ext != ".json" {
+			continue
+		}
+		key := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+		path := filepath.Join(dir, entry.Name())
+		data, err := embeddedConfigFS.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("loadModelProviderConfigMapDir(): failed to read %s: %w", path, err)
+		}
+
+		var item conf.ModelProviderConfig
+		if ext == ".json" {
+			if err := json.Unmarshal(data, &item); err != nil {
+				return nil, fmt.Errorf("loadModelProviderConfigMapDir(): failed to parse %s: %w", path, err)
+			}
+		} else {
+			if err := yaml.Unmarshal(data, &item); err != nil {
+				return nil, fmt.Errorf("loadModelProviderConfigMapDir(): failed to parse %s: %w", path, err)
+			}
+		}
+		result[key] = item
+	}
+
+	return result, nil
+}
+
+func (s *EmbeddedConfigStore) loadModelTemplateGroupsDir(dir string) (map[string]map[string]conf.ModelProviderConfig, error) {
+	entries, err := embeddedConfigFS.ReadDir(dir)
+	if err != nil {
+		if isNotExist(err) {
+			return map[string]map[string]conf.ModelProviderConfig{}, nil
+		}
+		return nil, fmt.Errorf("loadModelTemplateGroupsDir(): failed to read %s: %w", dir, err)
+	}
+
+	result := make(map[string]map[string]conf.ModelProviderConfig)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if ext != ".yml" && ext != ".yaml" && ext != ".json" {
+			continue
+		}
+		group := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+		path := filepath.Join(dir, entry.Name())
+		data, err := embeddedConfigFS.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("loadModelTemplateGroupsDir(): failed to read %s: %w", path, err)
+		}
+
+		items := make(map[string]conf.ModelProviderConfig)
+		if ext == ".json" {
+			if err := json.Unmarshal(data, &items); err != nil {
+				return nil, fmt.Errorf("loadModelTemplateGroupsDir(): failed to parse %s: %w", path, err)
+			}
+		} else {
+			if err := yaml.Unmarshal(data, &items); err != nil {
+				return nil, fmt.Errorf("loadModelTemplateGroupsDir(): failed to parse %s: %w", path, err)
+			}
+		}
+		result[group] = items
+	}
+
+	return result, nil
 }
 
 // loadAgentRoleConfigs loads all agent role configurations from the embedded roles directory.

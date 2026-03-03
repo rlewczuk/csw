@@ -110,50 +110,7 @@ func (m *MockConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 		return nil, m.GetGlobalConfigErr
 	}
 
-	// Return a copy
-	config := &conf.GlobalConfig{
-		ContextCompactionThreshold: m.globalConfig.ContextCompactionThreshold,
-		ModelTags:                  make([]conf.ModelTagMapping, len(m.globalConfig.ModelTags)),
-		DefaultProvider:            m.globalConfig.DefaultProvider,
-		DefaultRole:                m.globalConfig.DefaultRole,
-		LLMRetryMaxAttempts:        m.globalConfig.LLMRetryMaxAttempts,
-		LLMRetryMaxBackoffSeconds:  m.globalConfig.LLMRetryMaxBackoffSeconds,
-		Container: conf.ContainerConfig{
-			Mounts:  make([]string, len(m.globalConfig.Container.Mounts)),
-			Env:     make([]string, len(m.globalConfig.Container.Env)),
-			Image:   m.globalConfig.Container.Image,
-			Enabled: m.globalConfig.Container.Enabled,
-		},
-		Defaults: conf.CLIDefaultsConfig{
-			Model:          m.globalConfig.Defaults.Model,
-			Worktree:       m.globalConfig.Defaults.Worktree,
-			Merge:          m.globalConfig.Defaults.Merge,
-			LogLLMRequests: m.globalConfig.Defaults.LogLLMRequests,
-			Thinking:       m.globalConfig.Defaults.Thinking,
-			LSPServer:      m.globalConfig.Defaults.LSPServer,
-			GitUserName:    m.globalConfig.Defaults.GitUserName,
-			GitUserEmail:   m.globalConfig.Defaults.GitUserEmail,
-		},
-		ToolSelection: conf.ToolSelectionConfig{
-			Default: make(map[string]bool, len(m.globalConfig.ToolSelection.Default)),
-			Tags:    make(map[string]map[string]bool, len(m.globalConfig.ToolSelection.Tags)),
-		},
-	}
-	copy(config.Container.Mounts, m.globalConfig.Container.Mounts)
-	copy(config.Container.Env, m.globalConfig.Container.Env)
-	copy(config.ModelTags, m.globalConfig.ModelTags)
-	for toolName, enabled := range m.globalConfig.ToolSelection.Default {
-		config.ToolSelection.Default[toolName] = enabled
-	}
-	for tag, tools := range m.globalConfig.ToolSelection.Tags {
-		copiedTools := make(map[string]bool, len(tools))
-		for toolName, enabled := range tools {
-			copiedTools[toolName] = enabled
-		}
-		config.ToolSelection.Tags[tag] = copiedTools
-	}
-
-	return config, nil
+	return m.globalConfig.Clone(), nil
 }
 
 // LastGlobalConfigUpdate returns the timestamp of the last global config update.
@@ -180,10 +137,7 @@ func (m *MockConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelProvi
 	// Return a copy
 	configs := make(map[string]*conf.ModelProviderConfig, len(m.modelProviderConfigs))
 	for k, v := range m.modelProviderConfigs {
-		configCopy := *v
-		configCopy.ModelTags = make([]conf.ModelTagMapping, len(v.ModelTags))
-		copy(configCopy.ModelTags, v.ModelTags)
-		configs[k] = &configCopy
+		configs[k] = v.Clone()
 	}
 
 	return configs, nil

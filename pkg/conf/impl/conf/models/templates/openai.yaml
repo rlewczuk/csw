@@ -1,0 +1,28 @@
+gpt-4.1:
+  family: openai-gpt
+  default_temperature: 0.7
+  default_top_p: 1.0
+  max_tokens: 16384
+  max_output_tokens: 16384
+  reasoning:
+    none: disabled
+    low: low
+    medium: medium
+    high: high
+    xhigh: max
+  cost:
+    - context: 0
+      input: 2.0
+      output: 8.0
+    - context: 200000
+      input: 3.0
+      output: 10.0
+gpt-4o-mini:
+  family: openai-gpt
+  default_temperature: 0.7
+  max_tokens: 16384
+  max_output_tokens: 16384
+  cost:
+    - context: 0
+      input: 0.15
+      output: 0.6

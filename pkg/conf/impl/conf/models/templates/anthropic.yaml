@@ -1,0 +1,14 @@
+claude-sonnet-4:
+  family: anthropic-claude
+  max_tokens: 8192
+  max_output_tokens: 8192
+  reasoning:
+    none: off
+    low: low
+    medium: medium
+    high: high
+    xhigh: max
+  cost:
+    - context: 0
+      input: 3.0
+      output: 15.0

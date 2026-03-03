@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -144,8 +145,9 @@ func providerShowCommand(useJSON *bool) *cobra.Command {
 }
 
 func providerAddCommand(useJSON *bool, scope *ConfigScope) *cobra.Command {
-	var providerType, url, description, apiKey string
+	var providerType, url, description, apiKey, family, vendor string
 	var headers []string
+	var auth bool
 
 	cmd := &cobra.Command{
 		Use:   "add <provider-name> [flags]",
@@ -154,7 +156,11 @@ func providerAddCommand(useJSON *bool, scope *ConfigScope) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			providerName := args[0]
 
-			store, err := GetConfigStore(*scope)
+			if cmd.Flags().Changed("global") || cmd.Flags().Changed("to") {
+				return fmt.Errorf("providerAddCommand() [provider.go]: --global and --to are not supported for provider add")
+			}
+
+			store, err := getProviderAddConfigStore(cmd.Flags().Changed("local"))
 			if err != nil {
 				return err
 			}
@@ -172,10 +178,47 @@ func providerAddCommand(useJSON *bool, scope *ConfigScope) *cobra.Command {
 				}
 				config.Name = providerName
 			} else {
-				// Interactive prompts
-				config, err = promptProviderConfig(providerName, providerType, url, description, apiKey)
+				compositeStore, err := GetCompositeConfigStore()
 				if err != nil {
+					return fmt.Errorf("providerAddCommand() [provider.go]: failed to create composite config store: %w", err)
+				}
+				globalConfig, err := compositeStore.GetGlobalConfig()
+				if err != nil {
+					return fmt.Errorf("providerAddCommand() [provider.go]: failed to load global config: %w", err)
+				}
+
+				config, err = buildProviderConfigFromTemplates(globalConfig, family, vendor)
+				if err != nil {
+					return fmt.Errorf("providerAddCommand() [provider.go]: failed to build config from templates: %w", err)
+				}
+				config.Name = providerName
+
+				if providerType != "" {
+					config.Type = providerType
+				}
+				if url != "" {
+					config.URL = url
+				}
+				if description != "" {
+					config.Description = description
+				}
+				if apiKey != "" {
+					config.APIKey = apiKey
+				}
+
+				if err := promptMissingProviderConfig(config); err != nil {
 					return fmt.Errorf("providerAddCommand() [provider.go]: failed to get config: %w", err)
+				}
+
+				if auth {
+					if err := applyProviderAuthFlow(config); err != nil {
+						return fmt.Errorf("providerAddCommand() [provider.go]: authentication failed: %w", err)
+					}
+				}
+
+				config.Name = providerName
+				if description != "" {
+					config.Description = description
 				}
 			}
 
@@ -203,11 +246,243 @@ func providerAddCommand(useJSON *bool, scope *ConfigScope) *cobra.Command {
 
 	cmd.Flags().StringVar(&providerType, "type", "", "Provider type (openai, ollama, anthropic)")
 	cmd.Flags().StringVar(&url, "url", "", "Provider URL")
+	cmd.Flags().StringVar(&family, "family", "", "Model family template name")
+	cmd.Flags().StringVar(&vendor, "vendor", "", "Inference vendor template name")
 	cmd.Flags().StringVar(&description, "description", "", "Provider description")
 	cmd.Flags().StringVar(&apiKey, "api-key", "", "API key")
+	cmd.Flags().BoolVar(&auth, "auth", false, "Perform authentication flow")
 	cmd.Flags().StringArrayVar(&headers, "header", nil, "Custom header (key=value), repeatable")
 
 	return cmd
+}
+
+func getProviderAddConfigStore(projectLocal bool) (conf.WritableConfigStore, error) {
+	var configDir string
+	if projectLocal {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("getProviderAddConfigStore() [provider.go]: failed to get current directory: %w", err)
+		}
+		configDir = filepath.Join(cwd, ".csw", "config")
+	} else {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("getProviderAddConfigStore() [provider.go]: failed to get user home directory: %w", err)
+		}
+		configDir = filepath.Join(homeDir, "csw", "config")
+	}
+
+	return GetConfigStore(ConfigScope(configDir))
+}
+
+func buildProviderConfigFromTemplates(globalConfig *conf.GlobalConfig, family, vendor string) (*conf.ModelProviderConfig, error) {
+	result := &conf.ModelProviderConfig{}
+	if globalConfig == nil {
+		return result, nil
+	}
+
+	if family != "" {
+		familyTemplate, ok := globalConfig.ModelFamilies[family]
+		if !ok {
+			return nil, fmt.Errorf("buildProviderConfigFromTemplates() [provider.go]: model family not found: %s", family)
+		}
+		result.Merge(&familyTemplate)
+	}
+
+	if vendor != "" {
+		vendorTemplate, ok := globalConfig.ModelVendors[vendor]
+		if !ok {
+			return nil, fmt.Errorf("buildProviderConfigFromTemplates() [provider.go]: model vendor not found: %s", vendor)
+		}
+		result.Merge(&vendorTemplate)
+
+		if vendorOverride, ok := globalConfig.VendorFamilyOverrides[vendor]; ok {
+			result.Merge(&vendorOverride.Vendor)
+			if family != "" {
+				if familyOverride, ok := vendorOverride.Families[family]; ok {
+					result.Merge(&familyOverride)
+				}
+			}
+		}
+	}
+
+	if family != "" {
+		result.Family = family
+	}
+
+	return result, nil
+}
+
+func promptMissingProviderConfig(config *conf.ModelProviderConfig) error {
+	reader := bufio.NewReader(os.Stdin)
+
+	if config.Type == "" {
+		fmt.Print("Provider type (openai/ollama/anthropic) [openai]: ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("promptMissingProviderConfig() [provider.go]: failed to read type: %w", err)
+		}
+		input = strings.TrimSpace(input)
+		if input == "" {
+			config.Type = "openai"
+		} else {
+			config.Type = input
+		}
+	}
+
+	if config.Description == "" {
+		fmt.Print("Description (optional): ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("promptMissingProviderConfig() [provider.go]: failed to read description: %w", err)
+		}
+		config.Description = strings.TrimSpace(input)
+	}
+
+	if config.URL == "" {
+		fmt.Print("Provider URL: ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("promptMissingProviderConfig() [provider.go]: failed to read URL: %w", err)
+		}
+		config.URL = strings.TrimSpace(input)
+	}
+
+	if config.AuthMode == "" {
+		fmt.Print("Auth mode (none/api_key/oauth2) [api_key]: ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("promptMissingProviderConfig() [provider.go]: failed to read auth mode: %w", err)
+		}
+		input = strings.TrimSpace(input)
+		if input == "" {
+			config.AuthMode = conf.AuthModeAPIKey
+		} else {
+			config.AuthMode = conf.AuthMode(input)
+		}
+	}
+
+	switch config.AuthMode {
+	case conf.AuthModeAPIKey:
+		if config.APIKey == "" {
+			fmt.Print("API key: ")
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("promptMissingProviderConfig() [provider.go]: failed to read API key: %w", err)
+			}
+			config.APIKey = strings.TrimSpace(input)
+		}
+	case conf.AuthModeOAuth2:
+		if config.AuthURL == "" {
+			fmt.Print("OAuth auth URL: ")
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("promptMissingProviderConfig() [provider.go]: failed to read auth URL: %w", err)
+			}
+			config.AuthURL = strings.TrimSpace(input)
+		}
+		if config.TokenURL == "" {
+			fmt.Print("OAuth token URL: ")
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("promptMissingProviderConfig() [provider.go]: failed to read token URL: %w", err)
+			}
+			config.TokenURL = strings.TrimSpace(input)
+		}
+		if config.ClientID == "" {
+			fmt.Print("OAuth client ID: ")
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("promptMissingProviderConfig() [provider.go]: failed to read client ID: %w", err)
+			}
+			config.ClientID = strings.TrimSpace(input)
+		}
+		if config.ClientSecret == "" {
+			fmt.Print("OAuth client secret (optional): ")
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("promptMissingProviderConfig() [provider.go]: failed to read client secret: %w", err)
+			}
+			config.ClientSecret = strings.TrimSpace(input)
+		}
+	}
+
+	return nil
+}
+
+func applyProviderAuthFlow(config *conf.ModelProviderConfig) error {
+	if config == nil {
+		return fmt.Errorf("applyProviderAuthFlow() [provider.go]: config cannot be nil")
+	}
+
+	if config.AuthMode == conf.AuthModeOAuth2 {
+		pkce, err := models.GenerateOAuthPKCECodes()
+		if err != nil {
+			return fmt.Errorf("applyProviderAuthFlow() [provider.go]: failed to generate PKCE codes: %w", err)
+		}
+
+		state, err := models.GenerateOAuthState()
+		if err != nil {
+			return fmt.Errorf("applyProviderAuthFlow() [provider.go]: failed to generate OAuth state: %w", err)
+		}
+
+		redirectURI := providerAuthRedirectURI()
+		authURL, err := models.BuildAuthorizationURL(
+			config,
+			redirectURI,
+			state,
+			pkce.Challenge,
+			models.DefaultOAuthScope,
+			providerAuthExtraParams,
+		)
+		if err != nil {
+			return fmt.Errorf("applyProviderAuthFlow() [provider.go]: failed to build authorization URL: %w", err)
+		}
+
+		fmt.Printf("Open this link in your browser:\n%s\n", authURL)
+		fmt.Printf("Waiting for callback on %s ...\n", redirectURI)
+
+		ctx, cancel := context.WithTimeout(context.Background(), providerAuthTimeout)
+		defer cancel()
+
+		callback, err := models.WaitForOAuthCallback(ctx, providerAuthListenAddress(), providerAuthCallbackPath)
+		if err != nil {
+			return fmt.Errorf("applyProviderAuthFlow() [provider.go]: failed waiting for OAuth callback: %w", err)
+		}
+
+		if callback.State != state {
+			return fmt.Errorf("applyProviderAuthFlow() [provider.go]: invalid state returned by callback")
+		}
+
+		httpClient := &http.Client{Timeout: 30 * time.Second}
+		if config.RequestTimeout > 0 {
+			httpClient.Timeout = config.RequestTimeout
+		}
+
+		tokenResp, err := models.ExchangeAuthorizationCode(config, httpClient, callback.Code, redirectURI, pkce.Verifier)
+		if err != nil {
+			return fmt.Errorf("applyProviderAuthFlow() [provider.go]: failed to exchange authorization code: %w", err)
+		}
+
+		config.APIKey = tokenResp.AccessToken
+		if tokenResp.RefreshToken != "" {
+			config.RefreshToken = tokenResp.RefreshToken
+		}
+
+		return nil
+	}
+
+	if config.AuthMode == conf.AuthModeAPIKey && config.APIKey == "" {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("API key: ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("applyProviderAuthFlow() [provider.go]: failed to read API key: %w", err)
+		}
+		config.APIKey = strings.TrimSpace(input)
+	}
+
+	return nil
 }
 
 func providerRemoveCommand(scope *ConfigScope) *cobra.Command {

@@ -387,6 +387,35 @@ func TestPromptProviderConfig(t *testing.T) {
 	}
 }
 
+func TestBuildProviderConfigFromTemplates(t *testing.T) {
+	global := &conf.GlobalConfig{
+		ModelFamilies: map[string]conf.ModelProviderConfig{
+			"openai-gpt": {ModelTags: []conf.ModelTagMapping{{Model: "^gpt", Tag: "openai"}}, MaxTokens: 4096},
+		},
+		ModelVendors: map[string]conf.ModelProviderConfig{
+			"openai": {Type: "openai", URL: "https://api.openai.com/v1", AuthMode: conf.AuthModeAPIKey},
+		},
+		VendorFamilyOverrides: map[string]conf.ModelVendorFamilyTemplateOverride{
+			"openai": {
+				Vendor: conf.ModelProviderConfig{Headers: map[string]string{"X-Vendor": "1"}},
+				Families: map[string]conf.ModelProviderConfig{
+					"openai-gpt": {MaxTokens: 8192},
+				},
+			},
+		},
+	}
+
+	cfg, err := buildProviderConfigFromTemplates(global, "openai-gpt", "openai")
+	require.NoError(t, err)
+	assert.Equal(t, "openai", cfg.Type)
+	assert.Equal(t, "https://api.openai.com/v1", cfg.URL)
+	assert.Equal(t, conf.AuthModeAPIKey, cfg.AuthMode)
+	assert.Equal(t, "openai-gpt", cfg.Family)
+	assert.Equal(t, 8192, cfg.MaxTokens)
+	assert.Equal(t, "1", cfg.Headers["X-Vendor"])
+	assert.Len(t, cfg.ModelTags, 1)
+}
+
 func TestProviderCommandWithCustomPath(t *testing.T) {
 	// Create temporary directory for custom config
 	tmpDir, err := os.MkdirTemp("", "csw-custom-*")
