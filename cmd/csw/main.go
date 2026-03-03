@@ -24,17 +24,7 @@ func main() {
 		Long:  `Codesnort SWE is an AI-powered software engineering assistant that helps you write, review, and maintain code.`,
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Resolve working directory from argument or use current directory
-			var dirPath string
-			if len(args) > 0 {
-				dirPath = args[0]
-			}
-			workDir, err := ResolveWorkDir(dirPath)
-			if err != nil {
-				return err
-			}
-
-			return runTUI(workDir, configPath, projectConfig, modelName, roleName, lspServer, saveSessionTo, saveSession, logLLMRequests)
+			return cmd.Help()
 		},
 	}
 
