@@ -15,6 +15,8 @@ import (
 // TestCLISummaryIncludesDetailedSessionInfo verifies extended session info in summary.md.
 func TestCLISummaryIncludesDetailedSessionInfo(t *testing.T) {
 	tmpProjectDir := t.TempDir()
+	t.Setenv("HOME", tmpProjectDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpProjectDir, ".config"))
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpProjectDir, ".csw", "config", "models"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpProjectDir, "test.txt"), []byte("old\n"), 0644))
 	require.NoError(t, runGit(tmpProjectDir, "init"))

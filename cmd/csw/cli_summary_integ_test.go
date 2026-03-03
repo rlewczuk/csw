@@ -14,6 +14,8 @@ import (
 // TestCLISavesSummaryMarkdown verifies that CLI mode saves summary.md in the session log directory.
 func TestCLISavesSummaryMarkdown(t *testing.T) {
 	tmpProjectDir := t.TempDir()
+	t.Setenv("HOME", tmpProjectDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpProjectDir, ".config"))
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpProjectDir, ".csw", "config", "models"), 0755))
 
 	mockServer := testutil.NewMockHTTPServer()

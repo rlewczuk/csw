@@ -67,11 +67,17 @@ func NewGitRepo(path string, worktreesPath string, hidePatterns []string, name s
 		gitUserEmail:  email,
 	}
 
-	if err := g.runGit("rev-parse", "--git-dir"); err != nil {
+	showTopLevelOutput, err := g.runGitOutput("rev-parse", "--show-toplevel")
+	if err != nil {
 		if isExitCode(err, 128) {
 			return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", ErrFileNotFound)
 		}
 		return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", err)
+	}
+
+	repoTopLevelPath := filepath.Clean(strings.TrimSpace(showTopLevelOutput))
+	if repoTopLevelPath != absPath {
+		return nil, fmt.Errorf("NewGitRepo() [git.go]: path %q is not a git repository root: %w", absPath, ErrFileNotFound)
 	}
 
 	return g, nil
@@ -486,12 +492,30 @@ func (g *GitVCS) gitCommandEnv() []string {
 		gitUserEmail = "csw@example.com"
 	}
 
-	env := os.Environ()
+	env := sanitizedGitEnv(os.Environ())
 	env = upsertEnvValue(env, "GIT_AUTHOR_NAME", gitUserName)
 	env = upsertEnvValue(env, "GIT_AUTHOR_EMAIL", gitUserEmail)
 	env = upsertEnvValue(env, "GIT_COMMITTER_NAME", gitUserName)
 	env = upsertEnvValue(env, "GIT_COMMITTER_EMAIL", gitUserEmail)
 	return env
+}
+
+// sanitizedGitEnv removes git environment variables that can override repository discovery.
+func sanitizedGitEnv(env []string) []string {
+	filtered := make([]string, 0, len(env))
+	for _, item := range env {
+		if strings.HasPrefix(item, "GIT_DIR=") ||
+			strings.HasPrefix(item, "GIT_WORK_TREE=") ||
+			strings.HasPrefix(item, "GIT_COMMON_DIR=") ||
+			strings.HasPrefix(item, "GIT_INDEX_FILE=") ||
+			strings.HasPrefix(item, "GIT_OBJECT_DIRECTORY=") ||
+			strings.HasPrefix(item, "GIT_ALTERNATE_OBJECT_DIRECTORIES=") {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+
+	return filtered
 }
 
 // upsertEnvValue sets a key-value env pair, replacing any existing key entry.
