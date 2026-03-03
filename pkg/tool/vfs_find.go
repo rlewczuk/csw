@@ -61,13 +61,29 @@ func (t *VFSFindTool) Execute(args *ToolCall) *ToolResponse {
 // Render returns a string representation of the tool call.
 func (t *VFSFindTool) Render(call *ToolCall) (string, string, map[string]string) {
 	query, _ := call.Arguments.StringOK("query")
-	oneLiner := truncateString("find "+query, 128)
-	full := oneLiner + "\n\n"
-	// Try to get files from result if available
-	if files, ok := call.Arguments.Get("files").ArrayOK(); ok && len(files) > 0 {
-		for _, f := range files {
-			full += f.AsString() + "\n"
-		}
+
+	// Count results from files if available
+	resultCount := 0
+	var files []ToolValue
+	if filesArr, ok := call.Arguments.Get("files").ArrayOK(); ok {
+		files = filesArr
+		resultCount = len(filesArr)
+	}
+
+	// Build result count suffix
+	resultSuffix := ""
+	if resultCount > 0 {
+		resultSuffix = formatResultCount(resultCount)
+	}
+
+	baseText := truncateString("find "+query, 128)
+
+	oneLiner := baseText + resultSuffix
+	full := baseText + resultSuffix + "\n\n"
+
+	// Add files to full output
+	for _, f := range files {
+		full += f.AsString() + "\n"
 	}
 
 	// Handle error if present

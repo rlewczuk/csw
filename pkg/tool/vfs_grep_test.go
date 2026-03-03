@@ -569,4 +569,94 @@ func TestVFSGrepToolRender(t *testing.T) {
 		// Assert - full should contain full error with ERROR: prefix
 		assert.Contains(t, full, "ERROR: error on line 1\nerror on line 2\nerror on line 3")
 	})
+
+	t.Run("should include result count in oneliner and full output", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSGrepTool(mockVFS)
+
+		// Execute - call with content
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": "hello",
+				"content": "file1.txt:1\nfile1.txt:3\nfile2.txt:1",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - should include result count
+		assert.Equal(t, "grep hello (3 results)", oneLiner)
+		assert.Contains(t, full, "grep hello (3 results)\n\n")
+		assert.Contains(t, full, "file1.txt:1")
+	})
+
+	t.Run("should show single result with singular form", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSGrepTool(mockVFS)
+
+		// Execute - call with single result
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": "hello",
+				"content": "file1.txt:5",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - should use singular form "1 result"
+		assert.Equal(t, "grep hello (1 result)", oneLiner)
+		assert.Contains(t, full, "grep hello (1 result)\n\n")
+	})
+
+	t.Run("should not show result count when no results", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSGrepTool(mockVFS)
+
+		// Execute - call with no results
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": "hello",
+				"content": "No files found",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - should not include result count
+		assert.Equal(t, "grep hello", oneLiner)
+		assert.Equal(t, "grep hello\n\nNo files found", full)
+	})
+
+	t.Run("should include result count with path in oneliner", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSGrepTool(mockVFS)
+
+		// Execute - call with path and content
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": "hello",
+				"path":    "src",
+				"content": "src/file1.txt:1\nsrc/file2.txt:2",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - should include result count with path
+		assert.Equal(t, "grep hello in src (2 results)", oneLiner)
+		assert.Contains(t, full, "grep hello in src (2 results)\n\n")
+	})
 }

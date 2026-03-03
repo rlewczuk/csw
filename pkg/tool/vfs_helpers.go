@@ -226,3 +226,16 @@ func makeRelativePath(path string, v vfs.VFS) string {
 
 	return relPath
 }
+
+// formatResultCount formats the result count for display.
+// Returns " (1 result)" for single result, " (N results)" for multiple results.
+// Returns empty string if count is 0 or negative.
+func formatResultCount(count int) string {
+	if count <= 0 {
+		return ""
+	}
+	if count == 1 {
+		return " (1 result)"
+	}
+	return fmt.Sprintf(" (%d results)", count)
+}

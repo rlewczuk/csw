@@ -178,11 +178,27 @@ func (t *VFSGrepTool) Render(call *ToolCall) (string, string, map[string]string)
 		}
 	}
 
-	oneLiner := truncateString("grep "+pattern, 128)
-	if path != "" {
-		oneLiner = truncateString("grep "+pattern+" in "+path, 128)
+	// Count results from content if available
+	resultCount := 0
+	if content, ok := call.Arguments.Get("content").AsStringOK(); ok && content != "" {
+		resultCount = countGrepResults(content)
 	}
-	full := oneLiner + "\n\n"
+
+	// Build result count suffix
+	resultSuffix := ""
+	if resultCount > 0 {
+		resultSuffix = formatResultCount(resultCount)
+	}
+
+	baseText := "grep " + pattern
+	if path != "" {
+		baseText = "grep " + pattern + " in " + path
+	}
+	baseText = truncateString(baseText, 128)
+
+	oneLiner := baseText + resultSuffix
+	full := baseText + resultSuffix + "\n\n"
+
 	// Try to get content from result if available
 	if content, ok := call.Arguments.Get("content").AsStringOK(); ok && content != "" {
 		full += content
@@ -196,4 +212,21 @@ func (t *VFSGrepTool) Render(call *ToolCall) (string, string, map[string]string)
 	}
 
 	return oneLiner, full, make(map[string]string)
+}
+
+// countGrepResults counts the number of result lines in grep output.
+// It excludes the truncation message and empty lines.
+func countGrepResults(content string) int {
+	if content == "No files found" {
+		return 0
+	}
+	lines := strings.Split(content, "\n")
+	count := 0
+	for _, line := range lines {
+		// Skip truncation message and empty lines
+		if line != "" && !strings.HasPrefix(line, "(Results are truncated") {
+			count++
+		}
+	}
+	return count
 }

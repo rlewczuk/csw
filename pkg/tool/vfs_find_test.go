@@ -401,7 +401,8 @@ func TestVFSFindToolRender(t *testing.T) {
 		oneLiner, full, _ := tool.Render(call)
 
 		// Assert
-		assert.Equal(t, "find *.txt", oneLiner)
+		assert.Equal(t, "find *.txt (3 results)", oneLiner)
+		assert.Contains(t, full, "find *.txt (3 results)")
 		assert.Contains(t, full, "file1.txt")
 		assert.Contains(t, full, "file2.txt")
 		assert.Contains(t, full, "dir/file3.txt")
@@ -456,5 +457,71 @@ func TestVFSFindToolRender(t *testing.T) {
 		assert.Equal(t, 2, len(lines), "oneliner should have exactly 2 lines")
 		// Assert - full should contain full error with ERROR: prefix
 		assert.Contains(t, full, "ERROR: error details:\nline 1\nline 2")
+	})
+
+	t.Run("should show single result with singular form", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSFindTool(mockVFS)
+
+		// Execute - call with single file
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsFind",
+			Arguments: NewToolValue(map[string]any{
+				"query": "*.txt",
+				"files": []any{"file1.txt"},
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - should use singular form "1 result"
+		assert.Equal(t, "find *.txt (1 result)", oneLiner)
+		assert.Contains(t, full, "find *.txt (1 result)\n\n")
+		assert.Contains(t, full, "file1.txt")
+	})
+
+	t.Run("should not show result count when no files", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSFindTool(mockVFS)
+
+		// Execute - call with empty files array
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsFind",
+			Arguments: NewToolValue(map[string]any{
+				"query": "*.txt",
+				"files": []any{},
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - should not include result count
+		assert.Equal(t, "find *.txt", oneLiner)
+		assert.Equal(t, "find *.txt\n\n", full)
+	})
+
+	t.Run("should not show result count when files not present", func(t *testing.T) {
+		// Setup
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSFindTool(mockVFS)
+
+		// Execute - call without files
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsFind",
+			Arguments: NewToolValue(map[string]any{
+				"query": "*.txt",
+			}),
+		}
+
+		oneLiner, full, _ := tool.Render(call)
+
+		// Assert - should not include result count
+		assert.Equal(t, "find *.txt", oneLiner)
+		assert.Equal(t, "find *.txt\n\n", full)
 	})
 }
