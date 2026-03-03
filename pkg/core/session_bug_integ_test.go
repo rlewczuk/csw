@@ -21,7 +21,7 @@ import (
 // the same tool call to be executed repeatedly.
 func TestPermissionLoopBug(t *testing.T) {
 	// Create a local VFS
-	localVFS, err := vfs.NewLocalVFS(t.TempDir(), nil)
+	localVFS, err := vfs.NewLocalVFS(t.TempDir(), nil, nil)
 	require.NoError(t, err)
 
 	// Wrap with access control that asks for all permissions

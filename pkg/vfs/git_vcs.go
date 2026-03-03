@@ -119,7 +119,7 @@ func (g *GitVCS) GetWorktree(branch string) (VFS, error) {
 		return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", err)
 	}
 
-	localVFS, err := NewLocalVFS(worktreePath, g.hidePatterns)
+	localVFS, err := NewLocalVFS(worktreePath, g.hidePatterns, nil)
 	if err != nil {
 		_ = g.runGit("worktree", "remove", "--force", worktreePath)
 		_ = os.RemoveAll(worktreePath)

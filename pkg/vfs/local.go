@@ -13,6 +13,10 @@ type LocalVFS struct {
 	root   string
 	repo   VCS
 	filter GlobFilter
+	// allowedPaths contains additional absolute paths that are allowed for access
+	// outside of the root directory. Paths must be absolute and are matched using
+	// prefix matching (path must be within one of these directories).
+	allowedPaths []string
 }
 
 func (l *LocalVFS) GetBranch() string {
@@ -31,7 +35,9 @@ func (l *LocalVFS) GetRepo() VCS {
 // The root path is converted to an absolute path and all operations are sandboxed within this directory.
 // The hidePatterns parameter specifies glob patterns for files and directories that should be ignored
 // by all operations (ListFiles, FindFiles). By default, it should be empty (no files are hidden).
-func NewLocalVFS(root string, hidePatterns []string) (*LocalVFS, error) {
+// The allowedPaths parameter specifies additional absolute paths that can be accessed outside of root.
+// When accessing files via allowedPaths, the path must be absolute and point within one of these directories.
+func NewLocalVFS(root string, hidePatterns []string, allowedPaths []string) (*LocalVFS, error) {
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
@@ -54,10 +60,24 @@ func NewLocalVFS(root string, hidePatterns []string) (*LocalVFS, error) {
 	// and patterns that should be hidden (match=true means hide)
 	filter := NewGlobFilter(false, hidePatterns)
 
-	return &LocalVFS{root: absRoot, filter: filter}, nil
+	// Normalize allowed paths - convert to absolute and clean
+	var normalizedAllowedPaths []string
+	for _, path := range allowedPaths {
+		if path == "" {
+			continue
+		}
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return nil, fmt.Errorf("NewLocalVFS() [local.go]: invalid allowed path %q: %w", path, err)
+		}
+		cleanPath := filepath.Clean(absPath)
+		normalizedAllowedPaths = append(normalizedAllowedPaths, cleanPath)
+	}
+
+	return &LocalVFS{root: absRoot, filter: filter, allowedPaths: normalizedAllowedPaths}, nil
 }
 
-// validatePath ensures the path is valid and within the sandbox.
+// validatePath ensures the path is valid and within the sandbox or allowed paths.
 // It returns the absolute filesystem path if valid.
 func (l *LocalVFS) validatePath(path string) (string, error) {
 	if path == "" {
@@ -74,8 +94,16 @@ func (l *LocalVFS) validatePath(path string) (string, error) {
 		return "", err
 	}
 
+	// Check if path is within root directory
 	if strings.HasPrefix(cleanPath, l.root) {
 		return cleanPath, nil
+	}
+
+	// Check if path is within one of the allowed paths
+	for _, allowedPath := range l.allowedPaths {
+		if strings.HasPrefix(cleanPath, allowedPath) {
+			return cleanPath, nil
+		}
 	}
 
 	return "", fmt.Errorf("LocalVFS.validatePath() [local.go]: %w", ErrPermissionDenied)

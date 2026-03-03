@@ -58,6 +58,7 @@ type CLIParams struct {
 	ForceResume           bool
 	BashRunTimeout        time.Duration
 	Verbose               bool
+	VFSAllow              []string
 }
 
 const defaultBashRunTimeout = 120 * time.Second
@@ -99,6 +100,7 @@ func CliCommand() *cobra.Command {
 		cliForce          bool
 		cliBashRunTimeout string
 		cliVerbose        bool
+		cliVFSAllow       []string
 	)
 
 	cmd := &cobra.Command{
@@ -180,6 +182,9 @@ func CliCommand() *cobra.Command {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: container mode options are not supported with --resume")
 			}
 
+			// Parse vfs-allow paths, handling both repeated flags and colon-separated values
+			vfsAllowPaths := parseVFSAllowPaths(cliVFSAllow)
+
 			return runCLIFunc(&CLIParams{
 				Prompt:                prompt,
 				ModelName:             cliModel,
@@ -209,6 +214,7 @@ func CliCommand() *cobra.Command {
 				ForceResume:           cliForce,
 				BashRunTimeout:        bashRunTimeout,
 				Verbose:               cliVerbose,
+				VFSAllow:              vfsAllowPaths,
 			})
 		},
 	}
@@ -241,6 +247,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliForce, "force", false, "Force resume even when there is no pending work")
 	cmd.Flags().StringVar(&cliBashRunTimeout, "bash-run-timeout", "120", "Default runBash command timeout (duration; plain number means seconds)")
 	cmd.Flags().BoolVar(&cliVerbose, "verbose", false, "Display full tool output instead of one-liners")
+	cmd.Flags().StringArrayVar(&cliVFSAllow, "vfs-allow", nil, "Additional path to allow VFS access outside of worktree (repeatable, or use ':' separated list)")
 	resumeFlag := cmd.Flags().Lookup("resume")
 	if resumeFlag != nil {
 		resumeFlag.NoOptDefVal = "last"
@@ -353,6 +360,7 @@ func runCLI(params *CLIParams) error {
 		LogLLMRequests:    params.LogLLMRequests,
 		Thinking:          params.Thinking,
 		BashRunTimeout:    params.BashRunTimeout,
+		AllowedPaths:      params.VFSAllow,
 	})
 	if err != nil {
 		return err
@@ -583,6 +591,23 @@ func parseBashRunTimeout(value string) (time.Duration, error) {
 	}
 
 	return parsed, nil
+}
+
+// parseVFSAllowPaths parses the --vfs-allow flag values.
+// It handles both repeated flags and colon-separated values.
+func parseVFSAllowPaths(values []string) []string {
+	var result []string
+	for _, v := range values {
+		// Split by colon to support colon-separated list
+		parts := strings.Split(v, ":")
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				result = append(result, part)
+			}
+		}
+	}
+	return result
 }
 
 func buildSessionSummaryMessage(duration time.Duration, session *core.SweSession, buildResult BuildSystemResult) string {

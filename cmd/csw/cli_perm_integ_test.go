@@ -129,7 +129,7 @@ func (m *autoDenyPermissionMockView) QueryPermission(query *ui.PermissionQueryUI
 // When not in interactive mode and without --allow-all-permissions, permissions should be denied by default.
 func TestCLIPermissionQueryHandling(t *testing.T) {
 	// Create a VFS with access control that requires asking for permissions
-	localVFS, err := vfs.NewLocalVFS(t.TempDir(), nil)
+	localVFS, err := vfs.NewLocalVFS(t.TempDir(), nil, nil)
 	require.NoError(t, err)
 
 	// Wrap with access control that asks for all permissions
@@ -330,7 +330,7 @@ func TestCLIAllowAllPermissionsExecutesAllToolCalls(t *testing.T) {
 // This test reproduces the bug where the session hangs after permission denial.
 func TestCLIPermissionQueryWithResponse(t *testing.T) {
 	// Create a VFS with access control that requires asking for permissions
-	localVFS, err := vfs.NewLocalVFS(t.TempDir(), nil)
+	localVFS, err := vfs.NewLocalVFS(t.TempDir(), nil, nil)
 	require.NoError(t, err)
 
 	// Wrap with access control that asks for all permissions

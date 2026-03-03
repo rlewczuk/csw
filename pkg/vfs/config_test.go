@@ -179,7 +179,7 @@ tmp/
 		hidePatterns, err := BuildHidePatterns(tempDir, basePatterns)
 		require.NoError(t, err)
 
-		vfs, err := NewLocalVFS(tempDir, hidePatterns)
+		vfs, err := NewLocalVFS(tempDir, hidePatterns, nil)
 		require.NoError(t, err)
 
 		// List files

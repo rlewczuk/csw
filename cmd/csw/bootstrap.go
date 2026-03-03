@@ -58,6 +58,10 @@ type BuildSystemParams struct {
 	Thinking string
 	// BashRunTimeout sets default timeout for runBash tool command execution.
 	BashRunTimeout time.Duration
+	// AllowedPaths specifies additional absolute paths outside of workDir that VFS can access.
+	// Paths must be absolute. When accessing files via allowedPaths, the path must be absolute
+	// and point within one of these directories.
+	AllowedPaths []string
 }
 
 // BuildSystemResult contains outputs from building a SweSystem.
@@ -78,8 +82,8 @@ type BuildSystemResult struct {
 	Cleanup          func()
 }
 
-func prepareSessionVFS(workDir string, worktreeBranch string, hidePatterns []string, gitUserName string, gitUserEmail string) (vfs.VCS, vfs.VFS, error) {
-	localVFS, err := vfs.NewLocalVFS(workDir, hidePatterns)
+func prepareSessionVFS(workDir string, worktreeBranch string, hidePatterns []string, gitUserName string, gitUserEmail string, allowedPaths []string) (vfs.VCS, vfs.VFS, error) {
+	localVFS, err := vfs.NewLocalVFS(workDir, hidePatterns, allowedPaths)
 	if err != nil {
 		return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create local VFS: %w", err)
 	}
@@ -193,7 +197,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to build hide patterns: %w", err)
 	}
 
-	selectedVCS, selectedVFS, err := prepareSessionVFS(workDir, params.WorktreeBranch, hidePatterns, params.GitUserName, params.GitUserEmail)
+	selectedVCS, selectedVFS, err := prepareSessionVFS(workDir, params.WorktreeBranch, hidePatterns, params.GitUserName, params.GitUserEmail, params.AllowedPaths)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
