@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/testutil/fixture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,11 +30,13 @@ func setupGitRepoFixtureWithIdentity(t *testing.T, gitUserName string, gitUserEm
 	t.Helper()
 
 	// Create a temporary directory in project root tmp/
-	tempDir, err := os.MkdirTemp("../../tmp", "git-test-*")
-	require.NoError(t, err, "Failed to create temp directory")
+	tempDir := fixture.MkProjectTempDir(t, "git-test-*")
+	var err error
 
 	// Create a worktrees directory
 	worktreesDir := filepath.Join(tempDir, "worktrees")
+	err = os.MkdirAll(worktreesDir, 0o755)
+	require.NoError(t, err, "Failed to create temp directory")
 
 	// Initialize a git repository
 	_, err = runGitCommand(tempDir, "init")
@@ -122,26 +125,27 @@ func TestNewGitRepo(t *testing.T) {
 	})
 
 	t.Run("NonExistentDirectory", func(t *testing.T) {
-		_, err := NewGitRepo("/path/that/does/not/exist", "../../tmp/worktrees", nil, "", "")
+		_, err := NewGitRepo("/path/that/does/not/exist", fixture.ProjectPath("tmp", "worktrees"), nil, "", "")
 		assert.ErrorIs(t, err, ErrFileNotFound)
 	})
 
 	t.Run("NotAGitRepository", func(t *testing.T) {
-		tempDir, err := os.MkdirTemp("../../tmp", "not-git-*")
-		require.NoError(t, err, "Failed to create temp directory")
-		defer os.RemoveAll(tempDir)
+		tempDir := fixture.MkProjectTempDir(t, "not-git-*")
 
-		_, err = NewGitRepo(tempDir, "../../tmp/worktrees", nil, "", "")
+		_, err := NewGitRepo(tempDir, fixture.ProjectPath("tmp", "worktrees"), nil, "", "")
 		assert.ErrorIs(t, err, ErrFileNotFound)
 	})
 
 	t.Run("PathIsFile", func(t *testing.T) {
-		tempFile, err := os.CreateTemp("../../tmp", "git-test-file-*")
+		tmpDir := fixture.ProjectTmpDir(t)
+		tempFile, err := os.CreateTemp(tmpDir, "git-test-file-*")
 		require.NoError(t, err, "Failed to create temp file")
-		defer os.Remove(tempFile.Name())
+		t.Cleanup(func() {
+			_ = os.Remove(tempFile.Name())
+		})
 		tempFile.Close()
 
-		_, err = NewGitRepo(tempFile.Name(), "../../tmp/worktrees", nil, "", "")
+		_, err = NewGitRepo(tempFile.Name(), fixture.ProjectPath("tmp", "worktrees"), nil, "", "")
 		assert.ErrorIs(t, err, ErrNotADir)
 	})
 }
