@@ -62,6 +62,21 @@ func TestPrepareSessionVFSRecreatesExistingWorktreePath(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestPrepareSessionVFSWithWorktreeRespectsAllowedPaths(t *testing.T) {
+	repoDir := initTestGitRepository(t)
+	allowedDir := t.TempDir()
+	allowedFile := filepath.Join(allowedDir, "allowed.txt")
+	require.NoError(t, os.WriteFile(allowedFile, []byte("allowed-content"), 0644))
+
+	_, selectedVFS, err := prepareSessionVFS(repoDir, "feature/vfs-allow", nil, "", "", []string{allowedDir})
+	require.NoError(t, err)
+	require.NotNil(t, selectedVFS)
+
+	data, err := selectedVFS.ReadFile(allowedFile)
+	require.NoError(t, err)
+	assert.Equal(t, "allowed-content", string(data))
+}
+
 func initTestGitRepository(t *testing.T) string {
 	t.Helper()
 

@@ -22,11 +22,23 @@ type GitTestFixture struct {
 // setupGitRepoFixture creates a temporary git repository for testing
 func setupGitRepoFixture(t *testing.T) *GitTestFixture {
 	t.Helper()
-	return setupGitRepoFixtureWithIdentity(t, "", "")
+	return setupGitRepoFixtureWithOptions(t, nil, "", "")
 }
 
 // setupGitRepoFixtureWithIdentity creates a temporary git repository for testing with explicit git identity.
 func setupGitRepoFixtureWithIdentity(t *testing.T, gitUserName string, gitUserEmail string) *GitTestFixture {
+	t.Helper()
+	return setupGitRepoFixtureWithOptions(t, nil, gitUserName, gitUserEmail)
+}
+
+// setupGitRepoFixtureWithAllowedPaths creates a temporary git repository for testing with allowed paths.
+func setupGitRepoFixtureWithAllowedPaths(t *testing.T, allowedPaths []string) *GitTestFixture {
+	t.Helper()
+	return setupGitRepoFixtureWithOptions(t, allowedPaths, "", "")
+}
+
+// setupGitRepoFixtureWithOptions creates a temporary git repository for testing with explicit configuration.
+func setupGitRepoFixtureWithOptions(t *testing.T, allowedPaths []string, gitUserName string, gitUserEmail string) *GitTestFixture {
 	t.Helper()
 
 	// Create a temporary directory in project root tmp/
@@ -54,7 +66,7 @@ func setupGitRepoFixtureWithIdentity(t *testing.T, gitUserName string, gitUserEm
 	require.NoError(t, err, "Failed to create initial commit")
 
 	// Create the GitVCS with worktrees directory
-	gitRepo, err := NewGitRepo(tempDir, worktreesDir, nil, gitUserName, gitUserEmail)
+	gitRepo, err := NewGitRepo(tempDir, worktreesDir, nil, allowedPaths, gitUserName, gitUserEmail)
 	require.NoError(t, err, "Failed to create GitVCS")
 
 	return &GitTestFixture{
@@ -125,14 +137,14 @@ func TestNewGitRepo(t *testing.T) {
 	})
 
 	t.Run("NonExistentDirectory", func(t *testing.T) {
-		_, err := NewGitRepo("/path/that/does/not/exist", fixture.ProjectPath("tmp", "worktrees"), nil, "", "")
+		_, err := NewGitRepo("/path/that/does/not/exist", fixture.ProjectPath("tmp", "worktrees"), nil, nil, "", "")
 		assert.ErrorIs(t, err, ErrFileNotFound)
 	})
 
 	t.Run("NotAGitRepository", func(t *testing.T) {
 		tempDir := fixture.MkProjectTempDir(t, "not-git-*")
 
-		_, err := NewGitRepo(tempDir, fixture.ProjectPath("tmp", "worktrees"), nil, "", "")
+		_, err := NewGitRepo(tempDir, fixture.ProjectPath("tmp", "worktrees"), nil, nil, "", "")
 		assert.ErrorIs(t, err, ErrFileNotFound)
 	})
 
@@ -145,7 +157,7 @@ func TestNewGitRepo(t *testing.T) {
 		})
 		tempFile.Close()
 
-		_, err = NewGitRepo(tempFile.Name(), fixture.ProjectPath("tmp", "worktrees"), nil, "", "")
+		_, err = NewGitRepo(tempFile.Name(), fixture.ProjectPath("tmp", "worktrees"), nil, nil, "", "")
 		assert.ErrorIs(t, err, ErrNotADir)
 	})
 }
@@ -177,6 +189,24 @@ func TestGetWorktree(t *testing.T) {
 			_, err := fixture.Repo.GetWorktree("nonexistent-branch")
 			assert.ErrorIs(t, err, ErrFileNotFound)
 		})
+	})
+
+	t.Run("GetWorktreeRespectsAllowedPaths", func(t *testing.T) {
+		allowedDir := fixture.MkProjectTempDir(t, "git-allowed-*")
+		allowedFile := filepath.Join(allowedDir, "allowed.txt")
+		err := os.WriteFile(allowedFile, []byte("allowed content"), 0644)
+		require.NoError(t, err)
+
+		gitFixture := setupGitRepoFixtureWithAllowedPaths(t, []string{allowedDir})
+		defer gitFixture.Cleanup()
+
+		branch := getDefaultBranch(t, gitFixture)
+		worktree, err := gitFixture.Repo.GetWorktree(branch)
+		require.NoError(t, err)
+
+		data, err := worktree.ReadFile(allowedFile)
+		require.NoError(t, err)
+		assert.Equal(t, "allowed content", string(data))
 	})
 }
 
@@ -212,7 +242,7 @@ func TestDropWorktree(t *testing.T) {
 			_, err = fixture.Repo.GetWorktree(worktreeBranch)
 			require.NoError(t, err)
 
-			freshRepo, err := NewGitRepo(fixture.Root, fixture.WorktreesDir, nil, "", "")
+			freshRepo, err := NewGitRepo(fixture.Root, fixture.WorktreesDir, nil, nil, "", "")
 			require.NoError(t, err)
 
 			err = freshRepo.DropWorktree(worktreeBranch)

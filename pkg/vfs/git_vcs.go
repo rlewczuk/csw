@@ -19,6 +19,7 @@ type GitVCS struct {
 	worktrees     map[string]*gitWorktree
 	mutex         sync.RWMutex
 	hidePatterns  []string
+	allowedPaths  []string
 	gitUserName   string
 	gitUserEmail  string
 }
@@ -33,7 +34,8 @@ type gitWorktree struct {
 // NewGitRepo creates a new GitVCS instance from an existing git repository path.
 // The worktreesPath parameter specifies the directory where worktrees will be created.
 // The hidePatterns parameter specifies glob patterns for files and directories that should be hidden.
-func NewGitRepo(path string, worktreesPath string, hidePatterns []string, name string, email string) (*GitVCS, error) {
+// The allowedPaths parameter specifies additional absolute paths allowed outside of each worktree.
+func NewGitRepo(path string, worktreesPath string, hidePatterns []string, allowedPaths []string, name string, email string) (*GitVCS, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", err)
@@ -63,6 +65,7 @@ func NewGitRepo(path string, worktreesPath string, hidePatterns []string, name s
 		worktreesPath: absWorktreesPath,
 		worktrees:     make(map[string]*gitWorktree),
 		hidePatterns:  hidePatterns,
+		allowedPaths:  append([]string(nil), allowedPaths...),
 		gitUserName:   name,
 		gitUserEmail:  email,
 	}
@@ -119,7 +122,7 @@ func (g *GitVCS) GetWorktree(branch string) (VFS, error) {
 		return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", err)
 	}
 
-	localVFS, err := NewLocalVFS(worktreePath, g.hidePatterns, nil)
+	localVFS, err := NewLocalVFS(worktreePath, g.hidePatterns, g.allowedPaths)
 	if err != nil {
 		_ = g.runGit("worktree", "remove", "--force", worktreePath)
 		_ = os.RemoveAll(worktreePath)

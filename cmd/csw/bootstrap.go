@@ -97,7 +97,7 @@ func prepareSessionVFS(workDir string, worktreeBranch string, hidePatterns []str
 
 	if worktreeBranch != "" {
 		worktreesRoot := filepath.Join(workDir, ".cswdata", "work")
-		gitRepo, err := vfs.NewGitRepo(workDir, worktreesRoot, hidePatterns, gitUserName, gitUserEmail)
+		gitRepo, err := vfs.NewGitRepo(workDir, worktreesRoot, hidePatterns, allowedPaths, gitUserName, gitUserEmail)
 		if err != nil {
 			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create GitVCS: %w", err)
 		}
