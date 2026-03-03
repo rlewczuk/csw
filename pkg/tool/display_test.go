@@ -277,6 +277,42 @@ func TestVFSGrepTool_Render(t *testing.T) {
 	}
 }
 
+// TestVFSListTool_Render tests the Render method for VFSListTool
+func TestVFSListTool_Render(t *testing.T) {
+	mockVFS := vfs.NewMockVFS()
+	tool := NewVFSListTool(mockVFS)
+
+	tests := []struct {
+		name        string
+		args        *ToolCall
+		wantPattern string
+		wantPath    string
+	}{
+		{
+			name: "basic list",
+			args: &ToolCall{
+				Function:  "vfsList",
+				Arguments: NewToolValue(map[string]any{"path": ".", "pattern": "*.go"}),
+			},
+			wantPattern: "*.go",
+			wantPath:    ".",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			summary, details, meta := tool.Render(tt.args)
+			assert.NotEmpty(t, summary, "Summary should not be empty")
+			assert.True(t, strings.HasPrefix(summary, "list "), "Summary should start with 'list '")
+			assert.Contains(t, summary, tt.wantPath, "Summary should contain path")
+			assert.Contains(t, summary, tt.wantPattern, "Summary should contain pattern")
+			assert.LessOrEqual(t, len(summary), 128, "Summary should not exceed 128 characters")
+			assert.NotNil(t, meta, "Meta should not be nil")
+			assert.Contains(t, details, summary, "Details should start with summary")
+		})
+	}
+}
+
 // TestAccessControlTool_Render tests the Render method for AccessControlTool
 func TestAccessControlTool_Render(t *testing.T) {
 	mockTool := &mockTool{name: "testTool"}

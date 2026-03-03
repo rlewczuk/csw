@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -440,4 +441,113 @@ func TestVFSMoveTool_RegisteredAndAdvertised(t *testing.T) {
 	// Verify the description content
 	descContent := allRole.ToolFragments["vfsMove/vfsMove.md"]
 	assert.NotEmpty(t, descContent, "vfsMove description should not be empty")
+}
+
+func TestVFSListTool_RegisteredAndAdvertised(t *testing.T) {
+	// Create temporary directories
+	tmpDir, err := os.MkdirTemp("", "csw-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	tmpHome, err := os.MkdirTemp("", "csw-home-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpHome)
+
+	// Set HOME to temp directory
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", oldHome)
+
+	// Change to temp directory
+	oldDir, err := os.Getwd()
+	require.NoError(t, err)
+	defer os.Chdir(oldDir)
+	err = os.Chdir(tmpDir)
+	require.NoError(t, err)
+
+	// Get composite config store (loads from embedded defaults)
+	store, err := GetCompositeConfigStore()
+	require.NoError(t, err)
+
+	roleConfigs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+
+	// Verify vfsList is advertised to LLM via tool fragments
+	allRole, exists := roleConfigs["all"]
+	require.True(t, exists, "all role should exist")
+	require.NotNil(t, allRole.ToolFragments, "all role should have tool fragments")
+
+	_, hasSchema := allRole.ToolFragments["vfsList/vfsList.schema.json"]
+	_, hasDesc := allRole.ToolFragments["vfsList/vfsList.md"]
+	assert.True(t, hasSchema, "vfsList should have vfsList.schema.json advertised to LLM")
+	assert.True(t, hasDesc, "vfsList should have vfsList.md advertised to LLM")
+
+	schemaContent := allRole.ToolFragments["vfsList/vfsList.schema.json"]
+	assert.NotEmpty(t, schemaContent, "vfsList schema should not be empty")
+	assert.Contains(t, schemaContent, "path", "vfsList schema should contain 'path' property")
+	assert.Contains(t, schemaContent, "pattern", "vfsList schema should contain 'pattern' property")
+
+	descContent := allRole.ToolFragments["vfsList/vfsList.md"]
+	assert.NotEmpty(t, descContent, "vfsList description should not be empty")
+}
+
+func TestConfToolCommandsIncludeVFSList(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "csw-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	tmpHome, err := os.MkdirTemp("", "csw-home-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpHome)
+
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", oldHome)
+
+	oldDir, err := os.Getwd()
+	require.NoError(t, err)
+	defer os.Chdir(oldDir)
+	require.NoError(t, os.Chdir(tmpDir))
+
+	runAndCapture := func(args []string) string {
+		t.Helper()
+		rootCmd := mainRootCommandForTest()
+
+		oldStdout := os.Stdout
+		r, w, err := os.Pipe()
+		require.NoError(t, err)
+		os.Stdout = w
+
+		rootCmd.SetErr(w)
+		rootCmd.SetArgs(args)
+		execErr := rootCmd.Execute()
+
+		require.NoError(t, w.Close())
+		os.Stdout = oldStdout
+		require.NoError(t, execErr)
+
+		var buf bytes.Buffer
+		_, err = buf.ReadFrom(r)
+		require.NoError(t, err)
+		return buf.String()
+	}
+
+	listOutput := runAndCapture([]string{"conf", "tool", "list", "--json"})
+	assert.Contains(t, listOutput, "\"name\": \"vfsList\"")
+
+	infoOutput := runAndCapture([]string{"conf", "tool", "info", "vfsList"})
+	assert.Contains(t, infoOutput, "name: vfsList")
+
+	descOutput := runAndCapture([]string{"conf", "tool", "desc", "vfsList"})
+	assert.Contains(t, descOutput, "Lists files and directories")
+}
+
+func mainRootCommandForTest() *cobra.Command {
+	cmd := &cobra.Command{Use: "csw", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		return cmd.Help()
+	}}
+	cmd.AddCommand(ConfCommand())
+	cmd.AddCommand(CliCommand())
+	cmd.AddCommand(CleanCommand())
+	return cmd
 }
