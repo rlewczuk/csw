@@ -18,6 +18,10 @@ var (
 	_ ChatModel      = (*ResponsesChatModel)(nil)
 	_ EmbeddingModel = (*ResponsesEmbeddingModel)(nil)
 
+	_ ModelProvider  = (*JetBrainsClient)(nil)
+	_ ChatModel      = (*JetBrainsChatModel)(nil)
+	_ EmbeddingModel = (*JetBrainsEmbeddingModel)(nil)
+
 	_ ModelProvider  = (*MockClient)(nil)
 	_ ChatModel      = (*MockChatModel)(nil)
 	_ EmbeddingModel = (*MockEmbeddingModel)(nil)

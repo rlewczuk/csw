@@ -244,7 +244,7 @@ func providerAddCommand(useJSON *bool, scope *ConfigScope) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&providerType, "type", "", "Provider type (openai, ollama, anthropic)")
+	cmd.Flags().StringVar(&providerType, "type", "", "Provider type (openai, ollama, anthropic, responses, jetbrains)")
 	cmd.Flags().StringVar(&url, "url", "", "Provider URL")
 	cmd.Flags().StringVar(&family, "family", "", "Model family template name")
 	cmd.Flags().StringVar(&vendor, "vendor", "", "Inference vendor template name")
@@ -317,7 +317,7 @@ func promptMissingProviderConfig(config *conf.ModelProviderConfig) error {
 	reader := bufio.NewReader(os.Stdin)
 
 	if config.Type == "" {
-		fmt.Print("Provider type (openai/ollama/anthropic) [openai]: ")
+		fmt.Print("Provider type (openai/ollama/anthropic/responses/jetbrains) [openai]: ")
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			return fmt.Errorf("promptMissingProviderConfig() [provider.go]: failed to read type: %w", err)
@@ -918,7 +918,7 @@ func promptProviderConfig(name, providerType, url, description, apiKey string) (
 
 	// Prompt for type if not provided
 	if providerType == "" {
-		fmt.Print("Provider type (openai/ollama/anthropic) [openai]: ")
+		fmt.Print("Provider type (openai/ollama/anthropic/responses/jetbrains) [openai]: ")
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			return nil, fmt.Errorf("promptProviderConfig() [provider.go]: failed to read type: %w", err)
@@ -943,6 +943,10 @@ func promptProviderConfig(name, providerType, url, description, apiKey string) (
 			defaultURL = "http://localhost:11434"
 		case "anthropic":
 			defaultURL = "https://api.anthropic.com/v1"
+		case "responses":
+			defaultURL = "https://api.openai.com/v1"
+		case "jetbrains":
+			defaultURL = "https://api.jetbrains.ai"
 		}
 
 		fmt.Printf("Provider URL [%s]: ", defaultURL)

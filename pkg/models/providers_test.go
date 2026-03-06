@@ -138,11 +138,18 @@ func TestProviderRegistry_List(t *testing.T) {
 						URL:    "https://api.openai.com/v1",
 						APIKey: "test-key",
 					},
+					"jetbrains": {
+						Type:         "jetbrains",
+						Name:         "jetbrains",
+						URL:          "https://api.jetbrains.ai",
+						APIKey:       "jwt-token",
+						RefreshToken: "bearer-token",
+					},
 				}
 				store.SetModelProviderConfigs(configs)
 			},
-			expectedCount: 3,
-			expectedNames: []string{"anthropic", "ollama", "openai"},
+			expectedCount: 4,
+			expectedNames: []string{"anthropic", "jetbrains", "ollama", "openai"},
 		},
 		{
 			name: "list empty providers",
@@ -362,6 +369,13 @@ func TestProviderRegistry_MultipleProviderTypes(t *testing.T) {
 			URL:    "https://api.openai.com/v1",
 			APIKey: "test-key",
 		},
+		"jetbrains": {
+			Type:         "jetbrains",
+			Name:         "jetbrains",
+			URL:          "https://api.jetbrains.ai",
+			APIKey:       "jwt-token",
+			RefreshToken: "bearer-token",
+		},
 	}
 	configStore.SetModelProviderConfigs(configs)
 
@@ -369,7 +383,7 @@ func TestProviderRegistry_MultipleProviderTypes(t *testing.T) {
 
 	// Verify all providers are accessible
 	names := registry.List()
-	assert.Equal(t, 4, len(names))
+	assert.Equal(t, 5, len(names))
 
 	for name := range configs {
 		provider, err := registry.Get(name)
@@ -474,6 +488,20 @@ func TestFromConfig(t *testing.T) {
 				DefaultTopP:        0.9,
 				DefaultTopK:        40,
 				MaxTokens:          4096,
+			},
+			expectError: false,
+		},
+		{
+			name: "creates jetbrains provider with valid config",
+			config: &conf.ModelProviderConfig{
+				Type:           "jetbrains",
+				Name:           "jetbrains-cloud",
+				URL:            "https://api.jetbrains.ai",
+				APIKey:         "jwt-token",
+				RefreshToken:   "bearer-token",
+				ConnectTimeout: 5 * time.Second,
+				RequestTimeout: 30 * time.Second,
+				MaxTokens:      4096,
 			},
 			expectError: false,
 		},

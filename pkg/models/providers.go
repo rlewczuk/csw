@@ -132,6 +132,8 @@ func ModelFromConfig(config *conf.ModelProviderConfig) (ModelProvider, error) {
 		return NewAnthropicClient(config)
 	case "responses":
 		return NewResponsesClient(config)
+	case "jetbrains":
+		return NewJetBrainsClient(config)
 	default:
 		return nil, fmt.Errorf("ModelFromConfig() [config.go]: unsupported provider type: %s", config.Type)
 	}

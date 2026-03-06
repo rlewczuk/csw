@@ -1,12 +1,15 @@
 package models
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"iter"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/rlewczuk/csw/pkg/conf"
@@ -17,6 +20,8 @@ const (
 	jetbrainsAccessTokenHeader          string = "jb-access-token"
 	jetbrainsAuthenticateJWTHeader      string = "grazie-authenticate-jwt"
 	jetbrainsFallbackBrowserTokenHeader string = "x-jetbrains-bearer"
+	// jetbrainsChatStreamPath is the observed private JetBrains AI streaming endpoint.
+	jetbrainsChatStreamPath             string = "/user/v5/llm/chat/stream/v8"
 )
 
 // NewJetBrainsClient creates a new JetBrains AI client.
@@ -29,6 +34,7 @@ func NewJetBrainsClient(config *conf.ModelProviderConfig) (*JetBrainsClient, err
 	if err != nil {
 		return nil, fmt.Errorf("NewJetBrainsClient() [jetbrains_client.go]: failed to create base client: %w", err)
 	}
+	openaiClient.apiKey = ""
 
 	if strings.TrimSpace(openaiClient.baseURL) == "" {
 		return nil, fmt.Errorf("NewJetBrainsClient() [jetbrains_client.go]: URL cannot be empty")
@@ -44,6 +50,7 @@ func NewJetBrainsClientWithHTTPClient(baseURL string, httpClient *http.Client) (
 	if err != nil {
 		return nil, fmt.Errorf("NewJetBrainsClientWithHTTPClient() [jetbrains_client.go]: failed to create base client: %w", err)
 	}
+	openaiClient.apiKey = ""
 
 	return &JetBrainsClient{openaiClient: openaiClient}, nil
 }
@@ -413,7 +420,7 @@ func (m *JetBrainsChatModel) buildHTTPRequest(ctx context.Context, chatReq *Resp
 		return nil, nil, fmt.Errorf("JetBrainsChatModel.buildHTTPRequest() [jetbrains_client.go]: failed to marshal request: %w", err)
 	}
 
-	url := strings.TrimSuffix(m.client.openaiClient.baseURL, "/") + "/user/v5/llm/chat/stream/v8"
+	url := strings.TrimSuffix(m.client.openaiClient.baseURL, "/") + jetbrainsChatStreamPath
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, nil, fmt.Errorf("JetBrainsChatModel.buildHTTPRequest() [jetbrains_client.go]: failed to create request: %w", err)
@@ -424,26 +431,24 @@ func (m *JetBrainsChatModel) buildHTTPRequest(ctx context.Context, chatReq *Resp
 		req.Header.Set("Accept", "text/event-stream")
 	}
 
-	token, err := m.client.openaiClient.GetAccessToken()
-	if err != nil {
-		return nil, nil, err
-	}
-	if strings.TrimSpace(token) != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	if cfg := m.client.GetConfig(); cfg != nil {
-		setJetBrainsAuthHeaders(req, cfg)
-	}
-
 	setUserAgentHeader(req)
 	m.client.openaiClient.applyConfiguredQueryParams(req)
 	m.client.openaiClient.applyConfiguredHeaders(req)
 	applyOptionsHeaders(req, options)
 
+	cfg := m.client.GetConfig()
+	setJetBrainsAuthHeaders(req, cfg)
+	if req.Header.Get("Authorization") == "" {
+		authToken := extractJetBrainsBearerToken(cfg)
+		if authToken != "" {
+			req.Header.Set("Authorization", "Bearer "+authToken)
+		}
+	}
+
 	return req, body, nil
 }
 
+// setJetBrainsAuthHeaders applies JetBrains private API auth headers.
 func setJetBrainsAuthHeaders(req *http.Request, cfg *conf.ModelProviderConfig) {
 	if req == nil || cfg == nil {
 		return
@@ -454,20 +459,52 @@ func setJetBrainsAuthHeaders(req *http.Request, cfg *conf.ModelProviderConfig) {
 		req.Header.Set(jetbrainsAuthenticateJWTHeader, apiKey)
 	}
 
-	bearerToken := strings.TrimSpace(cfg.RefreshToken)
-	if bearerToken == "" {
-		for _, headerName := range []string{jetbrainsAccessTokenHeader, jetbrainsFallbackBrowserTokenHeader} {
-			if cfg.Headers == nil {
-				continue
-			}
-			if token := strings.TrimSpace(cfg.Headers[headerName]); token != "" {
-				bearerToken = token
-				break
-			}
-		}
-	}
+	bearerToken := extractJetBrainsBearerToken(cfg)
 
 	if req.Header.Get(jetbrainsAccessTokenHeader) == "" && bearerToken != "" {
 		req.Header.Set(jetbrainsAccessTokenHeader, bearerToken)
 	}
+}
+
+// extractJetBrainsBearerToken returns bearer token from JetBrains-related config fields.
+func extractJetBrainsBearerToken(cfg *conf.ModelProviderConfig) string {
+	if cfg == nil {
+		return ""
+	}
+
+	bearerToken := strings.TrimSpace(cfg.RefreshToken)
+	if bearerToken == "" {
+		for _, headerName := range []string{jetbrainsAccessTokenHeader, jetbrainsFallbackBrowserTokenHeader, "authorization"} {
+			token := getConfiguredHeaderValue(cfg.Headers, headerName)
+			if token == "" {
+				continue
+			}
+			bearerToken = token
+			break
+		}
+	}
+
+	return normalizeBearerToken(bearerToken)
+}
+
+// getConfiguredHeaderValue returns a header value using case-insensitive key lookup.
+func getConfiguredHeaderValue(headers map[string]string, name string) string {
+	if headers == nil {
+		return ""
+	}
+	for headerName, value := range headers {
+		if strings.EqualFold(headerName, name) {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+// normalizeBearerToken removes optional "Bearer " prefix from token value.
+func normalizeBearerToken(value string) string {
+	token := strings.TrimSpace(value)
+	if len(token) >= len("Bearer ") && strings.EqualFold(token[:len("Bearer ")], "Bearer ") {
+		token = strings.TrimSpace(token[len("Bearer "):])
+	}
+	return token
 }

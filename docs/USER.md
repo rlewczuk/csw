@@ -219,6 +219,14 @@ csw conf provider auth openai-codex
 
 `csw` opens a localhost callback flow (`http://localhost:1455/auth/callback`) and stores access/refresh tokens in provider config.
 
+#### JetBrains AI provider
+
+CSW supports `jetbrains` provider type for JetBrains private AI endpoint integration.
+
+See full setup guide, token acquisition, and sample config in:
+
+- [docs/JETBRAINS.md](JETBRAINS.md)
+
 #### Validate provider setup
 
 List models:
