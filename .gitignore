@@ -5,6 +5,7 @@ _*.sh
 /csw
 /mdw
 _local/
+_tmp/
 _integ/
 /testterm
 /gtvdemo
