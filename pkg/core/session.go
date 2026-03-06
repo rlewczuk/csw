@@ -144,6 +144,20 @@ func (s *SweSession) Run(ctx context.Context) error {
 			}
 			continue
 		}
+
+		if sessionTool, getErr := s.Tools.Get(toolName); getErr == nil {
+			dynamicDescription, overwrite := sessionTool.GetDescription()
+			if strings.TrimSpace(dynamicDescription) != "" {
+				if overwrite {
+					toolInfo.Description = dynamicDescription
+				} else if strings.TrimSpace(toolInfo.Description) == "" {
+					toolInfo.Description = dynamicDescription
+				} else {
+					toolInfo.Description = strings.TrimRight(toolInfo.Description, "\n") + dynamicDescription
+				}
+			}
+		}
+
 		tools = append(tools, toolInfo)
 	}
 

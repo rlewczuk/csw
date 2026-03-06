@@ -237,6 +237,16 @@ func TestRegisterWebFetchTool(t *testing.T) {
 	assert.IsType(t, &WebFetchTool{}, registeredTool)
 }
 
+func TestRegisterSkillTool(t *testing.T) {
+	registry := NewToolRegistry()
+
+	RegisterSkillTool(registry, ".")
+
+	registeredTool, err := registry.Get("skill")
+	require.NoError(t, err)
+	assert.IsType(t, &SkillTool{}, registeredTool)
+}
+
 func TestToolRegistry_VFSIntegration(t *testing.T) {
 	registry := NewToolRegistry()
 	mockVFS := vfs.NewMockVFS()

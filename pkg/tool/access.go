@@ -16,7 +16,10 @@ type AccessControlTool struct {
 }
 
 func (a *AccessControlTool) GetDescription() (string, bool) {
-	return "", false
+	if a.tool == nil {
+		return "", false
+	}
+	return a.tool.GetDescription()
 }
 
 // NewAccessControlTool creates a new AccessControlTool that wraps the given tool.

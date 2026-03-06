@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -203,6 +204,97 @@ func TestWebFetchToolIntegration(t *testing.T) {
 		}
 	}
 	assert.True(t, foundToolList, "should have found a chat request with webFetch tool")
+}
+
+// TestSkillToolIntegration tests that skill tool is registered, advertised to the model, and executable.
+func TestSkillToolIntegration(t *testing.T) {
+	vfsInstance := vfs.NewMockVFS()
+	tools := tool.NewToolRegistry()
+
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, ".agents", "skills", "demo"), 0755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(tmpDir, ".agents", "skills", "demo", "SKILL.md"),
+		[]byte("---\nname: demo\ndescription: Demo skill\n---\n\nUse demo instructions.\n"),
+		0644,
+	))
+
+	tool.RegisterSkillTool(tools, tmpDir)
+
+	logsDir := filepath.Join(tmpDir, "logs")
+	err := os.MkdirAll(logsDir, 0755)
+	require.NoError(t, err)
+
+	fixture := newCliSystemFixture(t, "You are a helpful assistant.",
+		coretestfixture.WithVFS(vfsInstance),
+		coretestfixture.WithTools(tools),
+		coretestfixture.WithWorkDir(tmpDir),
+		coretestfixture.WithLogBaseDir(logsDir),
+	)
+	system := fixture.System
+	mockServer := fixture.Server
+
+	// First response: call skill tool.
+	mockServer.AddStreamingResponse("/api/chat", "POST", false,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"skill","arguments":{"name":"demo"}}}]},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	// Second response: completion message after tool execution.
+	mockServer.AddStreamingResponse("/api/chat", "POST", true,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"Loaded demo skill."},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
+
+	thread := core.NewSessionThread(system, nil)
+	err = thread.StartSession("ollama/test-model")
+	require.NoError(t, err)
+
+	basePresenter := presenter.NewChatPresenter(system, thread)
+	baseView := newMockChatView()
+	err = basePresenter.SetView(baseView)
+	require.NoError(t, err)
+
+	thread.SetOutputHandler(basePresenter)
+
+	userMsg := &ui.ChatMessageUI{Role: ui.ChatRoleUser, Text: "Load demo skill"}
+	err = basePresenter.SendUserMessage(userMsg)
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		for {
+			if !thread.IsRunning() {
+				close(done)
+				return
+			}
+		}
+	}()
+	<-done
+
+	toolNames := tools.List()
+	assert.Contains(t, toolNames, "skill", "skill tool should be registered")
+
+	requests := mockServer.GetRequests()
+	require.GreaterOrEqual(t, len(requests), 2, "should have captured chat requests")
+
+	var foundSkillInTools bool
+	var foundSkillResponse bool
+	for _, req := range requests {
+		if req.Path != "/api/chat" || req.Method != "POST" {
+			continue
+		}
+		bodyStr := string(req.Body)
+		if strings.Contains(bodyStr, "\"name\":\"skill\"") {
+			foundSkillInTools = true
+		}
+		if strings.Contains(bodyStr, "skill_content name") {
+			foundSkillResponse = true
+		}
+	}
+
+	assert.True(t, foundSkillInTools, "LLM request should include skill tool definition")
+	assert.True(t, foundSkillResponse, "LLM follow-up request should include skill tool response content")
 }
 
 // TestCLIVFSToolLogging verifies that VFS write/edit tools log to the session logger.

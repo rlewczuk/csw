@@ -149,8 +149,7 @@ type TodoReadTool struct {
 }
 
 func (t *TodoReadTool) GetDescription() (string, bool) {
-	//TODO implement me
-	panic("implement me")
+	return "", false
 }
 
 // NewTodoReadTool creates a new TodoReadTool instance.

@@ -284,6 +284,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 
 	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, effectiveWorkDir, params.BashRunTimeout)
 	tool.RegisterWebFetchTool(toolRegistry, nil)
+	tool.RegisterSkillTool(toolRegistry, effectiveWorkDir)
 	if err := tool.RegisterCustomTools(toolRegistry, configStore, effectiveWorkDir, bashRunner); err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to register custom tools: %w", err)

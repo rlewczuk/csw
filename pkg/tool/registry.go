@@ -173,6 +173,11 @@ func RegisterWebFetchTool(registry *ToolRegistry, httpClient *http.Client) {
 	registry.Register("webFetch", NewWebFetchTool(httpClient))
 }
 
+// RegisterSkillTool registers the skill tool that loads skills from .agents/skills.
+func RegisterSkillTool(registry *ToolRegistry, workdir string) {
+	registry.Register("skill", NewSkillTool(workdir))
+}
+
 // Render returns a string representation of the tool call.
 func (r *ToolRegistry) Render(call *ToolCall) (string, string, map[string]string) {
 	return "ToolRegistry", "ToolRegistry", make(map[string]string)
