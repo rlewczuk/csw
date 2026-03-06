@@ -30,6 +30,10 @@ type RunBashTool struct {
 	defaultTimeout time.Duration
 }
 
+func (t *RunBashTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // NewRunBashTool creates a new RunBashTool instance.
 // runner is the CommandRunner to use for executing commands.
 // privileges is a map of command regex patterns to access flags.
@@ -45,8 +49,6 @@ func NewRunBashTool(r runner.CommandRunner, privileges map[string]conf.AccessFla
 		defaultTimeout: timeout,
 	}
 }
-
-
 
 // NewRunBashToolWithSessionWorkdir creates a new RunBashTool instance with a session workdir.
 // runner is the CommandRunner to use for executing commands.

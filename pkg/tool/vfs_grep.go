@@ -13,6 +13,10 @@ type VFSGrepTool struct {
 	vfs vfs.VFS
 }
 
+func (t *VFSGrepTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // NewVFSGrepTool creates a new VFSGrepTool instance.
 func NewVFSGrepTool(v vfs.VFS) *VFSGrepTool {
 	return &VFSGrepTool{vfs: v}

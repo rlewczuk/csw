@@ -18,6 +18,10 @@ import (
 
 type roleLimitedToolStub struct{}
 
+func (s *roleLimitedToolStub) GetDescription() (string, bool) {
+	return "", false
+}
+
 func (s *roleLimitedToolStub) Execute(args *tool.ToolCall) *tool.ToolResponse {
 	return &tool.ToolResponse{Call: args, Done: true}
 }

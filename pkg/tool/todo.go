@@ -25,6 +25,10 @@ type TodoWriteTool struct {
 	session TodoSession
 }
 
+func (t *TodoWriteTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // NewTodoWriteTool creates a new TodoWriteTool instance.
 func NewTodoWriteTool(session TodoSession) *TodoWriteTool {
 	return &TodoWriteTool{session: session}
@@ -142,6 +146,11 @@ func (t *TodoWriteTool) Execute(args *ToolCall) *ToolResponse {
 // TodoReadTool implements the todoRead tool for retrieving the current todo list.
 type TodoReadTool struct {
 	session TodoSession
+}
+
+func (t *TodoReadTool) GetDescription() (string, bool) {
+	//TODO implement me
+	panic("implement me")
 }
 
 // NewTodoReadTool creates a new TodoReadTool instance.

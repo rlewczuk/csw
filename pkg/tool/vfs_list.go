@@ -12,6 +12,10 @@ type VFSListTool struct {
 	vfs vfs.VFS
 }
 
+func (t *VFSListTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // NewVFSListTool creates a new VFSListTool instance.
 func NewVFSListTool(v vfs.VFS) *VFSListTool {
 	return &VFSListTool{vfs: v}

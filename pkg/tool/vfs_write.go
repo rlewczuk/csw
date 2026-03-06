@@ -15,6 +15,10 @@ type VFSWriteTool struct {
 	logger *slog.Logger
 }
 
+func (t *VFSWriteTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // NewVFSWriteTool creates a new VFSWriteTool instance.
 // lsp parameter is optional and can be nil.
 func NewVFSWriteTool(v vfs.VFS, l lsp.LSP) *VFSWriteTool {

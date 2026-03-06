@@ -11,6 +11,10 @@ type VFSMoveTool struct {
 	vfs vfs.VFS
 }
 
+func (t *VFSMoveTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // NewVFSMoveTool creates a new VFSMoveTool instance.
 func NewVFSMoveTool(v vfs.VFS) *VFSMoveTool {
 	return &VFSMoveTool{vfs: v}

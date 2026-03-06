@@ -562,6 +562,13 @@ type Tool interface {
 	// Second string is full information (equivalent of DisplayModeFull).
 	// Map contains additional properties that can be used to display in the UI.
 	Render(call *ToolCall) (string, string, map[string]string)
+
+	// GetDescription returns the description of the tool.
+	// This can be used to add dynamic information to the description.
+	// Result of this method (if not empty) will replace or be appended to the static description from tool info.
+	// Second return value indicates whether static description should be fully overwritten.
+	// If false, first result value will be appended to the static description.
+	GetDescription() (string, bool)
 }
 
 // formatRenderError formats an error for display in Render output.

@@ -54,6 +54,10 @@ type CustomCommandTool struct {
 	logger      *slog.Logger
 }
 
+func (t *CustomCommandTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // RegisterCustomTools discovers and registers custom tools from loaded role tool fragments.
 func RegisterCustomTools(registry *ToolRegistry, configStore conf.ConfigStore, workdir string, commandRunner runner.CommandRunner) error {
 	if registry == nil {

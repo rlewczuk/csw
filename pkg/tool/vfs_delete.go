@@ -11,6 +11,10 @@ type VFSDeleteTool struct {
 	vfs vfs.VFS
 }
 
+func (t *VFSDeleteTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // NewVFSDeleteTool creates a new VFSDeleteTool instance.
 func NewVFSDeleteTool(v vfs.VFS) *VFSDeleteTool {
 	return &VFSDeleteTool{vfs: v}

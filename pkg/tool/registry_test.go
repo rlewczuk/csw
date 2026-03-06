@@ -15,6 +15,10 @@ type MockTool struct {
 	name string
 }
 
+func (m *MockTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 func (m *MockTool) Execute(args *ToolCall) *ToolResponse {
 	var result ToolValue
 	result.Set("executed", m.name)

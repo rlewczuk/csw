@@ -17,6 +17,10 @@ type mockTool struct {
 	err         error
 }
 
+func (m *mockTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 func (m *mockTool) Execute(call *ToolCall) *ToolResponse {
 	m.executed = true
 	return &ToolResponse{

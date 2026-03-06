@@ -18,6 +18,10 @@ type WebFetchTool struct {
 	httpClient *http.Client
 }
 
+func (t *WebFetchTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // NewWebFetchTool creates a new WebFetchTool instance.
 func NewWebFetchTool(httpClient *http.Client) *WebFetchTool {
 	if httpClient == nil {

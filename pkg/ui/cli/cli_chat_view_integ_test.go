@@ -476,6 +476,10 @@ type dummyTool struct {
 	name string
 }
 
+func (d *dummyTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 func (d *dummyTool) Execute(args *tool.ToolCall) *tool.ToolResponse {
 	return &tool.ToolResponse{
 		Call:   args,

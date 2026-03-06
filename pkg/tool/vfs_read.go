@@ -12,6 +12,10 @@ type VFSReadTool struct {
 	lineNumbers bool
 }
 
+func (t *VFSReadTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // NewVFSReadTool creates a new VFSReadTool instance.
 // If lineNumbers is true, the tool will format content with line numbers (cat -n style).
 func NewVFSReadTool(v vfs.VFS, lineNumbers bool) *VFSReadTool {

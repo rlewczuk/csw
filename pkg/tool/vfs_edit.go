@@ -16,6 +16,10 @@ type VFSEditTool struct {
 	logger *slog.Logger
 }
 
+func (t *VFSEditTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // NewVFSEditTool creates a new VFSEditTool instance.
 // lsp parameter is optional and can be nil.
 func NewVFSEditTool(v vfs.VFS, l lsp.LSP) *VFSEditTool {

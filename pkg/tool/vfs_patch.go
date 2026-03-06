@@ -22,6 +22,10 @@ type VFSPatchTool struct {
 	logger *slog.Logger
 }
 
+func (t *VFSPatchTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // NewVFSPatchTool creates a new VFSPatchTool instance.
 // lsp parameter is optional and can be nil.
 func NewVFSPatchTool(v vfs.VFS, l lsp.LSP) *VFSPatchTool {

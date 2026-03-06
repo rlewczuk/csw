@@ -9,6 +9,10 @@ type VFSFindTool struct {
 	vfs vfs.VFS
 }
 
+func (t *VFSFindTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // NewVFSFindTool creates a new VFSFindTool instance.
 func NewVFSFindTool(v vfs.VFS) *VFSFindTool {
 	return &VFSFindTool{vfs: v}

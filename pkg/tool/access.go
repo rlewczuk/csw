@@ -15,6 +15,10 @@ type AccessControlTool struct {
 	privileges map[string]conf.AccessFlag
 }
 
+func (a *AccessControlTool) GetDescription() (string, bool) {
+	return "", false
+}
+
 // NewAccessControlTool creates a new AccessControlTool that wraps the given tool.
 // The privileges map specifies access flags for different tool name patterns.
 // Supported patterns:

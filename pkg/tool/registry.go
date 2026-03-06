@@ -18,6 +18,10 @@ type ToolRegistry struct {
 	tools map[string]Tool
 }
 
+func (r *ToolRegistry) GetDescription() (string, bool) {
+	return "", false
+}
+
 // LoggerSetter is implemented by tools that accept a logger for structured output.
 // SetLogger assigns the logger instance used by the tool.
 type LoggerSetter interface {
