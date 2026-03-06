@@ -115,3 +115,21 @@ type ResponsesTextConfig struct {
 type ResponsesTextFormat struct {
 	Type string `json:"type,omitempty"`
 }
+
+// ResponsesModelListResponse represents model listing payload variants used by
+// responses-compatible providers.
+type ResponsesModelListResponse struct {
+	Object string            `json:"object,omitempty"`
+	Data   []OpenaiModelData `json:"data,omitempty"`
+	Models []ResponsesModel  `json:"models,omitempty"`
+}
+
+// ResponsesModel represents model metadata from providers that return `models`
+// array with `slug` instead of OpenAI `data[].id` shape.
+type ResponsesModel struct {
+	ID          string `json:"id,omitempty"`
+	Slug        string `json:"slug,omitempty"`
+	Created     int64  `json:"created,omitempty"`
+	OwnedBy     string `json:"owned_by,omitempty"`
+	DisplayName string `json:"display_name,omitempty"`
+}

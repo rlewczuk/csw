@@ -167,6 +167,26 @@ func TestResponsesClient_ListModels(t *testing.T) {
 	})
 }
 
+func TestResponsesClient_ListModels_ResponsesModelsPayload(t *testing.T) {
+	tc := getResponsesTestClient(t)
+	defer tc.Close()
+
+	if tc.Mock == nil {
+		t.Skip("Skipping responses payload assertions against real provider")
+	}
+
+	tc.Mock.AddRestResponse("/models", "GET", `{"models":[{"slug":"gpt-5.2-codex","display_name":"gpt-5.2-codex"},{"slug":"gpt-5.2","display_name":"gpt-5.2"}]}`)
+
+	modelList, err := tc.Client.ListModels()
+	require.NoError(t, err)
+	require.Len(t, modelList, 2)
+
+	assert.Equal(t, "gpt-5.2-codex", modelList[0].Name)
+	assert.Equal(t, "gpt-5.2-codex", modelList[0].Model)
+	assert.Equal(t, "gpt-5.2", modelList[1].Name)
+	assert.Equal(t, "gpt-5.2", modelList[1].Model)
+}
+
 func TestResponsesClient_ChatModel(t *testing.T) {
 	tc := getResponsesTestClient(t)
 	defer tc.Close()

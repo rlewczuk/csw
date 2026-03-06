@@ -329,20 +329,48 @@ func (c *ResponsesClient) ListModels() ([]ModelInfo, error) {
 		return nil, err
 	}
 
-	var response OpenaiModelList
+	var response ResponsesModelListResponse
 	if err := json.Unmarshal(bodyBytes, &response); err != nil {
 		return nil, fmt.Errorf("ResponsesClient.ListModels() [responses_client.go]: failed to decode response: %w", err)
 	}
 
-	result := make([]ModelInfo, len(response.Data))
-	for i, model := range response.Data {
-		result[i] = ModelInfo{
+	result := make([]ModelInfo, 0, len(response.Data)+len(response.Models))
+	for _, model := range response.Data {
+		result = append(result, ModelInfo{
 			Name:       model.ID,
 			Model:      model.ID,
 			ModifiedAt: time.Unix(model.Created, 0).Format(time.RFC3339),
 			Size:       0,
 			Family:     model.OwnedBy,
+		})
+	}
+
+	for _, model := range response.Models {
+		modelName := model.ID
+		if modelName == "" {
+			modelName = model.Slug
 		}
+		if modelName == "" {
+			continue
+		}
+
+		modifiedAt := ""
+		if model.Created > 0 {
+			modifiedAt = time.Unix(model.Created, 0).Format(time.RFC3339)
+		}
+
+		family := model.OwnedBy
+		if family == "" {
+			family = model.DisplayName
+		}
+
+		result = append(result, ModelInfo{
+			Name:       modelName,
+			Model:      modelName,
+			ModifiedAt: modifiedAt,
+			Size:       0,
+			Family:     family,
+		})
 	}
 
 	return result, nil
