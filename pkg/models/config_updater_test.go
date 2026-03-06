@@ -265,3 +265,57 @@ func TestConfigUpdaterImpl_Update_PreservesJSONFormatAndCreatesBackup(t *testing
 	yamlPath := filepath.Join(modelsDir, "provider-json.yaml")
 	assert.NoFileExists(t, yamlPath)
 }
+
+func TestConfigUpdaterImpl_Update_PreservesDurationFieldsAfterReadBack(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "csw-config-updater-durations-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	modelsDir := filepath.Join(tmpDir, "models")
+	require.NoError(t, os.MkdirAll(modelsDir, 0o755))
+
+	providerPath := filepath.Join(modelsDir, "provider-duration.json")
+	originalRaw := []byte(`{
+  "name": "provider-duration",
+  "type": "openai",
+  "url": "https://api.example.com/v1",
+  "api_key": "old-token",
+  "connect_timeout": "3600s",
+  "request_timeout": "120s"
+}`)
+	require.NoError(t, os.WriteFile(providerPath, originalRaw, 0o644))
+
+	store, err := confimpl.NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	configs, err := store.GetModelProviderConfigs()
+	require.NoError(t, err)
+
+	config, ok := configs["provider-duration"]
+	require.True(t, ok)
+	assert.Equal(t, 3600*time.Second, config.ConnectTimeout)
+	assert.Equal(t, 120*time.Second, config.RequestTimeout)
+
+	updater := NewConfigUpdater(store, "provider-duration")
+	callback := updater.Update()
+
+	config.APIKey = "new-token"
+	require.NoError(t, callback(config))
+
+	configsAfterUpdate, err := store.GetModelProviderConfigs()
+	require.NoError(t, err)
+
+	updatedConfig, ok := configsAfterUpdate["provider-duration"]
+	require.True(t, ok)
+	assert.Equal(t, 3600*time.Second, updatedConfig.ConnectTimeout)
+	assert.Equal(t, 120*time.Second, updatedConfig.RequestTimeout)
+
+	updatedRaw, err := os.ReadFile(providerPath)
+	require.NoError(t, err)
+
+	var persisted map[string]any
+	require.NoError(t, json.Unmarshal(updatedRaw, &persisted))
+	assert.Equal(t, "3600s", persisted["connect_timeout"])
+	assert.Equal(t, "120s", persisted["request_timeout"])
+}

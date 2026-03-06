@@ -236,6 +236,68 @@ type ModelProviderConfig struct {
 	RefreshToken string `json:"refresh_token,omitempty" yaml:"refresh_token,omitempty"`
 }
 
+// MarshalJSON implements custom JSON marshaling for ModelProviderConfig.
+// It serializes duration fields as strings (e.g., "30s", "5m", "1h0m0s").
+func (c ModelProviderConfig) MarshalJSON() ([]byte, error) {
+	type Alias ModelProviderConfig
+	aux := &struct {
+		ConnectTimeout        string `json:"connect_timeout,omitempty"`
+		RequestTimeout        string `json:"request_timeout,omitempty"`
+		RateLimitBackoffScale string `json:"rate_limit_backoff_scale,omitempty"`
+		*Alias
+	}{
+		Alias: (*Alias)(&c),
+	}
+
+	if c.ConnectTimeout != 0 {
+		aux.ConnectTimeout = formatDurationForConfig(c.ConnectTimeout)
+	}
+	if c.RequestTimeout != 0 {
+		aux.RequestTimeout = formatDurationForConfig(c.RequestTimeout)
+	}
+	if c.RateLimitBackoffScale != 0 {
+		aux.RateLimitBackoffScale = formatDurationForConfig(c.RateLimitBackoffScale)
+	}
+
+	data, err := json.Marshal(aux)
+	if err != nil {
+		return nil, fmt.Errorf("ModelProviderConfig.MarshalJSON() [conf.go]: %w", err)
+	}
+
+	return data, nil
+}
+
+// MarshalYAML implements custom YAML marshaling for ModelProviderConfig.
+// It keeps duration fields serialized as strings, same as JSON marshaling.
+func (c ModelProviderConfig) MarshalYAML() (any, error) {
+	data, err := c.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("ModelProviderConfig.MarshalYAML() [conf.go]: %w", err)
+	}
+
+	var out map[string]any
+	if err := json.Unmarshal(data, &out); err != nil {
+		return nil, fmt.Errorf("ModelProviderConfig.MarshalYAML() [conf.go]: failed to unmarshal marshaled json: %w", err)
+	}
+
+	return out, nil
+}
+
+// formatDurationForConfig converts duration value to a string with explicit unit suffix.
+func formatDurationForConfig(d time.Duration) string {
+	if d%time.Second == 0 {
+		return fmt.Sprintf("%ds", d/time.Second)
+	}
+	if d%time.Millisecond == 0 {
+		return fmt.Sprintf("%dms", d/time.Millisecond)
+	}
+	if d%time.Microsecond == 0 {
+		return fmt.Sprintf("%dus", d/time.Microsecond)
+	}
+
+	return fmt.Sprintf("%dns", d)
+}
+
 // UnmarshalJSON implements custom JSON unmarshaling for ModelProviderConfig.
 // It handles duration fields that are represented as strings in JSON (e.g., "30s", "5m").
 func (c *ModelProviderConfig) UnmarshalJSON(data []byte) error {
