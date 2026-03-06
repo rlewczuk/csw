@@ -1,6 +1,7 @@
 package tool
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -358,6 +359,56 @@ func TestVFSFindToolPermissionQuery(t *testing.T) {
 		assert.Error(t, response.Error)
 		assert.ErrorIs(t, response.Error, vfs.ErrPermissionDenied)
 		assert.True(t, response.Done)
+	})
+}
+
+func TestVFSFindToolAbsolutePath(t *testing.T) {
+	t.Run("should find files in allowed absolute path", func(t *testing.T) {
+		rootDir := t.TempDir()
+		allowedDir := t.TempDir()
+
+		require.NoError(t, os.WriteFile(filepath.Join(allowedDir, "a.txt"), []byte("a"), 0644))
+		require.NoError(t, os.MkdirAll(filepath.Join(allowedDir, "sub"), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(allowedDir, "sub", "b.go"), []byte("b"), 0644))
+
+		localVFS, err := vfs.NewLocalVFS(rootDir, nil, []string{allowedDir})
+		require.NoError(t, err)
+
+		tool := NewVFSFindTool(localVFS)
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsFind",
+			Arguments: NewToolValue(map[string]any{
+				"path":      allowedDir,
+				"query":     "*.go",
+				"recursive": true,
+			}),
+		})
+
+		require.NoError(t, response.Error)
+		files := response.Result.Get("files").Array()
+		require.Len(t, files, 1)
+		assert.Equal(t, filepath.Join(allowedDir, "sub", "b.go"), files[0].AsString())
+	})
+
+	t.Run("should fail when absolute path is outside allowed paths", func(t *testing.T) {
+		rootDir := t.TempDir()
+		outsideDir := t.TempDir()
+
+		localVFS, err := vfs.NewLocalVFS(rootDir, nil, nil)
+		require.NoError(t, err)
+
+		tool := NewVFSFindTool(localVFS)
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsFind",
+			Arguments: NewToolValue(map[string]any{
+				"path": outsideDir,
+			}),
+		})
+
+		require.Error(t, response.Error)
+		assert.ErrorIs(t, response.Error, vfs.ErrPermissionDenied)
 	})
 }
 

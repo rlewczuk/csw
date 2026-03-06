@@ -1,6 +1,8 @@
 package tool
 
 import (
+	"path/filepath"
+
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
@@ -20,6 +22,8 @@ func NewVFSFindTool(v vfs.VFS) *VFSFindTool {
 
 // Execute executes the tool with the given arguments and returns the response.
 func (t *VFSFindTool) Execute(args *ToolCall) *ToolResponse {
+	path := args.Arguments.String("path")
+
 	// Get query parameter, empty string means match all files (use "**")
 	query := args.Arguments.String("query")
 	if query == "" {
@@ -32,10 +36,23 @@ func (t *VFSFindTool) Execute(args *ToolCall) *ToolResponse {
 		recursive = args.Arguments.Bool("recursive")
 	}
 
-	files, err := t.vfs.FindFiles(query, recursive)
-	if err == vfs.ErrAskPermission {
-		return NewVFSPermissionQuery(args, query, "finding files", "find")
+	var (
+		files []string
+		err   error
+	)
+
+	if filepath.IsAbs(path) {
+		files, err = t.findFilesInPath(path, query, recursive)
+		if err == vfs.ErrAskPermission {
+			return NewVFSPermissionQuery(args, path, "finding files", "find")
+		}
+	} else {
+		files, err = t.vfs.FindFiles(query, recursive)
+		if err == vfs.ErrAskPermission {
+			return NewVFSPermissionQuery(args, query, "finding files", "find")
+		}
 	}
+
 	if perr, ok := err.(*vfs.PermissionError); ok {
 		return NewVFSPermissionQuery(args, perr.Path, "finding files", "find")
 	}
@@ -60,6 +77,42 @@ func (t *VFSFindTool) Execute(args *ToolCall) *ToolResponse {
 		Result: result,
 		Done:   true,
 	}
+}
+
+// findFilesInPath finds files under an absolute path and filters them by query.
+func (t *VFSFindTool) findFilesInPath(path, query string, recursive bool) ([]string, error) {
+	listedFiles, err := t.vfs.ListFiles(path, recursive)
+	if err != nil {
+		return nil, err
+	}
+
+	filter := vfs.NewGlobFilter(false, []string{query})
+	filtered := make([]string, 0, len(listedFiles))
+	for _, listedFile := range listedFiles {
+		absoluteFile := normalizeAbsoluteFindResult(t.vfs.WorktreePath(), listedFile)
+		relativeToSearchPath, relErr := filepath.Rel(path, absoluteFile)
+		if relErr != nil {
+			continue
+		}
+		relativeToSearchPath = filepath.Clean(relativeToSearchPath)
+
+		if filter.Matches(relativeToSearchPath) || filter.Matches(filepath.Base(relativeToSearchPath)) {
+			filtered = append(filtered, absoluteFile)
+		}
+	}
+
+	return filtered, nil
+}
+
+// normalizeAbsoluteFindResult converts list results to absolute host paths.
+func normalizeAbsoluteFindResult(worktreeRoot, listedPath string) string {
+	if filepath.IsAbs(listedPath) {
+		return filepath.Clean(listedPath)
+	}
+	if worktreeRoot == "" {
+		return filepath.Clean(listedPath)
+	}
+	return filepath.Clean(filepath.Join(worktreeRoot, listedPath))
 }
 
 // Render returns a string representation of the tool call.
