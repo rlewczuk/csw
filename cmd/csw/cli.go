@@ -64,6 +64,7 @@ type CLIParams struct {
 const defaultBashRunTimeout = 120 * time.Second
 
 var runCLIFunc = runCLI
+var saveSessionSummaryMarkdownFunc = saveSessionSummaryMarkdown
 
 var newCompositeConfigStoreFunc = impl.NewCompositeConfigStore
 var resolveModelNameFunc = ResolveModelName
@@ -480,23 +481,42 @@ func runCLI(params *CLIParams) error {
 		}
 	}
 
+	var sessionRunErr error
+
 	// Wait for completion or context cancellation
 	select {
 	case err := <-done:
 		if err != nil {
-			return fmt.Errorf("runCLI() [cli.go]: session error: %w", err)
+			sessionRunErr = fmt.Errorf("runCLI() [cli.go]: session error: %w", err)
 		}
 	case <-ctx.Done():
-		return ctx.Err()
+		sessionRunErr = ctx.Err()
 	}
 
-	sessionInfo := buildSessionSummaryMessage(time.Since(startTime), session, buildResult)
-	if err := saveSessionSummaryMarkdown(buildResult.LogsDir, session, sessionInfo); err != nil {
-		return fmt.Errorf("runCLI() [cli.go]: failed to save session summary: %w", err)
+	if err := emitSessionSummary(startTime, session, buildResult, appView, sessionRunErr); err != nil {
+		return err
 	}
 
-	appView.ShowMessage(sessionInfo, ui.MessageTypeInfo)
 	return nil
+}
+
+func emitSessionSummary(startTime time.Time, session *core.SweSession, buildResult BuildSystemResult, appView ui.IAppView, sessionRunErr error) error {
+	sessionInfo := buildSessionSummaryMessage(time.Since(startTime), session, buildResult)
+	if err := saveSessionSummaryMarkdownFunc(buildResult.LogsDir, session, sessionInfo); err != nil {
+		if sessionRunErr == nil {
+			return fmt.Errorf("emitSessionSummary() [cli.go]: failed to save session summary: %w", err)
+		}
+
+		if appView != nil {
+			appView.ShowMessage(fmt.Sprintf("Failed to save session summary: %v", err), ui.MessageTypeWarning)
+		}
+	}
+
+	if appView != nil {
+		appView.ShowMessage(sessionInfo, ui.MessageTypeInfo)
+	}
+
+	return sessionRunErr
 }
 
 func saveSessionSummaryMarkdown(logsDir string, session *core.SweSession, sessionInfo string) error {
