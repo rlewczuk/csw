@@ -3,6 +3,7 @@ package tool
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // TodoSession is an interface for accessing todo list functionality from a session.
@@ -207,64 +208,69 @@ func (t *TodoReadTool) Render(call *ToolCall) (string, string, map[string]string
 }
 
 // renderTodoList renders the todo list in one-liner and full description formats.
-// One-liner format: (5/12 current task description)
-// Full format: Todo list header followed by tasks with status indicators.
+// One-liner format: (6/11) Current task to be done.
+// Full format: list of all todos with status indicators [ ], [X], [*].
 func renderTodoList(todos []TodoItem) (string, string) {
 	if len(todos) == 0 {
-		return "(0/0 no tasks)", "Todo list: 0/0 tasks completed\n"
+		return "(0/0) No current task.", ""
 	}
 
 	total := len(todos)
 	completed := 0
 	inProgressIdx := -1
-	lastCompletedIdx := -1
+	firstPendingIdx := -1
 
 	for i, todo := range todos {
 		switch todo.Status {
 		case "completed":
 			completed++
-			lastCompletedIdx = i
 		case "in_progress":
 			inProgressIdx = i
+		case "pending":
+			if firstPendingIdx == -1 {
+				firstPendingIdx = i
+			}
 		}
 	}
 
-	// First number: tasks done + task in progress (starting from 1)
-	// If there's an in_progress task, count all completed + 1 (the in_progress one)
-	donePlusInProgress := completed
+	// First number: completed + 1 when there is a current actionable task
+	// (in_progress or pending).
+	progress := completed
 	if inProgressIdx != -1 {
-		donePlusInProgress++
-	}
-	// If no in_progress but we have completed tasks, the "current" is the last completed
-	// If nothing completed and no in_progress, current is the first task
-	if donePlusInProgress == 0 {
-		donePlusInProgress = 1
+		progress++
+	} else if firstPendingIdx != -1 {
+		progress++
 	}
 
 	// Determine current task description
 	var currentTask string
 	if inProgressIdx != -1 {
 		currentTask = todos[inProgressIdx].Content
-	} else if lastCompletedIdx != -1 {
-		currentTask = todos[lastCompletedIdx].Content
+	} else if firstPendingIdx != -1 {
+		currentTask = todos[firstPendingIdx].Content
 	} else {
-		currentTask = todos[0].Content
+		currentTask = todos[total-1].Content
+	}
+	currentTask = strings.TrimSpace(currentTask)
+	if currentTask == "" {
+		currentTask = "No current task"
+	}
+	if !strings.HasSuffix(currentTask, ".") {
+		currentTask += "."
 	}
 
-	oneLiner := fmt.Sprintf("(%d/%d %s)", donePlusInProgress, total, currentTask)
+	oneLiner := fmt.Sprintf("(%d/%d) %s", progress, total, currentTask)
 
 	// Build full description
-	full := fmt.Sprintf("Todo list: %d/%d tasks completed\n", completed, total)
+	full := ""
 	for _, todo := range todos {
 		var statusIcon string
 		switch todo.Status {
 		case "completed":
-			statusIcon = "[✓]"
+			statusIcon = "[X]"
 		case "in_progress":
 			statusIcon = "[*]"
-		case "cancelled":
-			statusIcon = "[-]"
-		default: // pending
+		default:
 			statusIcon = "[ ]"
 		}
 		full += fmt.Sprintf("%s %s\n", statusIcon, todo.Content)

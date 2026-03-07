@@ -221,16 +221,16 @@ func (p *ChatPresenter) AddToolCallResult(result *tool.ToolResponse) {
 				} else {
 					t.Status = ui.ToolStatusSucceeded
 				}
-				// Get the render result from the tool
-				if p.system != nil && p.system.Tools != nil {
-					if toolImpl, err := p.system.Tools.Get(result.Call.Function); err == nil {
-						// Pass result and error information to Render via Arguments
-						callForRender := copyToolCallWithResult(result.Call, result)
-						summary, details, meta := toolImpl.Render(callForRender)
-						t.Summary = summary
-						t.Details = details
-						t.Meta = meta
-					}
+				// Get the render result from the session tool registry first.
+				// Some tools (e.g. todoRead/todoWrite) are session-specific and are not
+				// registered on system-level registry.
+				if toolImpl := p.resolveToolForRender(result.Call.Function); toolImpl != nil {
+					// Pass result and error information to Render via Arguments
+					callForRender := copyToolCallWithResult(result.Call, result)
+					summary, details, meta := toolImpl.Render(callForRender)
+					t.Summary = summary
+					t.Details = details
+					t.Meta = meta
 				}
 				toolState = t
 				break
@@ -243,6 +243,31 @@ func (p *ChatPresenter) AddToolCallResult(result *tool.ToolResponse) {
 		view.UpdateTool(toolState)
 		view.MoveToBottom()
 	}
+}
+
+// resolveToolForRender resolves a tool implementation for rendering output.
+// It prefers session-level tools because they can carry session state.
+func (p *ChatPresenter) resolveToolForRender(toolName string) tool.Tool {
+	if p == nil || toolName == "" {
+		return nil
+	}
+
+	if p.thread != nil {
+		session := p.thread.GetSession()
+		if session != nil && session.Tools != nil {
+			if toolImpl, err := session.Tools.Get(toolName); err == nil {
+				return toolImpl
+			}
+		}
+	}
+
+	if p.system != nil && p.system.Tools != nil {
+		if toolImpl, err := p.system.Tools.Get(toolName); err == nil {
+			return toolImpl
+		}
+	}
+
+	return nil
 }
 
 // RunFinished is called when the session Run() loop is finished.

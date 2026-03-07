@@ -9,6 +9,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/testutil"
+	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/ui/mock"
 	"github.com/stretchr/testify/assert"
@@ -250,6 +251,72 @@ func TestChatPresenter_ToolCallHandling(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, string(content), "Hello World")
 	})
+}
+
+func TestChatPresenter_TodoToolRenderingUsesSessionToolRegistry(t *testing.T) {
+	fixture := newPresenterFixture(t)
+	system := fixture.System
+
+	mockHandler := testutil.NewMockSessionOutputHandler()
+	thread := core.NewSessionThread(system, mockHandler)
+
+	err := thread.StartSession("ollama/devstral-small-2:latest")
+	require.NoError(t, err)
+
+	presenter := NewChatPresenter(system, thread)
+
+	mockView := mock.NewMockChatView()
+	err = presenter.SetView(mockView)
+	require.NoError(t, err)
+
+	session := thread.GetSession()
+	require.NotNil(t, session)
+
+	presenter.AddAssistantMessage("", "")
+
+	call := &tool.ToolCall{
+		ID:       "todo-call-1",
+		Function: "todoWrite",
+		Arguments: tool.NewToolValue(map[string]any{
+			"todos": []any{
+				map[string]any{
+					"id":       "todo-1",
+					"content":  "Completed task",
+					"status":   "completed",
+					"priority": "high",
+				},
+				map[string]any{
+					"id":       "todo-2",
+					"content":  "Current task to be done",
+					"status":   "in_progress",
+					"priority": "medium",
+				},
+				map[string]any{
+					"id":       "todo-3",
+					"content":  "Pending task",
+					"status":   "pending",
+					"priority": "low",
+				},
+			},
+		}),
+	}
+
+	presenter.AddToolCall(call)
+
+	todoWriteTool := tool.NewTodoWriteTool(session)
+	response := todoWriteTool.Execute(call)
+	require.NoError(t, response.Error)
+
+	presenter.AddToolCallResult(response)
+
+	require.NotEmpty(t, mockView.UpdateToolCalls)
+	updatedTool := mockView.UpdateToolCalls[len(mockView.UpdateToolCalls)-1]
+
+	assert.Equal(t, ui.ToolStatusSucceeded, updatedTool.Status)
+	assert.Equal(t, "(2/3) Current task to be done.", updatedTool.Summary)
+	assert.Contains(t, updatedTool.Details, "[X] Completed task")
+	assert.Contains(t, updatedTool.Details, "[*] Current task to be done")
+	assert.Contains(t, updatedTool.Details, "[ ] Pending task")
 }
 
 func TestChatPresenter_SessionPersistence(t *testing.T) {
