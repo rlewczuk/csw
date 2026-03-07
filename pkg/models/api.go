@@ -9,6 +9,38 @@ import (
 	"github.com/rlewczuk/csw/pkg/tool"
 )
 
+// LLMRequestError represents an LLM request failure with optional raw HTTP response.
+//
+// This error type is client-agnostic and can be reused by different model clients.
+// RawResponse should contain a multiline representation of the HTTP response:
+// status code in first line, then headers, then an empty line, then raw body.
+type LLMRequestError struct {
+	Err         error
+	RawResponse string
+}
+
+// Error returns the wrapped error message.
+func (e *LLMRequestError) Error() string {
+	if e == nil {
+		return "llm request failed"
+	}
+
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+
+	return "llm request failed"
+}
+
+// Unwrap returns the underlying wrapped error.
+func (e *LLMRequestError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+
+	return e.Err
+}
+
 // Default retry configuration constants.
 const (
 	// DefaultMaxRetries is the default number of retries for network/rate limit errors.

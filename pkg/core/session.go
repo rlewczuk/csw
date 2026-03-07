@@ -291,7 +291,7 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 
 			if !isTemporaryLLMError(err) {
 				if s.logger != nil {
-					s.logger.Error("chat_non_streaming_error", "error", err)
+					s.logLLMRequestError("chat_non_streaming_error", err)
 				}
 				return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: chat request failed: %w", err)
 			}
@@ -310,6 +310,9 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 			}
 
 			if attempt >= maxAttempts {
+				if s.logger != nil {
+					s.logLLMRequestError("chat_non_streaming_error", err)
+				}
 				if s.outputHandler != nil {
 					if s.outputHandler.ShouldRetryAfterFailure(fmt.Sprintf("LLM API request failed after %d attempts: %v", maxAttempts, err)) {
 						s.outputHandler.ShowMessage("Retry requested by user. Starting another retry cycle.", sessionMessageTypeInfo)
@@ -339,6 +342,20 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 			}
 		}
 	}
+}
+
+func (s *SweSession) logLLMRequestError(event string, err error) {
+	if s == nil || s.logger == nil || err == nil {
+		return
+	}
+
+	var llmRequestErr *models.LLMRequestError
+	if errors.As(err, &llmRequestErr) {
+		s.logger.Error(event, "error", err, "llm_raw_response", llmRequestErr.RawResponse)
+		return
+	}
+
+	s.logger.Error(event, "error", err)
 }
 
 // executeToolCalls executes the given tool calls and appends the results to the conversation.

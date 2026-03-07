@@ -4,6 +4,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/conf/impl"
+	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/rlewczuk/csw/pkg/tool"
@@ -934,4 +936,40 @@ func TestSessionVFSMoveToolIntegration(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestSessionLLMRequestErrorLoggingIncludesRawResponse(t *testing.T) {
+	mockProvider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model", Model: "test-model"}})
+	rawResponse := "200\nContent-Type: text/event-stream\nX-Request-ID: req-123\n\ndata: {\"type\":\"response.completed\"}\n\ndata: [DONE]"
+	mockProvider.SetChatResponse("test-model", &models.MockChatResponse{
+		Error: &models.LLMRequestError{
+			Err:         errors.New("convertFromResponsesStreamBody() [responses_client.go]: no usable output items in response"),
+			RawResponse: rawResponse,
+		},
+	})
+
+	fixture := newSweSystemFixture(t, "You are a helpful assistant.",
+		withModelProviders(map[string]models.ModelProvider{"mock": mockProvider}),
+	)
+
+	mockHandler := testutil.NewMockSessionOutputHandler()
+	session, err := fixture.system.NewSession("mock/test-model", mockHandler)
+	require.NoError(t, err)
+
+	session.UserPrompt("trigger llm request")
+	err = session.Run(t.Context())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "chat request failed")
+	assert.Contains(t, err.Error(), "no usable output items in response")
+
+	logBuffer := logging.GetTestSessionBuffer(session.ID())
+	require.NotNil(t, logBuffer)
+	logOutput := logBuffer.String()
+
+	assert.Contains(t, logOutput, "chat_non_streaming_error")
+	assert.Contains(t, logOutput, "llm_raw_response")
+	assert.Contains(t, logOutput, "Content-Type: text/event-stream")
+	assert.Contains(t, logOutput, "X-Request-ID: req-123")
+	assert.Contains(t, logOutput, "response.completed")
+	assert.Contains(t, logOutput, "no usable output items in response")
 }

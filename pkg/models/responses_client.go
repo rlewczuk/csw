@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -461,13 +462,14 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 
 	resp, err := m.client.httpClient.Do(req)
 	if err != nil {
-		return nil, m.client.handleHTTPError(err)
+		return nil, wrapLLMRequestError(m.client.handleHTTPError(err), nil, nil)
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("ResponsesChatModel.Chat() [responses_client.go]: failed to read response body: %w", err)
+		readErr := fmt.Errorf("ResponsesChatModel.Chat() [responses_client.go]: failed to read response body: %w", err)
+		return nil, wrapLLMRequestError(readErr, resp, nil)
 	}
 
 	if effectiveOptions != nil && effectiveOptions.Verbose {
@@ -478,20 +480,21 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		if effectiveOptions != nil && effectiveOptions.Logger != nil {
 			logHTTPErrorResponse(effectiveOptions.Logger, resp, bodyBytes)
 		}
-		return nil, err
+		return nil, wrapLLMRequestError(err, resp, bodyBytes)
 	}
 
 	if chatReq.Stream {
 		result, err := convertFromResponsesStreamBody(bodyBytes)
 		if err != nil {
-			return nil, err
+			return nil, wrapLLMRequestError(err, resp, bodyBytes)
 		}
 		return result, nil
 	}
 
 	var chatResp ResponsesResponse
 	if err := json.Unmarshal(bodyBytes, &chatResp); err != nil {
-		return nil, fmt.Errorf("ResponsesChatModel.Chat() [responses_client.go]: failed to decode response: %w", err)
+		decodeErr := fmt.Errorf("ResponsesChatModel.Chat() [responses_client.go]: failed to decode response: %w", err)
+		return nil, wrapLLMRequestError(decodeErr, resp, bodyBytes)
 	}
 
 	if effectiveOptions != nil && effectiveOptions.Logger != nil {
@@ -500,7 +503,7 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 
 	result, err := convertFromResponsesOutput(chatResp.Output)
 	if err != nil {
-		return nil, err
+		return nil, wrapLLMRequestError(err, resp, bodyBytes)
 	}
 	if chatResp.Usage != nil {
 		total := chatResp.Usage.TotalTokens
@@ -1333,4 +1336,57 @@ func convertToolsToResponses(tools []tool.ToolInfo) []ResponsesTool {
 	}
 
 	return converted
+}
+
+func wrapLLMRequestError(err error, resp *http.Response, bodyBytes []byte) error {
+	if err == nil {
+		return nil
+	}
+
+	var llmReqErr *LLMRequestError
+	if errors.As(err, &llmReqErr) {
+		if strings.TrimSpace(llmReqErr.RawResponse) == "" && resp != nil {
+			llmReqErr.RawResponse = formatRawHTTPResponse(resp.StatusCode, resp.Header, bodyBytes)
+		}
+		return err
+	}
+
+	rawResponse := ""
+	if resp != nil {
+		rawResponse = formatRawHTTPResponse(resp.StatusCode, resp.Header, bodyBytes)
+	}
+
+	return &LLMRequestError{
+		Err:         err,
+		RawResponse: rawResponse,
+	}
+}
+
+func formatRawHTTPResponse(statusCode int, headers http.Header, bodyBytes []byte) string {
+	var responseBuilder strings.Builder
+
+	responseBuilder.WriteString(strconv.Itoa(statusCode))
+	responseBuilder.WriteString("\n")
+
+	if headers != nil {
+		headerKeys := make([]string, 0, len(headers))
+		for key := range headers {
+			headerKeys = append(headerKeys, key)
+		}
+		sort.Strings(headerKeys)
+
+		for _, key := range headerKeys {
+			for _, value := range headers.Values(key) {
+				responseBuilder.WriteString(key)
+				responseBuilder.WriteString(": ")
+				responseBuilder.WriteString(value)
+				responseBuilder.WriteString("\n")
+			}
+		}
+	}
+
+	responseBuilder.WriteString("\n")
+	responseBuilder.Write(bodyBytes)
+
+	return responseBuilder.String()
 }

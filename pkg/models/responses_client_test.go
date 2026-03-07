@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -18,6 +19,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 const (
 	defaultResponsesTestURL = "https://api.openai.com/v1"
@@ -677,6 +684,100 @@ func TestConvertFromResponsesStreamBody_ExtendsScannerBufferForLargeTokens(t *te
 	require.NoError(t, err)
 	require.NotNil(t, message)
 	assert.Equal(t, longDelta, message.GetText())
+}
+
+func TestFormatRawHTTPResponse(t *testing.T) {
+	t.Run("formats status headers and body as multiline string", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Add("X-Zeta", "z")
+		headers.Add("X-Alpha", "a1")
+		headers.Add("X-Alpha", "a2")
+
+		raw := formatRawHTTPResponse(http.StatusBadRequest, headers, []byte("body-line"))
+
+		assert.Equal(t, "400\nX-Alpha: a1\nX-Alpha: a2\nX-Zeta: z\n\nbody-line", raw)
+	})
+
+	t.Run("formats response with empty headers and empty body", func(t *testing.T) {
+		raw := formatRawHTTPResponse(http.StatusOK, nil, nil)
+		assert.Equal(t, "200\n\n", raw)
+	})
+}
+
+func TestResponsesClient_ChatWrapsLLMRequestError(t *testing.T) {
+	t.Run("wraps codex stream conversion error with raw response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, writeErr := w.Write([]byte("data: {\"type\":\"response.completed\"}\n\n"))
+			require.NoError(t, writeErr)
+			_, writeErr = w.Write([]byte("data: [DONE]\n\n"))
+			require.NoError(t, writeErr)
+		}))
+		defer server.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    server.URL + "/backend-api/codex",
+			APIKey: "test-key",
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel("gpt-5.2-codex", nil)
+		_, err = chatModel.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}, nil, nil)
+		require.Error(t, err)
+
+		var llmErr *LLMRequestError
+		require.True(t, errors.As(err, &llmErr))
+		assert.Contains(t, err.Error(), "convertFromResponsesStreamBody() [responses_client.go]: no usable output items in response")
+		assert.Contains(t, llmErr.RawResponse, "200\n")
+		assert.Contains(t, llmErr.RawResponse, "Content-Type: text/event-stream")
+		assert.Contains(t, llmErr.RawResponse, "\n\n")
+		assert.Contains(t, llmErr.RawResponse, "response.completed")
+	})
+
+	t.Run("wraps network request failure with empty raw response", func(t *testing.T) {
+		httpClient := &http.Client{
+			Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				return nil, io.EOF
+			}),
+		}
+
+		client, err := NewResponsesClientWithHTTPClient("https://example.test", httpClient)
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel("test-model", nil)
+		_, err = chatModel.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}, nil, nil)
+		require.Error(t, err)
+
+		var llmErr *LLMRequestError
+		require.True(t, errors.As(err, &llmErr))
+		assert.Empty(t, llmErr.RawResponse)
+	})
+
+	t.Run("wraps non-stream decode error with raw response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, writeErr := w.Write([]byte("not-json"))
+			require.NoError(t, writeErr)
+		}))
+		defer server.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    server.URL,
+			APIKey: "test-key",
+		})
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel("test-model", nil)
+		_, err = chatModel.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}, nil, nil)
+		require.Error(t, err)
+
+		var llmErr *LLMRequestError
+		require.True(t, errors.As(err, &llmErr))
+		assert.Contains(t, err.Error(), "failed to decode response")
+		assert.Contains(t, llmErr.RawResponse, "200\n")
+		assert.Contains(t, llmErr.RawResponse, "Content-Type: application/json")
+		assert.True(t, strings.HasSuffix(llmErr.RawResponse, "not-json"))
+	})
 }
 
 func TestResponsesClient_SystemMessageInInstructions(t *testing.T) {
