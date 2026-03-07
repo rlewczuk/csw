@@ -43,6 +43,7 @@ type BuildSystemParams struct {
 	ModelName         string
 	RoleName          string
 	WorktreeBranch    string
+	ContinueWorktree  bool
 	GitUserName       string
 	GitUserEmail      string
 	ContainerEnabled  bool
@@ -82,7 +83,7 @@ type BuildSystemResult struct {
 	Cleanup          func()
 }
 
-func prepareSessionVFS(workDir string, worktreeBranch string, hidePatterns []string, gitUserName string, gitUserEmail string, allowedPaths []string) (vfs.VCS, vfs.VFS, error) {
+func prepareSessionVFS(workDir string, worktreeBranch string, continueWorktree bool, hidePatterns []string, gitUserName string, gitUserEmail string, allowedPaths []string) (vfs.VCS, vfs.VFS, error) {
 	localVFS, err := vfs.NewLocalVFS(workDir, hidePatterns, allowedPaths)
 	if err != nil {
 		return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create local VFS: %w", err)
@@ -102,20 +103,39 @@ func prepareSessionVFS(workDir string, worktreeBranch string, hidePatterns []str
 			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create GitVCS: %w", err)
 		}
 
-		if err := os.RemoveAll(filepath.Join(worktreesRoot, worktreeBranch)); err != nil {
-			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to remove existing worktree path: %w", err)
-		}
+		if continueWorktree {
+			branches, listErr := gitRepo.ListBranches("")
+			if listErr != nil {
+				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to list branches for continue mode: %w", listErr)
+			}
 
-		if err := gitRepo.DropWorktree(worktreeBranch); err != nil && !errors.Is(err, vfs.ErrFileNotFound) {
-			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to drop existing worktree: %w", err)
-		}
+			branchExists := false
+			for _, branch := range branches {
+				if branch == worktreeBranch {
+					branchExists = true
+					break
+				}
+			}
 
-		if err := gitRepo.DeleteBranch(worktreeBranch); err != nil && !errors.Is(err, vfs.ErrFileNotFound) {
-			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to delete existing worktree branch: %w", err)
-		}
+			if !branchExists {
+				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: worktree branch %q not found: %w", worktreeBranch, vfs.ErrFileNotFound)
+			}
+		} else {
+			if err := os.RemoveAll(filepath.Join(worktreesRoot, worktreeBranch)); err != nil {
+				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to remove existing worktree path: %w", err)
+			}
 
-		if err := gitRepo.NewBranch(worktreeBranch, "HEAD"); err != nil {
-			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create worktree branch: %w", err)
+			if err := gitRepo.DropWorktree(worktreeBranch); err != nil && !errors.Is(err, vfs.ErrFileNotFound) {
+				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to drop existing worktree: %w", err)
+			}
+
+			if err := gitRepo.DeleteBranch(worktreeBranch); err != nil && !errors.Is(err, vfs.ErrFileNotFound) {
+				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to delete existing worktree branch: %w", err)
+			}
+
+			if err := gitRepo.NewBranch(worktreeBranch, "HEAD"); err != nil {
+				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create worktree branch: %w", err)
+			}
 		}
 
 		selectedVCS = gitRepo
@@ -197,7 +217,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to build hide patterns: %w", err)
 	}
 
-	selectedVCS, selectedVFS, err := prepareSessionVFS(workDir, params.WorktreeBranch, hidePatterns, params.GitUserName, params.GitUserEmail, params.AllowedPaths)
+	selectedVCS, selectedVFS, err := prepareSessionVFS(workDir, params.WorktreeBranch, params.ContinueWorktree, hidePatterns, params.GitUserName, params.GitUserEmail, params.AllowedPaths)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)

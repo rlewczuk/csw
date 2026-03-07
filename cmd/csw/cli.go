@@ -35,6 +35,7 @@ type CLIParams struct {
 	RoleName              string
 	WorkDir               string
 	WorktreeBranch        string
+	ContinueWorktree      bool
 	GitUserName           string
 	GitUserEmail          string
 	Merge                 bool
@@ -97,7 +98,8 @@ func CliCommand() *cobra.Command {
 		cliContainerMount []string
 		cliContainerEnv   []string
 		cliResume         string
-		cliContinue       bool
+		cliContinue       string
+		cliResumeContinue bool
 		cliForce          bool
 		cliBashRunTimeout string
 		cliVerbose        bool
@@ -105,7 +107,7 @@ func CliCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last>] [--continue] [--force] [\"prompt\"]",
+		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--continue <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last>] [--resume-continue] [--force] [\"prompt\"]",
 		Short: "Start a CLI chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.MaximumNArgs(1),
@@ -119,7 +121,12 @@ func CliCommand() *cobra.Command {
 				return err
 			}
 
-			if cliContinue && resumeTarget == "" {
+			continueWorktreeBranch := strings.TrimSpace(cliContinue)
+			if continueWorktreeBranch != "" && cliResumeContinue {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: --continue <branch> cannot be used with --resume-continue")
+			}
+
+			if cliResumeContinue && resumeTarget == "" {
 				resumeTarget = "last"
 			}
 
@@ -155,12 +162,20 @@ func CliCommand() *cobra.Command {
 				}
 			}
 
-			if resumeTarget != "" && !cliContinue && prompt != "" {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt requires --continue when --resume is set")
+			if continueWorktreeBranch != "" && cmd.Flags().Changed("worktree") {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: --continue and --worktree cannot be used together")
 			}
 
-			if cliContinue && prompt == "" {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty when --continue is set")
+			if continueWorktreeBranch != "" && resumeTarget != "" {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: --continue <branch> cannot be used with --resume")
+			}
+
+			if resumeTarget != "" && !cliResumeContinue && prompt != "" {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt requires --resume-continue when --resume is set")
+			}
+
+			if cliResumeContinue && prompt == "" {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty when --resume-continue is set")
 			}
 
 			bashRunTimeout, err := parseBashRunTimeout(cliBashRunTimeout)
@@ -191,7 +206,8 @@ func CliCommand() *cobra.Command {
 				ModelName:             cliModel,
 				RoleName:              cliRole,
 				WorkDir:               cliWorkDir,
-				WorktreeBranch:        cliWorktree,
+				WorktreeBranch:        firstNonEmpty(continueWorktreeBranch, cliWorktree),
+				ContinueWorktree:      continueWorktreeBranch != "",
 				GitUserName:           resolveGitIdentity(cliGitUser, "user.name"),
 				GitUserEmail:          resolveGitIdentity(cliGitEmail, "user.email"),
 				Merge:                 cliMerge,
@@ -211,7 +227,7 @@ func CliCommand() *cobra.Command {
 				LSPServer:             cliLSPServer,
 				Thinking:              cliThinking,
 				ResumeTarget:          resumeTarget,
-				ContinueSession:       cliContinue,
+				ContinueSession:       cliResumeContinue,
 				ForceResume:           cliForce,
 				BashRunTimeout:        bashRunTimeout,
 				Verbose:               cliVerbose,
@@ -244,7 +260,8 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliGitUser, "git-user", "", "Git user name for git operations (default: from git config)")
 	cmd.Flags().StringVar(&cliGitEmail, "git-email", "", "Git user email for git operations (default: from git config)")
 	cmd.Flags().StringVar(&cliResume, "resume", "", "Resume session by id (UUID) or 'last'. If value is omitted, resumes last session")
-	cmd.Flags().BoolVar(&cliContinue, "continue", false, "Continue resumed session with a new user message")
+	cmd.Flags().StringVar(&cliContinue, "continue", "", "Continue work in an existing git worktree branch")
+	cmd.Flags().BoolVar(&cliResumeContinue, "resume-continue", false, "Continue resumed session with a new user message")
 	cmd.Flags().BoolVar(&cliForce, "force", false, "Force resume even when there is no pending work")
 	cmd.Flags().StringVar(&cliBashRunTimeout, "bash-run-timeout", "120", "Default runBash command timeout (duration; plain number means seconds)")
 	cmd.Flags().BoolVar(&cliVerbose, "verbose", false, "Display full tool output instead of one-liners")
@@ -254,6 +271,16 @@ func CliCommand() *cobra.Command {
 		resumeFlag.NoOptDefVal = "last"
 	}
 	return cmd
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+
+	return ""
 }
 
 func applyCLIDefaults(
@@ -350,6 +377,7 @@ func runCLI(params *CLIParams) error {
 		ModelName:         params.ModelName,
 		RoleName:          params.RoleName,
 		WorktreeBranch:    params.WorktreeBranch,
+		ContinueWorktree:  params.ContinueWorktree,
 		GitUserName:       params.GitUserName,
 		GitUserEmail:      params.GitUserEmail,
 		ContainerEnabled:  params.ContainerEnabled,
@@ -465,7 +493,7 @@ func runCLI(params *CLIParams) error {
 			}
 		} else {
 			if !params.ForceResume && !session.HasPendingWork() {
-				return fmt.Errorf("runCLI() [cli.go]: resumed session has no pending work (use --continue to add a prompt or --force to run anyway)")
+				return fmt.Errorf("runCLI() [cli.go]: resumed session has no pending work (use --resume-continue to add a prompt or --force to run anyway)")
 			}
 			if err := thread.ResumePending(); err != nil {
 				return fmt.Errorf("runCLI() [cli.go]: failed to resume pending work: %w", err)

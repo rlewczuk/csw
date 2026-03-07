@@ -46,24 +46,26 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 		expectedPrompt  string
 		expectedCont    bool
 		expectedForce   bool
+		expectedWorktree string
+		expectContinueWt bool
 	}{
 		{
-			name:          "continue defaults to last",
-			args:          []string{"--continue", "next message"},
+			name:          "resume continue defaults to last",
+			args:          []string{"--resume-continue", "next message"},
 			expectedResume: "last",
 			expectedPrompt: "next message",
 			expectedCont:   true,
 		},
 		{
 			name:          "resume no value defaults to last",
-			args:          []string{"--resume", "--continue", "next message"},
+			args:          []string{"--resume", "--resume-continue", "next message"},
 			expectedResume: "last",
 			expectedPrompt: "next message",
 			expectedCont:   true,
 		},
 		{
 			name:          "resume explicit uuid",
-			args:          []string{"--resume=018f6e30-3acb-7f24-bede-8d96cd157152", "--continue", "next"},
+			args:          []string{"--resume=018f6e30-3acb-7f24-bede-8d96cd157152", "--resume-continue", "next"},
 			expectedResume: "018f6e30-3acb-7f24-bede-8d96cd157152",
 			expectedPrompt: "next",
 			expectedCont:   true,
@@ -91,22 +93,47 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 			expectedError: "prompt cannot be empty",
 		},
 		{
-			name:          "continue without prompt error",
-			args:          []string{"--continue"},
+			name:          "resume continue without prompt error",
+			args:          []string{"--resume-continue"},
 			expectError:   true,
-			expectedError: "prompt cannot be empty when --continue is set",
+			expectedError: "prompt cannot be empty when --resume-continue is set",
 		},
 		{
 			name:          "resume with prompt but no continue error",
 			args:          []string{"--resume=last", "hello"},
 			expectError:   true,
-			expectedError: "prompt requires --continue when --resume is set",
+			expectedError: "prompt requires --resume-continue when --resume is set",
 		},
 		{
 			name:          "invalid resume value",
-			args:          []string{"--resume=bad", "--continue", "hello"},
+			args:          []string{"--resume=bad", "--resume-continue", "hello"},
 			expectError:   true,
 			expectedError: "invalid --resume value",
+		},
+		{
+			name:          "continue worktree branch",
+			args:          []string{"--continue", "feature/existing", "hello"},
+			expectedPrompt: "hello",
+			expectedWorktree: "feature/existing",
+			expectContinueWt: true,
+		},
+		{
+			name:          "continue branch cannot be used with worktree",
+			args:          []string{"--continue", "feature/existing", "--worktree", "feature/new", "hello"},
+			expectError:   true,
+			expectedError: "--continue and --worktree cannot be used together",
+		},
+		{
+			name:          "continue branch cannot be used with resume",
+			args:          []string{"--continue=feature/existing", "--resume=last", "hello"},
+			expectError:   true,
+			expectedError: "--continue <branch> cannot be used with --resume",
+		},
+		{
+			name:          "continue branch cannot be used with resume continue",
+			args:          []string{"--continue=feature/existing", "--resume-continue", "hello"},
+			expectError:   true,
+			expectedError: "--continue <branch> cannot be used with --resume-continue",
 		},
 	}
 
@@ -119,7 +146,7 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 			})
 
 			runCLIFunc = func(params *CLIParams) error {
-				capturedCall = fmt.Sprintf("prompt=%s,resume=%s,continue=%t,force=%t", params.Prompt, params.ResumeTarget, params.ContinueSession, params.ForceResume)
+				capturedCall = fmt.Sprintf("prompt=%s,resume=%s,continue=%t,force=%t,worktree=%s,continuewt=%t", params.Prompt, params.ResumeTarget, params.ContinueSession, params.ForceResume, params.WorktreeBranch, params.ContinueWorktree)
 				return nil
 			}
 
@@ -142,6 +169,8 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 			assert.Contains(t, capturedCall, "resume="+tc.expectedResume)
 			assert.Contains(t, capturedCall, fmt.Sprintf("continue=%t", tc.expectedCont))
 			assert.Contains(t, capturedCall, fmt.Sprintf("force=%t", tc.expectedForce))
+			assert.Contains(t, capturedCall, "worktree="+tc.expectedWorktree)
+			assert.Contains(t, capturedCall, fmt.Sprintf("continuewt=%t", tc.expectContinueWt))
 		})
 	}
 }

@@ -14,7 +14,7 @@ import (
 func TestPrepareSessionVFSWithoutWorktree(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	repo, selectedVFS, err := prepareSessionVFS(tmpDir, "", nil, "", "", nil)
+	repo, selectedVFS, err := prepareSessionVFS(tmpDir, "", false, nil, "", "", nil)
 	require.NoError(t, err)
 	require.NotNil(t, repo)
 	require.NotNil(t, selectedVFS)
@@ -27,7 +27,7 @@ func TestPrepareSessionVFSWithoutWorktree(t *testing.T) {
 func TestPrepareSessionVFSWithWorktreeCreatesBranchAndWorktree(t *testing.T) {
 	repoDir := initTestGitRepository(t)
 
-	repo, selectedVFS, err := prepareSessionVFS(repoDir, "feature/worktree", nil, "", "", nil)
+	repo, selectedVFS, err := prepareSessionVFS(repoDir, "feature/worktree", false, nil, "", "", nil)
 	require.NoError(t, err)
 	require.NotNil(t, repo)
 	require.NotNil(t, selectedVFS)
@@ -51,7 +51,7 @@ func TestPrepareSessionVFSRecreatesExistingWorktreePath(t *testing.T) {
 	require.NoError(t, os.MkdirAll(stalePath, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(stalePath, "stale.txt"), []byte("stale"), 0644))
 
-	_, selectedVFS, err := prepareSessionVFS(repoDir, "feature-recreate", nil, "", "", nil)
+	_, selectedVFS, err := prepareSessionVFS(repoDir, "feature-recreate", false, nil, "", "", nil)
 	require.NoError(t, err)
 	require.NotNil(t, selectedVFS)
 
@@ -68,13 +68,55 @@ func TestPrepareSessionVFSWithWorktreeRespectsAllowedPaths(t *testing.T) {
 	allowedFile := filepath.Join(allowedDir, "allowed.txt")
 	require.NoError(t, os.WriteFile(allowedFile, []byte("allowed-content"), 0644))
 
-	_, selectedVFS, err := prepareSessionVFS(repoDir, "feature/vfs-allow", nil, "", "", []string{allowedDir})
+	_, selectedVFS, err := prepareSessionVFS(repoDir, "feature/vfs-allow", false, nil, "", "", []string{allowedDir})
 	require.NoError(t, err)
 	require.NotNil(t, selectedVFS)
 
 	data, err := selectedVFS.ReadFile(allowedFile)
 	require.NoError(t, err)
 	assert.Equal(t, "allowed-content", string(data))
+}
+
+func TestPrepareSessionVFSContinueModeReusesExistingWorktree(t *testing.T) {
+	repoDir := initTestGitRepository(t)
+
+	_, firstVFS, err := prepareSessionVFS(repoDir, "feature/reuse", false, nil, "", "", nil)
+	require.NoError(t, err)
+
+	err = firstVFS.WriteFile("WIP.txt", []byte("in-progress"))
+	require.NoError(t, err)
+
+	_, continuedVFS, err := prepareSessionVFS(repoDir, "feature/reuse", true, nil, "", "", nil)
+	require.NoError(t, err)
+
+	content, err := continuedVFS.ReadFile("WIP.txt")
+	require.NoError(t, err)
+	assert.Equal(t, "in-progress", string(content))
+}
+
+func TestPrepareSessionVFSContinueModeExtractsMissingWorktree(t *testing.T) {
+	repoDir := initTestGitRepository(t)
+
+	_, _, err := prepareSessionVFS(repoDir, "feature/extract", false, nil, "", "", nil)
+	require.NoError(t, err)
+
+	worktreePath := filepath.Join(repoDir, ".cswdata", "work", "feature", "extract")
+	require.NoError(t, os.RemoveAll(worktreePath))
+
+	_, continuedVFS, err := prepareSessionVFS(repoDir, "feature/extract", true, nil, "", "", nil)
+	require.NoError(t, err)
+	require.NotNil(t, continuedVFS)
+
+	_, err = continuedVFS.ReadFile("README.md")
+	require.NoError(t, err)
+}
+
+func TestPrepareSessionVFSContinueModeFailsWhenBranchDoesNotExist(t *testing.T) {
+	repoDir := initTestGitRepository(t)
+
+	_, _, err := prepareSessionVFS(repoDir, "feature/missing", true, nil, "", "", nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "worktree branch \"feature/missing\" not found")
 }
 
 func initTestGitRepository(t *testing.T) string {

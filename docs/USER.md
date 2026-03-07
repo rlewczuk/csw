@@ -36,6 +36,13 @@ If you also want branch merge at the end:
 ./bin/csw cli --worktree feature/docs-update --merge "Update user docs"
 ```
 
+Continue work on an existing worktree branch (reuses extracted worktree if present,
+or extracts it if missing):
+
+```bash
+./bin/csw cli --continue feature/docs-update "Apply requested review fixes"
+```
+
 ### 4) Run with containerized command execution
 
 ```bash
@@ -391,12 +398,13 @@ Session and runtime options:
 Resume options:
 
 - `--resume [last|<session-id>]`: resume previous session
-- `--continue`: continue resumed session with new user message
+- `--resume-continue`: continue resumed session with new user message
 - `--force`: force resume even with no pending work
 
 Worktree and merge options:
 
 - `--worktree <branch>`: run in dedicated git worktree
+- `--continue <branch>`: continue work in existing worktree branch (branch must exist)
 - `--merge`: merge worktree branch after commit (requires `--worktree`)
 - `--commit-message <template>`: custom commit template
 

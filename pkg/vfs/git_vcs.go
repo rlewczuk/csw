@@ -109,6 +109,27 @@ func (g *GitVCS) GetWorktree(branch string) (VFS, error) {
 		return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: branch %q not found: %w", branch, ErrFileNotFound)
 	}
 
+	worktreeInfo, statErr := os.Stat(worktreePath)
+	if statErr == nil && worktreeInfo.IsDir() {
+		currentBranch, branchErr := g.currentBranchInWorktree(worktreePath)
+		if branchErr == nil && currentBranch == branch {
+			localVFS, localErr := NewLocalVFS(worktreePath, g.hidePatterns, g.allowedPaths)
+			if localErr != nil {
+				return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", localErr)
+			}
+			localVFS.repo = g
+
+			wt := &gitWorktree{
+				branch: branch,
+				path:   worktreePath,
+				vfs:    localVFS,
+			}
+
+			g.worktrees[branch] = wt
+			return wt.vfs, nil
+		}
+	}
+
 	if err := os.RemoveAll(worktreePath); err != nil {
 		return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", err)
 	}
