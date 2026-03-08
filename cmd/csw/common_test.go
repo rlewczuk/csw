@@ -10,14 +10,14 @@ import (
 )
 
 func TestBuildConfigPath_DefaultProjectConfig(t *testing.T) {
-	// When projectConfig is empty, should use default ./.csw/config
+	// When projectConfig is empty, should use default @PROJ/.csw/config
 	path, err := BuildConfigPath("", "")
 	require.NoError(t, err)
 
 	homeDir, err := os.UserHomeDir()
 	require.NoError(t, err)
 
-	expectedSuffix := "@DEFAULTS:" + filepath.Join(homeDir, ".config", "csw") + ":./.csw/config"
+	expectedSuffix := "@DEFAULTS:" + filepath.Join(homeDir, ".config", "csw") + ":@PROJ/.csw/config"
 	assert.Equal(t, expectedSuffix, path)
 }
 

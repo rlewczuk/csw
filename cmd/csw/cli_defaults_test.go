@@ -40,8 +40,9 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 	captured := ""
 	runCLIFunc = func(params *CLIParams) error {
 		captured = fmt.Sprintf(
-			"model=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s",
+			"model=%s,shadow=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s",
 			params.ModelName,
+			params.ShadowDir,
 			params.WorktreeBranch,
 			params.Merge,
 			params.LogLLMRequests,
@@ -63,6 +64,7 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 	assert.Contains(t, captured, "model=provider/default")
+	assert.Contains(t, captured, "shadow=")
 	assert.Contains(t, captured, "worktree=feature/default")
 	assert.Contains(t, captured, "merge=true")
 	assert.Contains(t, captured, "log=true")
@@ -101,8 +103,9 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	captured := ""
 	runCLIFunc = func(params *CLIParams) error {
 		captured = fmt.Sprintf(
-			"model=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s",
+			"model=%s,shadow=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s",
 			params.ModelName,
+			params.ShadowDir,
 			params.WorktreeBranch,
 			params.Merge,
 			params.LogLLMRequests,
@@ -141,4 +144,29 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	assert.Contains(t, captured, "lsp=custom-lsp")
 	assert.Contains(t, captured, "gitUser=CLI User")
 	assert.Contains(t, captured, "gitEmail=cli@example.com")
+}
+
+func TestCLIShadowDirFlagPropagation(t *testing.T) {
+	originalRun := runCLIFunc
+	t.Cleanup(func() {
+		runCLIFunc = originalRun
+	})
+
+	captured := ""
+	runCLIFunc = func(params *CLIParams) error {
+		captured = params.ShadowDir
+		return nil
+	}
+
+	cmd := CliCommand()
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	shadowDir := t.TempDir()
+	cmd.SetArgs([]string{"--shadow-dir=" + shadowDir, "prompt"})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Equal(t, shadowDir, captured)
 }

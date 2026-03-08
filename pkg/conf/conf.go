@@ -367,6 +367,8 @@ type GlobalConfig struct {
 	Container ContainerConfig `json:"container,omitempty" yaml:"container,omitempty"`
 	// Defaults defines default values for cli command flags.
 	Defaults CLIDefaultsConfig `json:"defaults,omitempty" yaml:"defaults,omitempty"`
+	// ShadowPaths defines glob patterns redirected to shadow directory when --shadow-dir is enabled.
+	ShadowPaths []string `json:"shadow_paths,omitempty" yaml:"shadow_paths,omitempty"`
 	// ModelFamilies contains model family templates.
 	ModelFamilies map[string]ModelProviderConfig `json:"model_families,omitempty" yaml:"model_families,omitempty"`
 	// ModelVendors contains inference vendor templates.

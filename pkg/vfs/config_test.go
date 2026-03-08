@@ -193,3 +193,16 @@ tmp/
 		assert.NotContains(t, files, "tmp")
 	})
 }
+
+func TestDefaultShadowPatterns(t *testing.T) {
+	patterns := DefaultShadowPatterns()
+	assert.Equal(t, []string{
+		"AGENTS.md",
+		"**/AGENTS.md",
+		".agentsignore",
+		"**/.agentsignore",
+		".agents/**",
+		".csw/**",
+		".cswdata/**",
+	}, patterns)
+}

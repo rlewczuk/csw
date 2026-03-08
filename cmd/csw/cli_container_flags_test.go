@@ -13,6 +13,7 @@ func TestCLIContainerFlagsPropagation(t *testing.T) {
 	tests := []struct {
 		name                     string
 		args                     []string
+		expectedShadowDir        string
 		expectedEnabled          bool
 		expectedDisabled         bool
 		expectedImage            string
@@ -23,7 +24,8 @@ func TestCLIContainerFlagsPropagation(t *testing.T) {
 	}{
 		{
 			name:            "container image does not enable mode",
-			args:            []string{"--container-image=busybox:latest", "prompt"},
+			args:            []string{"--shadow-dir=./", "--container-image=busybox:latest", "prompt"},
+			expectedShadowDir: "./",
 			expectedEnabled: false,
 			expectedImage:   "busybox:latest",
 		},
@@ -82,7 +84,7 @@ func TestCLIContainerFlagsPropagation(t *testing.T) {
 				runCLIFunc = originalRun
 			} else {
 				runCLIFunc = func(params *CLIParams) error {
-					captured = fmt.Sprintf("enabled=%t,disabled=%t,image=%s,mounts=%v,env=%v", params.ContainerEnabled, params.ContainerDisabled, params.ContainerImage, params.ContainerMounts, params.ContainerEnv)
+					captured = fmt.Sprintf("shadow=%s,enabled=%t,disabled=%t,image=%s,mounts=%v,env=%v", params.ShadowDir, params.ContainerEnabled, params.ContainerDisabled, params.ContainerImage, params.ContainerMounts, params.ContainerEnv)
 					return nil
 				}
 			}
@@ -102,6 +104,7 @@ func TestCLIContainerFlagsPropagation(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			assert.Contains(t, captured, fmt.Sprintf("shadow=%s", tc.expectedShadowDir))
 			assert.Contains(t, captured, fmt.Sprintf("enabled=%t", tc.expectedEnabled))
 			assert.Contains(t, captured, fmt.Sprintf("disabled=%t", tc.expectedDisabled))
 			assert.Contains(t, captured, fmt.Sprintf("image=%s", tc.expectedImage))

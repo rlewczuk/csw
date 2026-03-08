@@ -123,6 +123,7 @@ func (c *GlobalConfig) Clone() *GlobalConfig {
 		LLMRetryMaxBackoffSeconds:  c.LLMRetryMaxBackoffSeconds,
 		Container:                  c.Container.Clone(),
 		Defaults:                   c.Defaults,
+		ShadowPaths:                append([]string(nil), c.ShadowPaths...),
 		ModelFamilies:              cloneModelProviderMapValue(c.ModelFamilies),
 		ModelVendors:               cloneModelProviderMapValue(c.ModelVendors),
 		ModelTemplates:             cloneModelTemplateGroups(c.ModelTemplates),
@@ -160,6 +161,9 @@ func (c *GlobalConfig) Merge(override *GlobalConfig) {
 
 	c.Container.Merge(override.Container)
 	c.Defaults.MergeFrom(override.Defaults)
+	if len(override.ShadowPaths) > 0 {
+		c.ShadowPaths = append([]string(nil), override.ShadowPaths...)
+	}
 
 	if c.ModelFamilies == nil {
 		c.ModelFamilies = make(map[string]ModelProviderConfig)

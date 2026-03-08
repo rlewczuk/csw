@@ -187,9 +187,10 @@ func TestGlobalConfig_Merge(t *testing.T) {
 			Env:    []string{"A=1"},
 		},
 		Defaults: CLIDefaultsConfig{Model: "m1", Worktree: "w1", Thinking: "low"},
+		ShadowPaths: []string{"AGENTS.md"},
 	}
 
-	override := &GlobalConfig{
+		override := &GlobalConfig{
 		ModelTags: []ModelTagMapping{{Model: "claude-.*", Tag: "anthropic"}},
 		ToolSelection: ToolSelectionConfig{
 			Default: map[string]bool{"runBash": true, "vfsEdit": false},
@@ -207,6 +208,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 			Env:     []string{"B=2"},
 		},
 		Defaults: CLIDefaultsConfig{Model: "m2", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2"},
+		ShadowPaths: []string{".cswdata/**", ".agents/**"},
 	}
 
 	base.Merge(override)
@@ -221,6 +223,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 	assert.Equal(t, 60, base.LLMRetryMaxBackoffSeconds)
 	assert.Equal(t, ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, base.Container)
 	assert.Equal(t, CLIDefaultsConfig{Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2"}, base.Defaults)
+	assert.Equal(t, []string{".cswdata/**", ".agents/**"}, base.ShadowPaths)
 }
 
 func TestAgentRoleConfig_Merge(t *testing.T) {

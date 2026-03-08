@@ -38,6 +38,7 @@ var gitConfigValueFunc = readGitConfigValue
 // BuildSystemParams contains inputs for constructing a SweSystem.
 type BuildSystemParams struct {
 	WorkDir           string
+	ShadowDir         string
 	ConfigPath        string
 	ProjectConfig     string
 	ModelName         string
@@ -69,6 +70,7 @@ type BuildSystemParams struct {
 type BuildSystemResult struct {
 	WorkDir          string
 	WorkDirRoot      string
+	ShadowDir        string
 	RoleConfig       conf.AgentRoleConfig
 	ModelName        string
 	ConfigStore      conf.ConfigStore
@@ -83,7 +85,7 @@ type BuildSystemResult struct {
 	Cleanup          func()
 }
 
-func prepareSessionVFS(workDir string, worktreeBranch string, continueWorktree bool, hidePatterns []string, gitUserName string, gitUserEmail string, allowedPaths []string) (vfs.VCS, vfs.VFS, error) {
+func prepareSessionVFS(workDir string, worktreesBaseDir string, worktreeBranch string, continueWorktree bool, hidePatterns []string, gitUserName string, gitUserEmail string, allowedPaths []string) (vfs.VCS, vfs.VFS, error) {
 	localVFS, err := vfs.NewLocalVFS(workDir, hidePatterns, allowedPaths)
 	if err != nil {
 		return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create local VFS: %w", err)
@@ -97,7 +99,7 @@ func prepareSessionVFS(workDir string, worktreeBranch string, continueWorktree b
 	var selectedVCS vfs.VCS = nullVCS
 
 	if worktreeBranch != "" {
-		worktreesRoot := filepath.Join(workDir, ".cswdata", "work")
+		worktreesRoot := filepath.Join(worktreesBaseDir, ".cswdata", "work")
 		gitRepo, err := vfs.NewGitRepo(workDir, worktreesRoot, hidePatterns, allowedPaths, gitUserName, gitUserEmail)
 		if err != nil {
 			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create GitVCS: %w", err)
@@ -158,7 +160,20 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 
-	logsDir := filepath.Join(workDir, ".cswdata", "logs")
+	shadowDir := ""
+	if strings.TrimSpace(params.ShadowDir) != "" {
+		shadowDir, err = ResolveWorkDir(params.ShadowDir)
+		if err != nil {
+			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve shadow directory: %w", err)
+		}
+	}
+
+	configRoot := workDir
+	if shadowDir != "" {
+		configRoot = shadowDir
+	}
+
+	logsDir := filepath.Join(configRoot, ".cswdata", "logs")
 	if err := logging.SetLogsDirectory(logsDir, true); err != nil {
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to initialize logging: %w", err)
 	}
@@ -169,7 +184,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 
-	configStore, err := impl.NewCompositeConfigStore(workDir, configPathStr)
+	configStore, err := impl.NewCompositeConfigStore(configRoot, configPathStr)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create config store: %w", err)
@@ -179,6 +194,11 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to load global config: %w", err)
+	}
+
+	shadowPatterns := append([]string(nil), globalConfig.ShadowPaths...)
+	if len(shadowPatterns) == 0 {
+		shadowPatterns = vfs.DefaultShadowPatterns()
 	}
 
 	providerRegistry := models.NewProviderRegistry(configStore)
@@ -217,13 +237,33 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to build hide patterns: %w", err)
 	}
 
-	selectedVCS, selectedVFS, err := prepareSessionVFS(workDir, params.WorktreeBranch, params.ContinueWorktree, hidePatterns, params.GitUserName, params.GitUserEmail, params.AllowedPaths)
+	allowedPaths := append([]string(nil), params.AllowedPaths...)
+	if shadowDir != "" {
+		allowedPaths = append(allowedPaths, shadowDir)
+	}
+
+	selectedVCS, selectedVFS, err := prepareSessionVFS(workDir, configRoot, params.WorktreeBranch, params.ContinueWorktree, hidePatterns, params.GitUserName, params.GitUserEmail, allowedPaths)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 
 	effectiveWorkDir := selectedVFS.WorktreePath()
+
+	toolVFS := selectedVFS
+	if shadowDir != "" {
+		shadowLocalVFS, shadowErr := vfs.NewLocalVFS(shadowDir, hidePatterns, allowedPaths)
+		if shadowErr != nil {
+			logging.FlushLogs()
+			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create shadow local VFS: %w", shadowErr)
+		}
+		shadowOverlay, overlayErr := vfs.NewShadowVFS(selectedVFS, shadowLocalVFS, shadowPatterns)
+		if overlayErr != nil {
+			logging.FlushLogs()
+			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create shadow VFS overlay: %w", overlayErr)
+		}
+		toolVFS = shadowOverlay
+	}
 
 	var lspClient lsp.LSP
 	if params.LSPServer != "" {
@@ -246,12 +286,12 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	}
 
 	toolRegistry := tool.NewToolRegistry()
-	tool.RegisterVFSTools(toolRegistry, selectedVFS, lspClient, nil)
+	tool.RegisterVFSTools(toolRegistry, toolVFS, lspClient, nil)
 
 	bashRunner := runner.CommandRunner(runner.NewBashRunner(effectiveWorkDir, params.BashRunTimeout))
 	cleanupFn := func() {}
 
-	containerRuntimeConfig, err := resolveContainerRuntimeConfig(globalConfig, params, effectiveWorkDir)
+	containerRuntimeConfig, err := resolveContainerRuntimeConfig(globalConfig, params, effectiveWorkDir, shadowDir)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve container config: %w", err)
@@ -304,13 +344,13 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 
 	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, effectiveWorkDir, params.BashRunTimeout)
 	tool.RegisterWebFetchTool(toolRegistry, nil)
-	tool.RegisterSkillTool(toolRegistry, effectiveWorkDir)
-	if err := tool.RegisterCustomTools(toolRegistry, configStore, effectiveWorkDir, bashRunner); err != nil {
+	tool.RegisterSkillTool(toolRegistry, configRoot)
+	if err := tool.RegisterCustomTools(toolRegistry, configStore, configRoot, bashRunner); err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to register custom tools: %w", err)
 	}
 
-	promptGenerator, err := core.NewConfPromptGenerator(configStore, selectedVFS)
+	promptGenerator, err := core.NewConfPromptGenerator(configStore, toolVFS)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create prompt generator: %w", err)
@@ -328,12 +368,13 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		ToolSelection:   globalConfig.ToolSelection,
 		PromptGenerator: promptGenerator,
 		Tools:           toolRegistry,
-		VFS:             selectedVFS,
+		VFS:             toolVFS,
 		Roles:           roleRegistry,
 		LSP:             lspClient,
 		ConfigStore:     configStore,
 		LogBaseDir:      logsDir,
 		WorkDir:         effectiveWorkDir,
+		ShadowDir:       shadowDir,
 		LogLLMRequests:  params.LogLLMRequests,
 		Thinking:        params.Thinking,
 	}
@@ -341,6 +382,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 	result = BuildSystemResult{
 		WorkDir:          effectiveWorkDir,
 		WorkDirRoot:      workDir,
+		ShadowDir:        shadowDir,
 		RoleConfig:       roleConfig,
 		ModelName:        modelName,
 		ConfigStore:      configStore,
@@ -366,7 +408,7 @@ type containerRuntimeConfig struct {
 	Env     map[string]string
 }
 
-func resolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params BuildSystemParams, effectiveWorkDir string) (containerRuntimeConfig, error) {
+func resolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params BuildSystemParams, effectiveWorkDir string, shadowDir string) (containerRuntimeConfig, error) {
 	var runtimeConfig containerRuntimeConfig
 
 	runtimeConfig.Enabled = globalConfig.Container.Enabled
@@ -393,6 +435,9 @@ func resolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params Build
 	mountSpecs = append(mountSpecs, globalConfig.Container.Mounts...)
 	mountSpecs = append(mountSpecs, params.ContainerMounts...)
 	runtimeConfig.Mounts = map[string]string{effectiveWorkDir: effectiveWorkDir}
+	if strings.TrimSpace(shadowDir) != "" {
+		runtimeConfig.Mounts[shadowDir] = shadowDir
+	}
 	for _, mountSpec := range mountSpecs {
 		hostPath, containerPath, err := parseContainerMountSpec(mountSpec)
 		if err != nil {

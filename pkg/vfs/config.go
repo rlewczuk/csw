@@ -49,6 +49,19 @@ func BuildHidePatterns(projectRoot string, basePatterns []string) ([]string, err
 	return result, nil
 }
 
+// DefaultShadowPatterns returns default glob patterns that are redirected to shadow directory.
+func DefaultShadowPatterns() []string {
+	return []string{
+		"AGENTS.md",
+		"**/AGENTS.md",
+		".agentsignore",
+		"**/.agentsignore",
+		".agents/**",
+		".csw/**",
+		".cswdata/**",
+	}
+}
+
 // parseIgnoreFile parses a .gitignore/.cswignore file and returns a list of patterns
 func parseIgnoreFile(content string) []string {
 	// Split content into lines and parse each line

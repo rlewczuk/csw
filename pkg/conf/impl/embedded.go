@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/vfs"
 	"gopkg.in/yaml.v3"
 )
 
@@ -222,6 +223,9 @@ func (s *EmbeddedConfigStore) loadGlobalConfig() error {
 		if err := yaml.Unmarshal(data, &config); err != nil {
 			return fmt.Errorf("loadGlobalConfig(): failed to parse %s: %w", yamlPath, err)
 		}
+		if len(config.ShadowPaths) == 0 {
+			config.ShadowPaths = append([]string(nil), vfs.DefaultShadowPatterns()...)
+		}
 		s.globalConfig = &config
 		return nil
 	}
@@ -245,6 +249,9 @@ func (s *EmbeddedConfigStore) loadGlobalConfig() error {
 	var config conf.GlobalConfig
 	if err := json.Unmarshal(data, &config); err != nil {
 		return fmt.Errorf("loadGlobalConfig(): failed to parse %s: %w", jsonPath, err)
+	}
+	if len(config.ShadowPaths) == 0 {
+		config.ShadowPaths = append([]string(nil), vfs.DefaultShadowPatterns()...)
 	}
 
 	s.globalConfig = &config

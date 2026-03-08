@@ -623,9 +623,15 @@ func (s *SweSession) ModelWithProvider() string {
 
 // GetState returns the current agent state for this session.
 func (s *SweSession) GetState() AgentState {
+	shadowDir := ""
+	if s.system != nil {
+		shadowDir = s.system.ShadowDir
+	}
+
 	return AgentState{
 		Info: AgentStateCommonInfo{
 			WorkDir:             s.workDir,
+			ShadowDir:           shadowDir,
 			CurrentTime:         time.Now().Format(time.RFC3339),
 			AgentName:           "CSW Coding Agent",
 			TokenUsage:          s.tokenUsage,

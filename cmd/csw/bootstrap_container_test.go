@@ -70,6 +70,7 @@ func TestParseContainerEnvSpec(t *testing.T) {
 func TestResolveContainerRuntimeConfig(t *testing.T) {
 	effectiveWorkDir := t.TempDir()
 	extraMountHost := t.TempDir()
+	shadowDir := t.TempDir()
 
 	tests := []struct {
 		name          string
@@ -151,7 +152,7 @@ func TestResolveContainerRuntimeConfig(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			resolved, err := resolveContainerRuntimeConfig(tc.global, tc.params, effectiveWorkDir)
+			resolved, err := resolveContainerRuntimeConfig(tc.global, tc.params, effectiveWorkDir, shadowDir)
 			if tc.expectError {
 				require.Error(t, err)
 				return
@@ -165,6 +166,10 @@ func TestResolveContainerRuntimeConfig(t *testing.T) {
 				hostPath, hasWorkdirMount := resolved.Mounts[effectiveWorkDir]
 				require.True(t, hasWorkdirMount)
 				assert.Equal(t, effectiveWorkDir, hostPath)
+
+				shadowHostPath, hasShadowMount := resolved.Mounts[shadowDir]
+				require.True(t, hasShadowMount)
+				assert.Equal(t, shadowDir, shadowHostPath)
 			}
 
 			if tc.expectEnvKey != "" {
@@ -180,4 +185,14 @@ func TestResolveContainerRuntimeConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestResolveContainerRuntimeConfig_ShadowDirNotMountedWhenEmpty(t *testing.T) {
+	effectiveWorkDir := t.TempDir()
+
+	resolved, err := resolveContainerRuntimeConfig(&conf.GlobalConfig{Container: conf.ContainerConfig{Enabled: true, Image: "busybox:latest"}}, BuildSystemParams{}, effectiveWorkDir, "")
+	require.NoError(t, err)
+
+	_, hasWorkdirMount := resolved.Mounts[effectiveWorkDir]
+	require.True(t, hasWorkdirMount)
 }

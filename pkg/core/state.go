@@ -5,6 +5,7 @@ import "github.com/rlewczuk/csw/pkg/models"
 type AgentStateCommonInfo struct {
 	AgentName           string
 	WorkDir             string
+	ShadowDir           string
 	CurrentTime         string
 	TokenUsage          models.TokenUsage
 	ContextLengthTokens int

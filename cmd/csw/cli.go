@@ -34,6 +34,7 @@ type CLIParams struct {
 	ModelName             string
 	RoleName              string
 	WorkDir               string
+	ShadowDir             string
 	WorktreeBranch        string
 	ContinueWorktree      bool
 	GitUserName           string
@@ -79,6 +80,7 @@ func CliCommand() *cobra.Command {
 		cliRole           string
 		cliWorkDir        string
 		cliWorktree       string
+		cliShadowDir      string
 		cliAllowAllPerms  bool
 		cliInteractive    bool
 		cliConfigPath     string
@@ -107,7 +109,7 @@ func CliCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--worktree <feature-branch-name>] [--continue <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last>] [--resume-continue] [--force] [\"prompt\"]",
+		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--continue <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last>] [--resume-continue] [--force] [\"prompt\"]",
 		Short: "Start a CLI chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.MaximumNArgs(1),
@@ -183,7 +185,7 @@ func CliCommand() *cobra.Command {
 				return err
 			}
 
-			if err := applyCLIDefaults(cmd, cliWorkDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail); err != nil {
+			if err := applyCLIDefaults(cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail); err != nil {
 				return err
 			}
 
@@ -206,6 +208,7 @@ func CliCommand() *cobra.Command {
 				ModelName:             cliModel,
 				RoleName:              cliRole,
 				WorkDir:               cliWorkDir,
+				ShadowDir:             cliShadowDir,
 				WorktreeBranch:        firstNonEmpty(continueWorktreeBranch, cliWorktree),
 				ContinueWorktree:      continueWorktreeBranch != "",
 				GitUserName:           resolveGitIdentity(cliGitUser, "user.name"),
@@ -240,6 +243,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliModel, "model", "", "Model name in provider/model format (if not set, uses default provider)")
 	cmd.Flags().StringVar(&cliRole, "role", "developer", "Agent role name")
 	cmd.Flags().StringVar(&cliWorkDir, "workdir", "", "Working directory (default: current directory)")
+	cmd.Flags().StringVar(&cliShadowDir, "shadow-dir", "", "Shadow directory for agent files overlay (AGENTS.md, .agents*, .csw*, .cswdata)")
 	cmd.Flags().StringVar(&cliWorktree, "worktree", "", "Create and use a git worktree for this session on a feature branch")
 	cmd.Flags().BoolVar(&cliMerge, "merge", false, "Merge the feature worktree branch into main after commit")
 	cmd.Flags().StringVar(&cliContainerImage, "container-image", "", "Container image for running bash commands in container mode")
@@ -286,6 +290,7 @@ func firstNonEmpty(values ...string) string {
 func applyCLIDefaults(
 	cmd *cobra.Command,
 	workDir string,
+	shadowDir string,
 	projectConfig string,
 	configPath string,
 	model *string,
@@ -307,7 +312,16 @@ func applyCLIDefaults(
 		return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to build config path: %w", err)
 	}
 
-	configStore, err := newCompositeConfigStoreFunc(resolvedWorkDir, configPathStr)
+	configRoot := resolvedWorkDir
+	if strings.TrimSpace(shadowDir) != "" {
+		resolvedShadowDir, shadowErr := ResolveWorkDir(shadowDir)
+		if shadowErr != nil {
+			return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to resolve shadow directory: %w", shadowErr)
+		}
+		configRoot = resolvedShadowDir
+	}
+
+	configStore, err := newCompositeConfigStoreFunc(configRoot, configPathStr)
 	if err != nil {
 		return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to create config store: %w", err)
 	}
@@ -361,7 +375,7 @@ func runCLI(params *CLIParams) error {
 		return fmt.Errorf("runCLI() [cli.go]: container mode options are not supported with --resume")
 	}
 
-	resolvedWorktreeBranch, err := resolveWorktreeBranchName(ctx, params.Prompt, params.ModelName, params.WorkDir, params.ProjectConfig, params.ConfigPath, params.WorktreeBranch)
+	resolvedWorktreeBranch, err := resolveWorktreeBranchName(ctx, params.Prompt, params.ModelName, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath, params.WorktreeBranch)
 	if err != nil {
 		return fmt.Errorf("runCLI() [cli.go]: failed to resolve worktree branch: %w", err)
 	}
@@ -372,6 +386,7 @@ func runCLI(params *CLIParams) error {
 
 	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
 		WorkDir:           params.WorkDir,
+		ShadowDir:         params.ShadowDir,
 		ConfigPath:        params.ConfigPath,
 		ProjectConfig:     params.ProjectConfig,
 		ModelName:         params.ModelName,
@@ -398,6 +413,7 @@ func runCLI(params *CLIParams) error {
 	defer logging.FlushLogs()
 
 	params.WorkDir = buildResult.WorkDir
+	params.ShadowDir = buildResult.ShadowDir
 	params.ModelName = buildResult.ModelName
 	if params.LSPServer != "" {
 		lspStatus := "disabled"
@@ -806,7 +822,7 @@ func resolveGitIdentity(value, gitConfigKey string) string {
 	return resolveHostGitConfigValue(gitConfigKey)
 }
 
-func resolveWorktreeBranchName(ctx context.Context, prompt, modelName, workDir, projectConfig, configPath, worktreeBranch string) (string, error) {
+func resolveWorktreeBranchName(ctx context.Context, prompt, modelName, workDir, shadowDir, projectConfig, configPath, worktreeBranch string) (string, error) {
 	if worktreeBranch == "" || !strings.HasSuffix(worktreeBranch, "%") {
 		return worktreeBranch, nil
 	}
@@ -826,7 +842,16 @@ func resolveWorktreeBranchName(ctx context.Context, prompt, modelName, workDir, 
 		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to build config path: %w", err)
 	}
 
-	configStore, err := newCompositeConfigStoreFunc(resolvedWorkDir, configPathStr)
+	configRoot := resolvedWorkDir
+	if strings.TrimSpace(shadowDir) != "" {
+		resolvedShadowDir, shadowErr := ResolveWorkDir(shadowDir)
+		if shadowErr != nil {
+			return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to resolve shadow directory: %w", shadowErr)
+		}
+		configRoot = resolvedShadowDir
+	}
+
+	configStore, err := newCompositeConfigStoreFunc(configRoot, configPathStr)
 	if err != nil {
 		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to create config store: %w", err)
 	}

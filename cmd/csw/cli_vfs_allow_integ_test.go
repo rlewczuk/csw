@@ -202,6 +202,7 @@ func TestVFSAllowFlagInHelp(t *testing.T) {
 	// Verify that --vfs-allow is mentioned in help
 	assert.Contains(t, helpOutput, "--vfs-allow")
 	assert.Contains(t, helpOutput, "Additional path to allow VFS access")
+	assert.Contains(t, helpOutput, "--shadow-dir")
 }
 
 // require is a helper to assert no error

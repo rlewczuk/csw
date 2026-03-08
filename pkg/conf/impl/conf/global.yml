@@ -27,3 +27,12 @@ tool_selection:
 llm_retry_max_attempts: 10
 llm_retry_max_backoff_seconds: 60
 context_compaction_threshold: 0.95
+
+shadow_paths:
+  - AGENTS.md
+  - "**/AGENTS.md"
+  - .agentsignore
+  - "**/.agentsignore"
+  - .agents/**
+  - .csw/**
+  - .cswdata/**

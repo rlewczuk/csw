@@ -73,6 +73,9 @@ type SweSystem struct {
 	// Working directory for the system
 	WorkDir string
 
+	// ShadowDir is the optional shadow directory used for agent files and runtime data.
+	ShadowDir string
+
 	// LogLLMRequests enables logging of LLM requests and responses
 	LogLLMRequests bool
 

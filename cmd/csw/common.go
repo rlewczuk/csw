@@ -82,7 +82,7 @@ func GetCompositeConfigStore() (conf.ConfigStore, error) {
 
 // BuildConfigPath builds a config path hierarchy string from the base path and optional custom paths.
 // Returns a string in the format: "@DEFAULTS:~/.config/csw:<project-config>[:custom-paths]"
-// If projectConfig is empty, defaults to "./.csw/config".
+// If projectConfig is empty, defaults to "@PROJ/.csw/config".
 func BuildConfigPath(projectConfig, customConfigPath string) (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -90,7 +90,7 @@ func BuildConfigPath(projectConfig, customConfigPath string) (string, error) {
 	}
 
 	// Determine project config path
-	projectConfigPath := "./.csw/config"
+	projectConfigPath := "@PROJ/.csw/config"
 	if projectConfig != "" {
 		// Validate project config directory exists and is a directory
 		info, err := os.Stat(projectConfig)
