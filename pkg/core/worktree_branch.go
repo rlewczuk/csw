@@ -17,13 +17,13 @@ type WorktreeBranchPromptData struct {
 }
 
 // GenerateWorktreeBranchName generates a symbolic worktree branch suffix using the active chat model.
-func GenerateWorktreeBranchName(ctx context.Context, sweSystem *SweSystem, model string, inputPrompt string) (string, error) {
-	if sweSystem == nil {
-		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: sweSystem cannot be nil")
+func GenerateWorktreeBranchName(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore conf.ConfigStore, model string, inputPrompt string) (string, error) {
+	if modelProviders == nil {
+		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: model providers cannot be nil")
 	}
 
-	if sweSystem.ConfigStore == nil {
-		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: sweSystem config store cannot be nil")
+	if configStore == nil {
+		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: config store cannot be nil")
 	}
 
 	providerName, modelName, err := parseProviderModel(model)
@@ -31,12 +31,12 @@ func GenerateWorktreeBranchName(ctx context.Context, sweSystem *SweSystem, model
 		return "", err
 	}
 
-	provider, ok := sweSystem.ModelProviders[providerName]
+	provider, ok := modelProviders[providerName]
 	if !ok {
 		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: provider not found: %s", providerName)
 	}
 
-	systemPrompt, messageTemplate, err := LoadWorktreeBranchPromptTemplates(sweSystem.ConfigStore)
+	systemPrompt, messageTemplate, err := LoadWorktreeBranchPromptTemplates(configStore)
 	if err != nil {
 		return "", err
 	}

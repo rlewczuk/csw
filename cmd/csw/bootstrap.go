@@ -18,6 +18,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
@@ -152,7 +153,7 @@ func prepareSessionVFS(workDir string, worktreesBaseDir string, worktreeBranch s
 }
 
 // BuildSystem builds a SweSystem and related setup for CLI and TUI.
-func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, error) {
+func BuildSystem(params BuildSystemParams) (*system.SweSystem, BuildSystemResult, error) {
 	var result BuildSystemResult
 
 	workDir, err := ResolveWorkDir(params.WorkDir)
@@ -362,7 +363,7 @@ func BuildSystem(params BuildSystemParams) (*core.SweSystem, BuildSystemResult, 
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 
-	sweSystem := &core.SweSystem{
+	sweSystem := &system.SweSystem{
 		ModelProviders:  modelProviders,
 		ModelTags:       modelTagRegistry,
 		ToolSelection:   globalConfig.ToolSelection,

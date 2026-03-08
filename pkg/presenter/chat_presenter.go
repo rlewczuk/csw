@@ -5,6 +5,7 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
 )
@@ -17,7 +18,7 @@ type ChatPresenter struct {
 	view    ui.IChatView
 	appView ui.IAppView
 	thread  *core.SessionThread
-	system  *core.SweSystem
+	system  *system.SweSystem
 
 	// Tracking state for current run
 	currentAssistantMessage *ui.ChatMessageUI
@@ -33,7 +34,7 @@ func (p *ChatPresenter) SetAppView(view ui.IAppView) {
 }
 
 // NewChatPresenter creates a new ChatPresenter with the given system and session thread.
-func NewChatPresenter(system *core.SweSystem, thread *core.SessionThread) *ChatPresenter {
+func NewChatPresenter(system *system.SweSystem, thread *core.SessionThread) *ChatPresenter {
 	p := &ChatPresenter{
 		system: system,
 		thread: thread,

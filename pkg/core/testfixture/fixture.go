@@ -9,6 +9,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vfs"
@@ -50,7 +51,7 @@ type SweSystemFixture struct {
 	Client models.ModelProvider
 	VFS    vfs.VFS
 	Tools  *tool.ToolRegistry
-	System *core.SweSystem
+	System *system.SweSystem
 }
 
 // SweSystemFixtureOption configures a SweSystemFixture.
@@ -65,7 +66,7 @@ type SweSystemFixtureConfig struct {
 	VFS              vfs.VFS
 	Tools            *tool.ToolRegistry
 	WorkDir          string
-	SessionLogger    core.SessionLoggerFactory
+	SessionLogger    system.SessionLoggerFactory
 	Roles            *core.AgentRoleRegistry
 	ConfigStore      conf.ConfigStore
 	LSP              lsp.LSP
@@ -126,7 +127,7 @@ func NewSweSystemFixture(t *testing.T, opts ...SweSystemFixtureOption) *SweSyste
 		providers = map[string]models.ModelProvider{config.ProviderName: provider}
 	}
 
-	system := &core.SweSystem{
+	system := &system.SweSystem{
 		ModelProviders:       providers,
 		ModelTags:            models.NewModelTagRegistry(),
 		PromptGenerator:      config.PromptGenerator,
@@ -202,7 +203,7 @@ func WithWorkDir(workDir string) SweSystemFixtureOption {
 }
 
 // WithSessionLoggerFactory sets a custom session logger factory.
-func WithSessionLoggerFactory(factory core.SessionLoggerFactory) SweSystemFixtureOption {
+func WithSessionLoggerFactory(factory system.SessionLoggerFactory) SweSystemFixtureOption {
 	return func(config *SweSystemFixtureConfig) {
 		config.SessionLogger = factory
 	}

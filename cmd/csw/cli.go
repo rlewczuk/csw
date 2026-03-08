@@ -21,6 +21,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/presenter"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/ui/cli"
@@ -871,12 +872,7 @@ func resolveWorktreeBranchName(ctx context.Context, prompt, modelName, workDir, 
 		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to create provider map: %w", err)
 	}
 
-	sweSystem := &core.SweSystem{
-		ModelProviders: modelProviders,
-		ConfigStore:    configStore,
-	}
-
-	branchSuffix, err := generateWorktreeBranchNameFunc(ctx, sweSystem, resolvedModelName, prompt)
+	branchSuffix, err := generateWorktreeBranchNameFunc(ctx, modelProviders, configStore, resolvedModelName, prompt)
 	if err != nil {
 		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to generate branch name: %w", err)
 	}
@@ -884,12 +880,12 @@ func resolveWorktreeBranchName(ctx context.Context, prompt, modelName, workDir, 
 	return prefix + branchSuffix, nil
 }
 
-func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *core.SweSystem, session *core.SweSession, stderr io.Writer) {
+func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer) {
 	if worktreeBranch == "" || vcs == nil {
 		return
 	}
 
-	commitMessage, err := generateWorktreeCommitMessage(ctx, sweSystem, session, worktreeBranch, commitMessageTemplate)
+	commitMessage, err := generateWorktreeCommitMessage(ctx, sweSystem.ModelProviders, sweSystem.ConfigStore, session, worktreeBranch, commitMessageTemplate)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "worktree commit message generation failed: %v\n", err)
 		if dropErr := vcs.DropWorktree(worktreeBranch); dropErr != nil {

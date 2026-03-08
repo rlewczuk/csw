@@ -34,7 +34,6 @@ const (
 
 type SweSession struct {
 	id            string
-	system        *SweSystem
 	provider      models.ModelProvider
 	providerName  string
 	model         string
@@ -43,14 +42,27 @@ type SweSession struct {
 	messages      []*models.ChatMessage
 	role          *conf.AgentRoleConfig
 	VFS           vfs.VFS
+	baseVFS       vfs.VFS
 	LSP           lsp.LSP
 	Tools         *tool.ToolRegistry
 	outputHandler SessionThreadOutput
 	workDir       string
+	shadowDir     string
 	todoList      []tool.TodoItem
 	todoMu        sync.Mutex
 	logger        *slog.Logger
 	llmLogger     *slog.Logger
+
+	modelProviders map[string]models.ModelProvider
+	modelTags      *models.ModelTagRegistry
+	toolSelection  conf.ToolSelectionConfig
+	promptGenerator PromptGenerator
+	roles          *AgentRoleRegistry
+	configStore    conf.ConfigStore
+	systemTools    *tool.ToolRegistry
+	logBaseDir     string
+	thinking       string
+
 	// pendingPermissionToolCall stores the tool call that was blocked by a permission query
 	// This is used to re-execute the tool after permission is granted
 	pendingPermissionToolCalls []*tool.ToolCall
@@ -62,6 +74,111 @@ type SweSession struct {
 	tokenUsage       models.TokenUsage
 	contextLength    int
 	compactionCount  int
+}
+
+// SweSessionParams stores dependencies and initial values used to create a SweSession.
+type SweSessionParams struct {
+	ID           string
+	Provider     models.ModelProvider
+	ProviderName string
+	Model        string
+
+	VFS       vfs.VFS
+	BaseVFS   vfs.VFS
+	LSP       lsp.LSP
+	SystemTools *tool.ToolRegistry
+
+	ModelProviders map[string]models.ModelProvider
+	ModelTags      *models.ModelTagRegistry
+	ToolSelection  conf.ToolSelectionConfig
+	PromptGenerator PromptGenerator
+	Roles          *AgentRoleRegistry
+	ConfigStore    conf.ConfigStore
+
+	OutputHandler SessionThreadOutput
+	WorkDir       string
+	ShadowDir     string
+	LogBaseDir    string
+	Thinking      string
+
+	Logger    *slog.Logger
+	LLMLogger *slog.Logger
+
+	Role            *conf.AgentRoleConfig
+	Messages        []*models.ChatMessage
+	TodoList        []tool.TodoItem
+	RolesUsed       []string
+	ToolsUsed       []string
+	LoadedAgentFiles map[string]struct{}
+
+	PendingPermissionToolCalls []*tool.ToolCall
+	PendingToolResponses       []*tool.ToolResponse
+	TokenUsage                 models.TokenUsage
+	ContextLength              int
+	CompactionCount            int
+}
+
+// NewSweSession creates a new SweSession from provided parameters.
+func NewSweSession(params *SweSessionParams) *SweSession {
+	if params == nil {
+		params = &SweSessionParams{}
+	}
+
+	session := &SweSession{
+		id:             params.ID,
+		provider:       params.Provider,
+		providerName:   params.ProviderName,
+		model:          params.Model,
+		rolesUsed:      append([]string(nil), params.RolesUsed...),
+		toolsUsed:      append([]string(nil), params.ToolsUsed...),
+		messages:       make([]*models.ChatMessage, 0, len(params.Messages)),
+		role:           params.Role,
+		VFS:            params.VFS,
+		baseVFS:        params.BaseVFS,
+		LSP:            params.LSP,
+		Tools:          nil,
+		outputHandler:  params.OutputHandler,
+		workDir:        params.WorkDir,
+		shadowDir:      params.ShadowDir,
+		todoList:       make([]tool.TodoItem, len(params.TodoList)),
+		logger:         params.Logger,
+		llmLogger:      params.LLMLogger,
+		modelProviders: params.ModelProviders,
+		modelTags:      params.ModelTags,
+		toolSelection:  params.ToolSelection,
+		promptGenerator: params.PromptGenerator,
+		roles:          params.Roles,
+		configStore:    params.ConfigStore,
+		systemTools:    params.SystemTools,
+		logBaseDir:     params.LogBaseDir,
+		thinking:       params.Thinking,
+
+		pendingPermissionToolCalls: make([]*tool.ToolCall, 0, len(params.PendingPermissionToolCalls)),
+		pendingToolResponses:       make([]*tool.ToolResponse, 0, len(params.PendingToolResponses)),
+		loadedAgentFiles:           make(map[string]struct{}, len(params.LoadedAgentFiles)),
+		tokenUsage:                 params.TokenUsage,
+		contextLength:              params.ContextLength,
+		compactionCount:            params.CompactionCount,
+	}
+
+	if session.baseVFS == nil {
+		session.baseVFS = session.VFS
+	}
+
+	copy(session.todoList, params.TodoList)
+	session.messages = append(session.messages, params.Messages...)
+	session.pendingPermissionToolCalls = append(session.pendingPermissionToolCalls, params.PendingPermissionToolCalls...)
+	session.pendingToolResponses = append(session.pendingToolResponses, params.PendingToolResponses...)
+	for path := range params.LoadedAgentFiles {
+		session.loadedAgentFiles[path] = struct{}{}
+	}
+
+	session.applyModelTagToolSelection()
+	if session.role != nil && session.role.ToolsAccess != nil {
+		session.Tools = wrapToolsWithAccessControl(session.Tools, session.role.ToolsAccess)
+	}
+
+	return session
 }
 
 type persistedToolResponse struct {
@@ -102,6 +219,9 @@ type persistedSessionState struct {
 	UpdatedAt                  string                  `json:"updated_at"`
 }
 
+// PersistedSessionState is a persisted session state model used for loading sessions.
+type PersistedSessionState = persistedSessionState
+
 // Prompt adds user prompt to the conversation and starts processing if processing is not already in progress.
 // If processing is already in progress, if will be added at the end of conversation after current LLM request is completed,
 // its tool calls are executed etc. Returns immediately.
@@ -127,13 +247,13 @@ func (s *SweSession) Run(ctx context.Context) error {
 	toolNames := s.Tools.List()
 
 	// Get model tags for this model
-	tags := s.system.ModelTags.GetTagsForModel(s.providerName, s.model)
+	tags := s.GetModelTags()
 
 	// Get agent state for template processing
 	state := s.GetState()
 
 	for _, toolName := range toolNames {
-		toolInfo, err := s.system.PromptGenerator.GetToolInfo(tags, toolName, s.role, &state)
+		toolInfo, err := s.promptGenerator.GetToolInfo(tags, toolName, s.role, &state)
 		if err != nil {
 			// Log warning and skip this tool if description not found
 			if s.logger != nil {
@@ -223,14 +343,14 @@ func (s *SweSession) Run(ctx context.Context) error {
 }
 
 func (s *SweSession) buildChatOptions() *models.ChatOptions {
-	if s.llmLogger == nil && s.id == "" && s.system.Thinking == "" {
+	if s.llmLogger == nil && s.id == "" && s.thinking == "" {
 		return nil
 	}
 
 	return &models.ChatOptions{
 		Logger:    s.llmLogger,
 		SessionID: s.id,
-		Thinking:  s.system.Thinking,
+		Thinking:  s.thinking,
 	}
 }
 
@@ -431,7 +551,7 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 
 // buildAdditionalAgentMessages builds user messages with extra AGENTS.md instructions for vfsRead/vfsGrep tool calls.
 func (s *SweSession) buildAdditionalAgentMessages(toolCall *tool.ToolCall, response *tool.ToolResponse) ([]*models.ChatMessage, error) {
-	if s == nil || s.system == nil || s.system.PromptGenerator == nil || toolCall == nil || response == nil || response.Error != nil {
+	if s == nil || s.promptGenerator == nil || toolCall == nil || response == nil || response.Error != nil {
 		return nil, nil
 	}
 
@@ -502,7 +622,7 @@ func (s *SweSession) buildAdditionalAgentMessageForDir(dir string) ([]*models.Ch
 		s.loadedAgentFiles = make(map[string]struct{})
 	}
 
-	files, err := s.system.PromptGenerator.GetAgentFiles(relDir)
+	files, err := s.promptGenerator.GetAgentFiles(relDir)
 	if err != nil {
 		return nil, fmt.Errorf("SweSession.buildAdditionalAgentMessageForDir() [session.go]: failed to get agent files for %q: %w", relDir, err)
 	}
@@ -603,6 +723,16 @@ func (s *SweSession) SetLogger(logger *slog.Logger) {
 	s.logger = logger
 }
 
+// SetOutputHandler sets output handler used by session callbacks.
+func (s *SweSession) SetOutputHandler(handler SessionThreadOutput) {
+	s.outputHandler = handler
+}
+
+// OutputHandler returns currently configured output handler.
+func (s *SweSession) OutputHandler() SessionThreadOutput {
+	return s.outputHandler
+}
+
 // Model returns the model name (without provider prefix) used for this session.
 func (s *SweSession) Model() string {
 	return s.model
@@ -624,10 +754,10 @@ func (s *SweSession) ModelWithProvider() string {
 // GetState returns the current agent state for this session.
 func (s *SweSession) GetState() AgentState {
 	shadowDir := ""
-	if s.system != nil {
-		shadowDir = strings.TrimSpace(s.system.ShadowDir)
+	if s != nil {
+		shadowDir = strings.TrimSpace(s.shadowDir)
 		if shadowDir == "" {
-			shadowDir = strings.TrimSpace(s.system.WorkDir)
+			shadowDir = strings.TrimSpace(s.workDir)
 		}
 	}
 	if shadowDir == "" {
@@ -667,6 +797,11 @@ func (s *SweSession) SetWorkDir(dir string) {
 	s.persistSessionState()
 }
 
+// PersistSessionState persists current session state to disk.
+func (s *SweSession) PersistSessionState() {
+	s.persistSessionState()
+}
+
 // Role returns the current agent role for this session.
 func (s *SweSession) Role() *conf.AgentRoleConfig {
 	return s.role
@@ -679,11 +814,11 @@ func (s *SweSession) ProviderName() string {
 
 // ThinkingLevel returns configured thinking level for this session.
 func (s *SweSession) ThinkingLevel() string {
-	if s == nil || s.system == nil {
+	if s == nil {
 		return ""
 	}
 
-	return strings.TrimSpace(s.system.Thinking)
+	return strings.TrimSpace(s.thinking)
 }
 
 // UsedRoles returns roles used during this session in first-seen order.
@@ -712,10 +847,10 @@ func (s *SweSession) UsedTools() []string {
 // Tags are determined by matching the model name against regexp patterns
 // from both global config and provider-specific config.
 func (s *SweSession) GetModelTags() []string {
-	if s.system.ModelTags == nil {
+	if s.modelTags == nil {
 		return nil
 	}
-	return s.system.ModelTags.GetTagsForModel(s.providerName, s.model)
+	return s.modelTags.GetTagsForModel(s.providerName, s.model)
 }
 
 // SetModel sets the model used for the session.
@@ -735,7 +870,7 @@ func (s *SweSession) SetModel(modelStr string) error {
 	providerName := parts[0]
 	modelName := parts[1]
 
-	provider, ok := s.system.ModelProviders[providerName]
+	provider, ok := s.modelProviders[providerName]
 	if !ok {
 		if s.logger != nil {
 			s.logger.Error("set_model_failed", "model", modelStr, "error", "provider not found")
@@ -756,13 +891,13 @@ func (s *SweSession) SetModel(modelStr string) error {
 
 // applyModelTagToolSelection rebuilds tools and applies model-tag based tool selection rules.
 func (s *SweSession) applyModelTagToolSelection() {
-	baseTools := buildSessionToolRegistry(s.system.Tools, s.VFS, s.LSP, s)
-	if s.system.ModelTags == nil {
-		s.Tools = filterToolsForRole(baseTools.FilterByModelTags(nil, s.system.ToolSelection), s.role)
+	baseTools := buildSessionToolRegistry(s.systemTools, s.VFS, s.LSP, s)
+	if s.modelTags == nil {
+		s.Tools = filterToolsForRole(baseTools.FilterByModelTags(nil, s.toolSelection), s.role)
 		return
 	}
-	tags := s.system.ModelTags.GetTagsForModel(s.providerName, s.model)
-	s.Tools = filterToolsForRole(baseTools.FilterByModelTags(tags, s.system.ToolSelection), s.role)
+	tags := s.modelTags.GetTagsForModel(s.providerName, s.model)
+	s.Tools = filterToolsForRole(baseTools.FilterByModelTags(tags, s.toolSelection), s.role)
 }
 
 // SetRole changes the agent role for this session.
@@ -773,7 +908,7 @@ func (s *SweSession) SetRole(roleName string) error {
 		s.logger.Info("set_role", "role", roleName)
 	}
 
-	role, ok := s.system.Roles.Get(roleName)
+	role, ok := s.roles.Get(roleName)
 	if !ok {
 		if s.logger != nil {
 			s.logger.Error("set_role_failed", "role", roleName, "error", "role not found")
@@ -787,9 +922,9 @@ func (s *SweSession) SetRole(roleName string) error {
 
 	// Wrap VFS with access control based on role privileges
 	if role.VFSPrivileges != nil {
-		s.VFS = vfs.NewAccessControlVFS(s.system.VFS, role.VFSPrivileges)
+		s.VFS = vfs.NewAccessControlVFS(s.baseVFS, role.VFSPrivileges)
 	} else {
-		s.VFS = s.system.VFS
+		s.VFS = s.baseVFS
 	}
 
 	// Rebuild tools with the session's VFS and role and apply model-tag selection
@@ -801,7 +936,7 @@ func (s *SweSession) SetRole(roleName string) error {
 	}
 
 	// Generate and update system prompt using the prompt generator
-	if s.system.PromptGenerator != nil {
+	if s.promptGenerator != nil {
 		state := s.GetState()
 
 		// Get model tags from registry
@@ -812,7 +947,7 @@ func (s *SweSession) SetRole(roleName string) error {
 			tags = []string{}
 		}
 
-		renderedPrompt, err := s.system.PromptGenerator.GetPrompt(tags, &role, &state)
+		renderedPrompt, err := s.promptGenerator.GetPrompt(tags, &role, &state)
 		if err != nil {
 			return fmt.Errorf("SweSession.SetRole() [session.go]: failed to generate system prompt: %w", err)
 		}
@@ -1123,8 +1258,8 @@ func (s *SweSession) getSessionLogDirectory() string {
 		return ""
 	}
 
-	if s.system != nil && s.system.LogBaseDir != "" {
-		return filepath.Join(s.system.LogBaseDir, "sessions", s.id)
+	if s.logBaseDir != "" {
+		return filepath.Join(s.logBaseDir, "sessions", s.id)
 	}
 
 	dir := logging.GetSessionLogDirectory(s.id)
@@ -1194,8 +1329,8 @@ func (s *SweSession) maybeCompactContext() error {
 }
 
 func (s *SweSession) contextCompactionThreshold() float64 {
-	if s.system != nil && s.system.ConfigStore != nil {
-		globalConfig, err := s.system.ConfigStore.GetGlobalConfig()
+	if s.configStore != nil {
+		globalConfig, err := s.configStore.GetGlobalConfig()
 		if err == nil && globalConfig != nil && globalConfig.ContextCompactionThreshold > 0 && globalConfig.ContextCompactionThreshold <= 1 {
 			return globalConfig.ContextCompactionThreshold
 		}
@@ -1276,8 +1411,8 @@ func serializeToolResponse(response *tool.ToolResponse) persistedToolResponse {
 // maxRetries returns the maximum number of retries for rate limit/network errors.
 // Returns default value from models.DefaultMaxRetries if not configured.
 func (s *SweSession) llmRetryMaxAttempts() int {
-	if s.system != nil && s.system.ConfigStore != nil {
-		globalConfig, err := s.system.ConfigStore.GetGlobalConfig()
+	if s.configStore != nil {
+		globalConfig, err := s.configStore.GetGlobalConfig()
 		if err == nil && globalConfig != nil && globalConfig.LLMRetryMaxAttempts > 0 {
 			return globalConfig.LLMRetryMaxAttempts
 		}
@@ -1297,8 +1432,8 @@ func (s *SweSession) llmRetryMaxAttempts() int {
 
 // llmRetryMaxBackoffSeconds returns the maximum backoff in seconds for temporary failures.
 func (s *SweSession) llmRetryMaxBackoffSeconds() int {
-	if s.system != nil && s.system.ConfigStore != nil {
-		globalConfig, err := s.system.ConfigStore.GetGlobalConfig()
+	if s.configStore != nil {
+		globalConfig, err := s.configStore.GetGlobalConfig()
 		if err == nil && globalConfig != nil && globalConfig.LLMRetryMaxBackoffSeconds > 0 {
 			return globalConfig.LLMRetryMaxBackoffSeconds
 		}
@@ -1337,62 +1472,65 @@ func (s *SweSession) HasPendingWork() bool {
 	return false
 }
 
-func restoreSessionFromPersistedState(system *SweSystem, state persistedSessionState, outputHandler SessionThreadOutput) (*SweSession, error) {
+// RestoreSessionFromPersistedState restores session state from persisted data.
+func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedSessionState, outputHandler SessionThreadOutput) (*SweSession, error) {
 	if strings.TrimSpace(state.SessionID) == "" {
-		return nil, fmt.Errorf("restoreSessionFromPersistedState() [session.go]: missing session_id in persisted state")
+		return nil, fmt.Errorf("RestoreSessionFromPersistedState() [session.go]: missing session_id in persisted state")
 	}
 
-	provider, ok := system.ModelProviders[state.ProviderName]
+	if params == nil {
+		return nil, fmt.Errorf("RestoreSessionFromPersistedState() [session.go]: params cannot be nil")
+	}
+
+	provider, ok := params.ModelProviders[state.ProviderName]
 	if !ok {
-		return nil, fmt.Errorf("restoreSessionFromPersistedState() [session.go]: provider not found: %s", state.ProviderName)
+		return nil, fmt.Errorf("RestoreSessionFromPersistedState() [session.go]: provider not found: %s", state.ProviderName)
 	}
 
-	sessionLogger := logging.GetSessionLogger(state.SessionID, logging.LogTypeSession)
-
-	var llmLogger *slog.Logger
-	if system.LogLLMRequests {
-		llmLogger = logging.GetSessionLogger(state.SessionID, logging.LogTypeLLM)
-	}
-
-	session := &SweSession{
-		id:              state.SessionID,
-		system:          system,
-		provider:        provider,
-		providerName:    state.ProviderName,
-		model:           state.Model,
-		rolesUsed:       append([]string(nil), state.RolesUsed...),
-		toolsUsed:       append([]string(nil), state.ToolsUsed...),
-		messages:        make([]*models.ChatMessage, 0, len(state.Messages)),
-		role:            nil,
-		VFS:             system.VFS,
-		LSP:             system.LSP,
-		Tools:           nil,
-		outputHandler:   outputHandler,
-		workDir:         state.WorkDir,
-		todoList:        make([]tool.TodoItem, len(state.TodoList)),
-		logger:          sessionLogger,
-		llmLogger:       llmLogger,
-		tokenUsage:      state.TokenUsage,
-		contextLength:   state.ContextLengthTokens,
-		compactionCount: state.ContextCompactionCount,
-	}
-
-	copy(session.todoList, state.TodoList)
-
-	session.applyModelTagToolSelection()
+	session := NewSweSession(&SweSessionParams{
+		ID:              state.SessionID,
+		Provider:        provider,
+		ProviderName:    state.ProviderName,
+		Model:           state.Model,
+		RolesUsed:       state.RolesUsed,
+		ToolsUsed:       state.ToolsUsed,
+		Messages:        []*models.ChatMessage{},
+		Role:            nil,
+		VFS:             params.VFS,
+		BaseVFS:         params.VFS,
+		LSP:             params.LSP,
+		SystemTools:     params.SystemTools,
+		ModelProviders:  params.ModelProviders,
+		ModelTags:       params.ModelTags,
+		ToolSelection:   params.ToolSelection,
+		PromptGenerator: params.PromptGenerator,
+		Roles:           params.Roles,
+		ConfigStore:     params.ConfigStore,
+		OutputHandler:   outputHandler,
+		WorkDir:         state.WorkDir,
+		ShadowDir:       params.ShadowDir,
+		LogBaseDir:      params.LogBaseDir,
+		Thinking:        params.Thinking,
+		Logger:          params.Logger,
+		LLMLogger:       params.LLMLogger,
+		TodoList:        state.TodoList,
+		TokenUsage:      state.TokenUsage,
+		ContextLength:   state.ContextLengthTokens,
+		CompactionCount: state.ContextCompactionCount,
+	})
 
 	if strings.TrimSpace(state.RoleName) != "" {
-		role, roleOK := system.Roles.Get(state.RoleName)
+		role, roleOK := params.Roles.Get(state.RoleName)
 		if !roleOK {
-			return nil, fmt.Errorf("restoreSessionFromPersistedState() [session.go]: role not found: %s", state.RoleName)
+			return nil, fmt.Errorf("RestoreSessionFromPersistedState() [session.go]: role not found: %s", state.RoleName)
 		}
 
 		session.role = &role
 
 		if role.VFSPrivileges != nil {
-			session.VFS = vfs.NewAccessControlVFS(system.VFS, role.VFSPrivileges)
+			session.VFS = vfs.NewAccessControlVFS(params.VFS, role.VFSPrivileges)
 		} else {
-			session.VFS = system.VFS
+			session.VFS = params.VFS
 		}
 
 		session.applyModelTagToolSelection()
@@ -1407,7 +1545,7 @@ func restoreSessionFromPersistedState(system *SweSystem, state persistedSessionS
 	for _, persistedMsg := range state.Messages {
 		message, err := deserializeChatMessage(persistedMsg)
 		if err != nil {
-			return nil, fmt.Errorf("restoreSessionFromPersistedState() [session.go]: failed to deserialize message: %w", err)
+			return nil, fmt.Errorf("RestoreSessionFromPersistedState() [session.go]: failed to deserialize message: %w", err)
 		}
 		session.messages = append(session.messages, message)
 	}
@@ -1422,7 +1560,7 @@ func restoreSessionFromPersistedState(system *SweSystem, state persistedSessionS
 	for _, pendingResponse := range state.PendingToolResponses {
 		response, err := deserializeToolResponse(pendingResponse)
 		if err != nil {
-			return nil, fmt.Errorf("restoreSessionFromPersistedState() [session.go]: failed to deserialize pending tool response: %w", err)
+			return nil, fmt.Errorf("RestoreSessionFromPersistedState() [session.go]: failed to deserialize pending tool response: %w", err)
 		}
 		session.pendingToolResponses = append(session.pendingToolResponses, response)
 	}

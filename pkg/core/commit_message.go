@@ -24,20 +24,20 @@ type CommitMessageTemplateData struct {
 
 // GenerateCommitMessage generates a short commit message using the active chat model.
 // If customMessageTemplate is non-empty, it overrides the configured message template.
-func GenerateCommitMessage(ctx context.Context, sweSystem *SweSystem, session *SweSession, branch string, customMessageTemplate string) (string, error) {
-	if sweSystem == nil {
-		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: sweSystem cannot be nil")
+func GenerateCommitMessage(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore conf.ConfigStore, session *SweSession, branch string, customMessageTemplate string) (string, error) {
+	if modelProviders == nil {
+		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: model providers cannot be nil")
 	}
 
 	if session == nil {
 		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: session cannot be nil")
 	}
 
-	if sweSystem.ConfigStore == nil {
-		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: sweSystem config store cannot be nil")
+	if configStore == nil {
+		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: config store cannot be nil")
 	}
 
-	systemPrompt, promptTemplate, messageTemplate, err := LoadCommitPromptTemplates(sweSystem.ConfigStore)
+	systemPrompt, promptTemplate, messageTemplate, err := LoadCommitPromptTemplates(configStore)
 	if err != nil {
 		return "", err
 	}
@@ -57,7 +57,7 @@ func GenerateCommitMessage(ctx context.Context, sweSystem *SweSystem, session *S
 	}
 
 	providerName := session.ProviderName()
-	provider, ok := sweSystem.ModelProviders[providerName]
+	provider, ok := modelProviders[providerName]
 	if !ok {
 		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: provider not found: %s", providerName)
 	}

@@ -57,11 +57,16 @@ type SessionThreadOutput interface {
 	ShouldRetryAfterFailure(message string) bool
 }
 
+// SessionFactory creates a new session for a model and output handler.
+type SessionFactory interface {
+	NewSession(model string, outputHandler SessionThreadOutput) (*SweSession, error)
+}
+
 // SessionThread manages a session thread with input and context management.
 // It ensures that SweSession is only called from a background thread and that
 // at most one session loop is running at a time.
 type SessionThread struct {
-	system        *SweSystem
+	system        SessionFactory
 	outputHandler SessionThreadOutput
 
 	mu                     sync.Mutex
@@ -77,7 +82,7 @@ type SessionThread struct {
 }
 
 // NewSessionThread creates a new SessionThread with the given system and output handler.
-func NewSessionThread(system *SweSystem, outputHandler SessionThreadOutput) *SessionThread {
+func NewSessionThread(system SessionFactory, outputHandler SessionThreadOutput) *SessionThread {
 	return &SessionThread{
 		system:        system,
 		outputHandler: outputHandler,
@@ -87,9 +92,9 @@ func NewSessionThread(system *SweSystem, outputHandler SessionThreadOutput) *Ses
 
 // NewSessionThreadWithSession creates a new SessionThread with an existing session.
 // This allows creating a new thread/presenter while preserving session state and messages.
-func NewSessionThreadWithSession(system *SweSystem, session *SweSession, outputHandler SessionThreadOutput) *SessionThread {
+func NewSessionThreadWithSession(system SessionFactory, session *SweSession, outputHandler SessionThreadOutput) *SessionThread {
 	// Update the session's output handler to the new one
-	session.outputHandler = outputHandler
+	session.SetOutputHandler(outputHandler)
 	return &SessionThread{
 		system:        system,
 		session:       session,
@@ -249,7 +254,7 @@ func (c *SessionThread) SetOutputHandler(handler SessionThreadOutput) {
 
 	c.outputHandler = handler
 	if c.session != nil {
-		c.session.outputHandler = handler
+		c.session.SetOutputHandler(handler)
 	}
 }
 
@@ -301,6 +306,10 @@ func (c *SessionThread) StartSession(model string) error {
 
 	if c.session != nil {
 		return fmt.Errorf("SessionThread.StartSession() [session_thread.go]: session already exists")
+	}
+
+	if c.system == nil {
+		return fmt.Errorf("SessionThread.StartSession() [session_thread.go]: session creator is nil")
 	}
 
 	session, err := c.system.NewSession(model, c.outputHandler)

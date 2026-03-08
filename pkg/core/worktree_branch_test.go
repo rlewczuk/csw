@@ -6,6 +6,7 @@ import (
 
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,9 +37,9 @@ func TestGenerateWorktreeBranchName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			system, provider := newWorktreeBranchTestSystem(t, tt.llmResponse)
+			sweSystem, provider := newWorktreeBranchTestSystem(t, tt.llmResponse)
 
-			branch, err := GenerateWorktreeBranchName(context.Background(), system, "mock/test-model", tt.inputPrompt)
+			branch, err := GenerateWorktreeBranchName(context.Background(), sweSystem.ModelProviders, sweSystem.ConfigStore, "mock/test-model", tt.inputPrompt)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedBranch, branch)
 
@@ -55,34 +56,34 @@ func TestGenerateWorktreeBranchName(t *testing.T) {
 func TestGenerateWorktreeBranchNameErrors(t *testing.T) {
 	tests := []struct {
 		name           string
-		setupSystem    func(t *testing.T) *SweSystem
+			setupSystem    func(t *testing.T) *system.SweSystem
 		modelName      string
 		expectedErrSub string
 	}{
 		{
 			name: "fails when config store missing",
-			setupSystem: func(t *testing.T) *SweSystem {
-				system, _ := newWorktreeBranchTestSystem(t, "valid-name")
-				system.ConfigStore = nil
-				return system
+			setupSystem: func(t *testing.T) *system.SweSystem {
+				sweSystem, _ := newWorktreeBranchTestSystem(t, "valid-name")
+				sweSystem.ConfigStore = nil
+				return sweSystem
 			},
 			modelName:      "mock/test-model",
 			expectedErrSub: "config store cannot be nil",
 		},
 		{
 			name: "fails when generated name is empty after normalization",
-			setupSystem: func(t *testing.T) *SweSystem {
-				system, _ := newWorktreeBranchTestSystem(t, "!!!")
-				return system
+			setupSystem: func(t *testing.T) *system.SweSystem {
+				sweSystem, _ := newWorktreeBranchTestSystem(t, "!!!")
+				return sweSystem
 			},
 			modelName:      "mock/test-model",
 			expectedErrSub: "generated branch name is empty",
 		},
 		{
 			name: "fails on invalid model format",
-			setupSystem: func(t *testing.T) *SweSystem {
-				system, _ := newWorktreeBranchTestSystem(t, "valid-name")
-				return system
+			setupSystem: func(t *testing.T) *system.SweSystem {
+				sweSystem, _ := newWorktreeBranchTestSystem(t, "valid-name")
+				return sweSystem
 			},
 			modelName:      "test-model",
 			expectedErrSub: "invalid model format",
@@ -91,8 +92,8 @@ func TestGenerateWorktreeBranchNameErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			system := tt.setupSystem(t)
-			_, err := GenerateWorktreeBranchName(context.Background(), system, tt.modelName, "Fix cleanup issue")
+			sweSystem := tt.setupSystem(t)
+			_, err := GenerateWorktreeBranchName(context.Background(), sweSystem.ModelProviders, sweSystem.ConfigStore, tt.modelName, "Fix cleanup issue")
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.expectedErrSub)
 		})
@@ -154,7 +155,7 @@ func TestNormalizeWorktreeBranchSymbolicName(t *testing.T) {
 	}
 }
 
-func newWorktreeBranchTestSystem(t *testing.T, llmResponse string) (*SweSystem, *models.MockClient) {
+func newWorktreeBranchTestSystem(t *testing.T, llmResponse string) (*system.SweSystem, *models.MockClient) {
 	t.Helper()
 
 	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
@@ -166,10 +167,10 @@ func newWorktreeBranchTestSystem(t *testing.T, llmResponse string) (*SweSystem, 
 	store.SetAgentConfigFile("worktree", "system.md", []byte("system worktree prompt"))
 	store.SetAgentConfigFile("worktree", "message.md", []byte("input:\n{{ .Input }}"))
 
-	system := &SweSystem{
+	sweSystem := &system.SweSystem{
 		ModelProviders: map[string]models.ModelProvider{"mock": provider},
 		ConfigStore:    store,
 	}
 
-	return system, provider
+	return sweSystem, provider
 }
