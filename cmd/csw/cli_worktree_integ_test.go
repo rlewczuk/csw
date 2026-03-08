@@ -8,6 +8,7 @@ import (
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -156,7 +157,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 	}
 }
 
-func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTemplate bool) (*core.SweSystem, *core.SweSession, *vfs.MockVCS) {
+func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTemplate bool) (*system.SweSystem, *core.SweSession, *vfs.MockVCS) {
 	t.Helper()
 
 	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
@@ -171,7 +172,7 @@ func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTe
 	configStore.SetAgentConfigFile("commit", "prompt.md", []byte("{{- range .Messages }}{{ . }}\n{{- end }}"))
 	configStore.SetAgentConfigFile("commit", "message.md", []byte("[{{ .Branch }}] {{ .Message }}"))
 
-	system := &core.SweSystem{
+	system := &system.SweSystem{
 		ModelProviders: map[string]models.ModelProvider{"mock": provider},
 		ConfigStore:    configStore,
 	}

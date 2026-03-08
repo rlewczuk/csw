@@ -482,9 +482,6 @@ func TestSweSessionGetState(t *testing.T) {
 	})
 
 	t.Run("SetWorkDir updates work directory in state", func(t *testing.T) {
-		expectedWorkDir, err := filepath.Abs(".")
-		require.NoError(t, err)
-
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
 			ModelTags:            models.NewModelTagRegistry(),
@@ -502,7 +499,7 @@ func TestSweSessionGetState(t *testing.T) {
 
 		state := session.GetState()
 		assert.Equal(t, "/home/user/project", state.Info.WorkDir)
-		assert.Equal(t, expectedWorkDir, state.Info.ShadowDir)
+		assert.Equal(t, "/home/user/project", state.Info.ShadowDir)
 	})
 
 	t.Run("GetState returns absolute shadow directory when explicitly set", func(t *testing.T) {

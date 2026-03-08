@@ -6,7 +6,6 @@ import (
 
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
-	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -68,15 +67,15 @@ func TestGenerateCommitMessage(t *testing.T) {
 func TestGenerateCommitMessageErrors(t *testing.T) {
 	tests := []struct {
 		name           string
-			setupSystem    func(t *testing.T) (*system.SweSystem, *SweSession)
+		setupSystem    func(t *testing.T) (*SweSystem, *SweSession)
 		expectedErrSub string
 	}{
 		{
 			name: "fails when template file is missing",
-			setupSystem: func(t *testing.T) (*system.SweSystem, *SweSession) {
+			setupSystem: func(t *testing.T) (*SweSystem, *SweSession) {
 				model := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
 				store := confimpl.NewMockConfigStore()
-				system := &system.SweSystem{ModelProviders: map[string]models.ModelProvider{"mock": model}, ConfigStore: store}
+				system := &SweSystem{ModelProviders: map[string]models.ModelProvider{"mock": model}, ConfigStore: store}
 				session, err := system.NewSession("mock/test-model", nil)
 				require.NoError(t, err)
 				return system, session
@@ -85,7 +84,7 @@ func TestGenerateCommitMessageErrors(t *testing.T) {
 		},
 		{
 			name: "fails when config store is missing",
-			setupSystem: func(t *testing.T) (*system.SweSystem, *SweSession) {
+			setupSystem: func(t *testing.T) (*SweSystem, *SweSession) {
 				system, session, _ := newCommitMessageTestSystem(t, "ignored")
 				system.ConfigStore = nil
 				return system, session
@@ -94,7 +93,7 @@ func TestGenerateCommitMessageErrors(t *testing.T) {
 		},
 		{
 			name: "fails when generated message is empty",
-			setupSystem: func(t *testing.T) (*system.SweSystem, *SweSession) {
+			setupSystem: func(t *testing.T) (*SweSystem, *SweSession) {
 				system, session, _ := newCommitMessageTestSystem(t, "   ")
 				return system, session
 			},
@@ -112,7 +111,7 @@ func TestGenerateCommitMessageErrors(t *testing.T) {
 	}
 }
 
-func newCommitMessageTestSystem(t *testing.T, llmResponse string) (*system.SweSystem, *SweSession, *models.MockClient) {
+func newCommitMessageTestSystem(t *testing.T, llmResponse string) (*SweSystem, *SweSession, *models.MockClient) {
 	t.Helper()
 
 	model := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
@@ -125,7 +124,7 @@ func newCommitMessageTestSystem(t *testing.T, llmResponse string) (*system.SweSy
 	store.SetAgentConfigFile("commit", "prompt.md", []byte("messages:\n{{- range .Messages }}\n- {{ . }}\n{{- end }}"))
 	store.SetAgentConfigFile("commit", "message.md", []byte("[{{ .Branch }}] {{ .Message }}"))
 
-	system := &system.SweSystem{
+	system := &SweSystem{
 		ModelProviders: map[string]models.ModelProvider{"mock": model},
 		ConfigStore:    store,
 	}

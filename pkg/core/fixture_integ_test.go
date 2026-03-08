@@ -8,7 +8,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/models"
-	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vfs"
@@ -19,7 +18,7 @@ type sweSystemFixture struct {
 	client models.ModelProvider
 	vfs    vfs.VFS
 	tools  *tool.ToolRegistry
-	system *system.SweSystem
+	system *SweSystem
 }
 
 type sweSystemFixtureOption func(*sweSystemFixtureConfig)
@@ -88,7 +87,7 @@ func newSweSystemFixture(t *testing.T, prompt string, opts ...sweSystemFixtureOp
 		providers = map[string]models.ModelProvider{config.providerName: provider}
 	}
 
-	system := &system.SweSystem{
+	system := &SweSystem{
 		ModelProviders:       providers,
 		ModelTags:            models.NewModelTagRegistry(),
 		PromptGenerator:      config.promptGenerator,

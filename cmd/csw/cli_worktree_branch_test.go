@@ -7,7 +7,6 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
-	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -88,7 +87,7 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 			}
 
 			generateCalls := 0
-			generateWorktreeBranchNameFunc = func(ctx context.Context, sweSystem *core.SweSystem, model string, inputPrompt string) (string, error) {
+			generateWorktreeBranchNameFunc = func(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore conf.ConfigStore, model string, inputPrompt string) (string, error) {
 				generateCalls++
 				if tt.generatorError != nil {
 					return "", tt.generatorError

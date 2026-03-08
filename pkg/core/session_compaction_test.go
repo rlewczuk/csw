@@ -49,11 +49,9 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 
 		handler := &compactionOutputHandler{}
 		session := &SweSession{
-			id: "session-1",
-			system: &SweSystem{
-				LogBaseDir:  tmpDir,
-				ConfigStore: configStore,
-			},
+			id:         "session-1",
+			logBaseDir: tmpDir,
+			configStore: configStore,
 			provider:      provider,
 			contextLength: 96,
 			messages: []*models.ChatMessage{
@@ -93,11 +91,9 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 
 		handler := &compactionOutputHandler{}
 		session := &SweSession{
-			id: "session-2",
-			system: &SweSystem{
-				LogBaseDir:  tmpDir,
-				ConfigStore: configStore,
-			},
+			id:          "session-2",
+			logBaseDir:  tmpDir,
+			configStore: configStore,
 			provider:      provider,
 			contextLength: 94,
 			messages: []*models.ChatMessage{
@@ -123,7 +119,7 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 		provider.Config = &conf.ModelProviderConfig{ContextLengthLimit: 100}
 
 		session := &SweSession{
-			system: &SweSystem{ConfigStore: configStore},
+			configStore: configStore,
 			provider:      provider,
 			contextLength: 96,
 			messages: []*models.ChatMessage{

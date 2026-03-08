@@ -6,7 +6,6 @@ import (
 
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
-	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -56,13 +55,13 @@ func TestGenerateWorktreeBranchName(t *testing.T) {
 func TestGenerateWorktreeBranchNameErrors(t *testing.T) {
 	tests := []struct {
 		name           string
-			setupSystem    func(t *testing.T) *system.SweSystem
+		setupSystem    func(t *testing.T) *SweSystem
 		modelName      string
 		expectedErrSub string
 	}{
 		{
 			name: "fails when config store missing",
-			setupSystem: func(t *testing.T) *system.SweSystem {
+			setupSystem: func(t *testing.T) *SweSystem {
 				sweSystem, _ := newWorktreeBranchTestSystem(t, "valid-name")
 				sweSystem.ConfigStore = nil
 				return sweSystem
@@ -72,7 +71,7 @@ func TestGenerateWorktreeBranchNameErrors(t *testing.T) {
 		},
 		{
 			name: "fails when generated name is empty after normalization",
-			setupSystem: func(t *testing.T) *system.SweSystem {
+			setupSystem: func(t *testing.T) *SweSystem {
 				sweSystem, _ := newWorktreeBranchTestSystem(t, "!!!")
 				return sweSystem
 			},
@@ -81,7 +80,7 @@ func TestGenerateWorktreeBranchNameErrors(t *testing.T) {
 		},
 		{
 			name: "fails on invalid model format",
-			setupSystem: func(t *testing.T) *system.SweSystem {
+			setupSystem: func(t *testing.T) *SweSystem {
 				sweSystem, _ := newWorktreeBranchTestSystem(t, "valid-name")
 				return sweSystem
 			},
@@ -155,7 +154,7 @@ func TestNormalizeWorktreeBranchSymbolicName(t *testing.T) {
 	}
 }
 
-func newWorktreeBranchTestSystem(t *testing.T, llmResponse string) (*system.SweSystem, *models.MockClient) {
+func newWorktreeBranchTestSystem(t *testing.T, llmResponse string) (*SweSystem, *models.MockClient) {
 	t.Helper()
 
 	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
@@ -167,7 +166,7 @@ func newWorktreeBranchTestSystem(t *testing.T, llmResponse string) (*system.SweS
 	store.SetAgentConfigFile("worktree", "system.md", []byte("system worktree prompt"))
 	store.SetAgentConfigFile("worktree", "message.md", []byte("input:\n{{ .Input }}"))
 
-	sweSystem := &system.SweSystem{
+	sweSystem := &SweSystem{
 		ModelProviders: map[string]models.ModelProvider{"mock": provider},
 		ConfigStore:    store,
 	}

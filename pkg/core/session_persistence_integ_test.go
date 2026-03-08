@@ -124,10 +124,8 @@ func TestSessionPersistenceLogDirectoryFallback(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		session := &SweSession{
-			id: "session-1",
-			system: &SweSystem{
-				LogBaseDir: tmpDir,
-			},
+			id:         "session-1",
+			logBaseDir: tmpDir,
 		}
 
 		dir := session.getSessionLogDirectory()

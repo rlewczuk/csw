@@ -92,11 +92,9 @@ func TestBuildAdditionalAgentMessageForDir(t *testing.T) {
 	require.NoError(t, mockVFS.WriteFile("AGENTS.md", []byte("root instructions")))
 
 	session := &SweSession{
-		system: &SweSystem{
-			PromptGenerator: &sessionAgentTestPromptGenerator{vfs: mockVFS},
-		},
-		VFS:     mockVFS,
-		workDir: ".",
+		promptGenerator: &sessionAgentTestPromptGenerator{vfs: mockVFS},
+		VFS:             mockVFS,
+		workDir:         ".",
 	}
 
 	t.Run("loads messages for directory and parents excluding root", func(t *testing.T) {
@@ -123,14 +121,12 @@ func TestBuildAdditionalAgentMessageForDir(t *testing.T) {
 		assert.Nil(t, nextMsgs)
 	})
 
-	t.Run("deduplicates parent files across subsequent directory reads", func(t *testing.T) {
-		freshSession := &SweSession{
-			system: &SweSystem{
-				PromptGenerator: &sessionAgentTestPromptGenerator{vfs: mockVFS},
-			},
-			VFS:     mockVFS,
-			workDir: ".",
-		}
+		t.Run("deduplicates parent files across subsequent directory reads", func(t *testing.T) {
+			freshSession := &SweSession{
+				promptGenerator: &sessionAgentTestPromptGenerator{vfs: mockVFS},
+				VFS:             mockVFS,
+				workDir:         ".",
+			}
 
 		firstMsgs, err := freshSession.buildAdditionalAgentMessageForDir("pkg/foo/bar")
 		require.NoError(t, err)
@@ -155,15 +151,13 @@ func TestExecuteToolCalls_AppendsAgentInstructionsAfterToolResponse(t *testing.T
 	require.NoError(t, mockVFS.WriteFile("pkg/foo/AGENTS.md", []byte("follow foo instructions")))
 
 	session := &SweSession{
-		system: &SweSystem{
-			PromptGenerator: &sessionAgentTestPromptGenerator{vfs: mockVFS},
-			Tools:           tool.NewToolRegistry(),
-		},
-		VFS:     mockVFS,
-		workDir: ".",
-		logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+		promptGenerator: &sessionAgentTestPromptGenerator{vfs: mockVFS},
+		systemTools:     tool.NewToolRegistry(),
+		VFS:             mockVFS,
+		workDir:         ".",
+		logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
-	session.Tools = buildSessionToolRegistry(session.system.Tools, session.VFS, nil, session)
+	session.Tools = buildSessionToolRegistry(session.systemTools, session.VFS, nil, session)
 
 	call := &tool.ToolCall{
 		ID:       "vfsRead:0",

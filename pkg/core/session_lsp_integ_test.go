@@ -56,7 +56,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 			"test": &testRoleConfig,
 		})
 		roleRegistry := NewAgentRoleRegistry(configStore)
-		system.Roles = roleRegistry
+		session.roles = roleRegistry
 
 		// Set role to trigger tool re-registration
 		err = session.SetRole("test")
@@ -112,7 +112,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 			"test": &testRoleConfig,
 		})
 		roleRegistry := NewAgentRoleRegistry(configStore)
-		system.Roles = roleRegistry
+		session.roles = roleRegistry
 		err = session.SetRole("test")
 		require.NoError(t, err)
 
@@ -178,7 +178,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 			"test": &testRoleConfig,
 		})
 		roleRegistry := NewAgentRoleRegistry(configStore)
-		system.Roles = roleRegistry
+		session.roles = roleRegistry
 		err = session.SetRole("test")
 		require.NoError(t, err)
 
@@ -242,7 +242,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 			"test": &testRoleConfig,
 		})
 		roleRegistry := NewAgentRoleRegistry(configStore)
-		system.Roles = roleRegistry
+		session.roles = roleRegistry
 		err = session.SetRole("test")
 		require.NoError(t, err)
 
@@ -292,7 +292,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 			"test": &testRoleConfig,
 		})
 		roleRegistry := NewAgentRoleRegistry(configStore)
-		systemNoLSP.Roles = roleRegistry
+		session.roles = roleRegistry
 		err = session.SetRole("test")
 		require.NoError(t, err)
 
