@@ -320,8 +320,8 @@ func TestAccessControlTool_Render(t *testing.T) {
 
 	summary, details, meta := acTool.Render(&ToolCall{})
 	assert.NotEmpty(t, summary, "Summary should not be empty")
-	assert.Equal(t, "AccessControl", summary, "Summary should be 'AccessControl'")
-	assert.Equal(t, "AccessControl", details, "Details should be 'AccessControl'")
+	assert.Equal(t, "testTool", summary, "Summary should be forwarded from wrapped tool")
+	assert.Equal(t, "testTool", details, "Details should be forwarded from wrapped tool")
 	assert.LessOrEqual(t, len(summary), 150, "Summary should not exceed 150 characters")
 	assert.NotNil(t, meta, "Meta should not be nil")
 }
