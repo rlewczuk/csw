@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -459,6 +460,9 @@ func TestSweSessionGetState(t *testing.T) {
 	registry := NewAgentRoleRegistry(mockStore)
 
 	t.Run("GetState returns current work directory", func(t *testing.T) {
+		expectedWorkDir, err := filepath.Abs(".")
+		require.NoError(t, err)
+
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
 			ModelTags:            models.NewModelTagRegistry(),
@@ -474,9 +478,13 @@ func TestSweSessionGetState(t *testing.T) {
 
 		state := session.GetState()
 		assert.Equal(t, ".", state.Info.WorkDir)
+		assert.Equal(t, expectedWorkDir, state.Info.ShadowDir)
 	})
 
 	t.Run("SetWorkDir updates work directory in state", func(t *testing.T) {
+		expectedWorkDir, err := filepath.Abs(".")
+		require.NoError(t, err)
+
 		system := &SweSystem{
 			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
 			ModelTags:            models.NewModelTagRegistry(),
@@ -494,6 +502,29 @@ func TestSweSessionGetState(t *testing.T) {
 
 		state := session.GetState()
 		assert.Equal(t, "/home/user/project", state.Info.WorkDir)
+		assert.Equal(t, expectedWorkDir, state.Info.ShadowDir)
+	})
+
+	t.Run("GetState returns absolute shadow directory when explicitly set", func(t *testing.T) {
+		expectedShadowDir, err := filepath.Abs("./tmp-shadow")
+		require.NoError(t, err)
+
+		system := &SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+			ModelTags:            models.NewModelTagRegistry(),
+			Tools:                tools,
+			VFS:                  mockVFS,
+			Roles:                registry,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
+			ShadowDir:            "./tmp-shadow",
+		}
+
+		session, err := system.NewSession("mock/test-model", nil)
+		require.NoError(t, err)
+
+		state := session.GetState()
+		assert.Equal(t, expectedShadowDir, state.Info.ShadowDir)
 	})
 
 	t.Run("SetRole renders system prompt with current state", func(t *testing.T) {

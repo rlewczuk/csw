@@ -625,7 +625,18 @@ func (s *SweSession) ModelWithProvider() string {
 func (s *SweSession) GetState() AgentState {
 	shadowDir := ""
 	if s.system != nil {
-		shadowDir = s.system.ShadowDir
+		shadowDir = strings.TrimSpace(s.system.ShadowDir)
+		if shadowDir == "" {
+			shadowDir = strings.TrimSpace(s.system.WorkDir)
+		}
+	}
+	if shadowDir == "" {
+		shadowDir = strings.TrimSpace(s.workDir)
+	}
+	if shadowDir != "" && !filepath.IsAbs(shadowDir) {
+		if absShadowDir, err := filepath.Abs(shadowDir); err == nil {
+			shadowDir = absShadowDir
+		}
 	}
 
 	return AgentState{
