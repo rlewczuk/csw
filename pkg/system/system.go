@@ -1,6 +1,7 @@
 package system
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
@@ -18,6 +20,17 @@ import (
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
+
+type subAgentSummaryJSON struct {
+	SessionID       string          `json:"session_id"`
+	ParentSessionID string          `json:"parent_session_id,omitempty"`
+	Status          string          `json:"status"`
+	Summary         string          `json:"summary,omitempty"`
+	FinalTodoList   []tool.TodoItem `json:"final_todo_list"`
+	ModelUsed       string          `json:"model_used,omitempty"`
+	ThinkingLevel   string          `json:"thinking_level,omitempty"`
+	CompletedAt     string          `json:"completed_at"`
+}
 
 // SessionLoggerFactory is a function that creates a session logger.
 // This allows tests to provide in-memory loggers instead of file-based ones.
@@ -142,6 +155,10 @@ func (s *SweSystem) LoadLastSession(outputHandler core.SessionThreadOutput) (*co
 
 // NewSession creates a new session for selected model.
 func (s *SweSystem) NewSession(model string, outputHandler core.SessionThreadOutput) (*core.SweSession, error) {
+	return s.newSessionWithOptions(model, outputHandler, "", "", "")
+}
+
+func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.SessionThreadOutput, parentID string, slug string, thinking string) (*core.SweSession, error) {
 	providerName, modelName, err := parseProviderModel(model)
 	if err != nil {
 		return nil, err
@@ -157,6 +174,8 @@ func (s *SweSystem) NewSession(model string, outputHandler core.SessionThreadOut
 	sessionLogger, llmLogger := s.createSessionLoggers(sessionID)
 	session := core.NewSweSession(&core.SweSessionParams{
 		ID:              sessionID,
+		ParentID:        strings.TrimSpace(parentID),
+		Slug:            strings.TrimSpace(slug),
 		Provider:        provider,
 		ProviderName:    providerName,
 		Model:           modelName,
@@ -174,11 +193,12 @@ func (s *SweSystem) NewSession(model string, outputHandler core.SessionThreadOut
 		WorkDir:         s.WorkDir,
 		ShadowDir:       s.ShadowDir,
 		LogBaseDir:      s.LogBaseDir,
-		Thinking:        s.Thinking,
+		Thinking:        strings.TrimSpace(thinking),
 		Logger:          sessionLogger,
 		LLMLogger:       llmLogger,
 		Messages:        []*models.ChatMessage{},
 		TodoList:        []tool.TodoItem{},
+		SubAgentRunner:  s,
 	})
 
 	if sessionLogger != nil {
@@ -207,6 +227,219 @@ func (s *SweSystem) NewSession(model string, outputHandler core.SessionThreadOut
 
 	return session, nil
 }
+
+// ExecuteSubAgentTask executes delegated child-session task synchronously.
+func (s *SweSystem) ExecuteSubAgentTask(parent *core.SweSession, request tool.SubAgentTaskRequest) (tool.SubAgentTaskResult, error) {
+	if parent == nil {
+		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: parent session is nil")
+	}
+
+	if strings.TrimSpace(request.Slug) == "" {
+		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: slug cannot be empty")
+	}
+	if strings.TrimSpace(request.Title) == "" {
+		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: title cannot be empty")
+	}
+	if strings.TrimSpace(request.Prompt) == "" {
+		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: prompt cannot be empty")
+	}
+
+	if err := parent.ReserveSubAgentSlug(request.Slug); err != nil {
+		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: failed to reserve subagent slug: %w", err)
+	}
+
+	modelName := strings.TrimSpace(request.Model)
+	if modelName == "" {
+		modelName = strings.TrimSpace(parent.ModelWithProvider())
+	}
+	if modelName == "" {
+		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: unable to resolve child model")
+	}
+
+	thinking := strings.TrimSpace(request.Thinking)
+	if thinking == "" {
+		thinking = strings.TrimSpace(parent.ThinkingLevel())
+	}
+	childOutput := &subAgentOutputHandler{delegate: parent.OutputHandler(), slug: request.Slug}
+	child, err := s.newSessionWithOptions(modelName, childOutput, parent.ID(), request.Slug, thinking)
+	if err != nil {
+		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: failed to create child session: %w", err)
+	}
+
+	if roleName := strings.TrimSpace(request.Role); roleName != "" {
+		if err := child.SetRole(roleName); err != nil {
+			return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: failed to set child role: %w", err)
+		}
+	} else if parentRole := parent.Role(); parentRole != nil {
+		if err := child.SetRole(parentRole.Name); err != nil {
+			return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: failed to inherit parent role: %w", err)
+		}
+	}
+
+	if err := child.UserPrompt(request.Prompt); err != nil {
+		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: failed to submit child prompt: %w", err)
+	}
+
+	runErr := child.Run(context.Background())
+	summaryText := lastAssistantMessageText(child)
+	finalTodo := child.GetTodoList()
+	status := "completed"
+	if runErr != nil {
+		status = "error"
+	}
+
+	if err := writeSubAgentSummary(s.LogBaseDir, child, subAgentSummaryJSON{
+		SessionID:       child.ID(),
+		ParentSessionID: parent.ID(),
+		Status:          status,
+		Summary:         summaryText,
+		FinalTodoList:   finalTodo,
+		ModelUsed:       strings.TrimSpace(child.ModelWithProvider()),
+		ThinkingLevel:   strings.TrimSpace(child.ThinkingLevel()),
+		CompletedAt:     time.Now().Format(time.RFC3339Nano),
+	}); err != nil && child.OutputHandler() != nil {
+		child.OutputHandler().ShowMessage(fmt.Sprintf("Failed to write subagent summary: %v", err), "warning")
+	}
+
+	if runErr != nil {
+		return tool.SubAgentTaskResult{Status: "error", Summary: fmt.Sprintf("Subagent %q failed (session %s): %v", request.Slug, child.ID(), runErr), FinalTodoList: finalTodo}, nil
+	}
+
+	return tool.SubAgentTaskResult{Status: "completed", Summary: summaryText, FinalTodoList: finalTodo}, nil
+}
+
+func writeSubAgentSummary(logBaseDir string, session *core.SweSession, summary subAgentSummaryJSON) error {
+	if session == nil || strings.TrimSpace(logBaseDir) == "" {
+		return nil
+	}
+	dir := filepath.Join(logBaseDir, "sessions", session.ID())
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("writeSubAgentSummary() [system.go]: failed to create session summary dir: %w", err)
+	}
+	jsonData, err := json.MarshalIndent(summary, "", "  ")
+	if err != nil {
+		return fmt.Errorf("writeSubAgentSummary() [system.go]: failed to marshal summary json: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "summary.json"), jsonData, 0644); err != nil {
+		return fmt.Errorf("writeSubAgentSummary() [system.go]: failed to write summary json: %w", err)
+	}
+
+	markdown := strings.TrimSpace(summary.Summary)
+	if markdown == "" {
+		markdown = "(no summary)"
+	}
+	content := fmt.Sprintf("# Summary\n\n%s\n\n# Session Info\n\nSession ID: %s\nParent Session ID: %s\nStatus: %s\n", markdown, summary.SessionID, summary.ParentSessionID, summary.Status)
+	if err := os.WriteFile(filepath.Join(dir, "summary.md"), []byte(content), 0644); err != nil {
+		return fmt.Errorf("writeSubAgentSummary() [system.go]: failed to write summary markdown: %w", err)
+	}
+
+	return nil
+}
+
+func lastAssistantMessageText(session *core.SweSession) string {
+	if session == nil {
+		return ""
+	}
+	for i := len(session.ChatMessages()) - 1; i >= 0; i-- {
+		message := session.ChatMessages()[i]
+		if message == nil || message.Role != models.ChatRoleAssistant {
+			continue
+		}
+		var textBuilder strings.Builder
+		for _, part := range message.Parts {
+			if part.Text != "" {
+				textBuilder.WriteString(part.Text)
+			}
+		}
+		if textBuilder.Len() > 0 {
+			return textBuilder.String()
+		}
+		for _, part := range message.Parts {
+			if part.ReasoningContent != "" {
+				textBuilder.WriteString(part.ReasoningContent)
+			}
+		}
+		return textBuilder.String()
+	}
+	return ""
+}
+
+type subAgentOutputHandler struct {
+	delegate core.SessionThreadOutput
+	slug     string
+}
+
+func (h *subAgentOutputHandler) ShowMessage(message string, messageType string) {
+	if h.delegate == nil {
+		return
+	}
+	h.delegate.ShowMessage(prefixSubAgentMessage(h.slug, message), messageType)
+}
+
+func (h *subAgentOutputHandler) AddAssistantMessage(text string, thinking string) {
+	if h.delegate == nil {
+		return
+	}
+	h.delegate.AddAssistantMessage(prefixSubAgentMessage(h.slug, text), prefixSubAgentMessage(h.slug, thinking))
+}
+
+func (h *subAgentOutputHandler) AddToolCall(call *tool.ToolCall) {
+	if h.delegate == nil {
+		return
+	}
+	h.delegate.AddToolCall(call)
+}
+
+func (h *subAgentOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
+	if h.delegate == nil {
+		return
+	}
+	h.delegate.AddToolCallResult(result)
+}
+
+func (h *subAgentOutputHandler) RunFinished(err error) {
+	if h.delegate == nil {
+		return
+	}
+	h.delegate.RunFinished(err)
+}
+
+func (h *subAgentOutputHandler) OnPermissionQuery(query *tool.ToolPermissionsQuery) {
+	if h.delegate == nil {
+		return
+	}
+	h.delegate.OnPermissionQuery(query)
+}
+
+func (h *subAgentOutputHandler) OnRateLimitError(retryAfterSeconds int) {
+	if h.delegate == nil {
+		return
+	}
+	h.delegate.OnRateLimitError(retryAfterSeconds)
+}
+
+func (h *subAgentOutputHandler) ShouldRetryAfterFailure(message string) bool {
+	if h.delegate == nil {
+		return false
+	}
+	return h.delegate.ShouldRetryAfterFailure(prefixSubAgentMessage(h.slug, message))
+}
+
+func prefixSubAgentMessage(slug string, message string) string {
+	trimmedSlug := strings.TrimSpace(slug)
+	if trimmedSlug == "" || strings.TrimSpace(message) == "" {
+		return message
+	}
+	lines := strings.Split(message, "\n")
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		lines[i] = fmt.Sprintf("*%s* %s", trimmedSlug, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
 
 func (s *SweSystem) createSessionLoggers(sessionID string) (*slog.Logger, *slog.Logger) {
 	var sessionLogger *slog.Logger
@@ -244,6 +477,7 @@ func (s *SweSystem) buildSessionParams() *core.SweSessionParams {
 		LogBaseDir:      s.LogBaseDir,
 		ShadowDir:       s.ShadowDir,
 		Thinking:        s.Thinking,
+		SubAgentRunner:  s,
 	}
 }
 

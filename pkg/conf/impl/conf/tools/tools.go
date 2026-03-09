@@ -4,6 +4,7 @@ package tools
 var Names = []string{
 	"runBash",
 	"skill",
+	"subAgent",
 	"todoRead",
 	"todoWrite",
 	"vfsDelete",

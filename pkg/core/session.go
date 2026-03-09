@@ -32,8 +32,15 @@ const (
 	sessionMessageTypeError           = "error"
 )
 
+// SubAgentTaskRunner executes delegated subagent tasks for a parent session.
+type SubAgentTaskRunner interface {
+	ExecuteSubAgentTask(parent *SweSession, request tool.SubAgentTaskRequest) (tool.SubAgentTaskResult, error)
+}
+
 type SweSession struct {
 	id            string
+	parentID      string
+	slug          string
 	provider      models.ModelProvider
 	providerName  string
 	model         string
@@ -74,11 +81,16 @@ type SweSession struct {
 	tokenUsage       models.TokenUsage
 	contextLength    int
 	compactionCount  int
+	subAgentSlugs    map[string]struct{}
+	subAgentSlugsMu  sync.Mutex
+	subAgentRunner   SubAgentTaskRunner
 }
 
 // SweSessionParams stores dependencies and initial values used to create a SweSession.
 type SweSessionParams struct {
 	ID           string
+	ParentID     string
+	Slug         string
 	Provider     models.ModelProvider
 	ProviderName string
 	Model        string
@@ -116,6 +128,8 @@ type SweSessionParams struct {
 	TokenUsage                 models.TokenUsage
 	ContextLength              int
 	CompactionCount            int
+	UsedSubAgentSlugs          map[string]struct{}
+	SubAgentRunner             SubAgentTaskRunner
 }
 
 // NewSweSession creates a new SweSession from provided parameters.
@@ -126,6 +140,8 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 
 	session := &SweSession{
 		id:              params.ID,
+		parentID:        strings.TrimSpace(params.ParentID),
+		slug:            strings.TrimSpace(params.Slug),
 		provider:        params.Provider,
 		providerName:    params.ProviderName,
 		model:           params.Model,
@@ -159,6 +175,8 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		tokenUsage:                 params.TokenUsage,
 		contextLength:              params.ContextLength,
 		compactionCount:            params.CompactionCount,
+		subAgentSlugs:              make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
+		subAgentRunner:             params.SubAgentRunner,
 	}
 
 	if session.baseVFS == nil {
@@ -171,6 +189,13 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 	session.pendingToolResponses = append(session.pendingToolResponses, params.PendingToolResponses...)
 	for path := range params.LoadedAgentFiles {
 		session.loadedAgentFiles[path] = struct{}{}
+	}
+	for slug := range params.UsedSubAgentSlugs {
+		trimmedSlug := strings.TrimSpace(slug)
+		if trimmedSlug == "" {
+			continue
+		}
+		session.subAgentSlugs[trimmedSlug] = struct{}{}
 	}
 
 	session.applyModelTagToolSelection()
@@ -202,6 +227,8 @@ type persistedChatMessage struct {
 
 type persistedSessionState struct {
 	SessionID                  string                  `json:"session_id"`
+	ParentSessionID            string                  `json:"parent_session_id,omitempty"`
+	Slug                       string                  `json:"slug,omitempty"`
 	ProviderName               string                  `json:"provider_name"`
 	Model                      string                  `json:"model"`
 	RolesUsed                  []string                `json:"roles_used,omitempty"`
@@ -216,6 +243,7 @@ type persistedSessionState struct {
 	TokenUsage                 models.TokenUsage       `json:"token_usage"`
 	ContextLengthTokens        int                     `json:"context_length_tokens"`
 	ContextCompactionCount     int                     `json:"context_compaction_count"`
+	UsedSubAgentSlugs          []string                `json:"used_subagent_slugs,omitempty"`
 	UpdatedAt                  string                  `json:"updated_at"`
 }
 
@@ -717,6 +745,49 @@ func (s *SweSession) ID() string {
 	return s.id
 }
 
+// ParentID returns the parent session identifier for delegated child sessions.
+func (s *SweSession) ParentID() string {
+	if s == nil {
+		return ""
+	}
+
+	return s.parentID
+}
+
+// Slug returns session slug used by UI views and logs.
+func (s *SweSession) Slug() string {
+	if s == nil {
+		return ""
+	}
+
+	return s.slug
+}
+
+// ReserveSubAgentSlug marks slug as used in parent session.
+func (s *SweSession) ReserveSubAgentSlug(slug string) error {
+	if s == nil {
+		return fmt.Errorf("SweSession.ReserveSubAgentSlug() [session.go]: session is nil")
+	}
+
+	trimmedSlug := strings.TrimSpace(slug)
+	if trimmedSlug == "" {
+		return fmt.Errorf("SweSession.ReserveSubAgentSlug() [session.go]: slug cannot be empty")
+	}
+
+	s.subAgentSlugsMu.Lock()
+	defer s.subAgentSlugsMu.Unlock()
+	if s.subAgentSlugs == nil {
+		s.subAgentSlugs = make(map[string]struct{})
+	}
+	if _, exists := s.subAgentSlugs[trimmedSlug]; exists {
+		return fmt.Errorf("SweSession.ReserveSubAgentSlug() [session.go]: slug already used in session: %s", trimmedSlug)
+	}
+	s.subAgentSlugs[trimmedSlug] = struct{}{}
+	s.persistSessionState()
+
+	return nil
+}
+
 // SetLogger sets a custom logger for this session.
 // This is useful for testing or when you want to use a different logger implementation.
 func (s *SweSession) SetLogger(logger *slog.Logger) {
@@ -1120,6 +1191,20 @@ func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 	// Register todo tools
 	registry.Register("todoRead", tool.NewTodoReadTool(s))
 	registry.Register("todoWrite", tool.NewTodoWriteTool(s))
+	registry.Register("subAgent", tool.NewSubAgentTool(s))
+}
+
+// ExecuteSubAgentTask executes delegated subagent task for this parent session.
+func (s *SweSession) ExecuteSubAgentTask(request tool.SubAgentTaskRequest) (tool.SubAgentTaskResult, error) {
+	if s == nil {
+		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSession.ExecuteSubAgentTask() [session.go]: session is nil")
+	}
+ 
+	if s.subAgentRunner == nil {
+		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSession.ExecuteSubAgentTask() [session.go]: subagent runner is nil")
+	}
+
+	return s.subAgentRunner.ExecuteSubAgentTask(s, request)
 }
 
 func buildSessionToolRegistry(systemTools *tool.ToolRegistry, vfsImpl vfs.VFS, lspClient lsp.LSP, session *SweSession) *tool.ToolRegistry {
@@ -1216,6 +1301,8 @@ func (s *SweSession) persistSessionStateFile() error {
 func (s *SweSession) buildPersistedSessionState() persistedSessionState {
 	state := persistedSessionState{
 		SessionID:                  s.id,
+		ParentSessionID:            s.parentID,
+		Slug:                       s.slug,
 		ProviderName:               s.providerName,
 		Model:                      s.model,
 		RolesUsed:                  append([]string(nil), s.rolesUsed...),
@@ -1226,6 +1313,7 @@ func (s *SweSession) buildPersistedSessionState() persistedSessionState {
 		PendingPermissionToolCalls: make([]tool.ToolCall, 0, len(s.pendingPermissionToolCalls)),
 		PendingToolResponses:       make([]persistedToolResponse, 0, len(s.pendingToolResponses)),
 		LoadedAgentFiles:           make([]string, 0, len(s.loadedAgentFiles)),
+		UsedSubAgentSlugs:          make([]string, 0, len(s.subAgentSlugs)),
 		TokenUsage:                 s.tokenUsage,
 		ContextLengthTokens:        s.contextLength,
 		ContextCompactionCount:     s.compactionCount,
@@ -1258,6 +1346,11 @@ func (s *SweSession) buildPersistedSessionState() persistedSessionState {
 		state.LoadedAgentFiles = append(state.LoadedAgentFiles, path)
 	}
 	sort.Strings(state.LoadedAgentFiles)
+
+	for slug := range s.subAgentSlugs {
+		state.UsedSubAgentSlugs = append(state.UsedSubAgentSlugs, slug)
+	}
+	sort.Strings(state.UsedSubAgentSlugs)
 
 	return state
 }
@@ -1498,6 +1591,8 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 
 	session := NewSweSession(&SweSessionParams{
 		ID:              state.SessionID,
+		ParentID:        state.ParentSessionID,
+		Slug:            state.Slug,
 		Provider:        provider,
 		ProviderName:    state.ProviderName,
 		Model:           state.Model,
@@ -1526,6 +1621,17 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 		TokenUsage:      state.TokenUsage,
 		ContextLength:   state.ContextLengthTokens,
 		CompactionCount: state.ContextCompactionCount,
+		UsedSubAgentSlugs: func() map[string]struct{} {
+			result := make(map[string]struct{}, len(state.UsedSubAgentSlugs))
+			for _, slug := range state.UsedSubAgentSlugs {
+				trimmedSlug := strings.TrimSpace(slug)
+				if trimmedSlug == "" {
+					continue
+				}
+				result[trimmedSlug] = struct{}{}
+			}
+			return result
+		}(),
 	})
 
 	if strings.TrimSpace(state.RoleName) != "" {

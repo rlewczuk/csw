@@ -1,13 +1,18 @@
 package system_test
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
+	"path/filepath"
+	"os"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
+	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/testutil"
+	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -118,4 +123,49 @@ func TestLogLLMRequestsOption(t *testing.T) {
 		require.True(t, llmLoggerField.IsValid())
 		assert.True(t, llmLoggerField.IsNil())
 	})
+}
+
+func TestSweSystem_SubAgentIntegration(t *testing.T) {
+	fixture := coretestfixture.NewSweSystemFixture(t)
+	system := fixture.System
+
+	parentHandler := testutil.NewMockSessionOutputHandler()
+	parent, err := system.NewSession("ollama/test-model:latest", parentHandler)
+	require.NoError(t, err)
+
+	tmpLogs := t.TempDir()
+	system.LogBaseDir = tmpLogs
+
+	result, err := system.ExecuteSubAgentTask(parent, tool.SubAgentTaskRequest{
+		Slug:   "child-summary",
+		Title:  "Child summary",
+		Prompt: "Provide brief summary",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "completed", result.Status)
+
+	childSessions := system.ListSessions()
+	require.GreaterOrEqual(t, len(childSessions), 2)
+
+	var child *core.SweSession
+	for _, session := range childSessions {
+		if session.ID() == parent.ID() {
+			continue
+		}
+		if session.ParentID() == parent.ID() {
+			child = session
+			break
+		}
+	}
+	require.NotNil(t, child)
+	assert.Equal(t, "child-summary", child.Slug())
+
+	summaryPath := filepath.Join(tmpLogs, "sessions", child.ID(), "summary.json")
+	summaryBytes, readErr := os.ReadFile(summaryPath)
+	require.NoError(t, readErr)
+
+	var summary map[string]any
+	require.NoError(t, json.Unmarshal(summaryBytes, &summary))
+	assert.Equal(t, parent.ID(), summary["parent_session_id"])
+	assert.Equal(t, child.ID(), summary["session_id"])
 }

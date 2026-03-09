@@ -29,6 +29,7 @@ type LoggerSetter interface {
 	SetLogger(logger *slog.Logger)
 }
 
+
 // NewToolRegistry creates a new ToolRegistry instance.
 func NewToolRegistry() *ToolRegistry {
 	return &ToolRegistry{
