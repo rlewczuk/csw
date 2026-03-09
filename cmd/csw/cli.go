@@ -968,7 +968,7 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 		return result
 	}
 
-	commitMessage, err := generateWorktreeCommitMessage(ctx, sweSystem.ModelProviders, sweSystem.ConfigStore, session, worktreeBranch, commitMessageTemplate)
+	commitMessage, err := core.GenerateCommitMessage(ctx, sweSystem.ModelProviders, sweSystem.ConfigStore, session, worktreeBranch, commitMessageTemplate)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "worktree commit message generation failed: %v\n", err)
 		if dropErr := vcs.DropWorktree(worktreeBranch); dropErr != nil {
