@@ -2,10 +2,10 @@ package system_test
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
-	"path/filepath"
-	"os"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
@@ -128,6 +128,7 @@ func TestLogLLMRequestsOption(t *testing.T) {
 func TestSweSystem_SubAgentIntegration(t *testing.T) {
 	fixture := coretestfixture.NewSweSystemFixture(t)
 	system := fixture.System
+	mockServer := fixture.Server
 
 	parentHandler := testutil.NewMockSessionOutputHandler()
 	parent, err := system.NewSession("ollama/test-model:latest", parentHandler)
@@ -135,6 +136,11 @@ func TestSweSystem_SubAgentIntegration(t *testing.T) {
 
 	tmpLogs := t.TempDir()
 	system.LogBaseDir = tmpLogs
+
+	mockServer.AddStreamingResponse("/api/chat", "POST", true,
+		`{"model":"test-model:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Child completed."},"done":false}`,
+		`{"model":"test-model:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
+	)
 
 	result, err := system.ExecuteSubAgentTask(parent, tool.SubAgentTaskRequest{
 		Slug:   "child-summary",

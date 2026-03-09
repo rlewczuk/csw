@@ -172,7 +172,7 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 	sessionID := shared.GenerateUUIDv7()
 
 	sessionLogger, llmLogger := s.createSessionLoggers(sessionID)
-	session := core.NewSweSession(&core.SweSessionParams{
+		session := core.NewSweSession(&core.SweSessionParams{
 		ID:              sessionID,
 		ParentID:        strings.TrimSpace(parentID),
 		Slug:            strings.TrimSpace(slug),
@@ -193,7 +193,7 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 		WorkDir:         s.WorkDir,
 		ShadowDir:       s.ShadowDir,
 		LogBaseDir:      s.LogBaseDir,
-		Thinking:        strings.TrimSpace(thinking),
+		Thinking:        firstNonEmpty(strings.TrimSpace(thinking), strings.TrimSpace(s.Thinking)),
 		Logger:          sessionLogger,
 		LLMLogger:       llmLogger,
 		Messages:        []*models.ChatMessage{},
@@ -494,6 +494,16 @@ func parseProviderModel(model string) (string, string, error) {
 	}
 
 	return "", "", fmt.Errorf("SweSystem.NewSession() [system.go]: invalid model format, expected 'provider/model', got '%s'", model)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+
+	return ""
 }
 
 func (s *SweSystem) resolveDefaultRole() (string, error) {

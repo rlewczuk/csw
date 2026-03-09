@@ -1,6 +1,7 @@
 package tool
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -91,10 +92,16 @@ func (t *SubAgentTool) Execute(args *ToolCall) *ToolResponse {
 		return &ToolResponse{Call: args, Error: err, Done: true}
 	}
 
+	finalTodoList := make([]any, 0, len(result.FinalTodoList))
+	todoJSON, marshalErr := json.Marshal(result.FinalTodoList)
+	if marshalErr == nil {
+		_ = json.Unmarshal(todoJSON, &finalTodoList)
+	}
+
 	resultValue := NewToolValue(map[string]any{
 		"status":          result.Status,
 		"summary":         result.Summary,
-		"final_todo_list": result.FinalTodoList,
+		"final_todo_list": finalTodoList,
 	})
 
 	return &ToolResponse{Call: args, Result: resultValue, Done: true}

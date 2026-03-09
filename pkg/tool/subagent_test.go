@@ -23,6 +23,13 @@ func (m *subAgentExecutorMock) ExecuteSubAgentTask(request SubAgentTaskRequest) 
 }
 
 func TestSubAgentToolExecute(t *testing.T) {
+	t.Run("returns error when executor is nil", func(t *testing.T) {
+		tool := NewSubAgentTool(nil)
+		response := tool.Execute(&ToolCall{Function: "subAgent", Arguments: NewToolValue(map[string]any{"slug": "child", "title": "Task", "prompt": "Do task"})})
+		require.Error(t, response.Error)
+		assert.Contains(t, response.Error.Error(), "executor is nil")
+	})
+
 	t.Run("returns validation error for missing slug", func(t *testing.T) {
 		tool := NewSubAgentTool(&subAgentExecutorMock{})
 		response := tool.Execute(&ToolCall{Function: "subAgent", Arguments: NewToolValue(map[string]any{"title": "t", "prompt": "p"})})
@@ -64,6 +71,25 @@ func TestSubAgentToolExecute(t *testing.T) {
 		assert.Equal(t, "child-task", executor.request.Slug)
 		assert.Equal(t, "Task", executor.request.Title)
 		assert.Equal(t, "Do task", executor.request.Prompt)
+		assert.Equal(t, "developer", executor.request.Role)
+		assert.Equal(t, "mock/test-model", executor.request.Model)
+		assert.Equal(t, "high", executor.request.Thinking)
+	})
+
+	t.Run("trims text arguments before passing to executor", func(t *testing.T) {
+		executor := &subAgentExecutorMock{result: SubAgentTaskResult{Status: "completed", Summary: "ok"}}
+		tool := NewSubAgentTool(executor)
+		response := tool.Execute(&ToolCall{Function: "subAgent", Arguments: NewToolValue(map[string]any{
+			"slug":     "  child-task  ",
+			"title":    "  Task  ",
+			"prompt":   "Do task",
+			"role":     "  developer  ",
+			"model":    "  mock/test-model  ",
+			"thinking": "  high  ",
+		})})
+		require.NoError(t, response.Error)
+		assert.Equal(t, "child-task", executor.request.Slug)
+		assert.Equal(t, "Task", executor.request.Title)
 		assert.Equal(t, "developer", executor.request.Role)
 		assert.Equal(t, "mock/test-model", executor.request.Model)
 		assert.Equal(t, "high", executor.request.Thinking)
