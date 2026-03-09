@@ -83,9 +83,9 @@ func TestCLIVFSAllowIntegration(t *testing.T) {
 	err = os.WriteFile(filepath.Join(allowedDir2, "file2.txt"), []byte("content2"), 0644)
 	require.NoError(t, err)
 
-	t.Run("VFSAllowPathsPassedToBuildSystem", func(t *testing.T) {
-		// This test verifies that the VFSAllow paths are correctly passed through
-		// the CLIParams to BuildSystemParams
+	t.Run("VFSAllowPathsParsedAndPassedToRuntime", func(t *testing.T) {
+		// This test verifies that the VFSAllow paths are correctly parsed and
+		// passed through CLIParams to runtime code
 
 		// Create a mock runCLIFunc to capture the params
 		var capturedParams *CLIParams

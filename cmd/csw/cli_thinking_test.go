@@ -7,6 +7,7 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
@@ -133,7 +134,7 @@ func TestThinkingModeValidation(t *testing.T) {
 
 // TestBuildSystemParamsThinking tests that BuildSystemParams includes Thinking field
 func TestBuildSystemParamsThinking(t *testing.T) {
-	params := BuildSystemParams{
+	params := system.BuildSystemParams{
 		Thinking: "high",
 	}
 	assert.Equal(t, "high", params.Thinking)
@@ -158,7 +159,7 @@ func TestChatOptionsThinkingField(t *testing.T) {
 func TestBuildSessionSummaryMessage(t *testing.T) {
 	t.Run("includes token and context stats", func(t *testing.T) {
 		session := &core.SweSession{}
-		summary := buildSessionSummaryMessage(5*time.Second, session, BuildSystemResult{})
+		summary := buildSessionSummaryMessage(5*time.Second, session, system.BuildSystemResult{})
 		assert.Contains(t, summary, "Session completed in 5s | tokens(input=0[cached=0,noncached=0], output=0, total=0) | context=0")
 		assert.Contains(t, summary, "Model: -")
 		assert.Contains(t, summary, "Thinking: -")
@@ -172,7 +173,7 @@ func TestBuildSessionSummaryMessage(t *testing.T) {
 	t.Run("nil session returns base summary", func(t *testing.T) {
 		assert.Equal(t,
 			"Session completed in 5s",
-			buildSessionSummaryMessage(5*time.Second, nil, BuildSystemResult{}),
+			buildSessionSummaryMessage(5*time.Second, nil, system.BuildSystemResult{}),
 		)
 	})
 }

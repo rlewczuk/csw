@@ -25,15 +25,15 @@ type SessionLoggerFactory func(sessionID string, logBaseDir string) (*slog.Logge
 
 // SweSystem represents the core system for managing conversations, tools, and models.
 type SweSystem struct {
-	ModelProviders map[string]models.ModelProvider
-	ModelTags      *models.ModelTagRegistry
-	ToolSelection  conf.ToolSelectionConfig
+	ModelProviders  map[string]models.ModelProvider
+	ModelTags       *models.ModelTagRegistry
+	ToolSelection   conf.ToolSelectionConfig
 	PromptGenerator core.PromptGenerator
-	Tools          *tool.ToolRegistry
-	VFS            vfs.VFS
-	Roles          *core.AgentRoleRegistry
-	LSP            lsp.LSP
-	ConfigStore    conf.ConfigStore
+	Tools           *tool.ToolRegistry
+	VFS             vfs.VFS
+	Roles           *core.AgentRoleRegistry
+	LSP             lsp.LSP
+	ConfigStore     conf.ConfigStore
 
 	sessions   map[string]*core.SweSession
 	threads    map[string]*core.SessionThread

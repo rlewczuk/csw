@@ -6,35 +6,33 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCLIConfigDefaultsPropagation(t *testing.T) {
-	mockStore := impl.NewMockConfigStore()
-	mockStore.SetGlobalConfig(&conf.GlobalConfig{
-		Defaults: conf.CLIDefaultsConfig{
-			Model:          "provider/default",
-			Worktree:       "feature/default",
-			Merge:          true,
-			LogLLMRequests: true,
-			Thinking:       "high",
-			LSPServer:      "gopls",
-			GitUserName:    "Config User",
-			GitUserEmail:   "config@example.com",
-		},
-	})
+	defaults := conf.CLIDefaultsConfig{
+		Model:          "provider/default",
+		Worktree:       "feature/default",
+		Merge:          true,
+		LogLLMRequests: true,
+		Thinking:       "high",
+		LSPServer:      "gopls",
+		GitUserName:    "Config User",
+		GitUserEmail:   "config@example.com",
+	}
 
 	originalRun := runCLIFunc
-	originalConfigStoreBuilder := newCompositeConfigStoreFunc
+	originalDefaultsResolver := resolveCLIDefaultsFunc
 	t.Cleanup(func() {
 		runCLIFunc = originalRun
-		newCompositeConfigStoreFunc = originalConfigStoreBuilder
+		resolveCLIDefaultsFunc = originalDefaultsResolver
 	})
 
-	newCompositeConfigStoreFunc = func(projDir string, configPath string) (conf.ConfigStore, error) {
-		return mockStore, nil
+	resolveCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+		_ = params
+		return defaults, nil
 	}
 
 	captured := ""
@@ -75,29 +73,27 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 }
 
 func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
-	mockStore := impl.NewMockConfigStore()
-	mockStore.SetGlobalConfig(&conf.GlobalConfig{
-		Defaults: conf.CLIDefaultsConfig{
-			Model:          "provider/default",
-			Worktree:       "feature/default",
-			Merge:          true,
-			LogLLMRequests: true,
-			Thinking:       "high",
-			LSPServer:      "gopls",
-			GitUserName:    "Config User",
-			GitUserEmail:   "config@example.com",
-		},
-	})
+	defaults := conf.CLIDefaultsConfig{
+		Model:          "provider/default",
+		Worktree:       "feature/default",
+		Merge:          true,
+		LogLLMRequests: true,
+		Thinking:       "high",
+		LSPServer:      "gopls",
+		GitUserName:    "Config User",
+		GitUserEmail:   "config@example.com",
+	}
 
 	originalRun := runCLIFunc
-	originalConfigStoreBuilder := newCompositeConfigStoreFunc
+	originalDefaultsResolver := resolveCLIDefaultsFunc
 	t.Cleanup(func() {
 		runCLIFunc = originalRun
-		newCompositeConfigStoreFunc = originalConfigStoreBuilder
+		resolveCLIDefaultsFunc = originalDefaultsResolver
 	})
 
-	newCompositeConfigStoreFunc = func(projDir string, configPath string) (conf.ConfigStore, error) {
-		return mockStore, nil
+	resolveCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+		_ = params
+		return defaults, nil
 	}
 
 	captured := ""

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/spf13/cobra"
 )
@@ -31,7 +32,7 @@ Currently supports cleaning up worktrees:
 			cmd.SilenceUsage = true
 
 			// Resolve working directory
-			workDir, err := ResolveWorkDir(cleanWorkDir)
+			workDir, err := system.ResolveWorkDir(cleanWorkDir)
 			if err != nil {
 				return fmt.Errorf("CleanCommand.RunE() [clean.go]: %w", err)
 			}

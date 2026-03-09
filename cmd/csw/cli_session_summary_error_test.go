@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,13 +15,13 @@ import (
 // TestEmitSessionSummary validates summary behavior on success and error paths.
 func TestEmitSessionSummary(t *testing.T) {
 	tests := []struct {
-		name                    string
-		saveErr                 error
-		sessionRunErr           error
-		expectErr               string
-		expectInfoMessageCount  int
-		expectWarnMessageCount  int
-		expectWarningSubstring  string
+		name                   string
+		saveErr                error
+		sessionRunErr          error
+		expectErr              string
+		expectInfoMessageCount int
+		expectWarnMessageCount int
+		expectWarningSubstring string
 	}{
 		{
 			name:                   "session error still prints summary",
@@ -61,7 +62,7 @@ func TestEmitSessionSummary(t *testing.T) {
 			err := emitSessionSummary(
 				time.Now().Add(-5*time.Second),
 				nil,
-				BuildSystemResult{LogsDir: "any"},
+				system.BuildSystemResult{LogsDir: "any"},
 				view,
 				tc.sessionRunErr,
 			)

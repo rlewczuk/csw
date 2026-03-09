@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,22 +47,20 @@ func TestCLIGitIdentityPropagation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockStore := impl.NewMockConfigStore()
-			mockStore.SetGlobalConfig(&conf.GlobalConfig{})
-
 			originalRun := runCLIFunc
-			originalConfigStoreBuilder := newCompositeConfigStoreFunc
+			originalDefaultsResolver := resolveCLIDefaultsFunc
 			originalLookPath := gitLookPathFunc
 			originalConfigValue := gitConfigValueFunc
 			t.Cleanup(func() {
 				runCLIFunc = originalRun
-				newCompositeConfigStoreFunc = originalConfigStoreBuilder
+				resolveCLIDefaultsFunc = originalDefaultsResolver
 				gitLookPathFunc = originalLookPath
 				gitConfigValueFunc = originalConfigValue
 			})
 
-			newCompositeConfigStoreFunc = func(projDir string, configPath string) (conf.ConfigStore, error) {
-				return mockStore, nil
+			resolveCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+				_ = params
+				return conf.CLIDefaultsConfig{}, nil
 			}
 
 			gitLookPathFunc = func(file string) (string, error) {
@@ -137,11 +135,11 @@ func TestResolveGitIdentity(t *testing.T) {
 			expected:       "",
 		},
 		{
-			name:          "returns empty when git is not available",
-			value:         "",
-			gitConfigKey:  "user.name",
-			lookPathErr:   errors.New("git not found"),
-			expected:      "",
+			name:         "returns empty when git is not available",
+			value:        "",
+			gitConfigKey: "user.name",
+			lookPathErr:  errors.New("git not found"),
+			expected:     "",
 		},
 		{
 			name:           "returns empty when git config fails",

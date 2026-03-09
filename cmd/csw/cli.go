@@ -16,13 +16,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/presenter"
 	"github.com/rlewczuk/csw/pkg/system"
-	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/ui/cli"
 	"github.com/rlewczuk/csw/pkg/vfs"
@@ -68,11 +66,11 @@ const defaultBashRunTimeout = 120 * time.Second
 
 var runCLIFunc = runCLI
 var saveSessionSummaryMarkdownFunc = saveSessionSummaryMarkdown
-
-var newCompositeConfigStoreFunc = impl.NewCompositeConfigStore
-var resolveModelNameFunc = ResolveModelName
-var createProviderMapFunc = CreateProviderMap
-var generateWorktreeBranchNameFunc = core.GenerateWorktreeBranchName
+var resolveCLIDefaultsFunc = system.ResolveCLIDefaults
+var resolveWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
+var buildSystemFunc = system.BuildSystem
+var gitLookPathFunc = exec.LookPath
+var gitConfigValueFunc = system.ReadGitConfigValue
 
 // CliCommand creates the cli command.
 func CliCommand() *cobra.Command {
@@ -303,58 +301,39 @@ func applyCLIDefaults(
 	gitUser *string,
 	gitEmail *string,
 ) error {
-	resolvedWorkDir, err := ResolveWorkDir(workDir)
+	defaults, err := resolveCLIDefaultsFunc(system.ResolveCLIDefaultsParams{
+		WorkDir:       workDir,
+		ShadowDir:     shadowDir,
+		ProjectConfig: projectConfig,
+		ConfigPath:    configPath,
+	})
 	if err != nil {
-		return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to resolve work directory: %w", err)
+		return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to resolve CLI defaults: %w", err)
 	}
 
-	configPathStr, err := BuildConfigPath(projectConfig, configPath)
-	if err != nil {
-		return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to build config path: %w", err)
+	if !cmd.Flags().Changed("model") && defaults.Model != "" {
+		*model = defaults.Model
 	}
-
-	configRoot := resolvedWorkDir
-	if strings.TrimSpace(shadowDir) != "" {
-		resolvedShadowDir, shadowErr := ResolveWorkDir(shadowDir)
-		if shadowErr != nil {
-			return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to resolve shadow directory: %w", shadowErr)
-		}
-		configRoot = resolvedShadowDir
+	if !cmd.Flags().Changed("worktree") && defaults.Worktree != "" {
+		*worktree = defaults.Worktree
 	}
-
-	configStore, err := newCompositeConfigStoreFunc(configRoot, configPathStr)
-	if err != nil {
-		return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to create config store: %w", err)
-	}
-
-	globalConfig, err := configStore.GetGlobalConfig()
-	if err != nil {
-		return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to load global config: %w", err)
-	}
-
-	if !cmd.Flags().Changed("model") && globalConfig.Defaults.Model != "" {
-		*model = globalConfig.Defaults.Model
-	}
-	if !cmd.Flags().Changed("worktree") && globalConfig.Defaults.Worktree != "" {
-		*worktree = globalConfig.Defaults.Worktree
-	}
-	if !cmd.Flags().Changed("merge") && globalConfig.Defaults.Merge {
+	if !cmd.Flags().Changed("merge") && defaults.Merge {
 		*merge = true
 	}
-	if !cmd.Flags().Changed("log-llm-requests") && globalConfig.Defaults.LogLLMRequests {
+	if !cmd.Flags().Changed("log-llm-requests") && defaults.LogLLMRequests {
 		*logLLMRequests = true
 	}
-	if !cmd.Flags().Changed("thinking") && globalConfig.Defaults.Thinking != "" {
-		*thinking = globalConfig.Defaults.Thinking
+	if !cmd.Flags().Changed("thinking") && defaults.Thinking != "" {
+		*thinking = defaults.Thinking
 	}
-	if !cmd.Flags().Changed("lsp-server") && globalConfig.Defaults.LSPServer != "" {
-		*lspServer = globalConfig.Defaults.LSPServer
+	if !cmd.Flags().Changed("lsp-server") && defaults.LSPServer != "" {
+		*lspServer = defaults.LSPServer
 	}
-	if !cmd.Flags().Changed("git-user") && globalConfig.Defaults.GitUserName != "" {
-		*gitUser = globalConfig.Defaults.GitUserName
+	if !cmd.Flags().Changed("git-user") && defaults.GitUserName != "" {
+		*gitUser = defaults.GitUserName
 	}
-	if !cmd.Flags().Changed("git-email") && globalConfig.Defaults.GitUserEmail != "" {
-		*gitEmail = globalConfig.Defaults.GitUserEmail
+	if !cmd.Flags().Changed("git-email") && defaults.GitUserEmail != "" {
+		*gitEmail = defaults.GitUserEmail
 	}
 
 	return nil
@@ -363,7 +342,6 @@ func applyCLIDefaults(
 func runCLI(params *CLIParams) error {
 	startTime := time.Now()
 	ctx := context.Background()
-	appView := cli.NewAppView(os.Stdout)
 	if params.BashRunTimeout <= 0 {
 		params.BashRunTimeout = defaultBashRunTimeout
 	}
@@ -376,16 +354,24 @@ func runCLI(params *CLIParams) error {
 		return fmt.Errorf("runCLI() [cli.go]: container mode options are not supported with --resume")
 	}
 
-	resolvedWorktreeBranch, err := resolveWorktreeBranchName(ctx, params.Prompt, params.ModelName, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath, params.WorktreeBranch)
+	resolvedWorktreeBranch, err := resolveWorktreeBranchNameFunc(ctx, system.ResolveWorktreeBranchNameParams{
+		Prompt:         params.Prompt,
+		ModelName:      params.ModelName,
+		WorkDir:        params.WorkDir,
+		ShadowDir:      params.ShadowDir,
+		ProjectConfig:  params.ProjectConfig,
+		ConfigPath:     params.ConfigPath,
+		WorktreeBranch: params.WorktreeBranch,
+	})
 	if err != nil {
 		return fmt.Errorf("runCLI() [cli.go]: failed to resolve worktree branch: %w", err)
 	}
 	params.WorktreeBranch = resolvedWorktreeBranch
 	if params.WorktreeBranch != "" {
-		appView.ShowMessage(fmt.Sprintf("Worktree branch: %s", params.WorktreeBranch), ui.MessageTypeInfo)
+		_, _ = fmt.Fprintf(os.Stdout, "[INFO] Worktree branch: %s\n", params.WorktreeBranch)
 	}
 
-	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{
+	sweSystem, buildResult, err := buildSystemFunc(system.BuildSystemParams{
 		WorkDir:           params.WorkDir,
 		ShadowDir:         params.ShadowDir,
 		ConfigPath:        params.ConfigPath,
@@ -421,39 +407,37 @@ func runCLI(params *CLIParams) error {
 		if buildResult.LSPStarted {
 			lspStatus = "started"
 		}
-		appView.ShowMessage(fmt.Sprintf("LSP %s (workdir: %s)", lspStatus, buildResult.LSPWorkDir), ui.MessageTypeInfo)
+		_, _ = fmt.Fprintf(os.Stdout, "[INFO] LSP %s (workdir: %s)\n", lspStatus, buildResult.LSPWorkDir)
 	}
 
-	var (
-		thread  *core.SessionThread
-		session *core.SweSession
-	)
-
-	if params.ResumeTarget != "" {
-		if params.ResumeTarget == "last" {
-			session, err = sweSystem.LoadLastSession(nil)
-			if err != nil {
-				return fmt.Errorf("runCLI() [cli.go]: failed to load last session: %w", err)
-			}
-		} else {
-			session, err = sweSystem.LoadSession(params.ResumeTarget, nil)
-			if err != nil {
-				return fmt.Errorf("runCLI() [cli.go]: failed to load session: %w", err)
-			}
-		}
-		thread = core.NewSessionThreadWithSession(sweSystem, session, nil)
-	} else {
-		thread = core.NewSessionThread(sweSystem, nil)
-		if err := thread.StartSession(params.ModelName); err != nil {
-			return fmt.Errorf("runCLI() [cli.go]: failed to start session: %w", err)
-		}
-		session = thread.GetSession()
+	runtimeResult, err := sweSystem.StartCLISession(system.StartCLISessionParams{
+		ModelName:       params.ModelName,
+		RoleName:        params.RoleName,
+		Prompt:          params.Prompt,
+		ResumeTarget:    params.ResumeTarget,
+		ContinueSession: params.ContinueSession,
+		ForceResume:     params.ForceResume,
+		Interactive:     params.Interactive,
+		AllowAllPerms:   params.AllowAllPerms,
+		Verbose:         params.Verbose,
+		AppOutput:       os.Stdout,
+		ChatOutput:      os.Stdout,
+		ChatInput:       os.Stdin,
+		AppViewFactory: func(output io.Writer) system.SessionLoggerAppView {
+			return cli.NewAppView(output)
+		},
+		ChatPresenterFactory: func(factory core.SessionFactory, thread *core.SessionThread) system.ChatPresenter {
+			return presenter.NewChatPresenter(factory, thread)
+		},
+		ChatViewFactory: func(chatPresenter ui.IChatPresenter, output io.Writer, input io.Reader, interactive bool, allowAllPerms bool, verbose bool) system.ChatView {
+			return cli.NewCliChatView(chatPresenter, output, input, interactive, allowAllPerms, verbose)
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("runCLI() [cli.go]: failed to start CLI session runtime: %w", err)
 	}
-
-	if session == nil {
-		return fmt.Errorf("runCLI() [cli.go]: session is not available")
-	}
-	appView.SetSessionLogger(logging.GetSessionLogger(session.ID(), logging.LogTypeSession))
+	appView := runtimeResult.AppView
+	session := runtimeResult.Session
 
 	sessionID := session.ID()
 	defer func() {
@@ -462,75 +446,11 @@ func runCLI(params *CLIParams) error {
 
 	defer finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr)
 
-	// Set role
-	if params.ResumeTarget == "" {
-		if err := session.SetRole(params.RoleName); err != nil {
-			return fmt.Errorf("runCLI() [cli.go]: failed to set role: %w", err)
-		}
-		// Set working directory
-		session.SetWorkDir(params.WorkDir)
-	}
-
-	// Create chat presenter
-	basePresenter := presenter.NewChatPresenter(sweSystem, thread)
-	basePresenter.SetAppView(appView)
-
-	// Create CLI chat view
-	baseCliView := cli.NewCliChatView(basePresenter, os.Stdout, os.Stdin, params.Interactive, params.AllowAllPerms, params.Verbose)
-
-	// Set view on presenter
-	if err := basePresenter.SetView(baseCliView); err != nil {
-		return fmt.Errorf("runCLI() [cli.go]: failed to set view: %w", err)
-	}
-
-	// If interactive, start reading input
-	if params.Interactive {
-		baseCliView.StartReadingInput()
-	}
-
-	// Create a channel to track when processing is done
-	done := make(chan error, 1)
-
-	// Set up a custom output handler to track completion
-	// The basePresenter implements SessionThreadOutput
-	wrappedHandler := &cliOutputHandler{
-		delegate: basePresenter,
-		done:     done,
-	}
-	thread.SetOutputHandler(wrappedHandler)
-
-	if params.ResumeTarget != "" {
-		if params.ContinueSession {
-			userMsg := &ui.ChatMessageUI{
-				Role: ui.ChatRoleUser,
-				Text: params.Prompt,
-			}
-			if err := basePresenter.SendUserMessage(userMsg); err != nil {
-				return fmt.Errorf("runCLI() [cli.go]: failed to send continue message: %w", err)
-			}
-		} else {
-			if !params.ForceResume && !session.HasPendingWork() {
-				return fmt.Errorf("runCLI() [cli.go]: resumed session has no pending work (use --resume-continue to add a prompt or --force to run anyway)")
-			}
-			if err := thread.ResumePending(); err != nil {
-				return fmt.Errorf("runCLI() [cli.go]: failed to resume pending work: %w", err)
-			}
-		}
-	} else {
-		userMsg := &ui.ChatMessageUI{
-			Role: ui.ChatRoleUser,
-			Text: params.Prompt,
-		}
-		if err := basePresenter.SendUserMessage(userMsg); err != nil {
-			return fmt.Errorf("runCLI() [cli.go]: failed to send initial message: %w", err)
-		}
-	}
-
 	var sessionRunErr error
 
 	// Wait for completion or context cancellation
 	select {
-	case err := <-done:
+	case err := <-runtimeResult.Done:
 		if err != nil {
 			sessionRunErr = fmt.Errorf("runCLI() [cli.go]: session error: %w", err)
 		}
@@ -545,7 +465,7 @@ func runCLI(params *CLIParams) error {
 	return nil
 }
 
-func emitSessionSummary(startTime time.Time, session *core.SweSession, buildResult BuildSystemResult, appView ui.IAppView, sessionRunErr error) error {
+func emitSessionSummary(startTime time.Time, session *core.SweSession, buildResult system.BuildSystemResult, appView ui.IAppView, sessionRunErr error) error {
 	sessionInfo := buildSessionSummaryMessage(time.Since(startTime), session, buildResult)
 	if err := saveSessionSummaryMarkdownFunc(buildResult.LogsDir, session, sessionInfo); err != nil {
 		if sessionRunErr == nil {
@@ -675,7 +595,7 @@ func parseVFSAllowPaths(values []string) []string {
 	return result
 }
 
-func buildSessionSummaryMessage(duration time.Duration, session *core.SweSession, buildResult BuildSystemResult) string {
+func buildSessionSummaryMessage(duration time.Duration, session *core.SweSession, buildResult system.BuildSystemResult) string {
 	base := fmt.Sprintf("Session completed in %s", duration.Round(time.Second))
 	if session == nil {
 		return base
@@ -823,63 +743,6 @@ func resolveGitIdentity(value, gitConfigKey string) string {
 	return resolveHostGitConfigValue(gitConfigKey)
 }
 
-func resolveWorktreeBranchName(ctx context.Context, prompt, modelName, workDir, shadowDir, projectConfig, configPath, worktreeBranch string) (string, error) {
-	if worktreeBranch == "" || !strings.HasSuffix(worktreeBranch, "%") {
-		return worktreeBranch, nil
-	}
-
-	if strings.TrimSpace(prompt) == "" {
-		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: --worktree ending with %% requires non-empty prompt")
-	}
-
-	prefix := strings.TrimSuffix(worktreeBranch, "%")
-	resolvedWorkDir, err := ResolveWorkDir(workDir)
-	if err != nil {
-		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to resolve work directory: %w", err)
-	}
-
-	configPathStr, err := BuildConfigPath(projectConfig, configPath)
-	if err != nil {
-		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to build config path: %w", err)
-	}
-
-	configRoot := resolvedWorkDir
-	if strings.TrimSpace(shadowDir) != "" {
-		resolvedShadowDir, shadowErr := ResolveWorkDir(shadowDir)
-		if shadowErr != nil {
-			return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to resolve shadow directory: %w", shadowErr)
-		}
-		configRoot = resolvedShadowDir
-	}
-
-	configStore, err := newCompositeConfigStoreFunc(configRoot, configPathStr)
-	if err != nil {
-		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to create config store: %w", err)
-	}
-
-	providerRegistry := models.NewProviderRegistry(configStore)
-	if len(providerRegistry.List()) == 0 {
-		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: no model providers found in config")
-	}
-
-	resolvedModelName, err := resolveModelNameFunc(modelName, configStore, providerRegistry)
-	if err != nil {
-		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to resolve model name: %w", err)
-	}
-
-	modelProviders, err := createProviderMapFunc(providerRegistry)
-	if err != nil {
-		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to create provider map: %w", err)
-	}
-
-	branchSuffix, err := generateWorktreeBranchNameFunc(ctx, modelProviders, configStore, resolvedModelName, prompt)
-	if err != nil {
-		return "", fmt.Errorf("resolveWorktreeBranchName() [cli.go]: failed to generate branch name: %w", err)
-	}
-
-	return prefix + branchSuffix, nil
-}
-
 func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer) {
 	if worktreeBranch == "" || vcs == nil {
 		return
@@ -926,55 +789,5 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 		if deleteErr := vcs.DeleteBranch(worktreeBranch); deleteErr != nil {
 			_, _ = fmt.Fprintf(stderr, "feature branch cleanup failed: %v\n", deleteErr)
 		}
-	}
-}
-
-// cliOutputHandler wraps a SessionThreadOutput to track when processing is done.
-type cliOutputHandler struct {
-	delegate core.SessionThreadOutput
-	done     chan error
-}
-
-func (h *cliOutputHandler) AddAssistantMessage(text string, thinking string) {
-	h.delegate.AddAssistantMessage(text, thinking)
-}
-
-func (h *cliOutputHandler) ShowMessage(message string, messageType string) {
-	if h.delegate != nil {
-		h.delegate.ShowMessage(message, messageType)
-	}
-}
-
-func (h *cliOutputHandler) AddToolCall(call *tool.ToolCall) {
-	h.delegate.AddToolCall(call)
-}
-
-func (h *cliOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
-	h.delegate.AddToolCallResult(result)
-}
-
-func (h *cliOutputHandler) OnPermissionQuery(query *tool.ToolPermissionsQuery) {
-	h.delegate.OnPermissionQuery(query)
-}
-
-func (h *cliOutputHandler) OnRateLimitError(retryAfterSeconds int) {
-	if h.delegate != nil {
-		h.delegate.OnRateLimitError(retryAfterSeconds)
-	}
-}
-
-func (h *cliOutputHandler) ShouldRetryAfterFailure(message string) bool {
-	if h.delegate != nil {
-		return h.delegate.ShouldRetryAfterFailure(message)
-	}
-	return false
-}
-
-func (h *cliOutputHandler) RunFinished(err error) {
-	h.delegate.RunFinished(err)
-	// Signal completion
-	select {
-	case h.done <- err:
-	default:
 	}
 }

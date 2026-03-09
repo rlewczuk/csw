@@ -5,13 +5,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBuildConfigPath_DefaultProjectConfig(t *testing.T) {
 	// When projectConfig is empty, should use default @PROJ/.csw/config
-	path, err := BuildConfigPath("", "")
+	path, err := system.BuildConfigPath("", "")
 	require.NoError(t, err)
 
 	homeDir, err := os.UserHomeDir()
@@ -28,7 +29,7 @@ func TestBuildConfigPath_CustomProjectConfig(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// When projectConfig is provided, should use it instead of default
-	path, err := BuildConfigPath(tmpDir, "")
+	path, err := system.BuildConfigPath(tmpDir, "")
 	require.NoError(t, err)
 
 	homeDir, err := os.UserHomeDir()
@@ -41,7 +42,7 @@ func TestBuildConfigPath_CustomProjectConfig(t *testing.T) {
 func TestBuildConfigPath_ProjectConfigNotExist(t *testing.T) {
 	// When projectConfig doesn't exist, should return error
 	nonExistentPath := "/non/existent/path/that/does/not/exist"
-	_, err := BuildConfigPath(nonExistentPath, "")
+	_, err := system.BuildConfigPath(nonExistentPath, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "project config directory does not exist")
 }
@@ -55,7 +56,7 @@ func TestBuildConfigPath_ProjectConfigIsFile(t *testing.T) {
 	defer os.Remove(tmpFilePath)
 
 	// When projectConfig is a file, should return error
-	_, err = BuildConfigPath(tmpFilePath, "")
+	_, err = system.BuildConfigPath(tmpFilePath, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "project config path is not a directory")
 }
@@ -71,7 +72,7 @@ func TestBuildConfigPath_WithCustomConfigPath(t *testing.T) {
 	defer os.RemoveAll(tmpCustomDir)
 
 	// When both projectConfig and customConfigPath are provided
-	path, err := BuildConfigPath(tmpProjectDir, tmpCustomDir)
+	path, err := system.BuildConfigPath(tmpProjectDir, tmpCustomDir)
 	require.NoError(t, err)
 
 	homeDir, err := os.UserHomeDir()
@@ -89,7 +90,7 @@ func TestBuildConfigPath_CustomConfigPathNotExist(t *testing.T) {
 
 	// When customConfigPath doesn't exist, should return error
 	nonExistentPath := "/non/existent/path/that/does/not/exist"
-	_, err = BuildConfigPath(tmpProjectDir, nonExistentPath)
+	_, err = system.BuildConfigPath(tmpProjectDir, nonExistentPath)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "config path does not exist")
 }
@@ -100,13 +101,13 @@ func TestValidateConfigPaths_ValidPath(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	err = ValidateConfigPaths(tmpDir)
+	err = system.ValidateConfigPaths(tmpDir)
 	assert.NoError(t, err)
 }
 
 func TestValidateConfigPaths_InvalidPath(t *testing.T) {
 	// Test with non-existent path
-	err := ValidateConfigPaths("/non/existent/path")
+	err := system.ValidateConfigPaths("/non/existent/path")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "config path does not exist")
 }
@@ -119,14 +120,14 @@ func TestValidateConfigPaths_FileNotDirectory(t *testing.T) {
 	tmpFile.Close()
 	defer os.Remove(tmpFilePath)
 
-	err = ValidateConfigPaths(tmpFilePath)
+	err = system.ValidateConfigPaths(tmpFilePath)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "config path is not a directory")
 }
 
 func TestValidateConfigPaths_EmptyPath(t *testing.T) {
 	// Empty paths should be skipped
-	err := ValidateConfigPaths("")
+	err := system.ValidateConfigPaths("")
 	assert.NoError(t, err)
 }
 
@@ -142,6 +143,6 @@ func TestValidateConfigPaths_MultiplePaths(t *testing.T) {
 
 	// Test with multiple paths (colon-separated on Unix)
 	pathList := tmpDir1 + string(filepath.ListSeparator) + tmpDir2
-	err = ValidateConfigPaths(pathList)
+	err = system.ValidateConfigPaths(pathList)
 	assert.NoError(t, err)
 }

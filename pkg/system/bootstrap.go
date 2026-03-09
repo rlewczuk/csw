@@ -1,6 +1,7 @@
-package main
+package system
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -18,7 +19,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
-	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
@@ -34,7 +34,52 @@ const (
 var gitLookPathFunc = exec.LookPath
 
 // gitConfigValueFunc resolves git config values and can be overridden in tests.
-var gitConfigValueFunc = readGitConfigValue
+var gitConfigValueFunc = ReadGitConfigValue
+
+var newCompositeConfigStoreFunc = impl.NewCompositeConfigStore
+var resolveModelNameFunc = ResolveModelName
+var createProviderMapFunc = CreateProviderMap
+var generateWorktreeBranchNameFunc = core.GenerateWorktreeBranchName
+
+// SetNewCompositeConfigStoreFuncForTest overrides composite store constructor in tests.
+func SetNewCompositeConfigStoreFuncForTest(fn func(projectRoot string, configPath string) (conf.ConfigStore, error)) {
+	newCompositeConfigStoreFunc = fn
+}
+
+// NewCompositeConfigStoreFuncForTest returns current composite store constructor.
+func NewCompositeConfigStoreFuncForTest() func(projectRoot string, configPath string) (conf.ConfigStore, error) {
+	return newCompositeConfigStoreFunc
+}
+
+// SetResolveModelNameFuncForTest overrides model name resolver in tests.
+func SetResolveModelNameFuncForTest(fn func(modelName string, configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (string, error)) {
+	resolveModelNameFunc = fn
+}
+
+// ResolveModelNameFuncForTest returns current model name resolver.
+func ResolveModelNameFuncForTest() func(modelName string, configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (string, error) {
+	return resolveModelNameFunc
+}
+
+// SetCreateProviderMapFuncForTest overrides provider map builder in tests.
+func SetCreateProviderMapFuncForTest(fn func(providerRegistry *models.ProviderRegistry) (map[string]models.ModelProvider, error)) {
+	createProviderMapFunc = fn
+}
+
+// CreateProviderMapFuncForTest returns current provider map builder.
+func CreateProviderMapFuncForTest() func(providerRegistry *models.ProviderRegistry) (map[string]models.ModelProvider, error) {
+	return createProviderMapFunc
+}
+
+// SetGenerateWorktreeBranchNameFuncForTest overrides branch name generator in tests.
+func SetGenerateWorktreeBranchNameFuncForTest(fn func(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore conf.ConfigStore, model string, inputPrompt string) (string, error)) {
+	generateWorktreeBranchNameFunc = fn
+}
+
+// GenerateWorktreeBranchNameFuncForTest returns current branch name generator.
+func GenerateWorktreeBranchNameFuncForTest() func(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore conf.ConfigStore, model string, inputPrompt string) (string, error) {
+	return generateWorktreeBranchNameFunc
+}
 
 // BuildSystemParams contains inputs for constructing a SweSystem.
 type BuildSystemParams struct {
@@ -86,7 +131,125 @@ type BuildSystemResult struct {
 	Cleanup          func()
 }
 
-func prepareSessionVFS(workDir string, worktreesBaseDir string, worktreeBranch string, continueWorktree bool, hidePatterns []string, gitUserName string, gitUserEmail string, allowedPaths []string) (vfs.VCS, vfs.VFS, error) {
+// ResolveCLIDefaultsParams contains inputs for resolving CLI defaults.
+type ResolveCLIDefaultsParams struct {
+	WorkDir       string
+	ShadowDir     string
+	ProjectConfig string
+	ConfigPath    string
+}
+
+// ResolveWorktreeBranchNameParams contains inputs for resolving dynamic worktree branch names.
+type ResolveWorktreeBranchNameParams struct {
+	Prompt         string
+	ModelName      string
+	WorkDir        string
+	ShadowDir      string
+	ProjectConfig  string
+	ConfigPath     string
+	WorktreeBranch string
+}
+
+// ResolveCLIDefaults resolves CLI defaults from effective global config.
+func ResolveCLIDefaults(params ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+	var defaults conf.CLIDefaultsConfig
+
+	resolvedWorkDir, err := ResolveWorkDir(params.WorkDir)
+	if err != nil {
+		return defaults, fmt.Errorf("ResolveCLIDefaults() [bootstrap.go]: failed to resolve work directory: %w", err)
+	}
+
+	configPathStr, err := BuildConfigPath(params.ProjectConfig, params.ConfigPath)
+	if err != nil {
+		return defaults, fmt.Errorf("ResolveCLIDefaults() [bootstrap.go]: failed to build config path: %w", err)
+	}
+
+	configRoot := resolvedWorkDir
+	if strings.TrimSpace(params.ShadowDir) != "" {
+		resolvedShadowDir, shadowErr := ResolveWorkDir(params.ShadowDir)
+		if shadowErr != nil {
+			return defaults, fmt.Errorf("ResolveCLIDefaults() [bootstrap.go]: failed to resolve shadow directory: %w", shadowErr)
+		}
+		configRoot = resolvedShadowDir
+	}
+
+	configStore, err := newCompositeConfigStoreFunc(configRoot, configPathStr)
+	if err != nil {
+		return defaults, fmt.Errorf("ResolveCLIDefaults() [bootstrap.go]: failed to create config store: %w", err)
+	}
+
+	globalConfig, err := configStore.GetGlobalConfig()
+	if err != nil {
+		return defaults, fmt.Errorf("ResolveCLIDefaults() [bootstrap.go]: failed to load global config: %w", err)
+	}
+
+	if globalConfig == nil {
+		return defaults, nil
+	}
+
+	return globalConfig.Defaults, nil
+}
+
+// ResolveWorktreeBranchName resolves a worktree branch placeholder that ends with '%'.
+func ResolveWorktreeBranchName(ctx context.Context, params ResolveWorktreeBranchNameParams) (string, error) {
+	if params.WorktreeBranch == "" || !strings.HasSuffix(params.WorktreeBranch, "%") {
+		return params.WorktreeBranch, nil
+	}
+
+	if strings.TrimSpace(params.Prompt) == "" {
+		return "", fmt.Errorf("ResolveWorktreeBranchName() [bootstrap.go]: --worktree ending with %% requires non-empty prompt")
+	}
+
+	prefix := strings.TrimSuffix(params.WorktreeBranch, "%")
+	resolvedWorkDir, err := ResolveWorkDir(params.WorkDir)
+	if err != nil {
+		return "", fmt.Errorf("ResolveWorktreeBranchName() [bootstrap.go]: failed to resolve work directory: %w", err)
+	}
+
+	configPathStr, err := BuildConfigPath(params.ProjectConfig, params.ConfigPath)
+	if err != nil {
+		return "", fmt.Errorf("ResolveWorktreeBranchName() [bootstrap.go]: failed to build config path: %w", err)
+	}
+
+	configRoot := resolvedWorkDir
+	if strings.TrimSpace(params.ShadowDir) != "" {
+		resolvedShadowDir, shadowErr := ResolveWorkDir(params.ShadowDir)
+		if shadowErr != nil {
+			return "", fmt.Errorf("ResolveWorktreeBranchName() [bootstrap.go]: failed to resolve shadow directory: %w", shadowErr)
+		}
+		configRoot = resolvedShadowDir
+	}
+
+	configStore, err := newCompositeConfigStoreFunc(configRoot, configPathStr)
+	if err != nil {
+		return "", fmt.Errorf("ResolveWorktreeBranchName() [bootstrap.go]: failed to create config store: %w", err)
+	}
+
+	providerRegistry := models.NewProviderRegistry(configStore)
+	if len(providerRegistry.List()) == 0 {
+		return "", fmt.Errorf("ResolveWorktreeBranchName() [bootstrap.go]: no model providers found in config")
+	}
+
+	resolvedModelName, err := resolveModelNameFunc(params.ModelName, configStore, providerRegistry)
+	if err != nil {
+		return "", fmt.Errorf("ResolveWorktreeBranchName() [bootstrap.go]: failed to resolve model name: %w", err)
+	}
+
+	modelProviders, err := createProviderMapFunc(providerRegistry)
+	if err != nil {
+		return "", fmt.Errorf("ResolveWorktreeBranchName() [bootstrap.go]: failed to create provider map: %w", err)
+	}
+
+	branchSuffix, err := generateWorktreeBranchNameFunc(ctx, modelProviders, configStore, resolvedModelName, params.Prompt)
+	if err != nil {
+		return "", fmt.Errorf("ResolveWorktreeBranchName() [bootstrap.go]: failed to generate branch name: %w", err)
+	}
+
+	return prefix + branchSuffix, nil
+}
+
+// PrepareSessionVFS creates session VCS/VFS with optional worktree handling.
+func PrepareSessionVFS(workDir string, worktreesBaseDir string, worktreeBranch string, continueWorktree bool, hidePatterns []string, gitUserName string, gitUserEmail string, allowedPaths []string) (vfs.VCS, vfs.VFS, error) {
 	localVFS, err := vfs.NewLocalVFS(workDir, hidePatterns, allowedPaths)
 	if err != nil {
 		return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create local VFS: %w", err)
@@ -153,7 +316,7 @@ func prepareSessionVFS(workDir string, worktreesBaseDir string, worktreeBranch s
 }
 
 // BuildSystem builds a SweSystem and related setup for CLI and TUI.
-func BuildSystem(params BuildSystemParams) (*system.SweSystem, BuildSystemResult, error) {
+func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error) {
 	var result BuildSystemResult
 
 	workDir, err := ResolveWorkDir(params.WorkDir)
@@ -243,7 +406,7 @@ func BuildSystem(params BuildSystemParams) (*system.SweSystem, BuildSystemResult
 		allowedPaths = append(allowedPaths, shadowDir)
 	}
 
-	selectedVCS, selectedVFS, err := prepareSessionVFS(workDir, configRoot, params.WorktreeBranch, params.ContinueWorktree, hidePatterns, params.GitUserName, params.GitUserEmail, allowedPaths)
+	selectedVCS, selectedVFS, err := PrepareSessionVFS(workDir, configRoot, params.WorktreeBranch, params.ContinueWorktree, hidePatterns, params.GitUserName, params.GitUserEmail, allowedPaths)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
@@ -270,7 +433,6 @@ func BuildSystem(params BuildSystemParams) (*system.SweSystem, BuildSystemResult
 	if params.LSPServer != "" {
 		logger := logging.GetGlobalLogger()
 		logger.Debug("lsp_initialization", "enabled", true, "server", params.LSPServer)
-		// Check if the LSP server binary exists
 		if _, err := os.Stat(params.LSPServer); err != nil {
 			logger.Warn("LSP server binary not found, continuing without LSP", "server", params.LSPServer, "error", err)
 		} else {
@@ -292,7 +454,7 @@ func BuildSystem(params BuildSystemParams) (*system.SweSystem, BuildSystemResult
 	bashRunner := runner.CommandRunner(runner.NewBashRunner(effectiveWorkDir, params.BashRunTimeout))
 	cleanupFn := func() {}
 
-	containerRuntimeConfig, err := resolveContainerRuntimeConfig(globalConfig, params, effectiveWorkDir, shadowDir)
+	containerRuntimeConfig, err := ResolveContainerRuntimeConfig(globalConfig, params, effectiveWorkDir, shadowDir)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve container config: %w", err)
@@ -305,7 +467,7 @@ func BuildSystem(params BuildSystemParams) (*system.SweSystem, BuildSystemResult
 			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve current user identity: %w", err)
 		}
 
-		gitAuthorName, gitAuthorEmail := resolveContainerGitAuthorIdentity()
+		gitAuthorName, gitAuthorEmail := ResolveContainerGitAuthorIdentity()
 		containerEnv := copyStringMap(containerRuntimeConfig.Env)
 		if containerEnv == nil {
 			containerEnv = make(map[string]string)
@@ -363,7 +525,7 @@ func BuildSystem(params BuildSystemParams) (*system.SweSystem, BuildSystemResult
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 
-	sweSystem := &system.SweSystem{
+	sweSystem := &SweSystem{
 		ModelProviders:  modelProviders,
 		ModelTags:       modelTagRegistry,
 		ToolSelection:   globalConfig.ToolSelection,
@@ -409,7 +571,8 @@ type containerRuntimeConfig struct {
 	Env     map[string]string
 }
 
-func resolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params BuildSystemParams, effectiveWorkDir string, shadowDir string) (containerRuntimeConfig, error) {
+// ResolveContainerRuntimeConfig resolves effective container runtime setup.
+func ResolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params BuildSystemParams, effectiveWorkDir string, shadowDir string) (containerRuntimeConfig, error) {
 	var runtimeConfig containerRuntimeConfig
 
 	runtimeConfig.Enabled = globalConfig.Container.Enabled
@@ -440,7 +603,7 @@ func resolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params Build
 		runtimeConfig.Mounts[shadowDir] = shadowDir
 	}
 	for _, mountSpec := range mountSpecs {
-		hostPath, containerPath, err := parseContainerMountSpec(mountSpec)
+		hostPath, containerPath, err := ParseContainerMountSpec(mountSpec)
 		if err != nil {
 			return runtimeConfig, err
 		}
@@ -462,7 +625,7 @@ func resolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params Build
 	if len(envSpecs) > 0 {
 		runtimeConfig.Env = make(map[string]string, len(envSpecs))
 		for _, envSpec := range envSpecs {
-			key, value, err := parseContainerEnvSpec(envSpec)
+			key, value, err := ParseContainerEnvSpec(envSpec)
 			if err != nil {
 				return runtimeConfig, err
 			}
@@ -473,7 +636,8 @@ func resolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params Build
 	return runtimeConfig, nil
 }
 
-func parseContainerMountSpec(mountSpec string) (string, string, error) {
+// ParseContainerMountSpec parses mount in host_path:container_path format.
+func ParseContainerMountSpec(mountSpec string) (string, string, error) {
 	parts := strings.SplitN(mountSpec, ":", 2)
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("parseContainerMountSpec() [bootstrap.go]: mount must be in host_path:container_path format: %q", mountSpec)
@@ -487,7 +651,8 @@ func parseContainerMountSpec(mountSpec string) (string, string, error) {
 	return hostPath, containerPath, nil
 }
 
-func parseContainerEnvSpec(envSpec string) (string, string, error) {
+// ParseContainerEnvSpec parses env var in KEY=VALUE format.
+func ParseContainerEnvSpec(envSpec string) (string, string, error) {
 	parts := strings.SplitN(envSpec, "=", 2)
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("parseContainerEnvSpec() [bootstrap.go]: env must be in KEY=VALUE format: %q", envSpec)
@@ -568,7 +733,8 @@ func resolveCurrentUserIdentity() (ContainerUserIdentity, error) {
 
 // resolveContainerGitAuthorIdentity returns git author identity for container mode.
 // It uses host git config values when git is available, otherwise default fallback values.
-func resolveContainerGitAuthorIdentity() (string, string) {
+// ResolveContainerGitAuthorIdentity returns git author identity for container mode.
+func ResolveContainerGitAuthorIdentity() (string, string) {
 	name := defaultGitAuthorName
 	email := defaultGitAuthorEmail
 
@@ -589,13 +755,157 @@ func resolveContainerGitAuthorIdentity() (string, string) {
 	return name, email
 }
 
-// readGitConfigValue reads a single git configuration key from host git config.
-func readGitConfigValue(key string) (string, error) {
+// ReadGitConfigValue reads a single git configuration key from host git config.
+func ReadGitConfigValue(key string) (string, error) {
 	cmd := exec.Command("git", "config", "--get", key)
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("readGitConfigValue() [bootstrap.go]: failed to read git config key %q: %w", key, err)
+		return "", fmt.Errorf("ReadGitConfigValue() [bootstrap.go]: failed to read git config key %q: %w", key, err)
 	}
 
 	return strings.TrimSpace(string(output)), nil
+}
+
+// BuildConfigPath builds a config path hierarchy string from base and optional custom paths.
+func BuildConfigPath(projectConfig, customConfigPath string) (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("BuildConfigPath() [bootstrap.go]: failed to get user home directory: %w", err)
+	}
+
+	projectConfigPath := "@PROJ/.csw/config"
+	if projectConfig != "" {
+		info, err := os.Stat(projectConfig)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return "", fmt.Errorf("BuildConfigPath() [bootstrap.go]: project config directory does not exist: %s", projectConfig)
+			}
+			return "", fmt.Errorf("BuildConfigPath() [bootstrap.go]: failed to access project config directory %s: %w", projectConfig, err)
+		}
+		if !info.IsDir() {
+			return "", fmt.Errorf("BuildConfigPath() [bootstrap.go]: project config path is not a directory: %s", projectConfig)
+		}
+		projectConfigPath = projectConfig
+	}
+
+	configPathStr := "@DEFAULTS:" + filepath.Join(homeDir, ".config", "csw") + ":" + projectConfigPath
+
+	if customConfigPath != "" {
+		if err := ValidateConfigPaths(customConfigPath); err != nil {
+			return "", err
+		}
+		configPathStr = configPathStr + ":" + customConfigPath
+	}
+
+	return configPathStr, nil
+}
+
+// ValidateConfigPaths validates that all paths in a colon-separated string exist and are directories.
+func ValidateConfigPaths(configPath string) error {
+	pathComponents := filepath.SplitList(configPath)
+	for _, pathComponent := range pathComponents {
+		if pathComponent == "" {
+			continue
+		}
+		info, err := os.Stat(pathComponent)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("ValidateConfigPaths() [bootstrap.go]: config path does not exist: %s", pathComponent)
+			}
+			return fmt.Errorf("ValidateConfigPaths() [bootstrap.go]: failed to access config path %s: %w", pathComponent, err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("ValidateConfigPaths() [bootstrap.go]: config path is not a directory: %s", pathComponent)
+		}
+	}
+	return nil
+}
+
+// ResolveWorkDir resolves the working directory from an optional path argument.
+func ResolveWorkDir(dirPath string) (string, error) {
+	if dirPath == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("ResolveWorkDir() [bootstrap.go]: failed to get current working directory: %w", err)
+		}
+		return wd, nil
+	}
+
+	absPath, err := filepath.Abs(dirPath)
+	if err != nil {
+		return "", fmt.Errorf("ResolveWorkDir() [bootstrap.go]: failed to resolve directory path: %w", err)
+	}
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return "", fmt.Errorf("ResolveWorkDir() [bootstrap.go]: failed to access directory: %w", err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("ResolveWorkDir() [bootstrap.go]: path is not a directory: %s", dirPath)
+	}
+	return absPath, nil
+}
+
+// ResolveModelName determines the model name to use.
+func ResolveModelName(modelName string, configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (string, error) {
+	if modelName != "" {
+		return modelName, nil
+	}
+
+	globalConfig, err := configStore.GetGlobalConfig()
+	if err != nil {
+		return "", fmt.Errorf("ResolveModelName() [bootstrap.go]: failed to get global config: %w", err)
+	}
+
+	if globalConfig.DefaultProvider != "" {
+		return globalConfig.DefaultProvider + "/default", nil
+	}
+
+	providers := providerRegistry.List()
+	if len(providers) > 0 {
+		return providers[0] + "/default", nil
+	}
+
+	return "", fmt.Errorf("ResolveModelName() [bootstrap.go]: no default provider configured and no providers available")
+}
+
+// CreateProviderMap creates a map of provider names to ModelProvider instances from a registry.
+func CreateProviderMap(providerRegistry *models.ProviderRegistry) (map[string]models.ModelProvider, error) {
+	modelProviders := make(map[string]models.ModelProvider)
+	for _, name := range providerRegistry.List() {
+		provider, err := providerRegistry.Get(name)
+		if err != nil {
+			return nil, fmt.Errorf("CreateProviderMap() [bootstrap.go]: failed to get provider %s: %w", name, err)
+		}
+		modelProviders[name] = provider
+	}
+	return modelProviders, nil
+}
+
+// CreateModelTagRegistry creates and populates a model tag registry from config store.
+func CreateModelTagRegistry(configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (*models.ModelTagRegistry, error) {
+	modelTagRegistry := models.NewModelTagRegistry()
+
+	globalConfig, err := configStore.GetGlobalConfig()
+	if err == nil && globalConfig != nil && len(globalConfig.ModelTags) > 0 {
+		if err := modelTagRegistry.SetGlobalMappings(globalConfig.ModelTags); err != nil {
+			return nil, fmt.Errorf("CreateModelTagRegistry() [bootstrap.go]: failed to set global model tags: %w", err)
+		}
+	}
+
+	for _, providerName := range providerRegistry.List() {
+		provider, err := providerRegistry.Get(providerName)
+		if err != nil {
+			continue
+		}
+		if chatProvider, ok := provider.(interface{ GetConfig() interface{} }); ok {
+			config := chatProvider.GetConfig()
+			if providerConfig, ok := config.(*conf.ModelProviderConfig); ok && len(providerConfig.ModelTags) > 0 {
+				if err := modelTagRegistry.SetProviderMappings(providerName, providerConfig.ModelTags); err != nil {
+					return nil, fmt.Errorf("CreateModelTagRegistry() [bootstrap.go]: failed to set provider model tags: %w", err)
+				}
+			}
+		}
+	}
+
+	return modelTagRegistry, nil
 }
