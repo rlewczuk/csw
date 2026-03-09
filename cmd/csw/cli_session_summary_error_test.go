@@ -50,21 +50,29 @@ func TestEmitSessionSummary(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			originalSaveSummary := saveSessionSummaryMarkdownFunc
+			originalSaveSummaryJSON := saveSessionSummaryJSONFunc
 			t.Cleanup(func() {
 				saveSessionSummaryMarkdownFunc = originalSaveSummary
+				saveSessionSummaryJSONFunc = originalSaveSummaryJSON
 			})
 
 			saveSessionSummaryMarkdownFunc = func(logsDir string, session *core.SweSession, sessionInfo string) error {
 				return tc.saveErr
 			}
+			saveSessionSummaryJSONFunc = func(logsDir string, session *core.SweSession, buildResult system.BuildSystemResult, startTime time.Time, endTime time.Time, baseCommitID string, headCommitID string) error {
+				return nil
+			}
 
 			view := &summaryCaptureAppView{}
 			err := emitSessionSummary(
 				time.Now().Add(-5*time.Second),
+				time.Now(),
 				nil,
 				system.BuildSystemResult{LogsDir: "any"},
 				view,
 				tc.sessionRunErr,
+				"",
+				"",
 			)
 
 			if tc.expectErr == "" {

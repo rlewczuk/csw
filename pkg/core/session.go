@@ -53,15 +53,15 @@ type SweSession struct {
 	logger        *slog.Logger
 	llmLogger     *slog.Logger
 
-	modelProviders map[string]models.ModelProvider
-	modelTags      *models.ModelTagRegistry
-	toolSelection  conf.ToolSelectionConfig
+	modelProviders  map[string]models.ModelProvider
+	modelTags       *models.ModelTagRegistry
+	toolSelection   conf.ToolSelectionConfig
 	promptGenerator PromptGenerator
-	roles          *AgentRoleRegistry
-	configStore    conf.ConfigStore
-	systemTools    *tool.ToolRegistry
-	logBaseDir     string
-	thinking       string
+	roles           *AgentRoleRegistry
+	configStore     conf.ConfigStore
+	systemTools     *tool.ToolRegistry
+	logBaseDir      string
+	thinking        string
 
 	// pendingPermissionToolCall stores the tool call that was blocked by a permission query
 	// This is used to re-execute the tool after permission is granted
@@ -83,17 +83,17 @@ type SweSessionParams struct {
 	ProviderName string
 	Model        string
 
-	VFS       vfs.VFS
-	BaseVFS   vfs.VFS
-	LSP       lsp.LSP
+	VFS         vfs.VFS
+	BaseVFS     vfs.VFS
+	LSP         lsp.LSP
 	SystemTools *tool.ToolRegistry
 
-	ModelProviders map[string]models.ModelProvider
-	ModelTags      *models.ModelTagRegistry
-	ToolSelection  conf.ToolSelectionConfig
+	ModelProviders  map[string]models.ModelProvider
+	ModelTags       *models.ModelTagRegistry
+	ToolSelection   conf.ToolSelectionConfig
 	PromptGenerator PromptGenerator
-	Roles          *AgentRoleRegistry
-	ConfigStore    conf.ConfigStore
+	Roles           *AgentRoleRegistry
+	ConfigStore     conf.ConfigStore
 
 	OutputHandler SessionThreadOutput
 	WorkDir       string
@@ -104,11 +104,11 @@ type SweSessionParams struct {
 	Logger    *slog.Logger
 	LLMLogger *slog.Logger
 
-	Role            *conf.AgentRoleConfig
-	Messages        []*models.ChatMessage
-	TodoList        []tool.TodoItem
-	RolesUsed       []string
-	ToolsUsed       []string
+	Role             *conf.AgentRoleConfig
+	Messages         []*models.ChatMessage
+	TodoList         []tool.TodoItem
+	RolesUsed        []string
+	ToolsUsed        []string
 	LoadedAgentFiles map[string]struct{}
 
 	PendingPermissionToolCalls []*tool.ToolCall
@@ -125,33 +125,33 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 	}
 
 	session := &SweSession{
-		id:             params.ID,
-		provider:       params.Provider,
-		providerName:   params.ProviderName,
-		model:          params.Model,
-		rolesUsed:      append([]string(nil), params.RolesUsed...),
-		toolsUsed:      append([]string(nil), params.ToolsUsed...),
-		messages:       make([]*models.ChatMessage, 0, len(params.Messages)),
-		role:           params.Role,
-		VFS:            params.VFS,
-		baseVFS:        params.BaseVFS,
-		LSP:            params.LSP,
-		Tools:          nil,
-		outputHandler:  params.OutputHandler,
-		workDir:        params.WorkDir,
-		shadowDir:      params.ShadowDir,
-		todoList:       make([]tool.TodoItem, len(params.TodoList)),
-		logger:         params.Logger,
-		llmLogger:      params.LLMLogger,
-		modelProviders: params.ModelProviders,
-		modelTags:      params.ModelTags,
-		toolSelection:  params.ToolSelection,
+		id:              params.ID,
+		provider:        params.Provider,
+		providerName:    params.ProviderName,
+		model:           params.Model,
+		rolesUsed:       append([]string(nil), params.RolesUsed...),
+		toolsUsed:       append([]string(nil), params.ToolsUsed...),
+		messages:        make([]*models.ChatMessage, 0, len(params.Messages)),
+		role:            params.Role,
+		VFS:             params.VFS,
+		baseVFS:         params.BaseVFS,
+		LSP:             params.LSP,
+		Tools:           nil,
+		outputHandler:   params.OutputHandler,
+		workDir:         params.WorkDir,
+		shadowDir:       params.ShadowDir,
+		todoList:        make([]tool.TodoItem, len(params.TodoList)),
+		logger:          params.Logger,
+		llmLogger:       params.LLMLogger,
+		modelProviders:  params.ModelProviders,
+		modelTags:       params.ModelTags,
+		toolSelection:   params.ToolSelection,
 		promptGenerator: params.PromptGenerator,
-		roles:          params.Roles,
-		configStore:    params.ConfigStore,
-		systemTools:    params.SystemTools,
-		logBaseDir:     params.LogBaseDir,
-		thinking:       params.Thinking,
+		roles:           params.Roles,
+		configStore:     params.ConfigStore,
+		systemTools:     params.SystemTools,
+		logBaseDir:      params.LogBaseDir,
+		thinking:        params.Thinking,
 
 		pendingPermissionToolCalls: make([]*tool.ToolCall, 0, len(params.PendingPermissionToolCalls)),
 		pendingToolResponses:       make([]*tool.ToolResponse, 0, len(params.PendingToolResponses)),
@@ -789,6 +789,15 @@ func (s *SweSession) TokenUsage() models.TokenUsage {
 // ContextLengthTokens returns latest known context length in tokens.
 func (s *SweSession) ContextLengthTokens() int {
 	return s.contextLength
+}
+
+// CompactionCount returns number of performed context compactions.
+func (s *SweSession) CompactionCount() int {
+	if s == nil {
+		return 0
+	}
+
+	return s.compactionCount
 }
 
 // SetWorkDir sets the working directory for this session.

@@ -114,7 +114,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 			}
 
 			var stderr bytes.Buffer
-			finalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.merge, tt.customTemplate, system, session, &stderr)
+			_ = finalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.merge, tt.customTemplate, system, session, &stderr, "")
 
 			commitCalls := mockVCS.GetCommitCalls()
 			if tt.expectCommit {

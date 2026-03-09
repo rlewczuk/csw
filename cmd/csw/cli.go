@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +22,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/presenter"
 	"github.com/rlewczuk/csw/pkg/system"
+	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/ui/cli"
 	"github.com/rlewczuk/csw/pkg/vfs"
@@ -66,6 +68,7 @@ const defaultBashRunTimeout = 120 * time.Second
 
 var runCLIFunc = runCLI
 var saveSessionSummaryMarkdownFunc = saveSessionSummaryMarkdown
+var saveSessionSummaryJSONFunc = saveSessionSummaryJSON
 var resolveCLIDefaultsFunc = system.ResolveCLIDefaults
 var resolveWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
 var buildSystemFunc = system.BuildSystem
@@ -444,7 +447,7 @@ func runCLI(params *CLIParams) error {
 		_, _ = fmt.Fprintf(os.Stdout, "Session ID: %s\n", sessionID)
 	}()
 
-	defer finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr)
+	baseCommitID := resolveGitCommitID(chooseGitDiffDir(buildResult.WorkDirRoot, buildResult.WorkDir), "HEAD")
 
 	var sessionRunErr error
 
@@ -458,15 +461,19 @@ func runCLI(params *CLIParams) error {
 		sessionRunErr = ctx.Err()
 	}
 
-	if err := emitSessionSummary(startTime, session, buildResult, appView, sessionRunErr); err != nil {
+	finalizeResult := finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot)
+	endTime := time.Now()
+
+	if err := emitSessionSummary(startTime, endTime, session, buildResult, appView, sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func emitSessionSummary(startTime time.Time, session *core.SweSession, buildResult system.BuildSystemResult, appView ui.IAppView, sessionRunErr error) error {
-	sessionInfo := buildSessionSummaryMessage(time.Since(startTime), session, buildResult)
+func emitSessionSummary(startTime time.Time, endTime time.Time, session *core.SweSession, buildResult system.BuildSystemResult, appView ui.IAppView, sessionRunErr error, baseCommitID string, headCommitID string) error {
+	duration := endTime.Sub(startTime)
+	sessionInfo := buildSessionSummaryMessage(duration, session, buildResult)
 	if err := saveSessionSummaryMarkdownFunc(buildResult.LogsDir, session, sessionInfo); err != nil {
 		if sessionRunErr == nil {
 			return fmt.Errorf("emitSessionSummary() [cli.go]: failed to save session summary: %w", err)
@@ -477,11 +484,215 @@ func emitSessionSummary(startTime time.Time, session *core.SweSession, buildResu
 		}
 	}
 
+	if err := saveSessionSummaryJSONFunc(buildResult.LogsDir, session, buildResult, startTime, endTime, baseCommitID, headCommitID); err != nil {
+		if sessionRunErr == nil {
+			return fmt.Errorf("emitSessionSummary() [cli.go]: failed to save session summary JSON: %w", err)
+		}
+
+		if appView != nil {
+			appView.ShowMessage(fmt.Sprintf("Failed to save session summary JSON: %v", err), ui.MessageTypeWarning)
+		}
+	}
+
 	if appView != nil {
 		appView.ShowMessage(sessionInfo, ui.MessageTypeInfo)
 	}
 
 	return sessionRunErr
+}
+
+type sessionSummaryJSON struct {
+	BaseCommitID     string                `json:"base_commit_id,omitempty"`
+	HeadCommitID     string                `json:"head_commit_id,omitempty"`
+	EditedFiles      []string              `json:"edited_files"`
+	FinalTodoList    []tool.TodoItem       `json:"final_todo_list"`
+	FinalTokenUsage  sessionTokenUsageJSON `json:"final_token_usage"`
+	FinalContext     int                   `json:"final_context_length"`
+	FinalCompactions int                   `json:"final_compaction_count"`
+	FinalDuration    string                `json:"final_session_duration"`
+	FinalTimestamp   string                `json:"final_session_timestamp"`
+	ToolsUsed        []string              `json:"tools_used"`
+	RolesUsed        []string              `json:"roles_used"`
+	ModelUsed        string                `json:"model_used"`
+	ThinkingLevel    string                `json:"thinking_level"`
+	LSPServer        string                `json:"lsp_server,omitempty"`
+	ContainerImage   string                `json:"container_image,omitempty"`
+	TimeSpentSeconds float64               `json:"time_spent_seconds"`
+	SessionID        string                `json:"session_id"`
+}
+
+type sessionTokenUsageJSON struct {
+	Input  int `json:"input"`
+	Output int `json:"output"`
+	Total  int `json:"total"`
+	Cached int `json:"cached"`
+}
+
+func saveSessionSummaryJSON(logsDir string, session *core.SweSession, buildResult system.BuildSystemResult, startTime time.Time, endTime time.Time, baseCommitID string, headCommitID string) error {
+	if session == nil {
+		return fmt.Errorf("saveSessionSummaryJSON() [cli.go]: session is nil")
+	}
+
+	if strings.TrimSpace(logsDir) == "" {
+		return fmt.Errorf("saveSessionSummaryJSON() [cli.go]: logsDir is empty")
+	}
+
+	sessionLogDir := filepath.Join(logsDir, "sessions", session.ID())
+	if err := os.MkdirAll(sessionLogDir, 0755); err != nil {
+		return fmt.Errorf("saveSessionSummaryJSON() [cli.go]: failed to create session log directory: %w", err)
+	}
+
+	summary := buildSessionSummaryJSON(session, buildResult, startTime, endTime, baseCommitID, headCommitID)
+	content, err := json.MarshalIndent(summary, "", "  ")
+	if err != nil {
+		return fmt.Errorf("saveSessionSummaryJSON() [cli.go]: failed to marshal summary json: %w", err)
+	}
+
+	filePath := filepath.Join(sessionLogDir, "summary.json")
+	if err := os.WriteFile(filePath, content, 0644); err != nil {
+		return fmt.Errorf("saveSessionSummaryJSON() [cli.go]: failed to write summary json file: %w", err)
+	}
+
+	return nil
+}
+
+func buildSessionSummaryJSON(session *core.SweSession, buildResult system.BuildSystemResult, startTime time.Time, endTime time.Time, baseCommitID string, headCommitID string) sessionSummaryJSON {
+	usage := session.TokenUsage()
+	duration := endTime.Sub(startTime)
+	return sessionSummaryJSON{
+		BaseCommitID:     strings.TrimSpace(baseCommitID),
+		HeadCommitID:     strings.TrimSpace(headCommitID),
+		EditedFiles:      collectEditedFiles(buildResult.WorkDirRoot, buildResult.WorkDir, baseCommitID, headCommitID),
+		FinalTodoList:    session.GetTodoList(),
+		FinalTokenUsage:  sessionTokenUsageJSON{Input: usage.InputTokens, Output: usage.OutputTokens, Total: usage.TotalTokens, Cached: usage.InputCachedTokens},
+		FinalContext:     session.ContextLengthTokens(),
+		FinalCompactions: session.CompactionCount(),
+		FinalDuration:    duration.String(),
+		FinalTimestamp:   endTime.Format(time.RFC3339Nano),
+		ToolsUsed:        sortedList(session.UsedTools()),
+		RolesUsed:        sortedList(session.UsedRoles()),
+		ModelUsed:        strings.TrimSpace(session.ModelWithProvider()),
+		ThinkingLevel:    strings.TrimSpace(session.ThinkingLevel()),
+		LSPServer:        strings.TrimSpace(buildResult.LSPServer),
+		ContainerImage:   strings.TrimSpace(buildResult.ContainerImage),
+		TimeSpentSeconds: duration.Seconds(),
+		SessionID:        session.ID(),
+	}
+}
+
+func sortedList(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	copyValues := append([]string(nil), values...)
+	sort.Strings(copyValues)
+
+	return copyValues
+}
+
+func collectEditedFiles(workDirRoot string, workDir string, baseCommitID string, headCommitID string) []string {
+	diffDir := chooseGitDiffDir(workDirRoot, workDir)
+	if diffDir == "" {
+		return nil
+	}
+
+	trimmedBase := strings.TrimSpace(baseCommitID)
+	trimmedHead := strings.TrimSpace(headCommitID)
+	if trimmedBase != "" && trimmedHead != "" && trimmedBase != trimmedHead {
+		files := gitDiffNameOnly(diffDir, trimmedBase+".."+trimmedHead)
+		if len(files) > 0 {
+			return files
+		}
+	}
+
+	tracked := gitDiffNameOnly(diffDir, "")
+	untracked := gitUntrackedFiles(diffDir)
+	combined := append(tracked, untracked...)
+	if len(combined) == 0 {
+		return nil
+	}
+
+	unique := make(map[string]struct{}, len(combined))
+	for _, file := range combined {
+		if strings.TrimSpace(file) == "" {
+			continue
+		}
+		unique[file] = struct{}{}
+	}
+
+	result := make([]string, 0, len(unique))
+	for file := range unique {
+		result = append(result, file)
+	}
+	sort.Strings(result)
+
+	return result
+}
+
+func gitDiffNameOnly(workDir string, commitRange string) []string {
+	args := []string{"diff", "--name-only"}
+	if strings.TrimSpace(commitRange) != "" {
+		args = append(args, commitRange)
+	}
+
+	cmd := exec.Command("git", args...)
+	cmd.Dir = workDir
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+
+	return parseGitFileList(output)
+}
+
+func gitUntrackedFiles(workDir string) []string {
+	cmd := exec.Command("git", "ls-files", "--others", "--exclude-standard")
+	cmd.Dir = workDir
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+
+	return parseGitFileList(output)
+}
+
+func parseGitFileList(output []byte) []string {
+	if len(output) == 0 {
+		return nil
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	result := make([]string, 0)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		result = append(result, line)
+	}
+
+	if len(result) == 0 {
+		return nil
+	}
+
+	sort.Strings(result)
+	return result
+}
+
+func resolveGitCommitID(workDir string, rev string) string {
+	if strings.TrimSpace(workDir) == "" || strings.TrimSpace(rev) == "" {
+		return ""
+	}
+
+	cmd := exec.Command("git", "rev-parse", rev)
+	cmd.Dir = workDir
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(output))
 }
 
 func saveSessionSummaryMarkdown(logsDir string, session *core.SweSession, sessionInfo string) error {
@@ -743,9 +954,14 @@ func resolveGitIdentity(value, gitConfigKey string) string {
 	return resolveHostGitConfigValue(gitConfigKey)
 }
 
-func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer) {
+type worktreeFinalizeResult struct {
+	HeadCommitID string
+}
+
+func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer, repoDir string) worktreeFinalizeResult {
+	result := worktreeFinalizeResult{}
 	if worktreeBranch == "" || vcs == nil {
-		return
+		return result
 	}
 
 	commitMessage, err := generateWorktreeCommitMessage(ctx, sweSystem.ModelProviders, sweSystem.ConfigStore, session, worktreeBranch, commitMessageTemplate)
@@ -754,14 +970,14 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 		if dropErr := vcs.DropWorktree(worktreeBranch); dropErr != nil {
 			_, _ = fmt.Fprintf(stderr, "worktree cleanup failed: %v\n", dropErr)
 		}
-		return
+		return result
 	}
 
 	if commitErr := vcs.CommitWorktree(worktreeBranch, commitMessage); commitErr != nil && !errors.Is(commitErr, vfs.ErrNoChangesToCommit) {
 		_, _ = fmt.Fprintf(stderr, "worktree commit failed: %v\n", commitErr)
 		if merge {
 			_, _ = fmt.Fprintln(stderr, "merge skipped because commit failed. Resolve issues and merge manually.")
-			return
+			return result
 		}
 	}
 
@@ -772,13 +988,15 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 				_, _ = fmt.Fprintf(stderr, "automatic merge failed due to conflicts: %v\n", mergeErr)
 				_, _ = fmt.Fprintf(stderr, "resolve conflicts manually and merge branch '%s' into main.\n", worktreeBranch)
 				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual conflict resolution.")
-				return
+				return result
 			}
 
 			_, _ = fmt.Fprintf(stderr, "automatic merge failed: %v\n", mergeErr)
 			_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
-			return
+			return result
 		}
+
+		result.HeadCommitID = resolveGitCommitID(repoDir, "main")
 	}
 
 	if dropErr := vcs.DropWorktree(worktreeBranch); dropErr != nil {
@@ -790,4 +1008,6 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 			_, _ = fmt.Fprintf(stderr, "feature branch cleanup failed: %v\n", deleteErr)
 		}
 	}
+
+	return result
 }

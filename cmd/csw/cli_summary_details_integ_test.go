@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -41,7 +42,7 @@ func TestCLISummaryIncludesDetailedSessionInfo(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"vfsWrite","arguments":{"path":"test.txt","content":"new\nline\n"}}}]},"done":false}`,
 		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
- 
+
 	mockServer.AddStreamingResponse("/api/chat", "POST", true,
 		`{"model":"test-model","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"Done."},"done":false}`,
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
@@ -76,6 +77,37 @@ func TestCLISummaryIncludesDetailedSessionInfo(t *testing.T) {
 	assert.Contains(t, summary, "Edited files:")
 	assert.Contains(t, summary, "- test.txt (+2/-1)")
 	assert.Contains(t, summary, "Session ID: "+sessionID)
+
+	jsonPath := filepath.Join(sessionsDir, sessionID, "summary.json")
+	jsonBytes, err := os.ReadFile(jsonPath)
+	require.NoError(t, err)
+
+	var jsonSummary map[string]any
+	require.NoError(t, json.Unmarshal(jsonBytes, &jsonSummary))
+	assert.NotEmpty(t, jsonSummary["base_commit_id"])
+	assert.Nil(t, jsonSummary["head_commit_id"])
+	assert.Equal(t, "ollama/test-model", jsonSummary["model_used"])
+	assert.Equal(t, "high", jsonSummary["thinking_level"])
+	assert.Equal(t, "/not/used/lsp", jsonSummary["lsp_server"])
+	assert.Equal(t, sessionID, jsonSummary["session_id"])
+
+	editedFiles, ok := jsonSummary["edited_files"].([]any)
+	require.True(t, ok)
+	assert.Contains(t, editedFiles, "test.txt")
+
+	rolesUsed, ok := jsonSummary["roles_used"].([]any)
+	require.True(t, ok)
+	assert.Contains(t, rolesUsed, "developer")
+
+	toolsUsed, ok := jsonSummary["tools_used"].([]any)
+	require.True(t, ok)
+	assert.Contains(t, toolsUsed, "vfsWrite")
+
+	_, ok = jsonSummary["final_token_usage"].(map[string]any)
+	assert.True(t, ok)
+	assert.NotEmpty(t, jsonSummary["final_session_duration"])
+	assert.NotEmpty(t, jsonSummary["final_session_timestamp"])
+	assert.NotNil(t, jsonSummary["time_spent_seconds"])
 }
 
 func runGit(workDir string, args ...string) error {
