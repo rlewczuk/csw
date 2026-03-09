@@ -10,13 +10,14 @@ import (
 )
 
 // NewAppView creates a CLI app-level view.
-func NewAppView(output io.Writer) *CliAppView {
-	return NewCliAppView(output)
+func NewAppView(output io.Writer, slug ...string) *CliAppView {
+	return NewCliAppView(output, slug...)
 }
 
 // CliAppView implements ui.IAppView for plain CLI mode.
 type CliAppView struct {
 	output        io.Writer
+	slug          string
 	mu            sync.Mutex
 	sessionLogger *slog.Logger
 	pendingLogs   []diagnosticLogMessage
@@ -28,8 +29,13 @@ type diagnosticLogMessage struct {
 }
 
 // NewCliAppView creates a new CLI app view writing to output.
-func NewCliAppView(output io.Writer) *CliAppView {
-	return &CliAppView{output: output}
+func NewCliAppView(output io.Writer, slug ...string) *CliAppView {
+	resolvedSlug := ""
+	if len(slug) > 0 {
+		resolvedSlug = slug[0]
+	}
+
+	return &CliAppView{output: output, slug: normalizeCLISlug(resolvedSlug)}
 }
 
 // SetSessionLogger configures session logger used for diagnostic message entries.
@@ -69,7 +75,7 @@ func (v *CliAppView) ShowMessage(message string, messageType ui.MessageType) {
 		prefix = "[ERROR]"
 	}
 
-	_, _ = fmt.Fprintf(v.output, "%s %s\n", prefix, message)
+	_, _ = fmt.Fprintf(v.output, "%s\n", addCLISlugPrefix(v.slug, fmt.Sprintf("%s %s", prefix, message)))
 
 	v.mu.Lock()
 	defer v.mu.Unlock()

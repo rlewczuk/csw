@@ -405,6 +405,10 @@ func runCLI(params *CLIParams) error {
 	params.WorkDir = buildResult.WorkDir
 	params.ShadowDir = buildResult.ShadowDir
 	params.ModelName = buildResult.ModelName
+	cliSlug := strings.TrimSpace(buildResult.WorktreeBranch)
+	if cliSlug == "" {
+		cliSlug = "main"
+	}
 	if params.LSPServer != "" {
 		lspStatus := "disabled"
 		if buildResult.LSPStarted {
@@ -427,13 +431,13 @@ func runCLI(params *CLIParams) error {
 		ChatOutput:      os.Stdout,
 		ChatInput:       os.Stdin,
 		AppViewFactory: func(output io.Writer) system.SessionLoggerAppView {
-			return cli.NewAppView(output)
+			return cli.NewAppView(output, cliSlug)
 		},
 		ChatPresenterFactory: func(factory core.SessionFactory, thread *core.SessionThread) system.ChatPresenter {
 			return presenter.NewChatPresenter(factory, thread)
 		},
 		ChatViewFactory: func(chatPresenter ui.IChatPresenter, output io.Writer, input io.Reader, interactive bool, allowAllPerms bool, verbose bool) system.ChatView {
-			return cli.NewCliChatView(chatPresenter, output, input, interactive, allowAllPerms, verbose)
+			return cli.NewCliChatView(chatPresenter, output, input, cliSlug, interactive, allowAllPerms, verbose)
 		},
 	})
 	if err != nil {

@@ -70,6 +70,28 @@ func TestCliChatView_NewCliChatView(t *testing.T) {
 		assert.Nil(t, view.scanner)
 		assert.Len(t, presenter.SetViewCalls, 1)
 	})
+
+	t.Run("uses provided slug prefix", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, "feature/test", false, false, false)
+
+		err := view.AddMessage(&ui.ChatMessageUI{Id: "msg1", Role: ui.ChatRoleUser, Text: "Hello"})
+		require.NoError(t, err)
+
+		assert.Contains(t, output.String(), "*feature/test* You: Hello")
+	})
+
+	t.Run("falls back to main slug when empty", func(t *testing.T) {
+		output := &bytes.Buffer{}
+		presenter := mock.NewMockChatPresenter()
+		view := NewCliChatView(presenter, output, nil, "", false, false, false)
+
+		err := view.AddMessage(&ui.ChatMessageUI{Id: "msg1", Role: ui.ChatRoleUser, Text: "Hello"})
+		require.NoError(t, err)
+
+		assert.Contains(t, output.String(), "*main* You: Hello")
+	})
 }
 
 func TestCliChatView_Init(t *testing.T) {

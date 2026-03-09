@@ -15,6 +15,7 @@ type CliChatView struct {
 	presenter ui.IChatPresenter
 	output    io.Writer
 	input     io.Reader
+	slug      string
 
 	// interactive controls whether to read user input
 	interactive bool
@@ -46,7 +47,25 @@ type CliChatView struct {
 // interactive controls whether to read user input.
 // acceptAllPermissions controls whether to automatically accept all permissions.
 // verbose controls whether to display full tool output instead of one-liners.
-func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Reader, interactive bool, acceptAllPermissions bool, verbose bool) *CliChatView {
+func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Reader, options ...any) *CliChatView {
+	slug := defaultCLISlug
+	interactive := false
+	acceptAllPermissions := false
+	verbose := false
+
+	if len(options) == 3 {
+		interactive, _ = options[0].(bool)
+		acceptAllPermissions, _ = options[1].(bool)
+		verbose, _ = options[2].(bool)
+	}
+
+	if len(options) >= 4 {
+		slug, _ = options[0].(string)
+		interactive, _ = options[1].(bool)
+		acceptAllPermissions, _ = options[2].(bool)
+		verbose, _ = options[3].(bool)
+	}
+
 	// acceptAllPermissions implies interactive=false
 	if acceptAllPermissions {
 		interactive = false
@@ -56,6 +75,7 @@ func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Read
 		presenter:            presenter,
 		output:               output,
 		input:                input,
+		slug:                 normalizeCLISlug(slug),
 		interactive:          interactive,
 		acceptAllPermissions: acceptAllPermissions,
 		verbose:              verbose,
@@ -156,11 +176,11 @@ func (v *CliChatView) renderUpdatedMessage(prev *ui.ChatMessageUI, msg *ui.ChatM
 	}
 
 	if msg.Thinking != "" && msg.Thinking != prev.Thinking {
-		fmt.Fprintf(v.output, "\n*%s*\n", msg.Thinking)
+		v.writef("\n*%s*\n", msg.Thinking)
 	}
 
 	if msg.Text != "" && msg.Text != prev.Text {
-		fmt.Fprintf(v.output, "\nAssistant: %s\n", msg.Text)
+		v.writef("\nAssistant: %s\n", msg.Text)
 	}
 
 	for _, tool := range msg.Tools {
@@ -225,22 +245,22 @@ func (v *CliChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 	}
 
 	// Print the permission query
-	fmt.Fprintf(v.output, "\n=== Permission Required ===\n")
-	fmt.Fprintf(v.output, "%s\n", query.Title)
+	v.writef("\n=== Permission Required ===\n")
+	v.writef("%s\n", query.Title)
 	if query.Details != "" {
-		fmt.Fprintf(v.output, "%s\n", query.Details)
+		v.writef("%s\n", query.Details)
 	}
 
 	// Print options
 	for i, option := range query.Options {
-		fmt.Fprintf(v.output, "  %d. %s\n", i+1, option)
+		v.writef("  %d. %s\n", i+1, option)
 	}
 
 	if query.AllowCustomResponse != "" {
-		fmt.Fprintf(v.output, "  0. %s\n", query.AllowCustomResponse)
+		v.writef("  0. %s\n", query.AllowCustomResponse)
 	}
 
-	fmt.Fprintf(v.output, "Enter your choice: ")
+	v.writef("Enter your choice: ")
 
 	// Read user input
 	if v.scanner == nil || !v.scanner.Scan() {
@@ -253,7 +273,7 @@ func (v *CliChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 	var response string
 	if input == "0" && query.AllowCustomResponse != "" {
 		// Custom response
-		fmt.Fprintf(v.output, "%s: ", query.AllowCustomResponse)
+		v.writef("%s: ", query.AllowCustomResponse)
 		if v.scanner.Scan() {
 			response = strings.TrimSpace(v.scanner.Text())
 		}
@@ -286,14 +306,14 @@ func (v *CliChatView) StartReadingInput() {
 	}
 
 	go func() {
-		fmt.Fprintf(v.output, "\nType your message and press Enter (Ctrl+D to exit):\n")
+		v.writef("\nType your message and press Enter (Ctrl+D to exit):\n")
 
 		for {
 			select {
 			case <-v.stopCh:
 				return
 			default:
-				fmt.Fprintf(v.output, "> ")
+				v.writef("> ")
 				if !v.scanner.Scan() {
 					return
 				}
@@ -310,7 +330,7 @@ func (v *CliChatView) StartReadingInput() {
 						Text: input,
 					}
 					if err := v.presenter.SendUserMessage(msg); err != nil {
-						fmt.Fprintf(v.output, "Error sending message: %v\n", err)
+						v.writef("Error sending message: %v\n", err)
 					}
 				}
 			}
@@ -329,7 +349,7 @@ func (v *CliChatView) renderMessage(msg *ui.ChatMessageUI) {
 	switch msg.Role {
 	case ui.ChatRoleUser:
 		if msg.Text != "" {
-			fmt.Fprintf(v.output, "\nYou: %s\n", msg.Text)
+			v.writef("\nYou: %s\n", msg.Text)
 		}
 	case ui.ChatRoleAssistant:
 		v.renderAssistantMessage(msg)
@@ -340,11 +360,11 @@ func (v *CliChatView) renderMessage(msg *ui.ChatMessageUI) {
 // Must be called with mu locked.
 func (v *CliChatView) renderAssistantMessage(msg *ui.ChatMessageUI) {
 	if msg.Thinking != "" {
-		fmt.Fprintf(v.output, "\n*%s*\n", msg.Thinking)
+		v.writef("\n*%s*\n", msg.Thinking)
 	}
 
 	if msg.Text != "" {
-		fmt.Fprintf(v.output, "\nAssistant: %s\n", msg.Text)
+		v.writef("\nAssistant: %s\n", msg.Text)
 	}
 
 	for _, tool := range msg.Tools {
@@ -396,12 +416,20 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) bool {
 	}
 
 	// Render the tool call result
-	fmt.Fprint(v.output, outputLine)
+	v.write(outputLine)
 
 	// Mark this tool as rendered with current output
 	v.renderedTools[tool.Id] = outputLine
 
 	return true
+}
+
+func (v *CliChatView) writef(format string, args ...any) {
+	v.write(fmt.Sprintf(format, args...))
+}
+
+func (v *CliChatView) write(message string) {
+	_, _ = fmt.Fprint(v.output, addCLISlugPrefix(v.slug, message))
 }
 
 var _ ui.IChatView = (*CliChatView)(nil)
