@@ -180,5 +180,14 @@ func RegisterSkillTool(registry *ToolRegistry, workdir string) {
 
 // Render returns a string representation of the tool call.
 func (r *ToolRegistry) Render(call *ToolCall) (string, string, map[string]string) {
-	return "ToolRegistry", "ToolRegistry", make(map[string]string)
+	if call == nil || call.Function == "" {
+		return "ToolRegistry", "ToolRegistry", make(map[string]string)
+	}
+
+	toolImpl, err := r.Get(call.Function)
+	if err != nil || toolImpl == nil {
+		return call.Function, call.Function, make(map[string]string)
+	}
+
+	return toolImpl.Render(call)
 }

@@ -4,22 +4,27 @@ import (
 	"sync"
 
 	"github.com/rlewczuk/csw/pkg/core"
-	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/ui"
 )
+
+type sessionThreadProvider interface {
+	core.SessionFactory
+	GetSessionThread(id string) (*core.SessionThread, error)
+	Shutdown()
+}
 
 // AppPresenter implements ui.IAppPresenter.
 // It manages the application-level interactions between the UI and the SweSystem.
 type AppPresenter struct {
 	mu           sync.Mutex
-	system       *system.SweSystem
+	system       sessionThreadProvider
 	view         ui.IAppView
 	defaultModel string
 	defaultRole  string
 }
 
 // NewAppPresenter creates a new AppPresenter with the given system, default model, and default role.
-func NewAppPresenter(system *system.SweSystem, defaultModel string, defaultRole string) *AppPresenter {
+func NewAppPresenter(system sessionThreadProvider, defaultModel string, defaultRole string) *AppPresenter {
 	return &AppPresenter{
 		system:       system,
 		defaultModel: defaultModel,

@@ -5,7 +5,6 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
-	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
 )
@@ -18,7 +17,6 @@ type ChatPresenter struct {
 	view    ui.IChatView
 	appView ui.IAppView
 	thread  *core.SessionThread
-	system  *system.SweSystem
 
 	// Tracking state for current run
 	currentAssistantMessage *ui.ChatMessageUI
@@ -33,10 +31,9 @@ func (p *ChatPresenter) SetAppView(view ui.IAppView) {
 	p.appView = view
 }
 
-// NewChatPresenter creates a new ChatPresenter with the given system and session thread.
-func NewChatPresenter(system *system.SweSystem, thread *core.SessionThread) *ChatPresenter {
+// NewChatPresenter creates a new ChatPresenter with the given session thread.
+func NewChatPresenter(_ core.SessionFactory, thread *core.SessionThread) *ChatPresenter {
 	p := &ChatPresenter{
-		system: system,
 		thread: thread,
 	}
 	// Set this presenter as the output handler for the thread
@@ -222,17 +219,8 @@ func (p *ChatPresenter) AddToolCallResult(result *tool.ToolResponse) {
 				} else {
 					t.Status = ui.ToolStatusSucceeded
 				}
-				// Get the render result from the session tool registry first.
-				// Some tools (e.g. todoRead/todoWrite) are session-specific and are not
-				// registered on system-level registry.
-				if toolImpl := p.resolveToolForRender(result.Call.Function); toolImpl != nil {
-					// Pass result and error information to Render via Arguments
-					callForRender := copyToolCallWithResult(result.Call, result)
-					summary, details, meta := toolImpl.Render(callForRender)
-					t.Summary = summary
-					t.Details = details
-					t.Meta = meta
-				}
+				callForRender := copyToolCallWithResult(result.Call, result)
+				t.Summary, t.Details, t.Meta = p.renderToolResult(callForRender)
 				toolState = t
 				break
 			}
@@ -246,31 +234,6 @@ func (p *ChatPresenter) AddToolCallResult(result *tool.ToolResponse) {
 	}
 }
 
-// resolveToolForRender resolves a tool implementation for rendering output.
-// It prefers session-level tools because they can carry session state.
-func (p *ChatPresenter) resolveToolForRender(toolName string) tool.Tool {
-	if p == nil || toolName == "" {
-		return nil
-	}
-
-	if p.thread != nil {
-		session := p.thread.GetSession()
-		if session != nil && session.Tools != nil {
-			if toolImpl, err := session.Tools.Get(toolName); err == nil {
-				return toolImpl
-			}
-		}
-	}
-
-	if p.system != nil && p.system.Tools != nil {
-		if toolImpl, err := p.system.Tools.Get(toolName); err == nil {
-			return toolImpl
-		}
-	}
-
-	return nil
-}
-
 // RunFinished is called when the session Run() loop is finished.
 // Implements core.SessionThreadOutput.
 func (p *ChatPresenter) RunFinished(err error) {
@@ -278,6 +241,23 @@ func (p *ChatPresenter) RunFinished(err error) {
 	// Reset current assistant message for next run
 	p.currentAssistantMessage = nil
 	p.mu.Unlock()
+}
+
+func (p *ChatPresenter) renderToolResult(call *tool.ToolCall) (string, string, map[string]string) {
+	if call == nil {
+		return "", "", make(map[string]string)
+	}
+
+	if p.thread == nil {
+		return "", "", make(map[string]string)
+	}
+
+	session := p.thread.GetSession()
+	if session == nil || session.Tools == nil {
+		return "", "", make(map[string]string)
+	}
+
+	return session.Tools.Render(call)
 }
 
 // OnRateLimitError is called when the session encounters a rate limit error.
