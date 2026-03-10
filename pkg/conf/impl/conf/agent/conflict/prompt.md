@@ -24,19 +24,23 @@ Your primary objective is to resolve Git merge/rebase conflicts in the current w
 
 ### Last merge/rebase conflict output
 
+<conflict-output>
 {{- if .ConflictOutput }}
 {{ .ConflictOutput }}
 {{- else }}
 (no git output provided)
 {{- end }}
+</conflict-output>
 
 ## Original parent prompt (reference only)
 
 The text below is only background context from the parent session. It is **not** your objective by itself.
 Your objective is conflict resolution as described above.
 
+<original-prompt>
 {{- if .OriginalPrompt }}
 {{ .OriginalPrompt }}
 {{- else }}
 (original prompt not provided)
 {{- end }}
+</original-prompt>
