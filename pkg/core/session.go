@@ -517,14 +517,46 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 	if len(s.pendingToolResponses) > 0 {
 		toolResponses = append(toolResponses, s.pendingToolResponses...)
 	}
-	for i, toolCall := range toolCalls {
-		// Use s.Tools which might have access control wrappers
+	for _, toolCall := range toolCalls {
 		s.toolsUsed = appendUniqueString(s.toolsUsed, toolCall.Function)
-		s.logger.Info("executing_tool_call", "tool", toolCall.Function, "args", toolCall.Arguments)
-		response := s.Tools.Execute(toolCall)
-		s.logger.Info("tool_call_executed", "tool", toolCall.Function, "response", response)
+	}
 
-		// Check for permission query
+	type toolExecutionResult struct {
+		index    int
+		toolCall *tool.ToolCall
+		response *tool.ToolResponse
+	}
+
+	results := make([]toolExecutionResult, len(toolCalls))
+	var wg sync.WaitGroup
+	for i, toolCall := range toolCalls {
+		wg.Add(1)
+		go func(index int, call *tool.ToolCall) {
+			defer wg.Done()
+
+			if s.logger != nil {
+				s.logger.Info("executing_tool_call", "tool", call.Function, "args", call.Arguments)
+			}
+
+			response := s.Tools.Execute(call)
+
+			if s.logger != nil {
+				s.logger.Info("tool_call_executed", "tool", call.Function, "response", response)
+			}
+
+			results[index] = toolExecutionResult{index: index, toolCall: call, response: response}
+		}(i, toolCall)
+	}
+	wg.Wait()
+
+	pendingPermissionToolCalls := make([]*tool.ToolCall, 0)
+	var firstPermissionQuery error
+	for _, result := range results {
+		response := result.response
+		if response == nil {
+			continue
+		}
+
 		if permQuery, ok := response.Error.(*tool.ToolPermissionsQuery); ok {
 			if s.logger != nil {
 				toolFunc := ""
@@ -538,26 +570,33 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 					"details", permQuery.Details,
 				)
 			}
-			// Store executed responses and pending tool calls so we can resume after permission is granted
-			s.pendingToolResponses = toolResponses
-			s.pendingPermissionToolCalls = append([]*tool.ToolCall{toolCall}, toolCalls[i+1:]...)
-			s.persistSessionState()
-			return response.Error
+
+			pendingPermissionToolCalls = append(pendingPermissionToolCalls, result.toolCall)
+			if firstPermissionQuery == nil {
+				firstPermissionQuery = response.Error
+			}
+			continue
 		}
 
 		toolResponses = append(toolResponses, response)
 		logging.LogToolResult(s.logger, response)
 
-		newAgentMessages, err := s.buildAdditionalAgentMessages(toolCall, response)
+		newAgentMessages, err := s.buildAdditionalAgentMessages(result.toolCall, response)
 		if err != nil {
 			return fmt.Errorf("SweSession.executeToolCalls() [session.go]: failed to load additional AGENTS.md instructions: %w", err)
 		}
 		agentMessages = append(agentMessages, newAgentMessages...)
 
-		// Notify UI handler about tool result
 		if s.outputHandler != nil {
 			s.outputHandler.AddToolCallResult(response)
 		}
+	}
+
+	if len(pendingPermissionToolCalls) > 0 {
+		s.pendingToolResponses = toolResponses
+		s.pendingPermissionToolCalls = pendingPermissionToolCalls
+		s.persistSessionState()
+		return firstPermissionQuery
 	}
 
 	// Add tool responses to the conversation
