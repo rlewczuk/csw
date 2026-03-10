@@ -4,7 +4,6 @@
 
 ## Major files
 
-- `system.go`: Main system container (`SweSystem`) for session creation, lookup, listing, and shutdown.
 - `session.go`: Core session engine (`SweSession`) that runs chat/tool loops, handles retries, permissions, and model/role changes.
 - `session_thread.go`: Async thread wrapper around sessions for non-blocking UI interaction and interruption/pause/resume control.
 - `prompt.go`: Prompt and tool-info generator that merges role fragments and builds runtime tool schema metadata.
