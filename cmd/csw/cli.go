@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/core"
@@ -74,6 +75,9 @@ var resolveWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
 var buildSystemFunc = system.BuildSystem
 var gitLookPathFunc = exec.LookPath
 var gitConfigValueFunc = system.ReadGitConfigValue
+var runGitCommandFunc = runGitCommand
+var listGitConflictFilesFunc = listGitConflictFiles
+var executeConflictSubAgentFunc = executeConflictSubAgentTask
 
 // CliCommand creates the cli command.
 func CliCommand() *cobra.Command {
@@ -465,7 +469,7 @@ func runCLI(params *CLIParams) error {
 		sessionRunErr = ctx.Err()
 	}
 
-	finalizeResult := finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot)
+	finalizeResult := finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt)
 	endTime := time.Now()
 
 	if err := emitSessionSummary(startTime, endTime, session, buildResult, appView, sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
@@ -962,7 +966,7 @@ type worktreeFinalizeResult struct {
 	HeadCommitID string
 }
 
-func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer, repoDir string) worktreeFinalizeResult {
+func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer, repoDir string, worktreeDir string, originalPrompt string) worktreeFinalizeResult {
 	result := worktreeFinalizeResult{}
 	if worktreeBranch == "" || vcs == nil {
 		return result
@@ -986,21 +990,31 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 	}
 
 	if merge {
-		mergeErr := vcs.MergeBranches("main", worktreeBranch)
-		if mergeErr != nil {
-			if errors.Is(mergeErr, vfs.ErrMergeConflict) {
-				_, _ = fmt.Fprintf(stderr, "automatic merge failed due to conflicts: %v\n", mergeErr)
-				_, _ = fmt.Fprintf(stderr, "resolve conflicts manually and merge branch '%s' into main.\n", worktreeBranch)
-				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual conflict resolution.")
+		if strings.TrimSpace(repoDir) == "" || strings.TrimSpace(worktreeDir) == "" || sweSystem == nil || session == nil {
+			mergeErr := vcs.MergeBranches("main", worktreeBranch)
+			if mergeErr != nil {
+				if errors.Is(mergeErr, vfs.ErrMergeConflict) {
+					_, _ = fmt.Fprintf(stderr, "automatic merge failed due to conflicts: %v\n", mergeErr)
+					_, _ = fmt.Fprintf(stderr, "resolve conflicts manually and merge branch '%s' into main.\n", worktreeBranch)
+					_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual conflict resolution.")
+					return result
+				}
+
+				_, _ = fmt.Fprintf(stderr, "automatic merge failed: %v\n", mergeErr)
+				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
 				return result
 			}
 
-			_, _ = fmt.Fprintf(stderr, "automatic merge failed: %v\n", mergeErr)
-			_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
-			return result
+			result.HeadCommitID = resolveGitCommitID(repoDir, "main")
+		} else {
+			headCommitID, mergeErr := mergeWorktreeWithConflictResolution(ctx, repoDir, worktreeDir, worktreeBranch, originalPrompt, sweSystem, session, stderr)
+			if mergeErr != nil {
+				_, _ = fmt.Fprintf(stderr, "automatic merge failed: %v\n", mergeErr)
+				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
+				return result
+			}
+			result.HeadCommitID = headCommitID
 		}
-
-		result.HeadCommitID = resolveGitCommitID(repoDir, "main")
 	}
 
 	if dropErr := vcs.DropWorktree(worktreeBranch); dropErr != nil {
@@ -1014,4 +1028,226 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 	}
 
 	return result
+}
+
+type conflictResolutionPromptData struct {
+	Branch         string
+	OriginalPrompt string
+	ConflictFiles  string
+	ConflictOutput string
+}
+
+func mergeWorktreeWithConflictResolution(ctx context.Context, repoDir string, worktreeDir string, worktreeBranch string, originalPrompt string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer) (string, error) {
+	if sweSystem == nil || sweSystem.ConfigStore == nil {
+		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: system config store is not available")
+	}
+	if session == nil {
+		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: session is nil")
+	}
+
+	attempt := 1
+	failedRebaseOutput := ""
+	conflictFiles := []string{}
+
+	for {
+		command := []string{"rebase", "main"}
+		_, rebaseErr := runGitCommandFunc(worktreeDir, command...)
+		if rebaseErr == nil {
+			_, _ = fmt.Fprintf(stderr, "[conflict] rebase step succeeded (attempt %d, command: git %s)\n", attempt, strings.Join(command, " "))
+			break
+		}
+
+		rebaseOutput := rebaseErr.Error()
+		if !isMergeConflictError(rebaseOutput) {
+			return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: rebase failed: %w", rebaseErr)
+		}
+
+		failedRebaseOutput = rebaseOutput
+		conflictFiles = listGitConflictFilesFunc(worktreeDir)
+		if len(conflictFiles) == 0 {
+			conflictFiles = extractConflictFilesFromOutput(rebaseOutput)
+		}
+
+		_, _ = fmt.Fprintf(stderr, "[conflict] merge/rebase conflict detected on attempt %d\n", attempt)
+		if len(conflictFiles) > 0 {
+			_, _ = fmt.Fprintf(stderr, "[conflict] conflicted files: %s\n", strings.Join(conflictFiles, ", "))
+		}
+
+		prompt, err := buildConflictResolutionPrompt(sweSystem.ConfigStore, conflictResolutionPromptData{
+			Branch:         worktreeBranch,
+			OriginalPrompt: originalPrompt,
+			ConflictFiles:  strings.Join(conflictFiles, "\n"),
+			ConflictOutput: failedRebaseOutput,
+		})
+		if err != nil {
+			return "", err
+		}
+
+		request := tool.SubAgentTaskRequest{
+			Slug:   fmt.Sprintf("conflict-resolution-%d", attempt),
+			Title:  fmt.Sprintf("Resolve merge conflicts (%d)", attempt),
+			Role:   "developer",
+			Prompt: prompt,
+		}
+		_, _ = fmt.Fprintf(stderr, "[conflict] starting conflict-resolution sub-session: %s\n", request.Slug)
+		subAgentResult, subAgentErr := executeConflictSubAgentFunc(session, request)
+		if subAgentErr != nil {
+			return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: sub-session failed: %w", subAgentErr)
+		}
+		if subAgentResult.Status != "completed" {
+			return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: conflict-resolution sub-session ended with status %q: %s", subAgentResult.Status, strings.TrimSpace(subAgentResult.Summary))
+		}
+		_, _ = fmt.Fprintf(stderr, "[conflict] conflict-resolution sub-session completed: %s\n", request.Slug)
+		attempt++
+	}
+
+	mergeWorktreePath, cleanup, err := createMainMergeWorktree(repoDir)
+	if err != nil {
+		return "", err
+	}
+	defer cleanup()
+
+	if _, err := runGitCommandFunc(mergeWorktreePath, "merge", "--ff-only", worktreeBranch); err != nil {
+		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: fast-forward merge into main failed: %w", err)
+	}
+
+	headCommitID, err := runGitCommandFunc(mergeWorktreePath, "rev-parse", "HEAD")
+	if err != nil {
+		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: failed to resolve main HEAD commit: %w", err)
+	}
+
+	return strings.TrimSpace(headCommitID), nil
+}
+
+func createMainMergeWorktree(repoDir string) (string, func(), error) {
+	workRoot := filepath.Join(repoDir, ".cswdata", "work")
+	if err := os.MkdirAll(workRoot, 0755); err != nil {
+		return "", func() {}, fmt.Errorf("createMainMergeWorktree() [cli.go]: failed to create worktree root directory: %w", err)
+	}
+
+	mergeWorktreePath, err := os.MkdirTemp(workRoot, ".merge-main-")
+	if err != nil {
+		return "", func() {}, fmt.Errorf("createMainMergeWorktree() [cli.go]: failed to allocate temporary merge worktree path: %w", err)
+	}
+
+	if err := os.RemoveAll(mergeWorktreePath); err != nil {
+		return "", func() {}, fmt.Errorf("createMainMergeWorktree() [cli.go]: failed to prepare temporary merge worktree path: %w", err)
+	}
+
+	if _, err := runGitCommandFunc(repoDir, "worktree", "add", "--force", mergeWorktreePath, "main"); err != nil {
+		_ = os.RemoveAll(mergeWorktreePath)
+		return "", func() {}, fmt.Errorf("createMainMergeWorktree() [cli.go]: failed to create temporary main worktree: %w", err)
+	}
+
+	cleanup := func() {
+		_, _ = runGitCommandFunc(repoDir, "worktree", "remove", "--force", mergeWorktreePath)
+		_ = os.RemoveAll(mergeWorktreePath)
+	}
+
+	return mergeWorktreePath, cleanup, nil
+}
+
+func buildConflictResolutionPrompt(configStore interface{ GetAgentConfigFile(subdir, filename string) ([]byte, error) }, data conflictResolutionPromptData) (string, error) {
+	templateBytes, err := configStore.GetAgentConfigFile("conflict", "prompt.md")
+	if err != nil {
+		return "", fmt.Errorf("buildConflictResolutionPrompt() [cli.go]: failed to read conflict/prompt.md: %w", err)
+	}
+
+	tmpl, err := template.New("conflict-prompt").Parse(string(templateBytes))
+	if err != nil {
+		return "", fmt.Errorf("buildConflictResolutionPrompt() [cli.go]: failed to parse prompt template: %w", err)
+	}
+
+	var promptBuffer bytes.Buffer
+	if err := tmpl.Execute(&promptBuffer, data); err != nil {
+		return "", fmt.Errorf("buildConflictResolutionPrompt() [cli.go]: failed to render prompt template: %w", err)
+	}
+
+	return promptBuffer.String(), nil
+}
+
+func executeConflictSubAgentTask(session *core.SweSession, request tool.SubAgentTaskRequest) (tool.SubAgentTaskResult, error) {
+	if session == nil {
+		return tool.SubAgentTaskResult{}, fmt.Errorf("executeConflictSubAgentTask() [cli.go]: session is nil")
+	}
+
+	return session.ExecuteSubAgentTask(request)
+}
+
+func runGitCommand(workDir string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = workDir
+	output, err := cmd.CombinedOutput()
+	trimmedOutput := strings.TrimSpace(string(output))
+	if err != nil {
+		return "", fmt.Errorf("runGitCommand() [cli.go]: git %s failed: %w: %s", strings.Join(args, " "), err, trimmedOutput)
+	}
+
+	return trimmedOutput, nil
+}
+
+func listGitConflictFiles(workDir string) []string {
+	output, err := runGitCommandFunc(workDir, "diff", "--name-only", "--diff-filter=U")
+	if err != nil {
+		return nil
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	conflicts := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		conflicts = append(conflicts, trimmed)
+	}
+
+	return conflicts
+}
+
+func extractConflictFilesFromOutput(output string) []string {
+	if strings.TrimSpace(output) == "" {
+		return nil
+	}
+
+	pattern := regexp.MustCompile(`(?m)CONFLICT \([^\)]*\): .* in (.+)$`)
+	matches := pattern.FindAllStringSubmatch(output, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(matches))
+	files := make([]string, 0, len(matches))
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		name := strings.TrimSpace(match[1])
+		if name == "" {
+			continue
+		}
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = struct{}{}
+		files = append(files, name)
+	}
+
+	return files
+}
+
+func isMergeConflictError(output string) bool {
+	trimmedOutput := strings.TrimSpace(output)
+	if trimmedOutput == "" {
+		return false
+	}
+
+	upperOutput := strings.ToUpper(trimmedOutput)
+	if strings.Contains(upperOutput, "CONFLICT") {
+		return true
+	}
+
+	return strings.Contains(trimmedOutput, "could not apply") ||
+		strings.Contains(trimmedOutput, "Resolve all conflicts manually") ||
+		strings.Contains(trimmedOutput, "rebase-merge")
 }

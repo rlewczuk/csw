@@ -29,6 +29,12 @@ func TestEmbeddedConfigStore_GetAgentConfigFile(t *testing.T) {
 		assert.NotEmpty(t, messageData)
 	})
 
+	t.Run("reads embedded conflict resolution prompt template", func(t *testing.T) {
+		promptData, err := store.GetAgentConfigFile("conflict", "prompt.md")
+		require.NoError(t, err)
+		assert.NotEmpty(t, promptData)
+	})
+
 	t.Run("returns error when file missing", func(t *testing.T) {
 		_, err := store.GetAgentConfigFile("commit", "missing.md")
 		require.Error(t, err)
