@@ -1,18 +1,73 @@
-# pkg/tool
+# Package `pkg/tool` Overview
 
-`pkg/tool` is the agent tool execution layer. It defines the common tool interfaces/schema model, tool registry/composition behavior, permission-query integration, and concrete tools for shell execution, todo tracking, and VFS-based file operations.
+Package `pkg/tool` is the agent tool execution layer. It defines the common tool interfaces/schema model, tool registry/composition behavior, permission-query integration, and concrete tools for shell execution, todo tracking, subagent delegation, skill loading, web fetching, and VFS-based file operations.
 
-## Major files
+## Important files
 
-- `tool.go`: Core public tool API (`Tool`, `ToolCall`, `ToolResponse`, `ToolInfo`, schema/value types).
-- `registry.go`: Tool registry for registration, lookup, execution, logger injection, and model-tag filtering.
-- `access.go`: Access-control wrapper for tools based on configured permissions and wildcard rule matching.
-- `permissions.go`: Shared permission-query builders and option normalization.
-- `run_bash.go`: Bash execution tool implementation with privilege checks and command options.
-- `todo.go`: Todo read/write tool implementations and todo item/session interfaces.
-- `vfs_patch.go`: Structured patch-application tool for add/update/move/delete operations with diagnostics.
-- `vfs_write.go`: Full file write tool with optional post-write LSP validation.
-- `vfs_edit.go`: Targeted string-replacement edit tool with optional diagnostics.
-- `vfs_read.go`: File read tool with offset/limit slicing and numbered output formatting.
-- `vfs_grep.go`: Regex file-content search tool with optional include/path filters.
-- `vfs_helpers.go`: Shared helpers for VFS tool output formatting and LSP diagnostic conversion.
+* `tool.go` - Core tool API and schema/value types
+* `registry.go` - Tool registry for registration and execution
+* `access.go` - Access-control wrapper with permission rules
+* `permissions.go` - Permission query builders and options
+* `custom.go` - Custom user-defined tool execution
+* `run_bash.go` - Bash command execution tool
+* `todo.go` - Todo list read/write tools
+* `subagent.go` - Subagent task delegation tool
+* `skill.go` - Skill loading from .agents/skills
+* `web_fetch.go` - Web content fetching tool
+* `vfs_read.go` - File read with offset/limit
+* `vfs_write.go` - File write with LSP validation
+* `vfs_edit.go` - String replacement edit tool
+* `vfs_patch.go` - Structured patch application
+* `vfs_delete.go` - File deletion tool
+* `vfs_move.go` - File move/rename tool
+* `vfs_list.go` - Directory listing tool
+* `vfs_find.go` - File glob search tool
+* `vfs_grep.go` - Content regex search tool
+* `vfs_helpers.go` - Shared VFS tool helpers
+
+## Important public API objects
+
+* `Tool` - Interface for executable tools
+* `ToolCall` - Represents a tool invocation
+* `ToolResponse` - Tool execution result
+* `ToolValue` - JSON-compatible value wrapper
+* `ToolInfo` - Tool metadata and schema
+* `ToolSchema` - JSON Schema for tool arguments
+* `PropertySchema` - Schema for single property
+* `SchemaType` - JSON Schema type constants
+* `ToolRegistry` - Tool registration and lookup
+* `AccessControlTool` - Permission wrapper for tools
+* `ToolPermissionsQuery` - User permission request
+* `LoggerSetter` - Interface for logger injection
+* `RunBashTool` - Bash execution implementation
+* `TodoWriteTool` - Todo list update tool
+* `TodoReadTool` - Todo list retrieval tool
+* `TodoItem` - Single todo task representation
+* `TodoSession` - Interface for todo access
+* `SubAgentTool` - Subagent delegation tool
+* `SubAgentExecutor` - Interface for subagent execution
+* `SubAgentTaskRequest` - Subagent task input
+* `SubAgentTaskResult` - Subagent task output
+* `SkillTool` - Skill loading tool
+* `WebFetchTool` - Web fetching tool
+* `VFSReadTool` - File read tool
+* `VFSWriteTool` - File write tool
+* `VFSEditTool` - File edit tool
+* `VFSPatchTool` - Patch application tool
+* `VFSDeleteTool` - File delete tool
+* `VFSMoveTool` - File move tool
+* `VFSListTool` - Directory list tool
+* `VFSFindTool` - File find tool
+* `VFSGrepTool` - Content search tool
+* `CustomCommandTool` - User-defined custom tool
+* `RoleRestrictedTool` - Role-based tool restriction
+* `NewToolRegistry()` - Creates tool registry
+* `NewToolValue()` - Creates tool value
+* `NewToolSchema()` - Creates tool schema
+* `NewPermissionQuery()` - Creates permission query
+* `NewVFSPermissionQuery()` - Creates VFS permission query
+* `RegisterVFSTools()` - Registers all VFS tools
+* `RegisterRunBashTool()` - Registers bash tool
+* `RegisterWebFetchTool()` - Registers web fetch tool
+* `RegisterSkillTool()` - Registers skill tool
+* `RegisterCustomTools()` - Registers custom tools

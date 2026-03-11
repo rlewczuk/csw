@@ -47,19 +47,26 @@ Other rules:
 
 ## Code Organization
 
-- `cmd/csw`: Main CLI application (root command, bootstrap, CLI/TUI execution, provider/role/tool config commands).
-- `pkg/conf`: Configuration domain and config-store implementations (local, embedded defaults, composite, mock).
-- `pkg/core`: Session runtime orchestration (`SweSystem`, `SweSession`, threading, prompts, role registry, commit-message generation).
-- `pkg/gtv`: Terminal UI primitives (screen/event contracts, themes, and screen test helpers).
-- `pkg/logging`: Structured logging infrastructure for global/session/LLM logs and test log capture.
-- `pkg/lsp`: LSP abstraction and client implementation with DTOs and in-memory mock.
-- `pkg/models`: Model/provider interfaces, provider registry, concrete provider clients, OAuth helpers, tags, and mocks.
-- `pkg/presenter`: Presenter layer connecting core session output/input with UI interfaces.
-- `pkg/runner`: Command runner abstraction with bash implementation and mock.
-- `pkg/sandbox`: Placeholder for sandbox-related logic (currently no non-test implementation files).
-- `pkg/shared`: Shared utilities (custom patch parsing, file copy helpers, UUIDv7 generation).
-- `pkg/testinteg`: Placeholder for integration-test support code (currently no non-test implementation files).
-- `pkg/testutil`: Reusable test helpers and mocks (session output handler and mock HTTP server).
-- `pkg/tool`: Tool contracts, registry, permissions, and concrete tools (bash, todo, VFS read/write/edit/patch/grep).
-- `pkg/ui`: UI contracts and view models for app/chat presentation flows.
-- `pkg/vfs`: Filesystem and VCS interfaces plus local/git implementations, access control, search/filter, patching, and mocks.
+- `cmd/csw` - Main CLI application with Cobra commands, CLI session execution, configuration management, and worktree cleanup functionality.
+- `pkg/conf` - Configuration domain and config-store abstractions for global settings, model providers, agent roles, tool and file access policies.
+- `pkg/conf/impl` - Configuration store implementations (local filesystem-based, embedded, composite, and mock config stores).
+- `pkg/core` - Runtime orchestration layer for agent sessions, managing session lifecycle, prompt/tool assembly, role/model switching, and async session threading.
+- `pkg/core/testfixture` - Core integration test fixtures for creating pre-configured SweSystem instances with mock dependencies.
+- `pkg/logging` - Structured logging infrastructure for global runtime events and per-session logs.
+- `pkg/lsp` - Language Server Protocol integration layer with JSON-RPC client, protocol DTOs, and in-memory mock.
+- `pkg/models` - Model/provider abstraction layer for chat and embedding backends with provider registry, concrete clients, OAuth helpers, and tagging logic.
+- `pkg/presenter` - Presenter layer connecting core session/system behavior to UI interfaces.
+- `pkg/presenter/testfixture` - Presenter integration test fixtures.
+- `pkg/runner` - Command execution abstractions for running shell commands with bash and containerized environments.
+- `pkg/shared` - Cross-cutting utility code including patch parsing, file copy helpers, and UUIDv7 generation.
+- `pkg/shared/godown` - HTML to Markdown converter with customizable options.
+- `pkg/system` - Core system orchestration for managing sessions, models, tools, and CLI runtime initialization.
+- `pkg/testutil` - Reusable test doubles and fixtures for integration and package tests.
+- `pkg/testutil/cfg` - Integration test configuration helpers for managing test directories and feature flags.
+- `pkg/testutil/fixture` - Reusable test fixture helpers for locating project paths and managing temporary directories.
+- `pkg/tool` - Agent tool execution layer with tool interfaces, registry, permissions, and concrete tools for shell, todo, subagent, web fetch, and VFS operations.
+- `pkg/ui` - Frontend-agnostic UI contracts and view models for presenters and interfaces.
+- `pkg/ui/cli` - CLI implementations of UI interfaces for terminal-based interaction.
+- `pkg/ui/cli/testfixture` - CLI integration test fixtures for setting up test environments.
+- `pkg/ui/mock` - Mock implementations of UI interfaces for testing purposes.
+- `pkg/vfs` - Filesystem and VCS abstractions with local/git implementations, access control, search/filter, patching, and mocks.
