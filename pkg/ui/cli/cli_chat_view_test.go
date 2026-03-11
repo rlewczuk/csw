@@ -79,7 +79,7 @@ func TestCliChatView_NewCliChatView(t *testing.T) {
 		err := view.AddMessage(&ui.ChatMessageUI{Id: "msg1", Role: ui.ChatRoleUser, Text: "Hello"})
 		require.NoError(t, err)
 
-		assert.Contains(t, output.String(), "*feature/test* You: Hello")
+		assert.Contains(t, output.String(), "\x1b[90m[feature/test]\x1b[0m You: Hello")
 	})
 
 	t.Run("falls back to main slug when empty", func(t *testing.T) {
@@ -90,7 +90,7 @@ func TestCliChatView_NewCliChatView(t *testing.T) {
 		err := view.AddMessage(&ui.ChatMessageUI{Id: "msg1", Role: ui.ChatRoleUser, Text: "Hello"})
 		require.NoError(t, err)
 
-		assert.Contains(t, output.String(), "*main* You: Hello")
+		assert.Contains(t, output.String(), "\x1b[90m[main]\x1b[0m You: Hello")
 	})
 }
 

@@ -29,9 +29,9 @@ func TestCliAppView_ShowMessage(t *testing.T) {
 		messageType ui.MessageType
 		expected    string
 	}{
-		{name: "info", messageType: ui.MessageTypeInfo, expected: "*main* [INFO] hello\n"},
-		{name: "warning", messageType: ui.MessageTypeWarning, expected: "*main* [WARNING] hello\n"},
-		{name: "error", messageType: ui.MessageTypeError, expected: "*main* [ERROR] hello\n"},
+		{name: "info", messageType: ui.MessageTypeInfo, expected: "\x1b[90m[main]\x1b[0m [INFO] hello\n"},
+		{name: "warning", messageType: ui.MessageTypeWarning, expected: "\x1b[90m[main]\x1b[0m [WARNING] hello\n"},
+		{name: "error", messageType: ui.MessageTypeError, expected: "\x1b[90m[main]\x1b[0m [ERROR] hello\n"},
 	}
 
 	for _, tt := range tests {
@@ -52,7 +52,7 @@ func TestCliAppView_ShowMessage_UsesProvidedSlug(t *testing.T) {
 
 	view.ShowMessage("hello", ui.MessageTypeInfo)
 
-	assert.Equal(t, "*feature/slug* [INFO] hello\n", output.String())
+	assert.Equal(t, "\x1b[90m[feature/slug]\x1b[0m [INFO] hello\n", output.String())
 }
 
 func TestCliAppView_ShowMessage_LogsDiagnosticMessage(t *testing.T) {
