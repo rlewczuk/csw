@@ -283,6 +283,79 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 	})
 }
 
+func TestSyncCheckedOutBranchWorktrees(t *testing.T) {
+	t.Run("updates checked-out target branch worktrees except skipped path", func(t *testing.T) {
+		originalRunGit := runGitCommandFunc
+		defer func() {
+			runGitCommandFunc = originalRunGit
+		}()
+
+		worktreeListOutput := strings.Join([]string{
+			"worktree /repo/main",
+			"HEAD 1111111",
+			"branch refs/heads/main",
+			"",
+			"worktree /repo/.cswdata/work/.merge-main-123",
+			"HEAD 2222222",
+			"branch refs/heads/main",
+			"",
+			"worktree /repo/worktrees/feature",
+			"HEAD 3333333",
+			"branch refs/heads/feature/test",
+		}, "\n")
+
+		resetCalls := make([]string, 0)
+		runGitCommandFunc = func(workDir string, args ...string) (string, error) {
+			if len(args) == 3 && args[0] == "worktree" && args[1] == "list" && args[2] == "--porcelain" {
+				assert.Equal(t, "/repo", workDir)
+				return worktreeListOutput, nil
+			}
+
+			if len(args) == 3 && args[0] == "reset" && args[1] == "--hard" && args[2] == "main" {
+				resetCalls = append(resetCalls, workDir)
+				return "", nil
+			}
+
+			return "", nil
+		}
+
+		err := syncCheckedOutBranchWorktrees("/repo", "main", "/repo/.cswdata/work/.merge-main-123")
+		require.NoError(t, err)
+		require.Len(t, resetCalls, 1)
+		assert.Equal(t, "/repo/main", resetCalls[0])
+	})
+
+	t.Run("returns error when checked-out branch worktree reset fails", func(t *testing.T) {
+		originalRunGit := runGitCommandFunc
+		defer func() {
+			runGitCommandFunc = originalRunGit
+		}()
+
+		worktreeListOutput := strings.Join([]string{
+			"worktree /repo/main",
+			"HEAD 1111111",
+			"branch refs/heads/main",
+			"",
+		}, "\n")
+
+		runGitCommandFunc = func(workDir string, args ...string) (string, error) {
+			if len(args) == 3 && args[0] == "worktree" && args[1] == "list" && args[2] == "--porcelain" {
+				return worktreeListOutput, nil
+			}
+
+			if len(args) == 3 && args[0] == "reset" && args[1] == "--hard" && args[2] == "main" {
+				return "", fmt.Errorf("runGitCommand() [cli.go]: git reset --hard main failed: boom")
+			}
+
+			return "", nil
+		}
+
+		err := syncCheckedOutBranchWorktrees("/repo", "main", "")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to update checked-out \"main\" worktree")
+	})
+}
+
 func newConflictResolutionFixture(t *testing.T) (*system.SweSystem, *core.SweSession) {
 	t.Helper()
 

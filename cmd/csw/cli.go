@@ -1116,7 +1116,63 @@ func mergeWorktreeWithConflictResolution(ctx context.Context, repoDir string, wo
 		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: failed to resolve main HEAD commit: %w", err)
 	}
 
+	if err := syncCheckedOutBranchWorktrees(repoDir, "main", mergeWorktreePath); err != nil {
+		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: %w", err)
+	}
+
 	return strings.TrimSpace(headCommitID), nil
+}
+
+func syncCheckedOutBranchWorktrees(repoDir string, branch string, skipPath string) error {
+	worktreesOutput, err := runGitCommandFunc(repoDir, "worktree", "list", "--porcelain")
+	if err != nil {
+		return fmt.Errorf("syncCheckedOutBranchWorktrees() [cli.go]: failed to list git worktrees: %w", err)
+	}
+
+	branchRef := "refs/heads/" + branch
+	skipPath = filepath.Clean(strings.TrimSpace(skipPath))
+
+	resetWorktree := func(worktreePath string, worktreeBranchRef string) error {
+		trimmedPath := filepath.Clean(strings.TrimSpace(worktreePath))
+		if trimmedPath == "" || worktreeBranchRef != branchRef || trimmedPath == skipPath {
+			return nil
+		}
+
+		if _, resetErr := runGitCommandFunc(trimmedPath, "reset", "--hard", branch); resetErr != nil {
+			return fmt.Errorf("syncCheckedOutBranchWorktrees() [cli.go]: failed to update checked-out %q worktree at %q: %w", branch, trimmedPath, resetErr)
+		}
+
+		return nil
+	}
+
+	currentPath := ""
+	currentBranchRef := ""
+	for _, line := range strings.Split(worktreesOutput, "\n") {
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "" {
+			if err := resetWorktree(currentPath, currentBranchRef); err != nil {
+				return err
+			}
+			currentPath = ""
+			currentBranchRef = ""
+			continue
+		}
+
+		if strings.HasPrefix(trimmedLine, "worktree ") {
+			currentPath = strings.TrimPrefix(trimmedLine, "worktree ")
+			continue
+		}
+
+		if strings.HasPrefix(trimmedLine, "branch ") {
+			currentBranchRef = strings.TrimPrefix(trimmedLine, "branch ")
+		}
+	}
+
+	if err := resetWorktree(currentPath, currentBranchRef); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func createMainMergeWorktree(repoDir string) (string, func(), error) {
