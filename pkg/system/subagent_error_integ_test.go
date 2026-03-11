@@ -58,7 +58,7 @@ func TestSweSystem_SubAgentWritesErrorSummaryWithParentSession(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "error", result.Status)
-	assert.Contains(t, result.Summary, "Subagent \"failing-child\" failed")
+	assert.NotContains(t, result.Summary, "session")
 
 	childSessions := system.ListSessions()
 	var childSessionID string

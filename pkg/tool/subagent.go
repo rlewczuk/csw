@@ -1,7 +1,6 @@
 package tool
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -18,9 +17,8 @@ type SubAgentTaskRequest struct {
 
 // SubAgentTaskResult contains final subagent execution output.
 type SubAgentTaskResult struct {
-	Status        string
-	Summary       string
-	FinalTodoList []TodoItem
+	Status  string
+	Summary string
 }
 
 // SubAgentExecutor executes delegated subagent tasks.
@@ -92,16 +90,9 @@ func (t *SubAgentTool) Execute(args *ToolCall) *ToolResponse {
 		return &ToolResponse{Call: args, Error: err, Done: true}
 	}
 
-	finalTodoList := make([]any, 0, len(result.FinalTodoList))
-	todoJSON, marshalErr := json.Marshal(result.FinalTodoList)
-	if marshalErr == nil {
-		_ = json.Unmarshal(todoJSON, &finalTodoList)
-	}
-
 	resultValue := NewToolValue(map[string]any{
-		"status":          result.Status,
-		"summary":         result.Summary,
-		"final_todo_list": finalTodoList,
+		"status":  result.Status,
+		"summary": result.Summary,
 	})
 
 	return &ToolResponse{Call: args, Result: resultValue, Done: true}

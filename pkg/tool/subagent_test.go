@@ -60,14 +60,14 @@ func TestSubAgentToolExecute(t *testing.T) {
 	})
 
 	t.Run("returns summary payload from executor", func(t *testing.T) {
-		executor := &subAgentExecutorMock{result: SubAgentTaskResult{Status: "completed", Summary: "child done", FinalTodoList: []TodoItem{{ID: "1", Content: "done", Status: "completed", Priority: "low"}}}}
+		executor := &subAgentExecutorMock{result: SubAgentTaskResult{Status: "completed", Summary: "child done"}}
 		tool := NewSubAgentTool(executor)
 		response := tool.Execute(&ToolCall{Function: "subAgent", Arguments: NewToolValue(map[string]any{"slug": "child-task", "title": "Task", "prompt": "Do task", "role": "developer", "model": "mock/test-model", "thinking": "high"})})
 		require.NoError(t, response.Error)
 		assert.True(t, response.Done)
 		assert.Equal(t, "completed", response.Result.String("status"))
 		assert.Equal(t, "child done", response.Result.String("summary"))
-		require.Len(t, response.Result.Get("final_todo_list").Array(), 1)
+		assert.False(t, response.Result.Has("final_todo_list"))
 		assert.Equal(t, "child-task", executor.request.Slug)
 		assert.Equal(t, "Task", executor.request.Title)
 		assert.Equal(t, "Do task", executor.request.Prompt)

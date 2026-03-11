@@ -291,13 +291,12 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *SweSession, request tool.SubAgen
 
 	if runErr != nil {
 		return tool.SubAgentTaskResult{
-			Status:        "error",
-			Summary:       fmt.Sprintf("Subagent %q failed (session %s): %v", request.Slug, child.ID(), runErr),
-			FinalTodoList: finalTodo,
+			Status:  "error",
+			Summary: summaryText,
 		}, nil
 	}
 
-	return tool.SubAgentTaskResult{Status: "completed", Summary: summaryText, FinalTodoList: finalTodo}, nil
+	return tool.SubAgentTaskResult{Status: "completed", Summary: summaryText}, nil
 }
 
 func writeSubAgentSummary(logBaseDir string, session *SweSession, summary subAgentSummaryJSON) error {

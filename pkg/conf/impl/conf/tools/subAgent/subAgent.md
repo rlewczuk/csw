@@ -43,6 +43,5 @@ Usage notes:
 Returns child session summary result:
 - `status`: `completed` or `error`
 - `summary`: summary text from child model when completed
-- `final_todo_list`: child final todo list (if any)
 
 On failure, returns diagnostic error details instead of summary.
