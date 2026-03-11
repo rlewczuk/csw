@@ -435,13 +435,68 @@ func (g *GitVCS) MergeBranches(into string, from string) error {
 		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 
-	if intoMergePath != g.path && currentPrimaryBranch == into {
-		if err := g.runGitInWorktree(g.path, "reset", "--hard", into); err != nil {
-			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
+	if err := g.syncCheckedOutBranchWorktrees(into, intoMergePath); err != nil {
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
+	}
+
+	return nil
+}
+
+func (g *GitVCS) syncCheckedOutBranchWorktrees(branch string, skipPath string) error {
+	paths, err := g.checkedOutBranchWorktreePaths(branch)
+	if err != nil {
+		return fmt.Errorf("GitVCS.syncCheckedOutBranchWorktrees() [git.go]: %w", err)
+	}
+
+	for _, worktreePath := range paths {
+		if worktreePath == skipPath {
+			continue
+		}
+		if err := g.runGitInWorktree(worktreePath, "reset", "--hard", branch); err != nil {
+			return fmt.Errorf("GitVCS.syncCheckedOutBranchWorktrees() [git.go]: %w", err)
 		}
 	}
 
 	return nil
+}
+
+func (g *GitVCS) checkedOutBranchWorktreePaths(branch string) ([]string, error) {
+	output, err := g.runGitOutput("worktree", "list", "--porcelain")
+	if err != nil {
+		return nil, fmt.Errorf("GitVCS.checkedOutBranchWorktreePaths() [git.go]: %w", err)
+	}
+
+	branchRef := "refs/heads/" + branch
+	var paths []string
+	var currentPath string
+	var currentBranchRef string
+
+	for _, line := range strings.Split(output, "\n") {
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "" {
+			if currentPath != "" && currentBranchRef == branchRef {
+				paths = append(paths, currentPath)
+			}
+			currentPath = ""
+			currentBranchRef = ""
+			continue
+		}
+
+		if strings.HasPrefix(trimmedLine, "worktree ") {
+			currentPath = strings.TrimPrefix(trimmedLine, "worktree ")
+			continue
+		}
+
+		if strings.HasPrefix(trimmedLine, "branch ") {
+			currentBranchRef = strings.TrimPrefix(trimmedLine, "branch ")
+		}
+	}
+
+	if currentPath != "" && currentBranchRef == branchRef {
+		paths = append(paths, currentPath)
+	}
+
+	return paths, nil
 }
 
 func (g *GitVCS) currentBranchInWorktree(worktreePath string) (string, error) {

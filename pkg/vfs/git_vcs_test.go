@@ -620,6 +620,43 @@ func TestMergeBranches(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "updated after merge\n", string(content))
 	})
+
+	t.Run("GitVCSUpdatesAllCheckedOutTargetBranchWorktreesAfterMerge", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := setupGitRepoFixture(t)
+		defer fixture.Cleanup()
+
+		repo, ok := fixture.Repo.(*GitVCS)
+		require.True(t, ok)
+
+		targetBranch := getDefaultBranch(t, fixture)
+
+		err := repo.NewBranch("feature-update-all-checkouts", targetBranch)
+		require.NoError(t, err)
+
+		featureWorktree, err := repo.GetWorktree("feature-update-all-checkouts")
+		require.NoError(t, err)
+
+		err = featureWorktree.WriteFile("merged-everywhere.txt", []byte("synced in all checkouts\n"))
+		require.NoError(t, err)
+		err = repo.CommitWorktree("feature-update-all-checkouts", "Add merged file for all checkouts")
+		require.NoError(t, err)
+
+		_, err = repo.GetWorktree(targetBranch)
+		require.NoError(t, err)
+
+		ideWorktreePath := filepath.Join(fixture.Root, "ide-main")
+		_, err = runGitCommand(fixture.Root, "worktree", "add", "--force", ideWorktreePath, targetBranch)
+		require.NoError(t, err)
+
+		err = repo.MergeBranches(targetBranch, "feature-update-all-checkouts")
+		require.NoError(t, err)
+
+		ideContent, err := os.ReadFile(filepath.Join(ideWorktreePath, "merged-everywhere.txt"))
+		require.NoError(t, err)
+		assert.Equal(t, "synced in all checkouts\n", string(ideContent))
+	})
 }
 
 func TestRepoInterfaceCompliance(t *testing.T) {
