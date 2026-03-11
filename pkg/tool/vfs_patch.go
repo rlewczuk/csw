@@ -3,7 +3,6 @@ package tool
 import (
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"sort"
 	"strings"
 	"unicode"
@@ -309,7 +308,7 @@ func (t *VFSPatchTool) Render(call *ToolCall) (string, string, map[string]string
 	if patchText != "" {
 		parsed, err := shared.ParsePatch(patchText)
 		if err == nil && len(parsed.Hunks) > 0 {
-			oneLiner = renderPatchOneLiner(parsed)
+			oneLiner = renderPatchOneLiner(parsed, t.vfs)
 		}
 	}
 	oneLiner = truncateString(oneLiner, 128)
@@ -333,26 +332,26 @@ func (t *VFSPatchTool) Render(call *ToolCall) (string, string, map[string]string
 }
 
 // renderPatchOneLiner generates a one-line summary of patch operations.
-func renderPatchOneLiner(parsed *shared.Patch) string {
+func renderPatchOneLiner(parsed *shared.Patch, v vfs.VFS) string {
 	parts := make([]string, 0, len(parsed.Hunks))
 	for _, h := range parsed.Hunks {
 		switch hunk := h.(type) {
 		case shared.AddFile:
-			name := filepath.Base(hunk.Path)
 			linesAdded := countLines(hunk.Contents)
-			parts = append(parts, fmt.Sprintf("A:%s(+%d)", name, linesAdded))
+			path := makeRelativePath(hunk.Path, v)
+			parts = append(parts, fmt.Sprintf("A:%s(+%d)", path, linesAdded))
 		case shared.DeleteFile:
-			name := filepath.Base(hunk.Path)
-			parts = append(parts, fmt.Sprintf("D:%s", name))
+			path := makeRelativePath(hunk.Path, v)
+			parts = append(parts, fmt.Sprintf("D:%s", path))
 		case shared.UpdateFile:
-			name := filepath.Base(hunk.Path)
 			if hunk.MovePath != "" {
-				targetName := filepath.Base(hunk.MovePath)
 				added, removed := countUpdateLines(hunk.Chunks)
-				parts = append(parts, fmt.Sprintf("M:%s(+%d/-%d)", targetName, added, removed))
+				target := makeRelativePath(hunk.MovePath, v)
+				parts = append(parts, fmt.Sprintf("M:%s(+%d/-%d)", target, added, removed))
 			} else {
 				added, removed := countUpdateLines(hunk.Chunks)
-				parts = append(parts, fmt.Sprintf("U:%s(+%d/-%d)", name, added, removed))
+				path := makeRelativePath(hunk.Path, v)
+				parts = append(parts, fmt.Sprintf("U:%s(+%d/-%d)", path, added, removed))
 			}
 		}
 	}

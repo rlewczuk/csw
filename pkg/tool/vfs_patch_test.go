@@ -207,11 +207,11 @@ func TestVFSPatchToolRender(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{
-				"patchText": "*** Begin Patch\n*** Add File: /path/to/new.txt\n+line1\n+line2\n+line3\n*** End Patch",
+				"patchText": "*** Begin Patch\n*** Add File: /path/to/worktree/pkg/new.txt\n+line1\n+line2\n+line3\n*** End Patch",
 			}),
 		})
 
-		assert.Equal(t, "apply patch: A:new.txt(+3)", oneLiner)
+		assert.Equal(t, "apply patch: A:pkg/new.txt(+3)", oneLiner)
 	})
 
 	t.Run("should show deleted file", func(t *testing.T) {
@@ -222,11 +222,11 @@ func TestVFSPatchToolRender(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{
-				"patchText": "*** Begin Patch\n*** Delete File: /path/to/old.txt\n*** End Patch",
+				"patchText": "*** Begin Patch\n*** Delete File: /path/to/worktree/pkg/old.txt\n*** End Patch",
 			}),
 		})
 
-		assert.Equal(t, "apply patch: D:old.txt", oneLiner)
+		assert.Equal(t, "apply patch: D:pkg/old.txt", oneLiner)
 	})
 
 	t.Run("should show updated file with added and removed lines", func(t *testing.T) {
@@ -238,7 +238,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{
 				"patchText": `*** Begin Patch
-*** Update File: /path/to/existing.txt
+*** Update File: /path/to/worktree/pkg/existing.txt
 @@
 -old line 1
 -old line 2
@@ -249,7 +249,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 			}),
 		})
 
-		assert.Equal(t, "apply patch: U:existing.txt(+3/-2)", oneLiner)
+		assert.Equal(t, "apply patch: U:pkg/existing.txt(+3/-2)", oneLiner)
 	})
 
 	t.Run("should show moved file with M prefix", func(t *testing.T) {
@@ -261,8 +261,8 @@ func TestVFSPatchToolRender(t *testing.T) {
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{
 				"patchText": `*** Begin Patch
-*** Update File: /path/to/old.txt
-*** Move to: /path/to/new.txt
+*** Update File: /path/to/worktree/pkg/old.txt
+*** Move to: /path/to/worktree/pkg/new.txt
 @@
 -old content
 +new content
@@ -270,7 +270,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 			}),
 		})
 
-		assert.Equal(t, "apply patch: M:new.txt(+1/-1)", oneLiner)
+		assert.Equal(t, "apply patch: M:pkg/new.txt(+1/-1)", oneLiner)
 	})
 
 	t.Run("should show multiple files space separated", func(t *testing.T) {
@@ -296,7 +296,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 		assert.Equal(t, "apply patch: A:new.txt(+1) U:existing.txt(+1/-1) D:remove.txt", oneLiner)
 	})
 
-	t.Run("should use short basename only", func(t *testing.T) {
+	t.Run("should use project-relative path in output", func(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		tool := NewVFSPatchTool(mockVFS, nil)
 
@@ -304,11 +304,11 @@ func TestVFSPatchToolRender(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{
-				"patchText": "*** Begin Patch\n*** Add File: /very/long/path/to/the/file/name.txt\n+content\n*** End Patch",
+				"patchText": "*** Begin Patch\n*** Add File: /path/to/worktree/very/long/path/to/the/file/name.txt\n+content\n*** End Patch",
 			}),
 		})
 
-		assert.Equal(t, "apply patch: A:name.txt(+1)", oneLiner)
+		assert.Equal(t, "apply patch: A:very/long/path/to/the/file/name.txt(+1)", oneLiner)
 	})
 
 	t.Run("should render error in oneLiner and full when error is present", func(t *testing.T) {
