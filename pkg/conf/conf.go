@@ -147,6 +147,8 @@ type CLIDefaultsConfig struct {
 	GitUserName string `json:"git-user,omitempty" yaml:"git-user,omitempty"`
 	// GitUserEmail is the default --git-email value for git operations.
 	GitUserEmail string `json:"git-email,omitempty" yaml:"git-email,omitempty"`
+	// MaxThreads is the default --max-threads value.
+	MaxThreads int `json:"max-threads,omitempty" yaml:"max-threads,omitempty"`
 }
 
 // ModelProviderConfig represents common configuration for model providers.
@@ -363,6 +365,9 @@ type GlobalConfig struct {
 	// LLMRetryMaxBackoffSeconds caps exponential backoff delay in seconds.
 	// Defaults to 60 when unset or invalid.
 	LLMRetryMaxBackoffSeconds int `json:"llm_retry_max_backoff_seconds,omitempty" yaml:"llm_retry_max_backoff_seconds,omitempty"`
+	// MaxToolThreads is the maximum number of tool calls executed in parallel.
+	// Defaults to 8 when unset or invalid.
+	MaxToolThreads int `json:"max_tool_threads,omitempty" yaml:"max_tool_threads,omitempty"`
 	// Container defines default container execution settings.
 	Container ContainerConfig `json:"container,omitempty" yaml:"container,omitempty"`
 	// Defaults defines default values for cli command flags.

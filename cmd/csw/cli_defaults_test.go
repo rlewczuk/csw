@@ -21,6 +21,7 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 		LSPServer:      "gopls",
 		GitUserName:    "Config User",
 		GitUserEmail:   "config@example.com",
+		MaxThreads:     13,
 	}
 
 	originalRun := runCLIFunc
@@ -38,7 +39,7 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 	captured := ""
 	runCLIFunc = func(params *CLIParams) error {
 		captured = fmt.Sprintf(
-			"model=%s,shadow=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s",
+			"model=%s,shadow=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s,maxThreads=%d",
 			params.ModelName,
 			params.ShadowDir,
 			params.WorktreeBranch,
@@ -48,6 +49,7 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 			params.LSPServer,
 			params.GitUserName,
 			params.GitUserEmail,
+			params.MaxThreads,
 		)
 		return nil
 	}
@@ -70,6 +72,7 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 	assert.Contains(t, captured, "lsp=gopls")
 	assert.Contains(t, captured, "gitUser=Config User")
 	assert.Contains(t, captured, "gitEmail=config@example.com")
+	assert.Contains(t, captured, "maxThreads=13")
 }
 
 func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
@@ -82,6 +85,7 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 		LSPServer:      "gopls",
 		GitUserName:    "Config User",
 		GitUserEmail:   "config@example.com",
+		MaxThreads:     13,
 	}
 
 	originalRun := runCLIFunc
@@ -99,7 +103,7 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	captured := ""
 	runCLIFunc = func(params *CLIParams) error {
 		captured = fmt.Sprintf(
-			"model=%s,shadow=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s",
+			"model=%s,shadow=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s,maxThreads=%d",
 			params.ModelName,
 			params.ShadowDir,
 			params.WorktreeBranch,
@@ -109,6 +113,7 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 			params.LSPServer,
 			params.GitUserName,
 			params.GitUserEmail,
+			params.MaxThreads,
 		)
 		return nil
 	}
@@ -127,6 +132,7 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 		"--lsp-server=custom-lsp",
 		"--git-user=CLI User",
 		"--git-email=cli@example.com",
+		"--max-threads=2",
 		"prompt",
 	})
 
@@ -140,6 +146,7 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	assert.Contains(t, captured, "lsp=custom-lsp")
 	assert.Contains(t, captured, "gitUser=CLI User")
 	assert.Contains(t, captured, "gitEmail=cli@example.com")
+	assert.Contains(t, captured, "maxThreads=2")
 }
 
 func TestCLIShadowDirFlagPropagation(t *testing.T) {

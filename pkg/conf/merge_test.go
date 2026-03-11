@@ -26,7 +26,7 @@ func TestToolSelectionConfig_Merge(t *testing.T) {
 			override: ToolSelectionConfig{
 				Default: map[string]bool{"runBash": true, "vfsEdit": false},
 				Tags: map[string]map[string]bool{
-					"safe":  {"runBash": true},
+					"safe":   {"runBash": true},
 					"strict": {"vfsMove": false},
 				},
 			},
@@ -73,8 +73,8 @@ func TestContainerConfig_Merge(t *testing.T) {
 		expected ContainerConfig
 	}{
 		{
-			name: "replaces mounts env image and enables container",
-			base: ContainerConfig{Mounts: []string{"a"}, Env: []string{"A=1"}, Image: "img1", Enabled: false},
+			name:     "replaces mounts env image and enables container",
+			base:     ContainerConfig{Mounts: []string{"a"}, Env: []string{"A=1"}, Image: "img1", Enabled: false},
 			override: ContainerConfig{Mounts: []string{"b"}, Env: []string{"B=2"}, Image: "img2", Enabled: true},
 			expected: ContainerConfig{Mounts: []string{"b"}, Env: []string{"B=2"}, Image: "img2", Enabled: true},
 		},
@@ -105,6 +105,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		LSPServer:      "first",
 		GitUserName:    "Base User",
 		GitUserEmail:   "base@example.com",
+		MaxThreads:     4,
 	}
 	override := CLIDefaultsConfig{
 		Model:          "provider2/model",
@@ -113,6 +114,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		LSPServer:      "second",
 		GitUserName:    "Override User",
 		GitUserEmail:   "override@example.com",
+		MaxThreads:     12,
 	}
 
 	base.MergeFrom(override)
@@ -126,37 +128,38 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		LSPServer:      "second",
 		GitUserName:    "Override User",
 		GitUserEmail:   "override@example.com",
+		MaxThreads:     12,
 	}, base)
 }
 
 func TestCLIDefaultsConfig_MergeFrom_GitIdentity(t *testing.T) {
 	tests := []struct {
-		name           string
-		base           CLIDefaultsConfig
-		override       CLIDefaultsConfig
-		expectedName   string
-		expectedEmail  string
+		name          string
+		base          CLIDefaultsConfig
+		override      CLIDefaultsConfig
+		expectedName  string
+		expectedEmail string
 	}{
 		{
-			name:           "override sets git identity",
-			base:           CLIDefaultsConfig{},
-			override:       CLIDefaultsConfig{GitUserName: "New User", GitUserEmail: "new@example.com"},
-			expectedName:   "New User",
-			expectedEmail:  "new@example.com",
+			name:          "override sets git identity",
+			base:          CLIDefaultsConfig{},
+			override:      CLIDefaultsConfig{GitUserName: "New User", GitUserEmail: "new@example.com"},
+			expectedName:  "New User",
+			expectedEmail: "new@example.com",
 		},
 		{
-			name:           "empty override keeps base git identity",
-			base:           CLIDefaultsConfig{GitUserName: "Base User", GitUserEmail: "base@example.com"},
-			override:       CLIDefaultsConfig{},
-			expectedName:   "Base User",
-			expectedEmail:  "base@example.com",
+			name:          "empty override keeps base git identity",
+			base:          CLIDefaultsConfig{GitUserName: "Base User", GitUserEmail: "base@example.com"},
+			override:      CLIDefaultsConfig{},
+			expectedName:  "Base User",
+			expectedEmail: "base@example.com",
 		},
 		{
-			name:           "partial override only updates provided fields",
-			base:           CLIDefaultsConfig{GitUserName: "Base User", GitUserEmail: "base@example.com"},
-			override:       CLIDefaultsConfig{GitUserName: "New User"},
-			expectedName:   "New User",
-			expectedEmail:  "base@example.com",
+			name:          "partial override only updates provided fields",
+			base:          CLIDefaultsConfig{GitUserName: "Base User", GitUserEmail: "base@example.com"},
+			override:      CLIDefaultsConfig{GitUserName: "New User"},
+			expectedName:  "New User",
+			expectedEmail: "base@example.com",
 		},
 	}
 
@@ -181,16 +184,17 @@ func TestGlobalConfig_Merge(t *testing.T) {
 		DefaultRole:                "role1",
 		LLMRetryMaxAttempts:        5,
 		LLMRetryMaxBackoffSeconds:  30,
+		MaxToolThreads:             3,
 		Container: ContainerConfig{
 			Image:  "image1",
 			Mounts: []string{"/a:/b"},
 			Env:    []string{"A=1"},
 		},
-		Defaults: CLIDefaultsConfig{Model: "m1", Worktree: "w1", Thinking: "low"},
+		Defaults:    CLIDefaultsConfig{Model: "m1", Worktree: "w1", Thinking: "low"},
 		ShadowPaths: []string{"AGENTS.md"},
 	}
 
-		override := &GlobalConfig{
+	override := &GlobalConfig{
 		ModelTags: []ModelTagMapping{{Model: "claude-.*", Tag: "anthropic"}},
 		ToolSelection: ToolSelectionConfig{
 			Default: map[string]bool{"runBash": true, "vfsEdit": false},
@@ -201,13 +205,14 @@ func TestGlobalConfig_Merge(t *testing.T) {
 		DefaultRole:                "role2",
 		LLMRetryMaxAttempts:        10,
 		LLMRetryMaxBackoffSeconds:  60,
+		MaxToolThreads:             12,
 		Container: ContainerConfig{
 			Enabled: true,
 			Image:   "image2",
 			Mounts:  []string{"/c:/d"},
 			Env:     []string{"B=2"},
 		},
-		Defaults: CLIDefaultsConfig{Model: "m2", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2"},
+		Defaults:    CLIDefaultsConfig{Model: "m2", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2"},
 		ShadowPaths: []string{".cswdata/**", ".agents/**"},
 	}
 
@@ -221,6 +226,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 	assert.Equal(t, "role2", base.DefaultRole)
 	assert.Equal(t, 10, base.LLMRetryMaxAttempts)
 	assert.Equal(t, 60, base.LLMRetryMaxBackoffSeconds)
+	assert.Equal(t, 12, base.MaxToolThreads)
 	assert.Equal(t, ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, base.Container)
 	assert.Equal(t, CLIDefaultsConfig{Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2"}, base.Defaults)
 	assert.Equal(t, []string{".cswdata/**", ".agents/**"}, base.ShadowPaths)

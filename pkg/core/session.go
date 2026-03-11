@@ -27,6 +27,8 @@ const (
 	defaultLLMRetryMaxAttempts        = 10
 	defaultLLMRetryMaxBackoffSeconds  = 60
 	defaultContextCompactionThreshold = 0.95
+	defaultMaxToolThreads             = 8
+	toolExecutionStartDelay           = 250 * time.Millisecond
 	sessionMessageTypeInfo            = "info"
 	sessionMessageTypeWarning         = "warning"
 	sessionMessageTypeError           = "error"
@@ -69,6 +71,7 @@ type SweSession struct {
 	systemTools     *tool.ToolRegistry
 	logBaseDir      string
 	thinking        string
+	maxToolThreads  int
 
 	// pendingPermissionToolCall stores the tool call that was blocked by a permission query
 	// This is used to re-execute the tool after permission is granted
@@ -107,11 +110,12 @@ type SweSessionParams struct {
 	Roles           *AgentRoleRegistry
 	ConfigStore     conf.ConfigStore
 
-	OutputHandler SessionThreadOutput
-	WorkDir       string
-	ShadowDir     string
-	LogBaseDir    string
-	Thinking      string
+	OutputHandler  SessionThreadOutput
+	WorkDir        string
+	ShadowDir      string
+	LogBaseDir     string
+	Thinking       string
+	MaxToolThreads int
 
 	Logger    *slog.Logger
 	LLMLogger *slog.Logger
@@ -168,6 +172,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		systemTools:     params.SystemTools,
 		logBaseDir:      params.LogBaseDir,
 		thinking:        params.Thinking,
+		maxToolThreads:  params.MaxToolThreads,
 
 		pendingPermissionToolCalls: make([]*tool.ToolCall, 0, len(params.PendingPermissionToolCalls)),
 		pendingToolResponses:       make([]*tool.ToolResponse, 0, len(params.PendingToolResponses)),
@@ -528,25 +533,66 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 	}
 
 	results := make([]toolExecutionResult, len(toolCalls))
-	var wg sync.WaitGroup
-	for i, toolCall := range toolCalls {
-		wg.Add(1)
-		go func(index int, call *tool.ToolCall) {
-			defer wg.Done()
 
-			if s.logger != nil {
-				s.logger.Info("executing_tool_call", "tool", call.Function, "args", call.Arguments)
-			}
-
-			response := s.Tools.Execute(call)
-
-			if s.logger != nil {
-				s.logger.Info("tool_call_executed", "tool", call.Function, "response", response)
-			}
-
-			results[index] = toolExecutionResult{index: index, toolCall: call, response: response}
-		}(i, toolCall)
+	maxToolThreads := s.maxToolThreadsLimit()
+	if maxToolThreads > len(toolCalls) {
+		maxToolThreads = len(toolCalls)
 	}
+	if maxToolThreads <= 0 {
+		maxToolThreads = 1
+	}
+
+	type indexedToolCall struct {
+		index int
+		call  *tool.ToolCall
+	}
+
+	jobs := make(chan indexedToolCall, len(toolCalls))
+	for i, toolCall := range toolCalls {
+		jobs <- indexedToolCall{index: i, call: toolCall}
+	}
+	close(jobs)
+
+	var (
+		wg            sync.WaitGroup
+		startGateMu   sync.Mutex
+		lastStartTime time.Time
+	)
+
+	waitForStartSlot := func() {
+		startGateMu.Lock()
+		defer startGateMu.Unlock()
+		if !lastStartTime.IsZero() {
+			nextStartAt := lastStartTime.Add(toolExecutionStartDelay)
+			if sleepFor := time.Until(nextStartAt); sleepFor > 0 {
+				time.Sleep(sleepFor)
+			}
+		}
+		lastStartTime = time.Now()
+	}
+
+	for i := 0; i < maxToolThreads; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				waitForStartSlot()
+
+				if s.logger != nil {
+					s.logger.Info("executing_tool_call", "tool", job.call.Function, "args", job.call.Arguments)
+				}
+
+				response := s.Tools.Execute(job.call)
+
+				if s.logger != nil {
+					s.logger.Info("tool_call_executed", "tool", job.call.Function, "response", response)
+				}
+
+				results[job.index] = toolExecutionResult{index: job.index, toolCall: job.call, response: response}
+			}
+		}()
+	}
+
 	wg.Wait()
 
 	pendingPermissionToolCalls := make([]*tool.ToolCall, 0)
@@ -1238,7 +1284,7 @@ func (s *SweSession) ExecuteSubAgentTask(request tool.SubAgentTaskRequest) (tool
 	if s == nil {
 		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSession.ExecuteSubAgentTask() [session.go]: session is nil")
 	}
- 
+
 	if s.subAgentRunner == nil {
 		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSession.ExecuteSubAgentTask() [session.go]: subagent runner is nil")
 	}
@@ -1580,6 +1626,22 @@ func (s *SweSession) llmRetryMaxBackoffSeconds() int {
 		}
 	}
 	return defaultLLMRetryMaxBackoffSeconds
+}
+
+// maxToolThreadsLimit returns max number of parallel tool executions.
+func (s *SweSession) maxToolThreadsLimit() int {
+	if s.maxToolThreads > 0 {
+		return s.maxToolThreads
+	}
+
+	if s.configStore != nil {
+		globalConfig, err := s.configStore.GetGlobalConfig()
+		if err == nil && globalConfig != nil && globalConfig.MaxToolThreads > 0 {
+			return globalConfig.MaxToolThreads
+		}
+	}
+
+	return defaultMaxToolThreads
 }
 
 // HasPendingWork returns true when the session has pending work that can be resumed

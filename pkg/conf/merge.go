@@ -105,6 +105,9 @@ func (c *CLIDefaultsConfig) MergeFrom(override CLIDefaultsConfig) {
 	if override.GitUserEmail != "" {
 		c.GitUserEmail = override.GitUserEmail
 	}
+	if override.MaxThreads > 0 {
+		c.MaxThreads = override.MaxThreads
+	}
 }
 
 // Clone returns a deep copy of GlobalConfig.
@@ -121,6 +124,7 @@ func (c *GlobalConfig) Clone() *GlobalConfig {
 		DefaultRole:                c.DefaultRole,
 		LLMRetryMaxAttempts:        c.LLMRetryMaxAttempts,
 		LLMRetryMaxBackoffSeconds:  c.LLMRetryMaxBackoffSeconds,
+		MaxToolThreads:             c.MaxToolThreads,
 		Container:                  c.Container.Clone(),
 		Defaults:                   c.Defaults,
 		ShadowPaths:                append([]string(nil), c.ShadowPaths...),
@@ -157,6 +161,9 @@ func (c *GlobalConfig) Merge(override *GlobalConfig) {
 	}
 	if override.LLMRetryMaxBackoffSeconds > 0 {
 		c.LLMRetryMaxBackoffSeconds = override.LLMRetryMaxBackoffSeconds
+	}
+	if override.MaxToolThreads > 0 {
+		c.MaxToolThreads = override.MaxToolThreads
 	}
 
 	c.Container.Merge(override.Container)

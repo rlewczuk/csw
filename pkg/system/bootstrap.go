@@ -110,6 +110,8 @@ type BuildSystemParams struct {
 	// Paths must be absolute. When accessing files via allowedPaths, the path must be absolute
 	// and point within one of these directories.
 	AllowedPaths []string
+	// MaxToolThreads overrides max parallel tool executions. When <=0, value from config is used.
+	MaxToolThreads int
 }
 
 // BuildSystemResult contains outputs from building a SweSystem.
@@ -540,6 +542,12 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		ShadowDir:       shadowDir,
 		LogLLMRequests:  params.LogLLMRequests,
 		Thinking:        params.Thinking,
+		MaxToolThreads: func() int {
+			if params.MaxToolThreads > 0 {
+				return params.MaxToolThreads
+			}
+			return globalConfig.MaxToolThreads
+		}(),
 	}
 
 	result = BuildSystemResult{

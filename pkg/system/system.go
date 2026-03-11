@@ -58,6 +58,7 @@ type SweSystem struct {
 	ShadowDir            string
 	LogLLMRequests       bool
 	Thinking             string
+	MaxToolThreads       int
 }
 
 // LoadSession loads a persisted session from disk and registers it in memory.
@@ -172,7 +173,7 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 	sessionID := shared.GenerateUUIDv7()
 
 	sessionLogger, llmLogger := s.createSessionLoggers(sessionID)
-		session := core.NewSweSession(&core.SweSessionParams{
+	session := core.NewSweSession(&core.SweSessionParams{
 		ID:              sessionID,
 		ParentID:        strings.TrimSpace(parentID),
 		Slug:            strings.TrimSpace(slug),
@@ -194,6 +195,7 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 		ShadowDir:       s.ShadowDir,
 		LogBaseDir:      s.LogBaseDir,
 		Thinking:        firstNonEmpty(strings.TrimSpace(thinking), strings.TrimSpace(s.Thinking)),
+		MaxToolThreads:  s.MaxToolThreads,
 		Logger:          sessionLogger,
 		LLMLogger:       llmLogger,
 		Messages:        []*models.ChatMessage{},
@@ -440,7 +442,6 @@ func prefixSubAgentMessage(slug string, message string) string {
 	return strings.Join(lines, "\n")
 }
 
-
 func (s *SweSystem) createSessionLoggers(sessionID string) (*slog.Logger, *slog.Logger) {
 	var sessionLogger *slog.Logger
 	if s.SessionLoggerFactory != nil {
@@ -477,6 +478,7 @@ func (s *SweSystem) buildSessionParams() *core.SweSessionParams {
 		LogBaseDir:      s.LogBaseDir,
 		ShadowDir:       s.ShadowDir,
 		Thinking:        s.Thinking,
+		MaxToolThreads:  s.MaxToolThreads,
 		SubAgentRunner:  s,
 	}
 }

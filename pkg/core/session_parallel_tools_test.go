@@ -3,24 +3,30 @@ package core
 import (
 	"io"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
-	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/testutil"
+	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // probeTool is a test double that can be synchronized to verify parallel execution.
 type probeTool struct {
-	started  chan string
-	release  <-chan struct{}
-	active   *int32
-	overlap  *atomic.Bool
-	response func(call *tool.ToolCall) *tool.ToolResponse
+	started      chan string
+	release      <-chan struct{}
+	active       *int32
+	maxActive    *int32
+	overlap      *atomic.Bool
+	startTimes   *[]time.Time
+	startTimesMu *sync.Mutex
+	response     func(call *tool.ToolCall) *tool.ToolResponse
 }
 
 func (t *probeTool) Execute(args *tool.ToolCall) *tool.ToolResponse {
@@ -29,7 +35,24 @@ func (t *probeTool) Execute(args *tool.ToolCall) *tool.ToolResponse {
 		if current > 1 && t.overlap != nil {
 			t.overlap.Store(true)
 		}
+		if t.maxActive != nil {
+			for {
+				maxCurrent := atomic.LoadInt32(t.maxActive)
+				if current <= maxCurrent {
+					break
+				}
+				if atomic.CompareAndSwapInt32(t.maxActive, maxCurrent, current) {
+					break
+				}
+			}
+		}
 		defer atomic.AddInt32(t.active, -1)
+	}
+
+	if t.startTimes != nil && t.startTimesMu != nil {
+		t.startTimesMu.Lock()
+		*t.startTimes = append(*t.startTimes, time.Now())
+		t.startTimesMu.Unlock()
 	}
 
 	if t.started != nil {
@@ -148,9 +171,9 @@ func TestExecuteToolCalls_PermissionQueryCollectsSuccessfulResponsesAsPending(t 
 
 	output := testutil.NewMockSessionOutputHandler()
 	session := &SweSession{
-		Tools:        registry,
+		Tools:         registry,
 		outputHandler: output,
-		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
 	calls := []*tool.ToolCall{
@@ -222,4 +245,104 @@ func TestExecuteToolCalls_MultiplePermissionQueriesAreAllRetained(t *testing.T) 
 	assert.Equal(t, "a", session.pendingPermissionToolCalls[0].ID)
 	assert.Equal(t, "b", session.pendingPermissionToolCalls[1].ID)
 	assert.Empty(t, session.pendingToolResponses)
+}
+
+func TestExecuteToolCalls_RespectsConfiguredMaxThreadsAndQueuesRemainingCalls(t *testing.T) {
+	started := make(chan string, 3)
+	release := make(chan struct{})
+	var active int32
+	var maxActive int32
+
+	registry := tool.NewToolRegistry()
+	registry.Register("toolA", &probeTool{started: started, release: release, active: &active, maxActive: &maxActive})
+	registry.Register("toolB", &probeTool{started: started, release: release, active: &active, maxActive: &maxActive})
+	registry.Register("toolC", &probeTool{started: started, release: release, active: &active, maxActive: &maxActive})
+
+	configStore := impl.NewMockConfigStore()
+	configStore.SetGlobalConfig(nil)
+
+	session := &SweSession{
+		Tools:          registry,
+		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		configStore:    configStore,
+		maxToolThreads: 2,
+	}
+
+	calls := []*tool.ToolCall{
+		{ID: "call-1", Function: "toolA", Arguments: tool.NewToolValue(map[string]any{})},
+		{ID: "call-2", Function: "toolB", Arguments: tool.NewToolValue(map[string]any{})},
+		{ID: "call-3", Function: "toolC", Arguments: tool.NewToolValue(map[string]any{})},
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- session.executeToolCalls(calls)
+	}()
+
+	for i := 0; i < 2; i++ {
+		select {
+		case <-started:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("timeout waiting for tool %d to start", i+1)
+		}
+	}
+
+	select {
+	case id := <-started:
+		t.Fatalf("unexpected third tool started before queue release: %s", id)
+	case <-time.After(400 * time.Millisecond):
+	}
+
+	close(release)
+	require.NoError(t, <-errCh)
+
+	require.Len(t, session.messages, 1)
+	assert.LessOrEqual(t, atomic.LoadInt32(&maxActive), int32(2))
+}
+
+func TestExecuteToolCalls_SpacesToolStartsByMinimumDelay(t *testing.T) {
+	startTimes := make([]time.Time, 0, 3)
+	startTimesMu := sync.Mutex{}
+
+	registry := tool.NewToolRegistry()
+	registry.Register("toolA", &probeTool{startTimes: &startTimes, startTimesMu: &startTimesMu})
+	registry.Register("toolB", &probeTool{startTimes: &startTimes, startTimesMu: &startTimesMu})
+	registry.Register("toolC", &probeTool{startTimes: &startTimes, startTimesMu: &startTimesMu})
+
+	session := &SweSession{
+		Tools:          registry,
+		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		maxToolThreads: 8,
+	}
+
+	calls := []*tool.ToolCall{
+		{ID: "call-1", Function: "toolA", Arguments: tool.NewToolValue(map[string]any{})},
+		{ID: "call-2", Function: "toolB", Arguments: tool.NewToolValue(map[string]any{})},
+		{ID: "call-3", Function: "toolC", Arguments: tool.NewToolValue(map[string]any{})},
+	}
+
+	require.NoError(t, session.executeToolCalls(calls))
+	startTimesMu.Lock()
+	defer startTimesMu.Unlock()
+	require.Len(t, startTimes, 3)
+
+	for i := 1; i < len(startTimes); i++ {
+		delta := startTimes[i].Sub(startTimes[i-1])
+		assert.GreaterOrEqual(t, delta, 240*time.Millisecond)
+	}
+}
+
+func TestMaxToolThreadsLimit_UsesOverrideThenConfigThenDefault(t *testing.T) {
+	configStore := impl.NewMockConfigStore()
+	configStore.SetGlobalConfig(&conf.GlobalConfig{MaxToolThreads: 11})
+
+	session := &SweSession{configStore: configStore}
+	assert.Equal(t, 11, session.maxToolThreadsLimit())
+
+	session.maxToolThreads = 3
+	assert.Equal(t, 3, session.maxToolThreadsLimit())
+
+	configStore.SetGlobalConfig(nil)
+	session.maxToolThreads = 0
+	assert.Equal(t, defaultMaxToolThreads, session.maxToolThreadsLimit())
 }

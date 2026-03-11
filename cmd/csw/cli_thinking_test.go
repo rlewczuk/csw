@@ -140,6 +140,13 @@ func TestBuildSystemParamsThinking(t *testing.T) {
 	assert.Equal(t, "high", params.Thinking)
 }
 
+func TestBuildSystemParamsMaxToolThreads(t *testing.T) {
+	params := system.BuildSystemParams{
+		MaxToolThreads: 9,
+	}
+	assert.Equal(t, 9, params.MaxToolThreads)
+}
+
 // TestChatOptionsThinkingField tests that ChatOptions has the Thinking field
 func TestChatOptionsThinkingField(t *testing.T) {
 	opts := &models.ChatOptions{

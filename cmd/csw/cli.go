@@ -61,6 +61,7 @@ type CLIParams struct {
 	ContinueSession       bool
 	ForceResume           bool
 	BashRunTimeout        time.Duration
+	MaxThreads            int
 	Verbose               bool
 	VFSAllow              []string
 }
@@ -110,6 +111,7 @@ func CliCommand() *cobra.Command {
 		cliResumeContinue bool
 		cliForce          bool
 		cliBashRunTimeout string
+		cliMaxThreads     int
 		cliVerbose        bool
 		cliVFSAllow       []string
 	)
@@ -191,7 +193,7 @@ func CliCommand() *cobra.Command {
 				return err
 			}
 
-			if err := applyCLIDefaults(cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail); err != nil {
+			if err := applyCLIDefaults(cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads); err != nil {
 				return err
 			}
 
@@ -239,6 +241,7 @@ func CliCommand() *cobra.Command {
 				ContinueSession:       cliResumeContinue,
 				ForceResume:           cliForce,
 				BashRunTimeout:        bashRunTimeout,
+				MaxThreads:            cliMaxThreads,
 				Verbose:               cliVerbose,
 				VFSAllow:              vfsAllowPaths,
 			})
@@ -274,6 +277,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliResumeContinue, "resume-continue", false, "Continue resumed session with a new user message")
 	cmd.Flags().BoolVar(&cliForce, "force", false, "Force resume even when there is no pending work")
 	cmd.Flags().StringVar(&cliBashRunTimeout, "bash-run-timeout", "120", "Default runBash command timeout (duration; plain number means seconds)")
+	cmd.Flags().IntVar(&cliMaxThreads, "max-threads", 0, "Maximum number of tool calls executed in parallel")
 	cmd.Flags().BoolVar(&cliVerbose, "verbose", false, "Display full tool output instead of one-liners")
 	cmd.Flags().StringArrayVar(&cliVFSAllow, "vfs-allow", nil, "Additional path to allow VFS access outside of worktree (repeatable, or use ':' separated list)")
 	resumeFlag := cmd.Flags().Lookup("resume")
@@ -307,6 +311,7 @@ func applyCLIDefaults(
 	lspServer *string,
 	gitUser *string,
 	gitEmail *string,
+	maxThreads *int,
 ) error {
 	defaults, err := resolveCLIDefaultsFunc(system.ResolveCLIDefaultsParams{
 		WorkDir:       workDir,
@@ -341,6 +346,13 @@ func applyCLIDefaults(
 	}
 	if !cmd.Flags().Changed("git-email") && defaults.GitUserEmail != "" {
 		*gitEmail = defaults.GitUserEmail
+	}
+	if !cmd.Flags().Changed("max-threads") && defaults.MaxThreads > 0 {
+		*maxThreads = defaults.MaxThreads
+	}
+
+	if *maxThreads < 0 {
+		return fmt.Errorf("applyCLIDefaults() [cli.go]: --max-threads must be >= 0")
 	}
 
 	return nil
@@ -399,6 +411,7 @@ func runCLI(params *CLIParams) error {
 		Thinking:          params.Thinking,
 		BashRunTimeout:    params.BashRunTimeout,
 		AllowedPaths:      params.VFSAllow,
+		MaxToolThreads:    params.MaxThreads,
 	})
 	if err != nil {
 		return err
@@ -1203,7 +1216,9 @@ func createMainMergeWorktree(repoDir string) (string, func(), error) {
 	return mergeWorktreePath, cleanup, nil
 }
 
-func buildConflictResolutionPrompt(configStore interface{ GetAgentConfigFile(subdir, filename string) ([]byte, error) }, data conflictResolutionPromptData) (string, error) {
+func buildConflictResolutionPrompt(configStore interface {
+	GetAgentConfigFile(subdir, filename string) ([]byte, error)
+}, data conflictResolutionPromptData) (string, error) {
 	templateBytes, err := configStore.GetAgentConfigFile("conflict", "prompt.md")
 	if err != nil {
 		return "", fmt.Errorf("buildConflictResolutionPrompt() [cli.go]: failed to read conflict/prompt.md: %w", err)
