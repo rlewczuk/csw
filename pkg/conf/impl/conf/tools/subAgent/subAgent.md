@@ -22,6 +22,8 @@ Usage notes:
   * if you have dependencies between subAgent tool calls (i.e. subAgent A needs output from subAgent B), then run subAgent A first (first shot of subAgent tool calls), then wait for tool response, then subAgent B (second shot of subAgent tool calls)
 * subagent created by subAgent tool will reuse current session VFS/workdir/LSP
 * subagent will return summary of actions taken by the child session, not the full output of the child session
+* if there are many indepentent tasks that can be delegated to subagent, run all subagents at once, do not split them into multiple batches as subagent mechanism has its own rate limiting and queue management (i.e. there is no danger of overloading the subagent mechanism)
+  * but be sure to serialize subagent calls if there are clear dependencies between them, eg. one requires output from another
 
 ## Parameters
 
