@@ -1,6 +1,8 @@
 package core
 
 import (
+	"context"
+	"iter"
 	"os"
 	"path/filepath"
 	"testing"
@@ -130,5 +132,106 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 		err := session.maybeCompactContext()
 		require.NoError(t, err)
 		assert.Equal(t, 1, session.compactionCount)
+	})
+}
+
+type tokenLimitChatModel struct {
+	errors    []error
+	responses []*models.ChatMessage
+	callSizes []int
+	callIndex int
+}
+
+func (m *tokenLimitChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) (*models.ChatMessage, error) {
+	_ = ctx
+	_ = options
+	_ = tools
+	m.callSizes = append(m.callSizes, len(messages))
+
+	if m.callIndex < len(m.errors) {
+		err := m.errors[m.callIndex]
+		if err != nil {
+			m.callIndex++
+			return nil, err
+		}
+	}
+
+	if m.callIndex < len(m.responses) {
+		response := m.responses[m.callIndex]
+		m.callIndex++
+		return response, nil
+	}
+
+	m.callIndex++
+	return models.NewTextMessage(models.ChatRoleAssistant, "ok"), nil
+}
+
+func (m *tokenLimitChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) iter.Seq[*models.ChatMessage] {
+	_ = ctx
+	_ = messages
+	_ = options
+	_ = tools
+	return func(yield func(*models.ChatMessage) bool) {
+		_ = yield
+	}
+}
+
+func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
+	t.Run("compacts context and retries", func(t *testing.T) {
+		handler := &compactionOutputHandler{}
+		session := &SweSession{
+			messages: []*models.ChatMessage{
+				models.NewTextMessage(models.ChatRoleSystem, "system"),
+				models.NewTextMessage(models.ChatRoleUser, "first"),
+				models.NewTextMessage(models.ChatRoleAssistant, "first reply"),
+				models.NewTextMessage(models.ChatRoleUser, "second"),
+				models.NewTextMessage(models.ChatRoleAssistant, "second reply"),
+			},
+			outputHandler: handler,
+		}
+
+		chatModel := &tokenLimitChatModel{
+			errors: []error{models.ErrTooManyInputTokens, nil},
+			responses: []*models.ChatMessage{
+				nil,
+				models.NewTextMessage(models.ChatRoleAssistant, "done"),
+			},
+		}
+
+		response, err := session.runNonStreamingChat(t.Context(), chatModel, nil, nil)
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		assert.Equal(t, "done", response.GetText())
+		assert.Equal(t, 1, session.compactionCount)
+		require.Len(t, chatModel.callSizes, 2)
+		require.NotEmpty(t, handler.messages)
+		assert.Contains(t, handler.messages[0], "too large")
+		assert.Contains(t, handler.messages[1], "Context exceeded model input token limit")
+	})
+
+	t.Run("returns error after reaching max attempts", func(t *testing.T) {
+		handler := &compactionOutputHandler{}
+		session := &SweSession{
+			messages: []*models.ChatMessage{
+				models.NewTextMessage(models.ChatRoleSystem, "system"),
+				models.NewTextMessage(models.ChatRoleUser, "first"),
+				models.NewTextMessage(models.ChatRoleAssistant, "first reply"),
+				models.NewTextMessage(models.ChatRoleUser, "second"),
+			},
+			outputHandler: handler,
+			configStore:   impl.NewMockConfigStore(),
+		}
+		session.configStore.(*impl.MockConfigStore).SetGlobalConfig(&conf.GlobalConfig{LLMRetryMaxAttempts: 2})
+
+		chatModel := &tokenLimitChatModel{
+			errors: []error{models.ErrTooManyInputTokens, models.ErrTooManyInputTokens},
+		}
+
+		response, err := session.runNonStreamingChat(t.Context(), chatModel, nil, nil)
+		require.Nil(t, response)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "too many input tokens after 2 attempts")
+		assert.Equal(t, 2, session.compactionCount)
+		require.Len(t, chatModel.callSizes, 2)
 	})
 }

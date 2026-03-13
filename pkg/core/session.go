@@ -442,6 +442,26 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 				return responseMsg, nil
 			}
 
+			if errors.Is(err, models.ErrTooManyInputTokens) {
+				if s.logger != nil {
+					s.logger.Warn("chat_non_streaming_too_many_input_tokens", "attempt", attempt, "max_attempts", maxAttempts, "error", err)
+				}
+
+				if s.outputHandler != nil {
+					s.outputHandler.ShowMessage("LLM rejected input because context is too large. Compacting messages and retrying...", sessionMessageTypeWarning)
+				}
+
+				if compactErr := s.compactContext("Context exceeded model input token limit. Compacting messages..."); compactErr != nil {
+					return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: failed to compact context after token limit error: %w", compactErr)
+				}
+
+				if attempt >= maxAttempts {
+					return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: too many input tokens after %d attempts: %w", maxAttempts, err)
+				}
+
+				continue
+			}
+
 			if !isTemporaryLLMError(err) {
 				if s.logger != nil {
 					s.logLLMRequestError("chat_non_streaming_error", err)
@@ -1494,9 +1514,13 @@ func (s *SweSession) maybeCompactContext() error {
 		return nil
 	}
 
+	return s.compactContext("Context is near maximum length. Compacting messages...")
+}
+
+func (s *SweSession) compactContext(statusMessage string) error {
 	compactionNumber := s.compactionCount + 1
-	if s.outputHandler != nil {
-		s.outputHandler.ShowMessage("Context is near maximum length. Compacting messages...", sessionMessageTypeInfo)
+	if s.outputHandler != nil && strings.TrimSpace(statusMessage) != "" {
+		s.outputHandler.ShowMessage(statusMessage, sessionMessageTypeInfo)
 	}
 
 	if err := s.persistCompactionMessagesSnapshot("pre", compactionNumber, s.messages); err != nil {
