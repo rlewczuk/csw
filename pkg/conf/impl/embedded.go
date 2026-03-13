@@ -53,6 +53,7 @@ type EmbeddedConfigStore struct {
 	mu                   sync.RWMutex
 	globalConfig         *conf.GlobalConfig
 	modelProviderConfigs map[string]*conf.ModelProviderConfig
+	mcpServerConfigs     map[string]*conf.MCPServerConfig
 	agentRoleConfigs     map[string]*conf.AgentRoleConfig
 	loaded               bool
 }
@@ -63,6 +64,7 @@ func NewEmbeddedConfigStore() (conf.ConfigStore, error) {
 	store := &EmbeddedConfigStore{
 		globalConfig:         &conf.GlobalConfig{},
 		modelProviderConfigs: make(map[string]*conf.ModelProviderConfig),
+		mcpServerConfigs:     make(map[string]*conf.MCPServerConfig),
 		agentRoleConfigs:     make(map[string]*conf.AgentRoleConfig),
 	}
 
@@ -105,6 +107,24 @@ func (s *EmbeddedConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelP
 // LastModelProviderConfigsUpdate returns the timestamp of the last model provider configs update.
 // For embedded configuration, this always returns a constant timestamp.
 func (s *EmbeddedConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
+	return embeddedTimestamp, nil
+}
+
+// GetMCPServerConfigs returns map of MCP server configurations.
+func (s *EmbeddedConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	configs := make(map[string]*conf.MCPServerConfig, len(s.mcpServerConfigs))
+	for key, value := range s.mcpServerConfigs {
+		configs[key] = value.Clone()
+	}
+
+	return configs, nil
+}
+
+// LastMCPServerConfigsUpdate returns timestamp of last MCP server config update.
+func (s *EmbeddedConfigStore) LastMCPServerConfigsUpdate() (time.Time, error) {
 	return embeddedTimestamp, nil
 }
 
@@ -203,6 +223,9 @@ func (s *EmbeddedConfigStore) loadAllConfig() error {
 	}
 	if err := s.loadModelProviderConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load model provider configs: %w", err)
+	}
+	if err := s.loadMCPServerConfigs(); err != nil {
+		return fmt.Errorf("loadAllConfig(): failed to load MCP server configs: %w", err)
 	}
 	if err := s.loadAgentRoleConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load agent role configs: %w", err)
@@ -336,6 +359,72 @@ func (s *EmbeddedConfigStore) loadModelProviderConfigs() error {
 	}
 
 	s.modelProviderConfigs = configs
+	return nil
+}
+
+// loadMCPServerConfigs loads MCP server configurations from embedded mcp directory.
+// YAML files take precedence over JSON files if both exist for the same server.
+func (s *EmbeddedConfigStore) loadMCPServerConfigs() error {
+	mcpDir := "conf/mcp"
+
+	entries, err := embeddedConfigFS.ReadDir(mcpDir)
+	if err != nil {
+		if isNotExist(err) {
+			s.mcpServerConfigs = make(map[string]*conf.MCPServerConfig)
+			return nil
+		}
+		return fmt.Errorf("loadMCPServerConfigs() [embedded.go]: failed to read mcp directory: %w", err)
+	}
+
+	configs := make(map[string]*conf.MCPServerConfig)
+	loadedServers := make(map[string]bool)
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".yml" {
+			continue
+		}
+
+		serverName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
+		serverPath := filepath.Join(mcpDir, entry.Name())
+		data, readErr := embeddedConfigFS.ReadFile(serverPath)
+		if readErr != nil {
+			return fmt.Errorf("loadMCPServerConfigs() [embedded.go]: failed to read %s: %w", serverPath, readErr)
+		}
+
+		var config conf.MCPServerConfig
+		if unmarshalErr := yaml.Unmarshal(data, &config); unmarshalErr != nil {
+			return fmt.Errorf("loadMCPServerConfigs() [embedded.go]: failed to parse %s: %w", serverPath, unmarshalErr)
+		}
+
+		configs[serverName] = &config
+		loadedServers[serverName] = true
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+
+		serverName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
+		if loadedServers[serverName] {
+			continue
+		}
+
+		serverPath := filepath.Join(mcpDir, entry.Name())
+		data, readErr := embeddedConfigFS.ReadFile(serverPath)
+		if readErr != nil {
+			return fmt.Errorf("loadMCPServerConfigs() [embedded.go]: failed to read %s: %w", serverPath, readErr)
+		}
+
+		var config conf.MCPServerConfig
+		if unmarshalErr := json.Unmarshal(data, &config); unmarshalErr != nil {
+			return fmt.Errorf("loadMCPServerConfigs() [embedded.go]: failed to parse %s: %w", serverPath, unmarshalErr)
+		}
+
+		configs[serverName] = &config
+	}
+
+	s.mcpServerConfigs = configs
 	return nil
 }
 

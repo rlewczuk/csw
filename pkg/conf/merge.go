@@ -565,6 +565,29 @@ func cloneModelTemplateGroups(input map[string]map[string]ModelProviderConfig) m
 	return cloned
 }
 
+// Clone returns a deep copy of MCPServerConfig.
+func (c *MCPServerConfig) Clone() *MCPServerConfig {
+	if c == nil {
+		return nil
+	}
+
+	cloned := &MCPServerConfig{
+		Cmd:     c.Cmd,
+		Enabled: c.Enabled,
+		Args:    append([]string(nil), c.Args...),
+		Tools:   append([]string(nil), c.Tools...),
+	}
+
+	if c.Env != nil {
+		cloned.Env = make(map[string]string, len(c.Env))
+		for key, value := range c.Env {
+			cloned.Env[key] = value
+		}
+	}
+
+	return cloned
+}
+
 func cloneVendorFamilyOverrides(input map[string]ModelVendorFamilyTemplateOverride) map[string]ModelVendorFamilyTemplateOverride {
 	if input == nil {
 		return nil

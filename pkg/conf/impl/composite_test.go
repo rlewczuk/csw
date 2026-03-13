@@ -425,6 +425,7 @@ func TestCompositeConfigStore_ChangeDetection(t *testing.T) {
 		stores:             []conf.ConfigStore{store1, store2},
 		storeGlobalUpdates: make([]time.Time, 2),
 		storeModelUpdates:  make([]time.Time, 2),
+		storeMCPUpdates:    make([]time.Time, 2),
 		storeRoleUpdates:   make([]time.Time, 2),
 	}
 
@@ -513,6 +514,7 @@ func TestCompositeConfigStore_LastUpdateTimestamps(t *testing.T) {
 		stores:             []conf.ConfigStore{store1, store2},
 		storeGlobalUpdates: make([]time.Time, 2),
 		storeModelUpdates:  make([]time.Time, 2),
+		storeMCPUpdates:    make([]time.Time, 2),
 		storeRoleUpdates:   make([]time.Time, 2),
 	}
 
@@ -551,6 +553,7 @@ func TestCompositeConfigStore_CopyProtection(t *testing.T) {
 		stores:             []conf.ConfigStore{mockStore},
 		storeGlobalUpdates: make([]time.Time, 1),
 		storeModelUpdates:  make([]time.Time, 1),
+		storeMCPUpdates:    make([]time.Time, 1),
 		storeRoleUpdates:   make([]time.Time, 1),
 	}
 
@@ -578,6 +581,7 @@ func TestCompositeConfigStore_MultipleRefreshes(t *testing.T) {
 		stores:             []conf.ConfigStore{mockStore},
 		storeGlobalUpdates: make([]time.Time, 1),
 		storeModelUpdates:  make([]time.Time, 1),
+		storeMCPUpdates:    make([]time.Time, 1),
 		storeRoleUpdates:   make([]time.Time, 1),
 	}
 
@@ -597,6 +601,7 @@ func TestCompositeConfigStore_ConcurrentAccess(t *testing.T) {
 		stores:             []conf.ConfigStore{mockStore},
 		storeGlobalUpdates: make([]time.Time, 1),
 		storeModelUpdates:  make([]time.Time, 1),
+		storeMCPUpdates:    make([]time.Time, 1),
 		storeRoleUpdates:   make([]time.Time, 1),
 	}
 
@@ -632,6 +637,7 @@ func TestCompositeConfigStore_GetAgentConfigFile(t *testing.T) {
 			stores:             []conf.ConfigStore{embeddedStore, globalStore, localStore},
 			storeGlobalUpdates: make([]time.Time, 3),
 			storeModelUpdates:  make([]time.Time, 3),
+			storeMCPUpdates:    make([]time.Time, 3),
 			storeRoleUpdates:   make([]time.Time, 3),
 		}
 
@@ -652,6 +658,7 @@ func TestCompositeConfigStore_GetAgentConfigFile(t *testing.T) {
 			stores:             []conf.ConfigStore{embeddedStore, globalStore, localStore},
 			storeGlobalUpdates: make([]time.Time, 3),
 			storeModelUpdates:  make([]time.Time, 3),
+			storeMCPUpdates:    make([]time.Time, 3),
 			storeRoleUpdates:   make([]time.Time, 3),
 		}
 
@@ -665,6 +672,7 @@ func TestCompositeConfigStore_GetAgentConfigFile(t *testing.T) {
 			stores:             []conf.ConfigStore{NewMockConfigStore(), NewMockConfigStore()},
 			storeGlobalUpdates: make([]time.Time, 2),
 			storeModelUpdates:  make([]time.Time, 2),
+			storeMCPUpdates:    make([]time.Time, 2),
 			storeRoleUpdates:   make([]time.Time, 2),
 		}
 
@@ -721,6 +729,7 @@ func TestCompositeConfigStore_PromptFragmentsMerging(t *testing.T) {
 		stores:             []conf.ConfigStore{store1, store2, store3},
 		storeGlobalUpdates: make([]time.Time, 3),
 		storeModelUpdates:  make([]time.Time, 3),
+		storeMCPUpdates:    make([]time.Time, 3),
 		storeRoleUpdates:   make([]time.Time, 3),
 	}
 
@@ -785,6 +794,7 @@ func TestCompositeConfigStore_PromptFragmentsRemovalAndReaddition(t *testing.T) 
 		stores:             []conf.ConfigStore{store1, store2, store3},
 		storeGlobalUpdates: make([]time.Time, 3),
 		storeModelUpdates:  make([]time.Time, 3),
+		storeMCPUpdates:    make([]time.Time, 3),
 		storeRoleUpdates:   make([]time.Time, 3),
 	}
 
@@ -830,6 +840,7 @@ func TestCompositeConfigStore_PromptFragmentsEmptyString(t *testing.T) {
 		stores:             []conf.ConfigStore{store1, store2},
 		storeGlobalUpdates: make([]time.Time, 2),
 		storeModelUpdates:  make([]time.Time, 2),
+		storeMCPUpdates:    make([]time.Time, 2),
 		storeRoleUpdates:   make([]time.Time, 2),
 	}
 
@@ -887,6 +898,7 @@ func TestCompositeConfigStore_PromptFragmentsMultipleRoles(t *testing.T) {
 		stores:             []conf.ConfigStore{store1, store2},
 		storeGlobalUpdates: make([]time.Time, 2),
 		storeModelUpdates:  make([]time.Time, 2),
+		storeMCPUpdates:    make([]time.Time, 2),
 		storeRoleUpdates:   make([]time.Time, 2),
 	}
 
@@ -926,6 +938,7 @@ func TestCompositeConfigStore_PromptFragmentsCopyProtection(t *testing.T) {
 		stores:             []conf.ConfigStore{mockStore},
 		storeGlobalUpdates: make([]time.Time, 1),
 		storeModelUpdates:  make([]time.Time, 1),
+		storeMCPUpdates:    make([]time.Time, 1),
 		storeRoleUpdates:   make([]time.Time, 1),
 	}
 
@@ -978,6 +991,7 @@ func TestCompositeConfigStore_ToolFragmentsMerging(t *testing.T) {
 		stores:             []conf.ConfigStore{store1, store2},
 		storeGlobalUpdates: make([]time.Time, 2),
 		storeModelUpdates:  make([]time.Time, 2),
+		storeMCPUpdates:    make([]time.Time, 2),
 		storeRoleUpdates:   make([]time.Time, 2),
 	}
 

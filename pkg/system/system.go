@@ -47,6 +47,7 @@ type SweSystem struct {
 	Roles           *core.AgentRoleRegistry
 	LSP             lsp.LSP
 	ConfigStore     conf.ConfigStore
+	mcpManager      interface{ Close() error }
 
 	sessions   map[string]*core.SweSession
 	threads    map[string]*core.SessionThread
@@ -604,6 +605,9 @@ func (s *SweSystem) Shutdown() {
 
 	logging.FlushLogs()
 	logging.CloseSessionLoggers()
+	if s.mcpManager != nil {
+		_ = s.mcpManager.Close()
+	}
 
 	s.threads = make(map[string]*core.SessionThread)
 	s.sessions = make(map[string]*core.SweSession)

@@ -35,6 +35,14 @@ func (m *mockWritableStore) LastModelProviderConfigsUpdate() (time.Time, error) 
 	return time.Time{}, nil
 }
 
+func (m *mockWritableStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
+	return nil, nil
+}
+
+func (m *mockWritableStore) LastMCPServerConfigsUpdate() (time.Time, error) {
+	return time.Time{}, nil
+}
+
 func (m *mockWritableStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfig, error) {
 	return nil, nil
 }

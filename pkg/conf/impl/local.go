@@ -49,6 +49,8 @@ type LocalConfigStore struct {
 	globalConfigUpdate         time.Time
 	modelProviderConfigs       map[string]*conf.ModelProviderConfig
 	modelProviderConfigsUpdate time.Time
+	mcpServerConfigs           map[string]*conf.MCPServerConfig
+	mcpServerConfigsUpdate     time.Time
 	agentRoleConfigs           map[string]*conf.AgentRoleConfig
 	agentRoleConfigsUpdate     time.Time
 
@@ -76,6 +78,7 @@ func NewLocalConfigStore(configDir string) (*LocalConfigStore, error) {
 		configDir:            configDir,
 		globalConfig:         &conf.GlobalConfig{},
 		modelProviderConfigs: make(map[string]*conf.ModelProviderConfig),
+		mcpServerConfigs:     make(map[string]*conf.MCPServerConfig),
 		agentRoleConfigs:     make(map[string]*conf.AgentRoleConfig),
 		watcher:              watcher,
 		watcherCtx:           ctx,
@@ -143,6 +146,26 @@ func (s *LocalConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.modelProviderConfigsUpdate, nil
+}
+
+// GetMCPServerConfigs returns a map of MCP server configurations.
+func (s *LocalConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	configs := make(map[string]*conf.MCPServerConfig, len(s.mcpServerConfigs))
+	for key, value := range s.mcpServerConfigs {
+		configs[key] = value.Clone()
+	}
+
+	return configs, nil
+}
+
+// LastMCPServerConfigsUpdate returns timestamp of last MCP server configs update.
+func (s *LocalConfigStore) LastMCPServerConfigsUpdate() (time.Time, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.mcpServerConfigsUpdate, nil
 }
 
 // GetAgentRoleConfigs returns a map of agent role configurations.
@@ -238,6 +261,9 @@ func (s *LocalConfigStore) loadAllConfig() error {
 	}
 	if err := s.loadModelProviderConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load model provider configs: %w", err)
+	}
+	if err := s.loadMCPServerConfigs(); err != nil {
+		return fmt.Errorf("loadAllConfig(): failed to load MCP server configs: %w", err)
 	}
 	if err := s.loadAgentRoleConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load agent role configs: %w", err)
@@ -496,6 +522,83 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 	return nil
 }
 
+// loadMCPServerConfigs loads MCP server configurations from mcp directory.
+// Supports .json and .yml/.yaml files, with YAML taking precedence.
+func (s *LocalConfigStore) loadMCPServerConfigs() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	mcpDir := filepath.Join(s.configDir, "mcp")
+
+	entries, err := os.ReadDir(mcpDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			s.mcpServerConfigs = make(map[string]*conf.MCPServerConfig)
+			s.mcpServerConfigsUpdate = time.Now()
+			return nil
+		}
+		return fmt.Errorf("loadMCPServerConfigs() [local.go]: failed to read mcp directory: %w", err)
+	}
+
+	loadedServers := make(map[string]bool)
+	configs := make(map[string]*conf.MCPServerConfig)
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if ext != ".yml" && ext != ".yaml" {
+			continue
+		}
+
+		serverPath := filepath.Join(mcpDir, entry.Name())
+		data, readErr := os.ReadFile(serverPath)
+		if readErr != nil {
+			return fmt.Errorf("loadMCPServerConfigs() [local.go]: failed to read %s: %w", serverPath, readErr)
+		}
+
+		var config conf.MCPServerConfig
+		if unmarshalErr := yaml.Unmarshal(data, &config); unmarshalErr != nil {
+			return fmt.Errorf("loadMCPServerConfigs() [local.go]: failed to parse %s: %w", serverPath, unmarshalErr)
+		}
+
+		baseName := entry.Name()[:len(entry.Name())-len(ext)]
+		configs[baseName] = &config
+		loadedServers[baseName] = true
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+
+		baseName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
+		if loadedServers[baseName] {
+			continue
+		}
+
+		serverPath := filepath.Join(mcpDir, entry.Name())
+		data, readErr := os.ReadFile(serverPath)
+		if readErr != nil {
+			return fmt.Errorf("loadMCPServerConfigs() [local.go]: failed to read %s: %w", serverPath, readErr)
+		}
+
+		var config conf.MCPServerConfig
+		if unmarshalErr := json.Unmarshal(data, &config); unmarshalErr != nil {
+			return fmt.Errorf("loadMCPServerConfigs() [local.go]: failed to parse %s: %w", serverPath, unmarshalErr)
+		}
+
+		configs[baseName] = &config
+	}
+
+	s.mcpServerConfigs = configs
+	s.mcpServerConfigsUpdate = time.Now()
+
+	return nil
+}
+
 // loadAgentRoleConfigs loads all agent role configurations from the roles directory.
 // The special "all" meta-role is loaded without requiring config.json, as it only contains
 // prompt fragments that are merged into other roles.
@@ -728,6 +831,14 @@ func (s *LocalConfigStore) setupWatchers() error {
 		}
 	}
 
+	// Watch mcp directory
+	mcpDir := filepath.Join(s.configDir, "mcp")
+	if _, err := os.Stat(mcpDir); err == nil {
+		if err := s.watcher.Add(mcpDir); err != nil {
+			return fmt.Errorf("setupWatchers() [local.go]: failed to watch mcp directory: %w", err)
+		}
+	}
+
 	// Watch roles directory and all role subdirectories
 	rolesDir := filepath.Join(s.configDir, "roles")
 	if _, err := os.Stat(rolesDir); err == nil {
@@ -805,6 +916,7 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 	globalYAMLPath := filepath.Join(s.configDir, "global.yml")
 	globalJSONPath := filepath.Join(s.configDir, "global.json")
 	modelsDir := filepath.Join(s.configDir, "models")
+	mcpDir := filepath.Join(s.configDir, "mcp")
 	modelFamiliesDir := filepath.Join(modelsDir, "families")
 	modelVendorsDir := filepath.Join(modelsDir, "vendors")
 	modelTemplatesDir := filepath.Join(modelsDir, "templates")
@@ -825,6 +937,16 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 		if ext == ".json" || ext == ".yml" || ext == ".yaml" {
 			if err := s.loadModelProviderConfigs(); err != nil {
 				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload model provider configs: %v\n", err)
+			}
+			return
+		}
+	}
+
+	if filepath.Dir(event.Name) == mcpDir {
+		ext := strings.ToLower(filepath.Ext(event.Name))
+		if ext == ".json" || ext == ".yml" || ext == ".yaml" {
+			if err := s.loadMCPServerConfigs(); err != nil {
+				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent() [local.go]: failed to reload mcp server configs: %v\n", err)
 			}
 			return
 		}

@@ -49,12 +49,15 @@ type CompositeConfigStore struct {
 	globalConfigUpdate         time.Time
 	modelProviderConfigs       map[string]*conf.ModelProviderConfig
 	modelProviderConfigsUpdate time.Time
+	mcpServerConfigs           map[string]*conf.MCPServerConfig
+	mcpServerConfigsUpdate     time.Time
 	agentRoleConfigs           map[string]*conf.AgentRoleConfig
 	agentRoleConfigsUpdate     time.Time
 
 	// Track last known update times from stores
 	storeGlobalUpdates []time.Time
 	storeModelUpdates  []time.Time
+	storeMCPUpdates    []time.Time
 	storeRoleUpdates   []time.Time
 }
 
@@ -107,6 +110,7 @@ func NewCompositeConfigStore(projDir string, configPath string) (conf.ConfigStor
 		projDir:            projDir,
 		storeGlobalUpdates: make([]time.Time, len(stores)),
 		storeModelUpdates:  make([]time.Time, len(stores)),
+		storeMCPUpdates:    make([]time.Time, len(stores)),
 		storeRoleUpdates:   make([]time.Time, len(stores)),
 	}
 
@@ -158,6 +162,32 @@ func (c *CompositeConfigStore) GetModelProviderConfigs() (map[string]*conf.Model
 	}
 
 	return configs, nil
+}
+
+// GetMCPServerConfigs returns merged MCP server configurations from all sources.
+func (c *CompositeConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.needsRefreshMCPServers() {
+		if err := c.refreshMCPServerConfigs(); err != nil {
+			return nil, fmt.Errorf("CompositeConfigStore.GetMCPServerConfigs() [composite.go]: refresh failed: %w", err)
+		}
+	}
+
+	configs := make(map[string]*conf.MCPServerConfig, len(c.mcpServerConfigs))
+	for key, value := range c.mcpServerConfigs {
+		configs[key] = value.Clone()
+	}
+
+	return configs, nil
+}
+
+// LastMCPServerConfigsUpdate returns timestamp of most recent MCP server config update.
+func (c *CompositeConfigStore) LastMCPServerConfigsUpdate() (time.Time, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.mcpServerConfigsUpdate, nil
 }
 
 // LastModelProviderConfigsUpdate returns the timestamp of the most recent model provider configs update.
@@ -228,6 +258,9 @@ func (c *CompositeConfigStore) refresh() error {
 	if err := c.refreshModelProviderConfigs(); err != nil {
 		return err
 	}
+	if err := c.refreshMCPServerConfigs(); err != nil {
+		return err
+	}
 	if err := c.refreshAgentRoleConfigs(); err != nil {
 		return err
 	}
@@ -259,6 +292,25 @@ func (c *CompositeConfigStore) needsRefreshModelProviders() bool {
 			return true
 		}
 	}
+	return false
+}
+
+// needsRefreshMCPServers checks if MCP server configs need to be refreshed.
+func (c *CompositeConfigStore) needsRefreshMCPServers() bool {
+	if len(c.storeMCPUpdates) != len(c.stores) {
+		return true
+	}
+
+	for i, store := range c.stores {
+		lastUpdate, err := store.LastMCPServerConfigsUpdate()
+		if err != nil {
+			continue
+		}
+		if !lastUpdate.Equal(c.storeMCPUpdates[i]) {
+			return true
+		}
+	}
+
 	return false
 }
 
@@ -332,6 +384,40 @@ func (c *CompositeConfigStore) refreshModelProviderConfigs() error {
 
 	c.modelProviderConfigs = merged
 	c.modelProviderConfigsUpdate = latestUpdate
+	return nil
+}
+
+// refreshMCPServerConfigs reloads and merges MCP server configurations from all sources.
+func (c *CompositeConfigStore) refreshMCPServerConfigs() error {
+	if len(c.storeMCPUpdates) != len(c.stores) {
+		c.storeMCPUpdates = make([]time.Time, len(c.stores))
+	}
+
+	merged := make(map[string]*conf.MCPServerConfig)
+	var latestUpdate time.Time
+
+	for i, store := range c.stores {
+		configs, err := store.GetMCPServerConfigs()
+		if err != nil {
+			return fmt.Errorf("CompositeConfigStore.refreshMCPServerConfigs() [composite.go]: failed to get configs from store %d: %w", i, err)
+		}
+
+		for key, value := range configs {
+			merged[key] = value.Clone()
+		}
+
+		lastUpdate, err := store.LastMCPServerConfigsUpdate()
+		if err == nil {
+			c.storeMCPUpdates[i] = lastUpdate
+			if lastUpdate.After(latestUpdate) {
+				latestUpdate = lastUpdate
+			}
+		}
+	}
+
+	c.mcpServerConfigs = merged
+	c.mcpServerConfigsUpdate = latestUpdate
+
 	return nil
 }
 

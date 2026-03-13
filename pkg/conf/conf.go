@@ -129,6 +129,21 @@ type ContainerConfig struct {
 	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 }
 
+// MCPServerConfig defines configuration for running a local MCP server.
+type MCPServerConfig struct {
+	// Cmd is the command to run MCP server (may include arguments).
+	Cmd string `json:"cmd,omitempty" yaml:"cmd,omitempty"`
+	// Enabled controls whether MCP server should be started.
+	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	// Args are additional command arguments appended to Cmd arguments.
+	Args []string `json:"args,omitempty" yaml:"args,omitempty"`
+	// Env contains environment variables set for MCP server process.
+	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	// Tools contains regex patterns selecting enabled tool names.
+	// nil means all tools enabled, empty slice means all tools disabled.
+	Tools []string `json:"tools" yaml:"tools"`
+}
+
 // CLIDefaultsConfig defines default values for the cli command flags.
 type CLIDefaultsConfig struct {
 	// Model is the default --model value.
@@ -408,6 +423,12 @@ type ConfigStore interface {
 
 	// LastGlobalConfigUpdate returns timestamp of last update of global config
 	LastGlobalConfigUpdate() (time.Time, error)
+
+	// GetMCPServerConfigs returns MCP server configurations keyed by server name.
+	GetMCPServerConfigs() (map[string]*MCPServerConfig, error)
+
+	// LastMCPServerConfigsUpdate returns timestamp of last update of MCP server configs.
+	LastMCPServerConfigsUpdate() (time.Time, error)
 
 	// GetAgentConfigFile returns file content from agent configuration namespace.
 	// The expected virtual location is conf/agent/<subdir>/<filename>.

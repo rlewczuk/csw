@@ -17,6 +17,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/lsp"
+	"github.com/rlewczuk/csw/pkg/mcp"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/tool"
@@ -454,7 +455,16 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	tool.RegisterVFSTools(toolRegistry, toolVFS, lspClient, nil)
 
 	bashRunner := runner.CommandRunner(runner.NewBashRunner(effectiveWorkDir, params.BashRunTimeout))
-	cleanupFn := func() {}
+	cleanupFns := make([]func(), 0)
+	cleanupOnError := true
+	defer func() {
+		if !cleanupOnError {
+			return
+		}
+		for _, cleanupFn := range cleanupFns {
+			cleanupFn()
+		}
+	}()
 
 	containerRuntimeConfig, err := ResolveContainerRuntimeConfig(globalConfig, params, effectiveWorkDir, shadowDir)
 	if err != nil {
@@ -499,27 +509,42 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		}
 
 		bashRunner = containerRunner
-		cleanupFn = func() {
+		cleanupFns = append(cleanupFns, func() {
 			if closeErr := containerRunner.Close(); closeErr != nil {
 				logger := logging.GetGlobalLogger()
 				logger.Warn("failed to close container runner", "error", closeErr)
 			}
-		}
+		})
 	}
 
 	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, effectiveWorkDir, params.BashRunTimeout)
 	tool.RegisterWebFetchTool(toolRegistry, nil)
 	tool.RegisterSkillTool(toolRegistry, configRoot)
+
+	mcpManager, err := mcp.NewManager(configStore)
+	if err != nil {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to initialize mcp manager: %w", err)
+	}
+	cleanupFns = append(cleanupFns, func() {
+		_ = mcpManager.Close()
+	})
+	if err := mcp.RegisterTools(toolRegistry, mcpManager); err != nil {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to register mcp tools: %w", err)
+	}
+
 	if err := tool.RegisterCustomTools(toolRegistry, configStore, configRoot, bashRunner); err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to register custom tools: %w", err)
 	}
 
-	promptGenerator, err := core.NewConfPromptGenerator(configStore, toolVFS)
+	basePromptGenerator, err := core.NewConfPromptGenerator(configStore, toolVFS)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create prompt generator: %w", err)
 	}
+	promptGenerator := mcp.NewPromptGenerator(basePromptGenerator, mcpManager)
 
 	modelTagRegistry, err := CreateModelTagRegistry(configStore, providerRegistry)
 	if err != nil {
@@ -537,6 +562,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		Roles:           roleRegistry,
 		LSP:             lspClient,
 		ConfigStore:     configStore,
+		mcpManager:      mcpManager,
 		LogBaseDir:      logsDir,
 		WorkDir:         effectiveWorkDir,
 		ShadowDir:       shadowDir,
@@ -565,8 +591,13 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		ContainerImage:   containerRuntimeConfig.Image,
 		LSPStarted:       lspClient != nil,
 		LSPWorkDir:       effectiveWorkDir,
-		Cleanup:          cleanupFn,
+		Cleanup: func() {
+			for _, cleanupFn := range cleanupFns {
+				cleanupFn()
+			}
+		},
 	}
+	cleanupOnError = false
 
 	return sweSystem, result, nil
 }
