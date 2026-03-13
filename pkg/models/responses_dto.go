@@ -79,6 +79,7 @@ type ResponsesResponse struct {
 // ResponsesStreamEvent represents a streaming event from Responses API.
 type ResponsesStreamEvent struct {
 	Type      string             `json:"type"`
+	Error     *OpenaiAPIError    `json:"error,omitempty"`
 	Response  *ResponsesResponse `json:"response,omitempty"`
 	Item      *ResponsesItem     `json:"item,omitempty"`
 	ItemID    string             `json:"item_id,omitempty"`

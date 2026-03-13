@@ -1,6 +1,9 @@
 package models
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Network and API error variables.
 var (
@@ -67,4 +70,25 @@ func (e *NetworkError) Error() string {
 // Unwrap returns the underlying ErrNetworkError error.
 func (e *NetworkError) Unwrap() error {
 	return ErrNetworkError
+}
+
+// APIRequestError represents a structured API request validation error.
+type APIRequestError struct {
+	// ErrorType is a provider-specific error category.
+	ErrorType string
+	// Code is a provider-specific error code.
+	Code string
+	// Param is the request parameter that caused the error.
+	Param string
+	// Message is a human-readable error message.
+	Message string
+}
+
+// Error returns the error message for APIRequestError.
+func (e *APIRequestError) Error() string {
+	if e == nil {
+		return "api request error"
+	}
+
+	return fmt.Sprintf("api request error: type=%q code=%q param=%q message=%q", e.ErrorType, e.Code, e.Param, e.Message)
 }

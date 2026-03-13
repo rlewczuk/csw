@@ -1141,6 +1141,7 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 	}
 
 	toolCallsInProgress := make(map[string]*responsesToolCallInProgress)
+	var streamEventErr error
 	err := scanStreamBodyWithAdaptiveBuffer(bodyBytes, func(line string) bool {
 		if line == "" || strings.HasPrefix(line, "event: ") {
 			return false
@@ -1158,8 +1159,13 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 		}
 
 		var event ResponsesStreamEvent
-		if err := json.Unmarshal([]byte(data), &event); err != nil {
+		if unmarshalErr := json.Unmarshal([]byte(data), &event); unmarshalErr != nil {
 			return false
+		}
+
+		if event.Type == "error" && event.Error != nil {
+			streamEventErr = mapResponsesStreamError(event.Error)
+			return true
 		}
 
 		switch event.Type {
@@ -1205,6 +1211,9 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("convertFromResponsesStreamBody() [responses_client.go]: failed to scan stream body: %w", err)
+	}
+	if streamEventErr != nil {
+		return nil, streamEventErr
 	}
 
 	if len(result.Parts) == 0 {
@@ -1257,6 +1266,24 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 	}
 
 	return result, nil
+}
+
+func mapResponsesStreamError(apiErr *OpenaiAPIError) error {
+	if apiErr == nil {
+		return fmt.Errorf("mapResponsesStreamError() [responses_client.go]: empty stream error")
+	}
+
+	errorCode := fmt.Sprint(apiErr.Code)
+	if errorCode == "context_length_exceeded" {
+		return fmt.Errorf("%w: %s", ErrTooManyInputTokens, apiErr.Message)
+	}
+
+	return &APIRequestError{
+		ErrorType: apiErr.Type,
+		Code:      errorCode,
+		Param:     fmt.Sprint(apiErr.Param),
+		Message:   apiErr.Message,
+	}
 }
 
 func convertFromResponsesOutput(items []ResponsesItem) (*ChatMessage, error) {
