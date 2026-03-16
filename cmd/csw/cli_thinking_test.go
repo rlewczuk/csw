@@ -7,6 +7,7 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -183,4 +184,15 @@ func TestBuildSessionSummaryMessage(t *testing.T) {
 			buildSessionSummaryMessage(5*time.Second, nil, system.BuildSystemResult{}),
 		)
 	})
+}
+
+func TestBuildContainerStartupInfoMessage(t *testing.T) {
+	message := buildContainerStartupInfoMessage(system.BuildSystemResult{
+		ContainerImageName:    "busybox",
+		ContainerImageTag:     "1.36",
+		ContainerImageVersion: "1.36",
+		ContainerIdentity: runner.ContainerIdentity{UID: 1000, GID: 100, UserName: "alice", GroupName: "users"},
+	})
+
+	assert.Equal(t, "[INFO] Container: image=busybox tag=1.36 version=1.36 user=alice(uid=1000) group=users(gid=100)", message)
 }

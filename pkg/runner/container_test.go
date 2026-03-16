@@ -446,3 +446,119 @@ func TestContainerRunnerEnv(t *testing.T) {
 	assert.Equal(t, 0, exitCode)
 	assert.Equal(t, "Test User|test@example.com", strings.TrimSpace(output))
 }
+
+func TestParseContainerImageInfo(t *testing.T) {
+	tests := []struct {
+		name      string
+		reference string
+		expected  ContainerImageInfo
+	}{
+		{
+			name:      "name with explicit tag",
+			reference: "busybox:1.36",
+			expected: ContainerImageInfo{
+				Reference: "busybox:1.36",
+				Name:      "busybox",
+				Tag:       "1.36",
+				Version:   "1.36",
+			},
+		},
+		{
+			name:      "name without tag defaults to latest",
+			reference: "busybox",
+			expected: ContainerImageInfo{
+				Reference: "busybox",
+				Name:      "busybox",
+				Tag:       "latest",
+				Version:   "latest",
+			},
+		},
+		{
+			name:      "registry host with port and tag",
+			reference: "registry.local:5000/csw/runtime:v2",
+			expected: ContainerImageInfo{
+				Reference: "registry.local:5000/csw/runtime:v2",
+				Name:      "registry.local:5000/csw/runtime",
+				Tag:       "v2",
+				Version:   "v2",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, parseContainerImageInfo(tt.reference))
+		})
+	}
+}
+
+func TestParseMappedIdentityOutput(t *testing.T) {
+	tests := []struct {
+		name        string
+		output      string
+		expectError string
+		expected    ContainerIdentity
+	}{
+		{
+			name:   "parses mapped identity marker",
+			output: "setup logs\nCSW_IDENTITY\t1000\t50\talice\tstaff\t/home/alice\n",
+			expected: ContainerIdentity{
+				UID:       1000,
+				GID:       50,
+				UserName:  "alice",
+				GroupName: "staff",
+				HomeDir:   "/home/alice",
+			},
+		},
+		{
+			name:        "missing marker returns error",
+			output:      "no identity line\n",
+			expectError: "identity marker not found",
+		},
+		{
+			name:        "invalid uid returns error",
+			output:      "CSW_IDENTITY\tnot-num\t50\talice\tstaff\t/home/alice\n",
+			expectError: "invalid uid value",
+		},
+		{
+			name:        "incomplete details returns error",
+			output:      "CSW_IDENTITY\t1000\t50\t\tstaff\t/home/alice\n",
+			expectError: "incomplete identity details",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			identity, err := parseMappedIdentityOutput(tt.output)
+			if tt.expectError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectError)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, identity)
+		})
+	}
+}
+
+func TestBuildMappedIdentitySetupScript(t *testing.T) {
+	script := buildMappedIdentitySetupScript(ContainerConfig{
+		UID:       1000,
+		GID:       2000,
+		UserName:  "alice",
+		GroupName: "staff",
+		HomeDir:   "/home/alice",
+	})
+
+	assert.Contains(t, script, "target_uid=1000")
+	assert.Contains(t, script, "target_gid=2000")
+	assert.Contains(t, script, "target_user=\"alice\"")
+	assert.Contains(t, script, "target_group=\"staff\"")
+	assert.Contains(t, script, "target_home=\"/home/alice\"")
+	assert.Contains(t, script, "getent group \"$target_gid\"")
+	assert.Contains(t, script, "getent passwd \"$target_uid\"")
+	assert.Contains(t, script, "groupadd -g \"$target_gid\" \"$target_group\"")
+	assert.Contains(t, script, "useradd -m -u \"$target_uid\" -g \"$effective_gid\" -d \"$target_home\" -s /bin/sh \"$target_user\"")
+	assert.Contains(t, script, "CSW_IDENTITY")
+}

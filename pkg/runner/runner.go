@@ -51,8 +51,29 @@ type ContainerConfig struct {
 	ReadOnlyMounts bool
 }
 
+// ContainerImageInfo describes parsed container image reference details.
+type ContainerImageInfo struct {
+	Reference string
+	Name      string
+	Tag       string
+	Version   string
+}
+
+// ContainerIdentity describes effective container user/group mapping.
+type ContainerIdentity struct {
+	UID       int
+	GID       int
+	UserName  string
+	GroupName string
+	HomeDir   string
+}
+
 // ContainerRunner is a command runner that runs commands in a container.
 type ContainerRunner interface {
 	io.Closer
 	CommandRunner
+	// Identity returns effective user/group identity used by the container runner.
+	Identity() ContainerIdentity
+	// ImageInfo returns parsed container image reference details.
+	ImageInfo() ContainerImageInfo
 }

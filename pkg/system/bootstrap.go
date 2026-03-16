@@ -117,21 +117,25 @@ type BuildSystemParams struct {
 
 // BuildSystemResult contains outputs from building a SweSystem.
 type BuildSystemResult struct {
-	WorkDir          string
-	WorkDirRoot      string
-	ShadowDir        string
-	RoleConfig       conf.AgentRoleConfig
-	ModelName        string
-	ConfigStore      conf.ConfigStore
-	ProviderRegistry *models.ProviderRegistry
-	LogsDir          string
-	VCS              vfs.VCS
-	WorktreeBranch   string
-	LSPServer        string
-	ContainerImage   string
-	LSPStarted       bool
-	LSPWorkDir       string
-	Cleanup          func()
+	WorkDir               string
+	WorkDirRoot           string
+	ShadowDir             string
+	RoleConfig            conf.AgentRoleConfig
+	ModelName             string
+	ConfigStore           conf.ConfigStore
+	ProviderRegistry      *models.ProviderRegistry
+	LogsDir               string
+	VCS                   vfs.VCS
+	WorktreeBranch        string
+	LSPServer             string
+	ContainerImage        string
+	ContainerImageName    string
+	ContainerImageTag     string
+	ContainerImageVersion string
+	ContainerIdentity     runner.ContainerIdentity
+	LSPStarted            bool
+	LSPWorkDir            string
+	Cleanup               func()
 }
 
 // ResolveCLIDefaultsParams contains inputs for resolving CLI defaults.
@@ -473,6 +477,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	}
 
 	if containerRuntimeConfig.Enabled {
+		logger := logging.GetGlobalLogger()
 		containerUser, err := resolveCurrentUserIdentity()
 		if err != nil {
 			logging.FlushLogs()
@@ -507,6 +512,18 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 			logging.FlushLogs()
 			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create container runner: %w", err)
 		}
+		containerImageInfo := containerRunner.ImageInfo()
+		containerIdentity := containerRunner.Identity()
+		logger.Info(
+			"container runtime initialized",
+			"image", containerImageInfo.Name,
+			"tag", containerImageInfo.Tag,
+			"version", containerImageInfo.Version,
+			"uid", containerIdentity.UID,
+			"gid", containerIdentity.GID,
+			"user", containerIdentity.UserName,
+			"group", containerIdentity.GroupName,
+		)
 
 		bashRunner = containerRunner
 		cleanupFns = append(cleanupFns, func() {
@@ -596,6 +613,15 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 				cleanupFn()
 			}
 		},
+	}
+	if containerRuntimeConfig.Enabled {
+		containerImageInfo := parseContainerImageInfo(containerRuntimeConfig.Image)
+		result.ContainerImageName = containerImageInfo.Name
+		result.ContainerImageTag = containerImageInfo.Tag
+		result.ContainerImageVersion = containerImageInfo.Version
+		if containerRunner, ok := bashRunner.(runner.ContainerRunner); ok {
+			result.ContainerIdentity = containerRunner.Identity()
+		}
 	}
 	cleanupOnError = false
 
@@ -715,6 +741,36 @@ func copyStringMap(values map[string]string) map[string]string {
 	}
 
 	return cloned
+}
+
+func parseContainerImageInfo(reference string) runner.ContainerImageInfo {
+	trimmed := strings.TrimSpace(reference)
+	info := runner.ContainerImageInfo{
+		Reference: trimmed,
+		Name:      trimmed,
+		Tag:       "latest",
+		Version:   "latest",
+	}
+	if trimmed == "" {
+		return info
+	}
+
+	name := trimmed
+	tag := "latest"
+	lastColon := strings.LastIndex(trimmed, ":")
+	lastSlash := strings.LastIndex(trimmed, "/")
+	if lastColon > lastSlash {
+		name = trimmed[:lastColon]
+		tag = trimmed[lastColon+1:]
+	}
+	if strings.TrimSpace(tag) == "" {
+		tag = "latest"
+	}
+
+	info.Name = name
+	info.Tag = tag
+	info.Version = tag
+	return info
 }
 
 // ContainerUserIdentity stores host user identity mirrored in container mode.

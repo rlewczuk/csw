@@ -433,6 +433,9 @@ func runCLI(params *CLIParams) error {
 		}
 		_, _ = fmt.Fprintf(os.Stdout, "[INFO] LSP %s (workdir: %s)\n", lspStatus, buildResult.LSPWorkDir)
 	}
+	if strings.TrimSpace(buildResult.ContainerImage) != "" {
+		_, _ = fmt.Fprintln(os.Stdout, buildContainerStartupInfoMessage(buildResult))
+	}
 
 	runtimeResult, err := sweSystem.StartCLISession(system.StartCLISessionParams{
 		ModelName:       params.ModelName,
@@ -865,6 +868,20 @@ func nullValue(value string) string {
 	}
 
 	return value
+}
+
+func buildContainerStartupInfoMessage(buildResult system.BuildSystemResult) string {
+	identity := buildResult.ContainerIdentity
+	return fmt.Sprintf(
+		"[INFO] Container: image=%s tag=%s version=%s user=%s(uid=%d) group=%s(gid=%d)",
+		nullValue(strings.TrimSpace(buildResult.ContainerImageName)),
+		nullValue(strings.TrimSpace(buildResult.ContainerImageTag)),
+		nullValue(strings.TrimSpace(buildResult.ContainerImageVersion)),
+		nullValue(strings.TrimSpace(identity.UserName)),
+		identity.UID,
+		nullValue(strings.TrimSpace(identity.GroupName)),
+		identity.GID,
+	)
 }
 
 func formatList(values []string) string {
