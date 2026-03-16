@@ -348,22 +348,20 @@ func buildMappedIdentitySetupScript(config ContainerConfig) string {
 			"elif command -v groupadd >/dev/null 2>&1; then groupadd -g \"$target_gid\" \"$target_group\"; \n"+
 			"elif command -v addgroup >/dev/null 2>&1; then addgroup -g \"$target_gid\" \"$target_group\"; \n"+
 			"else echo 'group creation utility not found' >&2; exit 1; fi; \n"+
-			"effective_uid=$target_uid; effective_user=$target_user; effective_home=$target_home; effective_user_gid=$effective_gid; \n"+
+			"effective_uid=$target_uid; effective_user=$target_user; effective_home=$target_home; \n"+
 			"if command -v getent >/dev/null 2>&1 && getent passwd \"$target_uid\" >/dev/null 2>&1; then \n"+
 			"  effective_user=$(getent passwd \"$target_uid\" | cut -d: -f1); \n"+
 			"  effective_uid=$(getent passwd \"$target_uid\" | cut -d: -f3); \n"+
-			"  effective_user_gid=$(getent passwd \"$target_uid\" | cut -d: -f4); \n"+
 			"  effective_home=$(getent passwd \"$target_uid\" | cut -d: -f6); \n"+
 			"elif command -v getent >/dev/null 2>&1 && getent passwd \"$target_user\" >/dev/null 2>&1; then \n"+
 			"  effective_user=$target_user; \n"+
 			"  effective_uid=$(getent passwd \"$target_user\" | cut -d: -f3); \n"+
-			"  effective_user_gid=$(getent passwd \"$target_user\" | cut -d: -f4); \n"+
 			"  effective_home=$(getent passwd \"$target_user\" | cut -d: -f6); \n"+
 			"elif command -v useradd >/dev/null 2>&1; then useradd -m -u \"$target_uid\" -g \"$effective_gid\" -d \"$target_home\" -s /bin/sh \"$target_user\"; \n"+
 			"elif command -v adduser >/dev/null 2>&1; then adduser -D -u \"$target_uid\" -G \"$effective_group\" -h \"$target_home\" -s /bin/sh \"$target_user\"; \n"+
 			"else echo 'user creation utility not found' >&2; exit 1; fi; \n"+
-			"mkdir -p \"$target_home\"; chown -R $effective_uid:$effective_user_gid \"$target_home\"; \n"+
-			"printf 'CSW_IDENTITY\t%%s\t%%s\t%%s\t%%s\t%%s\n' \"$effective_uid\" \"$effective_user_gid\" \"$effective_user\" \"$effective_group\" \"$effective_home\"",
+			"mkdir -p \"$target_home\"; chown -R $effective_uid:$effective_gid \"$target_home\"; \n"+
+			"printf 'CSW_IDENTITY|%%s|%%s|%%s|%%s|%%s\n' \"$effective_uid\" \"$effective_gid\" \"$effective_user\" \"$effective_group\" \"$effective_home\"",
 		config.UID,
 		config.GID,
 		config.UserName,
@@ -374,27 +372,28 @@ func buildMappedIdentitySetupScript(config ContainerConfig) string {
 
 func parseMappedIdentityOutput(output string) (ContainerIdentity, error) {
 	var identity ContainerIdentity
-	for _, line := range strings.Split(output, "\n") {
-		if !strings.HasPrefix(line, "CSW_IDENTITY\t") {
+	for _, rawLine := range strings.Split(output, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if !strings.HasPrefix(line, "CSW_IDENTITY") {
 			continue
 		}
-		parts := strings.Split(line, "\t")
-		if len(parts) != 6 {
+		parts, err := parseIdentityMarkerParts(line)
+		if err != nil {
 			return identity, fmt.Errorf("parseMappedIdentityOutput() [container.go]: invalid identity output format")
 		}
-		uid, err := parseIdentityNumber(parts[1], "uid")
+		uid, err := parseIdentityNumber(parts[0], "uid")
 		if err != nil {
 			return identity, err
 		}
-		gid, err := parseIdentityNumber(parts[2], "gid")
+		gid, err := parseIdentityNumber(parts[1], "gid")
 		if err != nil {
 			return identity, err
 		}
 		identity.UID = uid
 		identity.GID = gid
-		identity.UserName = strings.TrimSpace(parts[3])
-		identity.GroupName = strings.TrimSpace(parts[4])
-		identity.HomeDir = strings.TrimSpace(parts[5])
+		identity.UserName = strings.TrimSpace(parts[2])
+		identity.GroupName = strings.TrimSpace(parts[3])
+		identity.HomeDir = strings.TrimSpace(parts[4])
 		if identity.UserName == "" || identity.GroupName == "" || identity.HomeDir == "" {
 			return identity, fmt.Errorf("parseMappedIdentityOutput() [container.go]: incomplete identity details")
 		}
@@ -402,6 +401,34 @@ func parseMappedIdentityOutput(output string) (ContainerIdentity, error) {
 	}
 
 	return identity, fmt.Errorf("parseMappedIdentityOutput() [container.go]: identity marker not found")
+}
+
+func parseIdentityMarkerParts(line string) ([]string, error) {
+	if strings.HasPrefix(line, "CSW_IDENTITY|") {
+		parts := strings.Split(line, "|")
+		if len(parts) != 6 {
+			return nil, fmt.Errorf("parseIdentityMarkerParts() [container.go]: invalid pipe marker format")
+		}
+		return parts[1:], nil
+	}
+
+	if strings.HasPrefix(line, "CSW_IDENTITY\t") {
+		parts := strings.Split(line, "\t")
+		if len(parts) != 6 {
+			return nil, fmt.Errorf("parseIdentityMarkerParts() [container.go]: invalid tab marker format")
+		}
+		return parts[1:], nil
+	}
+
+	if strings.HasPrefix(line, `CSW_IDENTITY\t`) {
+		parts := strings.Split(line, `\t`)
+		if len(parts) != 6 {
+			return nil, fmt.Errorf("parseIdentityMarkerParts() [container.go]: invalid escaped-tab marker format")
+		}
+		return parts[1:], nil
+	}
+
+	return nil, fmt.Errorf("parseIdentityMarkerParts() [container.go]: unsupported marker format")
 }
 
 func parseIdentityNumber(value string, fieldName string) (int, error) {

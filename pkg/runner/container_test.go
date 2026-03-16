@@ -511,6 +511,61 @@ func TestParseMappedIdentityOutput(t *testing.T) {
 			},
 		},
 		{
+			name:   "no user group in container maps to requested identity",
+			output: "CSW_IDENTITY|1001|1002|hostuser|hostgroup|/home/hostuser\n",
+			expected: ContainerIdentity{
+				UID:       1001,
+				GID:       1002,
+				UserName:  "hostuser",
+				GroupName: "hostgroup",
+				HomeDir:   "/home/hostuser",
+			},
+		},
+		{
+			name:   "existing user group with same ids and same names",
+			output: "CSW_IDENTITY|1001|1002|hostuser|hostgroup|/home/hostuser\n",
+			expected: ContainerIdentity{
+				UID:       1001,
+				GID:       1002,
+				UserName:  "hostuser",
+				GroupName: "hostgroup",
+				HomeDir:   "/home/hostuser",
+			},
+		},
+		{
+			name:   "existing user group with same ids and different names",
+			output: "CSW_IDENTITY|1001|1002|containeruser|containergroup|/home/containeruser\n",
+			expected: ContainerIdentity{
+				UID:       1001,
+				GID:       1002,
+				UserName:  "containeruser",
+				GroupName: "containergroup",
+				HomeDir:   "/home/containeruser",
+			},
+		},
+		{
+			name:   "parses mapped identity marker with pipe delimiter",
+			output: "setup logs\nCSW_IDENTITY|1000|50|alice|staff|/home/alice\n",
+			expected: ContainerIdentity{
+				UID:       1000,
+				GID:       50,
+				UserName:  "alice",
+				GroupName: "staff",
+				HomeDir:   "/home/alice",
+			},
+		},
+		{
+			name:   "parses mapped identity marker with escaped tab delimiter",
+			output: "setup logs\nCSW_IDENTITY\\t1000\\t50\\talice\\tstaff\\t/home/alice\n",
+			expected: ContainerIdentity{
+				UID:       1000,
+				GID:       50,
+				UserName:  "alice",
+				GroupName: "staff",
+				HomeDir:   "/home/alice",
+			},
+		},
+		{
 			name:        "missing marker returns error",
 			output:      "no identity line\n",
 			expectError: "identity marker not found",
@@ -557,8 +612,15 @@ func TestBuildMappedIdentitySetupScript(t *testing.T) {
 	assert.Contains(t, script, "target_group=\"staff\"")
 	assert.Contains(t, script, "target_home=\"/home/alice\"")
 	assert.Contains(t, script, "getent group \"$target_gid\"")
+	assert.Contains(t, script, "getent group \"$target_group\"")
 	assert.Contains(t, script, "getent passwd \"$target_uid\"")
+	assert.Contains(t, script, "getent passwd \"$target_user\"")
 	assert.Contains(t, script, "groupadd -g \"$target_gid\" \"$target_group\"")
+	assert.Contains(t, script, "addgroup -g \"$target_gid\" \"$target_group\"")
 	assert.Contains(t, script, "useradd -m -u \"$target_uid\" -g \"$effective_gid\" -d \"$target_home\" -s /bin/sh \"$target_user\"")
+	assert.Contains(t, script, "adduser -D -u \"$target_uid\" -G \"$effective_group\" -h \"$target_home\" -s /bin/sh \"$target_user\"")
+	assert.Contains(t, script, "chown -R $effective_uid:$effective_gid \"$target_home\"")
+	assert.Contains(t, script, "CSW_IDENTITY|")
+	assert.NotContains(t, script, "$effective_user_gid")
 	assert.Contains(t, script, "CSW_IDENTITY")
 }
