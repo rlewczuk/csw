@@ -566,6 +566,17 @@ func TestParseMappedIdentityOutput(t *testing.T) {
 			},
 		},
 		{
+			name:   "parses marker when prefixed by other output in same line",
+			output: "setup logs without newline...CSW_IDENTITY|1000|50|alice|staff|/home/alice\n",
+			expected: ContainerIdentity{
+				UID:       1000,
+				GID:       50,
+				UserName:  "alice",
+				GroupName: "staff",
+				HomeDir:   "/home/alice",
+			},
+		},
+		{
 			name:        "missing marker returns error",
 			output:      "no identity line\n",
 			expectError: "identity marker not found",

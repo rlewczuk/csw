@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,6 +34,21 @@ type containerRunner struct {
 // It starts a container with the specified image and mount directories.
 // The container will be removed when Close() is called.
 func NewContainerRunner(config ContainerConfig) (ContainerRunner, error) {
+	logger := slog.Default()
+	logger.Debug(
+		"container runner initialization started",
+		"image", config.ImageName,
+		"workdir", config.Workdir,
+		"mount_count", len(config.MountDirs),
+		"uid", config.UID,
+		"gid", config.GID,
+		"user", config.UserName,
+		"group", config.GroupName,
+		"home", config.HomeDir,
+		"env_count", len(config.Env),
+		"readonly_mounts", config.ReadOnlyMounts,
+	)
+
 	if config.ImageName == "" {
 		return nil, fmt.Errorf("NewContainerRunner() [container.go]: image name cannot be empty")
 	}
@@ -96,9 +112,18 @@ func NewContainerRunner(config ContainerConfig) (ContainerRunner, error) {
 		cancel()
 		return nil, fmt.Errorf("NewContainerRunner() [container.go]: failed to create container: %w", err)
 	}
+	logger.Debug("container runner container started", "image", config.ImageName)
 
 	// If UID/GID are specified, mirror host user/group and chown the home directory.
 	if config.UID > 0 && config.GID > 0 {
+		logger.Debug(
+			"container runner identity setup started",
+			"uid", config.UID,
+			"gid", config.GID,
+			"user", config.UserName,
+			"group", config.GroupName,
+			"home", config.HomeDir,
+		)
 		createUserScript := buildMappedIdentitySetupScript(config)
 
 		exitCode, reader, err := c.Exec(ctx, []string{"/bin/sh", "-c", createUserScript})
@@ -106,24 +131,59 @@ func NewContainerRunner(config ContainerConfig) (ContainerRunner, error) {
 		if reader != nil {
 			_, _ = io.Copy(&output, reader)
 		}
+		mappedIdentityOutput := output.String()
+		logger.Debug(
+			"container runner identity setup command finished",
+			"exit_code", exitCode,
+			"output_bytes", len(mappedIdentityOutput),
+			"output_excerpt", truncateForLog(mappedIdentityOutput, 1024),
+		)
 		if err != nil || exitCode != 0 {
 			// Terminate container on error
 			_ = c.Terminate(ctx)
 			cancel()
+			logger.Warn(
+				"container runner identity setup failed",
+				"exit_code", exitCode,
+				"error", err,
+				"output_excerpt", truncateForLog(mappedIdentityOutput, 1024),
+			)
 			if err != nil {
 				return nil, fmt.Errorf("NewContainerRunner() [container.go]: failed to create mapped user and prepare home directory: %w", err)
 			}
-			return nil, fmt.Errorf("NewContainerRunner() [container.go]: create mapped user/home preparation failed with exit code %d: %s", exitCode, output.String())
+			return nil, fmt.Errorf("NewContainerRunner() [container.go]: create mapped user/home preparation failed with exit code %d: %s", exitCode, mappedIdentityOutput)
 		}
 
-		resolvedIdentity, err := parseMappedIdentityOutput(output.String())
+		resolvedIdentity, err := parseMappedIdentityOutput(mappedIdentityOutput)
 		if err != nil {
 			_ = c.Terminate(ctx)
 			cancel()
+			logger.Warn(
+				"container runner identity output parsing failed",
+				"error", err,
+				"output_excerpt", truncateForLog(mappedIdentityOutput, 1024),
+			)
 			return nil, fmt.Errorf("NewContainerRunner() [container.go]: failed to parse mapped identity details: %w", err)
 		}
+		logger.Debug(
+			"container runner identity setup resolved",
+			"uid", resolvedIdentity.UID,
+			"gid", resolvedIdentity.GID,
+			"user", resolvedIdentity.UserName,
+			"group", resolvedIdentity.GroupName,
+			"home", resolvedIdentity.HomeDir,
+		)
 		identity = resolvedIdentity
 	}
+
+	logger.Debug(
+		"container runner initialization completed",
+		"uid", identity.UID,
+		"gid", identity.GID,
+		"user", identity.UserName,
+		"group", identity.GroupName,
+		"home", identity.HomeDir,
+	)
 
 	return &containerRunner{
 		container: c,
@@ -371,15 +431,19 @@ func buildMappedIdentitySetupScript(config ContainerConfig) string {
 }
 
 func parseMappedIdentityOutput(output string) (ContainerIdentity, error) {
+	const marker = "CSW_IDENTITY"
+
 	var identity ContainerIdentity
 	for _, rawLine := range strings.Split(output, "\n") {
 		line := strings.TrimSpace(rawLine)
-		if !strings.HasPrefix(line, "CSW_IDENTITY") {
+		markerIndex := strings.Index(line, marker)
+		if markerIndex < 0 {
 			continue
 		}
+		line = line[markerIndex:]
 		parts, err := parseIdentityMarkerParts(line)
 		if err != nil {
-			return identity, fmt.Errorf("parseMappedIdentityOutput() [container.go]: invalid identity output format")
+			return identity, fmt.Errorf("parseMappedIdentityOutput() [container.go]: invalid identity output format: %w", err)
 		}
 		uid, err := parseIdentityNumber(parts[0], "uid")
 		if err != nil {
@@ -400,7 +464,20 @@ func parseMappedIdentityOutput(output string) (ContainerIdentity, error) {
 		return identity, nil
 	}
 
-	return identity, fmt.Errorf("parseMappedIdentityOutput() [container.go]: identity marker not found")
+	return identity, fmt.Errorf("parseMappedIdentityOutput() [container.go]: identity marker not found (output_excerpt=%q)", truncateForLog(output, 256))
+}
+
+// truncateForLog truncates long strings for concise debug/error output.
+func truncateForLog(value string, maxLen int) string {
+	if maxLen <= 0 {
+		return ""
+	}
+
+	if len(value) <= maxLen {
+		return value
+	}
+
+	return value[:maxLen] + "...(truncated)"
 }
 
 func parseIdentityMarkerParts(line string) ([]string, error) {
