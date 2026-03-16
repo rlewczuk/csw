@@ -1060,3 +1060,46 @@ func TestCompositeConfigStore_ContainerConfigFromGlobalSource(t *testing.T) {
 	// Verify local config overrides other fields
 	assert.Equal(t, "custom-role", mergedConfig.DefaultRole, "DefaultRole should be overridden by local config")
 }
+
+// TestCompositeConfigStore_LocalContainerOverridesUserConfig ensures that
+// project-local .csw/config/global.json container settings override
+// ~/.config/csw/global.json values, including explicit false booleans.
+func TestCompositeConfigStore_LocalContainerOverridesUserConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	userConfigDir := filepath.Join(tmpDir, "user")
+	localConfigDir := filepath.Join(tmpDir, "local")
+
+	require.NoError(t, os.MkdirAll(userConfigDir, 0755))
+	require.NoError(t, os.MkdirAll(localConfigDir, 0755))
+
+	userGlobalConfig := `{
+		"container": {
+			"enabled": true,
+			"image": "user-image",
+			"env": ["USER=1"],
+			"mounts": ["/user:/mnt/user"]
+		}
+	}`
+	require.NoError(t, os.WriteFile(filepath.Join(userConfigDir, "global.json"), []byte(userGlobalConfig), 0644))
+
+	localGlobalConfig := `{
+		"container": {
+			"enabled": false,
+			"image": "local-image",
+			"env": ["LOCAL=1"],
+			"mounts": ["/local:/mnt/local"]
+		}
+	}`
+	require.NoError(t, os.WriteFile(filepath.Join(localConfigDir, "global.json"), []byte(localGlobalConfig), 0644))
+
+	store, err := NewCompositeConfigStore(tmpDir, fmt.Sprintf("%s:%s", userConfigDir, localConfigDir))
+	require.NoError(t, err)
+
+	globalConfig, err := store.GetGlobalConfig()
+	require.NoError(t, err)
+
+	assert.False(t, globalConfig.Container.Enabled)
+	assert.Equal(t, "local-image", globalConfig.Container.Image)
+	assert.Equal(t, []string{"LOCAL=1"}, globalConfig.Container.Env)
+	assert.Equal(t, []string{"/local:/mnt/local"}, globalConfig.Container.Mounts)
+}

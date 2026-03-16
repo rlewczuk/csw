@@ -132,6 +132,11 @@ func (c *GlobalConfig) Clone() *GlobalConfig {
 		ModelVendors:               cloneModelProviderMapValue(c.ModelVendors),
 		ModelTemplates:             cloneModelTemplateGroups(c.ModelTemplates),
 		VendorFamilyOverrides:      cloneVendorFamilyOverrides(c.VendorFamilyOverrides),
+		containerConfigured:        c.containerConfigured,
+		containerMountsConfigured:  c.containerMountsConfigured,
+		containerEnvConfigured:     c.containerEnvConfigured,
+		containerImageConfigured:   c.containerImageConfigured,
+		containerEnabledConfigured: c.containerEnabledConfigured,
 	}
 	copy(cloned.ModelTags, c.ModelTags)
 
@@ -166,7 +171,22 @@ func (c *GlobalConfig) Merge(override *GlobalConfig) {
 		c.MaxToolThreads = override.MaxToolThreads
 	}
 
-	c.Container.Merge(override.Container)
+	if override.containerConfigured {
+		if override.containerMountsConfigured {
+			c.Container.Mounts = append([]string(nil), override.Container.Mounts...)
+		}
+		if override.containerEnvConfigured {
+			c.Container.Env = append([]string(nil), override.Container.Env...)
+		}
+		if override.containerImageConfigured {
+			c.Container.Image = override.Container.Image
+		}
+		if override.containerEnabledConfigured {
+			c.Container.Enabled = override.Container.Enabled
+		}
+	} else {
+		c.Container.Merge(override.Container)
+	}
 	c.Defaults.MergeFrom(override.Defaults)
 	if len(override.ShadowPaths) > 0 {
 		c.ShadowPaths = append([]string(nil), override.ShadowPaths...)

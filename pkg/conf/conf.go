@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"regexp"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 type AccessFlag string
@@ -397,6 +399,105 @@ type GlobalConfig struct {
 	ModelTemplates map[string]map[string]ModelProviderConfig `json:"model_templates,omitempty" yaml:"model_templates,omitempty"`
 	// VendorFamilyOverrides contains per-provider vendor+family template overrides.
 	VendorFamilyOverrides map[string]ModelVendorFamilyTemplateOverride `json:"vendor_family_overrides,omitempty" yaml:"vendor_family_overrides,omitempty"`
+
+	containerConfigured       bool
+	containerMountsConfigured bool
+	containerEnvConfigured    bool
+	containerImageConfigured  bool
+	containerEnabledConfigured bool
+}
+
+// UnmarshalJSON unmarshals GlobalConfig and tracks presence of container fields.
+func (c *GlobalConfig) UnmarshalJSON(data []byte) error {
+	type globalConfigAlias GlobalConfig
+
+	var alias globalConfigAlias
+	if err := json.Unmarshal(data, &alias); err != nil {
+		return fmt.Errorf("GlobalConfig.UnmarshalJSON() [conf.go]: failed to unmarshal global config: %w", err)
+	}
+
+	*c = GlobalConfig(alias)
+	c.resetContainerPresenceFlags()
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("GlobalConfig.UnmarshalJSON() [conf.go]: failed to unmarshal global config raw map: %w", err)
+	}
+
+	rawContainer, ok := raw["container"]
+	if !ok {
+		return nil
+	}
+
+	c.containerConfigured = true
+
+	var containerMap map[string]json.RawMessage
+	if err := json.Unmarshal(rawContainer, &containerMap); err != nil {
+		return nil
+	}
+
+	_, c.containerMountsConfigured = containerMap["mounts"]
+	_, c.containerEnvConfigured = containerMap["env"]
+	_, c.containerImageConfigured = containerMap["image"]
+	_, c.containerEnabledConfigured = containerMap["enabled"]
+
+	return nil
+}
+
+// UnmarshalYAML unmarshals GlobalConfig and tracks presence of container fields.
+func (c *GlobalConfig) UnmarshalYAML(node *yaml.Node) error {
+	type globalConfigAlias GlobalConfig
+
+	var alias globalConfigAlias
+	if err := node.Decode(&alias); err != nil {
+		return fmt.Errorf("GlobalConfig.UnmarshalYAML() [conf.go]: failed to decode global config: %w", err)
+	}
+
+	*c = GlobalConfig(alias)
+	c.resetContainerPresenceFlags()
+
+	if node.Kind != yaml.MappingNode {
+		return nil
+	}
+
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		keyNode := node.Content[i]
+		valueNode := node.Content[i+1]
+		if keyNode.Value != "container" {
+			continue
+		}
+
+		c.containerConfigured = true
+		if valueNode.Kind != yaml.MappingNode {
+			return nil
+		}
+
+		for j := 0; j+1 < len(valueNode.Content); j += 2 {
+			subKey := valueNode.Content[j].Value
+			switch subKey {
+			case "mounts":
+				c.containerMountsConfigured = true
+			case "env":
+				c.containerEnvConfigured = true
+			case "image":
+				c.containerImageConfigured = true
+			case "enabled":
+				c.containerEnabledConfigured = true
+			}
+		}
+
+		return nil
+	}
+
+	return nil
+}
+
+func (c *GlobalConfig) resetContainerPresenceFlags() {
+	c.containerConfigured = false
+	c.containerMountsConfigured = false
+	c.containerEnvConfigured = false
+	c.containerImageConfigured = false
+	c.containerEnabledConfigured = false
 }
 
 // ConfigStore is an interface for accessing configuration data.

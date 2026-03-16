@@ -232,6 +232,32 @@ func TestGlobalConfig_Merge(t *testing.T) {
 	assert.Equal(t, []string{".cswdata/**", ".agents/**"}, base.ShadowPaths)
 }
 
+func TestGlobalConfig_Merge_ContainerExplicitFalseOverride(t *testing.T) {
+	base := &GlobalConfig{}
+	require.NoError(t, base.UnmarshalJSON([]byte(`{
+		"container": {
+			"enabled": true,
+			"image": "base-image",
+			"env": ["A=1"],
+			"mounts": ["/a:/b"]
+		}
+	}`)))
+
+	override := &GlobalConfig{}
+	require.NoError(t, override.UnmarshalJSON([]byte(`{
+		"container": {
+			"enabled": false
+		}
+	}`)))
+
+	base.Merge(override)
+
+	assert.False(t, base.Container.Enabled)
+	assert.Equal(t, "base-image", base.Container.Image)
+	assert.Equal(t, []string{"A=1"}, base.Container.Env)
+	assert.Equal(t, []string{"/a:/b"}, base.Container.Mounts)
+}
+
 func TestAgentRoleConfig_Merge(t *testing.T) {
 	base := &AgentRoleConfig{
 		Name:        "role",
