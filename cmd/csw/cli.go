@@ -1002,6 +1002,8 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 		return result
 	}
 
+	baseBranch := detectMergeBaseBranch(repoDir)
+
 	commitMessage, err := core.GenerateCommitMessage(ctx, sweSystem.ModelProviders, sweSystem.ConfigStore, session, worktreeBranch, commitMessageTemplate)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "worktree commit message generation failed: %v\n", err)
@@ -1021,11 +1023,11 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 
 	if merge {
 		if strings.TrimSpace(repoDir) == "" || strings.TrimSpace(worktreeDir) == "" || sweSystem == nil || session == nil {
-			mergeErr := vcs.MergeBranches("main", worktreeBranch)
+			mergeErr := vcs.MergeBranches(baseBranch, worktreeBranch)
 			if mergeErr != nil {
 				if errors.Is(mergeErr, vfs.ErrMergeConflict) {
 					_, _ = fmt.Fprintf(stderr, "automatic merge failed due to conflicts: %v\n", mergeErr)
-					_, _ = fmt.Fprintf(stderr, "resolve conflicts manually and merge branch '%s' into main.\n", worktreeBranch)
+					_, _ = fmt.Fprintf(stderr, "resolve conflicts manually and merge branch '%s' into %s.\n", worktreeBranch, baseBranch)
 					_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual conflict resolution.")
 					return result
 				}
@@ -1035,9 +1037,9 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 				return result
 			}
 
-			result.HeadCommitID = resolveGitCommitID(repoDir, "main")
+			result.HeadCommitID = resolveGitCommitID(repoDir, baseBranch)
 		} else {
-			headCommitID, mergeErr := mergeWorktreeWithConflictResolution(ctx, repoDir, worktreeDir, worktreeBranch, originalPrompt, sweSystem, session, stderr)
+			headCommitID, mergeErr := mergeWorktreeWithConflictResolution(ctx, repoDir, worktreeDir, worktreeBranch, baseBranch, originalPrompt, sweSystem, session, stderr)
 			if mergeErr != nil {
 				_, _ = fmt.Fprintf(stderr, "automatic merge failed: %v\n", mergeErr)
 				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
@@ -1060,6 +1062,25 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 	return result
 }
 
+// detectMergeBaseBranch resolves the branch currently checked out in repoDir.
+func detectMergeBaseBranch(repoDir string) string {
+	if strings.TrimSpace(repoDir) == "" {
+		return "main"
+	}
+
+	branch, err := runGitCommandFunc(repoDir, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return "main"
+	}
+
+	trimmedBranch := strings.TrimSpace(branch)
+	if trimmedBranch == "" || trimmedBranch == "HEAD" {
+		return "main"
+	}
+
+	return trimmedBranch
+}
+
 type conflictResolutionPromptData struct {
 	Branch         string
 	OriginalPrompt string
@@ -1067,12 +1088,15 @@ type conflictResolutionPromptData struct {
 	ConflictOutput string
 }
 
-func mergeWorktreeWithConflictResolution(ctx context.Context, repoDir string, worktreeDir string, worktreeBranch string, originalPrompt string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer) (string, error) {
+func mergeWorktreeWithConflictResolution(ctx context.Context, repoDir string, worktreeDir string, worktreeBranch string, baseBranch string, originalPrompt string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer) (string, error) {
 	if sweSystem == nil || sweSystem.ConfigStore == nil {
 		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: system config store is not available")
 	}
 	if session == nil {
 		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: session is nil")
+	}
+	if strings.TrimSpace(baseBranch) == "" {
+		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: baseBranch is empty")
 	}
 
 	attempt := 1
@@ -1080,7 +1104,7 @@ func mergeWorktreeWithConflictResolution(ctx context.Context, repoDir string, wo
 	conflictFiles := []string{}
 
 	for {
-		command := []string{"rebase", "main"}
+		command := []string{"rebase", baseBranch}
 		_, rebaseErr := runGitCommandFunc(worktreeDir, command...)
 		if rebaseErr == nil {
 			_, _ = fmt.Fprintf(stderr, "[conflict] rebase step succeeded (attempt %d, command: git %s)\n", attempt, strings.Join(command, " "))
@@ -1131,22 +1155,22 @@ func mergeWorktreeWithConflictResolution(ctx context.Context, repoDir string, wo
 		attempt++
 	}
 
-	mergeWorktreePath, cleanup, err := createMainMergeWorktree(repoDir)
+	mergeWorktreePath, cleanup, err := createMergeWorktree(repoDir, baseBranch)
 	if err != nil {
 		return "", err
 	}
 	defer cleanup()
 
 	if _, err := runGitCommandFunc(mergeWorktreePath, "merge", "--ff-only", worktreeBranch); err != nil {
-		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: fast-forward merge into main failed: %w", err)
+		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: fast-forward merge into %q failed: %w", baseBranch, err)
 	}
 
 	headCommitID, err := runGitCommandFunc(mergeWorktreePath, "rev-parse", "HEAD")
 	if err != nil {
-		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: failed to resolve main HEAD commit: %w", err)
+		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: failed to resolve %q HEAD commit: %w", baseBranch, err)
 	}
 
-	if err := syncCheckedOutBranchWorktrees(repoDir, "main", mergeWorktreePath); err != nil {
+	if err := syncCheckedOutBranchWorktrees(repoDir, baseBranch, mergeWorktreePath); err != nil {
 		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: %w", err)
 	}
 
@@ -1205,24 +1229,28 @@ func syncCheckedOutBranchWorktrees(repoDir string, branch string, skipPath strin
 	return nil
 }
 
-func createMainMergeWorktree(repoDir string) (string, func(), error) {
-	workRoot := filepath.Join(repoDir, ".cswdata", "work")
-	if err := os.MkdirAll(workRoot, 0755); err != nil {
-		return "", func() {}, fmt.Errorf("createMainMergeWorktree() [cli.go]: failed to create worktree root directory: %w", err)
+func createMergeWorktree(repoDir string, branch string) (string, func(), error) {
+	if strings.TrimSpace(branch) == "" {
+		return "", func() {}, fmt.Errorf("createMergeWorktree() [cli.go]: branch is empty")
 	}
 
-	mergeWorktreePath, err := os.MkdirTemp(workRoot, ".merge-main-")
+	workRoot := filepath.Join(repoDir, ".cswdata", "work")
+	if err := os.MkdirAll(workRoot, 0755); err != nil {
+		return "", func() {}, fmt.Errorf("createMergeWorktree() [cli.go]: failed to create worktree root directory: %w", err)
+	}
+
+	mergeWorktreePath, err := os.MkdirTemp(workRoot, ".merge-"+strings.ReplaceAll(branch, "/", "-")+"-")
 	if err != nil {
-		return "", func() {}, fmt.Errorf("createMainMergeWorktree() [cli.go]: failed to allocate temporary merge worktree path: %w", err)
+		return "", func() {}, fmt.Errorf("createMergeWorktree() [cli.go]: failed to allocate temporary merge worktree path: %w", err)
 	}
 
 	if err := os.RemoveAll(mergeWorktreePath); err != nil {
-		return "", func() {}, fmt.Errorf("createMainMergeWorktree() [cli.go]: failed to prepare temporary merge worktree path: %w", err)
+		return "", func() {}, fmt.Errorf("createMergeWorktree() [cli.go]: failed to prepare temporary merge worktree path: %w", err)
 	}
 
-	if _, err := runGitCommandFunc(repoDir, "worktree", "add", "--force", mergeWorktreePath, "main"); err != nil {
+	if _, err := runGitCommandFunc(repoDir, "worktree", "add", "--force", mergeWorktreePath, branch); err != nil {
 		_ = os.RemoveAll(mergeWorktreePath)
-		return "", func() {}, fmt.Errorf("createMainMergeWorktree() [cli.go]: failed to create temporary main worktree: %w", err)
+		return "", func() {}, fmt.Errorf("createMergeWorktree() [cli.go]: failed to create temporary %q worktree: %w", branch, err)
 	}
 
 	cleanup := func() {

@@ -161,6 +161,29 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 	}
 }
 
+func TestFinalizeWorktreeSessionUsesDetectedBaseBranch(t *testing.T) {
+	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge into detected base branch", true)
+
+	originalRunGit := runGitCommandFunc
+	defer func() {
+		runGitCommandFunc = originalRunGit
+	}()
+
+	runGitCommandFunc = func(workDir string, args ...string) (string, error) {
+		if len(args) == 3 && args[0] == "rev-parse" && args[1] == "--abbrev-ref" && args[2] == "HEAD" {
+			return "develop", nil
+		}
+		return "", nil
+	}
+
+	_ = finalizeWorktreeSession(context.Background(), mockVCS, "feature/detect-base", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "", "")
+
+	mergeCalls := mockVCS.GetMergeCalls()
+	require.Len(t, mergeCalls, 1)
+	assert.Equal(t, "develop", mergeCalls[0].Into)
+	assert.Equal(t, "feature/detect-base", mergeCalls[0].From)
+}
+
 func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTemplate bool) (*system.SweSystem, *core.SweSession, *vfs.MockVCS) {
 	t.Helper()
 
@@ -194,8 +217,9 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 			sweSystem, session := newConflictResolutionFixture(t)
 			repoDir := t.TempDir()
 			worktreeDir := filepath.Join(repoDir, ".cswdata", "work", "feature", "test")
+			baseBranch := "develop"
 			originalRunGit := runGitCommandFunc
-		originalSubAgent := executeConflictSubAgentFunc
+			originalSubAgent := executeConflictSubAgentFunc
 		originalListConflicts := listGitConflictFilesFunc
 		defer func() {
 			runGitCommandFunc = originalRunGit
@@ -205,7 +229,7 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 
 			commands := make([]string, 0)
 			resetCalls := make([]string, 0)
-			checkedOutMainPath := filepath.Join(repoDir, "main")
+			checkedOutBasePath := filepath.Join(repoDir, "develop")
 			mergeWorktreePath := ""
 			rebaseCalls := 0
 			runGitCommandFunc = func(workDir string, args ...string) (string, error) {
@@ -213,10 +237,10 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 				commands = append(commands, joined)
 
 				switch {
-				case strings.HasSuffix(joined, "::git rebase main"):
+				case strings.HasSuffix(joined, "::git rebase develop"):
 					rebaseCalls++
 					if rebaseCalls == 1 {
-						return "", fmt.Errorf("runGitCommand() [cli.go]: git rebase main failed: CONFLICT (content): Merge conflict in pkg/core/session.go")
+						return "", fmt.Errorf("runGitCommand() [cli.go]: git rebase develop failed: CONFLICT (content): Merge conflict in pkg/core/session.go")
 					}
 					return "", nil
 				case strings.Contains(joined, "::git worktree add --force"):
@@ -230,15 +254,15 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 					return "abc123", nil
 				case len(args) == 3 && args[0] == "worktree" && args[1] == "list" && args[2] == "--porcelain":
 					return strings.Join([]string{
-						"worktree " + checkedOutMainPath,
+						"worktree " + checkedOutBasePath,
 						"HEAD 1111111",
-						"branch refs/heads/main",
+						"branch refs/heads/develop",
 						"",
 						"worktree " + mergeWorktreePath,
 						"HEAD 2222222",
-						"branch refs/heads/main",
+						"branch refs/heads/develop",
 					}, "\n"), nil
-				case len(args) == 3 && args[0] == "reset" && args[1] == "--hard" && args[2] == "main":
+				case len(args) == 3 && args[0] == "reset" && args[1] == "--hard" && args[2] == "develop":
 					resetCalls = append(resetCalls, workDir)
 					return "", nil
 				case strings.Contains(joined, "::git worktree remove --force"):
@@ -263,12 +287,12 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 		}
 
 		var stderr bytes.Buffer
-		headCommitID, err := mergeWorktreeWithConflictResolution(context.Background(), repoDir, worktreeDir, "feature/test", "parent task prompt", sweSystem, session, &stderr)
+		headCommitID, err := mergeWorktreeWithConflictResolution(context.Background(), repoDir, worktreeDir, "feature/test", baseBranch, "parent task prompt", sweSystem, session, &stderr)
 			require.NoError(t, err)
 			assert.Equal(t, "abc123", headCommitID)
 			assert.Equal(t, 1, subAgentCalls)
 			require.Len(t, resetCalls, 1)
-			assert.Equal(t, checkedOutMainPath, resetCalls[0])
+			assert.Equal(t, checkedOutBasePath, resetCalls[0])
 			assert.NotEmpty(t, commands)
 			assert.Contains(t, stderr.String(), "conflict detected")
 		})
@@ -287,8 +311,8 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 		}()
 
 		runGitCommandFunc = func(workDir string, args ...string) (string, error) {
-			if len(args) == 2 && args[0] == "rebase" && args[1] == "main" {
-				return "", fmt.Errorf("runGitCommand() [cli.go]: git rebase main failed: CONFLICT (content): Merge conflict in file.txt")
+			if len(args) == 2 && args[0] == "rebase" && args[1] == "develop" {
+				return "", fmt.Errorf("runGitCommand() [cli.go]: git rebase develop failed: CONFLICT (content): Merge conflict in file.txt")
 			}
 			return "", nil
 		}
@@ -298,7 +322,7 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 			return tool.SubAgentTaskResult{Status: "error", Summary: "failed"}, nil
 		}
 
-		_, err := mergeWorktreeWithConflictResolution(context.Background(), repoDir, worktreeDir, "feature/test", "prompt", sweSystem, session, &bytes.Buffer{})
+		_, err := mergeWorktreeWithConflictResolution(context.Background(), repoDir, worktreeDir, "feature/test", "develop", "prompt", sweSystem, session, &bytes.Buffer{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "ended with status")
 	})
