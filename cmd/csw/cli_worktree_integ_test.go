@@ -121,7 +121,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 			}
 
 			var stderr bytes.Buffer
-			_ = finalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.merge, tt.customTemplate, system, session, &stderr, "", "", "", nil, nil)
+			_, _ = finalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.merge, tt.customTemplate, system, session, &stderr, "", "", "", nil, nil)
 
 			commitCalls := mockVCS.GetCommitCalls()
 			if tt.expectCommit {
@@ -179,7 +179,7 @@ func TestFinalizeWorktreeSessionUsesDetectedBaseBranch(t *testing.T) {
 		return "", nil
 	}
 
-	_ = finalizeWorktreeSession(context.Background(), mockVCS, "feature/detect-base", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "", "", nil, nil)
+	_, _ = finalizeWorktreeSession(context.Background(), mockVCS, "feature/detect-base", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "", "", nil, nil)
 
 	mergeCalls := mockVCS.GetMergeCalls()
 	require.Len(t, mergeCalls, 1)
@@ -214,7 +214,8 @@ func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
 	})
 	appView := mock.NewMockAppView()
 
-	result := finalizeWorktreeSession(context.Background(), mockVCS, "feature/hook", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, appView)
+	result, err := finalizeWorktreeSession(context.Background(), mockVCS, "feature/hook", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, appView)
+	require.NoError(t, err)
 
 	assert.Equal(t, "", result.HeadCommitID)
 	require.Empty(t, mockVCS.GetMergeCalls())
@@ -259,7 +260,7 @@ func TestFinalizeWorktreeSessionMergeHookProcessesFeedbackRequests(t *testing.T)
 	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
 	appView := mock.NewMockAppView()
 
-	_ = finalizeWorktreeSession(context.Background(), mockVCS, "feature/hook-feedback", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, appView)
+	_, _ = finalizeWorktreeSession(context.Background(), mockVCS, "feature/hook-feedback", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, appView)
 
 	assert.Equal(t, "ready", hookEngine.ContextData()["feedback-state"])
 	executions := hostRunner.GetExecutions()
@@ -269,6 +270,117 @@ func TestFinalizeWorktreeSessionMergeHookProcessesFeedbackRequests(t *testing.T)
 	assert.Contains(t, executions[2].Command, "CSW_RESPONSE=")
 	assert.Contains(t, executions[2].Command, "echo merge-feedback")
 	require.Len(t, provider.RecordedMessages, 3)
+}
+
+func TestFinalizeWorktreeSessionCommitHookUsesReturnedCommitMessage(t *testing.T) {
+	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "llm fallback message", true)
+	configStore, ok := sweSystem.ConfigStore.(*confimpl.MockConfigStore)
+	require.True(t, ok)
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"commit-custom": {
+			Name:    "commit-custom",
+			Hook:    "commit",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo commit-hook",
+			RunOn:   conf.HookRunOnHost,
+		},
+	})
+
+	hostRunner := runner.NewMockRunner()
+	hostRunner.SetResponseDetailed(
+		"echo commit-hook",
+		"CSWFEEDBACK: {\"fn\":\"response\",\"args\":{\"status\":\"OK\",\"commit-message\":\"hook supplied message\"}}\n",
+		"",
+		0,
+		nil,
+	)
+	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
+
+	_, err := finalizeWorktreeSession(context.Background(), mockVCS, "feature/commit-hook", false, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, nil)
+	require.NoError(t, err)
+
+	commitCalls := mockVCS.GetCommitCalls()
+	require.Len(t, commitCalls, 1)
+	assert.Equal(t, "hook supplied message", commitCalls[0].Message)
+}
+
+func TestFinalizeWorktreeSessionCommitHookCommittedStatusSkipsBuiltinCommit(t *testing.T) {
+	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "llm fallback message", true)
+	configStore, ok := sweSystem.ConfigStore.(*confimpl.MockConfigStore)
+	require.True(t, ok)
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"commit-custom": {
+			Name:    "commit-custom",
+			Hook:    "commit",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo commit-hook",
+			RunOn:   conf.HookRunOnHost,
+		},
+	})
+
+	hostRunner := runner.NewMockRunner()
+	hostRunner.SetResponseDetailed(
+		"echo commit-hook",
+		"CSWFEEDBACK: {\"fn\":\"response\",\"args\":{\"status\":\"COMMITED\"}}\n",
+		"",
+		0,
+		nil,
+	)
+	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
+
+	originalRunGit := runGitCommandFunc
+	defer func() {
+		runGitCommandFunc = originalRunGit
+	}()
+
+	commands := make([]string, 0)
+	runGitCommandFunc = func(workDir string, args ...string) (string, error) {
+		commands = append(commands, fmt.Sprintf("%s::%s", workDir, strings.Join(args, " ")))
+		if len(args) == 3 && args[0] == "rev-parse" && args[1] == "--abbrev-ref" && args[2] == "HEAD" {
+			return "main", nil
+		}
+		return "", nil
+	}
+
+	_, err := finalizeWorktreeSession(context.Background(), mockVCS, "feature/commit-hook", false, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, nil)
+	require.NoError(t, err)
+
+	assert.Empty(t, mockVCS.GetCommitCalls())
+	assert.Contains(t, commands, "/repo/work::reset --hard HEAD")
+	assert.Contains(t, commands, "/repo/work::clean -fd")
+}
+
+func TestFinalizeWorktreeSessionCommitHookErrorStatusAborts(t *testing.T) {
+	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "llm fallback message", true)
+	configStore, ok := sweSystem.ConfigStore.(*confimpl.MockConfigStore)
+	require.True(t, ok)
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"commit-custom": {
+			Name:    "commit-custom",
+			Hook:    "commit",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo commit-hook",
+			RunOn:   conf.HookRunOnHost,
+		},
+	})
+
+	hostRunner := runner.NewMockRunner()
+	hostRunner.SetResponseDetailed(
+		"echo commit-hook",
+		"CSWFEEDBACK: {\"fn\":\"response\",\"args\":{\"status\":\"ERROR\"}}\n",
+		"",
+		0,
+		nil,
+	)
+	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
+
+	_, err := finalizeWorktreeSession(context.Background(), mockVCS, "feature/commit-hook", false, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "commit hook")
+	assert.Empty(t, mockVCS.GetCommitCalls())
 }
 
 func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTemplate bool) (*system.SweSystem, *core.SweSession, *vfs.MockVCS) {

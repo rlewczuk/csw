@@ -87,6 +87,13 @@ type HookFeedbackResponse struct {
 
 var cswFeedbackLinePattern = regexp.MustCompile(`(?m)^\s*CSWFEEDBACK:\s*(\{.*\})\s*$`)
 
+const (
+	hookFeedbackFnResponse = "response"
+	hookStatusOK           = "OK"
+	hookStatusError        = "ERROR"
+	hookStatusTimeout      = "TIMEOUT"
+)
+
 // HookExecutionError represents non-zero hook exit code.
 type HookExecutionError struct {
 	HookName string
@@ -264,6 +271,7 @@ func (e *HookEngine) executeShell(ctx context.Context, hookConfig *conf.HookConf
 	}
 
 	feedbackRequests := parseHookFeedbackRequests(stdout, stderr)
+	feedbackRequests = ensureHookResponseFeedbackRequest(feedbackRequests, stdout, stderr, exitCode, runErr)
 	result.FeedbackRequests = feedbackRequests
 	feedbackExecutions := e.processHookFeedbackRequests(ctx, request, feedbackRequests)
 	if len(feedbackExecutions) > 0 {
@@ -366,10 +374,21 @@ func (e *HookEngine) processHookFeedbackRequests(ctx context.Context, hookReques
 		return nil
 	}
 
-	results := make(chan hookFeedbackExecution, len(requests))
+	processable := make([]HookFeedbackRequest, 0, len(requests))
+	for _, request := range requests {
+		if strings.EqualFold(strings.TrimSpace(request.Fn), hookFeedbackFnResponse) {
+			continue
+		}
+		processable = append(processable, request)
+	}
+	if len(processable) == 0 {
+		return nil
+	}
+
+	results := make(chan hookFeedbackExecution, len(processable))
 	var waitGroup sync.WaitGroup
 
-	for _, current := range requests {
+	for _, current := range processable {
 		request := current
 		waitGroup.Add(1)
 		go func() {
@@ -382,7 +401,7 @@ func (e *HookEngine) processHookFeedbackRequests(ctx context.Context, hookReques
 	waitGroup.Wait()
 	close(results)
 
-	collected := make([]hookFeedbackExecution, 0, len(requests))
+	collected := make([]hookFeedbackExecution, 0, len(processable))
 	for result := range results {
 		collected = append(collected, result)
 	}
@@ -505,6 +524,87 @@ func hookFeedbackValueToString(value any) string {
 	default:
 		return fmt.Sprintf("%v", typed)
 	}
+}
+
+func ensureHookResponseFeedbackRequest(requests []HookFeedbackRequest, stdout string, stderr string, exitCode int, runErr error) []HookFeedbackRequest {
+	for _, request := range requests {
+		if strings.EqualFold(strings.TrimSpace(request.Fn), hookFeedbackFnResponse) {
+			return requests
+		}
+	}
+
+	combinedOutput := strings.TrimSpace(strings.Join([]string{strings.TrimSpace(stdout), strings.TrimSpace(stderr)}, "\n"))
+	args := map[string]any{
+		"stdin":  combinedOutput,
+		"stdout": combinedOutput,
+		"stderr": stderr,
+	}
+	if runErr != nil && isHookTimeoutError(runErr, exitCode) {
+		args["status"] = hookStatusTimeout
+	} else if exitCode == 0 {
+		args["status"] = hookStatusOK
+	} else {
+		args["status"] = hookStatusError
+		args["code"] = exitCode
+	}
+
+	return append(requests, HookFeedbackRequest{Fn: hookFeedbackFnResponse, Args: args})
+}
+
+func isHookTimeoutError(err error, exitCode int) bool {
+	if err == nil {
+		return false
+	}
+	if exitCode == 124 {
+		return true
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "timed out")
+}
+
+// FindHookResponseRequest returns the first hook feedback request with fn="response".
+func FindHookResponseRequest(result *HookExecutionResult) *HookFeedbackRequest {
+	if result == nil {
+		return nil
+	}
+
+	for _, request := range result.FeedbackRequests {
+		if !strings.EqualFold(strings.TrimSpace(request.Fn), hookFeedbackFnResponse) {
+			continue
+		}
+		copied := request
+		if copied.Args == nil {
+			copied.Args = map[string]any{}
+		}
+		return &copied
+	}
+
+	return nil
+}
+
+// HookResponseStatus returns normalized hook response status. Missing status means OK.
+func HookResponseStatus(request *HookFeedbackRequest) string {
+	if request == nil || request.Args == nil {
+		return hookStatusOK
+	}
+
+	rawStatus, exists := request.Args["status"]
+	if !exists {
+		return hookStatusOK
+	}
+	status := strings.ToUpper(strings.TrimSpace(hookFeedbackValueToString(rawStatus)))
+	if status == "" {
+		return hookStatusOK
+	}
+
+	return status
+}
+
+// HookResponseArgString returns one response arg as string.
+func HookResponseArgString(request *HookFeedbackRequest, key string) string {
+	if request == nil || request.Args == nil {
+		return ""
+	}
+	return strings.TrimSpace(hookFeedbackArgString(request.Args, key))
 }
 
 func marshalHookFeedbackResponse(response HookFeedbackResponse) (string, error) {

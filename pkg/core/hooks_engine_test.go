@@ -157,7 +157,7 @@ func TestHookEngineExecuteShellProcessesContextFeedback(t *testing.T) {
 	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "merge"})
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	require.Len(t, result.FeedbackRequests, 1)
+	require.Len(t, result.FeedbackRequests, 2)
 	require.Len(t, result.FeedbackResponses, 1)
 
 	assert.Equal(t, "context", result.FeedbackResponses[0].Fn)
@@ -200,7 +200,7 @@ func TestHookEngineExecuteShellProcessesLLMFeedbackWithResponseModes(t *testing.
 	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "merge"})
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	require.Len(t, result.FeedbackRequests, 2)
+	require.Len(t, result.FeedbackRequests, 3)
 	require.Len(t, result.FeedbackResponses, 2)
 
 	ids := []string{result.FeedbackResponses[0].ID, result.FeedbackResponses[1].ID}
@@ -231,4 +231,93 @@ func TestParseHookFeedbackRequestsIgnoresInvalidLines(t *testing.T) {
 	assert.Equal(t, "context", requests[0].Fn)
 	assert.Equal(t, HookFeedbackResponseNone, requests[0].Response)
 	assert.Equal(t, "1", requests[0].Args["x"])
+}
+
+func TestHookEngineExecuteShellSynthesizesResponseFeedback(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-hook": {
+			Name:    "merge-hook",
+			Hook:    "merge",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo synthetic",
+			RunOn:   conf.HookRunOnHost,
+		},
+	})
+
+	hostRunner := runner.NewMockRunner()
+	hostRunner.SetResponseDetailed("echo synthetic", "hello-out\n", "hello-err\n", 0, nil)
+
+	engine := NewHookEngine(configStore, hostRunner, nil, nil)
+	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "merge"})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	response := FindHookResponseRequest(result)
+	require.NotNil(t, response)
+	assert.Equal(t, hookFeedbackFnResponse, response.Fn)
+	assert.Equal(t, hookStatusOK, HookResponseStatus(response))
+	assert.Contains(t, HookResponseArgString(response, "stdout"), "hello-out")
+	assert.Contains(t, HookResponseArgString(response, "stdout"), "hello-err")
+	assert.Contains(t, HookResponseArgString(response, "stdin"), "hello-out")
+	assert.Contains(t, HookResponseArgString(response, "stdin"), "hello-err")
+	assert.Equal(t, "hello-err", strings.TrimSpace(HookResponseArgString(response, "stderr")))
+}
+
+func TestHookEngineExecuteShellPreservesExplicitResponseFeedback(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-hook": {
+			Name:    "merge-hook",
+			Hook:    "merge",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo explicit",
+			RunOn:   conf.HookRunOnHost,
+		},
+	})
+
+	hostRunner := runner.NewMockRunner()
+	hostRunner.SetResponseDetailed("echo explicit", "CSWFEEDBACK: {\"fn\":\"response\",\"args\":{\"status\":\"COMMITED\",\"commit-message\":\"msg\"}}\n", "ignored\n", 0, nil)
+
+	engine := NewHookEngine(configStore, hostRunner, nil, nil)
+	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "merge"})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	requests := result.FeedbackRequests
+	require.Len(t, requests, 1)
+	assert.Equal(t, hookFeedbackFnResponse, requests[0].Fn)
+	assert.Equal(t, "COMMITED", HookResponseStatus(&requests[0]))
+	assert.Equal(t, "msg", HookResponseArgString(&requests[0], "commit-message"))
+}
+
+func TestHookEngineExecuteShellSynthesizedResponseContainsErrorStatusAndCode(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-hook": {
+			Name:    "merge-hook",
+			Hook:    "merge",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo failing",
+			RunOn:   conf.HookRunOnHost,
+		},
+	})
+
+	hostRunner := runner.NewMockRunner()
+	hostRunner.SetResponseDetailed("echo failing", "", "bad\n", 12, nil)
+
+	engine := NewHookEngine(configStore, hostRunner, nil, nil)
+	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "merge"})
+	require.Error(t, err)
+	require.NotNil(t, result)
+
+	response := FindHookResponseRequest(result)
+	require.NotNil(t, response)
+	assert.Equal(t, hookStatusError, HookResponseStatus(response))
+	code, exists := response.Args["code"]
+	require.True(t, exists)
+	assert.EqualValues(t, 12, code)
 }

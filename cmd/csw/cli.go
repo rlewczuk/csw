@@ -498,7 +498,10 @@ func runCLI(params *CLIParams) error {
 		"rootdir": strings.TrimSpace(buildResult.WorkDirRoot),
 		"status":  string(core.HookSessionStatusRunning),
 	})
-	finalizeResult = finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt, hookEngine, appView)
+	finalizeResult, finalizeErr := finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt, hookEngine, appView)
+	if finalizeErr != nil {
+		sessionRunErr = finalizeErr
+	}
 	endTime := time.Now()
 	hookEngine.SetContextValue("summary", strings.TrimSpace(lastAssistantMessageText(session)))
 	if sessionRunErr != nil {
@@ -1015,28 +1018,47 @@ type worktreeFinalizeResult struct {
 	HeadCommitID string
 }
 
-func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer, repoDir string, worktreeDir string, originalPrompt string, hookEngine *core.HookEngine, appView ui.IAppView) worktreeFinalizeResult {
+func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer, repoDir string, worktreeDir string, originalPrompt string, hookEngine *core.HookEngine, appView ui.IAppView) (worktreeFinalizeResult, error) {
 	result := worktreeFinalizeResult{}
 	if worktreeBranch == "" || vcs == nil {
-		return result
+		return result, nil
 	}
 
 	baseBranch := detectMergeBaseBranch(repoDir)
+	commitMessage := ""
+	commitHandledByHook := false
 
-	commitMessage, err := core.GenerateCommitMessage(ctx, sweSystem.ModelProviders, sweSystem.ConfigStore, session, worktreeBranch, commitMessageTemplate)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "worktree commit message generation failed: %v\n", err)
-		if dropErr := vcs.DropWorktree(worktreeBranch); dropErr != nil {
-			_, _ = fmt.Fprintf(stderr, "worktree cleanup failed: %v\n", dropErr)
-		}
-		return result
+	hookCommitMessage, skipBuiltInCommit, commitHookErr := handleCommitHookResponse(ctx, hookEngine, vcs, worktreeBranch, repoDir, worktreeDir, session, appView)
+	if commitHookErr != nil {
+		_, _ = fmt.Fprintf(stderr, "worktree commit hook failed: %v\n", commitHookErr)
+		return result, fmt.Errorf("finalizeWorktreeSession() [cli.go]: commit hook failed: %w", commitHookErr)
+	}
+	if strings.TrimSpace(hookCommitMessage) != "" {
+		commitMessage = hookCommitMessage
+	}
+	if skipBuiltInCommit {
+		commitHandledByHook = true
 	}
 
-	if commitErr := vcs.CommitWorktree(worktreeBranch, commitMessage); commitErr != nil && !errors.Is(commitErr, vfs.ErrNoChangesToCommit) {
-		_, _ = fmt.Fprintf(stderr, "worktree commit failed: %v\n", commitErr)
-		if merge {
-			_, _ = fmt.Fprintln(stderr, "merge skipped because commit failed. Resolve issues and merge manually.")
-			return result
+	if !commitHandledByHook {
+		if strings.TrimSpace(commitMessage) == "" {
+			generatedMessage, err := core.GenerateCommitMessage(ctx, sweSystem.ModelProviders, sweSystem.ConfigStore, session, worktreeBranch, commitMessageTemplate)
+			if err != nil {
+				_, _ = fmt.Fprintf(stderr, "worktree commit message generation failed: %v\n", err)
+				if dropErr := vcs.DropWorktree(worktreeBranch); dropErr != nil {
+					_, _ = fmt.Fprintf(stderr, "worktree cleanup failed: %v\n", dropErr)
+				}
+				return result, nil
+			}
+			commitMessage = generatedMessage
+		}
+
+		if commitErr := vcs.CommitWorktree(worktreeBranch, commitMessage); commitErr != nil && !errors.Is(commitErr, vfs.ErrNoChangesToCommit) {
+			_, _ = fmt.Fprintf(stderr, "worktree commit failed: %v\n", commitErr)
+			if merge {
+				_, _ = fmt.Fprintln(stderr, "merge skipped because commit failed. Resolve issues and merge manually.")
+				return result, nil
+			}
 		}
 	}
 
@@ -1055,7 +1077,7 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 			if hookErr != nil {
 				_, _ = fmt.Fprintf(stderr, "automatic merge failed: %v\n", hookErr)
 				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
-				return result
+				return result, nil
 			}
 		}
 
@@ -1068,12 +1090,12 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 					_, _ = fmt.Fprintf(stderr, "automatic merge failed due to conflicts: %v\n", mergeErr)
 					_, _ = fmt.Fprintf(stderr, "resolve conflicts manually and merge branch '%s' into %s.\n", worktreeBranch, baseBranch)
 					_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual conflict resolution.")
-					return result
+					return result, nil
 				}
 
 				_, _ = fmt.Fprintf(stderr, "automatic merge failed: %v\n", mergeErr)
 				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
-				return result
+				return result, nil
 			}
 
 			result.HeadCommitID = resolveGitCommitID(repoDir, baseBranch)
@@ -1082,7 +1104,7 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 			if mergeErr != nil {
 				_, _ = fmt.Fprintf(stderr, "automatic merge failed: %v\n", mergeErr)
 				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
-				return result
+				return result, nil
 			}
 			result.HeadCommitID = headCommitID
 		}
@@ -1098,7 +1120,68 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 		}
 	}
 
-	return result
+	return result, nil
+}
+
+func handleCommitHookResponse(ctx context.Context, hookEngine *core.HookEngine, vcs vfs.VCS, worktreeBranch string, repoDir string, worktreeDir string, session *core.SweSession, appView ui.IAppView) (string, bool, error) {
+	if hookEngine == nil {
+		return "", false, nil
+	}
+
+	hookEngine.MergeContext(map[string]string{
+		"branch":  strings.TrimSpace(worktreeBranch),
+		"workdir": strings.TrimSpace(firstNonEmpty(worktreeDir, repoDir)),
+		"rootdir": strings.TrimSpace(repoDir),
+	})
+	hookResult, hookErr := hookEngine.Execute(ctx, core.HookExecutionRequest{Name: "commit", View: appView, VCS: vcs, Session: session})
+	if hookResult == nil {
+		if hookErr != nil {
+			return "", false, fmt.Errorf("handleCommitHookResponse() [cli.go]: commit hook execution failed: %w", hookErr)
+		}
+		return "", false, nil
+	}
+
+	response := core.FindHookResponseRequest(hookResult)
+	if response == nil {
+		if hookErr != nil {
+			return "", false, fmt.Errorf("handleCommitHookResponse() [cli.go]: commit hook execution failed: %w", hookErr)
+		}
+		return "", false, nil
+	}
+
+	status := strings.ToUpper(strings.TrimSpace(core.HookResponseStatus(response)))
+	if status == "" {
+		status = "OK"
+	}
+
+	switch status {
+	case "TIMEOUT", "ERROR":
+		return "", false, fmt.Errorf("handleCommitHookResponse() [cli.go]: commit hook returned status %s", status)
+	case "COMMITED":
+		resetDir := strings.TrimSpace(firstNonEmpty(worktreeDir, repoDir))
+		if err := hardResetWorktree(resetDir); err != nil {
+			return "", false, err
+		}
+		return "", true, nil
+	default:
+		return core.HookResponseArgString(response, "commit-message"), false, nil
+	}
+}
+
+func hardResetWorktree(workDir string) error {
+	trimmedWorkDir := strings.TrimSpace(workDir)
+	if trimmedWorkDir == "" {
+		return fmt.Errorf("hardResetWorktree() [cli.go]: workDir is empty")
+	}
+
+	if _, err := runGitCommandFunc(trimmedWorkDir, "reset", "--hard", "HEAD"); err != nil {
+		return fmt.Errorf("hardResetWorktree() [cli.go]: failed to reset worktree: %w", err)
+	}
+	if _, err := runGitCommandFunc(trimmedWorkDir, "clean", "-fd"); err != nil {
+		return fmt.Errorf("hardResetWorktree() [cli.go]: failed to clean worktree: %w", err)
+	}
+
+	return nil
 }
 
 // detectMergeBaseBranch resolves the branch currently checked out in repoDir.
