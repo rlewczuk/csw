@@ -34,6 +34,7 @@ import (
 // CLIParams holds all parameters for runCLI.
 type CLIParams struct {
 	Prompt                string
+	ContextData           map[string]string
 	ModelName             string
 	RoleName              string
 	WorkDir               string
@@ -117,6 +118,7 @@ func CliCommand() *cobra.Command {
 		cliVerbose        bool
 		cliVFSAllow       []string
 		cliHooks          []string
+		cliContext        []string
 	)
 
 	cmd := &cobra.Command{
@@ -169,6 +171,19 @@ func CliCommand() *cobra.Command {
 				prompt = strings.TrimSpace(prompt)
 			}
 
+			contextData, err := parseCLIContextEntries(cliContext)
+			if err != nil {
+				return err
+			}
+
+			if prompt != "" {
+				renderedPrompt, renderErr := renderPromptWithContext(prompt, contextData)
+				if renderErr != nil {
+					return renderErr
+				}
+				prompt = strings.TrimSpace(renderedPrompt)
+			}
+
 			if resumeTarget == "" {
 				if prompt == "" {
 					return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
@@ -216,6 +231,7 @@ func CliCommand() *cobra.Command {
 
 			return runCLIFunc(&CLIParams{
 				Prompt:                prompt,
+				ContextData:           contextData,
 				ModelName:             cliModel,
 				RoleName:              cliRole,
 				WorkDir:               cliWorkDir,
@@ -285,6 +301,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliVerbose, "verbose", false, "Display full tool output instead of one-liners")
 	cmd.Flags().StringArrayVar(&cliVFSAllow, "vfs-allow", nil, "Additional path to allow VFS access outside of worktree (repeatable, or use ':' separated list)")
 	cmd.Flags().StringArrayVar(&cliHooks, "hook", nil, "Ephemeral hook override: --hook name | --hook name:disable | --hook name:key=value,key2=value2")
+	cmd.Flags().StringArrayVarP(&cliContext, "context", "c", nil, "Template context value in KEY=VAL format (repeatable)")
 	resumeFlag := cmd.Flags().Lookup("resume")
 	if resumeFlag != nil {
 		resumeFlag.NoOptDefVal = "last"
@@ -509,6 +526,7 @@ func runCLI(params *CLIParams) error {
 		"status":  string(core.HookSessionStatusRunning),
 		"user_prompt": strings.TrimSpace(params.Prompt),
 	})
+	hookEngine.MergeContext(params.ContextData)
 	finalizeResult, finalizeErr := finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt, hookEngine, appView)
 	if finalizeErr != nil {
 		sessionRunErr = finalizeErr
@@ -861,6 +879,50 @@ func parseVFSAllowPaths(values []string) []string {
 		}
 	}
 	return result
+}
+
+// parseCLIContextEntries parses repeated --context/-c CLI values in KEY=VAL format.
+func parseCLIContextEntries(values []string) (map[string]string, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+
+	result := make(map[string]string, len(values))
+	for _, entry := range values {
+		trimmed := strings.TrimSpace(entry)
+		if trimmed == "" {
+			return nil, fmt.Errorf("parseCLIContextEntries() [cli.go]: context entry cannot be empty")
+		}
+
+		parts := strings.SplitN(trimmed, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("parseCLIContextEntries() [cli.go]: invalid context entry %q: expected KEY=VAL format", entry)
+		}
+
+		key := strings.TrimSpace(parts[0])
+		if key == "" {
+			return nil, fmt.Errorf("parseCLIContextEntries() [cli.go]: invalid context entry %q: key cannot be empty", entry)
+		}
+
+		result[key] = parts[1]
+	}
+
+	return result, nil
+}
+
+// renderPromptWithContext renders prompt as text/template with provided context map.
+func renderPromptWithContext(prompt string, contextData map[string]string) (string, error) {
+	tmpl, err := template.New("cli-prompt").Option("missingkey=error").Parse(prompt)
+	if err != nil {
+		return "", fmt.Errorf("renderPromptWithContext() [cli.go]: failed to parse prompt template: %w", err)
+	}
+
+	var rendered bytes.Buffer
+	if err := tmpl.Execute(&rendered, contextData); err != nil {
+		return "", fmt.Errorf("renderPromptWithContext() [cli.go]: failed to render prompt template: %w", err)
+	}
+
+	return rendered.String(), nil
 }
 
 type runtimeHookConfigStore struct {
