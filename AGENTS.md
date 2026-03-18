@@ -44,6 +44,7 @@ Rules regarding implementing tests:
 
 Other rules:
 - When generating summary after performing a task, DO NOT save it to file, just put it in chat.
+- this is big project, to not list all existing files, always use scoped search and use hints from `AGENTS.md` files across project;
 
 ## Code Organization
 
