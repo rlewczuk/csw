@@ -180,16 +180,32 @@ func (e *HookEngine) SetSessionStatus(status HookSessionStatus) {
 	e.SetContextValue("status", string(status))
 }
 
-// FindEnabledHook returns enabled hook for the given extension point.
+// FindEnabledHook returns one enabled hook for the given extension point.
+//
+// Deprecated: prefer FindEnabledHooks when caller needs to execute all hooks.
 func (e *HookEngine) FindEnabledHook(hookName string) (*conf.HookConfig, error) {
+	hooks, err := e.FindEnabledHooks(hookName)
+	if err != nil {
+		return nil, err
+	}
+	if len(hooks) == 0 {
+		return nil, nil
+	}
+
+	return hooks[0], nil
+}
+
+// FindEnabledHooks returns all enabled hooks for the given extension point.
+func (e *HookEngine) FindEnabledHooks(hookName string) ([]*conf.HookConfig, error) {
 	if e == nil || e.configStore == nil {
 		return nil, nil
 	}
 
 	hooks, err := e.configStore.GetHookConfigs()
 	if err != nil {
-		return nil, fmt.Errorf("HookEngine.FindEnabledHook() [hooks_engine.go]: failed to load hook configs: %w", err)
+		return nil, fmt.Errorf("HookEngine.FindEnabledHooks() [hooks_engine.go]: failed to load hook configs: %w", err)
 	}
+	result := make([]*conf.HookConfig, 0)
 
 	for _, cfg := range hooks {
 		if cfg == nil {
@@ -201,10 +217,10 @@ func (e *HookEngine) FindEnabledHook(hookName string) (*conf.HookConfig, error) 
 		if strings.TrimSpace(cfg.Hook) != hookName {
 			continue
 		}
-		return cfg.Clone(), nil
+		result = append(result, cfg.Clone())
 	}
 
-	return nil, nil
+	return result, nil
 }
 
 // Execute runs one hook by extension point name when configured and enabled.
@@ -218,32 +234,84 @@ func (e *HookEngine) Execute(ctx context.Context, request HookExecutionRequest) 
 		return nil, fmt.Errorf("HookEngine.Execute() [hooks_engine.go]: hook name is empty")
 	}
 
-	hookConfig, err := e.FindEnabledHook(hookName)
+	hookConfigs, err := e.FindEnabledHooks(hookName)
 	if err != nil {
 		return nil, err
 	}
-	if hookConfig == nil {
+	if len(hookConfigs) == 0 {
 		return nil, nil
 	}
 
-	e.SetContextValue("hook", hookName)
-	hookDir, err := e.resolveAndPrepareHookDir(hookConfig)
-	if err != nil {
-		return nil, fmt.Errorf("HookEngine.Execute() [hooks_engine.go]: failed to prepare hook directory for hook %q: %w", hookConfig.Name, err)
-	}
-	e.SetContextValue("hook_dir", hookDir)
-	hookConfig.HookDir = hookDir
+	aggregated := &HookExecutionResult{}
+	for _, hookConfig := range hookConfigs {
+		e.SetContextValue("hook", hookName)
+		hookDir, prepareErr := e.resolveAndPrepareHookDir(hookConfig)
+		if prepareErr != nil {
+			return aggregated, fmt.Errorf("HookEngine.Execute() [hooks_engine.go]: failed to prepare hook directory for hook %q: %w", hookConfig.Name, prepareErr)
+		}
+		e.SetContextValue("hook_dir", hookDir)
+		hookConfig.HookDir = hookDir
 
-	switch hookConfig.Type {
-	case conf.HookTypeShell:
-		return e.executeShell(ctx, hookConfig, request)
-	case conf.HookTypeLLM:
-		return e.executeLLM(ctx, hookConfig, request)
-	case conf.HookTypeSubAgent:
-		return e.executeSubAgent(ctx, hookConfig, request)
-	default:
-		return nil, fmt.Errorf("HookEngine.Execute() [hooks_engine.go]: unsupported hook type %q", hookConfig.Type)
+		var (
+			result  *HookExecutionResult
+			execErr error
+		)
+		switch hookConfig.Type {
+		case conf.HookTypeShell:
+			result, execErr = e.executeShell(ctx, hookConfig, request)
+		case conf.HookTypeLLM:
+			result, execErr = e.executeLLM(ctx, hookConfig, request)
+		case conf.HookTypeSubAgent:
+			result, execErr = e.executeSubAgent(ctx, hookConfig, request)
+		default:
+			return aggregated, fmt.Errorf("HookEngine.Execute() [hooks_engine.go]: unsupported hook type %q", hookConfig.Type)
+		}
+
+		aggregated = mergeHookExecutionResult(aggregated, result)
+		if execErr != nil {
+			return aggregated, execErr
+		}
 	}
+
+	return aggregated, nil
+}
+
+func mergeHookExecutionResult(target *HookExecutionResult, source *HookExecutionResult) *HookExecutionResult {
+	if target == nil {
+		target = &HookExecutionResult{}
+	}
+	if source == nil {
+		return target
+	}
+
+	if strings.TrimSpace(source.Command) != "" {
+		if strings.TrimSpace(target.Command) == "" {
+			target.Command = source.Command
+		} else {
+			target.Command += "\n" + source.Command
+		}
+	}
+	if strings.TrimSpace(source.Stdout) != "" {
+		if strings.TrimSpace(target.Stdout) == "" {
+			target.Stdout = source.Stdout
+		} else {
+			target.Stdout += "\n" + source.Stdout
+		}
+	}
+	if strings.TrimSpace(source.Stderr) != "" {
+		if strings.TrimSpace(target.Stderr) == "" {
+			target.Stderr = source.Stderr
+		} else {
+			target.Stderr += "\n" + source.Stderr
+		}
+	}
+
+	target.ExitCode = source.ExitCode
+	target.Config = source.Config
+	target.FeedbackRequests = append(target.FeedbackRequests, source.FeedbackRequests...)
+	target.FeedbackResponses = append(target.FeedbackResponses, source.FeedbackResponses...)
+
+	return target
 }
 
 func (e *HookEngine) executeSubAgent(ctx context.Context, hookConfig *conf.HookConfig, request HookExecutionRequest) (*HookExecutionResult, error) {

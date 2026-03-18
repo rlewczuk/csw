@@ -168,6 +168,85 @@ func TestHookEngineFindEnabledHookMergesByName(t *testing.T) {
 	assert.Nil(t, resolved)
 }
 
+func TestHookEngineFindEnabledHooksReturnsAllMatchingEnabled(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-hook-a": {
+			Name:    "merge-hook-a",
+			Hook:    "merge",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo a",
+		},
+		"merge-hook-b": {
+			Name:    "merge-hook-b",
+			Hook:    "merge",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo b",
+		},
+		"merge-hook-disabled": {
+			Name:    "merge-hook-disabled",
+			Hook:    "merge",
+			Enabled: false,
+			Type:    conf.HookTypeShell,
+			Command: "echo disabled",
+		},
+		"summary-hook": {
+			Name:    "summary-hook",
+			Hook:    "summary",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo summary",
+		},
+	})
+
+	engine := NewHookEngine(configStore, runner.NewMockRunner(), nil, nil)
+	resolved, err := engine.FindEnabledHooks("merge")
+	require.NoError(t, err)
+	require.Len(t, resolved, 2)
+	names := []string{resolved[0].Name, resolved[1].Name}
+	assert.ElementsMatch(t, []string{"merge-hook-a", "merge-hook-b"}, names)
+}
+
+func TestHookEngineExecuteRunsAllHooksForSameExtensionPoint(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-hook-a": {
+			Name:    "merge-hook-a",
+			Hook:    "merge",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo hook-a",
+			RunOn:   conf.HookRunOnHost,
+		},
+		"merge-hook-b": {
+			Name:    "merge-hook-b",
+			Hook:    "merge",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo hook-b",
+			RunOn:   conf.HookRunOnHost,
+		},
+	})
+
+	hostRunner := runner.NewMockRunner()
+	hostRunner.SetResponseDetailed("echo hook-a", "ok-a\n", "", 0, nil)
+	hostRunner.SetResponseDetailed("echo hook-b", "ok-b\n", "", 0, nil)
+
+	engine := NewHookEngine(configStore, hostRunner, nil, nil)
+	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "merge"})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	executions := hostRunner.GetExecutions()
+	require.Len(t, executions, 2)
+	commands := []string{executions[0].Command, executions[1].Command}
+	assert.ElementsMatch(t, []string{"echo hook-a", "echo hook-b"}, commands)
+	assert.Contains(t, result.Stdout, "ok-a")
+	assert.Contains(t, result.Stdout, "ok-b")
+}
+
 func TestHookExecutionErrorMessage(t *testing.T) {
 	err := (&HookExecutionError{HookName: "merge-hook", ExitCode: 7}).Error()
 	assert.Equal(t, fmt.Sprintf("hook %q returned non-zero exit code %d", "merge-hook", 7), err)
