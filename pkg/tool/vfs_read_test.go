@@ -467,7 +467,7 @@ func TestVFSReadToolRender(t *testing.T) {
 				"path": "/path/to/worktree/cmd/csw/main.go",
 			}),
 		}
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - path should be relative to worktree with line count
 		assert.Equal(t, "read cmd/csw/main.go (0 lines)", oneLiner)
@@ -487,7 +487,7 @@ func TestVFSReadToolRender(t *testing.T) {
 				"path": "cmd/csw/main.go",
 			}),
 		}
-		oneLiner, _, _ := tool.Render(call)
+		oneLiner, _, _, _ := tool.Render(call)
 
 		// Assert
 		assert.Equal(t, "read cmd/csw/main.go (0 lines)", oneLiner)
@@ -506,7 +506,7 @@ func TestVFSReadToolRender(t *testing.T) {
 				"path": "/other/path/file.go",
 			}),
 		}
-		oneLiner, _, _ := tool.Render(call)
+		oneLiner, _, _, _ := tool.Render(call)
 
 		// Assert - path should remain as-is since it's outside worktree with line count
 		assert.Equal(t, "read /other/path/file.go (0 lines)", oneLiner)
@@ -526,7 +526,7 @@ func TestVFSReadToolRender(t *testing.T) {
 				"error": "failed to read file: permission denied",
 			}),
 		}
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - oneLiner should have error as second line
 		assert.Contains(t, oneLiner, "read cmd/csw/main.go")
@@ -549,7 +549,7 @@ func TestVFSReadToolRender(t *testing.T) {
 				"error": "error line 1\nerror line 2\nerror line 3",
 			}),
 		}
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - oneLiner should have error on single line
 		lines := strings.Split(oneLiner, "\n")
@@ -589,7 +589,7 @@ func TestVFSReadToolRender(t *testing.T) {
 				"content": response.Result.Get("content").AsString(),
 			}),
 		}
-		oneLiner, full, _ := tool.Render(callWithResult)
+		oneLiner, full, _, _ := tool.Render(callWithResult)
 
 		// Assert - should show correct line count (3 lines)
 		assert.Contains(t, oneLiner, "read test.txt (3 lines)")
@@ -620,7 +620,7 @@ func TestVFSReadToolRender(t *testing.T) {
 
 		// Call Render with original call (without result merged in)
 		// This simulates what currently happens in the presenter
-		oneLiner, _, _ := tool.Render(response.Call)
+		oneLiner, _, _, _ := tool.Render(response.Call)
 
 		// BUG: This shows "0 lines" because content is not in Arguments
 		// After fix, this should still show "0 lines" since we're testing

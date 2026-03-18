@@ -172,7 +172,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		tool := NewVFSPatchTool(mockVFS, nil)
 
-		oneLiner, full, _ := tool.Render(&ToolCall{
+		oneLiner, full, _, _ := tool.Render(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{
@@ -188,7 +188,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		tool := NewVFSPatchTool(mockVFS, nil)
 
-		oneLiner, _, _ := tool.Render(&ToolCall{
+		oneLiner, _, _, _ := tool.Render(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{
@@ -203,7 +203,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		tool := NewVFSPatchTool(mockVFS, nil)
 
-		oneLiner, _, _ := tool.Render(&ToolCall{
+		oneLiner, _, _, _ := tool.Render(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{
@@ -218,7 +218,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		tool := NewVFSPatchTool(mockVFS, nil)
 
-		oneLiner, _, _ := tool.Render(&ToolCall{
+		oneLiner, _, _, _ := tool.Render(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{
@@ -233,7 +233,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		tool := NewVFSPatchTool(mockVFS, nil)
 
-		oneLiner, _, _ := tool.Render(&ToolCall{
+		oneLiner, _, _, _ := tool.Render(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{
@@ -256,7 +256,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		tool := NewVFSPatchTool(mockVFS, nil)
 
-		oneLiner, _, _ := tool.Render(&ToolCall{
+		oneLiner, _, _, _ := tool.Render(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{
@@ -277,7 +277,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		tool := NewVFSPatchTool(mockVFS, nil)
 
-		oneLiner, _, _ := tool.Render(&ToolCall{
+		oneLiner, _, _, _ := tool.Render(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{
@@ -300,7 +300,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		tool := NewVFSPatchTool(mockVFS, nil)
 
-		oneLiner, _, _ := tool.Render(&ToolCall{
+		oneLiner, _, _, _ := tool.Render(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{
@@ -315,7 +315,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		tool := NewVFSPatchTool(mockVFS, nil)
 
-		oneLiner, full, _ := tool.Render(&ToolCall{
+		oneLiner, full, _, _ := tool.Render(&ToolCall{
 			ID:       "test-id",
 			Function: "vfsPatch",
 			Arguments: NewToolValue(map[string]any{

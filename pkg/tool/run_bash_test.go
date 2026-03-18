@@ -567,7 +567,7 @@ func TestRunBashTool_Render(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			summary, details, meta := tool.Render(tt.args)
+			summary, details, _, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
 			assert.True(t, strings.HasPrefix(summary, "bash: "), "Summary should start with 'bash: '")
 			assert.Contains(t, summary, tt.wantInSummary, "Summary should contain expected text")
@@ -640,7 +640,7 @@ func TestRunBashTool_Render_WithError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			summary, details, meta := tool.Render(tt.args)
+			summary, details, _, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
 			assert.NotNil(t, meta, "Meta should not be nil")
 			assert.Contains(t, summary, tt.wantInSummary, "Summary should contain expected text")

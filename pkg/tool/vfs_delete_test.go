@@ -195,7 +195,7 @@ func TestVFSDeleteToolRender(t *testing.T) {
 				"path": "/path/to/worktree/cmd/csw/main.go",
 			}),
 		}
-		oneLiner, _, _ := tool.Render(call)
+		oneLiner, _, _, _ := tool.Render(call)
 
 		// Assert - path should be relative to worktree
 		assert.Equal(t, "delete cmd/csw/main.go", oneLiner)
@@ -214,7 +214,7 @@ func TestVFSDeleteToolRender(t *testing.T) {
 				"path": "cmd/csw/main.go",
 			}),
 		}
-		oneLiner, _, _ := tool.Render(call)
+		oneLiner, _, _, _ := tool.Render(call)
 
 		// Assert
 		assert.Equal(t, "delete cmd/csw/main.go", oneLiner)
@@ -234,7 +234,7 @@ func TestVFSDeleteToolRender(t *testing.T) {
 				"error": "failed to delete file: file not found",
 			}),
 		}
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - oneLiner should have error as second line
 		assert.Contains(t, oneLiner, "delete cmd/csw/main.go")

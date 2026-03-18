@@ -427,7 +427,7 @@ func TestVFSFindToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert
 		assert.Equal(t, "find *.txt", oneLiner)
@@ -449,7 +449,7 @@ func TestVFSFindToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert
 		assert.Equal(t, "find *.txt (3 results)", oneLiner)
@@ -474,7 +474,7 @@ func TestVFSFindToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - oneliner should contain error on second line
 		assert.Contains(t, oneLiner, "find *.txt")
@@ -499,7 +499,7 @@ func TestVFSFindToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - oneliner should have error on single line (newlines converted to spaces)
 		assert.Contains(t, oneLiner, "find *.go")
@@ -525,7 +525,7 @@ func TestVFSFindToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - should use singular form "1 result"
 		assert.Equal(t, "find *.txt (1 result)", oneLiner)
@@ -548,7 +548,7 @@ func TestVFSFindToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - should not include result count
 		assert.Equal(t, "find *.txt", oneLiner)
@@ -569,7 +569,7 @@ func TestVFSFindToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - should not include result count
 		assert.Equal(t, "find *.txt", oneLiner)

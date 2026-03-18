@@ -127,13 +127,15 @@ func (t *SubAgentTool) Execute(args *ToolCall) *ToolResponse {
 }
 
 // Render returns a string representation of the subagent call.
-func (t *SubAgentTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *SubAgentTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	slug := call.Arguments.String("slug")
 	status := call.Arguments.String("status")
 	summary := call.Arguments.String("summary")
+	errMsg := call.Arguments.String("error")
 	oneLiner := truncateString(fmt.Sprintf("subAgent %s (%s)", slug, status), 128)
+	jsonl := buildToolRenderJSONL("subAgent", call, map[string]any{"slug": slug, "subagent_status": status, "summary": summary, "error": errMsg})
 	if strings.TrimSpace(summary) == "" {
-		return oneLiner, oneLiner, make(map[string]string)
+		return oneLiner, oneLiner, jsonl, make(map[string]string)
 	}
-	return oneLiner, oneLiner + "\n\n" + summary, make(map[string]string)
+	return oneLiner, oneLiner + "\n\n" + summary, jsonl, make(map[string]string)
 }

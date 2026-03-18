@@ -194,17 +194,51 @@ func (t *TodoReadTool) Execute(args *ToolCall) *ToolResponse {
 }
 
 // Render returns a string representation of the tool call.
-func (t *TodoWriteTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *TodoWriteTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	todos := t.session.GetTodoList()
 	oneLiner, full := renderTodoList(todos)
-	return oneLiner, full, make(map[string]string)
+	jsonl := buildToolRenderJSONL("todoWrite", call, renderTodoJSONFields(todos))
+	return oneLiner, full, jsonl, make(map[string]string)
 }
 
 // Render returns a string representation of the tool call.
-func (t *TodoReadTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *TodoReadTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	todos := t.session.GetTodoList()
 	oneLiner, full := renderTodoList(todos)
-	return oneLiner, full, make(map[string]string)
+	jsonl := buildToolRenderJSONL("todoRead", call, renderTodoJSONFields(todos))
+	return oneLiner, full, jsonl, make(map[string]string)
+}
+
+// renderTodoJSONFields builds todo counts and current task for JSONL rendering.
+func renderTodoJSONFields(todos []TodoItem) map[string]any {
+	completed := 0
+	inProgress := 0
+	pending := 0
+	currentTask := ""
+	for _, todo := range todos {
+		switch todo.Status {
+		case "completed":
+			completed++
+		case "in_progress":
+			inProgress++
+			if currentTask == "" {
+				currentTask = strings.TrimSpace(todo.Content)
+			}
+		case "pending":
+			pending++
+			if currentTask == "" {
+				currentTask = strings.TrimSpace(todo.Content)
+			}
+		}
+	}
+
+	return map[string]any{
+		"total":        len(todos),
+		"completed":    completed,
+		"in_progress":  inProgress,
+		"pending":      pending,
+		"current_task": currentTask,
+	}
 }
 
 // renderTodoList renders the todo list in one-liner and full description formats.

@@ -41,6 +41,9 @@ type ToolUI struct {
 	// Details is the full information of the tool call result from Tool.Render()
 	Details string `json:"details"`
 
+	// JSONL is the JSONL representation of the tool call result from Tool.Render()
+	JSONL string `json:"jsonl"`
+
 	// Meta contains additional properties from Tool.Render() that can be used to display in the UI
 	Meta map[string]string `json:"meta"`
 }

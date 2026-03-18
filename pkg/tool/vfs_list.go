@@ -112,7 +112,7 @@ func normalizeAbsoluteListResult(worktreeRoot, listedPath string) string {
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSListTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *VFSListTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	path := call.Arguments.String("path")
 	if path == "" {
 		path = "."
@@ -134,6 +134,7 @@ func (t *VFSListTool) Render(call *ToolCall) (string, string, map[string]string)
 
 	oneLiner := baseText + formatResultCount(resultCount)
 	full := oneLiner + "\n\n"
+	jsonl := buildToolRenderJSONL("vfsList", call, map[string]any{"path": path, "pattern": pattern, "count": resultCount})
 
 	for _, file := range files {
 		full += file.AsString() + "\n"
@@ -149,5 +150,5 @@ func (t *VFSListTool) Render(call *ToolCall) (string, string, map[string]string)
 		full += "\n\n" + errFull
 	}
 
-	return oneLiner, full, make(map[string]string)
+	return oneLiner, full, jsonl, make(map[string]string)
 }

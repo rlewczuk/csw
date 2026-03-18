@@ -107,13 +107,14 @@ func (t *HookFeedbackTool) Execute(args *ToolCall) *ToolResponse {
 }
 
 // Render returns a string representation of the hook feedback call.
-func (t *HookFeedbackTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *HookFeedbackTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	fn := strings.TrimSpace(call.Arguments.String("fn"))
 	if fn == "" {
 		fn = "unknown"
 	}
 	oneLiner := truncateString("hookFeedback "+fn, 128)
-	return oneLiner, oneLiner, map[string]string{}
+	jsonl := buildToolRenderJSONL("hookFeedback", call, map[string]any{"fn": fn})
+	return oneLiner, oneLiner, jsonl, map[string]string{}
 }
 
 func hookFeedbackArgString(args map[string]any, key string) string {

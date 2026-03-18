@@ -220,7 +220,7 @@ func (p *ChatPresenter) AddToolCallResult(result *tool.ToolResponse) {
 					t.Status = ui.ToolStatusSucceeded
 				}
 				callForRender := copyToolCallWithResult(result.Call, result)
-				t.Summary, t.Details, t.Meta = p.renderToolResult(callForRender)
+				t.Summary, t.Details, t.JSONL, t.Meta = p.renderToolResult(callForRender)
 				toolState = t
 				break
 			}
@@ -243,18 +243,18 @@ func (p *ChatPresenter) RunFinished(err error) {
 	p.mu.Unlock()
 }
 
-func (p *ChatPresenter) renderToolResult(call *tool.ToolCall) (string, string, map[string]string) {
+func (p *ChatPresenter) renderToolResult(call *tool.ToolCall) (string, string, string, map[string]string) {
 	if call == nil {
-		return "", "", make(map[string]string)
+		return "", "", "", make(map[string]string)
 	}
 
 	if p.thread == nil {
-		return "", "", make(map[string]string)
+		return "", "", "", make(map[string]string)
 	}
 
 	session := p.thread.GetSession()
 	if session == nil || session.Tools == nil {
-		return "", "", make(map[string]string)
+		return "", "", "", make(map[string]string)
 	}
 
 	return session.Tools.Render(call)

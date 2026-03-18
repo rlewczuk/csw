@@ -26,8 +26,8 @@ func (s *roleLimitedToolStub) Execute(args *tool.ToolCall) *tool.ToolResponse {
 	return &tool.ToolResponse{Call: args, Done: true}
 }
 
-func (s *roleLimitedToolStub) Render(call *tool.ToolCall) (string, string, map[string]string) {
-	return "stub", "stub", map[string]string{}
+func (s *roleLimitedToolStub) Render(call *tool.ToolCall) (string, string, string, map[string]string) {
+	return "stub", "stub", "{}", map[string]string{}
 }
 
 func (s *roleLimitedToolStub) IsRoleAllowed(roleName string) bool {

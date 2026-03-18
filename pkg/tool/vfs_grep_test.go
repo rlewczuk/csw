@@ -400,7 +400,7 @@ func TestVFSGrepToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - path should be relative to worktree root
 		assert.Contains(t, oneLiner, "grep hello in src")
@@ -423,7 +423,7 @@ func TestVFSGrepToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - path should remain unchanged
 		assert.Contains(t, oneLiner, "grep hello in src/components")
@@ -444,7 +444,7 @@ func TestVFSGrepToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - should not include "in" phrase
 		assert.Equal(t, "grep hello", oneLiner)
@@ -466,7 +466,7 @@ func TestVFSGrepToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, _, _ := tool.Render(call)
+		oneLiner, _, _, _ := tool.Render(call)
 
 		// Assert - should keep original path since it cannot be made relative
 		// filepath.Rel will return an error for paths on different drives/volumes
@@ -489,7 +489,7 @@ func TestVFSGrepToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert
 		assert.Equal(t, "grep func main", oneLiner)
@@ -511,7 +511,7 @@ func TestVFSGrepToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, _, _ := tool.Render(call)
+		oneLiner, _, _, _ := tool.Render(call)
 
 		// Assert - should be truncated to 128 chars
 		assert.LessOrEqual(t, len(oneLiner), 128)
@@ -533,7 +533,7 @@ func TestVFSGrepToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - oneliner should contain error on second line
 		assert.Contains(t, oneLiner, "grep hello")
@@ -558,7 +558,7 @@ func TestVFSGrepToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - oneliner should have error on single line (newlines converted to spaces)
 		assert.Contains(t, oneLiner, "grep test")
@@ -585,7 +585,7 @@ func TestVFSGrepToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - should include result count
 		assert.Equal(t, "grep hello (3 results)", oneLiner)
@@ -608,7 +608,7 @@ func TestVFSGrepToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - should use singular form "1 result"
 		assert.Equal(t, "grep hello (1 result)", oneLiner)
@@ -630,7 +630,7 @@ func TestVFSGrepToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - should not include result count
 		assert.Equal(t, "grep hello", oneLiner)
@@ -653,7 +653,7 @@ func TestVFSGrepToolRender(t *testing.T) {
 			}),
 		}
 
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - should include result count with path
 		assert.Equal(t, "grep hello in src (2 results)", oneLiner)

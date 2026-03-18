@@ -301,7 +301,7 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSPatchTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *VFSPatchTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	patchText, _ := call.Arguments.StringOK("patchText")
 
 	oneLiner := "apply patch"
@@ -312,6 +312,7 @@ func (t *VFSPatchTool) Render(call *ToolCall) (string, string, map[string]string
 		}
 	}
 	oneLiner = truncateString(oneLiner, 128)
+	jsonl := buildToolRenderJSONL("vfsPatch", call, map[string]any{"summary": oneLiner})
 
 	full := oneLiner
 
@@ -322,13 +323,13 @@ func (t *VFSPatchTool) Render(call *ToolCall) (string, string, map[string]string
 		oneLiner = oneLiner + "\n" + errOneLiner
 		// Add error to full output
 		full = full + "\n\n" + errFull
-		return oneLiner, full, make(map[string]string)
+		return oneLiner, full, jsonl, make(map[string]string)
 	}
 
 	if patchText != "" {
 		full += "\n\n" + patchText
 	}
-	return oneLiner, full, make(map[string]string)
+	return oneLiner, full, jsonl, make(map[string]string)
 }
 
 // renderPatchOneLiner generates a one-line summary of patch operations.

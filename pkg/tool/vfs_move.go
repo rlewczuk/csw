@@ -74,12 +74,13 @@ func (t *VFSMoveTool) Execute(args *ToolCall) *ToolResponse {
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSMoveTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *VFSMoveTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	path, _ := call.Arguments.StringOK("path")
 	destination, _ := call.Arguments.StringOK("destination")
 	relativePath := makeRelativePath(path, t.vfs)
 	relativeDest := makeRelativePath(destination, t.vfs)
 	oneLiner := truncateString("move "+relativePath+" -> "+relativeDest, 128)
+	jsonl := buildToolRenderJSONL("vfsMove", call, map[string]any{"path": relativePath, "destination": relativeDest})
 	full := oneLiner
 
 	// Check for error in arguments
@@ -89,8 +90,8 @@ func (t *VFSMoveTool) Render(call *ToolCall) (string, string, map[string]string)
 		oneLiner = oneLiner + "\n" + errOneLiner
 		// Add error to full output
 		full = full + "\n\n" + errFull
-		return oneLiner, full, make(map[string]string)
+		return oneLiner, full, jsonl, make(map[string]string)
 	}
 
-	return oneLiner, full, make(map[string]string)
+	return oneLiner, full, jsonl, make(map[string]string)
 }

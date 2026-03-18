@@ -39,7 +39,7 @@ func TestVFSReadTool_Render(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			summary, details, meta := tool.Render(tt.args)
+			summary, details, _, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
 			assert.True(t, strings.HasPrefix(summary, "read "), "Summary should start with 'read '")
 			assert.Contains(t, summary, tt.wantPath, "Summary should contain path")
@@ -74,7 +74,7 @@ func TestVFSWriteTool_Render(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			summary, details, meta := tool.Render(tt.args)
+			summary, details, _, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
 			assert.True(t, strings.HasPrefix(summary, "write "), "Summary should start with 'write '")
 			assert.Contains(t, summary, tt.wantPath, "Summary should contain path")
@@ -108,7 +108,7 @@ func TestVFSDeleteTool_Render(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			summary, details, meta := tool.Render(tt.args)
+			summary, details, _, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
 			assert.True(t, strings.HasPrefix(summary, "delete "), "Summary should start with 'delete '")
 			assert.Contains(t, summary, tt.wantPath, "Summary should contain path")
@@ -143,7 +143,7 @@ func TestVFSMoveTool_Render(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			summary, details, meta := tool.Render(tt.args)
+			summary, details, _, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
 			assert.True(t, strings.HasPrefix(summary, "move "), "Summary should start with 'move '")
 			assert.Contains(t, summary, tt.wantPath, "Summary should contain path")
@@ -177,7 +177,7 @@ func TestVFSFindTool_Render(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			summary, details, meta := tool.Render(tt.args)
+			summary, details, _, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
 			assert.True(t, strings.HasPrefix(summary, "find "), "Summary should start with 'find '")
 			assert.Contains(t, summary, tt.wantQuery, "Summary should contain query")
@@ -214,7 +214,7 @@ func TestVFSEditTool_Render(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			summary, details, meta := tool.Render(tt.args)
+			summary, details, _, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
 			assert.True(t, strings.HasPrefix(summary, "edit "), "Summary should start with 'edit '")
 			assert.Contains(t, summary, tt.wantPath, "Summary should contain path")
@@ -263,7 +263,7 @@ func TestVFSGrepTool_Render(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			summary, details, meta := tool.Render(tt.args)
+			summary, details, _, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
 			assert.True(t, strings.HasPrefix(summary, "grep "), "Summary should start with 'grep '")
 			assert.Contains(t, summary, tt.wantPattern, "Summary should contain pattern")
@@ -301,7 +301,7 @@ func TestVFSListTool_Render(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			summary, details, meta := tool.Render(tt.args)
+			summary, details, _, meta := tool.Render(tt.args)
 			assert.NotEmpty(t, summary, "Summary should not be empty")
 			assert.True(t, strings.HasPrefix(summary, "list "), "Summary should start with 'list '")
 			assert.Contains(t, summary, tt.wantPath, "Summary should contain path")
@@ -318,7 +318,7 @@ func TestAccessControlTool_Render(t *testing.T) {
 	mockTool := &mockTool{name: "testTool"}
 	acTool := NewAccessControlTool(mockTool, map[string]conf.AccessFlag{})
 
-	summary, details, meta := acTool.Render(&ToolCall{})
+	summary, details, _, meta := acTool.Render(&ToolCall{})
 	assert.NotEmpty(t, summary, "Summary should not be empty")
 	assert.Equal(t, "testTool", summary, "Summary should be forwarded from wrapped tool")
 	assert.Equal(t, "testTool", details, "Details should be forwarded from wrapped tool")
@@ -330,7 +330,7 @@ func TestAccessControlTool_Render(t *testing.T) {
 func TestToolRegistry_Render(t *testing.T) {
 	registry := NewToolRegistry()
 
-	summary, details, meta := registry.Render(&ToolCall{})
+	summary, details, _, meta := registry.Render(&ToolCall{})
 	assert.NotEmpty(t, summary, "Summary should not be empty")
 	assert.Equal(t, "ToolRegistry", summary, "Summary should be 'ToolRegistry'")
 	assert.Equal(t, "ToolRegistry", details, "Details should be 'ToolRegistry'")

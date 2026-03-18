@@ -70,8 +70,8 @@ func (t *probeTool) Execute(args *tool.ToolCall) *tool.ToolResponse {
 	return &tool.ToolResponse{Call: args, Done: true}
 }
 
-func (t *probeTool) Render(call *tool.ToolCall) (string, string, map[string]string) {
-	return "probe", "probe", map[string]string{}
+func (t *probeTool) Render(call *tool.ToolCall) (string, string, string, map[string]string) {
+	return "probe", "probe", "{}", map[string]string{}
 }
 
 func (t *probeTool) GetDescription() (string, bool) {

@@ -585,6 +585,7 @@ func TestAccessControlTool_GlobalDefault(t *testing.T) {
 	}
 }
 
-func (m *mockTool) Render(call *ToolCall) (string, string, map[string]string) {
-	return m.name, m.name, make(map[string]string)
+func (m *mockTool) Render(call *ToolCall) (string, string, string, map[string]string) {
+	jsonl := buildToolRenderJSONL(m.name, call, nil)
+	return m.name, m.name, jsonl, make(map[string]string)
 }

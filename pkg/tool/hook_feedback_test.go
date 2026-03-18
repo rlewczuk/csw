@@ -101,7 +101,7 @@ func TestHookFeedbackToolExecute(t *testing.T) {
 
 func TestHookFeedbackToolRender(t *testing.T) {
 	tool := NewHookFeedbackTool(&hookFeedbackExecutorMock{}, nil, nil)
-	oneLiner, full, meta := tool.Render(&ToolCall{Function: "hookFeedback", Arguments: NewToolValue(map[string]any{"fn": "context"})})
+	oneLiner, full, _, meta := tool.Render(&ToolCall{Function: "hookFeedback", Arguments: NewToolValue(map[string]any{"fn": "context"})})
 	assert.Equal(t, "hookFeedback context", oneLiner)
 	assert.Equal(t, oneLiner, full)
 	assert.Empty(t, meta)

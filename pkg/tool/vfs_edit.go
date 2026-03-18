@@ -154,7 +154,7 @@ func (t *VFSEditTool) Execute(args *ToolCall) *ToolResponse {
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSEditTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *VFSEditTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	path, _ := call.Arguments.StringOK("path")
 	oldString, _ := call.Arguments.StringOK("oldString")
 	newString, _ := call.Arguments.StringOK("newString")
@@ -171,6 +171,7 @@ func (t *VFSEditTool) Render(call *ToolCall) (string, string, map[string]string)
 	}
 
 	oneLiner := truncateString(fmt.Sprintf("edit %s (+%d/-%d)", relativePath, linesAdded, linesRemoved), 128)
+	baseJSONL := buildToolRenderJSONL("vfsEdit", call, map[string]any{"path": relativePath})
 	full := oneLiner + "\n\n"
 
 	// Check for error in arguments
@@ -180,7 +181,7 @@ func (t *VFSEditTool) Render(call *ToolCall) (string, string, map[string]string)
 		oneLiner = oneLiner + "\n" + errOneLiner
 		// Add error to full output
 		full = full + errFull
-		return oneLiner, full, make(map[string]string)
+		return oneLiner, full, baseJSONL, make(map[string]string)
 	}
 
 	// Create unified diff without line numbers
@@ -189,5 +190,5 @@ func (t *VFSEditTool) Render(call *ToolCall) (string, string, map[string]string)
 	full += "@@ -1 +1 @@\n"
 	full += "-" + oldString + "\n"
 	full += "+" + newString + "\n"
-	return oneLiner, full, make(map[string]string)
+	return oneLiner, full, baseJSONL, make(map[string]string)
 }

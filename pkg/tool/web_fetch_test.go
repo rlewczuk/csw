@@ -332,7 +332,7 @@ func TestWebFetchTool_Render(t *testing.T) {
 		}),
 	}
 
-	oneLiner, full, meta := tool.Render(call)
+	oneLiner, full, _, meta := tool.Render(call)
 
 	assert.Contains(t, oneLiner, "fetch https://example.com")
 	assert.Contains(t, full, "sample")

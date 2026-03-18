@@ -53,9 +53,10 @@ func (t *VFSDeleteTool) Execute(args *ToolCall) *ToolResponse {
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSDeleteTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *VFSDeleteTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	path, _ := call.Arguments.StringOK("path")
 	relativePath := makeRelativePath(path, t.vfs)
+	baseJSONL := buildToolRenderJSONL("vfsDelete", call, map[string]any{"path": relativePath})
 	oneLiner := truncateString("delete "+relativePath, 128)
 	full := oneLiner
 
@@ -66,8 +67,8 @@ func (t *VFSDeleteTool) Render(call *ToolCall) (string, string, map[string]strin
 		oneLiner = oneLiner + "\n" + errOneLiner
 		// Add error to full output
 		full = full + "\n\n" + errFull
-		return oneLiner, full, make(map[string]string)
+		return oneLiner, full, baseJSONL, make(map[string]string)
 	}
 
-	return oneLiner, full, make(map[string]string)
+	return oneLiner, full, baseJSONL, make(map[string]string)
 }

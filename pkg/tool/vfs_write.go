@@ -136,9 +136,10 @@ func (t *VFSWriteTool) Execute(args *ToolCall) *ToolResponse {
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSWriteTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *VFSWriteTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	path, _ := call.Arguments.StringOK("path")
 	relativePath := makeRelativePath(path, t.vfs)
+	baseJSONL := buildToolRenderJSONL("vfsWrite", call, map[string]any{"path": relativePath})
 	oneLiner := truncateString("write "+relativePath, 128)
 	full := oneLiner + "\n\n"
 
@@ -149,12 +150,12 @@ func (t *VFSWriteTool) Render(call *ToolCall) (string, string, map[string]string
 		oneLiner = oneLiner + "\n" + errOneLiner
 		// Add error to full output
 		full = full + errFull
-		return oneLiner, full, make(map[string]string)
+		return oneLiner, full, baseJSONL, make(map[string]string)
 	}
 
 	// Try to get content from arguments
 	if content, ok := call.Arguments.StringOK("content"); ok && content != "" {
 		full += content
 	}
-	return oneLiner, full, make(map[string]string)
+	return oneLiner, full, baseJSONL, make(map[string]string)
 }

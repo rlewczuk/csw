@@ -64,7 +64,7 @@ type CLIParams struct {
 	ForceResume           bool
 	BashRunTimeout        time.Duration
 	MaxThreads            int
-	Verbose               bool
+	OutputFormat          string
 	VFSAllow              []string
 	HookOverrides         []string
 }
@@ -115,7 +115,7 @@ func CliCommand() *cobra.Command {
 		cliForce          bool
 		cliBashRunTimeout string
 		cliMaxThreads     int
-		cliVerbose        bool
+		cliOutputFormat   string
 		cliVFSAllow       []string
 		cliHooks          []string
 		cliContext        []string
@@ -261,7 +261,7 @@ func CliCommand() *cobra.Command {
 				ForceResume:           cliForce,
 				BashRunTimeout:        bashRunTimeout,
 				MaxThreads:            cliMaxThreads,
-				Verbose:               cliVerbose,
+				OutputFormat:          cliOutputFormat,
 				VFSAllow:              vfsAllowPaths,
 				HookOverrides:         cliHooks,
 			})
@@ -298,7 +298,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliForce, "force", false, "Force resume even when there is no pending work")
 	cmd.Flags().StringVar(&cliBashRunTimeout, "bash-run-timeout", "120", "Default runBash command timeout (duration; plain number means seconds)")
 	cmd.Flags().IntVar(&cliMaxThreads, "max-threads", 0, "Maximum number of tool calls executed in parallel")
-	cmd.Flags().BoolVar(&cliVerbose, "verbose", false, "Display full tool output instead of one-liners")
+	cmd.Flags().StringVar(&cliOutputFormat, "output-format", "short", "Console output format: short, full, jsonl")
 	cmd.Flags().StringArrayVar(&cliVFSAllow, "vfs-allow", nil, "Additional path to allow VFS access outside of worktree (repeatable, or use ':' separated list)")
 	cmd.Flags().StringArrayVar(&cliHooks, "hook", nil, "Ephemeral hook override: --hook name | --hook name:disable | --hook name:key=value,key2=value2")
 	cmd.Flags().StringArrayVarP(&cliContext, "context", "c", nil, "Template context value in KEY=VAL format (repeatable)")
@@ -386,6 +386,12 @@ func runCLI(params *CLIParams) error {
 	if params.BashRunTimeout <= 0 {
 		params.BashRunTimeout = defaultBashRunTimeout
 	}
+	if strings.TrimSpace(params.OutputFormat) == "" {
+		params.OutputFormat = "short"
+	}
+	if params.OutputFormat != "short" && params.OutputFormat != "full" && params.OutputFormat != "jsonl" {
+		return fmt.Errorf("runCLI() [cli.go]: invalid --output-format %q (allowed: short, full, jsonl)", params.OutputFormat)
+	}
 
 	if params.Merge && params.WorktreeBranch == "" {
 		return fmt.Errorf("runCLI() [cli.go]: --merge requires --worktree")
@@ -459,7 +465,7 @@ func runCLI(params *CLIParams) error {
 		_, _ = fmt.Fprintln(os.Stdout, buildContainerStartupInfoMessage(buildResult))
 	}
 
-	runtimeResult, err := sweSystem.StartCLISession(system.StartCLISessionParams{
+		runtimeResult, err := sweSystem.StartCLISession(system.StartCLISessionParams{
 		ModelName:       params.ModelName,
 		RoleName:        params.RoleName,
 		Prompt:          params.Prompt,
@@ -468,7 +474,7 @@ func runCLI(params *CLIParams) error {
 		ForceResume:     params.ForceResume,
 		Interactive:     params.Interactive,
 		AllowAllPerms:   params.AllowAllPerms,
-		Verbose:         params.Verbose,
+		OutputFormat:    params.OutputFormat,
 		AppOutput:       os.Stdout,
 		ChatOutput:      os.Stdout,
 		ChatInput:       os.Stdin,
@@ -478,8 +484,8 @@ func runCLI(params *CLIParams) error {
 		ChatPresenterFactory: func(factory core.SessionFactory, thread *core.SessionThread) system.ChatPresenter {
 			return presenter.NewChatPresenter(factory, thread)
 		},
-		ChatViewFactory: func(chatPresenter ui.IChatPresenter, output io.Writer, input io.Reader, interactive bool, allowAllPerms bool, verbose bool) system.ChatView {
-			return cli.NewCliChatView(chatPresenter, output, input, cliSlug, interactive, allowAllPerms, verbose)
+		ChatViewFactory: func(chatPresenter ui.IChatPresenter, output io.Writer, input io.Reader, interactive bool, allowAllPerms bool, outputFormat string) system.ChatView {
+			return cli.NewCliChatView(chatPresenter, output, input, cliSlug, interactive, allowAllPerms, params.OutputFormat)
 		},
 	})
 	if err != nil {

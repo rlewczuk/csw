@@ -488,6 +488,6 @@ func (d *dummyTool) Execute(args *tool.ToolCall) *tool.ToolResponse {
 	}
 }
 
-func (d *dummyTool) Render(call *tool.ToolCall) (string, string, map[string]string) {
-	return d.name, d.name, make(map[string]string)
+func (d *dummyTool) Render(call *tool.ToolCall) (string, string, string, map[string]string) {
+	return d.name, d.name, "{}", make(map[string]string)
 }

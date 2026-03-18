@@ -333,7 +333,7 @@ func isTimeoutError(err error) bool {
 }
 
 // Render returns a string representation of the tool call.
-func (t *RunBashTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *RunBashTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	command, _ := call.Arguments.StringOK("command")
 	exitCode := call.Arguments.Int("exit_code")
 	output := call.Arguments.String("output")
@@ -363,5 +363,12 @@ func (t *RunBashTool) Render(call *ToolCall) (string, string, map[string]string)
 		full += output
 	}
 
-	return oneLiner, full, make(map[string]string)
+	jsonl := buildToolRenderJSONL("runBash", call, map[string]any{
+		"command": command,
+		"exit_code": exitCode,
+		"stderr":    stderr,
+		"output":    output,
+	})
+
+	return oneLiner, full, jsonl, make(map[string]string)
 }

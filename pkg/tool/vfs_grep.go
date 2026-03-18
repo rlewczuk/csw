@@ -170,7 +170,7 @@ func formatInt64(n int64) string {
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSGrepTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *VFSGrepTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	pattern, _ := call.Arguments.StringOK("pattern")
 	path := call.Arguments.String("path")
 
@@ -202,6 +202,7 @@ func (t *VFSGrepTool) Render(call *ToolCall) (string, string, map[string]string)
 
 	oneLiner := baseText + resultSuffix
 	full := baseText + resultSuffix + "\n\n"
+	jsonl := buildToolRenderJSONL("vfsGrep", call, map[string]any{"pattern": pattern, "path": path, "count": resultCount})
 
 	// Try to get content from result if available
 	if content, ok := call.Arguments.Get("content").AsStringOK(); ok && content != "" {
@@ -215,7 +216,7 @@ func (t *VFSGrepTool) Render(call *ToolCall) (string, string, map[string]string)
 		full += "\n\n" + errFull
 	}
 
-	return oneLiner, full, make(map[string]string)
+	return oneLiner, full, jsonl, make(map[string]string)
 }
 
 // countGrepResults counts the number of result lines in grep output.

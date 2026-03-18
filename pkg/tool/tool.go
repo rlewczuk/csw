@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 )
@@ -560,8 +561,9 @@ type Tool interface {
 	// Render returns a string representation of the tool call result.
 	// First string is one-line summary of the tool call (equivalent of DisplayModeShort).
 	// Second string is full information (equivalent of DisplayModeFull).
+	// Third string is JSONL representation of the tool call.
 	// Map contains additional properties that can be used to display in the UI.
-	Render(call *ToolCall) (string, string, map[string]string)
+	Render(call *ToolCall) (string, string, string, map[string]string)
 
 	// GetDescription returns the description of the tool.
 	// This can be used to add dynamic information to the description.
@@ -627,4 +629,63 @@ func truncateOutput(output string, maxLines int) string {
 	truncated := strings.Join(lines[:maxLines], "\n")
 	truncated += "\nOutput is truncated."
 	return truncated
+}
+
+// inferRenderStatusAndTime derives status and time from a rendered tool call.
+func inferRenderStatusAndTime(call *ToolCall) (string, string) {
+	status := "success"
+	timeStr := time.Now().UTC().Format(time.RFC3339Nano)
+	if call == nil {
+		return status, timeStr
+	}
+
+	if call.Arguments.String("error") != "" {
+		status = "error"
+	}
+	if exitCode, ok := call.Arguments.IntOK("exit_code"); ok && exitCode != 0 {
+		status = "error"
+	}
+	if explicitStatus := strings.TrimSpace(call.Arguments.String("status")); explicitStatus != "" {
+		status = explicitStatus
+	}
+
+	for _, key := range []string{"time", "timestamp"} {
+		if explicitTime := strings.TrimSpace(call.Arguments.String(key)); explicitTime != "" {
+			timeStr = explicitTime
+			break
+		}
+	}
+
+	return status, timeStr
+}
+
+// buildToolRenderJSONL builds one JSON object suitable for JSONL rendering.
+func buildToolRenderJSONL(toolName string, call *ToolCall, extra map[string]any) string {
+	status, timeStr := inferRenderStatusAndTime(call)
+	obj := map[string]any{
+		"tool":   strings.TrimSpace(toolName),
+		"time":   timeStr,
+		"status": status,
+	}
+	for k, v := range extra {
+		if strings.TrimSpace(k) == "" {
+			continue
+		}
+		if k == "tool" || k == "time" || k == "status" {
+			continue
+		}
+		obj[k] = v
+	}
+
+	content, err := json.Marshal(obj)
+	if err != nil {
+		fallback, _ := json.Marshal(map[string]any{
+			"tool":   strings.TrimSpace(toolName),
+			"time":   timeStr,
+			"status": status,
+		})
+		return string(fallback)
+	}
+
+	return string(content)
 }

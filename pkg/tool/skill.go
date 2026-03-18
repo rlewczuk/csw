@@ -103,7 +103,7 @@ func (t *SkillTool) Execute(args *ToolCall) *ToolResponse {
 }
 
 // Render returns a string representation of the tool call.
-func (t *SkillTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *SkillTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	name := call.Arguments.String("name")
 	if name == "" {
 		name = call.Arguments.String("tool")
@@ -111,16 +111,21 @@ func (t *SkillTool) Render(call *ToolCall) (string, string, map[string]string) {
 
 	oneLiner := truncateString(fmt.Sprintf("load skill %s", name), 128)
 	full := oneLiner
-	if output, ok := call.Arguments.StringOK("output"); ok && output != "" {
-		full += "\n\n" + output
+	outputValue := ""
+	if out, ok := call.Arguments.StringOK("output"); ok && out != "" {
+		full += "\n\n" + out
+		outputValue = out
 	}
+	errMsgValue := ""
 	if errMsg, ok := call.Arguments.StringOK("error"); ok && errMsg != "" {
 		errOneLiner, errFull := formatRenderError(errMsg)
 		oneLiner += "\n" + errOneLiner
 		full += "\n\n" + errFull
+		errMsgValue = errMsg
 	}
 
-	return oneLiner, full, make(map[string]string)
+	jsonl := buildToolRenderJSONL("skill", call, map[string]any{"name": name, "output": outputValue, "error": errMsgValue})
+	return oneLiner, full, jsonl, make(map[string]string)
 }
 
 func (t *SkillTool) getSkill(skillName string) (*skillEntry, error) {

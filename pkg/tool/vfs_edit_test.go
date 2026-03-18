@@ -578,7 +578,7 @@ func TestVFSEditToolRender(t *testing.T) {
 				"newString": "new",
 			}),
 		}
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - path should be relative to worktree with line stats (+1/-1)
 		assert.Equal(t, "edit cmd/csw/main.go (+1/-1)", oneLiner)
@@ -601,7 +601,7 @@ func TestVFSEditToolRender(t *testing.T) {
 				"newString": "new",
 			}),
 		}
-		oneLiner, _, _ := tool.Render(call)
+		oneLiner, _, _, _ := tool.Render(call)
 
 		// Assert - path should be relative with line stats (+1/-1)
 		assert.Equal(t, "edit cmd/csw/main.go (+1/-1)", oneLiner)
@@ -623,7 +623,7 @@ func TestVFSEditToolRender(t *testing.T) {
 				"error":     "failed to edit file: oldString not found",
 			}),
 		}
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - oneLiner should have error as second line
 		assert.Contains(t, oneLiner, "edit cmd/csw/main.go (+1/-1)")

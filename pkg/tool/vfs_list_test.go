@@ -241,7 +241,7 @@ func TestVFSListToolRender(t *testing.T) {
 		}),
 	}
 
-	oneLiner, full, _ := listTool.Render(call)
+	oneLiner, full, _, _ := listTool.Render(call)
 	assert.Contains(t, oneLiner, "list . matching *.go")
 	assert.Contains(t, oneLiner, "(2 results)")
 	assert.Contains(t, full, "a.go")

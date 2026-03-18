@@ -486,10 +486,19 @@ func (t *Tool) Execute(args *tool.ToolCall) *tool.ToolResponse {
 }
 
 // Render renders MCP tool call summary.
-func (t *Tool) Render(call *tool.ToolCall) (string, string, map[string]string) {
+func (t *Tool) Render(call *tool.ToolCall) (string, string, string, map[string]string) {
 	oneLine := fmt.Sprintf("MCP %s/%s", t.serverName, t.original)
 	full := fmt.Sprintf("MCP tool %s/%s", t.serverName, t.original)
-	return oneLine, full, map[string]string{"server": t.serverName, "tool": t.original}
+	jsonl := tool.NewToolValue(map[string]any{})
+	jsonl.Set("tool", strings.TrimSpace(t.name))
+	jsonl.Set("status", "success")
+	jsonl.Set("server", t.serverName)
+	jsonl.Set("mcp_tool", t.original)
+	jsonBytes, err := json.Marshal(jsonl.Raw())
+	if err != nil {
+		jsonBytes = []byte(`{"tool":"mcp","status":"success"}`)
+	}
+	return oneLine, full, string(jsonBytes), map[string]string{"server": t.serverName, "tool": t.original}
 }
 
 // GetDescription returns empty dynamic description (static description comes from MCP schema).

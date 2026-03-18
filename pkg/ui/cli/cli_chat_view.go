@@ -26,6 +26,9 @@ type CliChatView struct {
 	// verbose controls whether to display full tool output instead of one-liners
 	verbose bool
 
+	// outputFormat controls tool rendering output format: short, full, jsonl
+	outputFormat string
+
 	// messages stores all messages for rendering
 	messages []*ui.ChatMessageUI
 
@@ -52,19 +55,48 @@ func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Read
 	interactive := false
 	acceptAllPermissions := false
 	verbose := false
+	outputFormat := "short"
 
 	if len(options) == 3 {
 		interactive, _ = options[0].(bool)
 		acceptAllPermissions, _ = options[1].(bool)
-		verbose, _ = options[2].(bool)
+		switch formatValue := options[2].(type) {
+		case string:
+			outputFormat = strings.TrimSpace(formatValue)
+		case bool:
+			verbose = formatValue
+			if verbose {
+				outputFormat = "full"
+			}
+		}
 	}
 
 	if len(options) >= 4 {
 		slug, _ = options[0].(string)
 		interactive, _ = options[1].(bool)
 		acceptAllPermissions, _ = options[2].(bool)
-		verbose, _ = options[3].(bool)
+		switch formatValue := options[3].(type) {
+		case string:
+			outputFormat = strings.TrimSpace(formatValue)
+		case bool:
+			verbose = formatValue
+			if verbose {
+				outputFormat = "full"
+			}
+		}
 	}
+
+	if outputFormat == "" {
+		if verbose {
+			outputFormat = "full"
+		} else {
+			outputFormat = "short"
+		}
+	}
+	if outputFormat != "short" && outputFormat != "full" && outputFormat != "jsonl" {
+		outputFormat = "short"
+	}
+	verbose = outputFormat == "full"
 
 	// acceptAllPermissions implies interactive=false
 	if acceptAllPermissions {
@@ -79,6 +111,7 @@ func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Read
 		interactive:          interactive,
 		acceptAllPermissions: acceptAllPermissions,
 		verbose:              verbose,
+		outputFormat:         outputFormat,
 		messages:             make([]*ui.ChatMessageUI, 0),
 		stopCh:               make(chan struct{}),
 		renderedTools:        make(map[string]string),
@@ -382,9 +415,11 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) bool {
 		return false
 	}
 
-	// In verbose mode, use Details field; otherwise use Summary
+	// In selected mode, use JSONL/details/summary.
 	displayStr := tool.Summary
-	if v.verbose {
+	if v.outputFormat == "jsonl" {
+		displayStr = tool.JSONL
+	} else if v.verbose {
 		displayStr = tool.Details
 	}
 	if displayStr == "" {
@@ -409,6 +444,9 @@ func (v *CliChatView) renderTool(tool *ui.ToolUI) bool {
 	}
 
 	outputLine := fmt.Sprintf("%s %s\n", icon, displayStr)
+	if v.outputFormat == "jsonl" {
+		outputLine = displayStr + "\n"
+	}
 
 	// Check if this tool has already been rendered with the same output
 	if lastOutput, ok := v.renderedTools[tool.Id]; ok && lastOutput == outputLine {
@@ -429,6 +467,10 @@ func (v *CliChatView) writef(format string, args ...any) {
 }
 
 func (v *CliChatView) write(message string) {
+	if v.outputFormat == "jsonl" {
+		_, _ = fmt.Fprint(v.output, message)
+		return
+	}
 	_, _ = fmt.Fprint(v.output, addCLISlugPrefix(v.slug, message))
 }
 

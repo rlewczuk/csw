@@ -165,7 +165,7 @@ func (t *WebFetchTool) Execute(args *ToolCall) *ToolResponse {
 }
 
 // Render returns a string representation of the tool call.
-func (t *WebFetchTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *WebFetchTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	urlValue, _ := call.Arguments.StringOK("url")
 	oneLiner := truncateString("fetch "+urlValue, 128)
 	full := oneLiner + "\n\n"
@@ -174,7 +174,13 @@ func (t *WebFetchTool) Render(call *ToolCall) (string, string, map[string]string
 		full += content
 	}
 
-	return oneLiner, full, make(map[string]string)
+	jsonl := buildToolRenderJSONL("webFetch", call, map[string]any{
+		"url":          urlValue,
+		"format":       call.Arguments.String("format"),
+		"status_code":  call.Arguments.Int("statusCode"),
+		"content_type": call.Arguments.String("contentType"),
+	})
+	return oneLiner, full, jsonl, make(map[string]string)
 }
 
 func isHTMLContent(contentType string, content string) bool {

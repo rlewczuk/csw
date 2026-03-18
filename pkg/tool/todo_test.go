@@ -420,7 +420,7 @@ func TestTodoWriteTool_Render(t *testing.T) {
 		tool := NewTodoWriteTool(mockSession)
 		call := &ToolCall{ID: "test-id", Function: "todoWrite", Arguments: NewToolValue(map[string]any{})}
 
-		oneLiner, full, extra := tool.Render(call)
+		oneLiner, full, _, extra := tool.Render(call)
 
 		assert.Equal(t, "(0/0) No current task.", oneLiner)
 		assert.Equal(t, "", full)
@@ -436,7 +436,7 @@ func TestTodoWriteTool_Render(t *testing.T) {
 		tool := NewTodoWriteTool(mockSession)
 		call := &ToolCall{ID: "test-id", Function: "todoWrite", Arguments: NewToolValue(map[string]any{})}
 
-		oneLiner, full, extra := tool.Render(call)
+		oneLiner, full, _, extra := tool.Render(call)
 
 		assert.Equal(t, "(1/2) First task.", oneLiner)
 		assert.Contains(t, full, "[ ] First task")
@@ -454,7 +454,7 @@ func TestTodoWriteTool_Render(t *testing.T) {
 		tool := NewTodoWriteTool(mockSession)
 		call := &ToolCall{ID: "test-id", Function: "todoWrite", Arguments: NewToolValue(map[string]any{})}
 
-		oneLiner, full, extra := tool.Render(call)
+		oneLiner, full, _, extra := tool.Render(call)
 
 		assert.Equal(t, "(2/3) Second task.", oneLiner)
 		assert.Contains(t, full, "[X] First task")
@@ -472,7 +472,7 @@ func TestTodoWriteTool_Render(t *testing.T) {
 		tool := NewTodoWriteTool(mockSession)
 		call := &ToolCall{ID: "test-id", Function: "todoWrite", Arguments: NewToolValue(map[string]any{})}
 
-		oneLiner, full, extra := tool.Render(call)
+		oneLiner, full, _, extra := tool.Render(call)
 
 		assert.Equal(t, "(2/2) Second task.", oneLiner)
 		assert.Contains(t, full, "[X] First task")
@@ -490,7 +490,7 @@ func TestTodoWriteTool_Render(t *testing.T) {
 		tool := NewTodoWriteTool(mockSession)
 		call := &ToolCall{ID: "test-id", Function: "todoWrite", Arguments: NewToolValue(map[string]any{})}
 
-		oneLiner, full, extra := tool.Render(call)
+		oneLiner, full, _, extra := tool.Render(call)
 
 		assert.Equal(t, "(2/3) Third task.", oneLiner)
 		assert.Contains(t, full, "[X] First task")
@@ -506,7 +506,7 @@ func TestTodoReadTool_Render(t *testing.T) {
 		tool := NewTodoReadTool(mockSession)
 		call := &ToolCall{ID: "test-id", Function: "todoRead", Arguments: NewToolValue(map[string]any{})}
 
-		oneLiner, full, extra := tool.Render(call)
+		oneLiner, full, _, extra := tool.Render(call)
 
 		assert.Equal(t, "(0/0) No current task.", oneLiner)
 		assert.Equal(t, "", full)
@@ -524,7 +524,7 @@ func TestTodoReadTool_Render(t *testing.T) {
 		tool := NewTodoReadTool(mockSession)
 		call := &ToolCall{ID: "test-id", Function: "todoRead", Arguments: NewToolValue(map[string]any{})}
 
-		oneLiner, full, extra := tool.Render(call)
+		oneLiner, full, _, extra := tool.Render(call)
 
 		assert.Equal(t, "(2/4) In progress task.", oneLiner)
 		assert.Contains(t, full, "[X] Completed task")

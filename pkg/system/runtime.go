@@ -37,7 +37,7 @@ type AppViewFactory func(output io.Writer) SessionLoggerAppView
 type ChatPresenterFactory func(system core.SessionFactory, thread *core.SessionThread) ChatPresenter
 
 // ChatViewFactory builds chat view bound to presenter.
-type ChatViewFactory func(presenter ui.IChatPresenter, output io.Writer, input io.Reader, interactive bool, allowAllPerms bool, verbose bool) ChatView
+type ChatViewFactory func(presenter ui.IChatPresenter, output io.Writer, input io.Reader, interactive bool, allowAllPerms bool, outputFormat string) ChatView
 
 // StartCLISessionParams defines parameters for creating and starting CLI session runtime.
 type StartCLISessionParams struct {
@@ -49,7 +49,7 @@ type StartCLISessionParams struct {
 	ForceResume          bool
 	Interactive          bool
 	AllowAllPerms        bool
-	Verbose              bool
+	OutputFormat         string
 	AppOutput            io.Writer
 	ChatOutput           io.Writer
 	ChatInput            io.Reader
@@ -124,7 +124,7 @@ func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessi
 
 	chatPresenter := params.ChatPresenterFactory(s, thread)
 	chatPresenter.SetAppView(appView)
-	chatView := params.ChatViewFactory(chatPresenter, params.ChatOutput, params.ChatInput, params.Interactive, params.AllowAllPerms, params.Verbose)
+	chatView := params.ChatViewFactory(chatPresenter, params.ChatOutput, params.ChatInput, params.Interactive, params.AllowAllPerms, params.OutputFormat)
 
 	if err := chatPresenter.SetView(chatView); err != nil {
 		return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to set view: %w", err)

@@ -116,7 +116,7 @@ func normalizeAbsoluteFindResult(worktreeRoot, listedPath string) string {
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSFindTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *VFSFindTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	query, _ := call.Arguments.StringOK("query")
 
 	// Count results from files if available
@@ -137,6 +137,7 @@ func (t *VFSFindTool) Render(call *ToolCall) (string, string, map[string]string)
 
 	oneLiner := baseText + resultSuffix
 	full := baseText + resultSuffix + "\n\n"
+	jsonl := buildToolRenderJSONL("vfsFind", call, map[string]any{"query": query, "count": resultCount})
 
 	// Add files to full output
 	for _, f := range files {
@@ -150,5 +151,5 @@ func (t *VFSFindTool) Render(call *ToolCall) (string, string, map[string]string)
 		full += "\n\n" + errFull
 	}
 
-	return oneLiner, full, make(map[string]string)
+	return oneLiner, full, jsonl, make(map[string]string)
 }

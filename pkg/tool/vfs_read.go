@@ -82,9 +82,10 @@ func (t *VFSReadTool) Execute(args *ToolCall) *ToolResponse {
 }
 
 // Render returns a string representation of the tool call.
-func (t *VFSReadTool) Render(call *ToolCall) (string, string, map[string]string) {
+func (t *VFSReadTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	path, _ := call.Arguments.StringOK("path")
 	relativePath := makeRelativePath(path, t.vfs)
+	baseJSONL := buildToolRenderJSONL("vfsRead", call, map[string]any{"path": relativePath})
 
 	// Check for error in arguments
 	if errMsg, ok := call.Arguments.StringOK("error"); ok && errMsg != "" {
@@ -95,7 +96,7 @@ func (t *VFSReadTool) Render(call *ToolCall) (string, string, map[string]string)
 		oneLiner = oneLiner + "\n" + errOneLiner
 		// Add error to full output
 		full = full + errFull
-		return oneLiner, full, make(map[string]string)
+		return oneLiner, full, baseJSONL, make(map[string]string)
 	}
 
 	// Try to get content from result if available
@@ -106,5 +107,5 @@ func (t *VFSReadTool) Render(call *ToolCall) (string, string, map[string]string)
 	if content != "" {
 		full += content
 	}
-	return oneLiner, full, make(map[string]string)
+	return oneLiner, full, baseJSONL, make(map[string]string)
 }

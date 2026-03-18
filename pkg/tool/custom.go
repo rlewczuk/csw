@@ -529,6 +529,9 @@ func (t *CustomCommandTool) logExecutionError(message string, args ...any) {
 }
 
 // Render returns a short and full textual representation of the custom tool call.
-func (t *CustomCommandTool) Render(call *ToolCall) (string, string, map[string]string) {
-	return "custom: " + t.name, "custom tool: " + t.name, map[string]string{}
+func (t *CustomCommandTool) Render(call *ToolCall) (string, string, string, map[string]string) {
+	oneLiner := "custom: " + t.name
+	full := "custom tool: " + t.name
+	jsonl := buildToolRenderJSONL(t.name, call, map[string]any{"name": t.name})
+	return oneLiner, full, jsonl, map[string]string{}
 }

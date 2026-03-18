@@ -322,6 +322,7 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 	assert.Equal(t, "test.txt", filesArr[0].AsString())
 }
 
-func (m *MockTool) Render(call *ToolCall) (string, string, map[string]string) {
-	return m.name, m.name, make(map[string]string)
+func (m *MockTool) Render(call *ToolCall) (string, string, string, map[string]string) {
+	jsonl := buildToolRenderJSONL(m.name, call, nil)
+	return m.name, m.name, jsonl, make(map[string]string)
 }

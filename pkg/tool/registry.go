@@ -180,14 +180,16 @@ func RegisterSkillTool(registry *ToolRegistry, workdir string) {
 }
 
 // Render returns a string representation of the tool call.
-func (r *ToolRegistry) Render(call *ToolCall) (string, string, map[string]string) {
+func (r *ToolRegistry) Render(call *ToolCall) (string, string, string, map[string]string) {
 	if call == nil || call.Function == "" {
-		return "ToolRegistry", "ToolRegistry", make(map[string]string)
+		jsonl := buildToolRenderJSONL("toolRegistry", call, map[string]any{"label": "ToolRegistry"})
+		return "ToolRegistry", "ToolRegistry", jsonl, make(map[string]string)
 	}
 
 	toolImpl, err := r.Get(call.Function)
 	if err != nil || toolImpl == nil {
-		return call.Function, call.Function, make(map[string]string)
+		jsonl := buildToolRenderJSONL("toolRegistry", call, map[string]any{"function": call.Function})
+		return call.Function, call.Function, jsonl, make(map[string]string)
 	}
 
 	return toolImpl.Render(call)

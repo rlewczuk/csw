@@ -270,7 +270,7 @@ func TestVFSMoveToolRender(t *testing.T) {
 				"destination": "/path/to/worktree/cmd/csw/main_renamed.go",
 			}),
 		}
-		oneLiner, _, _ := tool.Render(call)
+		oneLiner, _, _, _ := tool.Render(call)
 
 		// Assert - paths should be relative to worktree
 		assert.Equal(t, "move cmd/csw/main.go -> cmd/csw/main_renamed.go", oneLiner)
@@ -290,7 +290,7 @@ func TestVFSMoveToolRender(t *testing.T) {
 				"destination": "cmd/csw/main_renamed.go",
 			}),
 		}
-		oneLiner, _, _ := tool.Render(call)
+		oneLiner, _, _, _ := tool.Render(call)
 
 		// Assert
 		assert.Equal(t, "move cmd/csw/main.go -> cmd/csw/main_renamed.go", oneLiner)
@@ -311,7 +311,7 @@ func TestVFSMoveToolRender(t *testing.T) {
 				"error":       "failed to move file: destination already exists",
 			}),
 		}
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - oneLiner should have error as second line
 		assert.Contains(t, oneLiner, "move cmd/csw/main.go -> cmd/csw/main_renamed.go")

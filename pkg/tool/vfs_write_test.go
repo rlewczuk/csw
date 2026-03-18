@@ -298,7 +298,7 @@ func TestVFSWriteToolRender(t *testing.T) {
 				"content": "package main",
 			}),
 		}
-		oneLiner, _, _ := tool.Render(call)
+		oneLiner, _, _, _ := tool.Render(call)
 
 		// Assert - path should be relative to worktree
 		assert.Equal(t, "write cmd/csw/main.go", oneLiner)
@@ -318,7 +318,7 @@ func TestVFSWriteToolRender(t *testing.T) {
 				"content": "package main",
 			}),
 		}
-		oneLiner, _, _ := tool.Render(call)
+		oneLiner, _, _, _ := tool.Render(call)
 
 		// Assert
 		assert.Equal(t, "write cmd/csw/main.go", oneLiner)
@@ -339,7 +339,7 @@ func TestVFSWriteToolRender(t *testing.T) {
 				"error":   "failed to write file: permission denied",
 			}),
 		}
-		oneLiner, full, _ := tool.Render(call)
+		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - oneLiner should have error as second line
 		assert.Contains(t, oneLiner, "write cmd/csw/main.go")
