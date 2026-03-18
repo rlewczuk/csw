@@ -3,15 +3,19 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/ui"
 )
@@ -35,19 +39,53 @@ type HookContext map[string]string
 
 // HookExecutionRequest defines one hook execution.
 type HookExecutionRequest struct {
-	Name string
-	View ui.IAppView
-	VCS  interface{}
+	Name    string
+	View    ui.IAppView
+	VCS     interface{}
+	Session *SweSession
 }
 
 // HookExecutionResult contains hook command execution details.
 type HookExecutionResult struct {
-	Config   *conf.HookConfig
-	Command  string
-	Stdout   string
-	Stderr   string
-	ExitCode int
+	Config            *conf.HookConfig
+	Command           string
+	Stdout            string
+	Stderr            string
+	ExitCode          int
+	FeedbackRequests  []HookFeedbackRequest
+	FeedbackResponses []HookFeedbackResponse
 }
+
+// HookFeedbackResponseMode defines response delivery mode for feedback command.
+type HookFeedbackResponseMode string
+
+const (
+	// HookFeedbackResponseNone means no response should be returned.
+	HookFeedbackResponseNone HookFeedbackResponseMode = "none"
+	// HookFeedbackResponseStdin means response should be passed through stdin as JSON lines.
+	HookFeedbackResponseStdin HookFeedbackResponseMode = "stdin"
+	// HookFeedbackResponseRerun means script should be rerun with response in CSW_RESPONSE env variable.
+	HookFeedbackResponseRerun HookFeedbackResponseMode = "rerun"
+)
+
+// HookFeedbackRequest defines one feedback command emitted by script.
+type HookFeedbackRequest struct {
+	Fn       string                   `json:"fn"`
+	Args     map[string]any           `json:"args,omitempty"`
+	Response HookFeedbackResponseMode `json:"response,omitempty"`
+	ID       string                   `json:"id,omitempty"`
+}
+
+// HookFeedbackResponse defines processed feedback result.
+type HookFeedbackResponse struct {
+	ID     string `json:"id,omitempty"`
+	Fn     string `json:"fn"`
+	OK     bool   `json:"ok"`
+	Result any    `json:"result,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+var cswFeedbackLinePattern = regexp.MustCompile(`(?m)^\s*CSWFEEDBACK:\s*(\{.*\})\s*$`)
 
 // HookExecutionError represents non-zero hook exit code.
 type HookExecutionError struct {
@@ -70,15 +108,18 @@ type HookEngine struct {
 	hostRunner  shellCommandRunner
 	shellRunner shellCommandRunner
 	contextData HookContext
+	providers   map[string]models.ModelProvider
+	mu          sync.RWMutex
 }
 
 // NewHookEngine creates a new hook execution engine.
-func NewHookEngine(configStore conf.ConfigStore, hostRunner shellCommandRunner, shellRunner shellCommandRunner) *HookEngine {
+func NewHookEngine(configStore conf.ConfigStore, hostRunner shellCommandRunner, shellRunner shellCommandRunner, providers map[string]models.ModelProvider) *HookEngine {
 	engine := &HookEngine{
 		configStore: configStore,
 		hostRunner:  hostRunner,
 		shellRunner: shellRunner,
 		contextData: make(HookContext),
+		providers:   providers,
 	}
 	engine.contextData["status"] = string(HookSessionStatusNone)
 	return engine
@@ -86,6 +127,9 @@ func NewHookEngine(configStore conf.ConfigStore, hostRunner shellCommandRunner, 
 
 // ContextData returns a copy of current hook context data.
 func (e *HookEngine) ContextData() HookContext {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	result := make(HookContext, len(e.contextData))
 	for key, value := range e.contextData {
 		result[key] = value
@@ -98,6 +142,10 @@ func (e *HookEngine) SetContextValue(key string, value string) {
 	if e == nil || strings.TrimSpace(key) == "" {
 		return
 	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	e.contextData[key] = value
 }
 
@@ -106,6 +154,10 @@ func (e *HookEngine) MergeContext(values map[string]string) {
 	if e == nil {
 		return
 	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	for key, value := range values {
 		if strings.TrimSpace(key) == "" {
 			continue
@@ -193,7 +245,7 @@ func (e *HookEngine) executeShell(ctx context.Context, hookConfig *conf.HookConf
 	}
 
 	originalEnv := snapshotEnvironment()
-	applyHookEnvironment(e.contextData)
+	applyHookEnvironment(e.ContextData())
 	defer restoreEnvironment(originalEnv)
 
 	timeout := hookConfig.Timeout
@@ -211,6 +263,42 @@ func (e *HookEngine) executeShell(ctx context.Context, hookConfig *conf.HookConf
 		ExitCode: exitCode,
 	}
 
+	feedbackRequests := parseHookFeedbackRequests(stdout, stderr)
+	result.FeedbackRequests = feedbackRequests
+	feedbackExecutions := e.processHookFeedbackRequests(ctx, request, feedbackRequests)
+	if len(feedbackExecutions) > 0 {
+		result.FeedbackResponses = make([]HookFeedbackResponse, 0, len(feedbackExecutions))
+		stdinResponses := make([]string, 0)
+		rerunResponses := make([]string, 0)
+
+		for _, execution := range feedbackExecutions {
+			result.FeedbackResponses = append(result.FeedbackResponses, execution.Response)
+			if execution.Mode == HookFeedbackResponseNone {
+				continue
+			}
+			line, err := marshalHookFeedbackResponse(execution.Response)
+			if err != nil {
+				continue
+			}
+			switch execution.Mode {
+			case HookFeedbackResponseStdin:
+				stdinResponses = append(stdinResponses, line)
+			case HookFeedbackResponseRerun:
+				rerunResponses = append(rerunResponses, line)
+			}
+		}
+
+		if len(stdinResponses) > 0 {
+			stdinCommand := buildStdinReplayCommand(command, stdinResponses)
+			_, _, _, _ = runnerToUse.RunCommandWithOptionsDetailed(stdinCommand, runner.CommandOptions{Timeout: timeout})
+		}
+
+		for _, line := range rerunResponses {
+			rerunCommand := buildRerunCommand(command, line)
+			_, _, _, _ = runnerToUse.RunCommandWithOptionsDetailed(rerunCommand, runner.CommandOptions{Timeout: timeout})
+		}
+	}
+
 	e.showHookOutput(request.View, hookConfig, command, stdout, stderr)
 
 	if runErr != nil {
@@ -221,6 +309,248 @@ func (e *HookEngine) executeShell(ctx context.Context, hookConfig *conf.HookConf
 	}
 
 	return result, nil
+}
+
+func parseHookFeedbackRequests(stdout string, stderr string) []HookFeedbackRequest {
+	matches := cswFeedbackLinePattern.FindAllStringSubmatch(strings.Join([]string{stdout, stderr}, "\n"), -1)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	result := make([]HookFeedbackRequest, 0, len(matches))
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		payload := strings.TrimSpace(match[1])
+		if payload == "" {
+			continue
+		}
+		request := HookFeedbackRequest{}
+		if err := json.Unmarshal([]byte(payload), &request); err != nil {
+			continue
+		}
+		request.Fn = strings.TrimSpace(request.Fn)
+		if request.Fn == "" {
+			continue
+		}
+		request.ID = strings.TrimSpace(request.ID)
+		request.Response = normalizeFeedbackResponseMode(request.Response)
+		if request.Args == nil {
+			request.Args = map[string]any{}
+		}
+		result = append(result, request)
+	}
+
+	return result
+}
+
+func normalizeFeedbackResponseMode(value HookFeedbackResponseMode) HookFeedbackResponseMode {
+	switch HookFeedbackResponseMode(strings.ToLower(strings.TrimSpace(string(value)))) {
+	case HookFeedbackResponseStdin:
+		return HookFeedbackResponseStdin
+	case HookFeedbackResponseRerun:
+		return HookFeedbackResponseRerun
+	default:
+		return HookFeedbackResponseNone
+	}
+}
+
+type hookFeedbackExecution struct {
+	Mode     HookFeedbackResponseMode
+	Response HookFeedbackResponse
+}
+
+func (e *HookEngine) processHookFeedbackRequests(ctx context.Context, hookRequest HookExecutionRequest, requests []HookFeedbackRequest) []hookFeedbackExecution {
+	if len(requests) == 0 {
+		return nil
+	}
+
+	results := make(chan hookFeedbackExecution, len(requests))
+	var waitGroup sync.WaitGroup
+
+	for _, current := range requests {
+		request := current
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			response := e.handleHookFeedbackRequest(ctx, hookRequest, request)
+			results <- hookFeedbackExecution{Mode: request.Response, Response: response}
+		}()
+	}
+
+	waitGroup.Wait()
+	close(results)
+
+	collected := make([]hookFeedbackExecution, 0, len(requests))
+	for result := range results {
+		collected = append(collected, result)
+	}
+
+	return collected
+}
+
+func (e *HookEngine) handleHookFeedbackRequest(ctx context.Context, hookRequest HookExecutionRequest, request HookFeedbackRequest) HookFeedbackResponse {
+	response := HookFeedbackResponse{ID: request.ID, Fn: request.Fn, OK: false}
+
+	switch request.Fn {
+	case "context":
+		updated, err := e.handleHookFeedbackContext(request.Args)
+		if err != nil {
+			response.Error = err.Error()
+			return response
+		}
+		response.OK = true
+		response.Result = updated
+	case "llm":
+		result, err := e.handleHookFeedbackLLM(ctx, hookRequest, request.Args)
+		if err != nil {
+			response.Error = err.Error()
+			return response
+		}
+		response.OK = true
+		response.Result = result
+	default:
+		response.Error = fmt.Sprintf("HookEngine.handleHookFeedbackRequest() [hooks_engine.go]: unsupported feedback function %q", request.Fn)
+	}
+
+	return response
+}
+
+func (e *HookEngine) handleHookFeedbackContext(args map[string]any) (map[string]string, error) {
+	updated := make(map[string]string)
+	for key, value := range args {
+		trimmedKey := strings.TrimSpace(key)
+		if trimmedKey == "" {
+			continue
+		}
+		updated[trimmedKey] = hookFeedbackValueToString(value)
+	}
+
+	e.MergeContext(updated)
+	return updated, nil
+}
+
+func (e *HookEngine) handleHookFeedbackLLM(ctx context.Context, hookRequest HookExecutionRequest, args map[string]any) (map[string]any, error) {
+	prompt := strings.TrimSpace(hookFeedbackArgString(args, "prompt"))
+	if prompt == "" {
+		return nil, fmt.Errorf("HookEngine.handleHookFeedbackLLM() [hooks_engine.go]: missing args.prompt")
+	}
+
+	modelRef := strings.TrimSpace(hookFeedbackArgString(args, "model"))
+	if modelRef == "" && hookRequest.Session != nil {
+		modelRef = hookRequest.Session.ModelWithProvider()
+	}
+	if strings.TrimSpace(modelRef) == "" {
+		return nil, fmt.Errorf("HookEngine.handleHookFeedbackLLM() [hooks_engine.go]: unable to resolve model")
+	}
+
+	providerName, modelName, err := parseFeedbackModelRef(modelRef)
+	if err != nil {
+		return nil, err
+	}
+
+	provider, ok := e.providers[providerName]
+	if !ok || provider == nil {
+		return nil, fmt.Errorf("HookEngine.handleHookFeedbackLLM() [hooks_engine.go]: provider not found: %s", providerName)
+	}
+
+	thinking := strings.TrimSpace(hookFeedbackArgString(args, "thinking"))
+	if thinking == "" && hookRequest.Session != nil {
+		thinking = hookRequest.Session.ThinkingLevel()
+	}
+
+	messages := make([]*models.ChatMessage, 0, 2)
+	systemPrompt := strings.TrimSpace(hookFeedbackArgString(args, "system-prompt"))
+	if systemPrompt != "" {
+		messages = append(messages, models.NewTextMessage(models.ChatRoleSystem, systemPrompt))
+	}
+	messages = append(messages, models.NewTextMessage(models.ChatRoleUser, prompt))
+
+	chatModel := provider.ChatModel(modelName, nil)
+	chatResponse, err := chatModel.Chat(ctx, messages, &models.ChatOptions{Thinking: thinking}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("HookEngine.handleHookFeedbackLLM() [hooks_engine.go]: llm request failed: %w", err)
+	}
+
+	result := map[string]any{
+		"model":    providerName + "/" + modelName,
+		"thinking": strings.TrimSpace(thinking),
+		"text":     "",
+	}
+	if chatResponse != nil {
+		result["text"] = strings.TrimSpace(chatResponse.GetText())
+	}
+
+	return result, nil
+}
+
+func hookFeedbackArgString(args map[string]any, key string) string {
+	if args == nil {
+		return ""
+	}
+	value, exists := args[key]
+	if !exists {
+		return ""
+	}
+	return hookFeedbackValueToString(value)
+}
+
+func hookFeedbackValueToString(value any) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return typed
+	default:
+		return fmt.Sprintf("%v", typed)
+	}
+}
+
+func marshalHookFeedbackResponse(response HookFeedbackResponse) (string, error) {
+	encoded, err := json.Marshal(response)
+	if err != nil {
+		return "", fmt.Errorf("marshalHookFeedbackResponse() [hooks_engine.go]: failed to marshal response: %w", err)
+	}
+	return string(encoded), nil
+}
+
+func buildStdinReplayCommand(command string, lines []string) string {
+	if len(lines) == 0 {
+		return command
+	}
+
+	quotedLines := make([]string, 0, len(lines))
+	for _, line := range lines {
+		quotedLines = append(quotedLines, singleQuoteShellValue(line))
+	}
+
+	return fmt.Sprintf("printf '%%s\\n' %s | (%s)", strings.Join(quotedLines, " "), command)
+}
+
+func singleQuoteShellValue(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
+}
+
+func buildRerunCommand(command string, responseLine string) string {
+	return fmt.Sprintf("CSW_RESPONSE=%s %s", singleQuoteShellValue(responseLine), command)
+}
+
+func parseFeedbackModelRef(model string) (string, string, error) {
+	trimmed := strings.TrimSpace(model)
+	for index, char := range trimmed {
+		if char != '/' {
+			continue
+		}
+		provider := strings.TrimSpace(trimmed[:index])
+		modelName := strings.TrimSpace(trimmed[index+1:])
+		if provider == "" || modelName == "" {
+			break
+		}
+		return provider, modelName, nil
+	}
+
+	return "", "", fmt.Errorf("parseFeedbackModelRef() [hooks_engine.go]: invalid model format, expected provider/model: %q", model)
 }
 
 func (e *HookEngine) selectRunner(runOn conf.HookRunOn) shellCommandRunner {
@@ -249,8 +579,9 @@ func (e *HookEngine) renderCommand(commandTemplate string) (string, error) {
 		return "", fmt.Errorf("HookEngine.renderCommand() [hooks_engine.go]: failed to parse command template: %w", err)
 	}
 
-	data := make(map[string]string, len(e.contextData))
-	for key, value := range e.contextData {
+	contextData := e.ContextData()
+	data := make(map[string]string, len(contextData))
+	for key, value := range contextData {
 		data[key] = value
 	}
 

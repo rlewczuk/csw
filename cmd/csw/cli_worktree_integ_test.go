@@ -205,7 +205,7 @@ func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
 	hostRunner := runner.NewMockRunner()
 	sandboxRunner := runner.NewMockRunner()
 	sandboxRunner.SetResponseDetailed("echo merge-hook", "merge ok\n", "", 0, nil)
-	hookEngine := core.NewHookEngine(configStore, hostRunner, sandboxRunner)
+	hookEngine := core.NewHookEngine(configStore, hostRunner, sandboxRunner, sweSystem.ModelProviders)
 	hookEngine.MergeContext(map[string]string{
 		"branch":  "feature/hook",
 		"workdir": "/repo/work",
@@ -223,6 +223,52 @@ func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
 	require.Len(t, appView.ShowMessageCalls, 2)
 	assert.Contains(t, appView.ShowMessageCalls[0].Message, "[hook:merge-custom] command")
 	assert.Contains(t, appView.ShowMessageCalls[1].Message, "[hook:merge-custom][stdout]")
+}
+
+func TestFinalizeWorktreeSessionMergeHookProcessesFeedbackRequests(t *testing.T) {
+	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge via hook feedback", true)
+	provider, ok := sweSystem.ModelProviders["mock"].(*models.MockClient)
+	require.True(t, ok)
+	provider.AddChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "feedback-response")})
+
+	configStore, ok := sweSystem.ConfigStore.(*confimpl.MockConfigStore)
+	require.True(t, ok)
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-feedback": {
+			Name:    "merge-feedback",
+			Hook:    "merge",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo merge-feedback",
+			RunOn:   conf.HookRunOnHost,
+		},
+	})
+
+	hostRunner := runner.NewMockRunner()
+	hostRunner.SetResponseDetailed(
+		"echo merge-feedback",
+		strings.Join([]string{
+			"CSWFEEDBACK: {\"fn\":\"context\",\"args\":{\"feedback-state\":\"ready\"},\"response\":\"none\",\"id\":\"ctx\"}",
+			"CSWFEEDBACK: {\"fn\":\"llm\",\"args\":{\"prompt\":\"feedback prompt\",\"model\":\"mock/test-model\"},\"response\":\"stdin\",\"id\":\"stdin-1\"}",
+			"CSWFEEDBACK: {\"fn\":\"llm\",\"args\":{\"prompt\":\"feedback prompt rerun\",\"model\":\"mock/test-model\"},\"response\":\"rerun\",\"id\":\"rerun-1\"}",
+		}, "\n")+"\n",
+		"",
+		0,
+		nil,
+	)
+	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
+	appView := mock.NewMockAppView()
+
+	_ = finalizeWorktreeSession(context.Background(), mockVCS, "feature/hook-feedback", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, appView)
+
+	assert.Equal(t, "ready", hookEngine.ContextData()["feedback-state"])
+	executions := hostRunner.GetExecutions()
+	require.Len(t, executions, 3)
+	assert.Equal(t, "echo merge-feedback", executions[0].Command)
+	assert.Contains(t, executions[1].Command, "| (echo merge-feedback)")
+	assert.Contains(t, executions[2].Command, "CSW_RESPONSE=")
+	assert.Contains(t, executions[2].Command, "echo merge-feedback")
+	require.Len(t, provider.RecordedMessages, 3)
 }
 
 func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTemplate bool) (*system.SweSystem, *core.SweSession, *vfs.MockVCS) {

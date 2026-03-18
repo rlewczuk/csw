@@ -490,6 +490,7 @@ func runCLI(params *CLIParams) error {
 		sweSystem.ConfigStore,
 		core.NewDefaultHookRunner(chooseGitDiffDir(buildResult.WorkDirRoot, buildResult.WorkDir)),
 		buildResult.ShellRunner,
+		sweSystem.ModelProviders,
 	)
 	hookEngine.MergeContext(map[string]string{
 		"branch":  strings.TrimSpace(buildResult.WorktreeBranch),
@@ -1047,7 +1048,7 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 				"workdir": strings.TrimSpace(firstNonEmpty(worktreeDir, repoDir)),
 				"rootdir": strings.TrimSpace(repoDir),
 			})
-			hookResult, hookErr := hookEngine.Execute(ctx, core.HookExecutionRequest{Name: "merge", View: appView, VCS: vcs})
+			hookResult, hookErr := hookEngine.Execute(ctx, core.HookExecutionRequest{Name: "merge", View: appView, VCS: vcs, Session: session})
 			if hookResult != nil {
 				mergeHookExecuted = true
 			}

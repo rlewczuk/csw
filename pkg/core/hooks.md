@@ -85,6 +85,45 @@ Shell hooks are executed by `HookEngine.Execute()`:
 5. Run command with optional timeout
 6. Capture and display both stdout and stderr through `IAppView.ShowMessage()`
 
+### Structured feedback channel (`CSWFEEDBACK`)
+
+Shell scripts can emit structured requests to the agent by printing lines in the form:
+
+`CSWFEEDBACK: { ...json... }`
+
+Each JSON object supports:
+
+- `fn` (required): function to execute
+  - `context`: merge `args` keys into current hook/session context (`map[string]string`)
+  - `llm`: run one-shot LLM query
+- `args` (optional object): function arguments
+  - for `llm`:
+    - `prompt` (required)
+    - `system-prompt` (optional)
+    - `model` (optional, `provider/model`, defaults to current session model)
+    - `thinking` (optional, defaults to current session thinking level)
+- `response` (optional): response delivery mode
+  - `none` (default): no response is delivered back to script
+  - `stdin`: script is re-executed once with JSON response lines piped to stdin
+  - `rerun`: script is re-executed once per response with `CSW_RESPONSE` environment variable set
+- `id` (optional): echoed back in feedback response JSON
+
+Notes:
+
+- Multiple `CSWFEEDBACK` lines are supported in one script run.
+- Requests are processed in parallel; completion order may differ from print order.
+- Feedback response JSON schema:
+  - `id` (optional)
+  - `fn`
+  - `ok` (`true`/`false`)
+  - `result` (function-specific payload)
+  - `error` (present when `ok=false`)
+
+Parsed and processed feedback is also attached to `HookExecutionResult` as:
+
+- `FeedbackRequests []HookFeedbackRequest`
+- `FeedbackResponses []HookFeedbackResponse`
+
 Hook success/failure is based on exit code:
 
 - Exit code `0` => success
