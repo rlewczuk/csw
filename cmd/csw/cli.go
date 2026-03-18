@@ -1116,8 +1116,10 @@ func applyHookSettings(target *conf.HookConfig, name string, settings map[string
 			target.Model = value
 		case "thinking":
 			target.Thinking = value
-		case "to_field", "to-field", "tofield":
-			target.ToField = value
+		case "output_to", "output-to", "outputto", "to_field", "to-field", "tofield":
+			target.OutputTo = value
+		case "error_to", "error-to", "errorto":
+			target.ErrorTo = value
 		case "timeout":
 			parsed, err := parseHookTimeout(value)
 			if err != nil {
@@ -1173,8 +1175,8 @@ func applyHookDefaults(target *conf.HookConfig) {
 	if target.RunOn == "" {
 		target.RunOn = conf.HookRunOnSandbox
 	}
-	if target.Type == conf.HookTypeLLM && strings.TrimSpace(target.ToField) == "" {
-		target.ToField = "result"
+	if target.Type == conf.HookTypeLLM && strings.TrimSpace(target.OutputTo) == "" {
+		target.OutputTo = "result"
 	}
 }
 

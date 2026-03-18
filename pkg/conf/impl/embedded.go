@@ -30,6 +30,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -466,65 +467,120 @@ func (s *EmbeddedConfigStore) loadHookConfigs() error {
 	}
 
 	configs := make(map[string]*conf.HookConfig)
-	loadedHooks := make(map[string]bool)
 
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if ext != ".yml" && ext != ".yaml" {
+		if !entry.IsDir() {
 			continue
 		}
 
-		hookName := entry.Name()[:len(entry.Name())-len(ext)]
-		hookPath := filepath.Join(hooksDir, entry.Name())
-		data, readErr := embeddedConfigFS.ReadFile(hookPath)
-		if readErr != nil {
-			return fmt.Errorf("loadHookConfigs() [embedded.go]: failed to read %s: %w", hookPath, readErr)
+		hookDirName := strings.TrimSpace(entry.Name())
+		hookDir := filepath.Join(hooksDir, hookDirName)
+		hookPath, hookBaseName, hookData, parseAsYAML, embeddedFiles, selectErr := selectEmbeddedHookConfigFile(hookDir, hookDirName)
+		if selectErr != nil {
+			return fmt.Errorf("loadHookConfigs() [embedded.go]: %w", selectErr)
+		}
+		if strings.TrimSpace(hookPath) == "" {
+			continue
 		}
 
 		var hookConfig conf.HookConfig
-		if unmarshalErr := yaml.Unmarshal(data, &hookConfig); unmarshalErr != nil {
-			return fmt.Errorf("loadHookConfigs() [embedded.go]: failed to parse %s: %w", hookPath, unmarshalErr)
+		if parseAsYAML {
+			if unmarshalErr := yaml.Unmarshal(hookData, &hookConfig); unmarshalErr != nil {
+				return fmt.Errorf("loadHookConfigs() [embedded.go]: failed to parse %s: %w", hookPath, unmarshalErr)
+			}
+		} else {
+			if unmarshalErr := json.Unmarshal(hookData, &hookConfig); unmarshalErr != nil {
+				return fmt.Errorf("loadHookConfigs() [embedded.go]: failed to parse %s: %w", hookPath, unmarshalErr)
+			}
 		}
 
-		if hookConfig.Name == "" {
-			hookConfig.Name = hookName
-		}
-		configs[hookConfig.Name] = &hookConfig
-		loadedHooks[hookName] = true
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
-			continue
-		}
-
-		hookName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
-		if loadedHooks[hookName] {
-			continue
+		hookConfig.HookDir = hookDir
+		hookConfig.EmbeddedFiles = embeddedFiles
+		hookConfig.EmbeddedSource = true
+		nameInConfig := strings.TrimSpace(hookConfig.Name)
+		nameMatches := nameInConfig != "" && nameInConfig == hookDirName
+		filenameMatches := hookBaseName == hookDirName
+		if !nameMatches || !filenameMatches {
+			fmt.Fprintf(os.Stderr, "loadHookConfigs() [embedded.go]: warning: disabled hook in %s because hook name/filename mismatch (dir=%q file=%q name=%q)\n", hookDir, hookDirName, hookBaseName, nameInConfig)
+			hookConfig.Enabled = false
+			hookConfig.Name = hookDirName
+		} else {
+			hookConfig.Name = nameInConfig
 		}
 
-		hookPath := filepath.Join(hooksDir, entry.Name())
-		data, readErr := embeddedConfigFS.ReadFile(hookPath)
-		if readErr != nil {
-			return fmt.Errorf("loadHookConfigs() [embedded.go]: failed to read %s: %w", hookPath, readErr)
-		}
-
-		var hookConfig conf.HookConfig
-		if unmarshalErr := json.Unmarshal(data, &hookConfig); unmarshalErr != nil {
-			return fmt.Errorf("loadHookConfigs() [embedded.go]: failed to parse %s: %w", hookPath, unmarshalErr)
-		}
-
-		if hookConfig.Name == "" {
-			hookConfig.Name = hookName
-		}
 		configs[hookConfig.Name] = &hookConfig
 	}
 
 	s.hookConfigs = configs
 	return nil
+}
+
+func selectEmbeddedHookConfigFile(hookDir string, hookDirName string) (string, string, []byte, bool, map[string][]byte, error) {
+	entries, err := embeddedConfigFS.ReadDir(hookDir)
+	if err != nil {
+		return "", "", nil, false, nil, fmt.Errorf("selectEmbeddedHookConfigFile() [embedded.go]: failed to read %s: %w", hookDir, err)
+	}
+
+	additionalFiles := make(map[string][]byte)
+	candidatePath := ""
+	candidateBase := ""
+	candidateYAML := false
+	var fallbackPath string
+	var fallbackBase string
+	var fallbackYAML bool
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		path := filepath.Join(hookDir, entry.Name())
+		if ext != ".yml" && ext != ".yaml" && ext != ".json" {
+			data, readErr := embeddedConfigFS.ReadFile(path)
+			if readErr != nil {
+				return "", "", nil, false, nil, fmt.Errorf("selectEmbeddedHookConfigFile() [embedded.go]: failed to read %s: %w", path, readErr)
+			}
+			additionalFiles[entry.Name()] = data
+			continue
+		}
+
+		baseName := strings.TrimSuffix(entry.Name(), ext)
+		isYAML := ext == ".yml" || ext == ".yaml"
+		if baseName == hookDirName {
+			if candidatePath == "" || (isYAML && !candidateYAML) {
+				candidatePath = path
+				candidateBase = baseName
+				candidateYAML = isYAML
+			}
+			continue
+		}
+
+		if fallbackPath == "" || (isYAML && !fallbackYAML) {
+			fallbackPath = path
+			fallbackBase = baseName
+			fallbackYAML = isYAML
+		}
+	}
+
+	if candidatePath != "" {
+		data, readErr := embeddedConfigFS.ReadFile(candidatePath)
+		if readErr != nil {
+			return "", "", nil, false, nil, fmt.Errorf("selectEmbeddedHookConfigFile() [embedded.go]: failed to read %s: %w", candidatePath, readErr)
+		}
+		return candidatePath, candidateBase, data, candidateYAML, additionalFiles, nil
+	}
+
+	if fallbackPath == "" {
+		return "", "", nil, false, additionalFiles, nil
+	}
+
+	data, readErr := embeddedConfigFS.ReadFile(fallbackPath)
+	if readErr != nil {
+		return "", "", nil, false, nil, fmt.Errorf("selectEmbeddedHookConfigFile() [embedded.go]: failed to read %s: %w", fallbackPath, readErr)
+	}
+
+	return fallbackPath, fallbackBase, data, fallbackYAML, additionalFiles, nil
 }
 
 func (s *EmbeddedConfigStore) loadModelTemplateConfig() error {

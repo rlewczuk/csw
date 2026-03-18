@@ -189,12 +189,26 @@ type HookConfig struct {
 	Model string `json:"model,omitempty" yaml:"model,omitempty"`
 	// Thinking is optional --thinking-style override for LLM hook execution.
 	Thinking string `json:"thinking,omitempty" yaml:"thinking,omitempty"`
-	// ToField is optional hook context field name for LLM response text. Defaults to "result".
-	ToField string `json:"to_field,omitempty" yaml:"to_field,omitempty"`
+	// OutputTo is optional output field name used by hooks for generated output.
+	// For LLM hooks it stores model response text in hook context. Defaults to "result".
+	// For shell hooks it is exposed in synthetic response feedback and maps to stdout.
+	OutputTo string `json:"output_to,omitempty" yaml:"output_to,omitempty"`
+	// ErrorTo is optional output field name used by shell hooks in synthetic response
+	// feedback and maps to stderr.
+	ErrorTo string `json:"error_to,omitempty" yaml:"error_to,omitempty"`
 	// Timeout limits hook execution. Zero means no timeout.
 	Timeout time.Duration `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 	// RunOn defines shell execution target: host or sandbox.
 	RunOn HookRunOn `json:"run-on,omitempty" yaml:"run-on,omitempty"`
+	// HookDir is absolute directory path containing hook config and additional files.
+	// It is populated by configuration store loaders and is not part of on-disk schema.
+	HookDir string `json:"-" yaml:"-"`
+	// EmbeddedFiles contains additional files bundled with embedded hook configuration.
+	// It is populated by embedded config loader and is not part of on-disk schema.
+	EmbeddedFiles map[string][]byte `json:"-" yaml:"-"`
+	// EmbeddedSource indicates that hook came from embedded config source and may require
+	// materialization of EmbeddedFiles before execution.
+	EmbeddedSource bool `json:"-" yaml:"-"`
 
 	enabledConfigured bool
 	hookConfigured    bool
@@ -205,7 +219,8 @@ type HookConfig struct {
 	systemConfigured  bool
 	modelConfigured   bool
 	thinkingConfigured bool
-	toFieldConfigured bool
+	outputToConfigured bool
+	errorToConfigured  bool
 	timeoutConfigured bool
 	runOnConfigured   bool
 }
@@ -222,7 +237,8 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 		System  string    `json:"system_prompt,omitempty"`
 		Model   string    `json:"model,omitempty"`
 		Thinking string   `json:"thinking,omitempty"`
-		ToField string    `json:"to_field,omitempty"`
+		OutputTo string   `json:"output_to,omitempty"`
+		ErrorTo string    `json:"error_to,omitempty"`
 		Timeout string    `json:"timeout,omitempty"`
 		RunOn   HookRunOn `json:"run-on,omitempty"`
 	}{}
@@ -243,7 +259,8 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 	c.SystemPrompt = aux.System
 	c.Model = aux.Model
 	c.Thinking = aux.Thinking
-	c.ToField = aux.ToField
+	c.OutputTo = aux.OutputTo
+	c.ErrorTo = aux.ErrorTo
 	c.RunOn = aux.RunOn
 
 	var raw map[string]json.RawMessage
@@ -260,7 +277,8 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 	_, c.systemConfigured = raw["system_prompt"]
 	_, c.modelConfigured = raw["model"]
 	_, c.thinkingConfigured = raw["thinking"]
-	_, c.toFieldConfigured = raw["to_field"]
+	_, c.outputToConfigured = raw["output_to"]
+	_, c.errorToConfigured = raw["error_to"]
 	_, c.timeoutConfigured = raw["timeout"]
 	_, c.runOnConfigured = raw["run-on"]
 
@@ -290,7 +308,8 @@ func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 		System  string    `yaml:"system_prompt,omitempty"`
 		Model   string    `yaml:"model,omitempty"`
 		Thinking string   `yaml:"thinking,omitempty"`
-		ToField string    `yaml:"to_field,omitempty"`
+		OutputTo string   `yaml:"output_to,omitempty"`
+		ErrorTo string    `yaml:"error_to,omitempty"`
 		Timeout string    `yaml:"timeout,omitempty"`
 		RunOn   HookRunOn `yaml:"run-on,omitempty"`
 	}{}
@@ -311,7 +330,8 @@ func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 	c.SystemPrompt = aux.System
 	c.Model = aux.Model
 	c.Thinking = aux.Thinking
-	c.ToField = aux.ToField
+	c.OutputTo = aux.OutputTo
+	c.ErrorTo = aux.ErrorTo
 	c.RunOn = aux.RunOn
 
 	if strings.TrimSpace(aux.Timeout) != "" {
@@ -348,8 +368,10 @@ func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 			c.modelConfigured = true
 		case "thinking":
 			c.thinkingConfigured = true
-		case "to_field":
-			c.toFieldConfigured = true
+		case "output_to":
+			c.outputToConfigured = true
+		case "error_to":
+			c.errorToConfigured = true
 		case "timeout":
 			c.timeoutConfigured = true
 		case "run-on":
@@ -371,8 +393,8 @@ func (c *HookConfig) applyDefaults() {
 	if c.RunOn == "" {
 		c.RunOn = HookRunOnSandbox
 	}
-	if c.Type == HookTypeLLM && strings.TrimSpace(c.ToField) == "" {
-		c.ToField = "result"
+	if c.Type == HookTypeLLM && strings.TrimSpace(c.OutputTo) == "" {
+		c.OutputTo = "result"
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -225,6 +226,12 @@ func (e *HookEngine) Execute(ctx context.Context, request HookExecutionRequest) 
 	}
 
 	e.SetContextValue("hook", hookName)
+	hookDir, err := e.resolveAndPrepareHookDir(hookConfig)
+	if err != nil {
+		return nil, fmt.Errorf("HookEngine.Execute() [hooks_engine.go]: failed to prepare hook directory for hook %q: %w", hookConfig.Name, err)
+	}
+	e.SetContextValue("hook_dir", hookDir)
+	hookConfig.HookDir = hookDir
 
 	switch hookConfig.Type {
 	case conf.HookTypeShell:
@@ -273,7 +280,7 @@ func (e *HookEngine) executeShell(ctx context.Context, hookConfig *conf.HookConf
 	}
 
 	feedbackRequests := parseHookFeedbackRequests(stdout, stderr)
-	feedbackRequests = ensureHookResponseFeedbackRequest(feedbackRequests, stdout, stderr, exitCode, runErr)
+	feedbackRequests = ensureHookResponseFeedbackRequest(feedbackRequests, hookConfig, stdout, stderr, exitCode, runErr)
 	result.FeedbackRequests = feedbackRequests
 	feedbackExecutions := e.processHookFeedbackRequests(ctx, request, feedbackRequests)
 	if len(feedbackExecutions) > 0 {
@@ -388,7 +395,7 @@ func (e *HookEngine) executeLLM(ctx context.Context, hookConfig *conf.HookConfig
 		responseText = strings.TrimSpace(chatResponse.GetText())
 	}
 
-	toField := strings.TrimSpace(hookConfig.ToField)
+	toField := strings.TrimSpace(hookConfig.OutputTo)
 	if toField == "" {
 		toField = "result"
 	}
@@ -616,7 +623,7 @@ func hookFeedbackValueToString(value any) string {
 	}
 }
 
-func ensureHookResponseFeedbackRequest(requests []HookFeedbackRequest, stdout string, stderr string, exitCode int, runErr error) []HookFeedbackRequest {
+func ensureHookResponseFeedbackRequest(requests []HookFeedbackRequest, hookConfig *conf.HookConfig, stdout string, stderr string, exitCode int, runErr error) []HookFeedbackRequest {
 	for _, request := range requests {
 		if strings.EqualFold(strings.TrimSpace(request.Fn), hookFeedbackFnResponse) {
 			return requests
@@ -629,6 +636,14 @@ func ensureHookResponseFeedbackRequest(requests []HookFeedbackRequest, stdout st
 		"stdout": combinedOutput,
 		"stderr": stderr,
 	}
+	if hookConfig != nil {
+		if outputField := strings.TrimSpace(hookConfig.OutputTo); outputField != "" {
+			args[outputField] = stdout
+		}
+		if errorField := strings.TrimSpace(hookConfig.ErrorTo); errorField != "" {
+			args[errorField] = stderr
+		}
+	}
 	if runErr != nil && isHookTimeoutError(runErr, exitCode) {
 		args["status"] = hookStatusTimeout
 	} else if exitCode == 0 {
@@ -639,6 +654,67 @@ func ensureHookResponseFeedbackRequest(requests []HookFeedbackRequest, stdout st
 	}
 
 	return append(requests, HookFeedbackRequest{Fn: hookFeedbackFnResponse, Args: args})
+}
+
+func (e *HookEngine) resolveAndPrepareHookDir(hookConfig *conf.HookConfig) (string, error) {
+	if hookConfig == nil {
+		return "", nil
+	}
+
+	configuredDir := strings.TrimSpace(hookConfig.HookDir)
+	if !hookConfig.EmbeddedSource {
+		return configuredDir, nil
+	}
+
+	rootDir := strings.TrimSpace(e.ContextData()["rootdir"])
+	if rootDir == "" {
+		rootDir = strings.TrimSpace(e.ContextData()["workdir"])
+	}
+	if rootDir == "" {
+		return "", fmt.Errorf("HookEngine.resolveAndPrepareHookDir() [hooks_engine.go]: rootdir/workdir hook context is empty")
+	}
+
+	hookName := strings.TrimSpace(hookConfig.Name)
+	if hookName == "" {
+		return "", fmt.Errorf("HookEngine.resolveAndPrepareHookDir() [hooks_engine.go]: hook name is empty")
+	}
+
+	targetDir := filepath.Join(rootDir, ".cswdata", "hooks", hookName)
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return "", fmt.Errorf("HookEngine.resolveAndPrepareHookDir() [hooks_engine.go]: failed to create %s: %w", targetDir, err)
+	}
+
+	for filename, data := range hookConfig.EmbeddedFiles {
+		trimmedName := strings.TrimSpace(filename)
+		if trimmedName == "" {
+			continue
+		}
+		if filepath.Base(trimmedName) != trimmedName {
+			return "", fmt.Errorf("HookEngine.resolveAndPrepareHookDir() [hooks_engine.go]: invalid embedded hook file name %q", filename)
+		}
+
+		outputPath := filepath.Join(targetDir, trimmedName)
+		existing, readErr := os.ReadFile(outputPath)
+		if readErr == nil && bytes.Equal(existing, data) {
+			continue
+		}
+		if readErr != nil && !os.IsNotExist(readErr) {
+			return "", fmt.Errorf("HookEngine.resolveAndPrepareHookDir() [hooks_engine.go]: failed to read %s: %w", outputPath, readErr)
+		}
+
+		if writeErr := os.WriteFile(outputPath, data, hookEmbeddedFileMode(trimmedName)); writeErr != nil {
+			return "", fmt.Errorf("HookEngine.resolveAndPrepareHookDir() [hooks_engine.go]: failed to write %s: %w", outputPath, writeErr)
+		}
+	}
+
+	return targetDir, nil
+}
+
+func hookEmbeddedFileMode(filename string) os.FileMode {
+	if strings.EqualFold(filepath.Ext(filename), ".sh") {
+		return 0o755
+	}
+	return 0o644
 }
 
 func isHookTimeoutError(err error, exitCode int) bool {

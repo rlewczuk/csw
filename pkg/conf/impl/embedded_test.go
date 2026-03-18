@@ -208,6 +208,18 @@ func TestEmbeddedConfigStore_GetAgentRoleConfigs(t *testing.T) {
 	assert.Contains(t, allRole.ToolFragments, "webFetch/.tooldir")
 }
 
+func TestEmbeddedConfigStore_GetHookConfigs(t *testing.T) {
+	store, err := NewEmbeddedConfigStore()
+	require.NoError(t, err)
+
+	hooks, err := store.GetHookConfigs()
+	require.NoError(t, err)
+	require.Contains(t, hooks, "merge")
+	assert.Equal(t, "merge", hooks["merge"].Name)
+	assert.Equal(t, "conf/hooks/merge", hooks["merge"].HookDir)
+	assert.True(t, hooks["merge"].EmbeddedSource)
+}
+
 func TestEmbeddedConfigStore_LastAgentRoleConfigsUpdate(t *testing.T) {
 	store, err := NewEmbeddedConfigStore()
 	require.NoError(t, err)

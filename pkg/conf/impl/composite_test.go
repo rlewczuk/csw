@@ -254,12 +254,13 @@ func TestCompositeConfigStore_HooksMergingByName(t *testing.T) {
 	dir1 := filepath.Join(tmpDir, "source1")
 	dir2 := filepath.Join(tmpDir, "source2")
 
-	require.NoError(t, os.MkdirAll(filepath.Join(dir1, "hooks"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(dir2, "hooks"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir1, "hooks", "merge-hook"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir2, "hooks", "merge-hook"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir2, "hooks", "summary-hook"), 0755))
 
-	require.NoError(t, os.WriteFile(filepath.Join(dir1, "hooks", "merge.yml"), []byte("name: merge-hook\nhook: merge\ncommand: echo one\nrun-on: host\n"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir2, "hooks", "merge.yml"), []byte("name: merge-hook\ncommand: echo two\nenabled: true\n"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir2, "hooks", "summary.yml"), []byte("name: summary-hook\nhook: summary\ncommand: echo summary\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir1, "hooks", "merge-hook", "merge-hook.yml"), []byte("name: merge-hook\nhook: merge\ncommand: echo one\nrun-on: host\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir2, "hooks", "merge-hook", "merge-hook.yml"), []byte("name: merge-hook\ncommand: echo two\nenabled: true\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir2, "hooks", "summary-hook", "summary-hook.yml"), []byte("name: summary-hook\nhook: summary\ncommand: echo summary\n"), 0644))
 
 	store, err := NewCompositeConfigStore(tmpDir, fmt.Sprintf("%s:%s", dir1, dir2))
 	require.NoError(t, err)

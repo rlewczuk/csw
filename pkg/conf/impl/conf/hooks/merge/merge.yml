@@ -1,4 +1,4 @@
-name: merge-default
+name: merge
 enabled: false
 hook: merge
 type: shell

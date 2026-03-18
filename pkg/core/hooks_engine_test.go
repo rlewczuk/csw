@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -238,6 +239,7 @@ func TestHookEngineExecuteLLMHookStoresResultInDefaultField(t *testing.T) {
 
 	engine := NewHookEngine(configStore, nil, nil, map[string]models.ModelProvider{"mock": provider})
 	engine.SetContextValue("user_prompt", "Initial request")
+	engine.SetContextValue("rootdir", t.TempDir())
 
 	session := &SweSession{providerName: "mock", model: "test-model", thinking: "medium"}
 	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary", Session: session})
@@ -250,7 +252,7 @@ func TestHookEngineExecuteLLMHookStoresResultInDefaultField(t *testing.T) {
 	assert.Equal(t, "Prompt: Initial request", strings.TrimSpace(provider.RecordedMessages[0][0].GetText()))
 }
 
-func TestHookEngineExecuteLLMHookUsesConfiguredOptionsAndToField(t *testing.T) {
+func TestHookEngineExecuteLLMHookUsesConfiguredOptionsAndOutputTo(t *testing.T) {
 	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
 	provider.SetChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "custom-result")})
 
@@ -265,12 +267,13 @@ func TestHookEngineExecuteLLMHookUsesConfiguredOptionsAndToField(t *testing.T) {
 			SystemPrompt: "System: {{.status}}",
 			Model:        "mock/test-model",
 			Thinking:     "high",
-			ToField:      "llm_out",
+			OutputTo:     "llm_out",
 		},
 	})
 
 	engine := NewHookEngine(configStore, nil, nil, map[string]models.ModelProvider{"mock": provider})
 	engine.MergeContext(map[string]string{"user_prompt": "Initial request", "status": "running"})
+	engine.SetContextValue("rootdir", t.TempDir())
 
 	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary"})
 	require.NoError(t, err)
@@ -345,6 +348,118 @@ func TestHookEngineExecuteShellSynthesizesResponseFeedback(t *testing.T) {
 	assert.Contains(t, HookResponseArgString(response, "stdin"), "hello-out")
 	assert.Contains(t, HookResponseArgString(response, "stdin"), "hello-err")
 	assert.Equal(t, "hello-err", strings.TrimSpace(HookResponseArgString(response, "stderr")))
+}
+
+func TestHookEngineExecuteShellMapsOutputToAndErrorToInResponseFeedback(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-hook": {
+			Name:     "merge-hook",
+			Hook:     "merge",
+			Enabled:  true,
+			Type:     conf.HookTypeShell,
+			Command:  "echo synthetic",
+			RunOn:    conf.HookRunOnHost,
+			OutputTo: "custom_output",
+			ErrorTo:  "custom_error",
+		},
+	})
+
+	hostRunner := runner.NewMockRunner()
+	hostRunner.SetResponseDetailed("echo synthetic", "hello-out\n", "hello-err\n", 0, nil)
+
+	engine := NewHookEngine(configStore, hostRunner, nil, nil)
+	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "merge"})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	response := FindHookResponseRequest(result)
+	require.NotNil(t, response)
+	assert.Equal(t, "hello-out", HookResponseArgString(response, "custom_output"))
+	assert.Equal(t, "hello-err", HookResponseArgString(response, "custom_error"))
+}
+
+func TestHookEngineExecuteShellSetsHookDirForLocalHooks(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-hook": {
+			Name:    "merge-hook",
+			Hook:    "merge",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo hookdir={{.hook_dir}}",
+			RunOn:   conf.HookRunOnHost,
+			HookDir: "/cfg/hooks/merge-hook",
+		},
+	})
+
+	hostRunner := runner.NewMockRunner()
+	hostRunner.SetResponseDetailed("echo hookdir=/cfg/hooks/merge-hook", "", "", 0, nil)
+
+	engine := NewHookEngine(configStore, hostRunner, nil, nil)
+	_, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "merge"})
+	require.NoError(t, err)
+
+	executions := hostRunner.GetExecutions()
+	require.Len(t, executions, 1)
+	assert.Equal(t, "echo hookdir=/cfg/hooks/merge-hook", executions[0].Command)
+	assert.Equal(t, "/cfg/hooks/merge-hook", engine.ContextData()["hook_dir"])
+}
+
+func TestHookEngineExecuteShellMaterializesEmbeddedHookFiles(t *testing.T) {
+	tmpRoot := t.TempDir()
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-hook": {
+			Name:           "merge-hook",
+			Hook:           "merge",
+			Enabled:        true,
+			Type:           conf.HookTypeShell,
+			Command:        "echo embedded={{.hook_dir}}",
+			RunOn:          conf.HookRunOnHost,
+			EmbeddedSource: true,
+			EmbeddedFiles: map[string][]byte{
+				"script.sh": []byte("#!/bin/sh\necho one\n"),
+			},
+		},
+	})
+
+	targetDir := filepath.Join(tmpRoot, ".cswdata", "hooks", "merge-hook")
+	hostRunner := runner.NewMockRunner()
+	hostRunner.SetResponseDetailed("echo embedded="+targetDir, "", "", 0, nil)
+
+	engine := NewHookEngine(configStore, hostRunner, nil, nil)
+	engine.MergeContext(map[string]string{"rootdir": tmpRoot})
+
+	_, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "merge"})
+	require.NoError(t, err)
+
+	content, readErr := os.ReadFile(filepath.Join(targetDir, "script.sh"))
+	require.NoError(t, readErr)
+	assert.Equal(t, "#!/bin/sh\necho one\n", string(content))
+	assert.Equal(t, targetDir, engine.ContextData()["hook_dir"])
+
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-hook": {
+			Name:           "merge-hook",
+			Hook:           "merge",
+			Enabled:        true,
+			Type:           conf.HookTypeShell,
+			Command:        "echo embedded={{.hook_dir}}",
+			RunOn:          conf.HookRunOnHost,
+			EmbeddedSource: true,
+			EmbeddedFiles: map[string][]byte{
+				"script.sh": []byte("#!/bin/sh\necho two\n"),
+			},
+		},
+	})
+
+	_, err = engine.Execute(context.Background(), HookExecutionRequest{Name: "merge"})
+	require.NoError(t, err)
+
+	updated, readUpdatedErr := os.ReadFile(filepath.Join(targetDir, "script.sh"))
+	require.NoError(t, readUpdatedErr)
+	assert.Equal(t, "#!/bin/sh\necho two\n", string(updated))
 }
 
 func TestHookEngineExecuteShellPreservesExplicitResponseFeedback(t *testing.T) {

@@ -24,7 +24,7 @@ func TestHookConfigUnmarshalJSONDefaults(t *testing.T) {
 
 func TestHookConfigUnmarshalJSONLLMFields(t *testing.T) {
 	var cfg HookConfig
-	err := json.Unmarshal([]byte(`{"name":"h1","hook":"summary","type":"llm","prompt":"p","system_prompt":"s","model":"mock/test","thinking":"high","to_field":"out"}`), &cfg)
+	err := json.Unmarshal([]byte(`{"name":"h1","hook":"summary","type":"llm","prompt":"p","system_prompt":"s","model":"mock/test","thinking":"high","output_to":"out"}`), &cfg)
 	require.NoError(t, err)
 
 	assert.Equal(t, HookTypeLLM, cfg.Type)
@@ -32,7 +32,7 @@ func TestHookConfigUnmarshalJSONLLMFields(t *testing.T) {
 	assert.Equal(t, "s", cfg.SystemPrompt)
 	assert.Equal(t, "mock/test", cfg.Model)
 	assert.Equal(t, "high", cfg.Thinking)
-	assert.Equal(t, "out", cfg.ToField)
+	assert.Equal(t, "out", cfg.OutputTo)
 }
 
 func TestHookConfigUnmarshalJSONLLMDefaultsToField(t *testing.T) {
@@ -41,7 +41,7 @@ func TestHookConfigUnmarshalJSONLLMDefaultsToField(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, HookTypeLLM, cfg.Type)
-	assert.Equal(t, "result", cfg.ToField)
+	assert.Equal(t, "result", cfg.OutputTo)
 }
 
 func TestHookConfigUnmarshalYAMLParsesTimeout(t *testing.T) {
@@ -62,7 +62,7 @@ func TestHookConfigUnmarshalYAMLUsesFilenameProvidedName(t *testing.T) {
 
 func TestHookConfigUnmarshalYAMLLLMFields(t *testing.T) {
 	var cfg HookConfig
-	err := yaml.Unmarshal([]byte("name: h1\nhook: summary\ntype: llm\nprompt: p\nsystem_prompt: s\nmodel: mock/test\nthinking: high\nto_field: out\n"), &cfg)
+	err := yaml.Unmarshal([]byte("name: h1\nhook: summary\ntype: llm\nprompt: p\nsystem_prompt: s\nmodel: mock/test\nthinking: high\noutput_to: out\n"), &cfg)
 	require.NoError(t, err)
 
 	assert.Equal(t, HookTypeLLM, cfg.Type)
@@ -70,5 +70,5 @@ func TestHookConfigUnmarshalYAMLLLMFields(t *testing.T) {
 	assert.Equal(t, "s", cfg.SystemPrompt)
 	assert.Equal(t, "mock/test", cfg.Model)
 	assert.Equal(t, "high", cfg.Thinking)
-	assert.Equal(t, "out", cfg.ToField)
+	assert.Equal(t, "out", cfg.OutputTo)
 }

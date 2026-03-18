@@ -197,14 +197,15 @@ func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
 			Hook:    "merge",
 			Enabled: true,
 			Type:    conf.HookTypeShell,
-			Command: "echo merge-hook",
+			Command: "echo merge-hook {{.hook_dir}}",
 			RunOn:   conf.HookRunOnSandbox,
+			HookDir: "/repo/.csw/conf/hooks/merge-custom",
 		},
 	})
 
 	hostRunner := runner.NewMockRunner()
 	sandboxRunner := runner.NewMockRunner()
-	sandboxRunner.SetResponseDetailed("echo merge-hook", "merge ok\n", "", 0, nil)
+	sandboxRunner.SetResponseDetailed("echo merge-hook /repo/.csw/conf/hooks/merge-custom", "merge ok\n", "", 0, nil)
 	hookEngine := core.NewHookEngine(configStore, hostRunner, sandboxRunner, sweSystem.ModelProviders)
 	hookEngine.MergeContext(map[string]string{
 		"branch":  "feature/hook",
@@ -221,7 +222,7 @@ func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
 	assert.Equal(t, "", result.HeadCommitID)
 	require.Empty(t, mockVCS.GetMergeCalls())
 	require.Len(t, sandboxRunner.GetExecutions(), 1)
-	assert.Equal(t, "echo merge-hook", sandboxRunner.GetExecutions()[0].Command)
+	assert.Equal(t, "echo merge-hook /repo/.csw/conf/hooks/merge-custom", sandboxRunner.GetExecutions()[0].Command)
 	require.Len(t, appView.ShowMessageCalls, 2)
 	assert.Contains(t, appView.ShowMessageCalls[0].Message, "[hook:merge-custom] command")
 	assert.Contains(t, appView.ShowMessageCalls[1].Message, "[hook:merge-custom][stdout]")

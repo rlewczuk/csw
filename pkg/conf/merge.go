@@ -592,6 +592,14 @@ func (c *HookConfig) Clone() *HookConfig {
 	}
 
 	cloned := *c
+	if c.EmbeddedFiles != nil {
+		cloned.EmbeddedFiles = make(map[string][]byte, len(c.EmbeddedFiles))
+		for key, value := range c.EmbeddedFiles {
+			copied := make([]byte, len(value))
+			copy(copied, value)
+			cloned.EmbeddedFiles[key] = copied
+		}
+	}
 	return &cloned
 }
 
@@ -640,9 +648,13 @@ func (c *HookConfig) Merge(override *HookConfig) {
 		c.Thinking = override.Thinking
 		c.thinkingConfigured = true
 	}
-	if override.toFieldConfigured {
-		c.ToField = override.ToField
-		c.toFieldConfigured = true
+	if override.outputToConfigured {
+		c.OutputTo = override.OutputTo
+		c.outputToConfigured = true
+	}
+	if override.errorToConfigured {
+		c.ErrorTo = override.ErrorTo
+		c.errorToConfigured = true
 	}
 	if override.timeoutConfigured {
 		c.Timeout = override.Timeout
@@ -651,6 +663,26 @@ func (c *HookConfig) Merge(override *HookConfig) {
 	if override.runOnConfigured {
 		c.RunOn = override.RunOn
 		c.runOnConfigured = true
+	}
+	if strings.TrimSpace(override.HookDir) != "" {
+		c.HookDir = override.HookDir
+		c.EmbeddedSource = override.EmbeddedSource
+		if !override.EmbeddedSource {
+			c.EmbeddedFiles = nil
+		}
+	}
+	if len(override.EmbeddedFiles) > 0 {
+		if c.EmbeddedFiles == nil {
+			c.EmbeddedFiles = make(map[string][]byte, len(override.EmbeddedFiles))
+		}
+		for key, value := range override.EmbeddedFiles {
+			copied := make([]byte, len(value))
+			copy(copied, value)
+			c.EmbeddedFiles[key] = copied
+		}
+	}
+	if override.EmbeddedSource {
+		c.EmbeddedSource = true
 	}
 
 	c.applyDefaults()
