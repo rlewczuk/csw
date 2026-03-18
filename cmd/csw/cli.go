@@ -18,6 +18,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/models"
@@ -64,6 +65,7 @@ type CLIParams struct {
 	MaxThreads            int
 	Verbose               bool
 	VFSAllow              []string
+	HookOverrides         []string
 }
 
 const defaultBashRunTimeout = 120 * time.Second
@@ -114,6 +116,7 @@ func CliCommand() *cobra.Command {
 		cliMaxThreads     int
 		cliVerbose        bool
 		cliVFSAllow       []string
+		cliHooks          []string
 	)
 
 	cmd := &cobra.Command{
@@ -244,6 +247,7 @@ func CliCommand() *cobra.Command {
 				MaxThreads:            cliMaxThreads,
 				Verbose:               cliVerbose,
 				VFSAllow:              vfsAllowPaths,
+				HookOverrides:         cliHooks,
 			})
 		},
 	}
@@ -280,6 +284,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().IntVar(&cliMaxThreads, "max-threads", 0, "Maximum number of tool calls executed in parallel")
 	cmd.Flags().BoolVar(&cliVerbose, "verbose", false, "Display full tool output instead of one-liners")
 	cmd.Flags().StringArrayVar(&cliVFSAllow, "vfs-allow", nil, "Additional path to allow VFS access outside of worktree (repeatable, or use ':' separated list)")
+	cmd.Flags().StringArrayVar(&cliHooks, "hook", nil, "Ephemeral hook override: --hook name | --hook name:disable | --hook name:key=value,key2=value2")
 	resumeFlag := cmd.Flags().Lookup("resume")
 	if resumeFlag != nil {
 		resumeFlag.NoOptDefVal = "last"
@@ -486,8 +491,13 @@ func runCLI(params *CLIParams) error {
 	}
 
 	var finalizeResult worktreeFinalizeResult
+	hookConfigStore, err := buildRuntimeHookConfigStore(sweSystem.ConfigStore, params.HookOverrides)
+	if err != nil {
+		return err
+	}
+
 	hookEngine := core.NewHookEngine(
-		sweSystem.ConfigStore,
+		hookConfigStore,
 		core.NewDefaultHookRunner(chooseGitDiffDir(buildResult.WorkDirRoot, buildResult.WorkDir)),
 		buildResult.ShellRunner,
 		sweSystem.ModelProviders,
@@ -850,6 +860,301 @@ func parseVFSAllowPaths(values []string) []string {
 		}
 	}
 	return result
+}
+
+type runtimeHookConfigStore struct {
+	base           conf.ConfigStore
+	hookConfigs    map[string]*conf.HookConfig
+	hookConfigsNow time.Time
+}
+
+func (s *runtimeHookConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelProviderConfig, error) {
+	return s.base.GetModelProviderConfigs()
+}
+
+func (s *runtimeHookConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
+	return s.base.LastModelProviderConfigsUpdate()
+}
+
+func (s *runtimeHookConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfig, error) {
+	return s.base.GetAgentRoleConfigs()
+}
+
+func (s *runtimeHookConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
+	return s.base.LastAgentRoleConfigsUpdate()
+}
+
+func (s *runtimeHookConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
+	return s.base.GetGlobalConfig()
+}
+
+func (s *runtimeHookConfigStore) LastGlobalConfigUpdate() (time.Time, error) {
+	return s.base.LastGlobalConfigUpdate()
+}
+
+func (s *runtimeHookConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
+	return s.base.GetMCPServerConfigs()
+}
+
+func (s *runtimeHookConfigStore) LastMCPServerConfigsUpdate() (time.Time, error) {
+	return s.base.LastMCPServerConfigsUpdate()
+}
+
+func (s *runtimeHookConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
+	cloned := make(map[string]*conf.HookConfig, len(s.hookConfigs))
+	for key, value := range s.hookConfigs {
+		cloned[key] = value.Clone()
+	}
+
+	return cloned, nil
+}
+
+func (s *runtimeHookConfigStore) LastHookConfigsUpdate() (time.Time, error) {
+	return s.hookConfigsNow, nil
+}
+
+func (s *runtimeHookConfigStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
+	return s.base.GetAgentConfigFile(subdir, filename)
+}
+
+func buildRuntimeHookConfigStore(base conf.ConfigStore, overrides []string) (conf.ConfigStore, error) {
+	if base == nil {
+		return nil, fmt.Errorf("buildRuntimeHookConfigStore() [cli.go]: base config store is nil")
+	}
+
+	if len(overrides) == 0 {
+		return base, nil
+	}
+
+	configs, err := base.GetHookConfigs()
+	if err != nil {
+		return nil, fmt.Errorf("buildRuntimeHookConfigStore() [cli.go]: failed to load hook configs: %w", err)
+	}
+
+	adjusted, err := applyHookOverridesToConfigs(configs, overrides)
+	if err != nil {
+		return nil, err
+	}
+
+	return &runtimeHookConfigStore{
+		base:           base,
+		hookConfigs:    adjusted,
+		hookConfigsNow: time.Now(),
+	}, nil
+}
+
+type hookOverride struct {
+	Name     string
+	Disable  bool
+	Settings map[string]string
+}
+
+func applyHookOverridesToConfigs(configs map[string]*conf.HookConfig, overrides []string) (map[string]*conf.HookConfig, error) {
+	cloned := make(map[string]*conf.HookConfig, len(configs))
+	for key, value := range configs {
+		cloned[key] = value.Clone()
+	}
+
+	for _, rawOverride := range overrides {
+		override, err := parseHookOverride(rawOverride)
+		if err != nil {
+			return nil, err
+		}
+
+		current, exists := cloned[override.Name]
+		if !exists {
+			if len(override.Settings) == 0 || override.Disable {
+				return nil, fmt.Errorf("applyHookOverridesToConfigs() [cli.go]: hook %q is not configured", override.Name)
+			}
+
+			created, createErr := buildNewHookConfig(override.Name, override.Settings)
+			if createErr != nil {
+				return nil, createErr
+			}
+			cloned[override.Name] = created
+			continue
+		}
+
+		wasDisabled := !current.Enabled
+		if override.Disable {
+			current.Enabled = false
+			continue
+		}
+
+		if len(override.Settings) == 0 {
+			if !current.Enabled {
+				current.Enabled = true
+			}
+			continue
+		}
+
+		if err := applyHookSettings(current, override.Name, override.Settings); err != nil {
+			return nil, err
+		}
+		if wasDisabled {
+			current.Enabled = true
+		}
+		applyHookDefaults(current)
+	}
+
+	return cloned, nil
+}
+
+func parseHookOverride(value string) (*hookOverride, error) {
+	trimmed := strings.TrimSpace(value)
+	trimmed = strings.TrimPrefix(trimmed, ":")
+	if trimmed == "" {
+		return nil, fmt.Errorf("parseHookOverride() [cli.go]: hook override cannot be empty")
+	}
+
+	parts := strings.SplitN(trimmed, ":", 2)
+	name := strings.TrimSpace(parts[0])
+	if name == "" {
+		return nil, fmt.Errorf("parseHookOverride() [cli.go]: hook name is required")
+	}
+
+	if len(parts) == 1 {
+		return &hookOverride{Name: name}, nil
+	}
+
+	action := strings.TrimSpace(parts[1])
+	if action == "" {
+		return nil, fmt.Errorf("parseHookOverride() [cli.go]: hook action for %q is empty", name)
+	}
+
+	if strings.EqualFold(action, "disable") {
+		return &hookOverride{Name: name, Disable: true}, nil
+	}
+
+	settings := make(map[string]string)
+	entries := strings.Split(action, ",")
+	for _, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+
+		keyValue := strings.SplitN(entry, "=", 2)
+		if len(keyValue) != 2 {
+			return nil, fmt.Errorf("parseHookOverride() [cli.go]: invalid hook setting %q for %q", entry, name)
+		}
+
+		key := strings.TrimSpace(keyValue[0])
+		val := strings.TrimSpace(keyValue[1])
+		if key == "" {
+			return nil, fmt.Errorf("parseHookOverride() [cli.go]: empty setting key in %q", entry)
+		}
+		settings[key] = val
+	}
+
+	if len(settings) == 0 {
+		return nil, fmt.Errorf("parseHookOverride() [cli.go]: no hook settings provided for %q", name)
+	}
+
+	return &hookOverride{Name: name, Settings: settings}, nil
+}
+
+func buildNewHookConfig(name string, settings map[string]string) (*conf.HookConfig, error) {
+	created := &conf.HookConfig{Name: name, Enabled: true}
+	if err := applyHookSettings(created, name, settings); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(created.Hook) == "" {
+		return nil, fmt.Errorf("buildNewHookConfig() [cli.go]: hook %q requires setting \"hook\"", name)
+	}
+	if strings.TrimSpace(created.Command) == "" {
+		return nil, fmt.Errorf("buildNewHookConfig() [cli.go]: hook %q requires setting \"command\"", name)
+	}
+	applyHookDefaults(created)
+
+	return created, nil
+}
+
+func applyHookSettings(target *conf.HookConfig, name string, settings map[string]string) error {
+	if target == nil {
+		return fmt.Errorf("applyHookSettings() [cli.go]: target hook is nil")
+	}
+
+	for key, value := range settings {
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "enabled":
+			parsed, err := strconv.ParseBool(value)
+			if err != nil {
+				return fmt.Errorf("applyHookSettings() [cli.go]: invalid enabled value for hook %q: %w", name, err)
+			}
+			target.Enabled = parsed
+		case "hook":
+			target.Hook = strings.TrimSpace(value)
+		case "name":
+			if strings.TrimSpace(value) != "" && strings.TrimSpace(value) != name {
+				return fmt.Errorf("applyHookSettings() [cli.go]: name override must match hook selector %q", name)
+			}
+			target.Name = name
+		case "type":
+			hookType := conf.HookType(strings.TrimSpace(value))
+			switch hookType {
+			case conf.HookTypeShell, conf.HookTypeLLM, conf.HookTypeSubAgent:
+				target.Type = hookType
+			default:
+				return fmt.Errorf("applyHookSettings() [cli.go]: unsupported hook type %q for %q", value, name)
+			}
+		case "command":
+			target.Command = value
+		case "timeout":
+			parsed, err := parseHookTimeout(value)
+			if err != nil {
+				return fmt.Errorf("applyHookSettings() [cli.go]: invalid timeout for hook %q: %w", name, err)
+			}
+			target.Timeout = parsed
+		case "run-on", "runon":
+			runOn := conf.HookRunOn(strings.TrimSpace(value))
+			switch runOn {
+			case conf.HookRunOnHost, conf.HookRunOnSandbox:
+				target.RunOn = runOn
+			default:
+				return fmt.Errorf("applyHookSettings() [cli.go]: unsupported run-on value %q for %q", value, name)
+			}
+		default:
+			return fmt.Errorf("applyHookSettings() [cli.go]: unsupported hook setting %q for %q", key, name)
+		}
+	}
+
+	if strings.TrimSpace(target.Name) == "" {
+		target.Name = name
+	}
+
+	return nil
+}
+
+func parseHookTimeout(value string) (time.Duration, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return 0, nil
+	}
+	if _, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
+		trimmed += "s"
+	}
+	parsed, err := time.ParseDuration(trimmed)
+	if err != nil {
+		return 0, err
+	}
+	if parsed < 0 {
+		return 0, fmt.Errorf("duration must not be negative")
+	}
+
+	return parsed, nil
+}
+
+func applyHookDefaults(target *conf.HookConfig) {
+	if target == nil {
+		return
+	}
+	if target.Type == "" {
+		target.Type = conf.HookTypeShell
+	}
+	if target.RunOn == "" {
+		target.RunOn = conf.HookRunOnSandbox
+	}
 }
 
 func buildSessionSummaryMessage(duration time.Duration, session *core.SweSession, buildResult system.BuildSystemResult) string {
