@@ -3,6 +3,8 @@ package system
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -363,6 +365,54 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 			assert.Equal(t, tt.generateCalls, generateCalls)
 		})
 	}
+}
+
+func TestCreateProviderMapConfigUpdaterWiring(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/oauth/token" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write([]byte(`{"access_token":"new-access-token","refresh_token":"new-refresh-token","expires_in":3600}`))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	store := confimpl.NewMockConfigStore()
+	store.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{
+		"resp": {
+			Name:         "resp",
+			Type:         "responses",
+			URL:          server.URL,
+			AuthMode:     conf.AuthModeOAuth2,
+			TokenURL:     server.URL + "/oauth/token",
+			ClientID:     "test-client-id",
+			RefreshToken: "old-refresh-token",
+		},
+	})
+
+	registry := models.NewProviderRegistry(store)
+	providers, err := CreateProviderMap(registry)
+	require.NoError(t, err)
+	require.Len(t, providers, 1)
+
+	provider, exists := providers["resp"]
+	require.True(t, exists)
+
+	responsesClient, ok := provider.(*models.ResponsesClient)
+	require.True(t, ok)
+
+	err = responsesClient.RefreshTokenIfNeeded()
+	require.NoError(t, err)
+
+	configs, err := store.GetModelProviderConfigs()
+	require.NoError(t, err)
+	updatedConfig, exists := configs["resp"]
+	require.True(t, exists)
+	assert.Equal(t, "new-access-token", updatedConfig.APIKey)
+	assert.Equal(t, "new-refresh-token", updatedConfig.RefreshToken)
 }
 
 func initTestGitRepository(t *testing.T) string {

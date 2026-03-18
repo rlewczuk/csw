@@ -39,6 +39,9 @@ type MockConfigStore struct {
 	LastHookConfigsUpdateErr          error
 	LastAgentRoleConfigsUpdateErr     error
 	GetAgentConfigFileErr             error
+	SaveModelProviderConfigErr        error
+	DeleteModelProviderConfigErr      error
+	SaveGlobalConfigErr               error
 }
 
 // NewMockConfigStore creates a new MockConfigStore with empty configuration.
@@ -314,6 +317,63 @@ func (m *MockConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
 	}
 
 	return m.agentRoleConfigsUpdate, nil
+}
+
+// SaveModelProviderConfig saves model provider configuration.
+func (m *MockConfigStore) SaveModelProviderConfig(config *conf.ModelProviderConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.SaveModelProviderConfigErr != nil {
+		return m.SaveModelProviderConfigErr
+	}
+	if config == nil {
+		return fmt.Errorf("MockConfigStore.SaveModelProviderConfig() [mock.go]: config cannot be nil")
+	}
+	if config.Name == "" {
+		return fmt.Errorf("MockConfigStore.SaveModelProviderConfig() [mock.go]: config name cannot be empty")
+	}
+
+	if m.modelProviderConfigs == nil {
+		m.modelProviderConfigs = make(map[string]*conf.ModelProviderConfig)
+	}
+	m.modelProviderConfigs[config.Name] = config.Clone()
+	m.modelProviderConfigsUpdate = time.Now()
+
+	return nil
+}
+
+// DeleteModelProviderConfig deletes model provider configuration.
+func (m *MockConfigStore) DeleteModelProviderConfig(name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.DeleteModelProviderConfigErr != nil {
+		return m.DeleteModelProviderConfigErr
+	}
+
+	delete(m.modelProviderConfigs, name)
+	m.modelProviderConfigsUpdate = time.Now()
+
+	return nil
+}
+
+// SaveGlobalConfig saves global configuration.
+func (m *MockConfigStore) SaveGlobalConfig(config *conf.GlobalConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.SaveGlobalConfigErr != nil {
+		return m.SaveGlobalConfigErr
+	}
+	if config == nil {
+		return fmt.Errorf("MockConfigStore.SaveGlobalConfig() [mock.go]: config cannot be nil")
+	}
+
+	m.globalConfig = config.Clone()
+	m.globalConfigUpdate = time.Now()
+
+	return nil
 }
 
 // GetAgentConfigFile returns configured agent config file content.

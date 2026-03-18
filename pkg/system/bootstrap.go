@@ -41,6 +41,7 @@ var newCompositeConfigStoreFunc = impl.NewCompositeConfigStore
 var resolveModelNameFunc = ResolveModelName
 var createProviderMapFunc = CreateProviderMap
 var generateWorktreeBranchNameFunc = core.GenerateWorktreeBranchName
+var createConfigUpdaterFunc = models.NewConfigUpdater
 
 // SetNewCompositeConfigStoreFuncForTest overrides composite store constructor in tests.
 func SetNewCompositeConfigStoreFuncForTest(fn func(projectRoot string, configPath string) (conf.ConfigStore, error)) {
@@ -968,14 +969,76 @@ func ResolveModelName(modelName string, configStore conf.ConfigStore, providerRe
 // CreateProviderMap creates a map of provider names to ModelProvider instances from a registry.
 func CreateProviderMap(providerRegistry *models.ProviderRegistry) (map[string]models.ModelProvider, error) {
 	modelProviders := make(map[string]models.ModelProvider)
+	configStore := providerRegistry.ConfigStore()
+	providerWritableStore := make(map[string]conf.WritableConfigStore)
+	if configStore != nil {
+		var err error
+		providerWritableStore, err = resolveWritableStoresForProviders(configStore)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	for _, name := range providerRegistry.List() {
 		provider, err := providerRegistry.Get(name)
 		if err != nil {
 			return nil, fmt.Errorf("CreateProviderMap() [bootstrap.go]: failed to get provider %s: %w", name, err)
 		}
+
+		if updaterTarget, ok := provider.(interface{ SetConfigUpdater(models.ConfigUpdater) }); ok {
+			if writableStore, exists := providerWritableStore[name]; exists && writableStore != nil {
+				updater := createConfigUpdaterFunc(writableStore, name)
+				updaterTarget.SetConfigUpdater(updater.Update())
+			}
+		}
 		modelProviders[name] = provider
 	}
 	return modelProviders, nil
+}
+
+func resolveWritableStoresForProviders(configStore conf.ConfigStore) (map[string]conf.WritableConfigStore, error) {
+	resolved := make(map[string]conf.WritableConfigStore)
+
+	if writable, ok := configStore.(conf.WritableConfigStore); ok {
+		configs, err := writable.GetModelProviderConfigs()
+		if err != nil {
+			return nil, fmt.Errorf("resolveWritableStoresForProviders() [bootstrap.go]: failed to read writable provider configs: %w", err)
+		}
+		for providerName := range configs {
+			resolved[providerName] = writable
+		}
+		return resolved, nil
+	}
+
+	compositeStore, ok := configStore.(*impl.CompositeConfigStore)
+	if !ok {
+		return resolved, nil
+	}
+
+	stores, err := compositeStore.Stores()
+	if err != nil {
+		return nil, fmt.Errorf("resolveWritableStoresForProviders() [bootstrap.go]: failed to resolve composite stores: %w", err)
+	}
+
+	for i := len(stores) - 1; i >= 0; i-- {
+		writable, ok := stores[i].(conf.WritableConfigStore)
+		if !ok {
+			continue
+		}
+
+		configs, err := writable.GetModelProviderConfigs()
+		if err != nil {
+			continue
+		}
+
+		for providerName := range configs {
+			if _, exists := resolved[providerName]; !exists {
+				resolved[providerName] = writable
+			}
+		}
+	}
+
+	return resolved, nil
 }
 
 // CreateModelTagRegistry creates and populates a model tag registry from config store.

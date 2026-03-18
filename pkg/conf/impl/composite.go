@@ -254,6 +254,17 @@ func (c *CompositeConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
 	return c.agentRoleConfigsUpdate, nil
 }
 
+// Stores returns a shallow copy of underlying config stores in merge order.
+func (c *CompositeConfigStore) Stores() ([]conf.ConfigStore, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	stores := make([]conf.ConfigStore, len(c.stores))
+	copy(stores, c.stores)
+
+	return stores, nil
+}
+
 // GetAgentConfigFile returns agent config file from the highest-priority source.
 // Later stores override earlier ones.
 func (c *CompositeConfigStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {

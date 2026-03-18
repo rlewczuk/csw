@@ -103,6 +103,15 @@ func (r *ProviderRegistry) List() []string {
 	return names
 }
 
+// ConfigStore returns the config store used by this provider registry.
+func (r *ProviderRegistry) ConfigStore() conf.ConfigStore {
+	if r == nil {
+		return nil
+	}
+
+	return r.configStore
+}
+
 // ModelFromConfig creates a new ModelProvider instance from the configuration.
 // It automatically selects the right implementation based on the Type field.
 func ModelFromConfig(config *conf.ModelProviderConfig) (ModelProvider, error) {

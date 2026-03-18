@@ -25,6 +25,8 @@ import (
 // Default token refresh safety margin - refresh token 5 minutes before expiry.
 const defaultTokenRefreshMargin = 5 * time.Minute
 
+const oauthRefreshMarginOptionKey = "oauth_refresh_margin"
+
 // defaultResponsesInstructions is used when no explicit instructions are provided.
 const defaultResponsesInstructions string = "You are a helpful assistant."
 
@@ -161,26 +163,45 @@ func (c *ResponsesClient) SetVerbose(verbose bool) {
 // updated configuration (including new refresh token if provided) will be
 // persisted using the ConfigUpdater callback.
 func (c *ResponsesClient) RefreshTokenIfNeeded() error {
+	return c.refreshTokenIfNeeded(false, "")
+}
+
+func (c *ResponsesClient) refreshTokenIfNeeded(force bool, previousToken string) error {
 	if !IsOAuth2Provider(c.config) {
 		return nil
 	}
 
-	c.tokenMu.RLock()
-	expiry := c.tokenExpiry
-	c.tokenMu.RUnlock()
+	if !force {
+		c.tokenMu.RLock()
+		currentToken := c.apiKey
+		expiry := c.tokenExpiry
+		c.tokenMu.RUnlock()
 
-	// Check if token is expired or about to expire
-	if !IsTokenExpired(expiry, defaultTokenRefreshMargin) {
-		return nil
+		// When token expiry cannot be determined (opaque access token), avoid eager
+		// refresh and rely on 401-based refresh path.
+		if currentToken != "" && expiry.IsZero() {
+			return nil
+		}
+
+		if !IsTokenExpired(expiry, c.tokenRefreshMargin()) {
+			return nil
+		}
 	}
 
-	// Need to refresh - upgrade to write lock
 	c.tokenMu.Lock()
 	defer c.tokenMu.Unlock()
 
-	// Double-check after acquiring write lock
-	if !IsTokenExpired(c.tokenExpiry, defaultTokenRefreshMargin) {
-		return nil
+	if force {
+		if previousToken != "" && c.apiKey != "" && c.apiKey != previousToken {
+			return nil
+		}
+	} else {
+		if c.apiKey != "" && c.tokenExpiry.IsZero() {
+			return nil
+		}
+		if !IsTokenExpired(c.tokenExpiry, c.tokenRefreshMargin()) {
+			return nil
+		}
 	}
 
 	// Refresh the token
@@ -216,6 +237,80 @@ func (c *ResponsesClient) RefreshTokenIfNeeded() error {
 	}
 
 	return nil
+}
+
+func (c *ResponsesClient) tokenRefreshMargin() time.Duration {
+	if c == nil || c.config == nil || c.config.Options == nil {
+		return defaultTokenRefreshMargin
+	}
+
+	marginRaw, ok := c.config.Options[oauthRefreshMarginOptionKey]
+	if !ok || marginRaw == nil {
+		return defaultTokenRefreshMargin
+	}
+
+	switch value := marginRaw.(type) {
+	case string:
+		parsed, err := time.ParseDuration(strings.TrimSpace(value))
+		if err == nil && parsed >= 0 {
+			return parsed
+		}
+	case float64:
+		if value >= 0 {
+			return time.Duration(value * float64(time.Second))
+		}
+	case int:
+		if value >= 0 {
+			return time.Duration(value) * time.Second
+		}
+	case int64:
+		if value >= 0 {
+			return time.Duration(value) * time.Second
+		}
+	}
+
+	return defaultTokenRefreshMargin
+}
+
+func (c *ResponsesClient) shouldRefreshAfterUnauthorized(resp *http.Response, bodyBytes []byte) bool {
+	if !IsOAuth2Provider(c.config) || c.config == nil || c.config.RefreshToken == "" || resp == nil {
+		return false
+	}
+
+	return isExpiredTokenUnauthorized(resp, bodyBytes)
+}
+
+func isExpiredTokenUnauthorized(resp *http.Response, bodyBytes []byte) bool {
+	if resp == nil || resp.StatusCode != http.StatusUnauthorized {
+		return false
+	}
+
+	wwwAuthenticate := strings.ToLower(resp.Header.Get("WWW-Authenticate"))
+	if strings.Contains(wwwAuthenticate, "invalid_token") && strings.Contains(wwwAuthenticate, "expired") {
+		return true
+	}
+
+	if len(bodyBytes) == 0 {
+		return false
+	}
+
+	var errResp OpenaiErrorResponse
+	if err := json.Unmarshal(bodyBytes, &errResp); err != nil || errResp.Error == nil {
+		return false
+	}
+
+	message := strings.ToLower(errResp.Error.Message)
+	code := strings.ToLower(fmt.Sprintf("%v", errResp.Error.Code))
+
+	if strings.Contains(code, "expired") {
+		return true
+	}
+
+	if strings.Contains(code, "invalid_token") && strings.Contains(message, "expired") {
+		return true
+	}
+
+	return strings.Contains(message, "token") && strings.Contains(message, "expired")
 }
 
 // GetAccessToken returns the current access token, refreshing it if necessary.
@@ -296,37 +391,60 @@ func (c *ResponsesClient) EmbeddingModel(model string) EmbeddingModel {
 func (c *ResponsesClient) ListModels() ([]ModelInfo, error) {
 	url := c.baseURL + "/models"
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("ResponsesClient.ListModels() [responses_client.go]: failed to create request: %w", err)
+	executeRequest := func(token string) (*http.Response, []byte, error) {
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		if err != nil {
+			return nil, nil, fmt.Errorf("ResponsesClient.ListModels() [responses_client.go]: failed to create request: %w", err)
+		}
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		c.applyConfiguredQueryParams(req)
+		setUserAgentHeader(req)
+		c.applyConfiguredHeaders(req)
+		applyOptionsHeaders(req, nil)
+
+		logVerboseRequest(req, nil, c.verbose)
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, nil, c.handleHTTPError(err)
+		}
+		defer resp.Body.Close()
+
+		bodyBytes, err := logVerboseResponse(resp, c.verbose)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return resp, bodyBytes, nil
 	}
 
 	token, err := c.GetAccessToken()
 	if err != nil {
 		return nil, err
 	}
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	c.applyConfiguredQueryParams(req)
-	setUserAgentHeader(req)
-	c.applyConfiguredHeaders(req)
-	applyOptionsHeaders(req, nil)
 
-	logVerboseRequest(req, nil, c.verbose)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, c.handleHTTPError(err)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := logVerboseResponse(resp, c.verbose)
+	resp, bodyBytes, err := executeRequest(token)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := c.checkStatusCode(resp); err != nil {
+	if c.shouldRefreshAfterUnauthorized(resp, bodyBytes) {
+		if err := c.refreshTokenIfNeeded(true, token); err != nil {
+			return nil, err
+		}
+		token, err = c.GetAccessToken()
+		if err != nil {
+			return nil, err
+		}
+		resp, bodyBytes, err = executeRequest(token)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := c.checkStatusCodeWithBody(resp, bodyBytes); err != nil {
 		return nil, err
 	}
 
@@ -439,41 +557,65 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		return nil, fmt.Errorf("ResponsesChatModel.Chat() [responses_client.go]: failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("ResponsesChatModel.Chat() [responses_client.go]: failed to create request: %w", err)
+	executeRequest := func(token string) (*http.Response, []byte, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+		if err != nil {
+			return nil, nil, fmt.Errorf("ResponsesChatModel.Chat() [responses_client.go]: failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		setUserAgentHeader(req)
+		m.client.applyConfiguredHeaders(req)
+		applyOptionsHeaders(req, effectiveOptions)
+
+		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
+		if effectiveOptions != nil && effectiveOptions.Logger != nil {
+			logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
+		}
+
+		resp, err := m.client.httpClient.Do(req)
+		if err != nil {
+			return nil, nil, wrapLLMRequestError(m.client.handleHTTPError(err), nil, nil)
+		}
+		defer resp.Body.Close()
+
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			readErr := fmt.Errorf("ResponsesChatModel.Chat() [responses_client.go]: failed to read response body: %w", err)
+			return nil, nil, wrapLLMRequestError(readErr, resp, nil)
+		}
+
+		if effectiveOptions != nil && effectiveOptions.Verbose {
+			logVerboseResponseFromBytes(resp, bodyBytes)
+		}
+
+		return resp, bodyBytes, nil
 	}
-	req.Header.Set("Content-Type", "application/json")
+
 	token, err := m.client.GetAccessToken()
 	if err != nil {
 		return nil, err
 	}
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	setUserAgentHeader(req)
-	m.client.applyConfiguredHeaders(req)
-	applyOptionsHeaders(req, effectiveOptions)
 
-	logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
-	if effectiveOptions != nil && effectiveOptions.Logger != nil {
-		logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
-	}
-
-	resp, err := m.client.httpClient.Do(req)
+	resp, bodyBytes, err := executeRequest(token)
 	if err != nil {
-		return nil, wrapLLMRequestError(m.client.handleHTTPError(err), nil, nil)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		readErr := fmt.Errorf("ResponsesChatModel.Chat() [responses_client.go]: failed to read response body: %w", err)
-		return nil, wrapLLMRequestError(readErr, resp, nil)
+		return nil, err
 	}
 
-	if effectiveOptions != nil && effectiveOptions.Verbose {
-		logVerboseResponseFromBytes(resp, bodyBytes)
+	if m.client.shouldRefreshAfterUnauthorized(resp, bodyBytes) {
+		if err := m.client.refreshTokenIfNeeded(true, token); err != nil {
+			return nil, err
+		}
+		token, err = m.client.GetAccessToken()
+		if err != nil {
+			return nil, err
+		}
+		resp, bodyBytes, err = executeRequest(token)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if err := m.client.checkStatusCodeWithBody(resp, bodyBytes); err != nil {
@@ -596,35 +738,71 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			return
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: ResponsesChatModel.ChatStream() [responses_client.go]: failed to create request: %v\n", err)
-			return
+		executeRequest := func(token string) (*http.Response, error) {
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+			if err != nil {
+				return nil, fmt.Errorf("ResponsesChatModel.ChatStream() [responses_client.go]: failed to create request: %w", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Accept", "text/event-stream")
+			if token != "" {
+				req.Header.Set("Authorization", "Bearer "+token)
+			}
+			setUserAgentHeader(req)
+			m.client.applyConfiguredHeaders(req)
+			applyOptionsHeaders(req, effectiveOptions)
+
+			logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
+			if effectiveOptions != nil && effectiveOptions.Logger != nil {
+				logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
+			}
+
+			resp, err := m.client.httpClient.Do(req)
+			if err != nil {
+				return nil, m.client.handleHTTPError(err)
+			}
+			return resp, nil
 		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Accept", "text/event-stream")
-		token, err := m.client.GetAccessToken()
+
+		var token string
+		token, err = m.client.GetAccessToken()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: ResponsesChatModel.ChatStream() [responses_client.go]: failed to get access token: %v\n", err)
 			return
 		}
-		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
-		}
-		setUserAgentHeader(req)
-		m.client.applyConfiguredHeaders(req)
-		applyOptionsHeaders(req, effectiveOptions)
 
-		logVerboseRequest(req, body, effectiveOptions != nil && effectiveOptions.Verbose)
-		if effectiveOptions != nil && effectiveOptions.Logger != nil {
-			logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
-		}
-
-		resp, err := m.client.httpClient.Do(req)
+		resp, err := executeRequest(token)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: ResponsesChatModel.ChatStream() [responses_client.go]: HTTP request failed: %v\n", err)
 			return
 		}
+
+		if m.client.shouldRefreshAfterUnauthorized(resp, nil) {
+			bodyBytes, readErr := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			if readErr == nil && m.client.shouldRefreshAfterUnauthorized(resp, bodyBytes) {
+				if refreshErr := m.client.refreshTokenIfNeeded(true, token); refreshErr == nil {
+					token, err = m.client.GetAccessToken()
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "ERROR: ResponsesChatModel.ChatStream() [responses_client.go]: failed to get refreshed access token: %v\n", err)
+						return
+					}
+
+					resp, err = executeRequest(token)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "ERROR: ResponsesChatModel.ChatStream() [responses_client.go]: HTTP request failed after token refresh: %v\n", err)
+						return
+					}
+				} else {
+					fmt.Fprintf(os.Stderr, "ERROR: ResponsesChatModel.ChatStream() [responses_client.go]: failed to refresh access token: %v\n", refreshErr)
+					return
+				}
+			} else if readErr != nil {
+				fmt.Fprintf(os.Stderr, "ERROR: ResponsesChatModel.ChatStream() [responses_client.go]: failed to read unauthorized response body: %v\n", readErr)
+				return
+			}
+		}
+
 		defer resp.Body.Close()
 
 		logVerboseStreamResponseHeaders(resp, effectiveOptions != nil && effectiveOptions.Verbose)
