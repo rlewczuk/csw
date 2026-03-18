@@ -87,6 +87,7 @@ type SweSession struct {
 	subAgentSlugs    map[string]struct{}
 	subAgentSlugsMu  sync.Mutex
 	subAgentRunner   SubAgentTaskRunner
+	hookFeedbackExec tool.HookFeedbackExecutor
 }
 
 // SweSessionParams stores dependencies and initial values used to create a SweSession.
@@ -134,6 +135,7 @@ type SweSessionParams struct {
 	CompactionCount            int
 	UsedSubAgentSlugs          map[string]struct{}
 	SubAgentRunner             SubAgentTaskRunner
+	HookFeedbackExecutor       tool.HookFeedbackExecutor
 }
 
 // NewSweSession creates a new SweSession from provided parameters.
@@ -182,6 +184,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		compactionCount:            params.CompactionCount,
 		subAgentSlugs:              make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
 		subAgentRunner:             params.SubAgentRunner,
+		hookFeedbackExec:           params.HookFeedbackExecutor,
 	}
 
 	if session.baseVFS == nil {
@@ -1297,6 +1300,9 @@ func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 	registry.Register("todoRead", tool.NewTodoReadTool(s))
 	registry.Register("todoWrite", tool.NewTodoWriteTool(s))
 	registry.Register("subAgent", tool.NewSubAgentTool(s))
+	if s.hookFeedbackExec != nil {
+		registry.Register("hookFeedback", tool.NewHookFeedbackTool(s.hookFeedbackExec, s.ModelWithProvider, s.ThinkingLevel))
+	}
 }
 
 // ExecuteSubAgentTask executes delegated subagent task for this parent session.

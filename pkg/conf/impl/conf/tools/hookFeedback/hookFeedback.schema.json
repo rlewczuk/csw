@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Sends hook feedback messages from hook-started subagent sessions.",
+  "type": "object",
+  "properties": {
+    "fn": {
+      "type": "string",
+      "description": "Determines what action (function) should be executed. Supported values are the same as CSWFEEDBACK payloads in external hook scripts, including context, llm and response."
+    },
+    "args": {
+      "type": "object",
+      "description": "Arguments map with content depending on fn value.",
+      "additionalProperties": true
+    },
+    "id": {
+      "type": "string",
+      "description": "Optional request id echoed in the response payload."
+    },
+    "response": {
+      "type": "string",
+      "description": "Ignored for this tool. Present only for compatibility with external hook script payloads."
+    }
+  },
+  "required": [
+    "fn"
+  ],
+  "additionalProperties": false
+}

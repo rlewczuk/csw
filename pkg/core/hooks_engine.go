@@ -305,6 +305,8 @@ func (e *HookEngine) executeSubAgent(ctx context.Context, hookConfig *conf.HookC
 		Model:    modelRef,
 		Thinking: thinking,
 	}
+	feedbackExecutor := newSubAgentHookFeedbackExecutor(e, ctx, request)
+	requestPayload.HookFeedbackExecutor = feedbackExecutor
 
 	result := &HookExecutionResult{Config: hookConfig.Clone(), Command: prompt}
 	responseRequest := HookFeedbackRequest{Fn: hookFeedbackFnResponse, Args: map[string]any{}}
@@ -354,9 +356,10 @@ func (e *HookEngine) executeSubAgent(ctx context.Context, hookConfig *conf.HookC
 			status = hookStatusOK
 		}
 
-		result.Stdout = strings.TrimSpace(run.value.Summary)
+		summaryText := strings.TrimSpace(run.value.Summary)
+		result.Stdout = summaryText
 		if status == hookStatusError && strings.TrimSpace(result.Stderr) == "" {
-			result.Stderr = strings.TrimSpace(run.value.Summary)
+			result.Stderr = summaryText
 			if result.Stderr == "" {
 				result.Stderr = fmt.Sprintf("subagent hook %q returned error status", hookConfig.Name)
 			}
@@ -387,7 +390,58 @@ func (e *HookEngine) executeSubAgent(ctx context.Context, hookConfig *conf.HookC
 		if errorField := strings.TrimSpace(hookConfig.ErrorTo); errorField != "" {
 			responseRequest.Args[errorField] = result.Stderr
 		}
+
+		if customResponse := feedbackExecutor.ResponseRequest(); customResponse != nil {
+			responseRequest = *customResponse
+			if responseRequest.Args == nil {
+				responseRequest.Args = map[string]any{}
+			}
+			if _, exists := responseRequest.Args["status"]; !exists {
+				responseRequest.Args["status"] = status
+			}
+			if _, exists := responseRequest.Args["stdout"]; !exists {
+				responseRequest.Args["stdout"] = summaryText
+			}
+			if _, exists := responseRequest.Args["stdin"]; !exists {
+				responseRequest.Args["stdin"] = summaryText
+			}
+			if _, exists := responseRequest.Args["stderr"]; !exists {
+				responseRequest.Args["stderr"] = result.Stderr
+			}
+
+			status = HookResponseStatus(&responseRequest)
+			if responseStdout := HookResponseArgString(&responseRequest, "stdout"); responseStdout != "" {
+				result.Stdout = responseStdout
+			}
+			if responseStderr := HookResponseArgString(&responseRequest, "stderr"); responseStderr != "" {
+				result.Stderr = responseStderr
+			}
+		}
 		result.FeedbackRequests = []HookFeedbackRequest{responseRequest}
+		if outputField := strings.TrimSpace(hookConfig.OutputTo); outputField != "" {
+			if value := HookResponseArgString(&responseRequest, outputField); value != "" {
+				e.SetContextValue(outputField, value)
+			}
+		}
+		if responseStdout := HookResponseArgString(&responseRequest, "stdout"); responseStdout != "" {
+			result.Stdout = responseStdout
+		}
+
+		if status == hookStatusOK {
+			result.ExitCode = 0
+		}
+		if status == hookStatusError {
+			result.ExitCode = 1
+			if strings.TrimSpace(result.Stderr) == "" {
+				result.Stderr = fmt.Sprintf("subagent hook %q returned error status", hookConfig.Name)
+			}
+		}
+		if status == hookStatusTimeout {
+			result.ExitCode = 124
+			if strings.TrimSpace(result.Stderr) == "" {
+				result.Stderr = fmt.Sprintf("subagent hook %q returned timeout status", hookConfig.Name)
+			}
+		}
 
 		if request.View != nil {
 			request.View.ShowMessage(fmt.Sprintf("[hook:%s][subagent] model=%s", hookConfig.Name, modelRef), ui.MessageTypeInfo)
@@ -408,6 +462,72 @@ func (e *HookEngine) executeSubAgent(ctx context.Context, hookConfig *conf.HookC
 
 		return result, nil
 	}
+}
+
+type subAgentHookFeedbackExecutor struct {
+	engine      *HookEngine
+	ctx         context.Context
+	hookRequest HookExecutionRequest
+	mu          sync.Mutex
+	response    *HookFeedbackRequest
+}
+
+func newSubAgentHookFeedbackExecutor(engine *HookEngine, ctx context.Context, hookRequest HookExecutionRequest) *subAgentHookFeedbackExecutor {
+	return &subAgentHookFeedbackExecutor{
+		engine:      engine,
+		ctx:         ctx,
+		hookRequest: hookRequest,
+	}
+}
+
+func (e *subAgentHookFeedbackExecutor) ExecuteHookFeedback(request tool.HookFeedbackRequest) tool.HookFeedbackResponse {
+	coreRequest := HookFeedbackRequest{
+		Fn:   strings.TrimSpace(request.Fn),
+		Args: copyHookFeedbackArgs(request.Args),
+		ID:   strings.TrimSpace(request.ID),
+	}
+	if coreRequest.Args == nil {
+		coreRequest.Args = map[string]any{}
+	}
+
+	if strings.EqualFold(coreRequest.Fn, hookFeedbackFnResponse) {
+		e.mu.Lock()
+		e.response = &HookFeedbackRequest{Fn: hookFeedbackFnResponse, Args: copyHookFeedbackArgs(coreRequest.Args), ID: coreRequest.ID}
+		e.mu.Unlock()
+
+		return tool.HookFeedbackResponse{ID: coreRequest.ID, Fn: coreRequest.Fn, OK: true, Result: copyHookFeedbackArgs(coreRequest.Args)}
+	}
+
+	response := e.engine.handleHookFeedbackRequest(e.ctx, e.hookRequest, coreRequest)
+	return tool.HookFeedbackResponse{
+		ID:     response.ID,
+		Fn:     response.Fn,
+		OK:     response.OK,
+		Result: response.Result,
+		Error:  response.Error,
+	}
+}
+
+func (e *subAgentHookFeedbackExecutor) ResponseRequest() *HookFeedbackRequest {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.response == nil {
+		return nil
+	}
+	copyValue := *e.response
+	copyValue.Args = copyHookFeedbackArgs(copyValue.Args)
+	return &copyValue
+}
+
+func copyHookFeedbackArgs(args map[string]any) map[string]any {
+	if args == nil {
+		return nil
+	}
+	copied := make(map[string]any, len(args))
+	for key, value := range args {
+		copied[key] = value
+	}
+	return copied
 }
 
 func (e *HookEngine) executeShell(ctx context.Context, hookConfig *conf.HookConfig, request HookExecutionRequest) (*HookExecutionResult, error) {

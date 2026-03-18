@@ -157,10 +157,10 @@ func (s *SweSystem) LoadLastSession(outputHandler core.SessionThreadOutput) (*co
 
 // NewSession creates a new session for selected model.
 func (s *SweSystem) NewSession(model string, outputHandler core.SessionThreadOutput) (*core.SweSession, error) {
-	return s.newSessionWithOptions(model, outputHandler, "", "", "")
+	return s.newSessionWithOptions(model, outputHandler, "", "", "", nil)
 }
 
-func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.SessionThreadOutput, parentID string, slug string, thinking string) (*core.SweSession, error) {
+func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.SessionThreadOutput, parentID string, slug string, thinking string, hookFeedbackExecutor tool.HookFeedbackExecutor) (*core.SweSession, error) {
 	providerName, modelName, err := parseProviderModel(model)
 	if err != nil {
 		return nil, err
@@ -175,33 +175,34 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 
 	sessionLogger, llmLogger := s.createSessionLoggers(sessionID)
 	session := core.NewSweSession(&core.SweSessionParams{
-		ID:              sessionID,
-		ParentID:        strings.TrimSpace(parentID),
-		Slug:            strings.TrimSpace(slug),
-		Provider:        provider,
-		ProviderName:    providerName,
-		Model:           modelName,
-		VFS:             s.VFS,
-		BaseVFS:         s.VFS,
-		LSP:             s.LSP,
-		SystemTools:     s.Tools,
-		ModelProviders:  s.ModelProviders,
-		ModelTags:       s.ModelTags,
-		ToolSelection:   s.ToolSelection,
-		PromptGenerator: s.PromptGenerator,
-		Roles:           s.Roles,
-		ConfigStore:     s.ConfigStore,
-		OutputHandler:   outputHandler,
-		WorkDir:         s.WorkDir,
-		ShadowDir:       s.ShadowDir,
-		LogBaseDir:      s.LogBaseDir,
-		Thinking:        firstNonEmpty(strings.TrimSpace(thinking), strings.TrimSpace(s.Thinking)),
-		MaxToolThreads:  s.MaxToolThreads,
-		Logger:          sessionLogger,
-		LLMLogger:       llmLogger,
-		Messages:        []*models.ChatMessage{},
-		TodoList:        []tool.TodoItem{},
-		SubAgentRunner:  s,
+		ID:                   sessionID,
+		ParentID:             strings.TrimSpace(parentID),
+		Slug:                 strings.TrimSpace(slug),
+		Provider:             provider,
+		ProviderName:         providerName,
+		Model:                modelName,
+		VFS:                  s.VFS,
+		BaseVFS:              s.VFS,
+		LSP:                  s.LSP,
+		SystemTools:          s.Tools,
+		ModelProviders:       s.ModelProviders,
+		ModelTags:            s.ModelTags,
+		ToolSelection:        s.ToolSelection,
+		PromptGenerator:      s.PromptGenerator,
+		Roles:                s.Roles,
+		ConfigStore:          s.ConfigStore,
+		OutputHandler:        outputHandler,
+		WorkDir:              s.WorkDir,
+		ShadowDir:            s.ShadowDir,
+		LogBaseDir:           s.LogBaseDir,
+		Thinking:             firstNonEmpty(strings.TrimSpace(thinking), strings.TrimSpace(s.Thinking)),
+		MaxToolThreads:       s.MaxToolThreads,
+		HookFeedbackExecutor: hookFeedbackExecutor,
+		Logger:               sessionLogger,
+		LLMLogger:            llmLogger,
+		Messages:             []*models.ChatMessage{},
+		TodoList:             []tool.TodoItem{},
+		SubAgentRunner:       s,
 	})
 
 	if sessionLogger != nil {
@@ -264,7 +265,7 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *core.SweSession, request tool.Su
 		thinking = strings.TrimSpace(parent.ThinkingLevel())
 	}
 	childOutput := &subAgentOutputHandler{delegate: parent.OutputHandler(), slug: request.Slug}
-	child, err := s.newSessionWithOptions(modelName, childOutput, parent.ID(), request.Slug, thinking)
+	child, err := s.newSessionWithOptions(modelName, childOutput, parent.ID(), request.Slug, thinking, request.HookFeedbackExecutor)
 	if err != nil {
 		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: failed to create child session: %w", err)
 	}
@@ -285,10 +286,32 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *core.SweSession, request tool.Su
 
 	runErr := child.Run(context.Background())
 	summaryText := lastAssistantMessageText(child)
+	responseSummaryText, responseStatus, responseError := lastHookFeedbackResponse(child)
+	if strings.TrimSpace(responseSummaryText) != "" {
+		summaryText = strings.TrimSpace(responseSummaryText)
+	}
 	finalTodo := child.GetTodoList()
 	status := "completed"
 	if runErr != nil {
 		status = "error"
+	}
+	if strings.EqualFold(responseStatus, "ERROR") {
+		status = "error"
+		if strings.TrimSpace(responseError) == "" {
+			responseError = fmt.Sprintf("subagent returned status %q", responseStatus)
+		}
+		if strings.TrimSpace(responseSummaryText) == "" {
+			summaryText = strings.TrimSpace(responseError)
+		}
+	}
+	if strings.EqualFold(responseStatus, "TIMEOUT") {
+		status = "error"
+		if strings.TrimSpace(responseError) == "" {
+			responseError = fmt.Sprintf("subagent returned status %q", responseStatus)
+		}
+		if strings.TrimSpace(responseSummaryText) == "" {
+			summaryText = strings.TrimSpace(responseError)
+		}
 	}
 
 	if err := writeSubAgentSummary(s.LogBaseDir, child, subAgentSummaryJSON{
@@ -305,10 +328,76 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *core.SweSession, request tool.Su
 	}
 
 	if runErr != nil {
-		return tool.SubAgentTaskResult{Status: "error", Summary: summaryText}, nil
+		if strings.TrimSpace(responseError) == "" {
+			responseError = runErr.Error()
+		}
+		return tool.SubAgentTaskResult{Status: "error", Summary: summaryText, Error: responseError}, nil
+	}
+
+	if status == "error" {
+		return tool.SubAgentTaskResult{Status: status, Summary: summaryText, Error: responseError}, nil
 	}
 
 	return tool.SubAgentTaskResult{Status: "completed", Summary: summaryText}, nil
+}
+
+func lastHookFeedbackResponse(session *core.SweSession) (string, string, string) {
+	if session == nil {
+		return "", "", ""
+	}
+
+	for i := len(session.ChatMessages()) - 1; i >= 0; i-- {
+		message := session.ChatMessages()[i]
+		if message == nil {
+			continue
+		}
+		if message.Role != models.ChatRoleUser {
+			continue
+		}
+		for _, part := range message.Parts {
+			if part.ToolResponse == nil || part.ToolResponse.Call == nil {
+				continue
+			}
+			if strings.TrimSpace(part.ToolResponse.Call.Function) != "hookFeedback" {
+				continue
+			}
+			if strings.TrimSpace(part.ToolResponse.Call.Arguments.String("fn")) != "response" {
+				continue
+			}
+
+			argsObject, hasArgs := part.ToolResponse.Call.Arguments.Get("args").ObjectOK()
+			status := ""
+			stdout := ""
+			stderr := ""
+			if hasArgs {
+				if value, exists := argsObject["status"]; exists {
+					status = strings.TrimSpace(value.AsString())
+				}
+				if value, exists := argsObject["stdout"]; exists {
+					stdout = strings.TrimSpace(value.AsString())
+				}
+				if value, exists := argsObject["stderr"]; exists {
+					stderr = strings.TrimSpace(value.AsString())
+				}
+			}
+
+			if status == "" || (stdout == "" && stderr == "") {
+				result := part.ToolResponse.Result
+				if status == "" {
+					status = strings.TrimSpace(result.String("status"))
+				}
+				if stdout == "" {
+					stdout = strings.TrimSpace(result.String("stdout"))
+				}
+				if stderr == "" {
+					stderr = strings.TrimSpace(result.String("stderr"))
+				}
+			}
+			return stdout, status, stderr
+		}
+	}
+
+	return "", "", ""
 }
 
 func writeSubAgentSummary(logBaseDir string, session *core.SweSession, summary subAgentSummaryJSON) error {

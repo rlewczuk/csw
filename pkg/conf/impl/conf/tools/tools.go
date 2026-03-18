@@ -3,6 +3,7 @@ package tools
 // Names lists built-in tool configuration directories bundled with defaults.
 var Names = []string{
 	"runBash",
+	"hookFeedback",
 	"skill",
 	"subAgent",
 	"todoRead",

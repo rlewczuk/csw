@@ -13,12 +13,37 @@ type SubAgentTaskRequest struct {
 	Role     string
 	Model    string
 	Thinking string
+	// HookFeedbackExecutor enables hookFeedback tool in child session when set.
+	HookFeedbackExecutor HookFeedbackExecutor
 }
 
 // SubAgentTaskResult contains final subagent execution output.
 type SubAgentTaskResult struct {
 	Status  string
 	Summary string
+	Error   string
+}
+
+// HookFeedbackRequest defines one hook feedback message payload.
+type HookFeedbackRequest struct {
+	Fn   string
+	Args map[string]any
+	ID   string
+}
+
+// HookFeedbackResponse defines one processed hook feedback result.
+type HookFeedbackResponse struct {
+	ID     string
+	Fn     string
+	OK     bool
+	Result any
+	Error  string
+}
+
+// HookFeedbackExecutor handles hook feedback requests from hook subagent sessions.
+type HookFeedbackExecutor interface {
+	// ExecuteHookFeedback executes one hook feedback request.
+	ExecuteHookFeedback(request HookFeedbackRequest) HookFeedbackResponse
 }
 
 // SubAgentExecutor executes delegated subagent tasks.
@@ -94,6 +119,9 @@ func (t *SubAgentTool) Execute(args *ToolCall) *ToolResponse {
 		"status":  result.Status,
 		"summary": result.Summary,
 	})
+	if strings.TrimSpace(result.Error) != "" {
+		resultValue.Set("error", result.Error)
+	}
 
 	return &ToolResponse{Call: args, Result: resultValue, Done: true}
 }
@@ -107,5 +135,5 @@ func (t *SubAgentTool) Render(call *ToolCall) (string, string, map[string]string
 	if strings.TrimSpace(summary) == "" {
 		return oneLiner, oneLiner, make(map[string]string)
 	}
-	return oneLiner, oneLiner+"\n\n"+summary, make(map[string]string)
+	return oneLiner, oneLiner + "\n\n" + summary, make(map[string]string)
 }

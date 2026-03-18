@@ -27,9 +27,13 @@ type mockSubAgentTaskRunner struct {
 	result   tool.SubAgentTaskResult
 	err      error
 	delay    time.Duration
+	onRun    func(request tool.SubAgentTaskRequest)
 }
 
 func (m *mockSubAgentTaskRunner) ExecuteSubAgentTask(_ *SweSession, request tool.SubAgentTaskRequest) (tool.SubAgentTaskResult, error) {
+	if m.onRun != nil {
+		m.onRun(request)
+	}
 	if m.delay > 0 {
 		time.Sleep(m.delay)
 	}
@@ -586,12 +590,63 @@ func TestHookEngineExecuteSubAgentHookUsesConfiguredAndInheritedFields(t *testin
 	assert.Equal(t, "mock/child-model", requests[0].Model)
 	assert.Equal(t, "high", requests[0].Thinking)
 	assert.Equal(t, "System: running\n\nPrompt: Initial request", requests[0].Prompt)
+	require.NotNil(t, requests[0].HookFeedbackExecutor)
 
 	response := FindHookResponseRequest(result)
 	require.NotNil(t, response)
 	assert.Equal(t, hookStatusOK, HookResponseStatus(response))
 	assert.Equal(t, "child summary", HookResponseArgString(response, "stdout"))
 	assert.Equal(t, "child summary", HookResponseArgString(response, "sub_out"))
+}
+
+func TestHookEngineExecuteSubAgentHookUsesCustomResponseFeedback(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"summary-subagent": {
+			Name:     "summary-subagent",
+			Hook:     "summary",
+			Enabled:  true,
+			Type:     conf.HookTypeSubAgent,
+			Prompt:   "Prompt",
+			OutputTo: "sub_out",
+		},
+	})
+
+	runner := &mockSubAgentTaskRunner{result: tool.SubAgentTaskResult{Status: "completed", Summary: "default summary"}}
+	feedbackCalled := false
+	feedbackOK := false
+	runner.onRun = func(request tool.SubAgentTaskRequest) {
+		if request.HookFeedbackExecutor == nil {
+			return
+		}
+		feedbackCalled = true
+		feedbackResp := request.HookFeedbackExecutor.ExecuteHookFeedback(tool.HookFeedbackRequest{
+			Fn: "response",
+			Args: map[string]any{
+				"status":  "OK",
+				"stdout":  "custom stdout",
+				"sub_out": "custom context value",
+			},
+			ID: "custom-1",
+		})
+		feedbackOK = feedbackResp.OK
+	}
+	session := &SweSession{subAgentRunner: runner, providerName: "mock", model: "parent-model", thinking: "medium", role: &conf.AgentRoleConfig{Name: "developer"}}
+
+	engine := NewHookEngine(configStore, nil, nil, map[string]models.ModelProvider{})
+	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary", Session: session})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	requests := runner.Requests()
+	require.Len(t, requests, 1)
+	require.NotNil(t, requests[0].HookFeedbackExecutor)
+	assert.True(t, feedbackCalled)
+	assert.True(t, feedbackOK)
+	response := FindHookResponseRequest(result)
+	require.NotNil(t, response)
+	assert.Equal(t, "custom stdout", HookResponseArgString(response, "stdout"))
+	assert.Equal(t, "custom context value", engine.ContextData()["sub_out"])
 }
 
 func TestHookEngineExecuteSubAgentHookFailsWithoutSession(t *testing.T) {

@@ -67,6 +67,7 @@ func TestSubAgentToolExecute(t *testing.T) {
 		assert.True(t, response.Done)
 		assert.Equal(t, "completed", response.Result.String("status"))
 		assert.Equal(t, "child done", response.Result.String("summary"))
+		assert.False(t, response.Result.Has("error"))
 		assert.False(t, response.Result.Has("final_todo_list"))
 		assert.Equal(t, "child-task", executor.request.Slug)
 		assert.Equal(t, "Task", executor.request.Title)
@@ -74,6 +75,16 @@ func TestSubAgentToolExecute(t *testing.T) {
 		assert.Equal(t, "developer", executor.request.Role)
 		assert.Equal(t, "mock/test-model", executor.request.Model)
 		assert.Equal(t, "high", executor.request.Thinking)
+	})
+
+	t.Run("includes error field when provided by executor", func(t *testing.T) {
+		executor := &subAgentExecutorMock{result: SubAgentTaskResult{Status: "error", Summary: "failed", Error: "subagent failed"}}
+		tool := NewSubAgentTool(executor)
+		response := tool.Execute(&ToolCall{Function: "subAgent", Arguments: NewToolValue(map[string]any{"slug": "child-task", "title": "Task", "prompt": "Do task"})})
+		require.NoError(t, response.Error)
+		assert.Equal(t, "error", response.Result.String("status"))
+		assert.Equal(t, "failed", response.Result.String("summary"))
+		assert.Equal(t, "subagent failed", response.Result.String("error"))
 	})
 
 	t.Run("trims text arguments before passing to executor", func(t *testing.T) {
