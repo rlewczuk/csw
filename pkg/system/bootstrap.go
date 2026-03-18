@@ -249,12 +249,59 @@ func ResolveWorktreeBranchName(ctx context.Context, params ResolveWorktreeBranch
 		return "", fmt.Errorf("ResolveWorktreeBranchName() [bootstrap.go]: failed to create provider map: %w", err)
 	}
 
+	if hookBranchSuffix, hookHandled, hookErr := resolveWorktreeBranchNameFromHook(ctx, configStore, modelProviders, params.Prompt, resolvedWorkDir); hookErr != nil {
+		return "", hookErr
+	} else if hookHandled {
+		return prefix + hookBranchSuffix, nil
+	}
+
 	branchSuffix, err := generateWorktreeBranchNameFunc(ctx, modelProviders, configStore, resolvedModelName, params.Prompt)
 	if err != nil {
 		return "", fmt.Errorf("ResolveWorktreeBranchName() [bootstrap.go]: failed to generate branch name: %w", err)
 	}
 
 	return prefix + branchSuffix, nil
+}
+
+func resolveWorktreeBranchNameFromHook(ctx context.Context, configStore conf.ConfigStore, modelProviders map[string]models.ModelProvider, prompt string, workDir string) (string, bool, error) {
+	if configStore == nil {
+		return "", false, fmt.Errorf("resolveWorktreeBranchNameFromHook() [bootstrap.go]: config store is nil")
+	}
+
+	hookEngine := core.NewHookEngine(configStore, core.NewDefaultHookRunner(workDir), nil, modelProviders)
+	enabledHook, err := hookEngine.FindEnabledHook("branch_name")
+	if err != nil {
+		return "", false, fmt.Errorf("resolveWorktreeBranchNameFromHook() [bootstrap.go]: failed to resolve branch_name hook: %w", err)
+	}
+	if enabledHook == nil {
+		return "", false, nil
+	}
+
+	hookEngine.MergeContext(map[string]string{
+		"user_prompt": strings.TrimSpace(prompt),
+		"workdir":     strings.TrimSpace(workDir),
+		"rootdir":     strings.TrimSpace(workDir),
+	})
+
+	hookResult, err := hookEngine.Execute(ctx, core.HookExecutionRequest{Name: "branch_name"})
+	if err != nil {
+		return "", true, fmt.Errorf("resolveWorktreeBranchNameFromHook() [bootstrap.go]: branch_name hook execution failed: %w", err)
+	}
+	if hookResult == nil {
+		return "", true, fmt.Errorf("resolveWorktreeBranchNameFromHook() [bootstrap.go]: branch_name hook was enabled but produced no result")
+	}
+
+	rawBranch := strings.TrimSpace(core.HookResponseArgString(core.FindHookResponseRequest(hookResult), "stdout"))
+	if rawBranch == "" {
+		rawBranch = strings.TrimSpace(hookResult.Stdout)
+	}
+
+	normalized := core.NormalizeWorktreeBranchSymbolicName(rawBranch)
+	if normalized == "" {
+		return "", true, fmt.Errorf("resolveWorktreeBranchNameFromHook() [bootstrap.go]: branch_name hook returned empty branch name")
+	}
+
+	return normalized, true, nil
 }
 
 // PrepareSessionVFS creates session VCS/VFS with optional worktree handling.

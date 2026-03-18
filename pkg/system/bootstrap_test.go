@@ -367,6 +367,72 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 	}
 }
 
+func TestResolveWorktreeBranchNameUsesEnabledBranchNameHook(t *testing.T) {
+	store := confimpl.NewMockConfigStore()
+	store.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{
+		"mock": {Name: "mock", Type: "openai", URL: "http://example.com", ModelTags: []conf.ModelTagMapping{}},
+	})
+	store.SetHookConfigs(map[string]*conf.HookConfig{
+		"branch_name": {
+			Name:    "branch_name",
+			Hook:    "branch_name",
+			Enabled: true,
+			Type:    conf.HookTypeLLM,
+			Model:   "mock/test-model",
+			Prompt:  "{{.user_prompt}}",
+		},
+	})
+
+	originalNewComposite := newCompositeConfigStoreFunc
+	originalResolveModel := resolveModelNameFunc
+	originalCreateProviderMap := createProviderMapFunc
+	originalGenerateBranch := generateWorktreeBranchNameFunc
+	t.Cleanup(func() {
+		newCompositeConfigStoreFunc = originalNewComposite
+		resolveModelNameFunc = originalResolveModel
+		createProviderMapFunc = originalCreateProviderMap
+		generateWorktreeBranchNameFunc = originalGenerateBranch
+	})
+
+	newCompositeConfigStoreFunc = func(rootPath, configPath string) (conf.ConfigStore, error) {
+		return store, nil
+	}
+	resolveModelNameFunc = func(modelName string, configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (string, error) {
+		return "mock/test-model", nil
+	}
+
+	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+	provider.SetChatResponse(
+		"test-model",
+		&models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "hook-generated")},
+	)
+	createProviderMapFunc = func(providerRegistry *models.ProviderRegistry) (map[string]models.ModelProvider, error) {
+		return map[string]models.ModelProvider{"mock": provider}, nil
+	}
+
+	generateCalls := 0
+	generateWorktreeBranchNameFunc = func(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore conf.ConfigStore, model string, inputPrompt string) (string, error) {
+		generateCalls++
+		return "fallback-generated", nil
+	}
+
+	branch, err := ResolveWorktreeBranchName(context.Background(), ResolveWorktreeBranchNameParams{
+		Prompt:         "Add branch hook support",
+		ModelName:      "mock/test-model",
+		WorkDir:        "",
+		ShadowDir:      "",
+		ProjectConfig:  "",
+		ConfigPath:     "",
+		WorktreeBranch: "sp-%",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "sp-hook-generated", branch)
+	assert.Equal(t, 0, generateCalls)
+	require.Len(t, provider.RecordedMessages, 1)
+	require.Len(t, provider.RecordedMessages[0], 1)
+	assert.Contains(t, provider.RecordedMessages[0][0].GetText(), "Add branch hook support")
+}
+
 func TestCreateProviderMapConfigUpdaterWiring(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/oauth/token" {
