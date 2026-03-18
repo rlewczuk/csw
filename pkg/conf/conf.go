@@ -189,6 +189,8 @@ type HookConfig struct {
 	Model string `json:"model,omitempty" yaml:"model,omitempty"`
 	// Thinking is optional --thinking-style override for LLM hook execution.
 	Thinking string `json:"thinking,omitempty" yaml:"thinking,omitempty"`
+	// Role is optional role override for subagent hook execution.
+	Role string `json:"role,omitempty" yaml:"role,omitempty"`
 	// OutputTo is optional output field name used by hooks for generated output.
 	// For LLM hooks it stores model response text in hook context. Defaults to "result".
 	// For shell hooks it is exposed in synthetic response feedback and maps to stdout.
@@ -219,6 +221,7 @@ type HookConfig struct {
 	systemConfigured  bool
 	modelConfigured   bool
 	thinkingConfigured bool
+	roleConfigured     bool
 	outputToConfigured bool
 	errorToConfigured  bool
 	timeoutConfigured bool
@@ -237,6 +240,7 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 		System  string    `json:"system_prompt,omitempty"`
 		Model   string    `json:"model,omitempty"`
 		Thinking string   `json:"thinking,omitempty"`
+		Role    string    `json:"role,omitempty"`
 		OutputTo string   `json:"output_to,omitempty"`
 		ErrorTo string    `json:"error_to,omitempty"`
 		Timeout string    `json:"timeout,omitempty"`
@@ -259,6 +263,7 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 	c.SystemPrompt = aux.System
 	c.Model = aux.Model
 	c.Thinking = aux.Thinking
+	c.Role = aux.Role
 	c.OutputTo = aux.OutputTo
 	c.ErrorTo = aux.ErrorTo
 	c.RunOn = aux.RunOn
@@ -277,6 +282,7 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 	_, c.systemConfigured = raw["system_prompt"]
 	_, c.modelConfigured = raw["model"]
 	_, c.thinkingConfigured = raw["thinking"]
+	_, c.roleConfigured = raw["role"]
 	_, c.outputToConfigured = raw["output_to"]
 	_, c.errorToConfigured = raw["error_to"]
 	_, c.timeoutConfigured = raw["timeout"]
@@ -308,6 +314,7 @@ func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 		System  string    `yaml:"system_prompt,omitempty"`
 		Model   string    `yaml:"model,omitempty"`
 		Thinking string   `yaml:"thinking,omitempty"`
+		Role    string    `yaml:"role,omitempty"`
 		OutputTo string   `yaml:"output_to,omitempty"`
 		ErrorTo string    `yaml:"error_to,omitempty"`
 		Timeout string    `yaml:"timeout,omitempty"`
@@ -330,6 +337,7 @@ func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 	c.SystemPrompt = aux.System
 	c.Model = aux.Model
 	c.Thinking = aux.Thinking
+	c.Role = aux.Role
 	c.OutputTo = aux.OutputTo
 	c.ErrorTo = aux.ErrorTo
 	c.RunOn = aux.RunOn
@@ -368,6 +376,8 @@ func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 			c.modelConfigured = true
 		case "thinking":
 			c.thinkingConfigured = true
+		case "role":
+			c.roleConfigured = true
 		case "output_to":
 			c.outputToConfigured = true
 		case "error_to":

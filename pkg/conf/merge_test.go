@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestToolSelectionConfig_Merge(t *testing.T) {
@@ -420,6 +421,22 @@ func TestAgentRoleConfig_Merge_NilOverride(t *testing.T) {
 	base := &AgentRoleConfig{Name: "role", HiddenPatterns: []string{".git/"}}
 	base.Merge(nil)
 	assert.Equal(t, []string{".git/"}, base.HiddenPatterns)
+}
+
+func TestHookConfig_Merge_SubAgentRoleAndPromptFields(t *testing.T) {
+	base := &HookConfig{}
+	require.NoError(t, yaml.Unmarshal([]byte("name: summary-hook\nhook: summary\ntype: subagent\nprompt: base prompt\nsystem_prompt: base system\nmodel: mock/base\nthinking: medium\nrole: developer\n"), base))
+
+	override := &HookConfig{}
+	require.NoError(t, yaml.Unmarshal([]byte("name: summary-hook\nrole: reviewer\nprompt: override prompt\n"), override))
+
+	base.Merge(override)
+
+	assert.Equal(t, "override prompt", base.Prompt)
+	assert.Equal(t, "base system", base.SystemPrompt)
+	assert.Equal(t, "mock/base", base.Model)
+	assert.Equal(t, "medium", base.Thinking)
+	assert.Equal(t, "reviewer", base.Role)
 }
 
 func TestModelProviderConfig_Clone_NilReceiver(t *testing.T) {

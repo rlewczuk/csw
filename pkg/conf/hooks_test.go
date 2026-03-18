@@ -72,3 +72,29 @@ func TestHookConfigUnmarshalYAMLLLMFields(t *testing.T) {
 	assert.Equal(t, "high", cfg.Thinking)
 	assert.Equal(t, "out", cfg.OutputTo)
 }
+
+func TestHookConfigUnmarshalYAMLSubAgentFields(t *testing.T) {
+	var cfg HookConfig
+	err := yaml.Unmarshal([]byte("name: h1\nhook: summary\ntype: subagent\nprompt: p\nsystem_prompt: s\nmodel: mock/test\nthinking: high\nrole: reviewer\n"), &cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, HookTypeSubAgent, cfg.Type)
+	assert.Equal(t, "p", cfg.Prompt)
+	assert.Equal(t, "s", cfg.SystemPrompt)
+	assert.Equal(t, "mock/test", cfg.Model)
+	assert.Equal(t, "high", cfg.Thinking)
+	assert.Equal(t, "reviewer", cfg.Role)
+}
+
+func TestHookConfigUnmarshalJSONSubAgentFields(t *testing.T) {
+	var cfg HookConfig
+	err := json.Unmarshal([]byte(`{"name":"h1","hook":"summary","type":"subagent","prompt":"p","system_prompt":"s","model":"mock/test","thinking":"high","role":"reviewer"}`), &cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, HookTypeSubAgent, cfg.Type)
+	assert.Equal(t, "p", cfg.Prompt)
+	assert.Equal(t, "s", cfg.SystemPrompt)
+	assert.Equal(t, "mock/test", cfg.Model)
+	assert.Equal(t, "high", cfg.Thinking)
+	assert.Equal(t, "reviewer", cfg.Role)
+}

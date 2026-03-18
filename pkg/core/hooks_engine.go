@@ -18,6 +18,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
+	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
 )
 
@@ -239,9 +240,173 @@ func (e *HookEngine) Execute(ctx context.Context, request HookExecutionRequest) 
 	case conf.HookTypeLLM:
 		return e.executeLLM(ctx, hookConfig, request)
 	case conf.HookTypeSubAgent:
-		return nil, fmt.Errorf("HookEngine.Execute() [hooks_engine.go]: hook type %q is not implemented", hookConfig.Type)
+		return e.executeSubAgent(ctx, hookConfig, request)
 	default:
 		return nil, fmt.Errorf("HookEngine.Execute() [hooks_engine.go]: unsupported hook type %q", hookConfig.Type)
+	}
+}
+
+func (e *HookEngine) executeSubAgent(ctx context.Context, hookConfig *conf.HookConfig, request HookExecutionRequest) (*HookExecutionResult, error) {
+	promptTemplate := strings.TrimSpace(hookConfig.Prompt)
+	if promptTemplate == "" {
+		return nil, fmt.Errorf("HookEngine.executeSubAgent() [hooks_engine.go]: hook %q has empty prompt", hookConfig.Name)
+	}
+
+	if request.Session == nil {
+		return nil, fmt.Errorf("HookEngine.executeSubAgent() [hooks_engine.go]: session is required for hook %q", hookConfig.Name)
+	}
+
+	prompt, err := e.renderTemplate("hook-subagent-prompt", promptTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("HookEngine.executeSubAgent() [hooks_engine.go]: failed to render prompt for hook %q: %w", hookConfig.Name, err)
+	}
+
+	if strings.TrimSpace(hookConfig.SystemPrompt) != "" {
+		systemPrompt, renderErr := e.renderTemplate("hook-subagent-system-prompt", hookConfig.SystemPrompt)
+		if renderErr != nil {
+			return nil, fmt.Errorf("HookEngine.executeSubAgent() [hooks_engine.go]: failed to render system prompt for hook %q: %w", hookConfig.Name, renderErr)
+		}
+		prompt = strings.TrimSpace(strings.Join([]string{systemPrompt, prompt}, "\n\n"))
+	}
+
+	modelRef := strings.TrimSpace(hookConfig.Model)
+	if modelRef == "" {
+		modelRef = request.Session.ModelWithProvider()
+	}
+	if strings.TrimSpace(modelRef) == "" {
+		return nil, fmt.Errorf("HookEngine.executeSubAgent() [hooks_engine.go]: unable to resolve model for hook %q", hookConfig.Name)
+	}
+
+	thinking := strings.TrimSpace(hookConfig.Thinking)
+	if thinking == "" {
+		thinking = request.Session.ThinkingLevel()
+	}
+
+	role := strings.TrimSpace(hookConfig.Role)
+	if role == "" {
+		if parentRole := request.Session.Role(); parentRole != nil {
+			role = strings.TrimSpace(parentRole.Name)
+		}
+	}
+
+	runner := request.Session
+	timeout := HookTimeoutOrDefault(hookConfig.Timeout)
+	if timeout > 0 {
+		timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		ctx = timeoutCtx
+	}
+
+	requestPayload := tool.SubAgentTaskRequest{
+		Slug:     buildSubAgentHookSlug(hookConfig),
+		Title:    fmt.Sprintf("Hook %s", strings.TrimSpace(hookConfig.Name)),
+		Prompt:   prompt,
+		Role:     role,
+		Model:    modelRef,
+		Thinking: thinking,
+	}
+
+	result := &HookExecutionResult{Config: hookConfig.Clone(), Command: prompt}
+	responseRequest := HookFeedbackRequest{Fn: hookFeedbackFnResponse, Args: map[string]any{}}
+
+	type runResult struct {
+		value tool.SubAgentTaskResult
+		err   error
+	}
+	resultCh := make(chan runResult, 1)
+	go func() {
+		value, runErr := runner.ExecuteSubAgentTask(requestPayload)
+		resultCh <- runResult{value: value, err: runErr}
+	}()
+
+	select {
+	case <-ctx.Done():
+		result.ExitCode = 124
+		result.Stderr = ctx.Err().Error()
+		responseRequest.Args["status"] = hookStatusTimeout
+		responseRequest.Args["stderr"] = result.Stderr
+		if errorField := strings.TrimSpace(hookConfig.ErrorTo); errorField != "" {
+			responseRequest.Args[errorField] = result.Stderr
+		}
+		result.FeedbackRequests = []HookFeedbackRequest{responseRequest}
+		return result, fmt.Errorf("HookEngine.executeSubAgent() [hooks_engine.go]: hook %q timed out: %w", hookConfig.Name, ctx.Err())
+	case run := <-resultCh:
+		if run.err != nil {
+			result.ExitCode = 1
+			result.Stderr = run.err.Error()
+			responseRequest.Args["status"] = hookStatusError
+			responseRequest.Args["stderr"] = result.Stderr
+			if errorField := strings.TrimSpace(hookConfig.ErrorTo); errorField != "" {
+				responseRequest.Args[errorField] = result.Stderr
+			}
+			result.FeedbackRequests = []HookFeedbackRequest{responseRequest}
+			return result, fmt.Errorf("HookEngine.executeSubAgent() [hooks_engine.go]: subagent execution failed for hook %q: %w", hookConfig.Name, run.err)
+		}
+
+		status := strings.ToUpper(strings.TrimSpace(run.value.Status))
+		if status == "COMPLETED" {
+			status = hookStatusOK
+		}
+		if status == "ERROR" {
+			result.ExitCode = 1
+		}
+		if status == "" {
+			status = hookStatusOK
+		}
+
+		result.Stdout = strings.TrimSpace(run.value.Summary)
+		if status == hookStatusError && strings.TrimSpace(result.Stderr) == "" {
+			result.Stderr = strings.TrimSpace(run.value.Summary)
+			if result.Stderr == "" {
+				result.Stderr = fmt.Sprintf("subagent hook %q returned error status", hookConfig.Name)
+			}
+		}
+		if status == hookStatusTimeout && strings.TrimSpace(result.Stderr) == "" {
+			result.Stderr = fmt.Sprintf("subagent hook %q returned timeout status", hookConfig.Name)
+		}
+		if status == hookStatusOK {
+			result.ExitCode = 0
+		}
+		if status == hookStatusTimeout {
+			result.ExitCode = 124
+		}
+
+		toField := strings.TrimSpace(hookConfig.OutputTo)
+		if toField == "" {
+			toField = "result"
+		}
+		e.SetContextValue(toField, result.Stdout)
+
+		responseRequest.Args["status"] = status
+		responseRequest.Args["stdout"] = result.Stdout
+		responseRequest.Args["stdin"] = result.Stdout
+		responseRequest.Args["stderr"] = result.Stderr
+		if outputField := strings.TrimSpace(hookConfig.OutputTo); outputField != "" {
+			responseRequest.Args[outputField] = result.Stdout
+		}
+		if errorField := strings.TrimSpace(hookConfig.ErrorTo); errorField != "" {
+			responseRequest.Args[errorField] = result.Stderr
+		}
+		result.FeedbackRequests = []HookFeedbackRequest{responseRequest}
+
+		if request.View != nil {
+			request.View.ShowMessage(fmt.Sprintf("[hook:%s][subagent] model=%s", hookConfig.Name, modelRef), ui.MessageTypeInfo)
+			if result.Stdout != "" {
+				request.View.ShowMessage(fmt.Sprintf("[hook:%s][subagent-summary]\n%s", hookConfig.Name, result.Stdout), ui.MessageTypeInfo)
+			}
+			if result.Stderr != "" {
+				request.View.ShowMessage(fmt.Sprintf("[hook:%s][subagent-error]\n%s", hookConfig.Name, result.Stderr), ui.MessageTypeWarning)
+			}
+		}
+
+		if status == hookStatusError {
+			return result, &HookExecutionError{HookName: hookConfig.Name, ExitCode: 1}
+		}
+		if status == hookStatusTimeout {
+			return result, fmt.Errorf("HookEngine.executeSubAgent() [hooks_engine.go]: subagent timed out for hook %q", hookConfig.Name)
+		}
+
+		return result, nil
 	}
 }
 
@@ -938,4 +1103,27 @@ func HookTimeoutOrDefault(value time.Duration) time.Duration {
 		return 0
 	}
 	return value
+}
+
+func buildSubAgentHookSlug(hookConfig *conf.HookConfig) string {
+	base := "hook"
+	if hookConfig != nil {
+		name := strings.TrimSpace(hookConfig.Name)
+		if name == "" {
+			name = strings.TrimSpace(hookConfig.Hook)
+		}
+		if name != "" {
+			name = strings.ToLower(name)
+			name = strings.ReplaceAll(name, "_", "-")
+			name = strings.ReplaceAll(name, " ", "-")
+			name = strings.ReplaceAll(name, "/", "-")
+			name = strings.ReplaceAll(name, ".", "-")
+			name = strings.Trim(name, "-")
+			if name != "" {
+				base = name
+			}
+		}
+	}
+
+	return fmt.Sprintf("hook-%s-%d", base, time.Now().UnixNano())
 }

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,10 +15,40 @@ import (
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
+	"github.com/rlewczuk/csw/pkg/tool"
 	uimock "github.com/rlewczuk/csw/pkg/ui/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type mockSubAgentTaskRunner struct {
+	mu       sync.Mutex
+	requests []tool.SubAgentTaskRequest
+	result   tool.SubAgentTaskResult
+	err      error
+	delay    time.Duration
+}
+
+func (m *mockSubAgentTaskRunner) ExecuteSubAgentTask(_ *SweSession, request tool.SubAgentTaskRequest) (tool.SubAgentTaskResult, error) {
+	if m.delay > 0 {
+		time.Sleep(m.delay)
+	}
+	m.mu.Lock()
+	m.requests = append(m.requests, request)
+	m.mu.Unlock()
+	if m.err != nil {
+		return tool.SubAgentTaskResult{}, m.err
+	}
+	return m.result, nil
+}
+
+func (m *mockSubAgentTaskRunner) Requests() []tool.SubAgentTaskRequest {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([]tool.SubAgentTaskRequest, len(m.requests))
+	copy(result, m.requests)
+	return result
+}
 
 func TestHookEngineExecuteShell(t *testing.T) {
 	configStore := confimpl.NewMockConfigStore()
@@ -517,4 +548,227 @@ func TestHookEngineExecuteShellSynthesizedResponseContainsErrorStatusAndCode(t *
 	code, exists := response.Args["code"]
 	require.True(t, exists)
 	assert.EqualValues(t, 12, code)
+}
+
+func TestHookEngineExecuteSubAgentHookUsesConfiguredAndInheritedFields(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"summary-subagent": {
+			Name:         "summary-subagent",
+			Hook:         "summary",
+			Enabled:      true,
+			Type:         conf.HookTypeSubAgent,
+			Prompt:       "Prompt: {{.user_prompt}}",
+			SystemPrompt: "System: {{.status}}",
+			Model:        "mock/child-model",
+			Thinking:     "high",
+			Role:         "reviewer",
+			OutputTo:     "sub_out",
+		},
+	})
+
+	runner := &mockSubAgentTaskRunner{result: tool.SubAgentTaskResult{Status: "completed", Summary: "child summary"}}
+	session := &SweSession{subAgentRunner: runner, providerName: "mock", model: "parent-model", thinking: "medium", role: &conf.AgentRoleConfig{Name: "developer"}}
+
+	engine := NewHookEngine(configStore, nil, nil, nil)
+	engine.MergeContext(map[string]string{"user_prompt": "Initial request", "status": "running"})
+
+	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary", Session: session})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "child summary", result.Stdout)
+	assert.Equal(t, 0, result.ExitCode)
+	assert.Equal(t, "child summary", engine.ContextData()["sub_out"])
+
+	requests := runner.Requests()
+	require.Len(t, requests, 1)
+	assert.Equal(t, "reviewer", requests[0].Role)
+	assert.Equal(t, "mock/child-model", requests[0].Model)
+	assert.Equal(t, "high", requests[0].Thinking)
+	assert.Equal(t, "System: running\n\nPrompt: Initial request", requests[0].Prompt)
+
+	response := FindHookResponseRequest(result)
+	require.NotNil(t, response)
+	assert.Equal(t, hookStatusOK, HookResponseStatus(response))
+	assert.Equal(t, "child summary", HookResponseArgString(response, "stdout"))
+	assert.Equal(t, "child summary", HookResponseArgString(response, "sub_out"))
+}
+
+func TestHookEngineExecuteSubAgentHookFailsWithoutSession(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"summary-subagent": {
+			Name:    "summary-subagent",
+			Hook:    "summary",
+			Enabled: true,
+			Type:    conf.HookTypeSubAgent,
+			Prompt:  "Prompt",
+		},
+	})
+
+	engine := NewHookEngine(configStore, nil, nil, nil)
+	_, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "session is required")
+}
+
+func TestHookEngineExecuteSubAgentHookFailsWhenPromptMissing(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"summary-subagent": {
+			Name:    "summary-subagent",
+			Hook:    "summary",
+			Enabled: true,
+			Type:    conf.HookTypeSubAgent,
+		},
+	})
+
+	session := &SweSession{subAgentRunner: &mockSubAgentTaskRunner{}}
+	engine := NewHookEngine(configStore, nil, nil, nil)
+	_, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary", Session: session})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty prompt")
+}
+
+func TestHookEngineExecuteSubAgentHookUsesSessionDefaults(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"summary-subagent": {
+			Name:    "summary-subagent",
+			Hook:    "summary",
+			Enabled: true,
+			Type:    conf.HookTypeSubAgent,
+			Prompt:  "Prompt: {{.user_prompt}}",
+		},
+	})
+
+	runner := &mockSubAgentTaskRunner{result: tool.SubAgentTaskResult{Status: "completed", Summary: "ok"}}
+	session := &SweSession{subAgentRunner: runner, providerName: "mock", model: "parent-model", thinking: "medium", role: &conf.AgentRoleConfig{Name: "developer"}}
+
+	engine := NewHookEngine(configStore, nil, nil, nil)
+	engine.MergeContext(map[string]string{"user_prompt": "Initial request"})
+
+	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary", Session: session})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	requests := runner.Requests()
+	require.Len(t, requests, 1)
+	assert.Equal(t, "developer", requests[0].Role)
+	assert.Equal(t, "mock/parent-model", requests[0].Model)
+	assert.Equal(t, "medium", requests[0].Thinking)
+	assert.Equal(t, "Prompt: Initial request", requests[0].Prompt)
+}
+
+func TestHookEngineExecuteSubAgentHookMapsErrorAndTimeoutStatus(t *testing.T) {
+	t.Run("subagent execution error is mapped to ERROR and stderr", func(t *testing.T) {
+		configStore := confimpl.NewMockConfigStore()
+		configStore.SetHookConfigs(map[string]*conf.HookConfig{
+			"summary-subagent": {
+				Name:    "summary-subagent",
+				Hook:    "summary",
+				Enabled: true,
+				Type:    conf.HookTypeSubAgent,
+				Prompt:  "Prompt",
+				ErrorTo: "sub_err",
+			},
+		})
+
+		runner := &mockSubAgentTaskRunner{err: fmt.Errorf("child failed")}
+		session := &SweSession{subAgentRunner: runner, providerName: "mock", model: "parent-model"}
+
+		engine := NewHookEngine(configStore, nil, nil, nil)
+		result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary", Session: session})
+		require.Error(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, 1, result.ExitCode)
+		assert.Contains(t, result.Stderr, "child failed")
+
+		response := FindHookResponseRequest(result)
+		require.NotNil(t, response)
+		assert.Equal(t, hookStatusError, HookResponseStatus(response))
+		assert.Contains(t, HookResponseArgString(response, "stderr"), "child failed")
+		assert.Contains(t, HookResponseArgString(response, "sub_err"), "child failed")
+	})
+
+	t.Run("subagent timeout is mapped to TIMEOUT", func(t *testing.T) {
+		configStore := confimpl.NewMockConfigStore()
+		configStore.SetHookConfigs(map[string]*conf.HookConfig{
+			"summary-subagent": {
+				Name:    "summary-subagent",
+				Hook:    "summary",
+				Enabled: true,
+				Type:    conf.HookTypeSubAgent,
+				Prompt:  "Prompt",
+				Timeout: 10 * time.Millisecond,
+			},
+		})
+
+		runner := &mockSubAgentTaskRunner{delay: 80 * time.Millisecond, result: tool.SubAgentTaskResult{Status: "completed", Summary: "late"}}
+		session := &SweSession{subAgentRunner: runner, providerName: "mock", model: "parent-model"}
+
+		engine := NewHookEngine(configStore, nil, nil, nil)
+		result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary", Session: session})
+		require.Error(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, 124, result.ExitCode)
+
+		response := FindHookResponseRequest(result)
+		require.NotNil(t, response)
+		assert.Equal(t, hookStatusTimeout, HookResponseStatus(response))
+	})
+
+	t.Run("subagent result status ERROR is mapped to error outcome", func(t *testing.T) {
+		configStore := confimpl.NewMockConfigStore()
+		configStore.SetHookConfigs(map[string]*conf.HookConfig{
+			"summary-subagent": {
+				Name:    "summary-subagent",
+				Hook:    "summary",
+				Enabled: true,
+				Type:    conf.HookTypeSubAgent,
+				Prompt:  "Prompt",
+			},
+		})
+
+		runner := &mockSubAgentTaskRunner{result: tool.SubAgentTaskResult{Status: "error", Summary: "child error details"}}
+		session := &SweSession{subAgentRunner: runner, providerName: "mock", model: "parent-model"}
+
+		engine := NewHookEngine(configStore, nil, nil, nil)
+		result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary", Session: session})
+		require.Error(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, 1, result.ExitCode)
+		assert.Equal(t, "child error details", result.Stderr)
+
+		response := FindHookResponseRequest(result)
+		require.NotNil(t, response)
+		assert.Equal(t, hookStatusError, HookResponseStatus(response))
+		assert.Equal(t, "child error details", HookResponseArgString(response, "stderr"))
+	})
+
+	t.Run("subagent result status TIMEOUT is mapped to timeout outcome", func(t *testing.T) {
+		configStore := confimpl.NewMockConfigStore()
+		configStore.SetHookConfigs(map[string]*conf.HookConfig{
+			"summary-subagent": {
+				Name:    "summary-subagent",
+				Hook:    "summary",
+				Enabled: true,
+				Type:    conf.HookTypeSubAgent,
+				Prompt:  "Prompt",
+			},
+		})
+
+		runner := &mockSubAgentTaskRunner{result: tool.SubAgentTaskResult{Status: "timeout", Summary: "child timed out"}}
+		session := &SweSession{subAgentRunner: runner, providerName: "mock", model: "parent-model"}
+
+		engine := NewHookEngine(configStore, nil, nil, nil)
+		result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary", Session: session})
+		require.Error(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, 124, result.ExitCode)
+
+		response := FindHookResponseRequest(result)
+		require.NotNil(t, response)
+		assert.Equal(t, hookStatusTimeout, HookResponseStatus(response))
+	})
 }

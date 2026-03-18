@@ -648,6 +648,10 @@ func (c *HookConfig) Merge(override *HookConfig) {
 		c.Thinking = override.Thinking
 		c.thinkingConfigured = true
 	}
+	if override.roleConfigured {
+		c.Role = override.Role
+		c.roleConfigured = true
+	}
 	if override.outputToConfigured {
 		c.OutputTo = override.OutputTo
 		c.outputToConfigured = true
