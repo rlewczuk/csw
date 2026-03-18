@@ -22,6 +22,28 @@ func TestHookConfigUnmarshalJSONDefaults(t *testing.T) {
 	assert.Equal(t, time.Duration(0), cfg.Timeout)
 }
 
+func TestHookConfigUnmarshalJSONLLMFields(t *testing.T) {
+	var cfg HookConfig
+	err := json.Unmarshal([]byte(`{"name":"h1","hook":"summary","type":"llm","prompt":"p","system_prompt":"s","model":"mock/test","thinking":"high","to_field":"out"}`), &cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, HookTypeLLM, cfg.Type)
+	assert.Equal(t, "p", cfg.Prompt)
+	assert.Equal(t, "s", cfg.SystemPrompt)
+	assert.Equal(t, "mock/test", cfg.Model)
+	assert.Equal(t, "high", cfg.Thinking)
+	assert.Equal(t, "out", cfg.ToField)
+}
+
+func TestHookConfigUnmarshalJSONLLMDefaultsToField(t *testing.T) {
+	var cfg HookConfig
+	err := json.Unmarshal([]byte(`{"name":"h1","hook":"summary","type":"llm","prompt":"p"}`), &cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, HookTypeLLM, cfg.Type)
+	assert.Equal(t, "result", cfg.ToField)
+}
+
 func TestHookConfigUnmarshalYAMLParsesTimeout(t *testing.T) {
 	var cfg HookConfig
 	err := yaml.Unmarshal([]byte("name: h1\nhook: merge\ncommand: echo hi\ntimeout: 10s\nrun-on: host\n"), &cfg)
@@ -36,4 +58,17 @@ func TestHookConfigUnmarshalYAMLUsesFilenameProvidedName(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "merge", cfg.Hook)
 	assert.Equal(t, "", cfg.Name)
+}
+
+func TestHookConfigUnmarshalYAMLLLMFields(t *testing.T) {
+	var cfg HookConfig
+	err := yaml.Unmarshal([]byte("name: h1\nhook: summary\ntype: llm\nprompt: p\nsystem_prompt: s\nmodel: mock/test\nthinking: high\nto_field: out\n"), &cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, HookTypeLLM, cfg.Type)
+	assert.Equal(t, "p", cfg.Prompt)
+	assert.Equal(t, "s", cfg.SystemPrompt)
+	assert.Equal(t, "mock/test", cfg.Model)
+	assert.Equal(t, "high", cfg.Thinking)
+	assert.Equal(t, "out", cfg.ToField)
 }

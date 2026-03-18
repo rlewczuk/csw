@@ -181,6 +181,16 @@ type HookConfig struct {
 	Type HookType `json:"type,omitempty" yaml:"type,omitempty"`
 	// Command is shell command template rendered with hook context data.
 	Command string `json:"command,omitempty" yaml:"command,omitempty"`
+	// Prompt is LLM user prompt template rendered with hook context data.
+	Prompt string `json:"prompt,omitempty" yaml:"prompt,omitempty"`
+	// SystemPrompt is optional LLM system prompt template rendered with hook context data.
+	SystemPrompt string `json:"system_prompt,omitempty" yaml:"system_prompt,omitempty"`
+	// Model is optional provider/model override for LLM hook execution.
+	Model string `json:"model,omitempty" yaml:"model,omitempty"`
+	// Thinking is optional --thinking-style override for LLM hook execution.
+	Thinking string `json:"thinking,omitempty" yaml:"thinking,omitempty"`
+	// ToField is optional hook context field name for LLM response text. Defaults to "result".
+	ToField string `json:"to_field,omitempty" yaml:"to_field,omitempty"`
 	// Timeout limits hook execution. Zero means no timeout.
 	Timeout time.Duration `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 	// RunOn defines shell execution target: host or sandbox.
@@ -191,6 +201,11 @@ type HookConfig struct {
 	nameConfigured    bool
 	typeConfigured    bool
 	commandConfigured bool
+	promptConfigured  bool
+	systemConfigured  bool
+	modelConfigured   bool
+	thinkingConfigured bool
+	toFieldConfigured bool
 	timeoutConfigured bool
 	runOnConfigured   bool
 }
@@ -203,6 +218,11 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 		Name    string    `json:"name,omitempty"`
 		Type    HookType  `json:"type,omitempty"`
 		Command string    `json:"command,omitempty"`
+		Prompt  string    `json:"prompt,omitempty"`
+		System  string    `json:"system_prompt,omitempty"`
+		Model   string    `json:"model,omitempty"`
+		Thinking string   `json:"thinking,omitempty"`
+		ToField string    `json:"to_field,omitempty"`
 		Timeout string    `json:"timeout,omitempty"`
 		RunOn   HookRunOn `json:"run-on,omitempty"`
 	}{}
@@ -219,6 +239,11 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 	c.Name = aux.Name
 	c.Type = aux.Type
 	c.Command = aux.Command
+	c.Prompt = aux.Prompt
+	c.SystemPrompt = aux.System
+	c.Model = aux.Model
+	c.Thinking = aux.Thinking
+	c.ToField = aux.ToField
 	c.RunOn = aux.RunOn
 
 	var raw map[string]json.RawMessage
@@ -231,6 +256,11 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 	_, c.nameConfigured = raw["name"]
 	_, c.typeConfigured = raw["type"]
 	_, c.commandConfigured = raw["command"]
+	_, c.promptConfigured = raw["prompt"]
+	_, c.systemConfigured = raw["system_prompt"]
+	_, c.modelConfigured = raw["model"]
+	_, c.thinkingConfigured = raw["thinking"]
+	_, c.toFieldConfigured = raw["to_field"]
 	_, c.timeoutConfigured = raw["timeout"]
 	_, c.runOnConfigured = raw["run-on"]
 
@@ -256,6 +286,11 @@ func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 		Name    string    `yaml:"name,omitempty"`
 		Type    HookType  `yaml:"type,omitempty"`
 		Command string    `yaml:"command,omitempty"`
+		Prompt  string    `yaml:"prompt,omitempty"`
+		System  string    `yaml:"system_prompt,omitempty"`
+		Model   string    `yaml:"model,omitempty"`
+		Thinking string   `yaml:"thinking,omitempty"`
+		ToField string    `yaml:"to_field,omitempty"`
 		Timeout string    `yaml:"timeout,omitempty"`
 		RunOn   HookRunOn `yaml:"run-on,omitempty"`
 	}{}
@@ -272,6 +307,11 @@ func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 	c.Name = aux.Name
 	c.Type = aux.Type
 	c.Command = aux.Command
+	c.Prompt = aux.Prompt
+	c.SystemPrompt = aux.System
+	c.Model = aux.Model
+	c.Thinking = aux.Thinking
+	c.ToField = aux.ToField
 	c.RunOn = aux.RunOn
 
 	if strings.TrimSpace(aux.Timeout) != "" {
@@ -300,6 +340,16 @@ func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 			c.typeConfigured = true
 		case "command":
 			c.commandConfigured = true
+		case "prompt":
+			c.promptConfigured = true
+		case "system_prompt":
+			c.systemConfigured = true
+		case "model":
+			c.modelConfigured = true
+		case "thinking":
+			c.thinkingConfigured = true
+		case "to_field":
+			c.toFieldConfigured = true
 		case "timeout":
 			c.timeoutConfigured = true
 		case "run-on":
@@ -320,6 +370,9 @@ func (c *HookConfig) applyDefaults() {
 	}
 	if c.RunOn == "" {
 		c.RunOn = HookRunOnSandbox
+	}
+	if c.Type == HookTypeLLM && strings.TrimSpace(c.ToField) == "" {
+		c.ToField = "result"
 	}
 }
 

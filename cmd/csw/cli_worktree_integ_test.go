@@ -211,6 +211,7 @@ func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
 		"workdir": "/repo/work",
 		"rootdir": "/repo",
 		"status":  string(core.HookSessionStatusRunning),
+		"user_prompt": "merge via hook",
 	})
 	appView := mock.NewMockAppView()
 
@@ -224,6 +225,41 @@ func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
 	require.Len(t, appView.ShowMessageCalls, 2)
 	assert.Contains(t, appView.ShowMessageCalls[0].Message, "[hook:merge-custom] command")
 	assert.Contains(t, appView.ShowMessageCalls[1].Message, "[hook:merge-custom][stdout]")
+}
+
+func TestFinalizeWorktreeSessionMergeLLMHookUsesUserPromptContext(t *testing.T) {
+	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge via llm hook", true)
+	provider, ok := sweSystem.ModelProviders["mock"].(*models.MockClient)
+	require.True(t, ok)
+	provider.AddChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "ok")})
+
+	configStore, ok := sweSystem.ConfigStore.(*confimpl.MockConfigStore)
+	require.True(t, ok)
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-llm": {
+			Name:    "merge-llm",
+			Hook:    "merge",
+			Enabled: true,
+			Type:    conf.HookTypeLLM,
+			Prompt:  "Prompt={{.user_prompt}}",
+		},
+	})
+
+	hookEngine := core.NewHookEngine(configStore, nil, nil, sweSystem.ModelProviders)
+	hookEngine.MergeContext(map[string]string{
+		"branch":      "feature/hook",
+		"workdir":     "/repo/work",
+		"rootdir":     "/repo",
+		"status":      string(core.HookSessionStatusRunning),
+		"user_prompt": "merge via llm hook",
+	})
+
+	_, err := finalizeWorktreeSession(context.Background(), mockVCS, "feature/hook", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "merge via llm hook", hookEngine, nil)
+	require.NoError(t, err)
+	require.Len(t, provider.RecordedMessages, 2)
+	require.Len(t, provider.RecordedMessages[1], 1)
+	assert.Equal(t, "Prompt=merge via llm hook", strings.TrimSpace(provider.RecordedMessages[1][0].GetText()))
+	assert.Equal(t, "ok", hookEngine.ContextData()["result"])
 }
 
 func TestFinalizeWorktreeSessionMergeHookProcessesFeedbackRequests(t *testing.T) {

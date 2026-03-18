@@ -102,6 +102,37 @@ func TestApplyHookOverridesToConfigs(t *testing.T) {
 			expectErr: "requires setting \"command\"",
 		},
 		{
+			name:      "new llm hook requires prompt",
+			configs:   map[string]*conf.HookConfig{},
+			overrides: []string{"summary:hook=summary,type=llm"},
+			expectErr: "requires setting \"prompt\"",
+		},
+		{
+			name:      "adds new llm hook when required fields are provided",
+			configs:   map[string]*conf.HookConfig{},
+			overrides: []string{"summary:hook=summary,type=llm,prompt=hello {{.user_prompt}},system_prompt=sys,model=mock/test,thinking=low,to_field=llm_result"},
+			assertResult: func(t *testing.T, cfg map[string]*conf.HookConfig) {
+				require.Contains(t, cfg, "summary")
+				assert.Equal(t, conf.HookTypeLLM, cfg["summary"].Type)
+				assert.Equal(t, "hello {{.user_prompt}}", cfg["summary"].Prompt)
+				assert.Equal(t, "sys", cfg["summary"].SystemPrompt)
+				assert.Equal(t, "mock/test", cfg["summary"].Model)
+				assert.Equal(t, "low", cfg["summary"].Thinking)
+				assert.Equal(t, "llm_result", cfg["summary"].ToField)
+			},
+		},
+		{
+			name: "llm hook defaults to result to_field",
+			configs: map[string]*conf.HookConfig{
+				"summary": {Name: "summary", Hook: "summary", Type: conf.HookTypeLLM, Prompt: "p", Enabled: true},
+			},
+			overrides: []string{"summary"},
+			assertResult: func(t *testing.T, cfg map[string]*conf.HookConfig) {
+				require.Contains(t, cfg, "summary")
+				assert.Equal(t, "result", cfg["summary"].ToField)
+			},
+		},
+		{
 			name:      "unknown hook with name only returns error",
 			configs:   map[string]*conf.HookConfig{},
 			overrides: []string{"missing"},
@@ -129,9 +160,10 @@ func TestBuildRuntimeHookConfigStoreOverridesAreEphemeral(t *testing.T) {
 	base := impl.NewMockConfigStore()
 	base.SetHookConfigs(map[string]*conf.HookConfig{
 		"commit": {Name: "commit", Hook: "commit", Command: "echo before", Enabled: false, Type: conf.HookTypeShell, RunOn: conf.HookRunOnSandbox},
+		"summary": {Name: "summary", Hook: "summary", Type: conf.HookTypeLLM, Prompt: "old", ToField: "result", Enabled: true},
 	})
 
-	runtimeStore, err := buildRuntimeHookConfigStore(base, []string{"commit:command=echo after"})
+	runtimeStore, err := buildRuntimeHookConfigStore(base, []string{"commit:command=echo after", "summary:prompt=new,to_field=hook_result"})
 	require.NoError(t, err)
 
 	runtimeHooks, err := runtimeStore.GetHookConfigs()
@@ -139,10 +171,16 @@ func TestBuildRuntimeHookConfigStoreOverridesAreEphemeral(t *testing.T) {
 	require.Contains(t, runtimeHooks, "commit")
 	assert.Equal(t, "echo after", runtimeHooks["commit"].Command)
 	assert.True(t, runtimeHooks["commit"].Enabled)
+	require.Contains(t, runtimeHooks, "summary")
+	assert.Equal(t, "new", runtimeHooks["summary"].Prompt)
+	assert.Equal(t, "hook_result", runtimeHooks["summary"].ToField)
 
 	baseHooks, err := base.GetHookConfigs()
 	require.NoError(t, err)
 	require.Contains(t, baseHooks, "commit")
 	assert.Equal(t, "echo before", baseHooks["commit"].Command)
 	assert.False(t, baseHooks["commit"].Enabled)
+	require.Contains(t, baseHooks, "summary")
+	assert.Equal(t, "old", baseHooks["summary"].Prompt)
+	assert.Equal(t, "result", baseHooks["summary"].ToField)
 }

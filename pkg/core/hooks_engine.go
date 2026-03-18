@@ -229,7 +229,9 @@ func (e *HookEngine) Execute(ctx context.Context, request HookExecutionRequest) 
 	switch hookConfig.Type {
 	case conf.HookTypeShell:
 		return e.executeShell(ctx, hookConfig, request)
-	case conf.HookTypeLLM, conf.HookTypeSubAgent:
+	case conf.HookTypeLLM:
+		return e.executeLLM(ctx, hookConfig, request)
+	case conf.HookTypeSubAgent:
 		return nil, fmt.Errorf("HookEngine.Execute() [hooks_engine.go]: hook type %q is not implemented", hookConfig.Type)
 	default:
 		return nil, fmt.Errorf("HookEngine.Execute() [hooks_engine.go]: unsupported hook type %q", hookConfig.Type)
@@ -317,6 +319,94 @@ func (e *HookEngine) executeShell(ctx context.Context, hookConfig *conf.HookConf
 	}
 
 	return result, nil
+}
+
+func (e *HookEngine) executeLLM(ctx context.Context, hookConfig *conf.HookConfig, request HookExecutionRequest) (*HookExecutionResult, error) {
+	promptTemplate := strings.TrimSpace(hookConfig.Prompt)
+	if promptTemplate == "" {
+		return nil, fmt.Errorf("HookEngine.executeLLM() [hooks_engine.go]: hook %q has empty prompt", hookConfig.Name)
+	}
+
+	prompt, err := e.renderTemplate("hook-llm-prompt", promptTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("HookEngine.executeLLM() [hooks_engine.go]: failed to render prompt for hook %q: %w", hookConfig.Name, err)
+	}
+
+	systemPrompt := ""
+	if strings.TrimSpace(hookConfig.SystemPrompt) != "" {
+		systemPrompt, err = e.renderTemplate("hook-llm-system-prompt", hookConfig.SystemPrompt)
+		if err != nil {
+			return nil, fmt.Errorf("HookEngine.executeLLM() [hooks_engine.go]: failed to render system prompt for hook %q: %w", hookConfig.Name, err)
+		}
+	}
+
+	modelRef := strings.TrimSpace(hookConfig.Model)
+	if modelRef == "" && request.Session != nil {
+		modelRef = request.Session.ModelWithProvider()
+	}
+	if strings.TrimSpace(modelRef) == "" {
+		return nil, fmt.Errorf("HookEngine.executeLLM() [hooks_engine.go]: unable to resolve model for hook %q", hookConfig.Name)
+	}
+
+	providerName, modelName, err := parseFeedbackModelRef(modelRef)
+	if err != nil {
+		return nil, fmt.Errorf("HookEngine.executeLLM() [hooks_engine.go]: failed to parse model for hook %q: %w", hookConfig.Name, err)
+	}
+
+	provider, ok := e.providers[providerName]
+	if !ok || provider == nil {
+		return nil, fmt.Errorf("HookEngine.executeLLM() [hooks_engine.go]: provider not found for hook %q: %s", hookConfig.Name, providerName)
+	}
+
+	thinking := strings.TrimSpace(hookConfig.Thinking)
+	if thinking == "" && request.Session != nil {
+		thinking = request.Session.ThinkingLevel()
+	}
+
+	messages := make([]*models.ChatMessage, 0, 2)
+	if strings.TrimSpace(systemPrompt) != "" {
+		messages = append(messages, models.NewTextMessage(models.ChatRoleSystem, systemPrompt))
+	}
+	messages = append(messages, models.NewTextMessage(models.ChatRoleUser, prompt))
+
+	chatCtx := ctx
+	var cancel context.CancelFunc
+	timeout := HookTimeoutOrDefault(hookConfig.Timeout)
+	if timeout > 0 {
+		chatCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	chatModel := provider.ChatModel(modelName, nil)
+	chatResponse, err := chatModel.Chat(chatCtx, messages, &models.ChatOptions{Thinking: thinking}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("HookEngine.executeLLM() [hooks_engine.go]: llm request failed for hook %q: %w", hookConfig.Name, err)
+	}
+
+	responseText := ""
+	if chatResponse != nil {
+		responseText = strings.TrimSpace(chatResponse.GetText())
+	}
+
+	toField := strings.TrimSpace(hookConfig.ToField)
+	if toField == "" {
+		toField = "result"
+	}
+	e.SetContextValue(toField, responseText)
+
+	if request.View != nil {
+		request.View.ShowMessage(fmt.Sprintf("[hook:%s][llm] model=%s", hookConfig.Name, providerName+"/"+modelName), ui.MessageTypeInfo)
+		if responseText != "" {
+			request.View.ShowMessage(fmt.Sprintf("[hook:%s][llm-response]\n%s", hookConfig.Name, responseText), ui.MessageTypeInfo)
+		}
+	}
+
+	return &HookExecutionResult{
+		Config:   hookConfig.Clone(),
+		Command:  prompt,
+		Stdout:   responseText,
+		ExitCode: 0,
+	}, nil
 }
 
 func parseHookFeedbackRequests(stdout string, stderr string) []HookFeedbackRequest {
@@ -674,9 +764,13 @@ func (e *HookEngine) selectRunner(runOn conf.HookRunOn) shellCommandRunner {
 }
 
 func (e *HookEngine) renderCommand(commandTemplate string) (string, error) {
-	tmpl, err := template.New("hook-command").Parse(commandTemplate)
+	return e.renderTemplate("hook-command", commandTemplate)
+}
+
+func (e *HookEngine) renderTemplate(templateName string, templateText string) (string, error) {
+	tmpl, err := template.New(templateName).Parse(templateText)
 	if err != nil {
-		return "", fmt.Errorf("HookEngine.renderCommand() [hooks_engine.go]: failed to parse command template: %w", err)
+		return "", fmt.Errorf("HookEngine.renderTemplate() [hooks_engine.go]: failed to parse template: %w", err)
 	}
 
 	contextData := e.ContextData()
@@ -687,7 +781,7 @@ func (e *HookEngine) renderCommand(commandTemplate string) (string, error) {
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("HookEngine.renderCommand() [hooks_engine.go]: failed to execute command template: %w", err)
+		return "", fmt.Errorf("HookEngine.renderTemplate() [hooks_engine.go]: failed to execute template: %w", err)
 	}
 
 	return strings.TrimSpace(buf.String()), nil

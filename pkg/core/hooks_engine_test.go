@@ -221,6 +221,88 @@ func TestHookEngineExecuteShellProcessesLLMFeedbackWithResponseModes(t *testing.
 	require.Len(t, provider.RecordedMessages, 2)
 }
 
+func TestHookEngineExecuteLLMHookStoresResultInDefaultField(t *testing.T) {
+	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+	provider.SetChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "hook-result")})
+
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"summary-llm": {
+			Name:    "summary-llm",
+			Hook:    "summary",
+			Enabled: true,
+			Type:    conf.HookTypeLLM,
+			Prompt:  "Prompt: {{.user_prompt}}",
+		},
+	})
+
+	engine := NewHookEngine(configStore, nil, nil, map[string]models.ModelProvider{"mock": provider})
+	engine.SetContextValue("user_prompt", "Initial request")
+
+	session := &SweSession{providerName: "mock", model: "test-model", thinking: "medium"}
+	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary", Session: session})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "hook-result", engine.ContextData()["result"])
+	require.Len(t, provider.RecordedMessages, 1)
+	require.Len(t, provider.RecordedMessages[0], 1)
+	assert.Equal(t, models.ChatRoleUser, provider.RecordedMessages[0][0].Role)
+	assert.Equal(t, "Prompt: Initial request", strings.TrimSpace(provider.RecordedMessages[0][0].GetText()))
+}
+
+func TestHookEngineExecuteLLMHookUsesConfiguredOptionsAndToField(t *testing.T) {
+	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+	provider.SetChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "custom-result")})
+
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"summary-llm": {
+			Name:         "summary-llm",
+			Hook:         "summary",
+			Enabled:      true,
+			Type:         conf.HookTypeLLM,
+			Prompt:       "Prompt: {{.user_prompt}}",
+			SystemPrompt: "System: {{.status}}",
+			Model:        "mock/test-model",
+			Thinking:     "high",
+			ToField:      "llm_out",
+		},
+	})
+
+	engine := NewHookEngine(configStore, nil, nil, map[string]models.ModelProvider{"mock": provider})
+	engine.MergeContext(map[string]string{"user_prompt": "Initial request", "status": "running"})
+
+	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary"})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "custom-result", engine.ContextData()["llm_out"])
+	require.Len(t, provider.RecordedMessages, 1)
+	require.Len(t, provider.RecordedMessages[0], 2)
+	assert.Equal(t, models.ChatRoleSystem, provider.RecordedMessages[0][0].Role)
+	assert.Equal(t, "System: running", strings.TrimSpace(provider.RecordedMessages[0][0].GetText()))
+	assert.Equal(t, models.ChatRoleUser, provider.RecordedMessages[0][1].Role)
+	assert.Equal(t, "Prompt: Initial request", strings.TrimSpace(provider.RecordedMessages[0][1].GetText()))
+}
+
+func TestHookEngineExecuteLLMHookFailsWhenPromptMissing(t *testing.T) {
+	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"summary-llm": {
+			Name:    "summary-llm",
+			Hook:    "summary",
+			Enabled: true,
+			Type:    conf.HookTypeLLM,
+		},
+	})
+
+	engine := NewHookEngine(configStore, nil, nil, map[string]models.ModelProvider{"mock": provider})
+	session := &SweSession{providerName: "mock", model: "test-model"}
+	_, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary", Session: session})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty prompt")
+}
+
 func TestParseHookFeedbackRequestsIgnoresInvalidLines(t *testing.T) {
 	requests := parseHookFeedbackRequests(
 		"hello\nCSWFEEDBACK: {invalid}\nCSWFEEDBACK: {\"fn\":\"context\",\"args\":{\"x\":\"1\"}}\n",

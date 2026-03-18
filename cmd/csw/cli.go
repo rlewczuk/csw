@@ -507,6 +507,7 @@ func runCLI(params *CLIParams) error {
 		"workdir": strings.TrimSpace(buildResult.WorkDir),
 		"rootdir": strings.TrimSpace(buildResult.WorkDirRoot),
 		"status":  string(core.HookSessionStatusRunning),
+		"user_prompt": strings.TrimSpace(params.Prompt),
 	})
 	finalizeResult, finalizeErr := finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt, hookEngine, appView)
 	if finalizeErr != nil {
@@ -985,6 +986,7 @@ func applyHookOverridesToConfigs(configs map[string]*conf.HookConfig, overrides 
 			if !current.Enabled {
 				current.Enabled = true
 			}
+			applyHookDefaults(current)
 			continue
 		}
 
@@ -1062,8 +1064,14 @@ func buildNewHookConfig(name string, settings map[string]string) (*conf.HookConf
 	if strings.TrimSpace(created.Hook) == "" {
 		return nil, fmt.Errorf("buildNewHookConfig() [cli.go]: hook %q requires setting \"hook\"", name)
 	}
-	if strings.TrimSpace(created.Command) == "" {
-		return nil, fmt.Errorf("buildNewHookConfig() [cli.go]: hook %q requires setting \"command\"", name)
+	if created.Type == conf.HookTypeLLM {
+		if strings.TrimSpace(created.Prompt) == "" {
+			return nil, fmt.Errorf("buildNewHookConfig() [cli.go]: hook %q requires setting \"prompt\"", name)
+		}
+	} else {
+		if strings.TrimSpace(created.Command) == "" {
+			return nil, fmt.Errorf("buildNewHookConfig() [cli.go]: hook %q requires setting \"command\"", name)
+		}
 	}
 	applyHookDefaults(created)
 
@@ -1100,6 +1108,16 @@ func applyHookSettings(target *conf.HookConfig, name string, settings map[string
 			}
 		case "command":
 			target.Command = value
+		case "prompt":
+			target.Prompt = value
+		case "system_prompt", "system-prompt":
+			target.SystemPrompt = value
+		case "model":
+			target.Model = value
+		case "thinking":
+			target.Thinking = value
+		case "to_field", "to-field", "tofield":
+			target.ToField = value
 		case "timeout":
 			parsed, err := parseHookTimeout(value)
 			if err != nil {
@@ -1154,6 +1172,9 @@ func applyHookDefaults(target *conf.HookConfig) {
 	}
 	if target.RunOn == "" {
 		target.RunOn = conf.HookRunOnSandbox
+	}
+	if target.Type == conf.HookTypeLLM && strings.TrimSpace(target.ToField) == "" {
+		target.ToField = "result"
 	}
 }
 

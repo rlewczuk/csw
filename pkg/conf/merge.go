@@ -624,6 +624,26 @@ func (c *HookConfig) Merge(override *HookConfig) {
 		c.Command = override.Command
 		c.commandConfigured = true
 	}
+	if override.promptConfigured {
+		c.Prompt = override.Prompt
+		c.promptConfigured = true
+	}
+	if override.systemConfigured {
+		c.SystemPrompt = override.SystemPrompt
+		c.systemConfigured = true
+	}
+	if override.modelConfigured {
+		c.Model = override.Model
+		c.modelConfigured = true
+	}
+	if override.thinkingConfigured {
+		c.Thinking = override.Thinking
+		c.thinkingConfigured = true
+	}
+	if override.toFieldConfigured {
+		c.ToField = override.ToField
+		c.toFieldConfigured = true
+	}
 	if override.timeoutConfigured {
 		c.Timeout = override.Timeout
 		c.timeoutConfigured = true
