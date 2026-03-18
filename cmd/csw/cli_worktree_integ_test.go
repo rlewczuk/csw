@@ -8,11 +8,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/ui/mock"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -118,7 +121,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 			}
 
 			var stderr bytes.Buffer
-			_ = finalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.merge, tt.customTemplate, system, session, &stderr, "", "", "")
+			_ = finalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.merge, tt.customTemplate, system, session, &stderr, "", "", "", nil, nil)
 
 			commitCalls := mockVCS.GetCommitCalls()
 			if tt.expectCommit {
@@ -176,12 +179,50 @@ func TestFinalizeWorktreeSessionUsesDetectedBaseBranch(t *testing.T) {
 		return "", nil
 	}
 
-	_ = finalizeWorktreeSession(context.Background(), mockVCS, "feature/detect-base", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "", "")
+	_ = finalizeWorktreeSession(context.Background(), mockVCS, "feature/detect-base", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "", "", nil, nil)
 
 	mergeCalls := mockVCS.GetMergeCalls()
 	require.Len(t, mergeCalls, 1)
 	assert.Equal(t, "develop", mergeCalls[0].Into)
 	assert.Equal(t, "feature/detect-base", mergeCalls[0].From)
+}
+
+func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
+	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge via hook", true)
+	configStore, ok := sweSystem.ConfigStore.(*confimpl.MockConfigStore)
+	require.True(t, ok)
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-custom": {
+			Name:    "merge-custom",
+			Hook:    "merge",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo merge-hook",
+			RunOn:   conf.HookRunOnSandbox,
+		},
+	})
+
+	hostRunner := runner.NewMockRunner()
+	sandboxRunner := runner.NewMockRunner()
+	sandboxRunner.SetResponseDetailed("echo merge-hook", "merge ok\n", "", 0, nil)
+	hookEngine := core.NewHookEngine(configStore, hostRunner, sandboxRunner)
+	hookEngine.MergeContext(map[string]string{
+		"branch":  "feature/hook",
+		"workdir": "/repo/work",
+		"rootdir": "/repo",
+		"status":  string(core.HookSessionStatusRunning),
+	})
+	appView := mock.NewMockAppView()
+
+	result := finalizeWorktreeSession(context.Background(), mockVCS, "feature/hook", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, appView)
+
+	assert.Equal(t, "", result.HeadCommitID)
+	require.Empty(t, mockVCS.GetMergeCalls())
+	require.Len(t, sandboxRunner.GetExecutions(), 1)
+	assert.Equal(t, "echo merge-hook", sandboxRunner.GetExecutions()[0].Command)
+	require.Len(t, appView.ShowMessageCalls, 2)
+	assert.Contains(t, appView.ShowMessageCalls[0].Message, "[hook:merge-custom] command")
+	assert.Contains(t, appView.ShowMessageCalls[1].Message, "[hook:merge-custom][stdout]")
 }
 
 func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTemplate bool) (*system.SweSystem, *core.SweSession, *vfs.MockVCS) {
@@ -213,13 +254,13 @@ func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTe
 }
 
 func TestMergeWorktreeWithConflictResolution(t *testing.T) {
-		t.Run("resolves conflict via sub-session and retries rebase", func(t *testing.T) {
-			sweSystem, session := newConflictResolutionFixture(t)
-			repoDir := t.TempDir()
-			worktreeDir := filepath.Join(repoDir, ".cswdata", "work", "feature", "test")
-			baseBranch := "develop"
-			originalRunGit := runGitCommandFunc
-			originalSubAgent := executeConflictSubAgentFunc
+	t.Run("resolves conflict via sub-session and retries rebase", func(t *testing.T) {
+		sweSystem, session := newConflictResolutionFixture(t)
+		repoDir := t.TempDir()
+		worktreeDir := filepath.Join(repoDir, ".cswdata", "work", "feature", "test")
+		baseBranch := "develop"
+		originalRunGit := runGitCommandFunc
+		originalSubAgent := executeConflictSubAgentFunc
 		originalListConflicts := listGitConflictFilesFunc
 		defer func() {
 			runGitCommandFunc = originalRunGit
@@ -227,49 +268,49 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 			listGitConflictFilesFunc = originalListConflicts
 		}()
 
-			commands := make([]string, 0)
-			resetCalls := make([]string, 0)
-			checkedOutBasePath := filepath.Join(repoDir, "develop")
-			mergeWorktreePath := ""
-			rebaseCalls := 0
-			runGitCommandFunc = func(workDir string, args ...string) (string, error) {
-				joined := fmt.Sprintf("%s::git %s", workDir, strings.Join(args, " "))
-				commands = append(commands, joined)
+		commands := make([]string, 0)
+		resetCalls := make([]string, 0)
+		checkedOutBasePath := filepath.Join(repoDir, "develop")
+		mergeWorktreePath := ""
+		rebaseCalls := 0
+		runGitCommandFunc = func(workDir string, args ...string) (string, error) {
+			joined := fmt.Sprintf("%s::git %s", workDir, strings.Join(args, " "))
+			commands = append(commands, joined)
 
-				switch {
-				case strings.HasSuffix(joined, "::git rebase develop"):
-					rebaseCalls++
-					if rebaseCalls == 1 {
-						return "", fmt.Errorf("runGitCommand() [cli.go]: git rebase develop failed: CONFLICT (content): Merge conflict in pkg/core/session.go")
-					}
-					return "", nil
-				case strings.Contains(joined, "::git worktree add --force"):
-					if len(args) == 5 {
-						mergeWorktreePath = args[3]
-					}
-					return "", nil
-				case strings.HasSuffix(joined, "::git merge --ff-only feature/test"):
-					return "", nil
-				case strings.HasSuffix(joined, "::git rev-parse HEAD"):
-					return "abc123", nil
-				case len(args) == 3 && args[0] == "worktree" && args[1] == "list" && args[2] == "--porcelain":
-					return strings.Join([]string{
-						"worktree " + checkedOutBasePath,
-						"HEAD 1111111",
-						"branch refs/heads/develop",
-						"",
-						"worktree " + mergeWorktreePath,
-						"HEAD 2222222",
-						"branch refs/heads/develop",
-					}, "\n"), nil
-				case len(args) == 3 && args[0] == "reset" && args[1] == "--hard" && args[2] == "develop":
-					resetCalls = append(resetCalls, workDir)
-					return "", nil
-				case strings.Contains(joined, "::git worktree remove --force"):
-					return "", nil
-				default:
-					return "", nil
+			switch {
+			case strings.HasSuffix(joined, "::git rebase develop"):
+				rebaseCalls++
+				if rebaseCalls == 1 {
+					return "", fmt.Errorf("runGitCommand() [cli.go]: git rebase develop failed: CONFLICT (content): Merge conflict in pkg/core/session.go")
 				}
+				return "", nil
+			case strings.Contains(joined, "::git worktree add --force"):
+				if len(args) == 5 {
+					mergeWorktreePath = args[3]
+				}
+				return "", nil
+			case strings.HasSuffix(joined, "::git merge --ff-only feature/test"):
+				return "", nil
+			case strings.HasSuffix(joined, "::git rev-parse HEAD"):
+				return "abc123", nil
+			case len(args) == 3 && args[0] == "worktree" && args[1] == "list" && args[2] == "--porcelain":
+				return strings.Join([]string{
+					"worktree " + checkedOutBasePath,
+					"HEAD 1111111",
+					"branch refs/heads/develop",
+					"",
+					"worktree " + mergeWorktreePath,
+					"HEAD 2222222",
+					"branch refs/heads/develop",
+				}, "\n"), nil
+			case len(args) == 3 && args[0] == "reset" && args[1] == "--hard" && args[2] == "develop":
+				resetCalls = append(resetCalls, workDir)
+				return "", nil
+			case strings.Contains(joined, "::git worktree remove --force"):
+				return "", nil
+			default:
+				return "", nil
+			}
 		}
 
 		listGitConflictFilesFunc = func(workDir string) []string {
@@ -288,14 +329,14 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 
 		var stderr bytes.Buffer
 		headCommitID, err := mergeWorktreeWithConflictResolution(context.Background(), repoDir, worktreeDir, "feature/test", baseBranch, "parent task prompt", sweSystem, session, &stderr)
-			require.NoError(t, err)
-			assert.Equal(t, "abc123", headCommitID)
-			assert.Equal(t, 1, subAgentCalls)
-			require.Len(t, resetCalls, 1)
-			assert.Equal(t, checkedOutBasePath, resetCalls[0])
-			assert.NotEmpty(t, commands)
-			assert.Contains(t, stderr.String(), "conflict detected")
-		})
+		require.NoError(t, err)
+		assert.Equal(t, "abc123", headCommitID)
+		assert.Equal(t, 1, subAgentCalls)
+		require.Len(t, resetCalls, 1)
+		assert.Equal(t, checkedOutBasePath, resetCalls[0])
+		assert.NotEmpty(t, commands)
+		assert.Contains(t, stderr.String(), "conflict detected")
+	})
 
 	t.Run("fails when sub-session reports error status", func(t *testing.T) {
 		sweSystem, session := newConflictResolutionFixture(t)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -16,6 +17,28 @@ const (
 	AccessAllow AccessFlag = "allow"
 	AccessDeny  AccessFlag = "deny"
 	AccessAsk   AccessFlag = "ask"
+)
+
+// HookType defines supported hook execution backend.
+type HookType string
+
+const (
+	// HookTypeShell runs a shell command.
+	HookTypeShell HookType = "shell"
+	// HookTypeLLM runs a one-shot LLM query.
+	HookTypeLLM HookType = "llm"
+	// HookTypeSubAgent runs a delegated subagent task.
+	HookTypeSubAgent HookType = "subagent"
+)
+
+// HookRunOn defines where shell hook commands are executed.
+type HookRunOn string
+
+const (
+	// HookRunOnHost executes command on host system.
+	HookRunOnHost HookRunOn = "host"
+	// HookRunOnSandbox executes command in sandbox/container when available.
+	HookRunOnSandbox HookRunOn = "sandbox"
 )
 
 // AuthMode represents the authentication mode for a model provider.
@@ -144,6 +167,160 @@ type MCPServerConfig struct {
 	// Tools contains regex patterns selecting enabled tool names.
 	// nil means all tools enabled, empty slice means all tools disabled.
 	Tools []string `json:"tools" yaml:"tools"`
+}
+
+// HookConfig defines configuration for one hook extension point binding.
+type HookConfig struct {
+	// Enabled controls whether hook should be executed. Defaults to true.
+	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	// Hook is extension point identifier (for example: merge, commit, summary).
+	Hook string `json:"hook,omitempty" yaml:"hook,omitempty"`
+	// Name is user-assigned hook identifier used for matching/overriding.
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+	// Type defines hook backend type. Defaults to shell.
+	Type HookType `json:"type,omitempty" yaml:"type,omitempty"`
+	// Command is shell command template rendered with hook context data.
+	Command string `json:"command,omitempty" yaml:"command,omitempty"`
+	// Timeout limits hook execution. Zero means no timeout.
+	Timeout time.Duration `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	// RunOn defines shell execution target: host or sandbox.
+	RunOn HookRunOn `json:"run-on,omitempty" yaml:"run-on,omitempty"`
+
+	enabledConfigured bool
+	hookConfigured    bool
+	nameConfigured    bool
+	typeConfigured    bool
+	commandConfigured bool
+	timeoutConfigured bool
+	runOnConfigured   bool
+}
+
+// UnmarshalJSON unmarshals HookConfig, applies defaults and tracks configured fields.
+func (c *HookConfig) UnmarshalJSON(data []byte) error {
+	aux := struct {
+		Enabled *bool     `json:"enabled,omitempty"`
+		Hook    string    `json:"hook,omitempty"`
+		Name    string    `json:"name,omitempty"`
+		Type    HookType  `json:"type,omitempty"`
+		Command string    `json:"command,omitempty"`
+		Timeout string    `json:"timeout,omitempty"`
+		RunOn   HookRunOn `json:"run-on,omitempty"`
+	}{}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return fmt.Errorf("HookConfig.UnmarshalJSON() [conf.go]: failed to unmarshal hook config: %w", err)
+	}
+
+	if aux.Enabled != nil {
+		c.Enabled = *aux.Enabled
+		c.enabledConfigured = true
+	}
+	c.Hook = aux.Hook
+	c.Name = aux.Name
+	c.Type = aux.Type
+	c.Command = aux.Command
+	c.RunOn = aux.RunOn
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("HookConfig.UnmarshalJSON() [conf.go]: failed to unmarshal hook config raw map: %w", err)
+	}
+
+	_, c.enabledConfigured = raw["enabled"]
+	_, c.hookConfigured = raw["hook"]
+	_, c.nameConfigured = raw["name"]
+	_, c.typeConfigured = raw["type"]
+	_, c.commandConfigured = raw["command"]
+	_, c.timeoutConfigured = raw["timeout"]
+	_, c.runOnConfigured = raw["run-on"]
+
+	if strings.TrimSpace(aux.Timeout) != "" {
+		d, err := time.ParseDuration(strings.TrimSpace(aux.Timeout))
+		if err != nil {
+			return fmt.Errorf("HookConfig.UnmarshalJSON() [conf.go]: invalid timeout: %w", err)
+		}
+		c.Timeout = d
+		c.timeoutConfigured = true
+	}
+
+	c.applyDefaults()
+
+	return nil
+}
+
+// UnmarshalYAML unmarshals HookConfig, applies defaults and tracks configured fields.
+func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
+	aux := struct {
+		Enabled *bool     `yaml:"enabled,omitempty"`
+		Hook    string    `yaml:"hook,omitempty"`
+		Name    string    `yaml:"name,omitempty"`
+		Type    HookType  `yaml:"type,omitempty"`
+		Command string    `yaml:"command,omitempty"`
+		Timeout string    `yaml:"timeout,omitempty"`
+		RunOn   HookRunOn `yaml:"run-on,omitempty"`
+	}{}
+
+	if err := node.Decode(&aux); err != nil {
+		return fmt.Errorf("HookConfig.UnmarshalYAML() [conf.go]: failed to decode hook config: %w", err)
+	}
+
+	if aux.Enabled != nil {
+		c.Enabled = *aux.Enabled
+		c.enabledConfigured = true
+	}
+	c.Hook = aux.Hook
+	c.Name = aux.Name
+	c.Type = aux.Type
+	c.Command = aux.Command
+	c.RunOn = aux.RunOn
+
+	if strings.TrimSpace(aux.Timeout) != "" {
+		d, err := time.ParseDuration(strings.TrimSpace(aux.Timeout))
+		if err != nil {
+			return fmt.Errorf("HookConfig.UnmarshalYAML() [conf.go]: invalid timeout: %w", err)
+		}
+		c.Timeout = d
+		c.timeoutConfigured = true
+	}
+
+	if node.Kind != yaml.MappingNode {
+		c.applyDefaults()
+		return nil
+	}
+
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		switch node.Content[i].Value {
+		case "enabled":
+			c.enabledConfigured = true
+		case "hook":
+			c.hookConfigured = true
+		case "name":
+			c.nameConfigured = true
+		case "type":
+			c.typeConfigured = true
+		case "command":
+			c.commandConfigured = true
+		case "timeout":
+			c.timeoutConfigured = true
+		case "run-on":
+			c.runOnConfigured = true
+		}
+	}
+	c.applyDefaults()
+
+	return nil
+}
+
+func (c *HookConfig) applyDefaults() {
+	if c.Enabled == false && !c.enabledConfigured {
+		c.Enabled = true
+	}
+	if c.Type == "" {
+		c.Type = HookTypeShell
+	}
+	if c.RunOn == "" {
+		c.RunOn = HookRunOnSandbox
+	}
 }
 
 // CLIDefaultsConfig defines default values for the cli command flags.
@@ -400,10 +577,10 @@ type GlobalConfig struct {
 	// VendorFamilyOverrides contains per-provider vendor+family template overrides.
 	VendorFamilyOverrides map[string]ModelVendorFamilyTemplateOverride `json:"vendor_family_overrides,omitempty" yaml:"vendor_family_overrides,omitempty"`
 
-	containerConfigured       bool
-	containerMountsConfigured bool
-	containerEnvConfigured    bool
-	containerImageConfigured  bool
+	containerConfigured        bool
+	containerMountsConfigured  bool
+	containerEnvConfigured     bool
+	containerImageConfigured   bool
 	containerEnabledConfigured bool
 }
 
@@ -530,6 +707,12 @@ type ConfigStore interface {
 
 	// LastMCPServerConfigsUpdate returns timestamp of last update of MCP server configs.
 	LastMCPServerConfigsUpdate() (time.Time, error)
+
+	// GetHookConfigs returns hook configurations keyed by hook name.
+	GetHookConfigs() (map[string]*HookConfig, error)
+
+	// LastHookConfigsUpdate returns timestamp of last update of hook configs.
+	LastHookConfigsUpdate() (time.Time, error)
 
 	// GetAgentConfigFile returns file content from agent configuration namespace.
 	// The expected virtual location is conf/agent/<subdir>/<filename>.

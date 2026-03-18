@@ -6,6 +6,7 @@ Package `pkg/core` contains the runtime orchestration layer for agent sessions, 
 
 * `commit_message.go` - Commit message generation using model-backed templates
 * `compact.go` - Context compaction for chat messages to manage token limits
+* `hooks.md` - Hooks mechanism design for agent lifecycle extension points
 * `prompt.go` - Prompt and tool-info generator with role fragment merging
 * `role.go` - Role registry with cached config loading and role merging
 * `session.go` - Core session engine with chat/tool loops and retries

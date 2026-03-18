@@ -485,8 +485,26 @@ func runCLI(params *CLIParams) error {
 		sessionRunErr = ctx.Err()
 	}
 
-	finalizeResult := finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt)
+	var finalizeResult worktreeFinalizeResult
+	hookEngine := core.NewHookEngine(
+		sweSystem.ConfigStore,
+		core.NewDefaultHookRunner(chooseGitDiffDir(buildResult.WorkDirRoot, buildResult.WorkDir)),
+		buildResult.ShellRunner,
+	)
+	hookEngine.MergeContext(map[string]string{
+		"branch":  strings.TrimSpace(buildResult.WorktreeBranch),
+		"workdir": strings.TrimSpace(buildResult.WorkDir),
+		"rootdir": strings.TrimSpace(buildResult.WorkDirRoot),
+		"status":  string(core.HookSessionStatusRunning),
+	})
+	finalizeResult = finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt, hookEngine, appView)
 	endTime := time.Now()
+	hookEngine.SetContextValue("summary", strings.TrimSpace(lastAssistantMessageText(session)))
+	if sessionRunErr != nil {
+		hookEngine.SetSessionStatus(core.HookSessionStatusFailed)
+	} else {
+		hookEngine.SetSessionStatus(core.HookSessionStatusSuccess)
+	}
 
 	if err := emitSessionSummary(startTime, endTime, session, buildResult, appView, sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
 		return err
@@ -996,7 +1014,7 @@ type worktreeFinalizeResult struct {
 	HeadCommitID string
 }
 
-func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer, repoDir string, worktreeDir string, originalPrompt string) worktreeFinalizeResult {
+func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer, repoDir string, worktreeDir string, originalPrompt string, hookEngine *core.HookEngine, appView ui.IAppView) worktreeFinalizeResult {
 	result := worktreeFinalizeResult{}
 	if worktreeBranch == "" || vcs == nil {
 		return result
@@ -1022,7 +1040,27 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 	}
 
 	if merge {
-		if strings.TrimSpace(repoDir) == "" || strings.TrimSpace(worktreeDir) == "" || sweSystem == nil || session == nil {
+		mergeHookExecuted := false
+		if hookEngine != nil {
+			hookEngine.MergeContext(map[string]string{
+				"branch":  strings.TrimSpace(worktreeBranch),
+				"workdir": strings.TrimSpace(firstNonEmpty(worktreeDir, repoDir)),
+				"rootdir": strings.TrimSpace(repoDir),
+			})
+			hookResult, hookErr := hookEngine.Execute(ctx, core.HookExecutionRequest{Name: "merge", View: appView, VCS: vcs})
+			if hookResult != nil {
+				mergeHookExecuted = true
+			}
+			if hookErr != nil {
+				_, _ = fmt.Fprintf(stderr, "automatic merge failed: %v\n", hookErr)
+				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
+				return result
+			}
+		}
+
+		if mergeHookExecuted {
+			result.HeadCommitID = resolveGitCommitID(repoDir, baseBranch)
+		} else if strings.TrimSpace(repoDir) == "" || strings.TrimSpace(worktreeDir) == "" || sweSystem == nil || session == nil {
 			mergeErr := vcs.MergeBranches(baseBranch, worktreeBranch)
 			if mergeErr != nil {
 				if errors.Is(mergeErr, vfs.ErrMergeConflict) {

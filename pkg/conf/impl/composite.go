@@ -51,6 +51,8 @@ type CompositeConfigStore struct {
 	modelProviderConfigsUpdate time.Time
 	mcpServerConfigs           map[string]*conf.MCPServerConfig
 	mcpServerConfigsUpdate     time.Time
+	hookConfigs                map[string]*conf.HookConfig
+	hookConfigsUpdate          time.Time
 	agentRoleConfigs           map[string]*conf.AgentRoleConfig
 	agentRoleConfigsUpdate     time.Time
 
@@ -58,6 +60,7 @@ type CompositeConfigStore struct {
 	storeGlobalUpdates []time.Time
 	storeModelUpdates  []time.Time
 	storeMCPUpdates    []time.Time
+	storeHookUpdates   []time.Time
 	storeRoleUpdates   []time.Time
 }
 
@@ -111,6 +114,7 @@ func NewCompositeConfigStore(projDir string, configPath string) (conf.ConfigStor
 		storeGlobalUpdates: make([]time.Time, len(stores)),
 		storeModelUpdates:  make([]time.Time, len(stores)),
 		storeMCPUpdates:    make([]time.Time, len(stores)),
+		storeHookUpdates:   make([]time.Time, len(stores)),
 		storeRoleUpdates:   make([]time.Time, len(stores)),
 	}
 
@@ -181,6 +185,32 @@ func (c *CompositeConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServer
 	}
 
 	return configs, nil
+}
+
+// GetHookConfigs returns merged hook configurations from all sources.
+func (c *CompositeConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.needsRefreshHooks() {
+		if err := c.refreshHookConfigs(); err != nil {
+			return nil, fmt.Errorf("CompositeConfigStore.GetHookConfigs() [composite.go]: refresh failed: %w", err)
+		}
+	}
+
+	configs := make(map[string]*conf.HookConfig, len(c.hookConfigs))
+	for key, value := range c.hookConfigs {
+		configs[key] = value.Clone()
+	}
+
+	return configs, nil
+}
+
+// LastHookConfigsUpdate returns timestamp of most recent hook config update.
+func (c *CompositeConfigStore) LastHookConfigsUpdate() (time.Time, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.hookConfigsUpdate, nil
 }
 
 // LastMCPServerConfigsUpdate returns timestamp of most recent MCP server config update.
@@ -261,6 +291,9 @@ func (c *CompositeConfigStore) refresh() error {
 	if err := c.refreshMCPServerConfigs(); err != nil {
 		return err
 	}
+	if err := c.refreshHookConfigs(); err != nil {
+		return err
+	}
 	if err := c.refreshAgentRoleConfigs(); err != nil {
 		return err
 	}
@@ -307,6 +340,25 @@ func (c *CompositeConfigStore) needsRefreshMCPServers() bool {
 			continue
 		}
 		if !lastUpdate.Equal(c.storeMCPUpdates[i]) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// needsRefreshHooks checks if hook configs need to be refreshed.
+func (c *CompositeConfigStore) needsRefreshHooks() bool {
+	if len(c.storeHookUpdates) != len(c.stores) {
+		return true
+	}
+
+	for i, store := range c.stores {
+		lastUpdate, err := store.LastHookConfigsUpdate()
+		if err != nil {
+			continue
+		}
+		if !lastUpdate.Equal(c.storeHookUpdates[i]) {
 			return true
 		}
 	}
@@ -417,6 +469,45 @@ func (c *CompositeConfigStore) refreshMCPServerConfigs() error {
 
 	c.mcpServerConfigs = merged
 	c.mcpServerConfigsUpdate = latestUpdate
+
+	return nil
+}
+
+// refreshHookConfigs reloads and merges hook configurations from all sources.
+func (c *CompositeConfigStore) refreshHookConfigs() error {
+	if len(c.storeHookUpdates) != len(c.stores) {
+		c.storeHookUpdates = make([]time.Time, len(c.stores))
+	}
+
+	merged := make(map[string]*conf.HookConfig)
+	var latestUpdate time.Time
+
+	for i, store := range c.stores {
+		configs, err := store.GetHookConfigs()
+		if err != nil {
+			return fmt.Errorf("CompositeConfigStore.refreshHookConfigs() [composite.go]: failed to get configs from store %d: %w", i, err)
+		}
+
+		for key, value := range configs {
+			existing, ok := merged[key]
+			if !ok {
+				merged[key] = value.Clone()
+				continue
+			}
+			existing.Merge(value)
+		}
+
+		lastUpdate, err := store.LastHookConfigsUpdate()
+		if err == nil {
+			c.storeHookUpdates[i] = lastUpdate
+			if lastUpdate.After(latestUpdate) {
+				latestUpdate = lastUpdate
+			}
+		}
+	}
+
+	c.hookConfigs = merged
+	c.hookConfigsUpdate = latestUpdate
 
 	return nil
 }

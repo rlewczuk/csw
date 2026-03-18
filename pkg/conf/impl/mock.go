@@ -21,6 +21,8 @@ type MockConfigStore struct {
 	modelProviderConfigsUpdate time.Time
 	mcpServerConfigs           map[string]*conf.MCPServerConfig
 	mcpServerConfigsUpdate     time.Time
+	hookConfigs                map[string]*conf.HookConfig
+	hookConfigsUpdate          time.Time
 	agentRoleConfigs           map[string]*conf.AgentRoleConfig
 	agentRoleConfigsUpdate     time.Time
 	agentConfigFiles           map[string][]byte
@@ -33,6 +35,8 @@ type MockConfigStore struct {
 	LastModelProviderConfigsUpdateErr error
 	GetMCPServerConfigsErr            error
 	LastMCPServerConfigsUpdateErr     error
+	GetHookConfigsErr                 error
+	LastHookConfigsUpdateErr          error
 	LastAgentRoleConfigsUpdateErr     error
 	GetAgentConfigFileErr             error
 }
@@ -46,6 +50,8 @@ func NewMockConfigStore() *MockConfigStore {
 		modelProviderConfigsUpdate: time.Now(),
 		mcpServerConfigs:           make(map[string]*conf.MCPServerConfig),
 		mcpServerConfigsUpdate:     time.Now(),
+		hookConfigs:                make(map[string]*conf.HookConfig),
+		hookConfigsUpdate:          time.Now(),
 		agentRoleConfigs:           make(map[string]*conf.AgentRoleConfig),
 		agentRoleConfigsUpdate:     time.Now(),
 		agentConfigFiles:           make(map[string][]byte),
@@ -58,6 +64,14 @@ func (m *MockConfigStore) SetMCPServerConfigs(configs map[string]*conf.MCPServer
 	defer m.mu.Unlock()
 	m.mcpServerConfigs = configs
 	m.mcpServerConfigsUpdate = time.Now()
+}
+
+// SetHookConfigs sets hook configurations and updates timestamp.
+func (m *MockConfigStore) SetHookConfigs(configs map[string]*conf.HookConfig) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.hookConfigs = configs
+	m.hookConfigsUpdate = time.Now()
 }
 
 // SetAgentConfigFile sets agent config file content for tests.
@@ -113,6 +127,13 @@ func (m *MockConfigStore) UpdateMCPServerConfigsTimestamp() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.mcpServerConfigsUpdate = time.Now()
+}
+
+// UpdateHookConfigsTimestamp updates hook configs timestamp.
+func (m *MockConfigStore) UpdateHookConfigsTimestamp() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.hookConfigsUpdate = time.Now()
 }
 
 // UpdateAgentRoleConfigsTimestamp updates the agent role configs timestamp.
@@ -203,6 +224,35 @@ func (m *MockConfigStore) LastMCPServerConfigsUpdate() (time.Time, error) {
 	}
 
 	return m.mcpServerConfigsUpdate, nil
+}
+
+// GetHookConfigs returns hook configurations.
+func (m *MockConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m.GetHookConfigsErr != nil {
+		return nil, m.GetHookConfigsErr
+	}
+
+	configs := make(map[string]*conf.HookConfig, len(m.hookConfigs))
+	for key, value := range m.hookConfigs {
+		configs[key] = value.Clone()
+	}
+
+	return configs, nil
+}
+
+// LastHookConfigsUpdate returns timestamp of last hook configs update.
+func (m *MockConfigStore) LastHookConfigsUpdate() (time.Time, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m.LastHookConfigsUpdateErr != nil {
+		return time.Time{}, m.LastHookConfigsUpdateErr
+	}
+
+	return m.hookConfigsUpdate, nil
 }
 
 // GetAgentRoleConfigs returns the agent role configurations.

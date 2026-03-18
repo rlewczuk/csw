@@ -585,6 +585,57 @@ func cloneModelTemplateGroups(input map[string]map[string]ModelProviderConfig) m
 	return cloned
 }
 
+// Clone returns a deep copy of HookConfig.
+func (c *HookConfig) Clone() *HookConfig {
+	if c == nil {
+		return nil
+	}
+
+	cloned := *c
+	return &cloned
+}
+
+// Merge merges override into HookConfig.
+//
+// Scalar fields are replaced when explicitly configured in override.
+func (c *HookConfig) Merge(override *HookConfig) {
+	if override == nil {
+		return
+	}
+
+	if override.enabledConfigured {
+		c.Enabled = override.Enabled
+		c.enabledConfigured = true
+	}
+
+	if override.hookConfigured {
+		c.Hook = override.Hook
+		c.hookConfigured = true
+	}
+	if override.nameConfigured {
+		c.Name = override.Name
+		c.nameConfigured = true
+	}
+	if override.typeConfigured {
+		c.Type = override.Type
+		c.typeConfigured = true
+	}
+	if override.commandConfigured {
+		c.Command = override.Command
+		c.commandConfigured = true
+	}
+	if override.timeoutConfigured {
+		c.Timeout = override.Timeout
+		c.timeoutConfigured = true
+	}
+	if override.runOnConfigured {
+		c.RunOn = override.RunOn
+		c.runOnConfigured = true
+	}
+
+	c.applyDefaults()
+}
+
 // Clone returns a deep copy of MCPServerConfig.
 func (c *MCPServerConfig) Clone() *MCPServerConfig {
 	if c == nil {

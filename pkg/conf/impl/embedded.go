@@ -54,6 +54,7 @@ type EmbeddedConfigStore struct {
 	globalConfig         *conf.GlobalConfig
 	modelProviderConfigs map[string]*conf.ModelProviderConfig
 	mcpServerConfigs     map[string]*conf.MCPServerConfig
+	hookConfigs          map[string]*conf.HookConfig
 	agentRoleConfigs     map[string]*conf.AgentRoleConfig
 	loaded               bool
 }
@@ -65,6 +66,7 @@ func NewEmbeddedConfigStore() (conf.ConfigStore, error) {
 		globalConfig:         &conf.GlobalConfig{},
 		modelProviderConfigs: make(map[string]*conf.ModelProviderConfig),
 		mcpServerConfigs:     make(map[string]*conf.MCPServerConfig),
+		hookConfigs:          make(map[string]*conf.HookConfig),
 		agentRoleConfigs:     make(map[string]*conf.AgentRoleConfig),
 	}
 
@@ -125,6 +127,24 @@ func (s *EmbeddedConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerC
 
 // LastMCPServerConfigsUpdate returns timestamp of last MCP server config update.
 func (s *EmbeddedConfigStore) LastMCPServerConfigsUpdate() (time.Time, error) {
+	return embeddedTimestamp, nil
+}
+
+// GetHookConfigs returns map of hook configurations.
+func (s *EmbeddedConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	configs := make(map[string]*conf.HookConfig, len(s.hookConfigs))
+	for key, value := range s.hookConfigs {
+		configs[key] = value.Clone()
+	}
+
+	return configs, nil
+}
+
+// LastHookConfigsUpdate returns timestamp of last hook config update.
+func (s *EmbeddedConfigStore) LastHookConfigsUpdate() (time.Time, error) {
 	return embeddedTimestamp, nil
 }
 
@@ -226,6 +246,9 @@ func (s *EmbeddedConfigStore) loadAllConfig() error {
 	}
 	if err := s.loadMCPServerConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load MCP server configs: %w", err)
+	}
+	if err := s.loadHookConfigs(); err != nil {
+		return fmt.Errorf("loadAllConfig(): failed to load hook configs: %w", err)
 	}
 	if err := s.loadAgentRoleConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load agent role configs: %w", err)
@@ -425,6 +448,82 @@ func (s *EmbeddedConfigStore) loadMCPServerConfigs() error {
 	}
 
 	s.mcpServerConfigs = configs
+	return nil
+}
+
+// loadHookConfigs loads hook configurations from embedded hooks directory.
+// YAML files take precedence over JSON files if both exist for the same hook.
+func (s *EmbeddedConfigStore) loadHookConfigs() error {
+	hooksDir := "conf/hooks"
+
+	entries, err := embeddedConfigFS.ReadDir(hooksDir)
+	if err != nil {
+		if isNotExist(err) {
+			s.hookConfigs = make(map[string]*conf.HookConfig)
+			return nil
+		}
+		return fmt.Errorf("loadHookConfigs() [embedded.go]: failed to read hooks directory: %w", err)
+	}
+
+	configs := make(map[string]*conf.HookConfig)
+	loadedHooks := make(map[string]bool)
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if ext != ".yml" && ext != ".yaml" {
+			continue
+		}
+
+		hookName := entry.Name()[:len(entry.Name())-len(ext)]
+		hookPath := filepath.Join(hooksDir, entry.Name())
+		data, readErr := embeddedConfigFS.ReadFile(hookPath)
+		if readErr != nil {
+			return fmt.Errorf("loadHookConfigs() [embedded.go]: failed to read %s: %w", hookPath, readErr)
+		}
+
+		var hookConfig conf.HookConfig
+		if unmarshalErr := yaml.Unmarshal(data, &hookConfig); unmarshalErr != nil {
+			return fmt.Errorf("loadHookConfigs() [embedded.go]: failed to parse %s: %w", hookPath, unmarshalErr)
+		}
+
+		if hookConfig.Name == "" {
+			hookConfig.Name = hookName
+		}
+		configs[hookConfig.Name] = &hookConfig
+		loadedHooks[hookName] = true
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+
+		hookName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
+		if loadedHooks[hookName] {
+			continue
+		}
+
+		hookPath := filepath.Join(hooksDir, entry.Name())
+		data, readErr := embeddedConfigFS.ReadFile(hookPath)
+		if readErr != nil {
+			return fmt.Errorf("loadHookConfigs() [embedded.go]: failed to read %s: %w", hookPath, readErr)
+		}
+
+		var hookConfig conf.HookConfig
+		if unmarshalErr := json.Unmarshal(data, &hookConfig); unmarshalErr != nil {
+			return fmt.Errorf("loadHookConfigs() [embedded.go]: failed to parse %s: %w", hookPath, unmarshalErr)
+		}
+
+		if hookConfig.Name == "" {
+			hookConfig.Name = hookName
+		}
+		configs[hookConfig.Name] = &hookConfig
+	}
+
+	s.hookConfigs = configs
 	return nil
 }
 

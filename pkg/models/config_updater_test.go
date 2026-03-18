@@ -16,15 +16,15 @@ import (
 
 // mockWritableStore is a mock implementation of conf.WritableConfigStore for testing.
 type mockWritableStore struct {
-	savedConfig   *conf.ModelProviderConfig
-	saveCalled    bool
-	saveError     error
-	deletedName   string
-	deleteCalled  bool
-	deleteError   error
-	globalConfig  *conf.GlobalConfig
-	globalSaved   bool
-	globalError   error
+	savedConfig  *conf.ModelProviderConfig
+	saveCalled   bool
+	saveError    error
+	deletedName  string
+	deleteCalled bool
+	deleteError  error
+	globalConfig *conf.GlobalConfig
+	globalSaved  bool
+	globalError  error
 }
 
 func (m *mockWritableStore) GetModelProviderConfigs() (map[string]*conf.ModelProviderConfig, error) {
@@ -40,6 +40,14 @@ func (m *mockWritableStore) GetMCPServerConfigs() (map[string]*conf.MCPServerCon
 }
 
 func (m *mockWritableStore) LastMCPServerConfigsUpdate() (time.Time, error) {
+	return time.Time{}, nil
+}
+
+func (m *mockWritableStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
+	return nil, nil
+}
+
+func (m *mockWritableStore) LastHookConfigsUpdate() (time.Time, error) {
 	return time.Time{}, nil
 }
 
@@ -107,9 +115,9 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 		callback := updater.Update()
 
 		config := &conf.ModelProviderConfig{
-			Name:  "test-provider",
-			URL:   "https://api.example.com",
-			Type:  "responses",
+			Name:   "test-provider",
+			URL:    "https://api.example.com",
+			Type:   "responses",
 			APIKey: "new-api-key",
 		}
 
@@ -136,8 +144,8 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 		callback := updater.Update()
 
 		config := &conf.ModelProviderConfig{
-			URL:   "https://api.example.com",
-			Type:  "responses",
+			URL:    "https://api.example.com",
+			Type:   "responses",
 			APIKey: "new-api-key",
 		}
 
@@ -155,8 +163,8 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 		callback := updater.Update()
 
 		config := &conf.ModelProviderConfig{
-			Name:  "test-provider",
-			URL:   "https://api.example.com",
+			Name: "test-provider",
+			URL:  "https://api.example.com",
 		}
 
 		err := callback(config)
