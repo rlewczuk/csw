@@ -130,6 +130,10 @@ type AgentRoleConfig struct {
 	// HiddenPatterns contains glob patterns for files and directories that should be hidden from VFS operations
 	// Supports .gitignore-compatible syntax
 	HiddenPatterns []string `json:"hidden-patterns,omitempty" yaml:"hidden-patterns,omitempty"`
+
+	// MCPServers contains MCP server names that should be enabled for this role.
+	// Names must match files under conf/mcp/<server-name>.
+	MCPServers []string `json:"mcp-servers,omitempty" yaml:"mcp-servers,omitempty"`
 }
 
 // ModelTagMapping represents a single model-to-tag mapping rule.
@@ -189,6 +193,54 @@ type MCPServerConfig struct {
 	// Each item is either an exact tool name or a glob pattern.
 	// Empty or nil slice means all tools enabled.
 	Tools []string `json:"tools" yaml:"tools"`
+
+	enabledConfigured bool
+}
+
+// UnmarshalJSON unmarshals MCPServerConfig and tracks explicitly configured fields.
+func (c *MCPServerConfig) UnmarshalJSON(data []byte) error {
+	type alias MCPServerConfig
+	var decoded alias
+
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return fmt.Errorf("MCPServerConfig.UnmarshalJSON() [conf.go]: failed to unmarshal mcp server config: %w", err)
+	}
+
+	*c = MCPServerConfig(decoded)
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("MCPServerConfig.UnmarshalJSON() [conf.go]: failed to unmarshal mcp server config raw map: %w", err)
+	}
+
+	_, c.enabledConfigured = raw["enabled"]
+
+	return nil
+}
+
+// UnmarshalYAML unmarshals MCPServerConfig and tracks explicitly configured fields.
+func (c *MCPServerConfig) UnmarshalYAML(node *yaml.Node) error {
+	type alias MCPServerConfig
+	var decoded alias
+
+	if err := node.Decode(&decoded); err != nil {
+		return fmt.Errorf("MCPServerConfig.UnmarshalYAML() [conf.go]: failed to decode mcp server config: %w", err)
+	}
+
+	*c = MCPServerConfig(decoded)
+
+	if node.Kind != yaml.MappingNode {
+		return nil
+	}
+
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == "enabled" {
+			c.enabledConfigured = true
+			break
+		}
+	}
+
+	return nil
 }
 
 // HookConfig defines configuration for one hook extension point binding.

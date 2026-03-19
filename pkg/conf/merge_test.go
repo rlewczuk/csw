@@ -376,6 +376,7 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 			PromptFragments: map[string]string{"a": "1"},
 			ToolFragments:   map[string]string{"x": "1"},
 			HiddenPatterns:  []string{".git/"},
+			MCPServers:      []string{"srv1"},
 		}
 
 		clone := cfg.Clone()
@@ -387,6 +388,7 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 		clone.PromptFragments["a"] = "2"
 		clone.ToolFragments["x"] = "2"
 		clone.HiddenPatterns[0] = "tmp/"
+		clone.MCPServers[0] = "srv2"
 
 		assert.Equal(t, AccessAllow, cfg.VFSPrivileges["/"].Read)
 		assert.Equal(t, AccessAllow, cfg.ToolsAccess["vfsRead"])
@@ -394,6 +396,7 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 		assert.Equal(t, "1", cfg.PromptFragments["a"])
 		assert.Equal(t, "1", cfg.ToolFragments["x"])
 		assert.Equal(t, ".git/", cfg.HiddenPatterns[0])
+		assert.Equal(t, "srv1", cfg.MCPServers[0])
 	})
 
 	t.Run("tool selection clone is deep copy", func(t *testing.T) {
@@ -450,6 +453,50 @@ func TestAgentRoleConfig_Merge_NilOverride(t *testing.T) {
 	base := &AgentRoleConfig{Name: "role", HiddenPatterns: []string{".git/"}}
 	base.Merge(nil)
 	assert.Equal(t, []string{".git/"}, base.HiddenPatterns)
+}
+
+func TestMCPServerConfig_Merge(t *testing.T) {
+	t.Run("explicit enabled false overrides base", func(t *testing.T) {
+		base := &MCPServerConfig{Enabled: true, Cmd: "base-cmd"}
+		override := &MCPServerConfig{}
+		require.NoError(t, yaml.Unmarshal([]byte("enabled: false\n"), override))
+
+		base.Merge(override)
+
+		assert.False(t, base.Enabled)
+		assert.Equal(t, "base-cmd", base.Cmd)
+	})
+
+	t.Run("configured fields override while preserving unspecified", func(t *testing.T) {
+		base := &MCPServerConfig{
+			Description: "base",
+			Transport:   MCPTransportTypeStdio,
+			Cmd:         "base-cmd",
+			Enabled:     true,
+			Tools:       []string{"a"},
+		}
+
+		override := &MCPServerConfig{}
+		require.NoError(t, yaml.Unmarshal([]byte("transport: https\nurl: https://example\napi_key: token\ntools:\n  - b\n"), override))
+
+		base.Merge(override)
+
+		assert.Equal(t, MCPTransportTypeHTTPS, base.Transport)
+		assert.Equal(t, "https://example", base.URL)
+		assert.Equal(t, "token", base.APIKey)
+		assert.Equal(t, "base-cmd", base.Cmd)
+		assert.True(t, base.Enabled)
+		assert.Equal(t, []string{"b"}, base.Tools)
+	})
+}
+
+func TestAgentRoleConfig_Merge_MCPServers(t *testing.T) {
+	base := &AgentRoleConfig{Name: "developer", MCPServers: []string{"srv-a"}}
+	override := &AgentRoleConfig{Name: "developer", MCPServers: []string{"srv-b", "srv-c"}}
+
+	base.Merge(override)
+
+	assert.Equal(t, []string{"srv-b", "srv-c"}, base.MCPServers)
 }
 
 func TestHookConfig_Merge_SubAgentRoleAndPromptFields(t *testing.T) {

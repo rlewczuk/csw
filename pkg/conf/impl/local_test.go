@@ -238,6 +238,7 @@ func TestLocalConfigStore_AgentRoleConfigs(t *testing.T) {
 	test1Config := conf.AgentRoleConfig{
 		Name:        "test1",
 		Description: "Test role 1",
+		MCPServers:  []string{"srv-a", "srv-b"},
 		VFSPrivileges: map[string]conf.FileAccess{
 			"/tmp": {Read: conf.AccessAllow, Write: conf.AccessDeny},
 		},
@@ -290,6 +291,7 @@ func TestLocalConfigStore_AgentRoleConfigs(t *testing.T) {
 	assert.Equal(t, conf.AccessAllow, test1.VFSPrivileges["/tmp"].Read)
 	assert.Len(t, test1.ToolsAccess, 2)
 	assert.Len(t, test1.RunPrivileges, 1)
+	assert.Equal(t, []string{"srv-a", "srv-b"}, test1.MCPServers)
 
 	test2, ok := configs["test2"]
 	require.True(t, ok)
@@ -374,6 +376,23 @@ func TestLocalConfigStore_MCPServerConfigs(t *testing.T) {
 	assert.Equal(t, conf.MCPTransportTypeHTTPS, yamlSrv.Transport)
 	assert.Equal(t, "https://yaml.example/mcp", yamlSrv.URL)
 	assert.Equal(t, "yaml-key", yamlSrv.APIKey)
+
+	t.Run("missing enabled field defaults to false", func(t *testing.T) {
+		tmpDirNested := t.TempDir()
+		mcpDirNested := filepath.Join(tmpDirNested, "mcp")
+		require.NoError(t, os.MkdirAll(mcpDirNested, 0o755))
+
+		require.NoError(t, os.WriteFile(filepath.Join(mcpDirNested, "default-disabled.yml"), []byte("description: no enabled field\ncmd: server\n"), 0o644))
+
+		storeNested, nestedErr := NewLocalConfigStore(tmpDirNested)
+		require.NoError(t, nestedErr)
+		defer storeNested.Close()
+
+		nestedConfigs, nestedErr := storeNested.GetMCPServerConfigs()
+		require.NoError(t, nestedErr)
+		require.Contains(t, nestedConfigs, "default-disabled")
+		assert.False(t, nestedConfigs["default-disabled"].Enabled)
+	})
 }
 
 func TestLocalConfigStore_HookConfigsNameMismatchDisablesHook(t *testing.T) {

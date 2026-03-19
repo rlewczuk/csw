@@ -66,6 +66,8 @@ type CLIParams struct {
 	MaxThreads            int
 	OutputFormat          string
 	VFSAllow              []string
+	MCPEnable             []string
+	MCPDisable            []string
 	HookOverrides         []string
 }
 
@@ -117,6 +119,8 @@ func CliCommand() *cobra.Command {
 		cliMaxThreads     int
 		cliOutputFormat   string
 		cliVFSAllow       []string
+		cliMCPEnable      []string
+		cliMCPDisable     []string
 		cliHooks          []string
 		cliContext        []string
 	)
@@ -220,6 +224,8 @@ func CliCommand() *cobra.Command {
 
 			// Parse vfs-allow paths, handling both repeated flags and colon-separated values
 			vfsAllowPaths := parseVFSAllowPaths(cliVFSAllow)
+			mcpEnableNames := parseMCPServerFlagValues(cliMCPEnable)
+			mcpDisableNames := parseMCPServerFlagValues(cliMCPDisable)
 
 			return runCLIFunc(&CLIParams{
 				Prompt:                prompt,
@@ -255,6 +261,8 @@ func CliCommand() *cobra.Command {
 				MaxThreads:            cliMaxThreads,
 				OutputFormat:          cliOutputFormat,
 				VFSAllow:              vfsAllowPaths,
+				MCPEnable:             mcpEnableNames,
+				MCPDisable:            mcpDisableNames,
 				HookOverrides:         cliHooks,
 			})
 		},
@@ -292,6 +300,8 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().IntVar(&cliMaxThreads, "max-threads", 0, "Maximum number of tool calls executed in parallel")
 	cmd.Flags().StringVar(&cliOutputFormat, "output-format", "short", "Console output format: short, full, jsonl")
 	cmd.Flags().StringArrayVar(&cliVFSAllow, "vfs-allow", nil, "Additional path to allow VFS access outside of worktree (repeatable, or use ':' separated list)")
+	cmd.Flags().StringArrayVar(&cliMCPEnable, "mcp-enable", nil, "Enable MCP server by name (repeatable, accepts comma-separated list)")
+	cmd.Flags().StringArrayVar(&cliMCPDisable, "mcp-disable", nil, "Disable MCP server by name (repeatable, accepts comma-separated list)")
 	cmd.Flags().StringArrayVar(&cliHooks, "hook", nil, "Ephemeral hook override: --hook name | --hook name:disable | --hook name:key=value,key2=value2")
 	cmd.Flags().StringArrayVarP(&cliContext, "context", "c", nil, "Template context value in KEY=VAL format (repeatable)")
 	resumeFlag := cmd.Flags().Lookup("resume")
@@ -432,6 +442,8 @@ func runCLI(params *CLIParams) error {
 		BashRunTimeout:    params.BashRunTimeout,
 		AllowedPaths:      params.VFSAllow,
 		MaxToolThreads:    params.MaxThreads,
+		MCPEnable:         params.MCPEnable,
+		MCPDisable:        params.MCPDisable,
 	})
 	if err != nil {
 		return err
@@ -871,6 +883,33 @@ func parseVFSAllowPaths(values []string) []string {
 			}
 		}
 	}
+	return result
+}
+
+// parseMCPServerFlagValues parses repeated --mcp-enable/--mcp-disable values.
+// It accepts repeated flags and comma-separated names in each value.
+func parseMCPServerFlagValues(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		parts := strings.Split(value, ",")
+		for _, part := range parts {
+			name := strings.TrimSpace(part)
+			if name == "" {
+				continue
+			}
+			if _, exists := seen[name]; exists {
+				continue
+			}
+			seen[name] = struct{}{}
+			result = append(result, name)
+		}
+	}
+
 	return result
 }
 

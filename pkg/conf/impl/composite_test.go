@@ -10,6 +10,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestParseConfigPath(t *testing.T) {
@@ -611,6 +612,48 @@ func TestCompositeConfigStore_GetMCPServerConfigs_MergesWithTransportFields(t *t
 	configs2, err := composite.GetMCPServerConfigs()
 	require.NoError(t, err)
 	assert.Equal(t, "token", configs2["srv"].APIKey)
+}
+
+func TestCompositeConfigStore_GetMCPServerConfigs_MergesEnabledFieldOnlyWhenConfigured(t *testing.T) {
+	store1 := NewMockConfigStore()
+	store2 := NewMockConfigStore()
+
+	store1.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{
+		"srv": {
+			Enabled: true,
+			Cmd:     "base",
+		},
+	})
+
+	// override with field omitted should keep base enabled=true
+	overrideNoEnabled := &conf.MCPServerConfig{}
+	require.NoError(t, yaml.Unmarshal([]byte("cmd: override\n"), overrideNoEnabled))
+	store2.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{"srv": overrideNoEnabled})
+
+	composite := &CompositeConfigStore{
+		stores:             []conf.ConfigStore{store1, store2},
+		storeGlobalUpdates: make([]time.Time, 2),
+		storeModelUpdates:  make([]time.Time, 2),
+		storeMCPUpdates:    make([]time.Time, 2),
+		storeRoleUpdates:   make([]time.Time, 2),
+	}
+	require.NoError(t, composite.refresh())
+
+	configs, err := composite.GetMCPServerConfigs()
+	require.NoError(t, err)
+	require.Contains(t, configs, "srv")
+	assert.True(t, configs["srv"].Enabled)
+	assert.Equal(t, "override", configs["srv"].Cmd)
+
+	// explicit false should override
+	overrideDisabled := &conf.MCPServerConfig{}
+	require.NoError(t, yaml.Unmarshal([]byte("enabled: false\n"), overrideDisabled))
+	store2.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{"srv": overrideDisabled})
+
+	require.NoError(t, composite.refresh())
+	configs, err = composite.GetMCPServerConfigs()
+	require.NoError(t, err)
+	assert.False(t, configs["srv"].Enabled)
 }
 
 func TestCompositeConfigStore_CopyProtection(t *testing.T) {

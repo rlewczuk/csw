@@ -114,6 +114,10 @@ type BuildSystemParams struct {
 	AllowedPaths []string
 	// MaxToolThreads overrides max parallel tool executions. When <=0, value from config is used.
 	MaxToolThreads int
+	// MCPEnable lists MCP server names to force-enable for this run.
+	MCPEnable []string
+	// MCPDisable lists MCP server names to force-disable for this run.
+	MCPDisable []string
 }
 
 // BuildSystemResult contains outputs from building a SweSystem.
@@ -451,6 +455,12 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: role not found: %s (available: %v)", params.RoleName, roleRegistry.List())
 	}
 
+	configStore, err = buildRuntimeMCPConfigStore(configStore, roleConfig.MCPServers, params.MCPEnable, params.MCPDisable)
+	if err != nil {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to build runtime mcp config: %w", err)
+	}
+
 	hidePatterns, err := vfs.BuildHidePatterns(workDir, roleConfig.HiddenPatterns)
 	if err != nil {
 		logging.FlushLogs()
@@ -676,6 +686,160 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	cleanupOnError = false
 
 	return sweSystem, result, nil
+}
+
+type runtimeMCPConfigStore struct {
+	base                 conf.ConfigStore
+	mcpServerConfigs     map[string]*conf.MCPServerConfig
+	mcpServerConfigsTime time.Time
+}
+
+func (s *runtimeMCPConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelProviderConfig, error) {
+	return s.base.GetModelProviderConfigs()
+}
+
+func (s *runtimeMCPConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
+	return s.base.LastModelProviderConfigsUpdate()
+}
+
+func (s *runtimeMCPConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfig, error) {
+	return s.base.GetAgentRoleConfigs()
+}
+
+func (s *runtimeMCPConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
+	return s.base.LastAgentRoleConfigsUpdate()
+}
+
+func (s *runtimeMCPConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
+	return s.base.GetGlobalConfig()
+}
+
+func (s *runtimeMCPConfigStore) LastGlobalConfigUpdate() (time.Time, error) {
+	return s.base.LastGlobalConfigUpdate()
+}
+
+func (s *runtimeMCPConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
+	cloned := make(map[string]*conf.MCPServerConfig, len(s.mcpServerConfigs))
+	for key, value := range s.mcpServerConfigs {
+		cloned[key] = value.Clone()
+	}
+
+	return cloned, nil
+}
+
+func (s *runtimeMCPConfigStore) LastMCPServerConfigsUpdate() (time.Time, error) {
+	return s.mcpServerConfigsTime, nil
+}
+
+func (s *runtimeMCPConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
+	return s.base.GetHookConfigs()
+}
+
+func (s *runtimeMCPConfigStore) LastHookConfigsUpdate() (time.Time, error) {
+	return s.base.LastHookConfigsUpdate()
+}
+
+func (s *runtimeMCPConfigStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
+	return s.base.GetAgentConfigFile(subdir, filename)
+}
+
+func buildRuntimeMCPConfigStore(base conf.ConfigStore, roleMCPServers []string, mcpEnable []string, mcpDisable []string) (conf.ConfigStore, error) {
+	if base == nil {
+		return nil, fmt.Errorf("buildRuntimeMCPConfigStore() [bootstrap.go]: base config store is nil")
+	}
+
+	enableNames := normalizeMCPServerNames(mcpEnable)
+	disableNames := normalizeMCPServerNames(mcpDisable)
+	hasFlagOverrides := len(enableNames) > 0 || len(disableNames) > 0
+	if !hasFlagOverrides {
+		enableNames = normalizeMCPServerNames(roleMCPServers)
+	}
+
+	if len(enableNames) == 0 && len(disableNames) == 0 {
+		return base, nil
+	}
+
+	configs, err := base.GetMCPServerConfigs()
+	if err != nil {
+		return nil, fmt.Errorf("buildRuntimeMCPConfigStore() [bootstrap.go]: failed to load mcp configs: %w", err)
+	}
+
+	adjusted, err := applyMCPServerOverrides(configs, enableNames, disableNames, hasFlagOverrides)
+	if err != nil {
+		return nil, err
+	}
+
+	return &runtimeMCPConfigStore{
+		base:                 base,
+		mcpServerConfigs:     adjusted,
+		mcpServerConfigsTime: time.Now(),
+	}, nil
+}
+
+func applyMCPServerOverrides(configs map[string]*conf.MCPServerConfig, enableNames []string, disableNames []string, hasFlagOverrides bool) (map[string]*conf.MCPServerConfig, error) {
+	cloned := make(map[string]*conf.MCPServerConfig, len(configs))
+	for key, value := range configs {
+		cloned[key] = value.Clone()
+	}
+
+	for _, name := range enableNames {
+		cfg, ok := cloned[name]
+		if !ok {
+			return nil, fmt.Errorf("applyMCPServerOverrides() [bootstrap.go]: mcp server %q is not configured", name)
+		}
+		cfg.Enabled = true
+	}
+
+	for _, name := range disableNames {
+		cfg, ok := cloned[name]
+		if !ok {
+			return nil, fmt.Errorf("applyMCPServerOverrides() [bootstrap.go]: mcp server %q is not configured", name)
+		}
+		cfg.Enabled = false
+	}
+
+	if hasFlagOverrides {
+		return cloned, nil
+	}
+
+	enabledSet := make(map[string]struct{}, len(enableNames))
+	for _, name := range enableNames {
+		enabledSet[name] = struct{}{}
+	}
+	for name, cfg := range cloned {
+		if _, ok := enabledSet[name]; ok {
+			cfg.Enabled = true
+			continue
+		}
+		cfg.Enabled = false
+	}
+
+	return cloned, nil
+}
+
+func normalizeMCPServerNames(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		parts := strings.Split(value, ",")
+		for _, part := range parts {
+			name := strings.TrimSpace(part)
+			if name == "" {
+				continue
+			}
+			if _, exists := seen[name]; exists {
+				continue
+			}
+			seen[name] = struct{}{}
+			result = append(result, name)
+		}
+	}
+
+	return result
 }
 
 // containerRuntimeConfig describes effective container runtime setup.

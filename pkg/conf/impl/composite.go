@@ -466,7 +466,12 @@ func (c *CompositeConfigStore) refreshMCPServerConfigs() error {
 		}
 
 		for key, value := range configs {
-			merged[key] = value.Clone()
+			existing, ok := merged[key]
+			if !ok {
+				merged[key] = value.Clone()
+				continue
+			}
+			existing.Merge(value)
 		}
 
 		lastUpdate, err := store.LastMCPServerConfigsUpdate()
