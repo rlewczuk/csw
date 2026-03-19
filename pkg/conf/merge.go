@@ -699,6 +699,7 @@ func (c *MCPServerConfig) Clone() *MCPServerConfig {
 	}
 
 	cloned := &MCPServerConfig{
+		Name:      c.Name,
 		Description: c.Description,
 		Transport: c.Transport,
 		URL:       c.URL,
@@ -731,6 +732,9 @@ func (c *MCPServerConfig) Merge(override *MCPServerConfig) {
 
 	if strings.TrimSpace(override.Description) != "" {
 		c.Description = override.Description
+	}
+	if strings.TrimSpace(override.Name) != "" {
+		c.Name = override.Name
 	}
 	if strings.TrimSpace(string(override.Transport)) != "" {
 		c.Transport = override.Transport

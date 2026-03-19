@@ -420,6 +420,9 @@ func (s *EmbeddedConfigStore) loadMCPServerConfigs() error {
 			return fmt.Errorf("loadMCPServerConfigs() [embedded.go]: failed to parse %s: %w", serverPath, unmarshalErr)
 		}
 
+		if strings.TrimSpace(config.Name) == "" {
+			config.Name = serverName
+		}
 		configs[serverName] = &config
 		loadedServers[serverName] = true
 	}
@@ -445,6 +448,9 @@ func (s *EmbeddedConfigStore) loadMCPServerConfigs() error {
 			return fmt.Errorf("loadMCPServerConfigs() [embedded.go]: failed to parse %s: %w", serverPath, unmarshalErr)
 		}
 
+		if strings.TrimSpace(config.Name) == "" {
+			config.Name = serverName
+		}
 		configs[serverName] = &config
 	}
 

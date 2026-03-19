@@ -393,6 +393,26 @@ func TestLocalConfigStore_MCPServerConfigs(t *testing.T) {
 		require.Contains(t, nestedConfigs, "default-disabled")
 		assert.False(t, nestedConfigs["default-disabled"].Enabled)
 	})
+
+	t.Run("missing name field defaults to filename without extension", func(t *testing.T) {
+		tmpDirNested := t.TempDir()
+		mcpDirNested := filepath.Join(tmpDirNested, "mcp")
+		require.NoError(t, os.MkdirAll(mcpDirNested, 0o755))
+
+		require.NoError(t, os.WriteFile(filepath.Join(mcpDirNested, "local-files.yml"), []byte("description: no name field\ncmd: local-files\nenabled: true\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(mcpDirNested, "remote-api.json"), []byte(`{"description":"no name field","url":"https://example.com/mcp","transport":"https","enabled":true}`), 0o644))
+
+		storeNested, nestedErr := NewLocalConfigStore(tmpDirNested)
+		require.NoError(t, nestedErr)
+		defer storeNested.Close()
+
+		nestedConfigs, nestedErr := storeNested.GetMCPServerConfigs()
+		require.NoError(t, nestedErr)
+		require.Contains(t, nestedConfigs, "local-files")
+		require.Contains(t, nestedConfigs, "remote-api")
+		assert.Equal(t, "local-files", nestedConfigs["local-files"].Name)
+		assert.Equal(t, "remote-api", nestedConfigs["remote-api"].Name)
+	})
 }
 
 func TestLocalConfigStore_HookConfigsNameMismatchDisablesHook(t *testing.T) {

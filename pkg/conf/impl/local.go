@@ -591,6 +591,9 @@ func (s *LocalConfigStore) loadMCPServerConfigs() error {
 		}
 
 		baseName := entry.Name()[:len(entry.Name())-len(ext)]
+		if strings.TrimSpace(config.Name) == "" {
+			config.Name = baseName
+		}
 		configs[baseName] = &config
 		loadedServers[baseName] = true
 	}
@@ -616,6 +619,9 @@ func (s *LocalConfigStore) loadMCPServerConfigs() error {
 			return fmt.Errorf("loadMCPServerConfigs() [local.go]: failed to parse %s: %w", serverPath, unmarshalErr)
 		}
 
+		if strings.TrimSpace(config.Name) == "" {
+			config.Name = baseName
+		}
 		configs[baseName] = &config
 	}
 
