@@ -67,7 +67,7 @@ headers:
 ## CLI setup example
 
 ```bash
-csw conf provider add jetbrains \
+csw provider add jetbrains \
   --type jetbrains \
   --url https://api.jetbrains.ai \
   --api-key "YOUR_GRAZIE_AUTHENTICATE_JWT" \

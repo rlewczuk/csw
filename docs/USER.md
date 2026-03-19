@@ -112,8 +112,8 @@ Useful flags:
 
 Provider diagnostics (outside session runtime):
 
-- `csw conf provider test ... --verbose`
-- `csw conf provider models ... --verbose`
+- `csw provider test ... --verbose`
+- `csw provider models ... --verbose`
 
 ---
 
@@ -125,6 +125,16 @@ Provider diagnostics (outside session runtime):
 - default CLI behavior
 - roles (prompt fragments, permissions, tool access)
 - custom tools and their runtime behavior
+- MCP server integration
+- lifecycle hooks and automation
+
+Detailed references:
+
+- [docs/PROVIDERS.md](PROVIDERS.md)
+- [docs/ROLES.md](ROLES.md)
+- [docs/TOOLS.md](TOOLS.md)
+- [docs/MCP.md](MCP.md)
+- [docs/HOOKS.md](HOOKS.md)
 
 ### Configuration hierarchy and file locations
 
@@ -169,92 +179,23 @@ Typical config layout:
       jiraSearch.yaml
       jiraSearch.md
       jiraSearch.schema.json
+  mcp/
+    local-filesystem.yml
+    remote-http.yml
+  hooks/
+    pre_run/
+      pre_run.yml
+      prompt_builder.sh
+    summary/
+      summary.yml
 ```
 
-### Configure providers (including OAuth)
+### Providers
 
-#### Basic provider management commands
+Provider setup, OAuth flow, file reference, and provider command reference moved to:
 
-```bash
-csw conf provider list
-csw conf provider show <provider-name>
-csw conf provider set-default <provider-name>
-csw conf provider remove <provider-name>
-```
-
-Scopes for write commands:
-
-- `--local` (default, project config)
-- `--global`
-- `--to <custom-config-dir>`
-
-#### Example: local Ollama provider
-
-```bash
-csw conf provider add ollama-local \
-  --type ollama \
-  --url http://localhost:11434 \
-  --description "Local Ollama"
-
-csw conf provider set-default ollama-local
-```
-
-#### Example: OpenAI Codex-style provider with OAuth
-
-Create provider config using JSON mode:
-
-```bash
-cat <<'JSON' | csw conf provider add openai-codex --json
-{
-  "type": "openai",
-  "name": "openai-codex",
-  "description": "OpenAI Codex via OAuth",
-  "url": "https://api.openai.com/v1",
-  "auth_mode": "oauth2",
-  "auth_url": "https://auth.openai.com/oauth/authorize",
-  "token_url": "https://auth.openai.com/oauth/token",
-  "client_id": "YOUR_CLIENT_ID"
-}
-JSON
-```
-
-Run OAuth flow:
-
-```bash
-csw conf provider auth openai-codex
-```
-
-`csw` opens a localhost callback flow (`http://localhost:1455/auth/callback`) and stores access/refresh tokens in provider config.
-
-#### JetBrains AI provider
-
-CSW supports `jetbrains` provider type for JetBrains private AI endpoint integration.
-
-See full setup guide, token acquisition, and sample config in:
-
-- [docs/JETBRAINS.md](JETBRAINS.md)
-
-#### Validate provider setup
-
-List models:
-
-```bash
-csw conf provider models
-csw conf provider models openai-codex
-```
-
-Test one provider/model pair:
-
-```bash
-csw conf provider test openai-codex gpt-5-codex
-```
-
-With protocol-level diagnostics:
-
-```bash
-csw conf provider test openai-codex gpt-5-codex --verbose
-csw conf provider models openai-codex --verbose
-```
+- [docs/PROVIDERS.md](PROVIDERS.md)
+- [docs/JETBRAINS.md](JETBRAINS.md) (JetBrains-specific setup)
 
 ### Configure defaults for CLI options
 
@@ -286,86 +227,29 @@ Supported CLI defaults:
 - `defaults.thinking`
 - `defaults.lsp-server`
 
-### Configure custom roles
+### Roles
 
-Use role commands for inspection/debugging:
+Role configuration (permissions, prompt fragments, `mcp-servers`) and command reference moved to:
 
-```bash
-csw conf role list
-csw conf role show developer
-csw conf role show developer --system-prompt --model openai-codex/gpt-5-codex
-csw conf role set-default developer
-csw conf role get-default
-```
+- [docs/ROLES.md](ROLES.md)
 
-Define a custom role by adding files under `roles/<role-name>/`.
+### Tools
 
-Example `roles/debugger/config.yml`:
+Custom tool configuration and `csw tool` command reference moved to:
 
-```yaml
-name: debugger
-description: Debug-focused role with strict execution style
-vfs-privileges:
-  "**":
-    read: allow
-    write: allow
-    delete: ask
-    list: allow
-    find: allow
-    move: ask
-tools-access:
-  "**": allow
-run-privileges:
-  "rm*": deny
-  ".*": allow
-```
+- [docs/TOOLS.md](TOOLS.md)
 
-Add prompt fragments such as `roles/debugger/10-system.md`, `20-style.md`, etc.
+### MCP
 
-### Configure custom tools
+MCP server configuration, role integration, runtime flags, and `csw mcp` diagnostics are documented in:
 
-Custom tools are loaded from:
+- [docs/MCP.md](MCP.md)
 
-```text
-<config-root>/tools/<tool-name>/<tool-name>.json|yaml|yml
-```
+### Hooks
 
-Optional companion files:
+Hook configuration, hook types (`shell`, `llm`, `subagent`), `--hook` runtime overrides, and feedback mechanism are documented in:
 
-- `<tool-name>.md` (tool description)
-- `<tool-name>.schema.json` (tool schema)
-
-Example custom tool config `tools/jiraSearch/jiraSearch.yaml`:
-
-```yaml
-command:
-  - "python3"
-  - "{{ .tooldir }}/jira_search.py"
-  - "{{ .arg.query }}"
-cwd: "{{ .workdir }}"
-env:
-  JIRA_URL: "https://jira.example.com"
-  JIRA_TOKEN: "{{ .arg.token }}"
-result:
-  matches: "{{ .stdout }}"
-error: "jiraSearch failed (exit={{ .exitCode }}): {{ .stderr }}"
-timeout: "60s"
-loglevel: "info"
-roles:
-  - developer
-  - debugger
-```
-
-Then inspect/debug via:
-
-```bash
-csw conf tool list
-csw conf tool list --role debugger
-csw conf tool info jiraSearch
-csw conf tool desc jiraSearch
-```
-
-Also ensure role access allows the tool in `roles/<role>/config.yml` (`tools-access`).
+- [docs/HOOKS.md](HOOKS.md)
 
 ---
 
@@ -429,42 +313,23 @@ Config path controls:
 - `--project-config <dir>`
 - `--config-path <dir1:dir2:...>`
 
-### `csw conf` reference
+### Provider/Role/Tool/MCP reference
 
-### `csw conf provider`
+### `csw provider`
 
-Subcommands:
+See: [docs/PROVIDERS.md](PROVIDERS.md)
 
-- `list`
-- `show <provider-name>`
-- `add <provider-name> [--type --url --description --api-key --header key=value]`
-- `remove <provider-name>`
-- `set-default <provider-name>`
-- `test <provider-name> <model-name> [--streaming] [--verbose]`
-- `auth <provider-name>`
-- `models [provider] [--verbose]`
+### `csw role`
 
-Persistent flags:
+See: [docs/ROLES.md](ROLES.md)
 
-- `--json`
-- `--local` / `--global` / `--to <path>`
+### `csw tool`
 
-### `csw conf role`
+See: [docs/TOOLS.md](TOOLS.md)
 
-Subcommands:
+### `csw mcp`
 
-- `list [--json]`
-- `show <role> [--json] [--system-prompt] [--model <provider/model>]`
-- `set-default <role> [--local|--global|--to]`
-- `get-default [--json]`
-
-### `csw conf tool`
-
-Subcommands:
-
-- `list [--role <role>] [--json]`
-- `info <tool-name> [--json]`
-- `desc <tool-name> [--json]`
+See: [docs/MCP.md](MCP.md)
 
 ### `csw clean` reference
 
@@ -499,40 +364,23 @@ Top-level keys:
 
 ### `models/<provider>.json|yml`
 
-Main keys:
-
-- `type`, `name`, `description`, `url`
-- `api_key`, `headers`, `query_params`
-- `connect_timeout`, `request_timeout`
-- generation defaults (`default_temperature`, etc.)
-- `model_tags`
-- OAuth keys: `auth_mode`, `auth_url`, `token_url`, `client_id`, `client_secret`, `refresh_token`
+See provider schema reference: [docs/PROVIDERS.md](PROVIDERS.md)
 
 ### `roles/<role>/config.json|yml`
 
-Main keys:
-
-- `name`, `description`
-- `vfs-privileges`
-- `tools-access`
-- `run-privileges`
-- `hidden-patterns`
-
-Role prompt files:
-
-- `roles/<role>/*.md` are prompt fragments.
-- `roles/all/` acts as common role layer.
+See role schema reference: [docs/ROLES.md](ROLES.md)
 
 ### `tools/<tool>/...`
 
-Custom tool definition file:
+See custom tools schema reference: [docs/TOOLS.md](TOOLS.md)
 
-- `<tool>.json`, `<tool>.yaml`, or `<tool>.yml`
+### `mcp/<server>.json|yml`
 
-Tool fragment helpers:
+See MCP schema reference: [docs/MCP.md](MCP.md)
 
-- `<tool>.md` (description)
-- `<tool>.schema.json` (schema)
+### `hooks/<hook-name>/<hook-name>.json|yml`
+
+See hooks schema reference: [docs/HOOKS.md](HOOKS.md)
 
 ---
 
