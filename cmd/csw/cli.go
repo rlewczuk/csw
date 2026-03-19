@@ -176,14 +176,6 @@ func CliCommand() *cobra.Command {
 				return err
 			}
 
-			if prompt != "" {
-				renderedPrompt, renderErr := renderPromptWithContext(prompt, contextData)
-				if renderErr != nil {
-					return renderErr
-				}
-				prompt = strings.TrimSpace(renderedPrompt)
-			}
-
 			if resumeTarget == "" {
 				if prompt == "" {
 					return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
@@ -450,6 +442,20 @@ func runCLI(params *CLIParams) error {
 	params.WorkDir = buildResult.WorkDir
 	params.ShadowDir = buildResult.ShadowDir
 	params.ModelName = buildResult.ModelName
+	hookConfigStore, err := buildRuntimeHookConfigStore(sweSystem.ConfigStore, params.HookOverrides)
+	if err != nil {
+		return err
+	}
+	hookEngine := core.NewHookEngine(
+		hookConfigStore,
+		core.NewDefaultHookRunner(chooseGitDiffDir(buildResult.WorkDirRoot, buildResult.WorkDir)),
+		buildResult.ShellRunner,
+		sweSystem.ModelProviders,
+	)
+	if err := preparePromptWithPreRunHook(ctx, params, buildResult.WorkDirRoot, hookEngine); err != nil {
+		return err
+	}
+
 	cliSlug := strings.TrimSpace(buildResult.WorktreeBranch)
 	if cliSlug == "" {
 		cliSlug = "main"
@@ -514,25 +520,6 @@ func runCLI(params *CLIParams) error {
 	}
 
 	var finalizeResult worktreeFinalizeResult
-	hookConfigStore, err := buildRuntimeHookConfigStore(sweSystem.ConfigStore, params.HookOverrides)
-	if err != nil {
-		return err
-	}
-
-	hookEngine := core.NewHookEngine(
-		hookConfigStore,
-		core.NewDefaultHookRunner(chooseGitDiffDir(buildResult.WorkDirRoot, buildResult.WorkDir)),
-		buildResult.ShellRunner,
-		sweSystem.ModelProviders,
-	)
-	hookEngine.MergeContext(map[string]string{
-		"branch":  strings.TrimSpace(buildResult.WorktreeBranch),
-		"workdir": strings.TrimSpace(buildResult.WorkDir),
-		"rootdir": strings.TrimSpace(buildResult.WorkDirRoot),
-		"status":  string(core.HookSessionStatusRunning),
-		"user_prompt": strings.TrimSpace(params.Prompt),
-	})
-	hookEngine.MergeContext(params.ContextData)
 	finalizeResult, finalizeErr := finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt, hookEngine, appView)
 	if finalizeErr != nil {
 		sessionRunErr = finalizeErr
@@ -929,6 +916,51 @@ func renderPromptWithContext(prompt string, contextData map[string]string) (stri
 	}
 
 	return rendered.String(), nil
+}
+
+func preparePromptWithPreRunHook(ctx context.Context, params *CLIParams, workDirRoot string, hookEngine *core.HookEngine) error {
+	if params == nil {
+		return fmt.Errorf("preparePromptWithPreRunHook() [cli.go]: params is nil")
+	}
+	if hookEngine == nil {
+		if strings.TrimSpace(params.Prompt) == "" {
+			return nil
+		}
+
+		renderedPrompt, err := renderPromptWithContext(params.Prompt, params.ContextData)
+		if err != nil {
+			return err
+		}
+		params.Prompt = strings.TrimSpace(renderedPrompt)
+
+		return nil
+	}
+
+	hookEngine.MergeContext(map[string]string{
+		"branch":      strings.TrimSpace(params.WorktreeBranch),
+		"workdir":     strings.TrimSpace(params.WorkDir),
+		"rootdir":     strings.TrimSpace(workDirRoot),
+		"status":      string(core.HookSessionStatusRunning),
+		"user_prompt": strings.TrimSpace(params.Prompt),
+	})
+	hookEngine.MergeContext(params.ContextData)
+
+	if _, err := hookEngine.Execute(ctx, core.HookExecutionRequest{Name: "pre_run"}); err != nil {
+		return fmt.Errorf("preparePromptWithPreRunHook() [cli.go]: pre_run hook execution failed: %w", err)
+	}
+
+	if strings.TrimSpace(params.Prompt) == "" {
+		return nil
+	}
+
+	renderedPrompt, err := renderPromptWithContext(params.Prompt, hookEngine.ContextData())
+	if err != nil {
+		return err
+	}
+	params.Prompt = strings.TrimSpace(renderedPrompt)
+	hookEngine.SetContextValue("user_prompt", params.Prompt)
+
+	return nil
 }
 
 type runtimeHookConfigStore struct {

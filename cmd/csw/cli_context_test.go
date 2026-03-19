@@ -139,7 +139,7 @@ func TestRenderPromptWithContext(t *testing.T) {
 	}
 }
 
-func TestCLIContextFlagPropagationAndPromptRendering(t *testing.T) {
+func TestCLIContextFlagPropagation(t *testing.T) {
 	tests := []struct {
 		name              string
 		args              []string
@@ -149,27 +149,21 @@ func TestCLIContextFlagPropagationAndPromptRendering(t *testing.T) {
 		expectedErrorText string
 	}{
 		{
-			name:           "long flag renders prompt",
+			name:           "long flag passes template prompt and context",
 			args:           []string{"--context=NAME=World", "Hello {{.NAME}}"},
-			expectedPrompt: "Hello World",
+			expectedPrompt: "Hello {{.NAME}}",
 			expectedContext: map[string]string{
 				"NAME": "World",
 			},
 		},
 		{
-			name:           "short flag and repeated entries",
+			name:           "short flag and repeated entries pass raw template",
 			args:           []string{"-c", "PROJECT=csw", "-c", "TASK=tests", "Fix {{.TASK}} in {{.PROJECT}}"},
-			expectedPrompt: "Fix tests in csw",
+			expectedPrompt: "Fix {{.TASK}} in {{.PROJECT}}",
 			expectedContext: map[string]string{
 				"PROJECT": "csw",
 				"TASK":    "tests",
 			},
-		},
-		{
-			name:              "missing template key fails",
-			args:              []string{"-c", "NAME=World", "Hello {{.MISSING}}"},
-			expectError:       true,
-			expectedErrorText: "failed to render prompt template",
 		},
 		{
 			name:              "invalid context format fails",
