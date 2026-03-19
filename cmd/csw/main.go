@@ -39,7 +39,9 @@ func main() {
 	rootCmd.Flags().BoolVar(&logLLMRequests, "log-llm-requests", false, "Log LLM requests and responses")
 
 	// Add subcommands
-	rootCmd.AddCommand(ConfCommand())
+	rootCmd.AddCommand(ProviderCommand())
+	rootCmd.AddCommand(RoleCommand())
+	rootCmd.AddCommand(ToolCommand())
 	rootCmd.AddCommand(CliCommand())
 	rootCmd.AddCommand(CleanCommand())
 	rootCmd.AddCommand(McpCommand())

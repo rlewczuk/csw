@@ -532,13 +532,13 @@ func TestConfToolCommandsIncludeVFSList(t *testing.T) {
 		return buf.String()
 	}
 
-	listOutput := runAndCapture([]string{"conf", "tool", "list", "--json"})
+	listOutput := runAndCapture([]string{"tool", "list", "--json"})
 	assert.Contains(t, listOutput, "\"name\": \"vfsList\"")
 
-	infoOutput := runAndCapture([]string{"conf", "tool", "info", "vfsList"})
+	infoOutput := runAndCapture([]string{"tool", "info", "vfsList"})
 	assert.Contains(t, infoOutput, "name: vfsList")
 
-	descOutput := runAndCapture([]string{"conf", "tool", "desc", "vfsList"})
+	descOutput := runAndCapture([]string{"tool", "desc", "vfsList"})
 	assert.Contains(t, descOutput, "Lists files and directories")
 }
 
@@ -546,7 +546,9 @@ func mainRootCommandForTest() *cobra.Command {
 	cmd := &cobra.Command{Use: "csw", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	}}
-	cmd.AddCommand(ConfCommand())
+	cmd.AddCommand(ProviderCommand())
+	cmd.AddCommand(RoleCommand())
+	cmd.AddCommand(ToolCommand())
 	cmd.AddCommand(CliCommand())
 	cmd.AddCommand(CleanCommand())
 	return cmd
