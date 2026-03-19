@@ -412,6 +412,7 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 
 	t.Run("mcp server clone preserves and copies transport fields", func(t *testing.T) {
 		cfg := &MCPServerConfig{
+			Description: "server description",
 			Transport: MCPTransportTypeHTTPS,
 			URL:       "https://example.com/mcp",
 			APIKey:    "secret",
@@ -424,6 +425,7 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 
 		clone := cfg.Clone()
 		require.NotNil(t, clone)
+		assert.Equal(t, "server description", clone.Description)
 		assert.Equal(t, MCPTransportTypeHTTPS, clone.Transport)
 		assert.Equal(t, "https://example.com/mcp", clone.URL)
 		assert.Equal(t, "secret", clone.APIKey)

@@ -699,6 +699,7 @@ func (c *MCPServerConfig) Clone() *MCPServerConfig {
 	}
 
 	cloned := &MCPServerConfig{
+		Description: c.Description,
 		Transport: c.Transport,
 		URL:       c.URL,
 		APIKey:    c.APIKey,

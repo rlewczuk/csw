@@ -168,6 +168,8 @@ type ContainerConfig struct {
 
 // MCPServerConfig defines configuration for running a local MCP server.
 type MCPServerConfig struct {
+	// Description is optional human-readable server description.
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 	// Transport defines MCP transport type: stdio, http, or https.
 	// Empty value defaults to stdio.
 	Transport MCPTransportType `json:"transport,omitempty" yaml:"transport,omitempty"`

@@ -347,8 +347,8 @@ func TestLocalConfigStore_MCPServerConfigs(t *testing.T) {
 	mcpDir := filepath.Join(tmpDir, "mcp")
 	require.NoError(t, os.MkdirAll(mcpDir, 0o755))
 
-	jsonConfig := `{"enabled":true,"transport":"http","url":"http://json.example/mcp","api_key":"json-key"}`
-	yamlConfig := "enabled: true\ntransport: https\nurl: https://yaml.example/mcp\napi_key: yaml-key\n"
+	jsonConfig := `{"description":"JSON server","enabled":true,"transport":"http","url":"http://json.example/mcp","api_key":"json-key"}`
+	yamlConfig := "description: YAML server\nenabled: true\ntransport: https\nurl: https://yaml.example/mcp\napi_key: yaml-key\n"
 
 	require.NoError(t, os.WriteFile(filepath.Join(mcpDir, "json-srv.json"), []byte(jsonConfig), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(mcpDir, "yaml-srv.yml"), []byte(yamlConfig), 0o644))
@@ -363,12 +363,14 @@ func TestLocalConfigStore_MCPServerConfigs(t *testing.T) {
 
 	jsonSrv, ok := configs["json-srv"]
 	require.True(t, ok)
+	assert.Equal(t, "JSON server", jsonSrv.Description)
 	assert.Equal(t, conf.MCPTransportTypeHTTP, jsonSrv.Transport)
 	assert.Equal(t, "http://json.example/mcp", jsonSrv.URL)
 	assert.Equal(t, "json-key", jsonSrv.APIKey)
 
 	yamlSrv, ok := configs["yaml-srv"]
 	require.True(t, ok)
+	assert.Equal(t, "YAML server", yamlSrv.Description)
 	assert.Equal(t, conf.MCPTransportTypeHTTPS, yamlSrv.Transport)
 	assert.Equal(t, "https://yaml.example/mcp", yamlSrv.URL)
 	assert.Equal(t, "yaml-key", yamlSrv.APIKey)
