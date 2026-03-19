@@ -23,12 +23,14 @@ func TestBuildQualifiedToolName(t *testing.T) {
 }
 
 func TestCompileToolMatchers(t *testing.T) {
-	matchers, err := compileToolMatchers([]string{"^read", "write$"})
+	matchers, err := compileToolMatchers([]string{"read_file", "write_*"})
 	require.NoError(t, err)
 	require.Len(t, matchers, 2)
-	assert.True(t, isToolEnabled("read_file", []string{"^read", "write$"}, matchers))
-	assert.True(t, isToolEnabled("mywrite", []string{"^read", "write$"}, matchers))
-	assert.False(t, isToolEnabled("list", []string{"^read", "write$"}, matchers))
+	assert.True(t, isToolEnabled("read_file", []string{"read_file", "write_*"}, matchers))
+	assert.True(t, isToolEnabled("write_file", []string{"read_file", "write_*"}, matchers))
+	assert.False(t, isToolEnabled("list", []string{"read_file", "write_*"}, matchers))
+	assert.True(t, isToolEnabled("list", nil, nil))
+	assert.True(t, isToolEnabled("list", []string{}, nil))
 
 	_, err = compileToolMatchers([]string{"["})
 	require.Error(t, err)
@@ -168,7 +170,7 @@ func TestNewManagerStartsEnabledServerAndRunsTool(t *testing.T) {
 	assert.True(t, mockClient.closed)
 }
 
-func TestNewManagerFiltersToolsByRegex(t *testing.T) {
+func TestNewManagerFiltersToolsByGlob(t *testing.T) {
 	original := newClientFunc
 	t.Cleanup(func() { newClientFunc = original })
 
@@ -182,7 +184,7 @@ func TestNewManagerFiltersToolsByRegex(t *testing.T) {
 
 	store := confimpl.NewMockConfigStore()
 	store.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{
-		"srv": {Enabled: true, Transport: conf.MCPTransportTypeStdio, Cmd: "dummy", Tools: []string{"^read_"}},
+		"srv": {Enabled: true, Transport: conf.MCPTransportTypeStdio, Cmd: "dummy", Tools: []string{"read_*"}},
 	})
 
 	manager, err := NewManager(store)
@@ -193,6 +195,75 @@ func TestNewManagerFiltersToolsByRegex(t *testing.T) {
 	_, hasWrite := infos["mcp.srv.write_file"]
 	assert.True(t, hasRead)
 	assert.False(t, hasWrite)
+}
+
+func TestNewManagerFiltersToolsByExactName(t *testing.T) {
+	original := newClientFunc
+	t.Cleanup(func() { newClientFunc = original })
+
+	mockClient := &stubClient{tools: []RemoteTool{
+		{Name: "read_file", InputSchema: map[string]any{"type": "object"}},
+		{Name: "write_file", InputSchema: map[string]any{"type": "object"}},
+	}}
+	newClientFunc = func(name string, cfg *conf.MCPServerConfig) (client, error) {
+		return mockClient, nil
+	}
+
+	store := confimpl.NewMockConfigStore()
+	store.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{
+		"srv": {Enabled: true, Transport: conf.MCPTransportTypeStdio, Cmd: "dummy", Tools: []string{"write_file"}},
+	})
+
+	manager, err := NewManager(store)
+	require.NoError(t, err)
+	infos := manager.ToolInfos()
+	require.Len(t, infos, 1)
+	_, hasRead := infos["mcp.srv.read_file"]
+	_, hasWrite := infos["mcp.srv.write_file"]
+	assert.False(t, hasRead)
+	assert.True(t, hasWrite)
+}
+
+func TestNewManagerWithEmptyToolsFilterKeepsAllTools(t *testing.T) {
+	original := newClientFunc
+	t.Cleanup(func() { newClientFunc = original })
+
+	mockClient := &stubClient{tools: []RemoteTool{
+		{Name: "read_file", InputSchema: map[string]any{"type": "object"}},
+		{Name: "write_file", InputSchema: map[string]any{"type": "object"}},
+	}}
+	newClientFunc = func(name string, cfg *conf.MCPServerConfig) (client, error) {
+		return mockClient, nil
+	}
+
+	store := confimpl.NewMockConfigStore()
+	store.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{
+		"srv": {Enabled: true, Transport: conf.MCPTransportTypeStdio, Cmd: "dummy", Tools: []string{}},
+	})
+
+	manager, err := NewManager(store)
+	require.NoError(t, err)
+	infos := manager.ToolInfos()
+	require.Len(t, infos, 2)
+}
+
+func TestNewManagerWithInvalidGlobReturnsError(t *testing.T) {
+	original := newClientFunc
+	t.Cleanup(func() { newClientFunc = original })
+
+	mockClient := &stubClient{tools: []RemoteTool{{Name: "read_file", InputSchema: map[string]any{"type": "object"}}}}
+	newClientFunc = func(name string, cfg *conf.MCPServerConfig) (client, error) {
+		return mockClient, nil
+	}
+
+	store := confimpl.NewMockConfigStore()
+	store.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{
+		"srv": {Enabled: true, Transport: conf.MCPTransportTypeStdio, Cmd: "dummy", Tools: []string{"["}},
+	})
+
+	_, err := NewManager(store)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid tool pattern")
 }
 
 func TestNewClient_SelectsTransport(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"regexp"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -707,7 +707,7 @@ func NewManager(store conf.ConfigStore) (*Manager, error) {
 		compiledMatchers, matcherErr := compileToolMatchers(cfg.Tools)
 		if matcherErr != nil {
 			_ = client.Close()
-			return nil, fmt.Errorf("NewManager() [mcp.go]: invalid tool regex in %s: %w", serverName, matcherErr)
+			return nil, fmt.Errorf("NewManager() [mcp.go]: invalid tool pattern in %s: %w", serverName, matcherErr)
 		}
 
 		for _, remoteTool := range tools {
@@ -1038,34 +1038,59 @@ func parseQualifiedToolName(qualified string) (string, string, error) {
 	return parts[1], parts[2], nil
 }
 
-func compileToolMatchers(patterns []string) ([]*regexp.Regexp, error) {
-	if patterns == nil {
+type toolMatcher struct {
+	exact string
+	glob  string
+}
+
+func compileToolMatchers(patterns []string) ([]toolMatcher, error) {
+	if len(patterns) == 0 {
 		return nil, nil
 	}
-	matchers := make([]*regexp.Regexp, 0, len(patterns))
+
+	matchers := make([]toolMatcher, 0, len(patterns))
 	for _, pattern := range patterns {
-		re, err := regexp.Compile(pattern)
-		if err != nil {
-			return nil, fmt.Errorf("compileToolMatchers() [mcp.go]: invalid regexp %q: %w", pattern, err)
+		trimmed := strings.TrimSpace(pattern)
+		if trimmed == "" {
+			continue
 		}
-		matchers = append(matchers, re)
+
+		if isGlobPattern(trimmed) {
+			if _, err := filepath.Match(trimmed, ""); err != nil {
+				return nil, fmt.Errorf("compileToolMatchers() [mcp.go]: invalid glob %q: %w", trimmed, err)
+			}
+			matchers = append(matchers, toolMatcher{glob: trimmed})
+			continue
+		}
+
+		matchers = append(matchers, toolMatcher{exact: trimmed})
 	}
+
 	return matchers, nil
 }
 
-func isToolEnabled(toolName string, patterns []string, matchers []*regexp.Regexp) bool {
-	if patterns == nil {
+func isToolEnabled(toolName string, patterns []string, matchers []toolMatcher) bool {
+	if len(patterns) == 0 {
 		return true
 	}
-	if len(patterns) == 0 {
-		return false
-	}
+
 	for _, matcher := range matchers {
-		if matcher.MatchString(toolName) {
+		if matcher.exact != "" && matcher.exact == toolName {
+			return true
+		}
+		if matcher.glob == "" {
+			continue
+		}
+		if ok, _ := filepath.Match(matcher.glob, toolName); ok {
 			return true
 		}
 	}
+
 	return false
+}
+
+func isGlobPattern(pattern string) bool {
+	return strings.ContainsAny(pattern, "*?[")
 }
 
 func cloneEnv(env map[string]string) map[string]string {

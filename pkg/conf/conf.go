@@ -183,8 +183,9 @@ type MCPServerConfig struct {
 	Args []string `json:"args,omitempty" yaml:"args,omitempty"`
 	// Env contains environment variables set for MCP server process.
 	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
-	// Tools contains regex patterns selecting enabled tool names.
-	// nil means all tools enabled, empty slice means all tools disabled.
+	// Tools contains tool filters selecting enabled tool names.
+	// Each item is either an exact tool name or a glob pattern.
+	// Empty or nil slice means all tools enabled.
 	Tools []string `json:"tools" yaml:"tools"`
 }
 
