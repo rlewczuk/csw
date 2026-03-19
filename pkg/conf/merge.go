@@ -699,10 +699,13 @@ func (c *MCPServerConfig) Clone() *MCPServerConfig {
 	}
 
 	cloned := &MCPServerConfig{
-		Cmd:     c.Cmd,
-		Enabled: c.Enabled,
-		Args:    append([]string(nil), c.Args...),
-		Tools:   append([]string(nil), c.Tools...),
+		Transport: c.Transport,
+		URL:       c.URL,
+		APIKey:    c.APIKey,
+		Cmd:       c.Cmd,
+		Enabled:   c.Enabled,
+		Args:      append([]string(nil), c.Args...),
+		Tools:     append([]string(nil), c.Tools...),
 	}
 
 	if c.Env != nil {

@@ -563,6 +563,56 @@ func TestCompositeConfigStore_LastUpdateTimestamps(t *testing.T) {
 	assert.False(t, roleUpdate.IsZero())
 }
 
+func TestCompositeConfigStore_GetMCPServerConfigs_MergesWithTransportFields(t *testing.T) {
+	store1 := NewMockConfigStore()
+	store2 := NewMockConfigStore()
+
+	store1.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{
+		"srv": {
+			Enabled:   true,
+			Transport: conf.MCPTransportTypeStdio,
+			Cmd:       "cmd1",
+			Tools:     []string{"^read_"},
+		},
+	})
+	store2.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{
+		"srv": {
+			Enabled:   true,
+			Transport: conf.MCPTransportTypeHTTPS,
+			URL:       "https://example.com/mcp",
+			APIKey:    "token",
+			Tools:     []string{"^write_"},
+		},
+	})
+
+	composite := &CompositeConfigStore{
+		stores:             []conf.ConfigStore{store1, store2},
+		storeGlobalUpdates: make([]time.Time, 2),
+		storeModelUpdates:  make([]time.Time, 2),
+		storeMCPUpdates:    make([]time.Time, 2),
+		storeRoleUpdates:   make([]time.Time, 2),
+	}
+
+	require.NoError(t, composite.refresh())
+
+	configs, err := composite.GetMCPServerConfigs()
+	require.NoError(t, err)
+	require.Len(t, configs, 1)
+
+	srv := configs["srv"]
+	require.NotNil(t, srv)
+	assert.Equal(t, conf.MCPTransportTypeHTTPS, srv.Transport)
+	assert.Equal(t, "https://example.com/mcp", srv.URL)
+	assert.Equal(t, "token", srv.APIKey)
+	assert.Equal(t, []string{"^write_"}, srv.Tools)
+
+	// copy protection
+	srv.APIKey = "changed"
+	configs2, err := composite.GetMCPServerConfigs()
+	require.NoError(t, err)
+	assert.Equal(t, "token", configs2["srv"].APIKey)
+}
+
 func TestCompositeConfigStore_CopyProtection(t *testing.T) {
 	// Create mock store with config
 	mockStore := NewMockConfigStore()

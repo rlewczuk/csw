@@ -409,6 +409,33 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 		assert.True(t, cfg.Default["runBash"])
 		assert.True(t, cfg.Tags["safe"]["vfsRead"])
 	})
+
+	t.Run("mcp server clone preserves and copies transport fields", func(t *testing.T) {
+		cfg := &MCPServerConfig{
+			Transport: MCPTransportTypeHTTPS,
+			URL:       "https://example.com/mcp",
+			APIKey:    "secret",
+			Cmd:       "server",
+			Enabled:   true,
+			Args:      []string{"--x"},
+			Env:       map[string]string{"A": "1"},
+			Tools:     []string{"^read_"},
+		}
+
+		clone := cfg.Clone()
+		require.NotNil(t, clone)
+		assert.Equal(t, MCPTransportTypeHTTPS, clone.Transport)
+		assert.Equal(t, "https://example.com/mcp", clone.URL)
+		assert.Equal(t, "secret", clone.APIKey)
+
+		clone.Args[0] = "--y"
+		clone.Env["A"] = "2"
+		clone.Tools[0] = "^write_"
+
+		assert.Equal(t, "--x", cfg.Args[0])
+		assert.Equal(t, "1", cfg.Env["A"])
+		assert.Equal(t, "^read_", cfg.Tools[0])
+	})
 }
 
 func TestGlobalConfig_Merge_NilOverride(t *testing.T) {

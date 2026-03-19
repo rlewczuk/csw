@@ -342,6 +342,38 @@ func TestLocalConfigStore_HookConfigs(t *testing.T) {
 
 }
 
+func TestLocalConfigStore_MCPServerConfigs(t *testing.T) {
+	tmpDir := t.TempDir()
+	mcpDir := filepath.Join(tmpDir, "mcp")
+	require.NoError(t, os.MkdirAll(mcpDir, 0o755))
+
+	jsonConfig := `{"enabled":true,"transport":"http","url":"http://json.example/mcp","api_key":"json-key"}`
+	yamlConfig := "enabled: true\ntransport: https\nurl: https://yaml.example/mcp\napi_key: yaml-key\n"
+
+	require.NoError(t, os.WriteFile(filepath.Join(mcpDir, "json-srv.json"), []byte(jsonConfig), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(mcpDir, "yaml-srv.yml"), []byte(yamlConfig), 0o644))
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	configs, err := store.GetMCPServerConfigs()
+	require.NoError(t, err)
+	require.Len(t, configs, 2)
+
+	jsonSrv, ok := configs["json-srv"]
+	require.True(t, ok)
+	assert.Equal(t, conf.MCPTransportTypeHTTP, jsonSrv.Transport)
+	assert.Equal(t, "http://json.example/mcp", jsonSrv.URL)
+	assert.Equal(t, "json-key", jsonSrv.APIKey)
+
+	yamlSrv, ok := configs["yaml-srv"]
+	require.True(t, ok)
+	assert.Equal(t, conf.MCPTransportTypeHTTPS, yamlSrv.Transport)
+	assert.Equal(t, "https://yaml.example/mcp", yamlSrv.URL)
+	assert.Equal(t, "yaml-key", yamlSrv.APIKey)
+}
+
 func TestLocalConfigStore_HookConfigsNameMismatchDisablesHook(t *testing.T) {
 	tmpDir := t.TempDir()
 	hooksDir := filepath.Join(tmpDir, "hooks")

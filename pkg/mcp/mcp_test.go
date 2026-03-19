@@ -5,11 +5,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -147,7 +150,7 @@ func TestNewManagerStartsEnabledServerAndRunsTool(t *testing.T) {
 
 	store := confimpl.NewMockConfigStore()
 	store.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{
-		"srv": {Enabled: true, Cmd: "dummy", Tools: nil},
+		"srv": {Enabled: true, Transport: conf.MCPTransportTypeStdio, Cmd: "dummy", Tools: nil},
 	})
 
 	manager, err := NewManager(store)
@@ -179,7 +182,7 @@ func TestNewManagerFiltersToolsByRegex(t *testing.T) {
 
 	store := confimpl.NewMockConfigStore()
 	store.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{
-		"srv": {Enabled: true, Cmd: "dummy", Tools: []string{"^read_"}},
+		"srv": {Enabled: true, Transport: conf.MCPTransportTypeStdio, Cmd: "dummy", Tools: []string{"^read_"}},
 	})
 
 	manager, err := NewManager(store)
@@ -190,6 +193,191 @@ func TestNewManagerFiltersToolsByRegex(t *testing.T) {
 	_, hasWrite := infos["mcp.srv.write_file"]
 	assert.True(t, hasRead)
 	assert.False(t, hasWrite)
+}
+
+func TestNewClient_SelectsTransport(t *testing.T) {
+	t.Run("defaults to stdio when transport not provided", func(t *testing.T) {
+		c, err := NewClient("srv", &conf.MCPServerConfig{Cmd: "dummy"})
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		_, ok := c.(*Client)
+		assert.True(t, ok)
+	})
+
+	t.Run("creates http client for http transport", func(t *testing.T) {
+		c, err := NewClient("srv", &conf.MCPServerConfig{Transport: conf.MCPTransportTypeHTTP, URL: "http://example.com/mcp"})
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		_, ok := c.(*HTTPClient)
+		assert.True(t, ok)
+	})
+
+	t.Run("creates http client for https transport", func(t *testing.T) {
+		c, err := NewClient("srv", &conf.MCPServerConfig{Transport: conf.MCPTransportTypeHTTPS, URL: "https://example.com/mcp"})
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		_, ok := c.(*HTTPClient)
+		assert.True(t, ok)
+	})
+}
+
+func TestNewHTTPClientValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     *conf.MCPServerConfig
+		hasErr  bool
+		errPart string
+	}{
+		{name: "nil config", cfg: nil, hasErr: true, errPart: "config cannot be nil"},
+		{name: "empty url", cfg: &conf.MCPServerConfig{Transport: conf.MCPTransportTypeHTTP}, hasErr: true, errPart: "url cannot be empty"},
+		{name: "invalid url", cfg: &conf.MCPServerConfig{Transport: conf.MCPTransportTypeHTTP, URL: "://bad"}, hasErr: true, errPart: "invalid url"},
+		{name: "http transport with https url", cfg: &conf.MCPServerConfig{Transport: conf.MCPTransportTypeHTTP, URL: "https://example.com/mcp"}, hasErr: true, errPart: "http transport requires http url"},
+		{name: "https transport with http url", cfg: &conf.MCPServerConfig{Transport: conf.MCPTransportTypeHTTPS, URL: "http://example.com/mcp"}, hasErr: true, errPart: "https transport requires https url"},
+		{name: "valid http", cfg: &conf.MCPServerConfig{Transport: conf.MCPTransportTypeHTTP, URL: "http://example.com/mcp"}, hasErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewHTTPClient("srv", tt.cfg)
+			if tt.hasErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errPart)
+				assert.Nil(t, client)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, client)
+		})
+	}
+}
+
+func TestHTTPClientStartListToolsAndCallTool(t *testing.T) {
+	server := testutil.NewMockHTTPServer()
+	defer server.Close()
+
+	server.AddRestResponseWithStatusAndHeaders(
+		"/mcp",
+		http.MethodPost,
+		`{"jsonrpc":"2.0","id":2,"result":{"protocolVersion":"2025-11-25","capabilities":{},"serverInfo":{"name":"mock","version":"1.0"}}}`,
+		http.StatusOK,
+		http.Header{mcpSessionIDHeader: []string{"session-123"}},
+	)
+	server.AddRestResponseWithStatus("/mcp", http.MethodPost, "", http.StatusAccepted)
+	server.AddRestResponse("/mcp", http.MethodPost, `{"jsonrpc":"2.0","id":3,"result":{"tools":[{"name":"echo","description":"Echo","inputSchema":{"type":"object"}}]}}`)
+	server.AddRestResponse("/mcp", http.MethodPost, `{"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"ok"}],"isError":false}}`)
+	server.AddRestResponseWithStatus("/mcp", http.MethodDelete, "", http.StatusNoContent)
+
+	client, err := NewHTTPClient("srv", &conf.MCPServerConfig{Transport: conf.MCPTransportTypeHTTP, URL: server.URL() + "/mcp", APIKey: "secret-token"})
+	require.NoError(t, err)
+
+	require.NoError(t, client.Start())
+
+	tools, err := client.ListTools()
+	require.NoError(t, err)
+	require.Len(t, tools, 1)
+	assert.Equal(t, "echo", tools[0].Name)
+
+	result, err := client.CallTool("echo", map[string]any{"text": "hello"})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, result.Content, 1)
+	assert.Equal(t, "ok", result.Content[0].Text)
+
+	require.NoError(t, client.Close())
+
+	requests := server.GetRequests()
+	require.Len(t, requests, 5)
+
+	for i, req := range requests[:4] {
+		assert.Equal(t, "Bearer secret-token", req.Header.Get("Authorization"))
+		assert.Equal(t, "application/json, text/event-stream", req.Header.Get("Accept"))
+		assert.Equal(t, LatestProtocolVersion, req.Header.Get(mcpProtocolVersionHeader))
+		if i == 0 {
+			assert.Empty(t, req.Header.Get(mcpSessionIDHeader))
+		} else {
+			assert.Equal(t, "session-123", req.Header.Get(mcpSessionIDHeader))
+		}
+	}
+
+	assert.Equal(t, "session-123", requests[4].Header.Get(mcpSessionIDHeader))
+	assert.Equal(t, LatestProtocolVersion, requests[4].Header.Get(mcpProtocolVersionHeader))
+}
+
+func TestHTTPClientHandlesSSEResponses(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte("data: {\"jsonrpc\":\"2.0\",\"id\":99,\"result\":{\"tools\":[]}}\n\n"))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	client, err := NewHTTPClient("srv", &conf.MCPServerConfig{Transport: conf.MCPTransportTypeHTTP, URL: server.URL})
+	require.NoError(t, err)
+	client.nextID.Store(98)
+
+	tools, err := client.ListTools()
+	require.NoError(t, err)
+	assert.Empty(t, tools)
+}
+
+func TestHTTPClientNotificationRequiresAccepted(t *testing.T) {
+	server := testutil.NewMockHTTPServer()
+	defer server.Close()
+
+	server.AddRestResponseWithStatus("/mcp", http.MethodPost, `{"jsonrpc":"2.0","id":2,"result":{"protocolVersion":"2025-11-25","capabilities":{},"serverInfo":{"name":"mock","version":"1.0"}}}`, http.StatusOK)
+	server.AddRestResponseWithStatus("/mcp", http.MethodPost, "{}", http.StatusOK)
+
+	client, err := NewHTTPClient("srv", &conf.MCPServerConfig{Transport: conf.MCPTransportTypeHTTP, URL: server.URL() + "/mcp"})
+	require.NoError(t, err)
+
+	err = client.Start()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expected 202 Accepted")
+}
+
+func TestReadSSEJSONRPCResponse(t *testing.T) {
+	tests := []struct {
+		name       string
+		payload    string
+		expectedID int64
+		hasErr     bool
+	}{
+		{
+			name:       "returns matching event",
+			payload:    "data: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"ok\":true}}\n\n",
+			expectedID: 1,
+			hasErr:     false,
+		},
+		{
+			name:       "ignores non-matching and returns matching later",
+			payload:    "data: {\"jsonrpc\":\"2.0\",\"id\":7,\"result\":{}}\n\ndata: {\"jsonrpc\":\"2.0\",\"id\":8,\"result\":{\"ok\":true}}\n\n",
+			expectedID: 8,
+			hasErr:     false,
+		},
+		{
+			name:       "returns error when no matching event",
+			payload:    "data: [DONE]\n\n",
+			expectedID: 1,
+			hasErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := readSSEJSONRPCResponse(bytes.NewBufferString(tt.payload), tt.expectedID)
+			if tt.hasErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			assert.Equal(t, tt.expectedID, resp.ID)
+		})
+	}
 }
 
 type stubClient struct {

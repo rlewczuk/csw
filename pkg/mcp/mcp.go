@@ -2,10 +2,13 @@ package mcp
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"regexp"
@@ -34,6 +37,10 @@ var newClientFunc = func(name string, cfg *conf.MCPServerConfig) (client, error)
 	return NewClient(name, cfg)
 }
 
+const mcpSessionIDHeader = "Mcp-Session-Id"
+
+const mcpProtocolVersionHeader = "MCP-Protocol-Version"
+
 // Client is stdio JSON-RPC client for MCP server.
 type Client struct {
 	name    string
@@ -55,16 +62,27 @@ type Client struct {
 	wg     sync.WaitGroup
 }
 
-// NewClient creates a new MCP stdio client.
-func NewClient(name string, cfg *conf.MCPServerConfig) (*Client, error) {
+// NewClient creates a new MCP client based on configured transport.
+func NewClient(name string, cfg *conf.MCPServerConfig) (client, error) {
+	transport := resolveMCPTransportType(cfg)
+	switch transport {
+	case conf.MCPTransportTypeHTTP, conf.MCPTransportTypeHTTPS:
+		return NewHTTPClient(name, cfg)
+	default:
+		return NewStdioClient(name, cfg)
+	}
+}
+
+// NewStdioClient creates a new MCP stdio client.
+func NewStdioClient(name string, cfg *conf.MCPServerConfig) (*Client, error) {
 	if strings.TrimSpace(name) == "" {
-		return nil, fmt.Errorf("NewClient() [mcp.go]: name cannot be empty")
+		return nil, fmt.Errorf("NewStdioClient() [mcp.go]: name cannot be empty")
 	}
 	if cfg == nil {
-		return nil, fmt.Errorf("NewClient() [mcp.go]: config cannot be nil")
+		return nil, fmt.Errorf("NewStdioClient() [mcp.go]: config cannot be nil")
 	}
 	if strings.TrimSpace(cfg.Cmd) == "" {
-		return nil, fmt.Errorf("NewClient() [mcp.go]: cmd cannot be empty for server %s", name)
+		return nil, fmt.Errorf("NewStdioClient() [mcp.go]: cmd cannot be empty for server %s", name)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -295,6 +313,352 @@ func (c *Client) readStderr() {
 	}
 }
 
+// HTTPClient is streamable HTTP JSON-RPC client for MCP server.
+type HTTPClient struct {
+	name      string
+	endpoint  string
+	apiKey    string
+	http      *http.Client
+	nextID    atomic.Int64
+	protocol  string
+	started   bool
+	sessionID string
+	mu        sync.RWMutex
+}
+
+// NewHTTPClient creates a new MCP streamable HTTP client.
+func NewHTTPClient(name string, cfg *conf.MCPServerConfig) (*HTTPClient, error) {
+	if strings.TrimSpace(name) == "" {
+		return nil, fmt.Errorf("NewHTTPClient() [mcp.go]: name cannot be empty")
+	}
+	if cfg == nil {
+		return nil, fmt.Errorf("NewHTTPClient() [mcp.go]: config cannot be nil")
+	}
+
+	endpoint := strings.TrimSpace(cfg.URL)
+	if endpoint == "" {
+		return nil, fmt.Errorf("NewHTTPClient() [mcp.go]: url cannot be empty for server %s", name)
+	}
+
+	parsedURL, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("NewHTTPClient() [mcp.go]: invalid url for server %s: %w", name, err)
+	}
+	if strings.TrimSpace(parsedURL.Scheme) == "" || strings.TrimSpace(parsedURL.Host) == "" {
+		return nil, fmt.Errorf("NewHTTPClient() [mcp.go]: url must include scheme and host for server %s", name)
+	}
+
+	transport := resolveMCPTransportType(cfg)
+	if transport == conf.MCPTransportTypeHTTPS && !strings.EqualFold(parsedURL.Scheme, "https") {
+		return nil, fmt.Errorf("NewHTTPClient() [mcp.go]: https transport requires https url for server %s", name)
+	}
+	if transport == conf.MCPTransportTypeHTTP && !strings.EqualFold(parsedURL.Scheme, "http") {
+		return nil, fmt.Errorf("NewHTTPClient() [mcp.go]: http transport requires http url for server %s", name)
+	}
+
+	client := &HTTPClient{
+		name:     name,
+		endpoint: endpoint,
+		apiKey:   strings.TrimSpace(cfg.APIKey),
+		http:     http.DefaultClient,
+		protocol: LatestProtocolVersion,
+	}
+	client.nextID.Store(1)
+
+	return client, nil
+}
+
+// Start initializes MCP protocol over HTTP transport.
+func (c *HTTPClient) Start() error {
+	if _, err := c.Initialize(); err != nil {
+		return fmt.Errorf("HTTPClient.Start() [mcp.go]: initialize failed for %s: %w", c.name, err)
+	}
+
+	if err := c.sendNotification("notifications/initialized", map[string]any{}); err != nil {
+		return fmt.Errorf("HTTPClient.Start() [mcp.go]: initialized notification failed for %s: %w", c.name, err)
+	}
+
+	c.mu.Lock()
+	c.started = true
+	c.mu.Unlock()
+
+	return nil
+}
+
+// Close closes HTTP client session when server supports explicit session termination.
+func (c *HTTPClient) Close() error {
+	c.mu.Lock()
+	c.started = false
+	sessionID := c.sessionID
+	c.mu.Unlock()
+
+	if strings.TrimSpace(sessionID) == "" {
+		return nil
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, c.endpoint, nil)
+	if err != nil {
+		return fmt.Errorf("HTTPClient.Close() [mcp.go]: failed to create delete request for %s: %w", c.name, err)
+	}
+	req.Header.Set(mcpSessionIDHeader, sessionID)
+	req.Header.Set(mcpProtocolVersionHeader, c.protocol)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("HTTPClient.Close() [mcp.go]: delete request failed for %s: %w", c.name, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusMethodNotAllowed || resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusOK {
+		return nil
+	}
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		return fmt.Errorf("HTTPClient.Close() [mcp.go]: unexpected delete status for %s: %s", c.name, resp.Status)
+	}
+
+	return nil
+}
+
+// Initialize performs MCP protocol initialization handshake.
+func (c *HTTPClient) Initialize() (*InitializeResult, error) {
+	params := InitializeRequestParams{
+		ProtocolVersion: LatestProtocolVersion,
+		Capabilities:    map[string]any{},
+		ClientInfo: MCPImplementationInfo{
+			Name:    "csw",
+			Version: "dev",
+		},
+	}
+
+	resultMap, header, err := c.requestWithHeaders("initialize", params)
+	if err != nil {
+		return nil, err
+	}
+
+	if sessionID := strings.TrimSpace(header.Get(mcpSessionIDHeader)); sessionID != "" {
+		c.mu.Lock()
+		c.sessionID = sessionID
+		c.mu.Unlock()
+	}
+
+	data, err := json.Marshal(resultMap)
+	if err != nil {
+		return nil, fmt.Errorf("HTTPClient.Initialize() [mcp.go]: failed to marshal initialize result for %s: %w", c.name, err)
+	}
+
+	var result InitializeResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("HTTPClient.Initialize() [mcp.go]: failed to parse initialize result for %s: %w", c.name, err)
+	}
+
+	return &result, nil
+}
+
+// ListTools lists tools exposed by MCP server.
+func (c *HTTPClient) ListTools() ([]RemoteTool, error) {
+	resultMap, _, err := c.requestWithHeaders("tools/list", map[string]any{})
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(resultMap)
+	if err != nil {
+		return nil, fmt.Errorf("HTTPClient.ListTools() [mcp.go]: failed to marshal tools/list result for %s: %w", c.name, err)
+	}
+
+	var result ListToolsResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("HTTPClient.ListTools() [mcp.go]: failed to parse tools/list result for %s: %w", c.name, err)
+	}
+
+	return result.Tools, nil
+}
+
+// CallTool invokes a specific MCP tool.
+func (c *HTTPClient) CallTool(name string, arguments map[string]any) (*CallToolResult, error) {
+	params := CallToolRequestParams{Name: name, Arguments: arguments}
+	resultMap, _, err := c.requestWithHeaders("tools/call", params)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(resultMap)
+	if err != nil {
+		return nil, fmt.Errorf("HTTPClient.CallTool() [mcp.go]: failed to marshal tools/call result for %s: %w", c.name, err)
+	}
+
+	var result CallToolResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("HTTPClient.CallTool() [mcp.go]: failed to parse tools/call result for %s: %w", c.name, err)
+	}
+
+	return &result, nil
+}
+
+func (c *HTTPClient) requestWithHeaders(method string, params any) (map[string]any, http.Header, error) {
+	id := c.nextID.Add(1)
+	req := JSONRPCRequest{JSONRPC: JSONRPCVersion, ID: id, Method: method, Params: params}
+	response, header, err := c.postJSONRPC(req, true, id)
+	if err != nil {
+		return nil, nil, fmt.Errorf("HTTPClient.requestWithHeaders() [mcp.go]: request %s failed for %s: %w", method, c.name, err)
+	}
+	if response.Error != nil {
+		return nil, nil, fmt.Errorf("HTTPClient.requestWithHeaders() [mcp.go]: mcp error from %s: code=%d message=%s", c.name, response.Error.Code, response.Error.Message)
+	}
+
+	return response.Result, header, nil
+}
+
+func (c *HTTPClient) sendNotification(method string, params any) error {
+	notification := JSONRPCNotification{JSONRPC: JSONRPCVersion, Method: method, Params: params}
+	_, _, err := c.postJSONRPC(notification, false, 0)
+	if err != nil {
+		return fmt.Errorf("HTTPClient.sendNotification() [mcp.go]: notification %s failed for %s: %w", method, c.name, err)
+	}
+
+	return nil
+}
+
+func (c *HTTPClient) postJSONRPC(message any, expectResponse bool, expectedID int64) (*JSONRPCResponse, http.Header, error) {
+	body, err := json.Marshal(message)
+	if err != nil {
+		return nil, nil, fmt.Errorf("HTTPClient.postJSONRPC() [mcp.go]: failed to marshal request for %s: %w", c.name, err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, c.endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, nil, fmt.Errorf("HTTPClient.postJSONRPC() [mcp.go]: failed to create request for %s: %w", c.name, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set(mcpProtocolVersionHeader, c.protocol)
+	if strings.TrimSpace(c.apiKey) != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+
+	c.mu.RLock()
+	sessionID := c.sessionID
+	c.mu.RUnlock()
+	if strings.TrimSpace(sessionID) != "" {
+		req.Header.Set(mcpSessionIDHeader, sessionID)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("HTTPClient.postJSONRPC() [mcp.go]: request failed for %s: %w", c.name, err)
+	}
+	defer resp.Body.Close()
+
+	if !expectResponse {
+		if resp.StatusCode != http.StatusAccepted {
+			return nil, resp.Header, fmt.Errorf("HTTPClient.postJSONRPC() [mcp.go]: expected 202 Accepted for notification from %s, got %s", c.name, resp.Status)
+		}
+		return nil, resp.Header, nil
+	}
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, resp.Header, fmt.Errorf("HTTPClient.postJSONRPC() [mcp.go]: request failed for %s with status %s", c.name, resp.Status)
+	}
+
+	contentType := strings.ToLower(strings.TrimSpace(strings.Split(resp.Header.Get("Content-Type"), ";")[0]))
+	switch contentType {
+	case "application/json":
+		decoder := json.NewDecoder(resp.Body)
+		var response JSONRPCResponse
+		if err := decoder.Decode(&response); err != nil {
+			return nil, resp.Header, fmt.Errorf("HTTPClient.postJSONRPC() [mcp.go]: failed to decode json response from %s: %w", c.name, err)
+		}
+		if response.ID != expectedID {
+			return nil, resp.Header, fmt.Errorf("HTTPClient.postJSONRPC() [mcp.go]: response id mismatch for %s: expected %d got %d", c.name, expectedID, response.ID)
+		}
+		return &response, resp.Header, nil
+	case "text/event-stream":
+		response, err := readSSEJSONRPCResponse(resp.Body, expectedID)
+		if err != nil {
+			return nil, resp.Header, fmt.Errorf("HTTPClient.postJSONRPC() [mcp.go]: failed to parse event stream response from %s: %w", c.name, err)
+		}
+		return response, resp.Header, nil
+	default:
+		return nil, resp.Header, fmt.Errorf("HTTPClient.postJSONRPC() [mcp.go]: unsupported content type from %s: %s", c.name, contentType)
+	}
+}
+
+func readSSEJSONRPCResponse(reader io.Reader, expectedID int64) (*JSONRPCResponse, error) {
+	if reader == nil {
+		return nil, fmt.Errorf("readSSEJSONRPCResponse() [mcp.go]: reader cannot be nil")
+	}
+
+	scanner := bufio.NewScanner(reader)
+	dataLines := make([]string, 0)
+
+	processEvent := func(lines []string) (*JSONRPCResponse, bool, error) {
+		if len(lines) == 0 {
+			return nil, false, nil
+		}
+		payload := strings.TrimSpace(strings.Join(lines, "\n"))
+		if payload == "" || payload == "[DONE]" {
+			return nil, false, nil
+		}
+
+		var response JSONRPCResponse
+		if err := json.Unmarshal([]byte(payload), &response); err != nil {
+			return nil, false, nil
+		}
+		if response.ID == expectedID {
+			return &response, true, nil
+		}
+
+		return nil, false, nil
+	}
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			response, found, err := processEvent(dataLines)
+			if err != nil {
+				return nil, err
+			}
+			if found {
+				return response, nil
+			}
+			dataLines = dataLines[:0]
+			continue
+		}
+		if strings.HasPrefix(line, "data:") {
+			dataLines = append(dataLines, strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("readSSEJSONRPCResponse() [mcp.go]: failed to scan event stream: %w", err)
+	}
+
+	response, found, err := processEvent(dataLines)
+	if err != nil {
+		return nil, err
+	}
+	if found {
+		return response, nil
+	}
+
+	return nil, fmt.Errorf("readSSEJSONRPCResponse() [mcp.go]: matching response not found")
+}
+
+func resolveMCPTransportType(cfg *conf.MCPServerConfig) conf.MCPTransportType {
+	if cfg == nil {
+		return conf.MCPTransportTypeStdio
+	}
+	transport := conf.MCPTransportType(strings.ToLower(strings.TrimSpace(string(cfg.Transport))))
+	switch transport {
+	case conf.MCPTransportTypeHTTP, conf.MCPTransportTypeHTTPS, conf.MCPTransportTypeStdio:
+		return transport
+	default:
+		return conf.MCPTransportTypeStdio
+	}
+}
+
 // Manager manages MCP server lifecycle and exposes MCP tools.
 type Manager struct {
 	clients  map[string]client
@@ -466,14 +830,18 @@ func (m *Manager) ExecuteTool(call *tool.ToolCall) *tool.ToolResponse {
 
 // Tool wraps manager tool forwarding in tool.Tool interface.
 type Tool struct {
-	manager    interface{ ExecuteTool(call *tool.ToolCall) *tool.ToolResponse }
+	manager interface {
+		ExecuteTool(call *tool.ToolCall) *tool.ToolResponse
+	}
 	name       string
 	serverName string
 	original   string
 }
 
 // NewTool creates MCP forwarding tool.
-func NewTool(manager interface{ ExecuteTool(call *tool.ToolCall) *tool.ToolResponse }, name string, serverName string, originalName string) *Tool {
+func NewTool(manager interface {
+	ExecuteTool(call *tool.ToolCall) *tool.ToolResponse
+}, name string, serverName string, originalName string) *Tool {
 	return &Tool{manager: manager, name: name, serverName: serverName, original: originalName}
 }
 
@@ -809,11 +1177,15 @@ func ReadMessage(reader *bufio.Reader) ([]byte, error) {
 // PromptGenerator wraps existing prompt generator and injects MCP tool infos.
 type PromptGenerator struct {
 	base    core.PromptGenerator
-	manager interface{ GetToolInfo(toolName string) (tool.ToolInfo, bool) }
+	manager interface {
+		GetToolInfo(toolName string) (tool.ToolInfo, bool)
+	}
 }
 
 // NewPromptGenerator creates prompt generator wrapper for MCP tools.
-func NewPromptGenerator(base core.PromptGenerator, manager interface{ GetToolInfo(toolName string) (tool.ToolInfo, bool) }) core.PromptGenerator {
+func NewPromptGenerator(base core.PromptGenerator, manager interface {
+	GetToolInfo(toolName string) (tool.ToolInfo, bool)
+}) core.PromptGenerator {
 	if manager == nil {
 		return base
 	}

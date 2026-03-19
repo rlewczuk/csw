@@ -19,6 +19,18 @@ const (
 	AccessAsk   AccessFlag = "ask"
 )
 
+// MCPTransportType defines transport used to connect to MCP server.
+type MCPTransportType string
+
+const (
+	// MCPTransportTypeStdio runs MCP over stdio with local subprocess.
+	MCPTransportTypeStdio MCPTransportType = "stdio"
+	// MCPTransportTypeHTTP runs MCP over streamable HTTP.
+	MCPTransportTypeHTTP MCPTransportType = "http"
+	// MCPTransportTypeHTTPS runs MCP over streamable HTTPS.
+	MCPTransportTypeHTTPS MCPTransportType = "https"
+)
+
 // HookType defines supported hook execution backend.
 type HookType string
 
@@ -156,6 +168,13 @@ type ContainerConfig struct {
 
 // MCPServerConfig defines configuration for running a local MCP server.
 type MCPServerConfig struct {
+	// Transport defines MCP transport type: stdio, http, or https.
+	// Empty value defaults to stdio.
+	Transport MCPTransportType `json:"transport,omitempty" yaml:"transport,omitempty"`
+	// URL is MCP endpoint URL for HTTP(S) transports.
+	URL string `json:"url,omitempty" yaml:"url,omitempty"`
+	// APIKey is optional bearer token used for HTTP(S) transport requests.
+	APIKey string `json:"api_key,omitempty" yaml:"api_key,omitempty"`
 	// Cmd is the command to run MCP server (may include arguments).
 	Cmd string `json:"cmd,omitempty" yaml:"cmd,omitempty"`
 	// Enabled controls whether MCP server should be started.
@@ -212,39 +231,39 @@ type HookConfig struct {
 	// materialization of EmbeddedFiles before execution.
 	EmbeddedSource bool `json:"-" yaml:"-"`
 
-	enabledConfigured bool
-	hookConfigured    bool
-	nameConfigured    bool
-	typeConfigured    bool
-	commandConfigured bool
-	promptConfigured  bool
-	systemConfigured  bool
-	modelConfigured   bool
+	enabledConfigured  bool
+	hookConfigured     bool
+	nameConfigured     bool
+	typeConfigured     bool
+	commandConfigured  bool
+	promptConfigured   bool
+	systemConfigured   bool
+	modelConfigured    bool
 	thinkingConfigured bool
 	roleConfigured     bool
 	outputToConfigured bool
 	errorToConfigured  bool
-	timeoutConfigured bool
-	runOnConfigured   bool
+	timeoutConfigured  bool
+	runOnConfigured    bool
 }
 
 // UnmarshalJSON unmarshals HookConfig, applies defaults and tracks configured fields.
 func (c *HookConfig) UnmarshalJSON(data []byte) error {
 	aux := struct {
-		Enabled *bool     `json:"enabled,omitempty"`
-		Hook    string    `json:"hook,omitempty"`
-		Name    string    `json:"name,omitempty"`
-		Type    HookType  `json:"type,omitempty"`
-		Command string    `json:"command,omitempty"`
-		Prompt  string    `json:"prompt,omitempty"`
-		System  string    `json:"system_prompt,omitempty"`
-		Model   string    `json:"model,omitempty"`
-		Thinking string   `json:"thinking,omitempty"`
-		Role    string    `json:"role,omitempty"`
-		OutputTo string   `json:"output_to,omitempty"`
-		ErrorTo string    `json:"error_to,omitempty"`
-		Timeout string    `json:"timeout,omitempty"`
-		RunOn   HookRunOn `json:"run-on,omitempty"`
+		Enabled  *bool     `json:"enabled,omitempty"`
+		Hook     string    `json:"hook,omitempty"`
+		Name     string    `json:"name,omitempty"`
+		Type     HookType  `json:"type,omitempty"`
+		Command  string    `json:"command,omitempty"`
+		Prompt   string    `json:"prompt,omitempty"`
+		System   string    `json:"system_prompt,omitempty"`
+		Model    string    `json:"model,omitempty"`
+		Thinking string    `json:"thinking,omitempty"`
+		Role     string    `json:"role,omitempty"`
+		OutputTo string    `json:"output_to,omitempty"`
+		ErrorTo  string    `json:"error_to,omitempty"`
+		Timeout  string    `json:"timeout,omitempty"`
+		RunOn    HookRunOn `json:"run-on,omitempty"`
 	}{}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -305,20 +324,20 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 // UnmarshalYAML unmarshals HookConfig, applies defaults and tracks configured fields.
 func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 	aux := struct {
-		Enabled *bool     `yaml:"enabled,omitempty"`
-		Hook    string    `yaml:"hook,omitempty"`
-		Name    string    `yaml:"name,omitempty"`
-		Type    HookType  `yaml:"type,omitempty"`
-		Command string    `yaml:"command,omitempty"`
-		Prompt  string    `yaml:"prompt,omitempty"`
-		System  string    `yaml:"system_prompt,omitempty"`
-		Model   string    `yaml:"model,omitempty"`
-		Thinking string   `yaml:"thinking,omitempty"`
-		Role    string    `yaml:"role,omitempty"`
-		OutputTo string   `yaml:"output_to,omitempty"`
-		ErrorTo string    `yaml:"error_to,omitempty"`
-		Timeout string    `yaml:"timeout,omitempty"`
-		RunOn   HookRunOn `yaml:"run-on,omitempty"`
+		Enabled  *bool     `yaml:"enabled,omitempty"`
+		Hook     string    `yaml:"hook,omitempty"`
+		Name     string    `yaml:"name,omitempty"`
+		Type     HookType  `yaml:"type,omitempty"`
+		Command  string    `yaml:"command,omitempty"`
+		Prompt   string    `yaml:"prompt,omitempty"`
+		System   string    `yaml:"system_prompt,omitempty"`
+		Model    string    `yaml:"model,omitempty"`
+		Thinking string    `yaml:"thinking,omitempty"`
+		Role     string    `yaml:"role,omitempty"`
+		OutputTo string    `yaml:"output_to,omitempty"`
+		ErrorTo  string    `yaml:"error_to,omitempty"`
+		Timeout  string    `yaml:"timeout,omitempty"`
+		RunOn    HookRunOn `yaml:"run-on,omitempty"`
 	}{}
 
 	if err := node.Decode(&aux); err != nil {

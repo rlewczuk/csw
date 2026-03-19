@@ -38,9 +38,9 @@ type JSONRPCResponse struct {
 
 // InitializeRequestParams are parameters for MCP initialize request.
 type InitializeRequestParams struct {
-	ProtocolVersion string                 `json:"protocolVersion"`
-	Capabilities    map[string]any         `json:"capabilities"`
-	ClientInfo      MCPImplementationInfo  `json:"clientInfo"`
+	ProtocolVersion string                `json:"protocolVersion"`
+	Capabilities    map[string]any        `json:"capabilities"`
+	ClientInfo      MCPImplementationInfo `json:"clientInfo"`
 }
 
 // MCPImplementationInfo identifies MCP endpoint implementation.
@@ -59,11 +59,11 @@ type InitializeResult struct {
 
 // RemoteTool defines MCP tool metadata returned by tools/list.
 type RemoteTool struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description,omitempty"`
-	InputSchema map[string]any         `json:"inputSchema"`
-	Annotations map[string]any         `json:"annotations,omitempty"`
-	Meta        map[string]any         `json:"_meta,omitempty"`
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	InputSchema map[string]any `json:"inputSchema"`
+	Annotations map[string]any `json:"annotations,omitempty"`
+	Meta        map[string]any `json:"_meta,omitempty"`
 }
 
 // ListToolsResult is result payload for tools/list request.
