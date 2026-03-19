@@ -71,6 +71,38 @@ type ListToolsResult struct {
 	Tools []RemoteTool `json:"tools"`
 }
 
+// RemoteResource defines MCP resource metadata returned by resources/list.
+type RemoteResource struct {
+	URI         string         `json:"uri"`
+	Name        string         `json:"name,omitempty"`
+	Description string         `json:"description,omitempty"`
+	MimeType    string         `json:"mimeType,omitempty"`
+	Meta        map[string]any `json:"_meta,omitempty"`
+}
+
+// ListResourcesResult is result payload for resources/list request.
+type ListResourcesResult struct {
+	Resources []RemoteResource `json:"resources"`
+}
+
+// ReadResourceRequestParams are parameters for resources/read request.
+type ReadResourceRequestParams struct {
+	URI string `json:"uri"`
+}
+
+// ResourceContent is a single resources/read response content entry.
+type ResourceContent struct {
+	URI      string `json:"uri,omitempty"`
+	MimeType string `json:"mimeType,omitempty"`
+	Text     string `json:"text,omitempty"`
+	Blob     string `json:"blob,omitempty"`
+}
+
+// ReadResourceResult is result payload for resources/read request.
+type ReadResourceResult struct {
+	Contents []ResourceContent `json:"contents"`
+}
+
 // CallToolRequestParams are parameters for tools/call request.
 type CallToolRequestParams struct {
 	Name      string         `json:"name"`

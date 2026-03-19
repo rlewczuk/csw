@@ -15,9 +15,13 @@ import (
 )
 
 type fakeMCPClient struct {
-	startErr error
-	listErr  error
-	tools    []mcp.RemoteTool
+	startErr      error
+	listErr       error
+	listResErr    error
+	readResErr    error
+	tools         []mcp.RemoteTool
+	resources     []mcp.RemoteResource
+	readResource  *mcp.ReadResourceResult
 
 	started bool
 	closed  bool
@@ -38,6 +42,23 @@ func (c *fakeMCPClient) ListTools() ([]mcp.RemoteTool, error) {
 		return nil, c.listErr
 	}
 	return append([]mcp.RemoteTool(nil), c.tools...), nil
+}
+
+func (c *fakeMCPClient) ListResources() ([]mcp.RemoteResource, error) {
+	if c.listResErr != nil {
+		return nil, c.listResErr
+	}
+	return append([]mcp.RemoteResource(nil), c.resources...), nil
+}
+
+func (c *fakeMCPClient) ReadResource(uri string) (*mcp.ReadResourceResult, error) {
+	if c.readResErr != nil {
+		return nil, c.readResErr
+	}
+	if c.readResource == nil {
+		return nil, fmt.Errorf("fakeMCPClient.ReadResource() [mcp_test.go]: no read resource response for %s", uri)
+	}
+	return c.readResource, nil
 }
 
 func TestMCPCommand_List(t *testing.T) {
@@ -195,5 +216,73 @@ func TestMCPCommand_ToolListAndInfo(t *testing.T) {
 		err := cmd.Execute()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "tool \"missing\" not found")
+	})
+}
+
+func TestMCPCommand_ResourceListAndRead(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpHome := t.TempDir()
+
+	oldHome := os.Getenv("HOME")
+	oldDir, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = os.Setenv("HOME", oldHome)
+		_ = os.Chdir(oldDir)
+	})
+	require.NoError(t, os.Setenv("HOME", tmpHome))
+	require.NoError(t, os.Chdir(tmpDir))
+
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, ".csw", "config", "mcp"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, ".csw", "config", "mcp", "srv.yml"), []byte("enabled: true\ntransport: stdio\ncmd: srv-server\n"), 0o644))
+
+	oldFactory := mcpNewClientFactory
+	t.Cleanup(func() { mcpNewClientFactory = oldFactory })
+	mcpNewClientFactory = func(name string, cfg *conf.MCPServerConfig) (mcpClient, error) {
+		return &fakeMCPClient{
+			resources: []mcp.RemoteResource{
+				{URI: "file:///tmp/a.txt", Name: "A", MimeType: "text/plain", Description: "alpha"},
+				{URI: "file:///tmp/b.txt", Name: "B", MimeType: "text/plain", Description: "beta"},
+			},
+			readResource: &mcp.ReadResourceResult{
+				Contents: []mcp.ResourceContent{{URI: "file:///tmp/a.txt", MimeType: "text/plain", Text: "hello from resource"}},
+			},
+		}, nil
+	}
+
+	t.Run("resource list", func(t *testing.T) {
+		cmd := McpCommand()
+		stdout := &bytes.Buffer{}
+		cmd.SetOut(stdout)
+		cmd.SetErr(&bytes.Buffer{})
+		cmd.SetArgs([]string{"resource", "list", "srv"})
+
+		err := cmd.Execute()
+		require.NoError(t, err)
+
+		output := stdout.String()
+		assert.Contains(t, output, "NAME")
+		assert.Contains(t, output, "URI")
+		assert.Contains(t, output, "MIME TYPE")
+		assert.Contains(t, output, "DESCRIPTION")
+		assert.Contains(t, output, "file:///tmp/a.txt")
+		assert.Contains(t, output, "file:///tmp/b.txt")
+	})
+
+	t.Run("resource read", func(t *testing.T) {
+		cmd := McpCommand()
+		stdout := &bytes.Buffer{}
+		cmd.SetOut(stdout)
+		cmd.SetErr(&bytes.Buffer{})
+		cmd.SetArgs([]string{"resource", "read", "srv", "file:///tmp/a.txt"})
+
+		err := cmd.Execute()
+		require.NoError(t, err)
+
+		output := stdout.String()
+		assert.Contains(t, output, "Server: srv")
+		assert.Contains(t, output, "Resource: file:///tmp/a.txt")
+		assert.Contains(t, output, "MIME Type: text/plain")
+		assert.Contains(t, output, "hello from resource")
 	})
 }

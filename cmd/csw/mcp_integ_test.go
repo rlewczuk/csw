@@ -38,6 +38,8 @@ func TestMCPCommand_HTTPIntegration(t *testing.T) {
 	queueMCPOperationCycle(mockServer)
 	queueMCPOperationCycle(mockServer)
 	queueMCPOperationCycle(mockServer)
+	queueMCPResourceListCycle(mockServer)
+	queueMCPResourceReadCycle(mockServer)
 
 	t.Run("mcp list --status", func(t *testing.T) {
 		cmd := McpCommand()
@@ -91,6 +93,42 @@ func TestMCPCommand_HTTPIntegration(t *testing.T) {
 		assert.Contains(t, output, "Description: Read file")
 		assert.Contains(t, output, "path (type: string, required: yes): Path to read")
 	})
+
+	t.Run("mcp resource list", func(t *testing.T) {
+		cmd := McpCommand()
+		stdout := &bytes.Buffer{}
+		stderr := &bytes.Buffer{}
+		cmd.SetOut(stdout)
+		cmd.SetErr(stderr)
+		cmd.SetArgs([]string{"resource", "list", "remote"})
+
+		err := cmd.Execute()
+		require.NoError(t, err)
+
+		output := stdout.String()
+		assert.Contains(t, output, "NAME")
+		assert.Contains(t, output, "URI")
+		assert.Contains(t, output, "README")
+		assert.Contains(t, output, "file:///workspace/README.md")
+	})
+
+	t.Run("mcp resource read", func(t *testing.T) {
+		cmd := McpCommand()
+		stdout := &bytes.Buffer{}
+		stderr := &bytes.Buffer{}
+		cmd.SetOut(stdout)
+		cmd.SetErr(stderr)
+		cmd.SetArgs([]string{"resource", "read", "remote", "file:///workspace/README.md"})
+
+		err := cmd.Execute()
+		require.NoError(t, err)
+
+		output := stdout.String()
+		assert.Contains(t, output, "Server: remote")
+		assert.Contains(t, output, "Resource: file:///workspace/README.md")
+		assert.Contains(t, output, "MIME Type: text/markdown")
+		assert.Contains(t, output, "# Demo")
+	})
 }
 
 func queueMCPOperationCycle(server *testutil.MockHTTPServer) {
@@ -110,5 +148,45 @@ func queueMCPOperationCycle(server *testutil.MockHTTPServer) {
 		"/mcp",
 		http.MethodPost,
 		`{"jsonrpc":"2.0","id":3,"result":{"tools":[{"name":"read_file","description":"Read file","inputSchema":{"type":"object","properties":{"path":{"type":"string","description":"Path to read"}},"required":["path"]}}]}}`,
+	)
+}
+
+func queueMCPResourceListCycle(server *testutil.MockHTTPServer) {
+	if server == nil {
+		return
+	}
+
+	server.AddRestResponseWithStatusAndHeaders(
+		"/mcp",
+		http.MethodPost,
+		`{"jsonrpc":"2.0","id":2,"result":{"protocolVersion":"2025-11-25","capabilities":{},"serverInfo":{"name":"mock","version":"1.0"}}}`,
+		http.StatusOK,
+		http.Header{"Mcp-Session-Id": []string{"session-123"}},
+	)
+	server.AddRestResponseWithStatus("/mcp", http.MethodPost, "", http.StatusAccepted)
+	server.AddRestResponse(
+		"/mcp",
+		http.MethodPost,
+		`{"jsonrpc":"2.0","id":3,"result":{"resources":[{"uri":"file:///workspace/README.md","name":"README","mimeType":"text/markdown","description":"Project readme"}]}}`,
+	)
+}
+
+func queueMCPResourceReadCycle(server *testutil.MockHTTPServer) {
+	if server == nil {
+		return
+	}
+
+	server.AddRestResponseWithStatusAndHeaders(
+		"/mcp",
+		http.MethodPost,
+		`{"jsonrpc":"2.0","id":2,"result":{"protocolVersion":"2025-11-25","capabilities":{},"serverInfo":{"name":"mock","version":"1.0"}}}`,
+		http.StatusOK,
+		http.Header{"Mcp-Session-Id": []string{"session-123"}},
+	)
+	server.AddRestResponseWithStatus("/mcp", http.MethodPost, "", http.StatusAccepted)
+	server.AddRestResponse(
+		"/mcp",
+		http.MethodPost,
+		`{"jsonrpc":"2.0","id":3,"result":{"contents":[{"uri":"file:///workspace/README.md","mimeType":"text/markdown","text":"# Demo\n"}]}}`,
 	)
 }

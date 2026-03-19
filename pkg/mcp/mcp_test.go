@@ -472,6 +472,14 @@ func (s *stubClient) ListTools() ([]RemoteTool, error) {
 	return s.tools, nil
 }
 
+func (s *stubClient) ListResources() ([]RemoteResource, error) {
+	return nil, nil
+}
+
+func (s *stubClient) ReadResource(uri string) (*ReadResourceResult, error) {
+	return nil, nil
+}
+
 func (s *stubClient) CallTool(name string, arguments map[string]any) (*CallToolResult, error) {
 	if s.callResult == nil {
 		return nil, fmt.Errorf("stubClient.CallTool() [mcp_test.go]: no result")

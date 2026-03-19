@@ -170,6 +170,31 @@ Outputs:
 - parameter summary
 - raw input JSON schema
 
+### List resources exposed by one server
+
+```bash
+csw mcp resource list <server-name>
+```
+
+Columns:
+
+- `NAME`
+- `URI`
+- `MIME TYPE`
+- `DESCRIPTION`
+
+### Read one resource by URI
+
+```bash
+csw mcp resource read <server-name> <resource-uri>
+```
+
+Outputs:
+
+- server + resource metadata
+- content blocks returned by the MCP server
+- text content directly (or decoded from base64 `blob` when it contains UTF-8 text)
+
 ## `csw mcp` command reference
 
 ### `csw mcp`
@@ -187,3 +212,11 @@ List tools from one MCP server and mark which are available after local filters.
 ### `csw mcp tool info <server-name> <tool-name>`
 
 Show detailed information and input schema for one remote MCP tool.
+
+### `csw mcp resource list <server-name>`
+
+List resources available on one MCP server.
+
+### `csw mcp resource read <server-name> <resource-uri>`
+
+Read one resource by URI from MCP server and print returned content.

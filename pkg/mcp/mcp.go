@@ -30,6 +30,8 @@ type client interface {
 	Start() error
 	Close() error
 	ListTools() ([]RemoteTool, error)
+	ListResources() ([]RemoteResource, error)
+	ReadResource(uri string) (*ReadResourceResult, error)
 	CallTool(name string, arguments map[string]any) (*CallToolResult, error)
 }
 
@@ -207,6 +209,47 @@ func (c *Client) ListTools() ([]RemoteTool, error) {
 	}
 
 	return result.Tools, nil
+}
+
+// ListResources lists resources exposed by MCP server.
+func (c *Client) ListResources() ([]RemoteResource, error) {
+	resultMap, err := c.request("resources/list", map[string]any{})
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(resultMap)
+	if err != nil {
+		return nil, fmt.Errorf("Client.ListResources() [mcp.go]: failed to marshal resources/list result for %s: %w", c.name, err)
+	}
+
+	var result ListResourcesResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("Client.ListResources() [mcp.go]: failed to parse resources/list result for %s: %w", c.name, err)
+	}
+
+	return result.Resources, nil
+}
+
+// ReadResource reads one MCP resource by URI.
+func (c *Client) ReadResource(uri string) (*ReadResourceResult, error) {
+	params := ReadResourceRequestParams{URI: uri}
+	resultMap, err := c.request("resources/read", params)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(resultMap)
+	if err != nil {
+		return nil, fmt.Errorf("Client.ReadResource() [mcp.go]: failed to marshal resources/read result for %s: %w", c.name, err)
+	}
+
+	var result ReadResourceResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("Client.ReadResource() [mcp.go]: failed to parse resources/read result for %s: %w", c.name, err)
+	}
+
+	return &result, nil
 }
 
 // CallTool invokes a specific MCP tool.
@@ -473,6 +516,47 @@ func (c *HTTPClient) ListTools() ([]RemoteTool, error) {
 	}
 
 	return result.Tools, nil
+}
+
+// ListResources lists resources exposed by MCP server.
+func (c *HTTPClient) ListResources() ([]RemoteResource, error) {
+	resultMap, _, err := c.requestWithHeaders("resources/list", map[string]any{})
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(resultMap)
+	if err != nil {
+		return nil, fmt.Errorf("HTTPClient.ListResources() [mcp.go]: failed to marshal resources/list result for %s: %w", c.name, err)
+	}
+
+	var result ListResourcesResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("HTTPClient.ListResources() [mcp.go]: failed to parse resources/list result for %s: %w", c.name, err)
+	}
+
+	return result.Resources, nil
+}
+
+// ReadResource reads one MCP resource by URI.
+func (c *HTTPClient) ReadResource(uri string) (*ReadResourceResult, error) {
+	params := ReadResourceRequestParams{URI: uri}
+	resultMap, _, err := c.requestWithHeaders("resources/read", params)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(resultMap)
+	if err != nil {
+		return nil, fmt.Errorf("HTTPClient.ReadResource() [mcp.go]: failed to marshal resources/read result for %s: %w", c.name, err)
+	}
+
+	var result ReadResourceResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("HTTPClient.ReadResource() [mcp.go]: failed to parse resources/read result for %s: %w", c.name, err)
+	}
+
+	return &result, nil
 }
 
 // CallTool invokes a specific MCP tool.

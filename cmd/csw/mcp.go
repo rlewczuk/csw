@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"text/tabwriter"
+	"unicode/utf8"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/mcp"
@@ -18,6 +20,8 @@ type mcpClient interface {
 	Start() error
 	Close() error
 	ListTools() ([]mcp.RemoteTool, error)
+	ListResources() ([]mcp.RemoteResource, error)
+	ReadResource(uri string) (*mcp.ReadResourceResult, error)
 }
 
 var mcpNewClientFactory = func(name string, cfg *conf.MCPServerConfig) (mcpClient, error) {
@@ -34,8 +38,76 @@ func McpCommand() *cobra.Command {
 
 	cmd.AddCommand(mcpListCommand())
 	cmd.AddCommand(mcpToolCommand())
+	cmd.AddCommand(mcpResourceCommand())
 
 	return cmd
+}
+
+func mcpResourceCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "resource",
+		Short: "Inspect MCP server resources",
+	}
+
+	cmd.AddCommand(mcpResourceListCommand())
+	cmd.AddCommand(mcpResourceReadCommand())
+
+	return cmd
+}
+
+func mcpResourceListCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "list <server-name>",
+		Short: "List resources available on MCP server",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			serverName := strings.TrimSpace(args[0])
+			store, err := GetCompositeConfigStore()
+			if err != nil {
+				return err
+			}
+
+			cfg, err := getMCPServerConfigByName(store, serverName)
+			if err != nil {
+				return err
+			}
+
+			resources, err := fetchMCPServerResources(serverName, cfg)
+			if err != nil {
+				return err
+			}
+
+			return outputMCPResourceList(cmd.OutOrStdout(), resources)
+		},
+	}
+}
+
+func mcpResourceReadCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "read <server-name> <resource-uri>",
+		Short: "Read one resource from MCP server",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			serverName := strings.TrimSpace(args[0])
+			resourceURI := strings.TrimSpace(args[1])
+			store, err := GetCompositeConfigStore()
+			if err != nil {
+				return err
+			}
+
+			cfg, err := getMCPServerConfigByName(store, serverName)
+			if err != nil {
+				return err
+			}
+
+			result, err := readMCPServerResource(serverName, cfg, resourceURI)
+			if err != nil {
+				return err
+			}
+
+			return outputMCPResourceRead(cmd.OutOrStdout(), serverName, resourceURI, result)
+		},
+	}
 }
 
 func mcpListCommand() *cobra.Command {
@@ -232,6 +304,71 @@ func outputMCPToolInfo(output io.Writer, serverName string, remoteTool mcp.Remot
 	return nil
 }
 
+func outputMCPResourceList(output io.Writer, resources []mcp.RemoteResource) error {
+	w := tabwriter.NewWriter(output, 0, 0, 2, ' ', 0)
+	defer w.Flush()
+
+	fmt.Fprintln(w, "NAME\tURI\tMIME TYPE\tDESCRIPTION")
+
+	sortedResources := append([]mcp.RemoteResource(nil), resources...)
+	sort.Slice(sortedResources, func(i, j int) bool {
+		return sortedResources[i].URI < sortedResources[j].URI
+	})
+
+	for _, resource := range sortedResources {
+		fmt.Fprintf(
+			w,
+			"%s\t%s\t%s\t%s\n",
+			strings.TrimSpace(resource.Name),
+			strings.TrimSpace(resource.URI),
+			strings.TrimSpace(resource.MimeType),
+			strings.TrimSpace(resource.Description),
+		)
+	}
+
+	return nil
+}
+
+func outputMCPResourceRead(output io.Writer, serverName string, resourceURI string, result *mcp.ReadResourceResult) error {
+	fmt.Fprintf(output, "Server: %s\n", serverName)
+	fmt.Fprintf(output, "Resource: %s\n", resourceURI)
+
+	if result == nil || len(result.Contents) == 0 {
+		fmt.Fprintln(output, "")
+		fmt.Fprintln(output, "No content returned.")
+		return nil
+	}
+
+	for index, content := range result.Contents {
+		fmt.Fprintln(output, "")
+		if len(result.Contents) > 1 {
+			fmt.Fprintf(output, "Content #%d\n", index+1)
+		}
+		if strings.TrimSpace(content.URI) != "" {
+			fmt.Fprintf(output, "URI: %s\n", strings.TrimSpace(content.URI))
+		}
+		if strings.TrimSpace(content.MimeType) != "" {
+			fmt.Fprintf(output, "MIME Type: %s\n", strings.TrimSpace(content.MimeType))
+		}
+
+		fmt.Fprintln(output, "")
+		if strings.TrimSpace(content.Text) != "" {
+			fmt.Fprintln(output, content.Text)
+			continue
+		}
+
+		decodedBlob, decoded := tryDecodeMCPResourceBlob(content.Blob)
+		if decoded {
+			fmt.Fprintln(output, decodedBlob)
+			continue
+		}
+
+		fmt.Fprintln(output, strings.TrimSpace(content.Blob))
+	}
+
+	return nil
+}
+
 func getMCPServerConfigByName(store conf.ConfigStore, serverName string) (*conf.MCPServerConfig, error) {
 	configs, err := store.GetMCPServerConfigs()
 	if err != nil {
@@ -264,6 +401,64 @@ func fetchMCPServerTools(serverName string, cfg *conf.MCPServerConfig) ([]mcp.Re
 	}
 
 	return tools, nil
+}
+
+func fetchMCPServerResources(serverName string, cfg *conf.MCPServerConfig) ([]mcp.RemoteResource, error) {
+	client, err := mcpNewClientFactory(serverName, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("fetchMCPServerResources() [mcp.go]: failed to create mcp client for %s: %w", serverName, err)
+	}
+
+	if err := client.Start(); err != nil {
+		_ = client.Close()
+		return nil, fmt.Errorf("fetchMCPServerResources() [mcp.go]: failed to start mcp client for %s: %w", serverName, err)
+	}
+	defer client.Close()
+
+	resources, err := client.ListResources()
+	if err != nil {
+		return nil, fmt.Errorf("fetchMCPServerResources() [mcp.go]: failed to list resources for %s: %w", serverName, err)
+	}
+
+	return resources, nil
+}
+
+func readMCPServerResource(serverName string, cfg *conf.MCPServerConfig, resourceURI string) (*mcp.ReadResourceResult, error) {
+	if strings.TrimSpace(resourceURI) == "" {
+		return nil, fmt.Errorf("readMCPServerResource() [mcp.go]: resource URI cannot be empty")
+	}
+
+	client, err := mcpNewClientFactory(serverName, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("readMCPServerResource() [mcp.go]: failed to create mcp client for %s: %w", serverName, err)
+	}
+
+	if err := client.Start(); err != nil {
+		_ = client.Close()
+		return nil, fmt.Errorf("readMCPServerResource() [mcp.go]: failed to start mcp client for %s: %w", serverName, err)
+	}
+	defer client.Close()
+
+	result, err := client.ReadResource(resourceURI)
+	if err != nil {
+		return nil, fmt.Errorf("readMCPServerResource() [mcp.go]: failed to read resource %s for %s: %w", resourceURI, serverName, err)
+	}
+
+	return result, nil
+}
+
+func tryDecodeMCPResourceBlob(blob string) (string, bool) {
+	trimmed := strings.TrimSpace(blob)
+	if trimmed == "" {
+		return "", false
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(trimmed)
+	if err != nil || !utf8.Valid(decoded) {
+		return "", false
+	}
+
+	return string(decoded), true
 }
 
 func probeMCPServerStatus(serverName string, cfg *conf.MCPServerConfig) string {
