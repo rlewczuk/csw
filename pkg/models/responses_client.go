@@ -583,7 +583,7 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
-			readErr := fmt.Errorf("ResponsesChatModel.Chat() [responses_client.go]: failed to read response body: %w", err)
+			readErr := fmt.Errorf("ResponsesChatModel.Chat() [responses_client.go]: failed to read response body: %w", m.client.handleHTTPError(err))
 			return nil, nil, wrapLLMRequestError(readErr, resp, nil)
 		}
 
@@ -989,6 +989,13 @@ func responsesToolCallFromStream(tc *responsesToolCallInProgress) *tool.ToolCall
 func (c *ResponsesClient) handleHTTPError(err error) error {
 	if err == nil {
 		return nil
+	}
+
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return &NetworkError{
+			Message:     fmt.Sprintf("unexpected stream EOF: %v", err),
+			IsRetryable: true,
+		}
 	}
 
 	// Check for DNS errors first

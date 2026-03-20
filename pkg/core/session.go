@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -1885,6 +1886,10 @@ func isTemporaryLLMError(err error) bool {
 	}
 
 	if errors.Is(err, models.ErrEndpointUnavailable) {
+		return true
+	}
+
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		return true
 	}
 

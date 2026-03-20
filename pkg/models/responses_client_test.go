@@ -28,6 +28,17 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
+type unexpectedEOFReadCloser struct{}
+
+func (r *unexpectedEOFReadCloser) Read(p []byte) (int, error) {
+	_ = p
+	return 0, io.ErrUnexpectedEOF
+}
+
+func (r *unexpectedEOFReadCloser) Close() error {
+	return nil
+}
+
 const (
 	defaultResponsesTestURL = "https://api.openai.com/v1"
 	testResponsesModelName  = "gpt-4o-mini"
@@ -814,6 +825,32 @@ func TestResponsesClient_ChatWrapsLLMRequestError(t *testing.T) {
 		assert.Contains(t, llmErr.RawResponse, "200\n")
 		assert.Contains(t, llmErr.RawResponse, "Content-Type: application/json")
 		assert.True(t, strings.HasSuffix(llmErr.RawResponse, "not-json"))
+	})
+
+	t.Run("wraps response body unexpected EOF as retryable network error", func(t *testing.T) {
+		httpClient := &http.Client{
+			Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     make(http.Header),
+					Body:       &unexpectedEOFReadCloser{},
+					Request:    req,
+				}, nil
+			}),
+		}
+
+		client, err := NewResponsesClientWithHTTPClient("https://example.test", httpClient)
+		require.NoError(t, err)
+
+		chatModel := client.ChatModel("test-model", nil)
+		_, err = chatModel.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}, nil, nil)
+		require.Error(t, err)
+
+		var networkErr *NetworkError
+		require.True(t, errors.As(err, &networkErr))
+		assert.True(t, networkErr.IsRetryable)
+		assert.Contains(t, networkErr.Message, "unexpected stream EOF")
+		assert.Contains(t, err.Error(), "failed to read response body")
 	})
 }
 

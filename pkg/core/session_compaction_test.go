@@ -2,7 +2,9 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"iter"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -233,5 +235,17 @@ func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 		assert.Contains(t, err.Error(), "too many input tokens after 2 attempts")
 		assert.Equal(t, 2, session.compactionCount)
 		require.Len(t, chatModel.callSizes, 2)
+	})
+}
+
+func TestIsTemporaryLLMError(t *testing.T) {
+	t.Run("returns true for wrapped unexpected EOF", func(t *testing.T) {
+		err := fmt.Errorf("wrapped: %w", io.ErrUnexpectedEOF)
+		assert.True(t, isTemporaryLLMError(err))
+	})
+
+	t.Run("returns true for wrapped retryable network error", func(t *testing.T) {
+		err := fmt.Errorf("read failed: %w", &models.NetworkError{Message: "unexpected stream EOF", IsRetryable: true})
+		assert.True(t, isTemporaryLLMError(err))
 	})
 }

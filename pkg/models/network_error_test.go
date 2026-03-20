@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"io"
 	"net"
 	"testing"
 
@@ -164,6 +165,15 @@ func TestResponsesClient_HandleHTTPError(t *testing.T) {
 		var networkErr *NetworkError
 		assert.True(t, errors.As(err, &networkErr))
 		assert.True(t, networkErr.IsRetryable)
+	})
+
+	t.Run("returns NetworkError for unexpected EOF", func(t *testing.T) {
+		err := client.handleHTTPError(io.ErrUnexpectedEOF)
+
+		var networkErr *NetworkError
+		assert.True(t, errors.As(err, &networkErr))
+		assert.True(t, networkErr.IsRetryable)
+		assert.Contains(t, networkErr.Message, "unexpected stream EOF")
 	})
 }
 
