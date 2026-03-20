@@ -182,7 +182,7 @@ func runOneHook(ctx context.Context, hookName string, contextData map[string]str
 		if cwdErr != nil {
 			return nil, fmt.Errorf("runOneHook() [hook.go]: failed to resolve workdir: %w", cwdErr)
 		}
-		sweSystem, buildResult, buildErr := system.BuildSystem(system.BuildSystemParams{WorkDir: cwd})
+		sweSystem, buildResult, buildErr := system.BuildSystem(system.BuildSystemParams{WorkDir: cwd, RoleName: "developer"})
 		if buildErr != nil {
 			return nil, fmt.Errorf("runOneHook() [hook.go]: failed to build system: %w", buildErr)
 		}
