@@ -1247,6 +1247,8 @@ func applyHookSettings(target *conf.HookConfig, name string, settings map[string
 			}
 		case "command":
 			target.Command = value
+		case "description":
+			target.Description = value
 		case "prompt":
 			target.Prompt = value
 		case "system_prompt", "system-prompt":

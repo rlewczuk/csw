@@ -249,6 +249,8 @@ func (c *MCPServerConfig) UnmarshalYAML(node *yaml.Node) error {
 type HookConfig struct {
 	// Enabled controls whether hook should be executed. Defaults to true.
 	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	// Description is optional human-readable hook description.
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 	// Hook is extension point identifier (for example: merge, commit, summary).
 	Hook string `json:"hook,omitempty" yaml:"hook,omitempty"`
 	// Name is user-assigned hook identifier used for matching/overriding.
@@ -289,6 +291,7 @@ type HookConfig struct {
 	EmbeddedSource bool `json:"-" yaml:"-"`
 
 	enabledConfigured  bool
+	descriptionConfigured bool
 	hookConfigured     bool
 	nameConfigured     bool
 	typeConfigured     bool
@@ -308,6 +311,7 @@ type HookConfig struct {
 func (c *HookConfig) UnmarshalJSON(data []byte) error {
 	aux := struct {
 		Enabled  *bool     `json:"enabled,omitempty"`
+		Description string `json:"description,omitempty"`
 		Hook     string    `json:"hook,omitempty"`
 		Name     string    `json:"name,omitempty"`
 		Type     HookType  `json:"type,omitempty"`
@@ -331,6 +335,7 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 		c.Enabled = *aux.Enabled
 		c.enabledConfigured = true
 	}
+	c.Description = aux.Description
 	c.Hook = aux.Hook
 	c.Name = aux.Name
 	c.Type = aux.Type
@@ -350,6 +355,7 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 	}
 
 	_, c.enabledConfigured = raw["enabled"]
+	_, c.descriptionConfigured = raw["description"]
 	_, c.hookConfigured = raw["hook"]
 	_, c.nameConfigured = raw["name"]
 	_, c.typeConfigured = raw["type"]
@@ -382,6 +388,7 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 	aux := struct {
 		Enabled  *bool     `yaml:"enabled,omitempty"`
+		Description string `yaml:"description,omitempty"`
 		Hook     string    `yaml:"hook,omitempty"`
 		Name     string    `yaml:"name,omitempty"`
 		Type     HookType  `yaml:"type,omitempty"`
@@ -405,6 +412,7 @@ func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 		c.Enabled = *aux.Enabled
 		c.enabledConfigured = true
 	}
+	c.Description = aux.Description
 	c.Hook = aux.Hook
 	c.Name = aux.Name
 	c.Type = aux.Type
@@ -438,6 +446,8 @@ func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 			c.enabledConfigured = true
 		case "hook":
 			c.hookConfigured = true
+		case "description":
+			c.descriptionConfigured = true
 		case "name":
 			c.nameConfigured = true
 		case "type":

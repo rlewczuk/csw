@@ -615,6 +615,10 @@ func (c *HookConfig) Merge(override *HookConfig) {
 		c.Enabled = override.Enabled
 		c.enabledConfigured = true
 	}
+	if override.descriptionConfigured {
+		c.Description = override.Description
+		c.descriptionConfigured = true
+	}
 
 	if override.hookConfigured {
 		c.Hook = override.Hook

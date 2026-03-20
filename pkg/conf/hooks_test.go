@@ -12,14 +12,22 @@ import (
 
 func TestHookConfigUnmarshalJSONDefaults(t *testing.T) {
 	var cfg HookConfig
-	err := json.Unmarshal([]byte(`{"name":"h1","hook":"merge","command":"echo hi"}`), &cfg)
+	err := json.Unmarshal([]byte(`{"name":"h1","description":"desc","hook":"merge","command":"echo hi"}`), &cfg)
 	require.NoError(t, err)
 	assert.Equal(t, "h1", cfg.Name)
+	assert.Equal(t, "desc", cfg.Description)
 	assert.Equal(t, "merge", cfg.Hook)
 	assert.True(t, cfg.Enabled)
 	assert.Equal(t, HookTypeShell, cfg.Type)
 	assert.Equal(t, HookRunOnSandbox, cfg.RunOn)
 	assert.Equal(t, time.Duration(0), cfg.Timeout)
+}
+
+func TestHookConfigUnmarshalYAMLDescription(t *testing.T) {
+	var cfg HookConfig
+	err := yaml.Unmarshal([]byte("name: h1\ndescription: test desc\nhook: merge\ncommand: echo hi\n"), &cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "test desc", cfg.Description)
 }
 
 func TestHookConfigUnmarshalJSONLLMFields(t *testing.T) {
