@@ -1,0 +1,8 @@
+name: jira_ticket
+hook: pre_run
+enabled: true
+type: shell
+run-on: host
+timeout: 30s
+command: |
+  python3 {{ .hook_dir }}/jira_ticket.py
