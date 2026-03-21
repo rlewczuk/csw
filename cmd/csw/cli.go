@@ -18,11 +18,13 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/presenter"
+	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
@@ -34,6 +36,9 @@ import (
 // CLIParams holds all parameters for runCLI.
 type CLIParams struct {
 	Prompt                string
+	CommandName           string
+	CommandArgs           []string
+	CommandTemplate       string
 	ContextData           map[string]string
 	ModelName             string
 	RoleName              string
@@ -126,10 +131,10 @@ func CliCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--continue <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last>] [--resume-continue] [--force] [\"prompt\"]",
+		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--continue <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last>] [--resume-continue] [--force] [\"prompt\"] [command-args...]",
 		Short: "Start a CLI chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Suppress usage for runtime errors from command execution.
 			// Argument/flag parsing errors happen before RunE and still show usage.
@@ -150,8 +155,10 @@ func CliCommand() *cobra.Command {
 			}
 
 			prompt := ""
-			if len(args) == 1 {
+			extraPositionalArgs := []string(nil)
+			if len(args) >= 1 {
 				prompt = args[0]
+				extraPositionalArgs = args[1:]
 			}
 
 			// Read prompt from file if it starts with @
@@ -173,6 +180,41 @@ func CliCommand() *cobra.Command {
 
 			if prompt != "" {
 				prompt = strings.TrimSpace(prompt)
+			}
+
+			invocation, isCommandInvocation, err := commands.ParseInvocation(prompt, extraPositionalArgs)
+			if err != nil {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: %w", err)
+			}
+			if !isCommandInvocation && len(extraPositionalArgs) > 0 {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt must be a single argument unless using /command invocation")
+			}
+
+			commandTemplate := ""
+			commandName := ""
+			commandArgs := []string(nil)
+			commandModelOverride := ""
+			commandRoleOverride := ""
+			commandNeedsShell := false
+			if invocation != nil {
+				commandsRoot, rootErr := resolveCommandsRootDir(cliWorkDir, cliShadowDir)
+				if rootErr != nil {
+					return rootErr
+				}
+				loadedCommand, loadErr := commands.LoadFromDir(filepath.Join(commandsRoot, ".agents", "commands"), invocation.Name)
+				if loadErr != nil {
+					return fmt.Errorf("CliCommand.RunE() [cli.go]: %w", loadErr)
+				}
+
+				commandTemplate = loadedCommand.Template
+				commandName = loadedCommand.Name
+				commandArgs = invocation.Arguments
+
+				commandModelOverride = strings.TrimSpace(loadedCommand.Metadata.Model)
+				commandRoleOverride = strings.TrimSpace(loadedCommand.Metadata.Agent)
+				commandNeedsShell = strings.Contains(loadedCommand.Template, "!`")
+
+				prompt = loadedCommand.Template
 			}
 
 			contextData, err := parseCLIContextEntries(cliContext)
@@ -211,6 +253,15 @@ func CliCommand() *cobra.Command {
 				return err
 			}
 
+			if invocation != nil {
+				if !cmd.Flags().Changed("model") && commandModelOverride != "" {
+					cliModel = commandModelOverride
+				}
+				if !cmd.Flags().Changed("role") && commandRoleOverride != "" {
+					cliRole = commandRoleOverride
+				}
+			}
+
 			containerEnabledChanged := cmd.Flags().Changed("container-enabled")
 			containerDisabledChanged := cmd.Flags().Changed("container-disabled")
 			if containerEnabledChanged && containerDisabledChanged {
@@ -218,6 +269,9 @@ func CliCommand() *cobra.Command {
 			}
 
 			containerRequested := (containerEnabledChanged && cliContainerOn) || len(cliContainerMount) > 0 || len(cliContainerEnv) > 0
+			if !containerDisabledChanged && invocation != nil && commandNeedsShell {
+				containerRequested = true
+			}
 			if containerRequested && resumeTarget != "" {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: container mode options are not supported with --resume")
 			}
@@ -229,6 +283,9 @@ func CliCommand() *cobra.Command {
 
 			return runCLIFunc(&CLIParams{
 				Prompt:                prompt,
+				CommandName:           commandName,
+				CommandArgs:           commandArgs,
+				CommandTemplate:       commandTemplate,
 				ContextData:           contextData,
 				ModelName:             cliModel,
 				RoleName:              cliRole,
@@ -454,6 +511,9 @@ func runCLI(params *CLIParams) error {
 	params.WorkDir = buildResult.WorkDir
 	params.ShadowDir = buildResult.ShadowDir
 	params.ModelName = buildResult.ModelName
+	if err := renderCommandPrompt(params, buildResult.WorkDir, buildResult.ShellRunner); err != nil {
+		return err
+	}
 	hookConfigStore, err := buildRuntimeHookConfigStore(sweSystem.ConfigStore, params.HookOverrides)
 	if err != nil {
 		return err
@@ -483,7 +543,7 @@ func runCLI(params *CLIParams) error {
 		_, _ = fmt.Fprintln(os.Stdout, buildContainerStartupInfoMessage(buildResult))
 	}
 
-		runtimeResult, err := sweSystem.StartCLISession(system.StartCLISessionParams{
+	runtimeResult, err := sweSystem.StartCLISession(system.StartCLISessionParams{
 		ModelName:       params.ModelName,
 		RoleName:        params.RoleName,
 		Prompt:          params.Prompt,
@@ -546,6 +606,50 @@ func runCLI(params *CLIParams) error {
 
 	if err := emitSessionSummary(startTime, endTime, session, buildResult, appView, sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func resolveCommandsRootDir(workDir string, shadowDir string) (string, error) {
+	if strings.TrimSpace(shadowDir) != "" {
+		resolvedShadowDir, err := system.ResolveWorkDir(shadowDir)
+		if err != nil {
+			return "", fmt.Errorf("resolveCommandsRootDir() [cli.go]: failed to resolve shadow directory: %w", err)
+		}
+		return resolvedShadowDir, nil
+	}
+
+	resolvedWorkDir, err := system.ResolveWorkDir(workDir)
+	if err != nil {
+		return "", fmt.Errorf("resolveCommandsRootDir() [cli.go]: failed to resolve work directory: %w", err)
+	}
+
+	return resolvedWorkDir, nil
+}
+
+func renderCommandPrompt(params *CLIParams, workDir string, shellRunner runner.CommandRunner) error {
+	if params == nil {
+		return fmt.Errorf("renderCommandPrompt() [cli.go]: params is nil")
+	}
+	if strings.TrimSpace(params.CommandName) == "" {
+		return nil
+	}
+
+	template := params.CommandTemplate
+	if strings.TrimSpace(template) == "" {
+		template = params.Prompt
+	}
+
+	withArguments := commands.ApplyArguments(template, params.CommandArgs)
+	expandedPrompt, err := commands.ExpandPrompt(withArguments, workDir, shellRunner)
+	if err != nil {
+		return fmt.Errorf("renderCommandPrompt() [cli.go]: failed to render command /%s: %w", params.CommandName, err)
+	}
+
+	params.Prompt = strings.TrimSpace(expandedPrompt)
+	if params.Prompt == "" {
+		return fmt.Errorf("renderCommandPrompt() [cli.go]: rendered command /%s prompt is empty", params.CommandName)
 	}
 
 	return nil
