@@ -14,6 +14,8 @@ import (
 
 var positionalArgPattern = regexp.MustCompile(`\$(\d+)`)
 var shellPattern = regexp.MustCompile("!`([^`]+)`")
+var defaultScriptPattern = regexp.MustCompile("(^|\\s)!([^\\s!`][^\\s`]*)")
+var hostScriptPattern = regexp.MustCompile("(^|\\s)!!([^\\s`]*)")
 var filePattern = regexp.MustCompile(`(^|\s)@([^\s]+)`)
 
 // Metadata describes supported command frontmatter fields.
@@ -117,13 +119,18 @@ func ApplyArguments(template string, args []string) string {
 }
 
 // ExpandPrompt expands shell and file references in rendered command template.
-func ExpandPrompt(prompt string, workDir string, shellRunner runner.CommandRunner) (string, error) {
-	withShell, err := expandShell(prompt, workDir, shellRunner)
+func ExpandPrompt(prompt string, workDir string, shellRunner runner.CommandRunner, hostShellRunner runner.CommandRunner) (string, error) {
+	withShell, err := expandShellExpressions(prompt, workDir, shellRunner)
 	if err != nil {
 		return "", err
 	}
 
-	withFiles, err := expandFiles(withShell, workDir)
+	withScripts, err := expandScripts(withShell, workDir, shellRunner, hostShellRunner)
+	if err != nil {
+		return "", err
+	}
+
+	withFiles, err := expandFiles(withScripts, workDir)
 	if err != nil {
 		return "", err
 	}
@@ -131,7 +138,16 @@ func ExpandPrompt(prompt string, workDir string, shellRunner runner.CommandRunne
 	return withFiles, nil
 }
 
-func expandShell(prompt string, workDir string, shellRunner runner.CommandRunner) (string, error) {
+// HasDefaultRuntimeShellExpansion reports whether prompt contains expansion that uses default runtime runner.
+func HasDefaultRuntimeShellExpansion(prompt string) bool {
+	if strings.Contains(prompt, "!`") {
+		return true
+	}
+
+	return defaultScriptPattern.FindStringIndex(prompt) != nil
+}
+
+func expandShellExpressions(prompt string, workDir string, shellRunner runner.CommandRunner) (string, error) {
 	if !strings.Contains(prompt, "!`") {
 		return prompt, nil
 	}
@@ -154,10 +170,10 @@ func expandShell(prompt string, workDir string, shellRunner runner.CommandRunner
 		command := prompt[match[2]:match[3]]
 		output, code, err := shellRunner.RunCommandWithOptions(command, runner.CommandOptions{Workdir: workDir})
 		if err != nil {
-			return "", fmt.Errorf("expandShell() [commands.go]: failed to run shell command %q: %w", command, err)
+			return "", fmt.Errorf("expandShellExpressions() [commands.go]: failed to run shell command %q: %w", command, err)
 		}
 		if code != 0 {
-			return "", fmt.Errorf("expandShell() [commands.go]: shell command %q failed with exit code %d: %s", command, code, strings.TrimSpace(output))
+			return "", fmt.Errorf("expandShellExpressions() [commands.go]: shell command %q failed with exit code %d: %s", command, code, strings.TrimSpace(output))
 		}
 		out.WriteString(strings.TrimRight(output, "\n"))
 		last = match[1]
@@ -165,6 +181,76 @@ func expandShell(prompt string, workDir string, shellRunner runner.CommandRunner
 	out.WriteString(prompt[last:])
 
 	return out.String(), nil
+}
+
+func expandScripts(prompt string, workDir string, shellRunner runner.CommandRunner, hostShellRunner runner.CommandRunner) (string, error) {
+	withHostScripts, err := expandScriptPattern(prompt, hostScriptPattern, workDir, hostShellRunner, "!!")
+	if err != nil {
+		return "", err
+	}
+
+	withDefaultScripts, err := expandScriptPattern(withHostScripts, defaultScriptPattern, workDir, shellRunner, "!")
+	if err != nil {
+		return "", err
+	}
+
+	return withDefaultScripts, nil
+}
+
+func expandScriptPattern(prompt string, pattern *regexp.Regexp, workDir string, shellRunner runner.CommandRunner, marker string) (string, error) {
+	if !strings.Contains(prompt, marker) {
+		return prompt, nil
+	}
+	if shellRunner == nil {
+		return "", fmt.Errorf("expandScriptPattern() [commands.go]: shell runner is nil for %s scripts", marker)
+	}
+
+	matches := pattern.FindAllStringSubmatchIndex(prompt, -1)
+	if len(matches) == 0 {
+		return prompt, nil
+	}
+
+	var out strings.Builder
+	last := 0
+	for _, match := range matches {
+		if len(match) < 6 {
+			continue
+		}
+
+		out.WriteString(prompt[last:match[0]])
+		prefix := prompt[match[2]:match[3]]
+		rawPath := prompt[match[4]:match[5]]
+		scriptPath := strings.TrimSpace(strings.TrimRight(rawPath, ",.;:"))
+		if scriptPath == "" {
+			out.WriteString(prompt[match[0]:match[1]])
+			last = match[1]
+			continue
+		}
+
+		command := buildScriptCommand(scriptPath)
+		output, code, err := shellRunner.RunCommandWithOptions(command, runner.CommandOptions{Workdir: workDir})
+		if err != nil {
+			return "", fmt.Errorf("expandScriptPattern() [commands.go]: failed to run %s script %q: %w", marker, scriptPath, err)
+		}
+		if code != 0 {
+			return "", fmt.Errorf("expandScriptPattern() [commands.go]: %s script %q failed with exit code %d: %s", marker, scriptPath, code, strings.TrimSpace(output))
+		}
+
+		out.WriteString(prefix)
+		out.WriteString(strings.TrimRight(output, "\n"))
+		last = match[1]
+	}
+
+	out.WriteString(prompt[last:])
+	return out.String(), nil
+}
+
+func buildScriptCommand(path string) string {
+	return "bash " + shellQuote(path)
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
 
 func expandFiles(prompt string, workDir string) (string, error) {

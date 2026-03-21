@@ -212,7 +212,7 @@ func CliCommand() *cobra.Command {
 
 				commandModelOverride = strings.TrimSpace(loadedCommand.Metadata.Model)
 				commandRoleOverride = strings.TrimSpace(loadedCommand.Metadata.Agent)
-				commandNeedsShell = strings.Contains(loadedCommand.Template, "!`")
+				commandNeedsShell = commands.HasDefaultRuntimeShellExpansion(loadedCommand.Template)
 
 				prompt = loadedCommand.Template
 			}
@@ -511,7 +511,7 @@ func runCLI(params *CLIParams) error {
 	params.WorkDir = buildResult.WorkDir
 	params.ShadowDir = buildResult.ShadowDir
 	params.ModelName = buildResult.ModelName
-	if err := renderCommandPrompt(params, buildResult.WorkDir, buildResult.ShellRunner); err != nil {
+	if err := renderCommandPrompt(params, buildResult.WorkDir, buildResult.ShellRunner, buildResult.HostShellRunner); err != nil {
 		return err
 	}
 	hookConfigStore, err := buildRuntimeHookConfigStore(sweSystem.ConfigStore, params.HookOverrides)
@@ -628,7 +628,7 @@ func resolveCommandsRootDir(workDir string, shadowDir string) (string, error) {
 	return resolvedWorkDir, nil
 }
 
-func renderCommandPrompt(params *CLIParams, workDir string, shellRunner runner.CommandRunner) error {
+func renderCommandPrompt(params *CLIParams, workDir string, shellRunner runner.CommandRunner, hostShellRunner runner.CommandRunner) error {
 	if params == nil {
 		return fmt.Errorf("renderCommandPrompt() [cli.go]: params is nil")
 	}
@@ -642,7 +642,7 @@ func renderCommandPrompt(params *CLIParams, workDir string, shellRunner runner.C
 	}
 
 	withArguments := commands.ApplyArguments(template, params.CommandArgs)
-	expandedPrompt, err := commands.ExpandPrompt(withArguments, workDir, shellRunner)
+	expandedPrompt, err := commands.ExpandPrompt(withArguments, workDir, shellRunner, hostShellRunner)
 	if err != nil {
 		return fmt.Errorf("renderCommandPrompt() [cli.go]: failed to render command /%s: %w", params.CommandName, err)
 	}

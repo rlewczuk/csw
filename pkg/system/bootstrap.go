@@ -134,6 +134,7 @@ type BuildSystemResult struct {
 	WorktreeBranch        string
 	LSPServer             string
 	ShellRunner           runner.CommandRunner
+	HostShellRunner       runner.CommandRunner
 	ContainerImage        string
 	ContainerImageName    string
 	ContainerImageTag     string
@@ -665,6 +666,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		WorktreeBranch:   params.WorktreeBranch,
 		LSPServer:        params.LSPServer,
 		ShellRunner:      bashRunner,
+		HostShellRunner:  runner.NewBashRunner(effectiveWorkDir, params.BashRunTimeout),
 		ContainerImage:   containerRuntimeConfig.Image,
 		LSPStarted:       lspClient != nil,
 		LSPWorkDir:       effectiveWorkDir,

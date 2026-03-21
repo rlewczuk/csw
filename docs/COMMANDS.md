@@ -57,8 +57,9 @@ When a command is invoked, `csw`:
 1. Loads `.agents/commands/<name>.md`
 2. Applies argument placeholders in template body
 3. Expands inline shell expressions (``!`...` ``)
-4. Expands file references (`@path`)
-5. Sends final rendered text as the session prompt
+4. Expands script shortcuts (`!script.sh` and `!!script.sh`)
+5. Expands file references (`@path`)
+6. Sends final rendered text as the session prompt
 
 If the rendered prompt is empty, command execution fails.
 
@@ -122,6 +123,25 @@ Notes:
 
 - Non-zero exit code fails command rendering.
 - If shell expansion is present, container mode is automatically requested unless `--container-disabled` is passed.
+
+#### Example: script shortcuts
+
+Template:
+
+```text
+Default runtime script output:
+!scripts/context.sh
+
+Always host script output:
+!!scripts/host_context.sh
+```
+
+Notes:
+
+- `!some_script.sh` runs using the **default runtime** (host or container, depending on CLI/config/runtime settings).
+- `!!some_script.sh` always runs on the **host**.
+- Script output replaces the token (trailing newline is trimmed).
+- Non-zero exit code fails command rendering.
 
 ---
 
@@ -244,6 +264,15 @@ If frontmatter is missing or invalid, file is treated as plain template body.
 
 - Syntax: ``!`<shell command>` ``
 - Command output (without trailing newline) replaces expression
+- Non-zero exit status fails command rendering
+
+### Script shortcuts
+
+- Syntax: `!path/to/script.sh`
+  - Runs script with default runtime shell (host or container).
+- Syntax: `!!path/to/script.sh`
+  - Runs script with host shell only.
+- Script output (without trailing newline) replaces the token
 - Non-zero exit status fails command rendering
 
 ### File references

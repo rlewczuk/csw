@@ -76,6 +76,18 @@ func TestCLICommandInvocation(t *testing.T) {
 			expectedContainerEnable: false,
 		},
 		{
+			name:           "host script does not enable container by default",
+			args:           []string{"/review"},
+			commandContent: "---\n---\nBefore !!scripts/host.sh",
+			shellResponse: map[string]string{
+				"bash 'scripts/host.sh'": "hello",
+			},
+			expectedPrompt:          "Before hello",
+			expectedRole:            "developer",
+			expectedModel:           "provider/default",
+			expectedContainerEnable: false,
+		},
+		{
 			name:          "not command with extra args fails",
 			args:          []string{"plain", "extra"},
 			expectError:   true,
@@ -106,10 +118,12 @@ func TestCLICommandInvocation(t *testing.T) {
 			captured := ""
 			runCLIFunc = func(params *CLIParams) error {
 				mockRunner := runner.NewMockRunner()
+				hostRunner := runner.NewMockRunner()
 				for command, output := range tt.shellResponse {
 					mockRunner.SetResponse(command, output, 0, nil)
+					hostRunner.SetResponse(command, output, 0, nil)
 				}
-				if err := renderCommandPrompt(params, workDir, mockRunner); err != nil {
+				if err := renderCommandPrompt(params, workDir, mockRunner, hostRunner); err != nil {
 					return err
 				}
 				captured = fmt.Sprintf("prompt=%s,role=%s,model=%s,container=%t", params.Prompt, params.RoleName, params.ModelName, params.ContainerEnabled)
@@ -145,7 +159,7 @@ func TestRenderCommandPromptFileReference(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(workDir, "file.txt"), []byte("abc"), 0644))
 
 	params := &CLIParams{CommandName: "review", CommandTemplate: "Read @file.txt", CommandArgs: []string{}}
-	err := renderCommandPrompt(params, workDir, runner.NewMockRunner())
+	err := renderCommandPrompt(params, workDir, runner.NewMockRunner(), runner.NewMockRunner())
 	require.NoError(t, err)
 	assert.Equal(t, "Read abc", params.Prompt)
 }

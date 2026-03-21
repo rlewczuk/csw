@@ -71,23 +71,65 @@ func TestExpandPrompt(t *testing.T) {
 	workDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(workDir, "sample.txt"), []byte("file-content"), 0644))
 
-	mockRunner := runner.NewMockRunner()
-	mockRunner.SetResponse("echo value", "shell-output\n", 0, nil)
+	defaultRunner := runner.NewMockRunner()
+	hostRunner := runner.NewMockRunner()
+	defaultRunner.SetResponse("echo value", "shell-output\n", 0, nil)
 
-	rendered, err := ExpandPrompt("Shell: !`echo value`\nFile: @sample.txt", workDir, mockRunner)
+	rendered, err := ExpandPrompt("Shell: !`echo value`\nFile: @sample.txt", workDir, defaultRunner, hostRunner)
 	require.NoError(t, err)
 	assert.Equal(t, "Shell: shell-output\nFile: file-content", rendered)
 
-	executions := mockRunner.GetExecutions()
+	executions := defaultRunner.GetExecutions()
 	require.Len(t, executions, 1)
 	assert.Equal(t, workDir, executions[0].Workdir)
 }
 
 func TestExpandPromptShellFailure(t *testing.T) {
-	mockRunner := runner.NewMockRunner()
-	mockRunner.SetResponse("false", "boom", 1, nil)
+	defaultRunner := runner.NewMockRunner()
+	hostRunner := runner.NewMockRunner()
+	defaultRunner.SetResponse("false", "boom", 1, nil)
 
-	_, err := ExpandPrompt("!`false`", t.TempDir(), mockRunner)
+	_, err := ExpandPrompt("!`false`", t.TempDir(), defaultRunner, hostRunner)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exit code 1")
+}
+
+func TestExpandPromptScriptPrefixes(t *testing.T) {
+	workDir := t.TempDir()
+	defaultRunner := runner.NewMockRunner()
+	hostRunner := runner.NewMockRunner()
+	defaultRunner.SetResponse("bash 'scripts/default.sh'", "default-output\n", 0, nil)
+	hostRunner.SetResponse("bash 'scripts/host.sh'", "host-output\n", 0, nil)
+
+	rendered, err := ExpandPrompt("A !scripts/default.sh B !!scripts/host.sh", workDir, defaultRunner, hostRunner)
+	require.NoError(t, err)
+	assert.Equal(t, "A default-output B host-output", rendered)
+
+	defaultExecutions := defaultRunner.GetExecutions()
+	hostExecutions := hostRunner.GetExecutions()
+	require.Len(t, defaultExecutions, 1)
+	require.Len(t, hostExecutions, 1)
+	assert.Equal(t, "bash 'scripts/default.sh'", defaultExecutions[0].Command)
+	assert.Equal(t, "bash 'scripts/host.sh'", hostExecutions[0].Command)
+	assert.Equal(t, workDir, defaultExecutions[0].Workdir)
+	assert.Equal(t, workDir, hostExecutions[0].Workdir)
+}
+
+func TestHasDefaultRuntimeShellExpansion(t *testing.T) {
+	tests := []struct {
+		name     string
+		prompt   string
+		expected bool
+	}{
+		{name: "inline shell command", prompt: "!`echo test`", expected: true},
+		{name: "default runtime script", prompt: "run !scripts/check.sh", expected: true},
+		{name: "host-only script", prompt: "run !!scripts/check.sh", expected: false},
+		{name: "no shell expansion", prompt: "plain prompt", expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, HasDefaultRuntimeShellExpansion(tt.prompt))
+		})
+	}
 }
