@@ -77,6 +77,7 @@ Typical fields in output include:
 - `name`, `description`, `hook`, `enabled`, `type`
 - shell fields: `command`, `run-on`
 - model fields: `prompt`, `system_prompt`, `model`, `thinking`
+- subagent role field: `role` (accepts role name or role alias)
 - routing fields: `output_to`, `error_to`, `timeout`
 
 ---

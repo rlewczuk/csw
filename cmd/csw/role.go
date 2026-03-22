@@ -82,7 +82,7 @@ func roleShowCommand() *cobra.Command {
 				return fmt.Errorf("roleShowCommand() [role.go]: failed to get role configs: %w", err)
 			}
 
-			config, exists := configs[roleName]
+			config, exists := findRoleConfigByName(configs, roleName)
 			if !exists {
 				return fmt.Errorf("roleShowCommand() [role.go]: role not found: %s", roleName)
 			}
@@ -159,7 +159,8 @@ func roleSetDefaultCommand() *cobra.Command {
 				return fmt.Errorf("roleSetDefaultCommand() [role.go]: failed to get role configs: %w", err)
 			}
 
-			if _, exists := configs[roleName]; !exists {
+			resolvedRole, exists := findRoleConfigByName(configs, roleName)
+			if !exists {
 				return fmt.Errorf("roleSetDefaultCommand() [role.go]: role not found: %s", roleName)
 			}
 
@@ -170,14 +171,14 @@ func roleSetDefaultCommand() *cobra.Command {
 			}
 
 			// Update default role
-			globalConfig.DefaultRole = roleName
+			globalConfig.DefaultRole = resolvedRole.Name
 
 			// Save global config
 			if err := store.SaveGlobalConfig(globalConfig); err != nil {
 				return fmt.Errorf("roleSetDefaultCommand() [role.go]: failed to save global config: %w", err)
 			}
 
-			fmt.Printf("Default role set to '%s'\n", roleName)
+			fmt.Printf("Default role set to '%s'\n", resolvedRole.Name)
 			return nil
 		},
 	}
@@ -260,6 +261,9 @@ func outputRoleDetails(config *conf.AgentRoleConfig) error {
 	fmt.Fprintln(w, "=== General Information ===")
 	fmt.Fprintln(w, "PROPERTY\tVALUE")
 	fmt.Fprintf(w, "Name\t%s\n", config.Name)
+	if len(config.Aliases) > 0 {
+		fmt.Fprintf(w, "Aliases\t%s\n", strings.Join(config.Aliases, ", "))
+	}
 	if config.Description != "" {
 		fmt.Fprintf(w, "Description\t%s\n", config.Description)
 	}
@@ -333,6 +337,33 @@ func outputRoleDetails(config *conf.AgentRoleConfig) error {
 	return nil
 }
 
+func findRoleConfigByName(configs map[string]*conf.AgentRoleConfig, roleName string) (*conf.AgentRoleConfig, bool) {
+	trimmedRoleName := strings.TrimSpace(roleName)
+	if trimmedRoleName == "" {
+		return nil, false
+	}
+
+	if config, exists := configs[trimmedRoleName]; exists && config != nil {
+		return config, true
+	}
+
+	for _, config := range configs {
+		if config == nil {
+			continue
+		}
+		if strings.EqualFold(config.Name, trimmedRoleName) {
+			return config, true
+		}
+		for _, alias := range config.Aliases {
+			if strings.EqualFold(strings.TrimSpace(alias), trimmedRoleName) {
+				return config, true
+			}
+		}
+	}
+
+	return nil, false
+}
+
 func formatAccessFlag(flag conf.AccessFlag) string {
 	switch flag {
 	case conf.AccessAllow:
@@ -394,5 +425,4 @@ func outputSystemPrompt(store conf.ConfigStore, roleConfig *conf.AgentRoleConfig
 	fmt.Print(prompt)
 	return nil
 }
-
 

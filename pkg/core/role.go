@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +17,10 @@ type AgentRoleRegistry struct {
 	cache        map[string]conf.AgentRoleConfig
 	lastUpdate   time.Time
 	cacheInvalid bool
+}
+
+func normalizeRoleLookupName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
 }
 
 // NewAgentRoleRegistry creates a new AgentRoleRegistry with the given ConfigStore.
@@ -72,6 +77,19 @@ func (r *AgentRoleRegistry) refreshCacheIfNeeded() error {
 			}
 
 			r.cache[name] = configCopy
+
+			normalizedRoleName := normalizeRoleLookupName(configCopy.Name)
+			if normalizedRoleName != "" {
+				r.cache[normalizedRoleName] = configCopy
+			}
+
+			for _, alias := range configCopy.Aliases {
+				normalizedAlias := normalizeRoleLookupName(alias)
+				if normalizedAlias == "" {
+					continue
+				}
+				r.cache[normalizedAlias] = configCopy
+			}
 		}
 	}
 
@@ -94,7 +112,13 @@ func (r *AgentRoleRegistry) Get(name string) (conf.AgentRoleConfig, bool) {
 		return conf.AgentRoleConfig{}, false
 	}
 
-	role, ok := r.cache[name]
+	lookupName := normalizeRoleLookupName(name)
+	role, ok := r.cache[lookupName]
+	if ok {
+		return role, ok
+	}
+
+	role, ok = r.cache[name]
 	return role, ok
 }
 
@@ -112,8 +136,17 @@ func (r *AgentRoleRegistry) List() []string {
 	}
 
 	names := make([]string, 0, len(r.cache))
-	for name := range r.cache {
-		names = append(names, name)
+	seen := make(map[string]struct{}, len(r.cache))
+	for _, role := range r.cache {
+		canonicalName := strings.TrimSpace(role.Name)
+		if canonicalName == "" {
+			continue
+		}
+		if _, exists := seen[canonicalName]; exists {
+			continue
+		}
+		seen[canonicalName] = struct{}{}
+		names = append(names, canonicalName)
 	}
 	return names
 }

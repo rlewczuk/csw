@@ -60,6 +60,30 @@ func TestAgentRoleRegistry(t *testing.T) {
 		assert.False(t, ok)
 	})
 
+	t.Run("Get resolves role aliases", func(t *testing.T) {
+		mockStore := impl.NewMockConfigStore()
+
+		role := &conf.AgentRoleConfig{
+			Name:        "developer",
+			Description: "Developer role",
+			Aliases:     []string{"dev", "build"},
+		}
+
+		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+			"developer": role,
+		})
+
+		registry := NewAgentRoleRegistry(mockStore)
+
+		resolvedByAlias, ok := registry.Get("dev")
+		assert.True(t, ok)
+		assert.Equal(t, "developer", resolvedByAlias.Name)
+
+		resolvedByAliasUpper, ok := registry.Get("BUILD")
+		assert.True(t, ok)
+		assert.Equal(t, "developer", resolvedByAliasUpper.Name)
+	})
+
 	t.Run("List returns all role names", func(t *testing.T) {
 		mockStore := impl.NewMockConfigStore()
 

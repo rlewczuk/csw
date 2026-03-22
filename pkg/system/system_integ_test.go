@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
 	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
 	"github.com/rlewczuk/csw/pkg/models"
@@ -174,6 +175,43 @@ func TestSweSystem_SubAgentIntegration(t *testing.T) {
 	require.NoError(t, json.Unmarshal(summaryBytes, &summary))
 	assert.Equal(t, parent.ID(), summary["parent_session_id"])
 	assert.Equal(t, child.ID(), summary["session_id"])
+}
+
+func TestSweSystem_SubAgentIntegrationRoleAlias(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"developer": {Name: "developer", Description: "Developer", Aliases: []string{"dev", "build"}},
+	})
+
+	fixture := coretestfixture.NewSweSystemFixture(
+		t,
+		coretestfixture.WithConfigStore(configStore),
+		coretestfixture.WithRoles(core.NewAgentRoleRegistry(configStore)),
+	)
+	system := fixture.System
+
+	parent, err := system.NewSession("ollama/test-model:latest", testutil.NewMockSessionOutputHandler())
+	require.NoError(t, err)
+
+	result, err := system.ExecuteSubAgentTask(parent, tool.SubAgentTaskRequest{
+		Slug:   "alias-role-child",
+		Title:  "Alias role child",
+		Role:   "dev",
+		Prompt: "Do simple summary",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "error", result.Status)
+
+	var child *core.SweSession
+	for _, session := range system.ListSessions() {
+		if session.ParentID() == parent.ID() && session.Slug() == "alias-role-child" {
+			child = session
+			break
+		}
+	}
+	require.NotNil(t, child)
+	require.NotNil(t, child.Role())
+	assert.Equal(t, "developer", child.Role().Name)
 }
 
 type hookFeedbackExecutorCapture struct {

@@ -829,6 +829,11 @@ func (c *AgentRoleConfig) Clone() *AgentRoleConfig {
 		copy(cloned.HiddenPatterns, c.HiddenPatterns)
 	}
 
+	if c.Aliases != nil {
+		cloned.Aliases = make([]string, len(c.Aliases))
+		copy(cloned.Aliases, c.Aliases)
+	}
+
 	if c.MCPServers != nil {
 		cloned.MCPServers = make([]string, len(c.MCPServers))
 		copy(cloned.MCPServers, c.MCPServers)
@@ -861,6 +866,9 @@ func (c *AgentRoleConfig) Merge(override *AgentRoleConfig) {
 	mergeFragments(c.ToolFragments, override.ToolFragments)
 
 	c.HiddenPatterns = append(existingHiddenPatterns, override.HiddenPatterns...)
+	if override.Aliases != nil {
+		c.Aliases = append([]string(nil), override.Aliases...)
+	}
 	if len(override.MCPServers) > 0 {
 		c.MCPServers = append([]string(nil), override.MCPServers...)
 	}

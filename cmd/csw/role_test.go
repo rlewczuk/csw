@@ -163,6 +163,7 @@ func TestOutputRoleList(t *testing.T) {
 func TestOutputRoleDetails(t *testing.T) {
 	config := &conf.AgentRoleConfig{
 		Name:        "test-role",
+		Aliases:     []string{"tester", "qa"},
 		Description: "Test role for details",
 		VFSPrivileges: map[string]conf.FileAccess{
 			"**": {
@@ -201,6 +202,7 @@ func TestOutputRoleDetails(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Contains(t, output, "test-role")
+	assert.Contains(t, output, "tester, qa")
 	assert.Contains(t, output, "Test role for details")
 	assert.Contains(t, output, "VFS Privileges")
 	assert.Contains(t, output, "Tool Access")
@@ -208,6 +210,35 @@ func TestOutputRoleDetails(t *testing.T) {
 	assert.Contains(t, output, "allow")
 	assert.Contains(t, output, "ask")
 	assert.Contains(t, output, "deny")
+}
+
+func TestFindRoleConfigByName(t *testing.T) {
+	configs := map[string]*conf.AgentRoleConfig{
+		"developer": {
+			Name:        "developer",
+			Description: "Developer",
+			Aliases:     []string{"dev", "build"},
+		},
+	}
+
+	byName, ok := findRoleConfigByName(configs, "developer")
+	require.True(t, ok)
+	require.NotNil(t, byName)
+	assert.Equal(t, "developer", byName.Name)
+
+	byAlias, ok := findRoleConfigByName(configs, "dev")
+	require.True(t, ok)
+	require.NotNil(t, byAlias)
+	assert.Equal(t, "developer", byAlias.Name)
+
+	byAliasCaseInsensitive, ok := findRoleConfigByName(configs, "BUILD")
+	require.True(t, ok)
+	require.NotNil(t, byAliasCaseInsensitive)
+	assert.Equal(t, "developer", byAliasCaseInsensitive.Name)
+
+	missing, ok := findRoleConfigByName(configs, "unknown")
+	assert.False(t, ok)
+	assert.Nil(t, missing)
 }
 
 func TestFormatAccessFlag(t *testing.T) {

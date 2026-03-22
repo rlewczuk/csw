@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,6 +47,22 @@ func TestToolCommand_List(t *testing.T) {
 	require.True(t, exists, "all role should exist in embedded defaults")
 	require.NotNil(t, allRole.ToolFragments, "all role should have tool fragments")
 	assert.NotEmpty(t, allRole.ToolFragments, "all role should have at least one tool fragment")
+}
+
+func TestToolListRoleAliasResolution(t *testing.T) {
+	roleConfigs := map[string]*conf.AgentRoleConfig{
+		"developer": {
+			Name:        "developer",
+			Aliases:     []string{"dev"},
+			Description: "Developer",
+			ToolsAccess: map[string]conf.AccessFlag{"vfsRead": conf.AccessAllow},
+		},
+	}
+
+	resolved, ok := findRoleConfigByName(roleConfigs, "dev")
+	require.True(t, ok)
+	require.NotNil(t, resolved)
+	assert.Equal(t, "developer", resolved.Name)
 }
 
 func TestToolCommand_ListJSON(t *testing.T) {

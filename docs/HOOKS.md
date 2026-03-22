@@ -219,6 +219,7 @@ Config object fields (`hooks/<name>/<name>.yml`):
 - `model` (optional provider/model override)
 - `thinking` (optional thinking override)
 - `role` (optional for subagent)
+  - accepts canonical role name or any configured role alias
 - `output_to` (context/output mapping key)
   - default for llm: `result`
 - `error_to` (error field mapping key)

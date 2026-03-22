@@ -108,6 +108,9 @@ type AgentRoleConfig struct {
 	// Name of the role (short name, used to select role and identify it in logs etc.)
 	Name string `json:"name" yaml:"name"`
 
+	// Aliases defines additional names that can be used to select this role.
+	Aliases []string `json:"aliases,omitempty" yaml:"aliases,omitempty"`
+
 	// Description of the role (longer text, used in UI to describe role to user)
 	Description string `json:"description" yaml:"description"`
 

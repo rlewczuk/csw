@@ -21,6 +21,7 @@ Special role:
 Main fields in `roles/<role>/config.*`:
 
 - `name`
+- `aliases` (optional alternate names for the role; usable anywhere a role is selected)
 - `description`
 - `vfs-privileges` (path pattern -> `{read,write,delete,list,find,move}`)
 - `tools-access` (tool name/pattern -> `auto|allow|deny|ask`)
@@ -36,6 +37,9 @@ Prompt fragments:
 
 ```yaml
 name: debugger
+aliases:
+  - debug
+  - triage
 description: Debug-focused role with strict execution style
 vfs-privileges:
   "**":
@@ -64,7 +68,19 @@ Across config layers (`@DEFAULTS` -> global -> project -> extra paths):
 - Scalar maps are overridden by more specific layers.
 - Prompt/tool fragments merge by fragment key.
 - `hidden-patterns` are additive.
+- `aliases` from a more specific layer replace previous list when provided.
 - `mcp-servers` from a more specific layer replace previous list when provided.
+
+## Role aliases
+
+Role aliases are alternative role names resolved to the canonical role.
+
+Example:
+
+- role `developer` with aliases `dev`, `build`
+- `csw cli --role dev ...` behaves like `--role developer`
+- command frontmatter `agent: build` behaves like `agent: developer`
+- subagent role fields (for example in hooks) accept aliases as well
 
 ## Role command reference
 

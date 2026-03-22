@@ -272,7 +272,7 @@ Prompt input modes:
 Session and runtime options:
 
 - `--model <provider/model>`: explicit model
-- `--role <name>`: role name (default: `developer`)
+- `--role <name>`: role name or configured role alias (default: `developer`)
 - `--workdir <dir>`: working directory
 - `--interactive`: allow interactive follow-up input
 - `--allow-all-permissions`: auto-allow permission prompts

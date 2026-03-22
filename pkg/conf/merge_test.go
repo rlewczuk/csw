@@ -499,6 +499,26 @@ func TestAgentRoleConfig_Merge_MCPServers(t *testing.T) {
 	assert.Equal(t, []string{"srv-b", "srv-c"}, base.MCPServers)
 }
 
+func TestAgentRoleConfig_Merge_Aliases(t *testing.T) {
+	base := &AgentRoleConfig{Name: "developer", Aliases: []string{"dev"}}
+	override := &AgentRoleConfig{Name: "developer", Aliases: []string{"build", "coder"}}
+
+	base.Merge(override)
+
+	assert.Equal(t, []string{"build", "coder"}, base.Aliases)
+}
+
+func TestAgentRoleConfig_Clone_Aliases(t *testing.T) {
+	original := &AgentRoleConfig{Name: "developer", Aliases: []string{"dev", "build"}}
+	cloned := original.Clone()
+
+	require.NotNil(t, cloned)
+	assert.Equal(t, original.Aliases, cloned.Aliases)
+
+	cloned.Aliases[0] = "changed"
+	assert.Equal(t, []string{"dev", "build"}, original.Aliases)
+}
+
 func TestHookConfig_Merge_SubAgentRoleAndPromptFields(t *testing.T) {
 	base := &HookConfig{}
 	require.NoError(t, yaml.Unmarshal([]byte("name: summary-hook\ndescription: base desc\nhook: summary\ntype: subagent\nprompt: base prompt\nsystem_prompt: base system\nmodel: mock/base\nthinking: medium\nrole: developer\n"), base))

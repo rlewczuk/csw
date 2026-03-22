@@ -62,8 +62,8 @@ func toolListCommand() *cobra.Command {
 
 			if roleName != "" {
 				// Get specific role's tool fragments
-				rc, exists := roleConfigs[roleName]
-				if !exists {
+				rc, exists := findRoleConfigByName(roleConfigs, roleName)
+				if !exists || rc == nil {
 					return fmt.Errorf("toolListCommand() [tool.go]: role not found: %s", roleName)
 				}
 				roleConfig = rc

@@ -252,6 +252,7 @@ If frontmatter is missing or invalid, file is treated as plain template body.
 
 - `description` (optional): free-text description
 - `agent` (optional): default role for the command (equivalent to CLI role override source)
+  - accepts canonical role name or any configured role alias
 - `model` (optional): default model in `provider/model` format
 
 ### Template placeholders
