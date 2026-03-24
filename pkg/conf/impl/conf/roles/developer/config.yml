@@ -1,4 +1,7 @@
 description: A software developer role with full VFS access
+aliases:
+  - dev
+  - build
 vfs-privileges:
   "**":
     read: allow
@@ -30,4 +33,4 @@ run-privileges:
   "cargo*": allow
   "dotnet*": allow
   "go*": allow"
-  ".*": allow
+  "./*": allow
