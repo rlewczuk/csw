@@ -257,6 +257,31 @@ func TestVFSFindTool(t *testing.T) {
 		assert.Contains(t, files, "test_dir")
 		assert.Contains(t, files, "test_other")
 	})
+
+	t.Run("should return first 25 files with suffix when more than 100 results", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+
+		for i := 0; i < 101; i++ {
+			err := mockVFS.WriteFile("file"+formatInt64(int64(i))+".txt", []byte("content"))
+			require.NoError(t, err)
+		}
+
+		tool := NewVFSFindTool(mockVFS)
+
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsFind",
+			Arguments: NewToolValue(map[string]any{
+				"query":     "*.txt",
+				"recursive": false,
+			}),
+		})
+
+		require.NoError(t, response.Error)
+		filesArr := response.Result.Get("files").Array()
+		require.Len(t, filesArr, 25)
+		assert.Equal(t, tooManyResultsSuffix, response.Result.Get("suffix").AsString())
+	})
 }
 
 func TestVFSFindToolPermissionQuery(t *testing.T) {
@@ -574,5 +599,25 @@ func TestVFSFindToolRender(t *testing.T) {
 		// Assert - should not include result count
 		assert.Equal(t, "find *.txt", oneLiner)
 		assert.Equal(t, "find *.txt\n\n", full)
+	})
+
+	t.Run("should include suffix in full output", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSFindTool(mockVFS)
+
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsFind",
+			Arguments: NewToolValue(map[string]any{
+				"query":  "*.txt",
+				"files":  []any{"file1.txt"},
+				"suffix": tooManyResultsSuffix,
+			}),
+		}
+
+		_, full, _, _ := tool.Render(call)
+
+		assert.Contains(t, full, "file1.txt")
+		assert.Contains(t, full, tooManyResultsSuffix)
 	})
 }

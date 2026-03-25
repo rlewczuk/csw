@@ -106,6 +106,15 @@ func (t *VFSGrepTool) formatResults(matches []vfs.GrepMatch, limit int64) string
 		return "No files found"
 	}
 
+	totalResults := 0
+	for _, match := range matches {
+		totalResults += len(match.Lines)
+	}
+
+	if totalResults > 100 {
+		return formatGrepMatchesWithCap(matches, 25) + tooManyResultsSuffix
+	}
+
 	var builder strings.Builder
 	matchCount := int64(0)
 	truncated := false
@@ -138,6 +147,27 @@ func (t *VFSGrepTool) formatResults(matches []vfs.GrepMatch, limit int64) string
 			return result[:len(result)-1]
 		}
 		return result
+	}
+
+	return builder.String()
+}
+
+// formatGrepMatchesWithCap formats grep matches and returns up to maxCount match lines.
+func formatGrepMatchesWithCap(matches []vfs.GrepMatch, maxCount int) string {
+	var builder strings.Builder
+	count := 0
+
+	for _, match := range matches {
+		for _, lineNum := range match.Lines {
+			if count >= maxCount {
+				return builder.String()
+			}
+			builder.WriteString(match.Path)
+			builder.WriteString(":")
+			builder.WriteString(formatInt64(int64(lineNum)))
+			builder.WriteString("\n")
+			count++
+		}
 	}
 
 	return builder.String()
@@ -229,7 +259,7 @@ func countGrepResults(content string) int {
 	count := 0
 	for _, line := range lines {
 		// Skip truncation message and empty lines
-		if line != "" && !strings.HasPrefix(line, "(Results are truncated") {
+		if line != "" && line != "..." && !strings.HasPrefix(line, "(Results are truncated") && !strings.HasPrefix(line, "(too many results") {
 			count++
 		}
 	}

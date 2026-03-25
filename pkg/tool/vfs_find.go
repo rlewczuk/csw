@@ -6,6 +6,8 @@ import (
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
+const tooManyResultsSuffix = "...\n(too many results, please narrow search query and try again)"
+
 // VFSFindTool implements the vfsFind tool.
 type VFSFindTool struct {
 	vfs vfs.VFS
@@ -64,6 +66,12 @@ func (t *VFSFindTool) Execute(args *ToolCall) *ToolResponse {
 		}
 	}
 
+	resultSuffix := ""
+	if len(files) > 100 {
+		files = files[:25]
+		resultSuffix = tooManyResultsSuffix
+	}
+
 	// Convert files to array of any for ToolValue
 	filesArray := make([]any, len(files))
 	for i, f := range files {
@@ -72,6 +80,9 @@ func (t *VFSFindTool) Execute(args *ToolCall) *ToolResponse {
 
 	var result ToolValue
 	result.Set("files", filesArray)
+	if resultSuffix != "" {
+		result.Set("suffix", resultSuffix)
+	}
 	return &ToolResponse{
 		Call:   args,
 		Result: result,
@@ -142,6 +153,13 @@ func (t *VFSFindTool) Render(call *ToolCall) (string, string, string, map[string
 	// Add files to full output
 	for _, f := range files {
 		full += f.AsString() + "\n"
+	}
+
+	if suffix, ok := call.Arguments.Get("suffix").AsStringOK(); ok && suffix != "" {
+		if len(files) > 0 {
+			full += "\n"
+		}
+		full += suffix
 	}
 
 	// Handle error if present

@@ -210,6 +210,30 @@ func TestVFSGrepTool(t *testing.T) {
 		assert.Contains(t, content, "(Results are truncated. Consider using a more specific path or pattern.)")
 	})
 
+	t.Run("should return first 25 results with suffix when matches exceed 100", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+
+		for i := 0; i < 101; i++ {
+			err := mockVFS.WriteFile("file"+formatInt64(int64(i))+".txt", []byte("hello"))
+			require.NoError(t, err)
+		}
+
+		tool := NewVFSGrepTool(mockVFS)
+
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": "hello",
+			}),
+		})
+
+		require.NoError(t, response.Error)
+		resultContent := response.Result.Get("content").AsString()
+		assert.Contains(t, resultContent, tooManyResultsSuffix)
+		assert.Equal(t, 25, countGrepResults(resultContent))
+	})
+
 	t.Run("should handle regex patterns", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
@@ -658,5 +682,24 @@ func TestVFSGrepToolRender(t *testing.T) {
 		// Assert - should include result count with path
 		assert.Equal(t, "grep hello in src (2 results)", oneLiner)
 		assert.Contains(t, full, "grep hello in src (2 results)\n\n")
+	})
+
+	t.Run("should count only grep rows when too many-results suffix is present", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSGrepTool(mockVFS)
+
+		call := &ToolCall{
+			ID:       "test-id",
+			Function: "vfsGrep",
+			Arguments: NewToolValue(map[string]any{
+				"pattern": "hello",
+				"content": "a.txt:1\na.txt:2\n...\n(too many results, please narrow search query and try again)",
+			}),
+		}
+
+		oneLiner, full, _, _ := tool.Render(call)
+
+		assert.Equal(t, "grep hello (2 results)", oneLiner)
+		assert.Contains(t, full, "(too many results, please narrow search query and try again)")
 	})
 }
