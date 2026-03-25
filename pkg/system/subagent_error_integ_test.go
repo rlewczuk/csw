@@ -31,13 +31,24 @@ func TestSweSystem_SubAgentDuplicateSlugAndErrorSummary(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = system.ExecuteSubAgentTask(parent, tool.SubAgentTaskRequest{
+	result, err := system.ExecuteSubAgentTask(parent, tool.SubAgentTaskRequest{
 		Slug:   "dup-slug",
 		Title:  "second",
 		Prompt: "second",
 	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "slug already used in session")
+	require.NoError(t, err)
+	assert.Equal(t, "error", result.Status)
+
+	childSessions := system.ListSessions()
+	childrenBySlug := make(map[string]struct{})
+	for _, session := range childSessions {
+		if session.ParentID() != parent.ID() {
+			continue
+		}
+		childrenBySlug[session.Slug()] = struct{}{}
+	}
+	assert.Contains(t, childrenBySlug, "dup-slug")
+	assert.Contains(t, childrenBySlug, "dup-slug-2")
 }
 
 func TestSweSystem_SubAgentWritesErrorSummaryWithParentSession(t *testing.T) {

@@ -897,6 +897,41 @@ func (s *SweSession) ReserveSubAgentSlug(slug string) error {
 	return nil
 }
 
+// ReserveUniqueSubAgentSlug reserves slug in parent session and adds numeric suffix when needed.
+func (s *SweSession) ReserveUniqueSubAgentSlug(slug string) (string, error) {
+	if s == nil {
+		return "", fmt.Errorf("SweSession.ReserveUniqueSubAgentSlug() [session.go]: session is nil")
+	}
+
+	baseSlug := strings.TrimSpace(slug)
+	if baseSlug == "" {
+		return "", fmt.Errorf("SweSession.ReserveUniqueSubAgentSlug() [session.go]: slug cannot be empty")
+	}
+
+	s.subAgentSlugsMu.Lock()
+	defer s.subAgentSlugsMu.Unlock()
+	if s.subAgentSlugs == nil {
+		s.subAgentSlugs = make(map[string]struct{})
+	}
+
+	resolvedSlug := baseSlug
+	if _, exists := s.subAgentSlugs[resolvedSlug]; exists {
+		for suffix := 2; ; suffix++ {
+			candidate := fmt.Sprintf("%s-%d", baseSlug, suffix)
+			if _, exists := s.subAgentSlugs[candidate]; exists {
+				continue
+			}
+			resolvedSlug = candidate
+			break
+		}
+	}
+
+	s.subAgentSlugs[resolvedSlug] = struct{}{}
+	s.persistSessionState()
+
+	return resolvedSlug, nil
+}
+
 // SetLogger sets a custom logger for this session.
 // This is useful for testing or when you want to use a different logger implementation.
 func (s *SweSession) SetLogger(logger *slog.Logger) {

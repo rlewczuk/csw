@@ -235,7 +235,8 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *SweSession, request tool.SubAgen
 		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system_test_support_test.go]: prompt cannot be empty")
 	}
 
-	if err := parent.ReserveSubAgentSlug(request.Slug); err != nil {
+	resolvedSlug, err := parent.ReserveUniqueSubAgentSlug(request.Slug)
+	if err != nil {
 		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system_test_support_test.go]: failed to reserve subagent slug: %w", err)
 	}
 
@@ -248,8 +249,8 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *SweSession, request tool.SubAgen
 	}
 
 	thinking := firstNonEmpty(strings.TrimSpace(request.Thinking), strings.TrimSpace(parent.ThinkingLevel()))
-	childOutput := &subAgentOutputHandler{delegate: parent.OutputHandler(), slug: request.Slug}
-	child, err := s.newSessionWithOptions(modelName, childOutput, parent.ID(), request.Slug, thinking)
+	childOutput := &subAgentOutputHandler{delegate: parent.OutputHandler(), slug: resolvedSlug}
+	child, err := s.newSessionWithOptions(modelName, childOutput, parent.ID(), resolvedSlug, thinking)
 	if err != nil {
 		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system_test_support_test.go]: failed to create child session: %w", err)
 	}
