@@ -258,10 +258,10 @@ func TestVFSFindTool(t *testing.T) {
 		assert.Contains(t, files, "test_other")
 	})
 
-	t.Run("should return first 25 files with suffix when more than 100 results", func(t *testing.T) {
+	t.Run("should return first 25 files with suffix when more than 255 results", func(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 
-		for i := 0; i < 101; i++ {
+		for i := 0; i < 256; i++ {
 			err := mockVFS.WriteFile("file"+formatInt64(int64(i))+".txt", []byte("content"))
 			require.NoError(t, err)
 		}

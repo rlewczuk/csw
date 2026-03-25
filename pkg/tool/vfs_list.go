@@ -78,6 +78,12 @@ func (t *VFSListTool) Execute(args *ToolCall) *ToolResponse {
 		}
 	}
 
+	resultSuffix := ""
+	if len(filtered) > tooManyResultsCap {
+		filtered = filtered[:tooManyResultsLimit]
+		resultSuffix = tooManyResultsSuffix
+	}
+
 	truncated := false
 	if limit > 0 && int64(len(filtered)) > limit {
 		filtered = filtered[:limit]
@@ -92,6 +98,9 @@ func (t *VFSListTool) Execute(args *ToolCall) *ToolResponse {
 	var result ToolValue
 	result.Set("files", filesArray)
 	result.Set("truncated", truncated)
+	if resultSuffix != "" {
+		result.Set("suffix", resultSuffix)
+	}
 
 	return &ToolResponse{
 		Call:   args,
@@ -138,6 +147,13 @@ func (t *VFSListTool) Render(call *ToolCall) (string, string, string, map[string
 
 	for _, file := range files {
 		full += file.AsString() + "\n"
+	}
+
+	if suffix, ok := call.Arguments.Get("suffix").AsStringOK(); ok && suffix != "" {
+		if len(files) > 0 {
+			full += "\n"
+		}
+		full += suffix
 	}
 
 	if call.Arguments.Bool("truncated") {

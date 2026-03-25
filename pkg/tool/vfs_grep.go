@@ -111,8 +111,8 @@ func (t *VFSGrepTool) formatResults(matches []vfs.GrepMatch, limit int64) string
 		totalResults += len(match.Lines)
 	}
 
-	if totalResults > 100 {
-		return formatGrepMatchesWithCap(matches, 25) + tooManyResultsSuffix
+	if totalResults > tooManyResultsCap {
+		return formatGrepMatchesWithCap(matches, tooManyResultsLimit) + tooManyResultsSuffix
 	}
 
 	var builder strings.Builder

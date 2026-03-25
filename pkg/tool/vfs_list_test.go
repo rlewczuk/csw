@@ -104,6 +104,31 @@ func TestVFSListTool(t *testing.T) {
 		assert.Len(t, response.Result.Get("files").Array(), 2)
 	})
 
+	t.Run("should return first 25 files with suffix when more than 255 results", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+
+		for i := 0; i < 256; i++ {
+			err := mockVFS.WriteFile("file"+formatInt64(int64(i))+".txt", []byte("content"))
+			require.NoError(t, err)
+		}
+
+		listTool := NewVFSListTool(mockVFS)
+		response := listTool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsList",
+			Arguments: NewToolValue(map[string]any{
+				"path":      ".",
+				"recursive": false,
+				"pattern":   "*.txt",
+			}),
+		})
+
+		require.NoError(t, response.Error)
+		assert.Len(t, response.Result.Get("files").Array(), 25)
+		assert.Equal(t, tooManyResultsSuffix, response.Result.Get("suffix").AsString())
+		assert.False(t, response.Result.Bool("truncated"))
+	})
+
 	t.Run("should return error when limit is negative", func(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		listTool := NewVFSListTool(mockVFS)
@@ -237,6 +262,7 @@ func TestVFSListToolRender(t *testing.T) {
 			"path":      ".",
 			"pattern":   "*.go",
 			"files":     []any{"a.go", "sub/b.go"},
+			"suffix":    tooManyResultsSuffix,
 			"truncated": true,
 		}),
 	}
@@ -246,5 +272,6 @@ func TestVFSListToolRender(t *testing.T) {
 	assert.Contains(t, oneLiner, "(2 results)")
 	assert.Contains(t, full, "a.go")
 	assert.Contains(t, full, "sub/b.go")
+	assert.Contains(t, full, tooManyResultsSuffix)
 	assert.Contains(t, full, "Results are truncated")
 }

@@ -210,10 +210,10 @@ func TestVFSGrepTool(t *testing.T) {
 		assert.Contains(t, content, "(Results are truncated. Consider using a more specific path or pattern.)")
 	})
 
-	t.Run("should return first 25 results with suffix when matches exceed 100", func(t *testing.T) {
+	t.Run("should return first 25 results with suffix when matches exceed 255", func(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 
-		for i := 0; i < 101; i++ {
+		for i := 0; i < 256; i++ {
 			err := mockVFS.WriteFile("file"+formatInt64(int64(i))+".txt", []byte("hello"))
 			require.NoError(t, err)
 		}

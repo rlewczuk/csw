@@ -6,7 +6,11 @@ import (
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
-const tooManyResultsSuffix = "...\n(too many results, please narrow search query and try again)"
+const (
+	tooManyResultsSuffix = "...\n(too many results, please narrow search query and try again)"
+	tooManyResultsCap    = 255
+	tooManyResultsLimit  = 25
+)
 
 // VFSFindTool implements the vfsFind tool.
 type VFSFindTool struct {
@@ -67,8 +71,8 @@ func (t *VFSFindTool) Execute(args *ToolCall) *ToolResponse {
 	}
 
 	resultSuffix := ""
-	if len(files) > 100 {
-		files = files[:25]
+	if len(files) > tooManyResultsCap {
+		files = files[:tooManyResultsLimit]
 		resultSuffix = tooManyResultsSuffix
 	}
 
