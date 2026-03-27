@@ -1,7 +1,9 @@
 package tool
 
 import (
+	"bytes"
 	"fmt"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -441,9 +443,9 @@ func TestRunBashTool_Execute_TimeoutErrorIncludesPartialOutput(t *testing.T) {
 	assert.Error(t, response.Error)
 	assert.Contains(t, response.Error.Error(), "command terminated due to timeout")
 	assert.Contains(t, response.Error.Error(), "Partial output:")
-	assert.Contains(t, response.Error.Error(), "line1")
 	assert.Contains(t, response.Error.Error(), "line2")
-	assert.Contains(t, response.Error.Error(), "Output is truncated.")
+	assert.Contains(t, response.Error.Error(), "line3")
+	assert.NotContains(t, response.Error.Error(), "line1")
 	assert.True(t, response.Done)
 }
 
@@ -679,11 +681,10 @@ func TestRunBashTool_Execute_WithLimit_TruncatesOutput(t *testing.T) {
 	assert.Equal(t, int64(0), response.Result.Int("exit_code"))
 
 	output := response.Result.String("output")
-	// Should be truncated to 5 lines plus truncation message
-	assert.Contains(t, output, "line1")
-	assert.Contains(t, output, "line5")
-	assert.NotContains(t, output, "line6")
-	assert.Contains(t, output, "Output is truncated.")
+	// Should keep only the last 5 lines
+	assert.NotContains(t, output, "line5")
+	assert.Contains(t, output, "line6")
+	assert.Contains(t, output, "line10")
 	assert.Equal(t, 1, mockRunner.ExecutionCount())
 }
 
@@ -711,7 +712,6 @@ func TestRunBashTool_Execute_WithLimit_NoTruncationNeeded(t *testing.T) {
 	assert.NoError(t, response.Error)
 	assert.True(t, response.Done)
 	assert.Equal(t, "line1\nline2\nline3\n", response.Result.String("output"))
-	assert.NotContains(t, response.Result.String("output"), "Output is truncated.")
 	assert.Equal(t, 1, mockRunner.ExecutionCount())
 }
 
@@ -739,7 +739,6 @@ func TestRunBashTool_Execute_WithLimitZero_NoLimit(t *testing.T) {
 	assert.NoError(t, response.Error)
 	assert.True(t, response.Done)
 	assert.Equal(t, longOutput, response.Result.String("output"))
-	assert.NotContains(t, response.Result.String("output"), "Output is truncated.")
 	assert.Equal(t, 1, mockRunner.ExecutionCount())
 }
 
@@ -770,24 +769,24 @@ func TestRunBashTool_Execute_WithInvalidLimit(t *testing.T) {
 
 func TestRunBashTool_Execute_DefaultLimit_Applied(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
-	// Create output with 250 lines (more than default 200)
+	// Create output with 550 lines (more than default 500)
 	var longOutput strings.Builder
-	for i := 1; i <= 250; i++ {
+	for i := 1; i <= 550; i++ {
 		longOutput.WriteString(fmt.Sprintf("line%d\n", i))
 	}
-	mockRunner.SetResponse("seq 1 250", longOutput.String(), 0, nil)
+	mockRunner.SetResponse("seq 1 550", longOutput.String(), 0, nil)
 
 	privileges := map[string]conf.AccessFlag{
 		".*": conf.AccessAllow,
 	}
 	tool := NewRunBashTool(mockRunner, privileges)
 
-	// No limit specified - should use default of 200
+	// No limit specified - should use default of 500
 	args := ToolCall{
 		ID:       "test-id",
 		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
-			"command": "seq 1 250",
+			"command": "seq 1 550",
 		}),
 	}
 
@@ -797,11 +796,10 @@ func TestRunBashTool_Execute_DefaultLimit_Applied(t *testing.T) {
 	assert.True(t, response.Done)
 
 	output := response.Result.String("output")
-	// Should be truncated to 200 lines plus truncation message
-	assert.Contains(t, output, "line1")
-	assert.Contains(t, output, "line200")
-	assert.NotContains(t, output, "line201")
-	assert.Contains(t, output, "Output is truncated.")
+	// Should be truncated to the last 500 lines
+	assert.NotContains(t, output, "line50\n")
+	assert.Contains(t, output, "line51")
+	assert.Contains(t, output, "line550")
 	assert.Equal(t, 1, mockRunner.ExecutionCount())
 }
 
@@ -832,11 +830,40 @@ func TestRunBashTool_Execute_WithLimitAndOtherOptions(t *testing.T) {
 	assert.True(t, response.Done)
 
 	output := response.Result.String("output")
-	assert.Contains(t, output, "line1")
+	assert.NotContains(t, output, "line1")
 	assert.Contains(t, output, "line3")
-	assert.NotContains(t, output, "line4")
-	assert.Contains(t, output, "Output is truncated.")
+	assert.Contains(t, output, "line4")
+	assert.Contains(t, output, "line5")
 	assert.Equal(t, 1, mockRunner.ExecutionCount())
+}
+
+func TestRunBashTool_Execute_WithLimit_LogsCropping(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	longOutput := "line1\nline2\nline3\nline4\nline5\n"
+	mockRunner.SetResponse("seq 1 5", longOutput, 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashTool(mockRunner, privileges)
+
+	var logs bytes.Buffer
+	tool.SetLogger(slog.New(slog.NewTextHandler(&logs, nil)))
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "seq 1 5",
+			"limit":   int64(3),
+		}),
+	}
+
+	response := tool.Execute(&args)
+
+	assert.NoError(t, response.Error)
+	assert.Contains(t, logs.String(), "runBash_output_cropped")
+	assert.Contains(t, logs.String(), "limit=3")
 }
 
 func TestRunBashTool_Execute_WithSessionWorkdir_DefaultsToSessionWorkdir(t *testing.T) {

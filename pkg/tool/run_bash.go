@@ -2,6 +2,7 @@ package tool
 
 import (
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -28,6 +29,7 @@ type RunBashTool struct {
 	privileges     map[string]conf.AccessFlag
 	sessionWorkdir string
 	defaultTimeout time.Duration
+	logger         *slog.Logger
 }
 
 func (t *RunBashTool) GetDescription() (string, bool) {
@@ -66,6 +68,11 @@ func NewRunBashToolWithSessionWorkdir(r runner.CommandRunner, privileges map[str
 		sessionWorkdir: sessionWorkdir,
 		defaultTimeout: timeout,
 	}
+}
+
+// SetLogger sets the logger for the tool.
+func (t *RunBashTool) SetLogger(logger *slog.Logger) {
+	t.logger = logger
 }
 
 // Execute executes the tool with the given arguments and returns the response.
@@ -114,8 +121,8 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 		timeout = time.Duration(timeoutSecs) * time.Second
 	}
 
-	// Parse optional limit argument (default: 200 lines, 0 means no limit)
-	limit := 200
+	// Parse optional limit argument (default: 500 lines, 0 means no limit)
+	limit := 500
 	if limitArg, ok := args.Arguments.IntOK("limit"); ok {
 		if limitArg < 0 {
 			return &ToolResponse{
@@ -196,7 +203,7 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 		if timeout > 0 {
 			details += fmt.Sprintf("\nTimeout: %v", timeout)
 		}
-		if limit != 200 {
+		if limit != 500 {
 			details += fmt.Sprintf("\nLimit: %d", limit)
 		}
 		return NewPermissionQuery(args, PermissionTitleRequired, details, PermissionOptions(PermissionOptionAllowRemember), map[string]string{
@@ -282,7 +289,11 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 	if err != nil {
 		if isTimeoutError(err) {
 			if limit > 0 {
-				output = truncateOutput(output, limit)
+				croppedOutput, cropped := cropOutputToLastLines(output, limit)
+				output = croppedOutput
+				if cropped && t.logger != nil {
+					t.logger.Info("runBash_output_cropped", "command", command, "limit", limit)
+				}
 			}
 
 			errMessage := fmt.Sprintf("command terminated due to timeout: %v", err)
@@ -307,7 +318,11 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 
 	// Apply line limit if specified (limit > 0)
 	if limit > 0 {
-		output = truncateOutput(output, limit)
+		croppedOutput, cropped := cropOutputToLastLines(output, limit)
+		output = croppedOutput
+		if cropped && t.logger != nil {
+			t.logger.Info("runBash_output_cropped", "command", command, "limit", limit)
+		}
 	}
 
 	// Return the output, stderr, and exit code
@@ -330,6 +345,33 @@ func isTimeoutError(err error) bool {
 	}
 
 	return strings.Contains(strings.ToLower(err.Error()), "timed out")
+}
+
+// cropOutputToLastLines crops output to at most maxLines from the end.
+// It returns the cropped output and true when cropping happened.
+func cropOutputToLastLines(output string, maxLines int) (string, bool) {
+	if maxLines <= 0 || output == "" {
+		return output, false
+	}
+
+	hasTrailingNewline := strings.HasSuffix(output, "\n")
+	normalized := strings.TrimSuffix(output, "\n")
+	if normalized == "" {
+		return output, false
+	}
+
+	lines := strings.Split(normalized, "\n")
+	if len(lines) <= maxLines {
+		return output, false
+	}
+
+	last := lines[len(lines)-maxLines:]
+	cropped := strings.Join(last, "\n")
+	if hasTrailingNewline {
+		cropped += "\n"
+	}
+
+	return cropped, true
 }
 
 // Render returns a string representation of the tool call.

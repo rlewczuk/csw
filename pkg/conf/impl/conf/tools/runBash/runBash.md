@@ -23,7 +23,7 @@ Before executing the command, please follow these steps:
 Usage notes:
 - The command argument is required.
 - You can specify an optional timeout in seconds. If not specified, commands will time out after 120 seconds (2 minutes).
-- You can specify an optional limit parameter to limit the output to at most N lines. If not specified, default is 200 lines. Use 0 for no limit.
+- You can specify an optional limit parameter to limit the output to at most N lines. If not specified, default is 500 lines. Use 0 for no limit.
 - It is very helpful if you write a clear, concise description of what this command does in 5-10 words.
 - If the output exceeds the specified limit, it will be truncated and you will be informed by adding a line at the end that states "Output is truncated."
 
