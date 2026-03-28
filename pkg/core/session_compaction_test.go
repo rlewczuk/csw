@@ -7,7 +7,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/conf/impl"
@@ -38,6 +40,35 @@ func (h *compactionOutputHandler) OnPermissionQuery(query *tool.ToolPermissionsQ
 func (h *compactionOutputHandler) OnRateLimitError(retryAfterSeconds int) {}
 
 func (h *compactionOutputHandler) ShouldRetryAfterFailure(message string) bool {
+	return false
+}
+
+type capturedSessionMessage struct {
+	message     string
+	messageType string
+}
+
+type retryOutputHandler struct {
+	messages []capturedSessionMessage
+}
+
+func (h *retryOutputHandler) ShowMessage(message string, messageType string) {
+	h.messages = append(h.messages, capturedSessionMessage{message: message, messageType: messageType})
+}
+
+func (h *retryOutputHandler) AddAssistantMessage(text string, thinking string) {}
+
+func (h *retryOutputHandler) AddToolCall(call *tool.ToolCall) {}
+
+func (h *retryOutputHandler) AddToolCallResult(result *tool.ToolResponse) {}
+
+func (h *retryOutputHandler) RunFinished(err error) {}
+
+func (h *retryOutputHandler) OnPermissionQuery(query *tool.ToolPermissionsQuery) {}
+
+func (h *retryOutputHandler) OnRateLimitError(retryAfterSeconds int) {}
+
+func (h *retryOutputHandler) ShouldRetryAfterFailure(message string) bool {
 	return false
 }
 
@@ -248,4 +279,70 @@ func TestIsTemporaryLLMError(t *testing.T) {
 		err := fmt.Errorf("read failed: %w", &models.NetworkError{Message: "unexpected stream EOF", IsRetryable: true})
 		assert.True(t, isTemporaryLLMError(err))
 	})
+}
+
+func TestBuildRateLimitResetMessage(t *testing.T) {
+	t.Run("returns usage limit reset message", func(t *testing.T) {
+		message := buildRateLimitResetMessage(&models.RateLimitError{RetryAfterSeconds: 120, Message: "The usage limit has been reached"})
+		assert.Contains(t, message, "Usage limit has been reached")
+		assert.Contains(t, message, "in 120 seconds")
+		assert.Contains(t, message, "Reset expected at")
+	})
+
+	t.Run("returns generic rate limit reset message", func(t *testing.T) {
+		message := buildRateLimitResetMessage(&models.RateLimitError{RetryAfterSeconds: 90, Message: "rate limit exceeded"})
+		assert.Contains(t, message, "Rate limit has been reached")
+		assert.Contains(t, message, "in 90 seconds")
+	})
+
+	t.Run("returns empty message when retry-after is unavailable", func(t *testing.T) {
+		message := buildRateLimitResetMessage(&models.RateLimitError{RetryAfterSeconds: 0, Message: "rate limit exceeded"})
+		assert.Equal(t, "", message)
+	})
+}
+
+func TestSweSessionRunNonStreamingChat_UsageLimitWait(t *testing.T) {
+	t.Run("waits retry-after plus buffer before retrying", func(t *testing.T) {
+		handler := &retryOutputHandler{}
+		provider := models.NewMockProvider(nil)
+		provider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: time.Millisecond}
+
+		session := &SweSession{
+			messages: []*models.ChatMessage{models.NewTextMessage(models.ChatRoleUser, "hello")},
+			outputHandler: handler,
+			provider: provider,
+			configStore: impl.NewMockConfigStore(),
+		}
+		session.configStore.(*impl.MockConfigStore).SetGlobalConfig(&conf.GlobalConfig{LLMRetryMaxAttempts: 2, LLMRetryMaxBackoffSeconds: 30})
+
+		chatModel := &tokenLimitChatModel{
+			errors: []error{
+				&models.RateLimitError{RetryAfterSeconds: 2, Message: "The usage limit has been reached"},
+				nil,
+			},
+			responses: []*models.ChatMessage{nil, models.NewTextMessage(models.ChatRoleAssistant, "done")},
+		}
+
+		start := time.Now()
+		response, err := session.runNonStreamingChat(t.Context(), chatModel, nil, nil)
+		elapsed := time.Since(start)
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		assert.Equal(t, "done", response.GetText())
+		assert.GreaterOrEqual(t, elapsed, 12*time.Millisecond)
+
+		messages := collectSessionMessages(handler.messages)
+		assert.Contains(t, messages, "Usage limit has been reached. Reset expected at")
+		assert.Contains(t, messages, "Retrying in")
+	})
+}
+
+func collectSessionMessages(records []capturedSessionMessage) string {
+	parts := make([]string, 0, len(records))
+	for _, record := range records {
+		parts = append(parts, record.message)
+	}
+
+	return strings.Join(parts, "\n")
 }

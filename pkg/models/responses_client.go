@@ -68,6 +68,18 @@ type responsesToolCallInProgress struct {
 	Arguments string
 }
 
+// responsesRateLimitErrorBody represents a 429 error response payload.
+type responsesRateLimitErrorBody struct {
+	Error *responsesRateLimitErrorDetails `json:"error"`
+}
+
+// responsesRateLimitErrorDetails represents rate-limit metadata returned in error payloads.
+type responsesRateLimitErrorDetails struct {
+	Type            string `json:"type"`
+	Message         string `json:"message"`
+	ResetsInSeconds int    `json:"resets_in_seconds"`
+}
+
 // NewResponsesClient creates a new Responses client with the given config.
 func NewResponsesClient(config *conf.ModelProviderConfig) (*ResponsesClient, error) {
 	if config == nil {
@@ -1203,19 +1215,123 @@ func (c *ResponsesClient) handleRateLimitErrorWithBody(resp *http.Response, body
 		}
 	}
 
+	codexRetryAfter := codexLimitRetryAfterSeconds(resp.Header)
+
 	// Try to parse error response for retry information
+	var usageLimitResp responsesRateLimitErrorBody
+	if json.Unmarshal(bodyBytes, &usageLimitResp) == nil && usageLimitResp.Error != nil {
+		retryAfter = mergeRateLimitRetryAfter(
+			retryAfter,
+			codexRetryAfter,
+			usageLimitResp.Error.ResetsInSeconds,
+			usageLimitResp.Error.Type,
+		)
+		return &RateLimitError{
+			RetryAfterSeconds: retryAfter,
+			Message:           usageLimitResp.Error.Message,
+		}
+	}
+
 	var errResp OpenaiErrorResponse
 	if json.Unmarshal(bodyBytes, &errResp) == nil && errResp.Error != nil {
+		retryAfter = mergeRateLimitRetryAfter(retryAfter, codexRetryAfter, 0, errResp.Error.Type)
 		return &RateLimitError{
 			RetryAfterSeconds: retryAfter,
 			Message:           errResp.Error.Message,
 		}
 	}
 
+	retryAfter = mergeRateLimitRetryAfter(retryAfter, codexRetryAfter, 0, "")
+
 	return &RateLimitError{
 		RetryAfterSeconds: retryAfter,
 		Message:           bodyStr,
 	}
+}
+
+// mergeRateLimitRetryAfter merges retry-after candidates based on error semantics.
+func mergeRateLimitRetryAfter(retryAfter int, codexRetryAfter int, bodyRetryAfter int, errorType string) int {
+	errorTypeLower := strings.ToLower(strings.TrimSpace(errorType))
+	if errorTypeLower == "usage_limit_reached" {
+		if codexRetryAfter > 0 {
+			return codexRetryAfter
+		}
+		if bodyRetryAfter > 0 {
+			return bodyRetryAfter
+		}
+		return retryAfter
+	}
+
+	if retryAfter > 0 {
+		return retryAfter
+	}
+	if bodyRetryAfter > 0 {
+		return bodyRetryAfter
+	}
+	if codexRetryAfter > 0 {
+		return codexRetryAfter
+	}
+
+	return 0
+}
+
+// codexLimitRetryAfterSeconds resolves retry-after from Codex-specific limit headers.
+func codexLimitRetryAfterSeconds(headers http.Header) int {
+	if len(headers) == 0 {
+		return 0
+	}
+
+	primaryUsedPercent := parseIntHeader(headers, "X-Codex-Primary-Used-Percent")
+	secondaryUsedPercent := parseIntHeader(headers, "X-Codex-Secondary-Used-Percent")
+	primaryResetAfter := parseIntHeader(headers, "X-Codex-Primary-Reset-After-Seconds")
+	secondaryResetAfter := parseIntHeader(headers, "X-Codex-Secondary-Reset-After-Seconds")
+	activeLimit := strings.ToLower(strings.TrimSpace(headers.Get("X-Codex-Active-Limit")))
+
+	if strings.Contains(activeLimit, "primary") && primaryResetAfter > 0 {
+		return primaryResetAfter
+	}
+	if strings.Contains(activeLimit, "secondary") && secondaryResetAfter > 0 {
+		return secondaryResetAfter
+	}
+
+	primaryExceeded := primaryUsedPercent >= 100
+	secondaryExceeded := secondaryUsedPercent >= 100
+
+	if primaryExceeded && !secondaryExceeded {
+		return primaryResetAfter
+	}
+	if secondaryExceeded && !primaryExceeded {
+		return secondaryResetAfter
+	}
+	if primaryExceeded && secondaryExceeded {
+		return maxInt(primaryResetAfter, secondaryResetAfter)
+	}
+
+	return 0
+}
+
+// parseIntHeader parses an integer header value and returns zero on parse failure.
+func parseIntHeader(headers http.Header, key string) int {
+	value := strings.TrimSpace(headers.Get(key))
+	if value == "" {
+		return 0
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0
+	}
+
+	return parsed
+}
+
+// maxInt returns the larger of two integers.
+func maxInt(a int, b int) int {
+	if a > b {
+		return a
+	}
+
+	return b
 }
 
 func convertToResponsesItems(messages []*ChatMessage) ([]ResponsesItem, error) {

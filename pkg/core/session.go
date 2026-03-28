@@ -27,6 +27,8 @@ import (
 const (
 	defaultLLMRetryMaxAttempts        = 10
 	defaultLLMRetryMaxBackoffSeconds  = 60
+	// usageLimitRetryBufferSeconds adds a safety margin after provider reset time.
+	usageLimitRetryBufferSeconds      = 10
 	defaultContextCompactionThreshold = 0.95
 	defaultMaxToolThreads             = 8
 	toolExecutionStartDelay           = 250 * time.Millisecond
@@ -474,11 +476,16 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 			}
 
 			retryAfterSeconds := 0
+			rateLimitRetryAfterSeconds := 0
 			var rateLimitErr *models.RateLimitError
 			if errors.As(err, &rateLimitErr) {
 				retryAfterSeconds = rateLimitErr.RetryAfterSeconds
+				rateLimitRetryAfterSeconds = rateLimitErr.RetryAfterSeconds
 				if s.outputHandler != nil {
 					s.outputHandler.OnRateLimitError(retryAfterSeconds)
+					if retryAfterSeconds > 0 {
+						s.outputHandler.ShowMessage(buildRateLimitResetMessage(rateLimitErr), sessionMessageTypeWarning)
+					}
 				}
 			}
 
@@ -500,10 +507,13 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 			}
 
 			backoffSeconds := retryAfterSeconds
+			if rateLimitRetryAfterSeconds > 0 {
+				backoffSeconds = rateLimitRetryAfterSeconds + usageLimitRetryBufferSeconds
+			}
 			if backoffSeconds <= 0 {
 				backoffSeconds = 1 << (attempt - 1)
 			}
-			if backoffSeconds > maxBackoffSeconds {
+			if rateLimitRetryAfterSeconds <= 0 && backoffSeconds > maxBackoffSeconds {
 				backoffSeconds = maxBackoffSeconds
 			}
 			backoffDuration := time.Duration(backoffSeconds) * backoffScale
@@ -519,6 +529,23 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 			}
 		}
 	}
+}
+
+// buildRateLimitResetMessage creates a readable message with expected reset time.
+func buildRateLimitResetMessage(rateLimitErr *models.RateLimitError) string {
+	if rateLimitErr == nil || rateLimitErr.RetryAfterSeconds <= 0 {
+		return ""
+	}
+
+	resetTime := time.Now().Add(time.Duration(rateLimitErr.RetryAfterSeconds) * time.Second)
+	resetAt := resetTime.Format("2006-01-02 15:04:05 MST")
+	messageLower := strings.ToLower(rateLimitErr.Message)
+
+	if strings.Contains(messageLower, "usage limit") {
+		return fmt.Sprintf("Usage limit has been reached. Reset expected at %s (in %d seconds).", resetAt, rateLimitErr.RetryAfterSeconds)
+	}
+
+	return fmt.Sprintf("Rate limit has been reached. Reset expected at %s (in %d seconds).", resetAt, rateLimitErr.RetryAfterSeconds)
 }
 
 func (s *SweSession) logLLMRequestError(event string, err error) {

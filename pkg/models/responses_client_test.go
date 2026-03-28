@@ -1186,6 +1186,71 @@ func TestResponsesClient_OptionsHeadersStream(t *testing.T) {
 }
 
 func TestResponsesClient_RateLimitError(t *testing.T) {
+	t.Run("returns codex primary reset seconds for usage limit reached", func(t *testing.T) {
+		tc := getResponsesTestClient(t)
+		defer tc.Close()
+
+		if tc.Mock == nil {
+			t.Skip("Skipping codex usage-limit header assertions against real provider")
+		}
+
+		headers := http.Header{}
+		headers.Set("X-Codex-Primary-Used-Percent", "100")
+		headers.Set("X-Codex-Primary-Reset-After-Seconds", "4348")
+		headers.Set("X-Codex-Secondary-Used-Percent", "77")
+		headers.Set("X-Codex-Secondary-Reset-After-Seconds", "68891")
+		tc.Mock.AddRestResponseWithStatusAndHeaders(
+			"/responses",
+			"POST",
+			`{"error":{"type":"usage_limit_reached","message":"The usage limit has been reached","resets_in_seconds":4347}}`,
+			http.StatusTooManyRequests,
+			headers,
+		)
+
+		chatModel := tc.Client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}
+
+		_, err := chatModel.Chat(context.Background(), messages, nil, nil)
+		require.Error(t, err)
+
+		var rateLimitErr *RateLimitError
+		require.True(t, errors.As(err, &rateLimitErr))
+		assert.Equal(t, 4348, rateLimitErr.RetryAfterSeconds)
+		assert.Equal(t, "The usage limit has been reached", rateLimitErr.Message)
+	})
+
+	t.Run("returns codex secondary reset seconds when secondary limit is exceeded", func(t *testing.T) {
+		tc := getResponsesTestClient(t)
+		defer tc.Close()
+
+		if tc.Mock == nil {
+			t.Skip("Skipping codex usage-limit header assertions against real provider")
+		}
+
+		headers := http.Header{}
+		headers.Set("X-Codex-Primary-Used-Percent", "95")
+		headers.Set("X-Codex-Primary-Reset-After-Seconds", "12")
+		headers.Set("X-Codex-Secondary-Used-Percent", "100")
+		headers.Set("X-Codex-Secondary-Reset-After-Seconds", "68891")
+		tc.Mock.AddRestResponseWithStatusAndHeaders(
+			"/responses",
+			"POST",
+			`{"error":{"type":"usage_limit_reached","message":"The usage limit has been reached","resets_in_seconds":68890}}`,
+			http.StatusTooManyRequests,
+			headers,
+		)
+
+		chatModel := tc.Client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}
+
+		_, err := chatModel.Chat(context.Background(), messages, nil, nil)
+		require.Error(t, err)
+
+		var rateLimitErr *RateLimitError
+		require.True(t, errors.As(err, &rateLimitErr))
+		assert.Equal(t, 68891, rateLimitErr.RetryAfterSeconds)
+	})
+
 	t.Run("returns rate limit error with retry-after header", func(t *testing.T) {
 		mock := testutil.NewMockHTTPServer()
 		defer mock.Close()
