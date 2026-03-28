@@ -143,6 +143,12 @@ func (c *OpenAIClient) SetVerbose(verbose bool) {
 	c.verbose = verbose
 }
 
+// SetRawLLMCallback sets callback for raw LLM communication lines.
+// OpenAI client does not currently emit raw lines through this callback.
+func (c *OpenAIClient) SetRawLLMCallback(callback func(string)) {
+	_ = callback
+}
+
 // RefreshTokenIfNeeded checks if the OAuth2 access token needs to be refreshed
 // and refreshes it if necessary. It returns an error if the refresh fails.
 // For non-OAuth2 providers, this method does nothing and returns nil.

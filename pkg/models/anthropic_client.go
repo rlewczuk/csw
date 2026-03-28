@@ -123,6 +123,12 @@ func (c *AnthropicClient) SetVerbose(verbose bool) {
 	c.verbose = verbose
 }
 
+// SetRawLLMCallback sets callback for raw LLM communication lines.
+// Anthropic client does not currently emit raw lines through this callback.
+func (c *AnthropicClient) SetRawLLMCallback(callback func(string)) {
+	_ = callback
+}
+
 func (c *AnthropicClient) applyConfiguredHeaders(req *http.Request) {
 	if c == nil || c.config == nil || len(c.config.Headers) == 0 {
 		return

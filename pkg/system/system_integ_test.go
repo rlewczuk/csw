@@ -1,6 +1,7 @@
 package system_test
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -123,6 +124,43 @@ func TestLogLLMRequestsOption(t *testing.T) {
 		llmLoggerField := reflect.ValueOf(session).Elem().FieldByName("llmLogger")
 		require.True(t, llmLoggerField.IsValid())
 		assert.True(t, llmLoggerField.IsNil())
+	})
+}
+
+func TestLogLLMRequestsRawOption(t *testing.T) {
+	t.Run("writes raw llm log file when LogLLMRequestsRaw is enabled", func(t *testing.T) {
+		rawServer := testutil.NewMockHTTPServer()
+		defer rawServer.Close()
+		rawServer.AddRestResponse("/responses", "POST", `{"id":"resp_1","object":"response","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}]}`)
+
+		provider, err := models.NewResponsesClient(&conf.ModelProviderConfig{URL: rawServer.URL(), APIKey: "raw-secret-token"})
+		require.NoError(t, err)
+
+		fixture := coretestfixture.NewSweSystemFixture(
+			t,
+			coretestfixture.WithModelProviders(map[string]models.ModelProvider{"responses": provider}),
+			coretestfixture.WithProviderName("responses"),
+			coretestfixture.WithLogLLMRequests(true),
+		)
+		system := fixture.System
+		system.LogLLMRequestsRaw = true
+		system.LogBaseDir = t.TempDir()
+
+		session, err := system.NewSession("responses/test-model", testutil.NewMockSessionOutputHandler())
+		require.NoError(t, err)
+
+		chatModel := provider.ChatModel("test-model", nil)
+		_, err = chatModel.Chat(context.Background(), []*models.ChatMessage{models.NewTextMessage(models.ChatRoleUser, "hello")}, nil, nil)
+		require.NoError(t, err)
+
+		rawPath := filepath.Join(system.LogBaseDir, "sessions", session.ID(), "llm_requests_raw.log")
+		content, readErr := os.ReadFile(rawPath)
+		require.NoError(t, readErr)
+		logText := string(content)
+		assert.Contains(t, logText, "responses/test-model >>> REQUEST POST")
+		assert.Contains(t, logText, "responses/test-model <<< RESPONSE 200")
+		assert.Contains(t, logText, "responses/test-model >>> HEADER Authorization: Bear...oken")
+		assert.NotContains(t, logText, "raw-secret-token")
 	})
 }
 

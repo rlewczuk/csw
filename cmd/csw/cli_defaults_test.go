@@ -128,6 +128,7 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 		"--worktree=feature/override",
 		"--merge=false",
 		"--log-llm-requests=false",
+		"--log-llm-requests-raw",
 		"--thinking=medium",
 		"--lsp-server=custom-lsp",
 		"--git-user=CLI User",
@@ -141,7 +142,7 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	assert.Contains(t, captured, "model=provider/override")
 	assert.Contains(t, captured, "worktree=feature/override")
 	assert.Contains(t, captured, "merge=false")
-	assert.Contains(t, captured, "log=false")
+	assert.Contains(t, captured, "log=true")
 	assert.Contains(t, captured, "thinking=medium")
 	assert.Contains(t, captured, "lsp=custom-lsp")
 	assert.Contains(t, captured, "gitUser=CLI User")

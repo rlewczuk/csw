@@ -102,6 +102,7 @@ type BuildSystemParams struct {
 	ContainerEnv      []string
 	LSPServer         string
 	LogLLMRequests    bool
+	LogLLMRequestsRaw bool
 	// Thinking controls the thinking/reasoning mode for LLM requests.
 	// Values like "low", "medium", "high", "xhigh" for effort-based thinking,
 	// or "true"/"false" for boolean thinking modes.
@@ -644,6 +645,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		WorkDir:         effectiveWorkDir,
 		ShadowDir:       shadowDir,
 		LogLLMRequests:  params.LogLLMRequests,
+		LogLLMRequestsRaw: params.LogLLMRequestsRaw,
 		Thinking:        params.Thinking,
 		MaxToolThreads: func() int {
 			if params.MaxToolThreads > 0 {

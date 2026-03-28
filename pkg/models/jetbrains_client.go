@@ -102,6 +102,14 @@ func (c *JetBrainsClient) SetVerbose(verbose bool) {
 	c.openaiClient.SetVerbose(verbose)
 }
 
+// SetRawLLMCallback sets callback for raw LLM communication lines.
+func (c *JetBrainsClient) SetRawLLMCallback(callback func(string)) {
+	if c == nil || c.openaiClient == nil {
+		return
+	}
+	c.openaiClient.SetRawLLMCallback(callback)
+}
+
 // ListModels lists available models using OpenAI-compatible /models endpoint.
 func (c *JetBrainsClient) ListModels() ([]ModelInfo, error) {
 	if c == nil || c.openaiClient == nil {

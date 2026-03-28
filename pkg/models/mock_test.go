@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMockProvider_ListModels(t *testing.T) {
@@ -43,6 +45,25 @@ func TestMockProvider_ListModels(t *testing.T) {
 	if models[1].Name != "mock-model-2" {
 		t.Errorf("expected second model name 'mock-model-2', got '%s'", models[1].Name)
 	}
+}
+
+func TestMockProvider_SetRawLLMCallback(t *testing.T) {
+	provider := NewMockProvider([]ModelInfo{})
+
+	called := false
+	provider.SetRawLLMCallback(func(line string) {
+		_ = line
+		called = true
+	})
+
+	provider.mu.RLock()
+	callback := provider.rawLLMCallback
+	provider.mu.RUnlock()
+
+	if assert.NotNil(t, callback) {
+		callback("test")
+	}
+	assert.True(t, called)
 }
 
 func TestMockChatModel_Chat(t *testing.T) {

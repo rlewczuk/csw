@@ -17,6 +17,7 @@ type MockClient struct {
 	chatResponses   map[string]*MockChatResponse
 	chatResponseQue map[string][]*MockChatResponse
 	embedResponses  map[string][]float64
+	rawLLMCallback  func(string)
 	mu              sync.RWMutex
 	// Config holds provider configuration for this mock.
 	Config *conf.ModelProviderConfig
@@ -141,6 +142,13 @@ func (p *MockClient) EmbeddingModel(model string) EmbeddingModel {
 // SetVerbose is a no-op for the mock client as it doesn't make HTTP requests.
 func (p *MockClient) SetVerbose(verbose bool) {
 	// No-op: Mock client doesn't make HTTP requests
+}
+
+// SetRawLLMCallback sets callback used by tests to capture raw LLM communication lines.
+func (p *MockClient) SetRawLLMCallback(callback func(string)) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.rawLLMCallback = callback
 }
 
 // MockChatModel implements models.ChatModel interface for testing purposes.

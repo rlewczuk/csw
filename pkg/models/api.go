@@ -233,4 +233,7 @@ type ModelProvider interface {
 
 	// SetVerbose enables or disables verbose logging for HTTP requests and responses.
 	SetVerbose(verbose bool)
+
+	// SetRawLLMCallback sets callback that receives raw, line-based LLM HTTP communication logs.
+	SetRawLLMCallback(callback func(string))
 }

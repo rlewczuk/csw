@@ -45,6 +45,8 @@ type ResponsesClient struct {
 	configUpdater ConfigUpdater
 	// verbose enables logging of HTTP requests and responses.
 	verbose bool
+	// rawLLMCallback receives raw, line-based LLM communication logs.
+	rawLLMCallback func(string)
 }
 
 // ResponsesChatModel is a chat model implementation for Responses API.
@@ -154,6 +156,70 @@ func (c *ResponsesClient) SetConfigUpdater(updater ConfigUpdater) {
 // SetVerbose enables or disables verbose logging for HTTP requests and responses.
 func (c *ResponsesClient) SetVerbose(verbose bool) {
 	c.verbose = verbose
+}
+
+// SetRawLLMCallback sets callback for raw, line-based LLM communication logs.
+func (c *ResponsesClient) SetRawLLMCallback(callback func(string)) {
+	c.rawLLMCallback = callback
+}
+
+func (c *ResponsesClient) emitRawLLMLine(line string) {
+	if c == nil || c.rawLLMCallback == nil {
+		return
+	}
+	c.rawLLMCallback(line)
+}
+
+func (c *ResponsesClient) emitRawRequest(req *http.Request, body []byte) {
+	if c == nil || c.rawLLMCallback == nil || req == nil {
+		return
+	}
+
+	c.emitRawLLMLine(">>> REQUEST " + req.Method + " " + req.URL.String())
+	obfuscatedHeaders := obfuscateHeaders(req.Header)
+	headerKeys := make([]string, 0, len(obfuscatedHeaders))
+	for key := range obfuscatedHeaders {
+		headerKeys = append(headerKeys, key)
+	}
+	sort.Strings(headerKeys)
+	for _, key := range headerKeys {
+		for _, value := range obfuscatedHeaders.Values(key) {
+			c.emitRawLLMLine(">>> HEADER " + key + ": " + value)
+		}
+	}
+	if len(body) > 0 {
+		c.emitRawLLMLine(">>> BODY " + obfuscateJSONBody(body))
+	}
+}
+
+func (c *ResponsesClient) emitRawResponse(resp *http.Response, body []byte) {
+	if c == nil || c.rawLLMCallback == nil || resp == nil {
+		return
+	}
+
+	c.emitRawLLMLine("<<< RESPONSE " + strconv.Itoa(resp.StatusCode))
+	obfuscatedHeaders := obfuscateHeaders(resp.Header)
+	headerKeys := make([]string, 0, len(obfuscatedHeaders))
+	for key := range obfuscatedHeaders {
+		headerKeys = append(headerKeys, key)
+	}
+	sort.Strings(headerKeys)
+	for _, key := range headerKeys {
+		for _, value := range obfuscatedHeaders.Values(key) {
+			c.emitRawLLMLine("<<< HEADER " + key + ": " + value)
+		}
+	}
+	if len(body) > 0 {
+		c.emitRawLLMLine("<<< BODY " + obfuscateJSONBody(body))
+	}
+}
+
+func (c *ResponsesClient) emitRawStreamChunk(line string) {
+	if c == nil || c.rawLLMCallback == nil {
+		return
+	}
+
+	c.emitRawLLMLine("<<< CHUNK " + obfuscateBodyWithRegex(line))
 }
 
 // RefreshTokenIfNeeded checks if the OAuth2 access token needs to be refreshed
@@ -574,6 +640,7 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		if effectiveOptions != nil && effectiveOptions.Logger != nil {
 			logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
 		}
+		m.client.emitRawRequest(req, body)
 
 		resp, err := m.client.httpClient.Do(req)
 		if err != nil {
@@ -590,6 +657,7 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		if effectiveOptions != nil && effectiveOptions.Verbose {
 			logVerboseResponseFromBytes(resp, bodyBytes)
 		}
+		m.client.emitRawResponse(resp, bodyBytes)
 
 		return resp, bodyBytes, nil
 	}
@@ -756,6 +824,7 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			if effectiveOptions != nil && effectiveOptions.Logger != nil {
 				logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
 			}
+			m.client.emitRawRequest(req, body)
 
 			resp, err := m.client.httpClient.Do(req)
 			if err != nil {
@@ -806,6 +875,7 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		defer resp.Body.Close()
 
 		logVerboseStreamResponseHeaders(resp, effectiveOptions != nil && effectiveOptions.Verbose)
+		m.client.emitRawResponse(resp, nil)
 
 		if err := m.client.checkStatusCode(resp); err != nil {
 			bodyBytes, _ := io.ReadAll(resp.Body)
@@ -829,6 +899,7 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			}
 
 			line := scanner.Text()
+			m.client.emitRawStreamChunk(line)
 			if line == "" {
 				continue
 			}

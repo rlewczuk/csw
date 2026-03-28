@@ -113,6 +113,12 @@ func (c *OllamaClient) SetVerbose(verbose bool) {
 	c.verbose = verbose
 }
 
+// SetRawLLMCallback sets callback for raw LLM communication lines.
+// Ollama client does not currently emit raw lines through this callback.
+func (c *OllamaClient) SetRawLLMCallback(callback func(string)) {
+	_ = callback
+}
+
 func (c *OllamaClient) applyConfiguredHeaders(req *http.Request) {
 	if c == nil || c.config == nil || len(c.config.Headers) == 0 {
 		return

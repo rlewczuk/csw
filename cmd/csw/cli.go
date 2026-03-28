@@ -62,6 +62,7 @@ type CLIParams struct {
 	SaveSessionTo         string
 	SaveSession           bool
 	LogLLMRequests        bool
+	LogLLMRequestsRaw     bool
 	LSPServer             string
 	Thinking              string
 	ResumeTarget          string
@@ -105,6 +106,7 @@ func CliCommand() *cobra.Command {
 		cliSaveSessionTo  string
 		cliSaveSession    bool
 		cliLogLLMRequests bool
+		cliLogLLMRequestsRaw bool
 		cliLSPServer      string
 		cliThinking       string
 		cliGitUser        string
@@ -252,6 +254,7 @@ func CliCommand() *cobra.Command {
 			if err := applyCLIDefaults(cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads); err != nil {
 				return err
 			}
+			cliLogLLMRequests = cliLogLLMRequests || cliLogLLMRequestsRaw
 
 			if invocation != nil {
 				if !cmd.Flags().Changed("model") && commandModelOverride != "" {
@@ -309,6 +312,7 @@ func CliCommand() *cobra.Command {
 				SaveSessionTo:         cliSaveSessionTo,
 				SaveSession:           cliSaveSession,
 				LogLLMRequests:        cliLogLLMRequests,
+				LogLLMRequestsRaw:     cliLogLLMRequestsRaw,
 				LSPServer:             cliLSPServer,
 				Thinking:              cliThinking,
 				ResumeTarget:          resumeTarget,
@@ -345,6 +349,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliSaveSessionTo, "save-session-to", "", "Save session conversation to specified markdown file")
 	cmd.Flags().BoolVar(&cliSaveSession, "save-session", false, "Save session conversation")
 	cmd.Flags().BoolVar(&cliLogLLMRequests, "log-llm-requests", false, "Log LLM requests and responses")
+	cmd.Flags().BoolVar(&cliLogLLMRequestsRaw, "log-llm-requests-raw", false, "Log raw line-based LLM requests and responses")
 	cmd.Flags().StringVar(&cliLSPServer, "lsp-server", "", "Path to LSP server binary (empty to disable LSP)")
 	cmd.Flags().StringVar(&cliThinking, "thinking", "", "Thinking/reasoning mode: low, medium, high, xhigh (effort-based) or true/false (boolean)")
 	cmd.Flags().StringVar(&cliGitUser, "git-user", "", "Git user name for git operations (default: from git config)")
@@ -495,6 +500,7 @@ func runCLI(params *CLIParams) error {
 		ContainerEnv:      params.ContainerEnv,
 		LSPServer:         params.LSPServer,
 		LogLLMRequests:    params.LogLLMRequests,
+		LogLLMRequestsRaw: params.LogLLMRequestsRaw,
 		Thinking:          params.Thinking,
 		BashRunTimeout:    params.BashRunTimeout,
 		AllowedPaths:      params.VFSAllow,

@@ -58,6 +58,7 @@ type SweSystem struct {
 	WorkDir              string
 	ShadowDir            string
 	LogLLMRequests       bool
+	LogLLMRequestsRaw    bool
 	Thinking             string
 	MaxToolThreads       int
 }
@@ -91,6 +92,14 @@ func (s *SweSystem) LoadSession(id string, outputHandler core.SessionThreadOutpu
 	params.Logger = logging.GetSessionLogger(state.SessionID, logging.LogTypeSession)
 	if s.LogLLMRequests {
 		params.LLMLogger = logging.GetSessionLogger(state.SessionID, logging.LogTypeLLM)
+	}
+	if s.LogLLMRequestsRaw && strings.TrimSpace(s.LogBaseDir) != "" {
+		if provider, ok := s.ModelProviders[state.ProviderName]; ok {
+			rawPath := filepath.Join(s.LogBaseDir, "sessions", state.SessionID, "llm_requests_raw.log")
+			if err := attachProviderRawLLMLogger(provider, state.ProviderName, state.Model, rawPath); err != nil && params.Logger != nil {
+				params.Logger.Warn("failed to setup raw llm logger", "error", err)
+			}
+		}
 	}
 
 	session, err := core.RestoreSessionFromPersistedState(params, state, outputHandler)
@@ -174,6 +183,14 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 	sessionID := shared.GenerateUUIDv7()
 
 	sessionLogger, llmLogger := s.createSessionLoggers(sessionID)
+	if s.LogLLMRequestsRaw && strings.TrimSpace(s.LogBaseDir) != "" {
+		rawPath := filepath.Join(s.LogBaseDir, "sessions", sessionID, "llm_requests_raw.log")
+		if err := attachProviderRawLLMLogger(provider, providerName, modelName, rawPath); err != nil {
+			if sessionLogger != nil {
+				sessionLogger.Warn("failed to setup raw llm logger", "error", err)
+			}
+		}
+	}
 	session := core.NewSweSession(&core.SweSessionParams{
 		ID:                   sessionID,
 		ParentID:             strings.TrimSpace(parentID),
@@ -230,6 +247,40 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 	session.PersistSessionState()
 
 	return session, nil
+}
+
+func attachProviderRawLLMLogger(provider models.ModelProvider, providerName string, modelName string, logPath string) error {
+	if provider == nil {
+		return fmt.Errorf("attachProviderRawLLMLogger() [system.go]: provider is nil")
+	}
+	if strings.TrimSpace(logPath) == "" {
+		return fmt.Errorf("attachProviderRawLLMLogger() [system.go]: log path is empty")
+	}
+	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
+		return fmt.Errorf("attachProviderRawLLMLogger() [system.go]: failed to create log directory: %w", err)
+	}
+	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("attachProviderRawLLMLogger() [system.go]: failed to open log file: %w", err)
+	}
+	if closeErr := file.Close(); closeErr != nil {
+		return fmt.Errorf("attachProviderRawLLMLogger() [system.go]: failed to close log file probe: %w", closeErr)
+	}
+	prefix := strings.TrimSpace(providerName) + "/" + strings.TrimSpace(modelName)
+	provider.SetRawLLMCallback(func(line string) {
+		trimmed := strings.TrimRight(line, "\r\n")
+		f, openErr := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if openErr != nil {
+			return
+		}
+		if _, writeErr := f.WriteString(prefix + " " + trimmed + "\n"); writeErr != nil {
+			_ = f.Close()
+			return
+		}
+		_ = f.Close()
+	})
+
+	return nil
 }
 
 // ExecuteSubAgentTask executes delegated child-session task synchronously.
