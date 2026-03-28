@@ -47,6 +47,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 		customTemplate     string
 		llmMessage         string
 		omitSystemTemplate bool
+		commitErr          error
 		mergeErr           error
 		expectCommit       bool
 		expectMerge        bool
@@ -97,12 +98,12 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 			expectedMessage:    "branch=feature/custom | add custom template option",
 		},
 		{
-			name:               "generation error skips commit and logs error",
+			name:               "generation error preserves worktree",
 			worktreeBranch:     "feature/error",
 			llmMessage:         "irrelevant",
 			omitSystemTemplate: true,
 			expectCommit:       false,
-			expectDropWorktree: true,
+			expectDropWorktree: false,
 			expectStderr:       "worktree commit message generation failed",
 		},
 		{
@@ -111,11 +112,57 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 			llmMessage:     "ignored",
 			expectCommit:   false,
 		},
+		{
+			name:               "commit failure with merge=false preserves worktree",
+			worktreeBranch:     "feature/commit-fail",
+			llmMessage:         "some message",
+			commitErr:          fmt.Errorf("simulated commit error"),
+			expectCommit:       true,
+			expectDropWorktree: false,
+			expectedMessage:    "[feature/commit-fail] some message",
+			expectStderr:       "worktree commit failed",
+		},
+		{
+			name:               "commit failure with merge=true preserves worktree and skips merge",
+			worktreeBranch:     "feature/commit-fail-merge",
+			merge:              true,
+			llmMessage:         "some message",
+			commitErr:          fmt.Errorf("simulated commit error"),
+			expectCommit:       true,
+			expectDropWorktree: false,
+			expectedMessage:    "[feature/commit-fail-merge] some message",
+			expectStderr:       "merge skipped because commit failed",
+		},
+		{
+			name:               "non-conflict merge error preserves worktree and branch",
+			worktreeBranch:     "feature/merge-fail",
+			merge:              true,
+			llmMessage:         "merge will fail",
+			mergeErr:           fmt.Errorf("simulated merge error"),
+			expectCommit:       true,
+			expectMerge:        true,
+			expectDeleteBranch: false,
+			expectDropWorktree: false,
+			expectedMessage:    "[feature/merge-fail] merge will fail",
+			expectStderr:       "automatic merge failed",
+		},
+		{
+			name:               "commit no changes error is tolerated and drops worktree",
+			worktreeBranch:     "feature/no-changes",
+			llmMessage:         "no changes msg",
+			commitErr:          vfs.ErrNoChangesToCommit,
+			expectCommit:       true,
+			expectDropWorktree: true,
+			expectedMessage:    "[feature/no-changes] no changes msg",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			system, session, mockVCS := newFinalizeWorktreeFixture(t, tt.llmMessage, !tt.omitSystemTemplate)
+			if tt.commitErr != nil {
+				mockVCS.SetCommitError(tt.commitErr)
+			}
 			if tt.mergeErr != nil {
 				mockVCS.SetMergeError(tt.mergeErr)
 			}

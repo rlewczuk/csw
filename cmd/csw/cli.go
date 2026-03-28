@@ -1618,9 +1618,7 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 			generatedMessage, err := core.GenerateCommitMessage(ctx, sweSystem.ModelProviders, sweSystem.ConfigStore, session, worktreeBranch, commitMessageTemplate)
 			if err != nil {
 				_, _ = fmt.Fprintf(stderr, "worktree commit message generation failed: %v\n", err)
-				if dropErr := vcs.DropWorktree(worktreeBranch); dropErr != nil {
-					_, _ = fmt.Fprintf(stderr, "worktree cleanup failed: %v\n", dropErr)
-				}
+				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
 				return result, nil
 			}
 			commitMessage = generatedMessage
@@ -1630,8 +1628,9 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 			_, _ = fmt.Fprintf(stderr, "worktree commit failed: %v\n", commitErr)
 			if merge {
 				_, _ = fmt.Fprintln(stderr, "merge skipped because commit failed. Resolve issues and merge manually.")
-				return result, nil
 			}
+			_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
+			return result, nil
 		}
 	}
 
