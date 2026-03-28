@@ -1,7 +1,9 @@
 package ui
 
+import "github.com/rlewczuk/csw/pkg/shared"
+
 // MessageType defines a type of user-facing status message.
-type MessageType string
+type MessageType = shared.MessageType
 
 const (
 	// MessageTypeInfo indicates an informational message.

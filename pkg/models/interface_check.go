@@ -25,4 +25,7 @@ var (
 	_ ModelProvider  = (*MockClient)(nil)
 	_ ChatModel      = (*MockChatModel)(nil)
 	_ EmbeddingModel = (*MockEmbeddingModel)(nil)
+
+	_ ChatModel = (*RetryChatModel)(nil)
+	_ ChatModel = (*UnstreamingChatModel)(nil)
 )
