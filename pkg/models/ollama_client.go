@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +30,8 @@ type OllamaClient struct {
 	config     *conf.ModelProviderConfig
 	// verbose enables logging of HTTP requests and responses.
 	verbose bool
+	// rawLLMCallback receives raw, line-based LLM communication logs.
+	rawLLMCallback func(string)
 }
 
 // OllamaChatModel is a chat model implementation for Ollama
@@ -113,10 +116,68 @@ func (c *OllamaClient) SetVerbose(verbose bool) {
 	c.verbose = verbose
 }
 
-// SetRawLLMCallback sets callback for raw LLM communication lines.
-// Ollama client does not currently emit raw lines through this callback.
+// SetRawLLMCallback sets callback for raw, line-based LLM communication logs.
 func (c *OllamaClient) SetRawLLMCallback(callback func(string)) {
-	_ = callback
+	c.rawLLMCallback = callback
+}
+
+func (c *OllamaClient) emitRawLLMLine(line string) {
+	if c == nil || c.rawLLMCallback == nil {
+		return
+	}
+	c.rawLLMCallback(line)
+}
+
+func (c *OllamaClient) emitRawRequest(req *http.Request, body []byte) {
+	if c == nil || c.rawLLMCallback == nil || req == nil {
+		return
+	}
+
+	c.emitRawLLMLine(">>> REQUEST " + req.Method + " " + req.URL.String())
+	obfuscatedHeaders := obfuscateHeaders(req.Header)
+	headerKeys := make([]string, 0, len(obfuscatedHeaders))
+	for key := range obfuscatedHeaders {
+		headerKeys = append(headerKeys, key)
+	}
+	sort.Strings(headerKeys)
+	for _, key := range headerKeys {
+		for _, value := range obfuscatedHeaders.Values(key) {
+			c.emitRawLLMLine(">>> HEADER " + key + ": " + value)
+		}
+	}
+	if len(body) > 0 {
+		c.emitRawLLMLine(">>> BODY " + obfuscateJSONBody(body))
+	}
+}
+
+func (c *OllamaClient) emitRawResponse(resp *http.Response, body []byte) {
+	if c == nil || c.rawLLMCallback == nil || resp == nil {
+		return
+	}
+
+	c.emitRawLLMLine("<<< RESPONSE " + strconv.Itoa(resp.StatusCode))
+	obfuscatedHeaders := obfuscateHeaders(resp.Header)
+	headerKeys := make([]string, 0, len(obfuscatedHeaders))
+	for key := range obfuscatedHeaders {
+		headerKeys = append(headerKeys, key)
+	}
+	sort.Strings(headerKeys)
+	for _, key := range headerKeys {
+		for _, value := range obfuscatedHeaders.Values(key) {
+			c.emitRawLLMLine("<<< HEADER " + key + ": " + value)
+		}
+	}
+	if len(body) > 0 {
+		c.emitRawLLMLine("<<< BODY " + obfuscateJSONBody(body))
+	}
+}
+
+func (c *OllamaClient) emitRawStreamChunk(line string) {
+	if c == nil || c.rawLLMCallback == nil {
+		return
+	}
+
+	c.emitRawLLMLine("<<< CHUNK " + obfuscateBodyWithRegex(line))
 }
 
 func (c *OllamaClient) applyConfiguredHeaders(req *http.Request) {
@@ -331,6 +392,8 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 		logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
 	}
 
+	m.client.emitRawRequest(req, body)
+
 	resp, err := m.client.httpClient.Do(req)
 	if err != nil {
 		return nil, m.client.handleHTTPError(err)
@@ -347,6 +410,8 @@ func (m *OllamaChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	if effectiveOptions != nil && effectiveOptions.Verbose {
 		logVerboseResponseFromBytes(resp, bodyBytes)
 	}
+
+	m.client.emitRawResponse(resp, bodyBytes)
 
 	// Check status code and log error response if needed
 	if err := m.client.checkStatusCodeWithBody(resp, bodyBytes); err != nil {
