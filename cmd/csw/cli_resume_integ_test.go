@@ -81,6 +81,18 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 			expectedCont:   true,
 		},
 		{
+			name:           "resume positional session id without prompt",
+			args:           []string{"--resume", "018f6e30-3acb-7f24-bede-8d96cd157152"},
+			expectedResume: "018f6e30-3acb-7f24-bede-8d96cd157152",
+		},
+		{
+			name:           "resume positional session id with prompt",
+			args:           []string{"--resume", "018f6e30-3acb-7f24-bede-8d96cd157152", "Please continue."},
+			expectedResume: "018f6e30-3acb-7f24-bede-8d96cd157152",
+			expectedPrompt: "Please continue.",
+			expectedCont:   true,
+		},
+		{
 			name:                 "resume force without prompt",
 			args:                 []string{"--resume", "--force", "--force-compact"},
 			expectedResume:       "last",

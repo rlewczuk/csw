@@ -96,6 +96,7 @@ var listGitConflictFilesFunc = listGitConflictFiles
 var executeConflictSubAgentFunc = executeConflictSubAgentTask
 
 var resumeUUIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+var resumeWorktreeNamePattern = regexp.MustCompile(`^[0-9]{4}-[a-z0-9][a-z0-9-]*$`)
 
 // CliCommand creates the cli command.
 func CliCommand() *cobra.Command {
@@ -158,11 +159,17 @@ func CliCommand() *cobra.Command {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: --continue <branch> cannot be used with --resume")
 			}
 
+			positionalArgs := append([]string(nil), args...)
+			if shouldConsumeFirstPositionalAsResumeTarget(cmd, resumeTarget, positionalArgs) {
+				resumeTarget = strings.ToLower(strings.TrimSpace(positionalArgs[0]))
+				positionalArgs = positionalArgs[1:]
+			}
+
 			prompt := ""
 			extraPositionalArgs := []string(nil)
-			if len(args) >= 1 {
-				prompt = args[0]
-				extraPositionalArgs = args[1:]
+			if len(positionalArgs) >= 1 {
+				prompt = positionalArgs[0]
+				extraPositionalArgs = positionalArgs[1:]
 			}
 
 			// Read prompt from file if it starts with @
@@ -387,6 +394,43 @@ func firstNonEmpty(values ...string) string {
 	}
 
 	return ""
+}
+
+func shouldConsumeFirstPositionalAsResumeTarget(cmd *cobra.Command, resumeTarget string, args []string) bool {
+	if cmd == nil {
+		return false
+	}
+	if !cmd.Flags().Changed("resume") {
+		return false
+	}
+	if strings.TrimSpace(resumeTarget) != "last" {
+		return false
+	}
+	if len(args) == 0 {
+		return false
+	}
+	return isLikelyResumeTargetToken(strings.TrimSpace(args[0]))
+}
+
+func isLikelyResumeTargetToken(value string) bool {
+	trimmedValue := strings.TrimSpace(value)
+	if trimmedValue == "" {
+		return false
+	}
+	if strings.EqualFold(trimmedValue, "last") {
+		return true
+	}
+	if resumeUUIDPattern.MatchString(trimmedValue) {
+		return true
+	}
+	if filepath.IsAbs(trimmedValue) {
+		return true
+	}
+	if strings.Contains(trimmedValue, "/") {
+		return true
+	}
+
+	return resumeWorktreeNamePattern.MatchString(trimmedValue)
 }
 
 func applyCLIDefaults(
