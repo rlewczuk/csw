@@ -963,6 +963,109 @@ func TestProviderAuthCommand_Success(t *testing.T) {
 	assert.Equal(t, "new-refresh-token", updated.RefreshToken)
 }
 
+func TestProviderAuthCommand_ClearsPreviousAuthDataBeforeReauth(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "csw-provider-auth-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	oldDir, err := os.Getwd()
+	require.NoError(t, err)
+	defer os.Chdir(oldDir)
+	err = os.Chdir(tmpDir)
+	require.NoError(t, err)
+
+	mock := testutil.NewMockHTTPServer()
+	defer mock.Close()
+	mock.AddRestResponse("/oauth/token", "POST", `{"access_token":"new-access-token","expires_in":3600}`)
+
+	store, err := GetConfigStore(ConfigScopeLocal)
+	require.NoError(t, err)
+	providerConfig := &conf.ModelProviderConfig{
+		Name:         "openai-auth",
+		Type:         "openai",
+		URL:          "https://chatgpt.com/backend-api/codex/responses",
+		AuthURL:      mock.URL() + "/oauth/authorize",
+		TokenURL:     mock.URL() + "/oauth/token",
+		ClientID:     "client-id",
+		AuthMode:     conf.AuthModeOAuth2,
+		APIKey:       "stale-access-token",
+		RefreshToken: "stale-refresh-token",
+		Headers:      map[string]string{"originator": "opencode"},
+		QueryParams:  map[string]string{},
+	}
+	err = store.SaveModelProviderConfig(providerConfig)
+	require.NoError(t, err)
+	if closer, ok := store.(interface{ Close() error }); ok {
+		require.NoError(t, closer.Close())
+	}
+
+	originalPort := providerAuthPort
+	originalTimeout := providerAuthTimeout
+	providerAuthPort = getFreePortNumber(t)
+	providerAuthTimeout = 15 * time.Second
+	defer func() {
+		providerAuthPort = originalPort
+		providerAuthTimeout = originalTimeout
+	}()
+
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = w
+	defer func() { os.Stdout = oldStdout }()
+
+	lineCh := make(chan string, 32)
+	scanDone := make(chan struct{})
+	go func() {
+		scanner := bufio.NewScanner(r)
+		for scanner.Scan() {
+			lineCh <- scanner.Text()
+		}
+		close(scanDone)
+		close(lineCh)
+	}()
+
+	cmd := providerAuthCommand()
+	cmd.SetArgs([]string{"openai-auth"})
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- cmd.Execute()
+		_ = w.Close()
+	}()
+
+	_, state := readAuthURLAndStateFromOutput(t, lineCh)
+	require.NotEmpty(t, state)
+
+	callbackURL := fmt.Sprintf("http://localhost:%d%s?code=auth-code-456&state=%s", providerAuthPort, providerAuthCallbackPath, url.QueryEscape(state))
+	sendCallbackRequestWithRetryForProviderTest(t, callbackURL)
+
+	select {
+	case execErr := <-errCh:
+		require.NoError(t, execErr)
+	case <-time.After(20 * time.Second):
+		t.Fatalf("TestProviderAuthCommand_ClearsPreviousAuthDataBeforeReauth() [provider_test.go]: timeout waiting for auth command")
+	}
+
+	<-scanDone
+
+	storeAfter, err := GetConfigStore(ConfigScopeLocal)
+	require.NoError(t, err)
+	defer func() {
+		if closer, ok := storeAfter.(interface{ Close() error }); ok {
+			_ = closer.Close()
+		}
+	}()
+
+	configs, err := storeAfter.GetModelProviderConfigs()
+	require.NoError(t, err)
+	updated, exists := configs["openai-auth"]
+	require.True(t, exists)
+	assert.Equal(t, conf.AuthModeOAuth2, updated.AuthMode)
+	assert.Equal(t, "new-access-token", updated.APIKey)
+	assert.Empty(t, updated.RefreshToken)
+}
+
 func readAuthURLAndStateFromOutput(t *testing.T, lineCh <-chan string) (string, string) {
 	t.Helper()
 

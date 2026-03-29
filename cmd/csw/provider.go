@@ -704,6 +704,12 @@ func providerAuthCommand() *cobra.Command {
 				return fmt.Errorf("providerAuthCommand() [provider.go]: provider not found: %s", providerName)
 			}
 
+			config.APIKey = ""
+			config.RefreshToken = ""
+			if err := store.SaveModelProviderConfig(config); err != nil {
+				return fmt.Errorf("providerAuthCommand() [provider.go]: failed to clear previous provider auth data: %w", err)
+			}
+
 			pkce, err := models.GenerateOAuthPKCECodes()
 			if err != nil {
 				return fmt.Errorf("providerAuthCommand() [provider.go]: failed to generate PKCE codes: %w", err)
