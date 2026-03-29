@@ -515,8 +515,8 @@ func runCLI(params *CLIParams) error {
 		return fmt.Errorf("runCLI() [cli.go]: invalid --output-format %q (allowed: short, full, jsonl)", params.OutputFormat)
 	}
 
-	if params.Merge && params.WorktreeBranch == "" {
-		return fmt.Errorf("runCLI() [cli.go]: --merge requires --worktree")
+	if err := validateMergeCLIParams(params); err != nil {
+		return err
 	}
 
 	if params.ResumeTarget != "" {
@@ -655,6 +655,19 @@ func runCLI(params *CLIParams) error {
 	appView := runtimeResult.AppView
 	session := runtimeResult.Session
 
+	finalizeVCS := buildResult.VCS
+	finalizeWorktreeBranch := buildResult.WorktreeBranch
+	finalizeWorktreeDir := buildResult.WorkDir
+	if params.Merge && params.ResumeTarget != "" && strings.TrimSpace(finalizeWorktreeBranch) == "" {
+		resumeVCS, resumeWorktreeBranch, resumeWorktreeDir, err := resolveResumeMergeWorktreeContext(buildResult, params, session)
+		if err != nil {
+			return err
+		}
+		finalizeVCS = resumeVCS
+		finalizeWorktreeBranch = resumeWorktreeBranch
+		finalizeWorktreeDir = resumeWorktreeDir
+	}
+
 	sessionID := session.ID()
 	defer func() {
 		_, _ = fmt.Fprintf(os.Stdout, "Session ID: %s\n", sessionID)
@@ -675,7 +688,7 @@ func runCLI(params *CLIParams) error {
 	}
 
 	var finalizeResult worktreeFinalizeResult
-	finalizeResult, finalizeErr := finalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt, hookEngine, appView)
+	finalizeResult, finalizeErr := finalizeWorktreeSession(ctx, finalizeVCS, finalizeWorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, finalizeWorktreeDir, params.Prompt, hookEngine, appView)
 	if finalizeErr != nil {
 		sessionRunErr = finalizeErr
 	}
@@ -692,6 +705,79 @@ func runCLI(params *CLIParams) error {
 	}
 
 	return nil
+}
+
+func validateMergeCLIParams(params *CLIParams) error {
+	if params == nil {
+		return fmt.Errorf("validateMergeCLIParams() [cli.go]: params cannot be nil")
+	}
+
+	if params.Merge && strings.TrimSpace(params.WorktreeBranch) == "" && strings.TrimSpace(params.ResumeTarget) == "" {
+		return fmt.Errorf("runCLI() [cli.go]: --merge requires --worktree")
+	}
+
+	return nil
+}
+
+func resolveResumeMergeWorktreeContext(buildResult system.BuildSystemResult, params *CLIParams, session *core.SweSession) (vfs.VCS, string, string, error) {
+	if params == nil {
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: params cannot be nil")
+	}
+	if session == nil {
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: session is nil")
+	}
+
+	sessionWorkDir := strings.TrimSpace(session.GetState().Info.WorkDir)
+	if sessionWorkDir == "" {
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: resumed session has empty workdir")
+	}
+
+	worktreeBranch, ok := inferResumeWorktreeBranch(buildResult.WorkDirRoot, buildResult.ShadowDir, sessionWorkDir)
+	if !ok {
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: --merge with --resume requires resumed session to use a worktree")
+	}
+
+	worktreesBaseDir := strings.TrimSpace(firstNonEmpty(buildResult.ShadowDir, buildResult.WorkDirRoot))
+	if worktreesBaseDir == "" {
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: worktrees base directory is empty")
+	}
+	worktreesRoot := filepath.Join(worktreesBaseDir, ".cswdata", "work")
+
+	resumeVCS, err := vfs.NewGitRepo(buildResult.WorkDirRoot, worktreesRoot, nil, nil, params.GitUserName, params.GitUserEmail)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: failed to create git vcs for resumed worktree: %w", err)
+	}
+
+	if _, err := resumeVCS.GetWorktree(worktreeBranch); err != nil {
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: failed to load resumed worktree %q: %w", worktreeBranch, err)
+	}
+
+	return resumeVCS, worktreeBranch, sessionWorkDir, nil
+}
+
+func inferResumeWorktreeBranch(workDirRoot string, shadowDir string, sessionWorkDir string) (string, bool) {
+	trimmedSessionWorkDir := strings.TrimSpace(sessionWorkDir)
+	if trimmedSessionWorkDir == "" {
+		return "", false
+	}
+
+	worktreesBaseDir := strings.TrimSpace(firstNonEmpty(shadowDir, workDirRoot))
+	if worktreesBaseDir == "" {
+		return "", false
+	}
+
+	worktreesRoot := filepath.Join(worktreesBaseDir, ".cswdata", "work")
+	relPath, err := filepath.Rel(worktreesRoot, trimmedSessionWorkDir)
+	if err != nil {
+		return "", false
+	}
+
+	normalizedRelPath := filepath.Clean(relPath)
+	if normalizedRelPath == "." || normalizedRelPath == ".." || strings.HasPrefix(normalizedRelPath, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+
+	return filepath.ToSlash(normalizedRelPath), true
 }
 
 func resolveCommandsRootDir(workDir string, shadowDir string) (string, error) {
