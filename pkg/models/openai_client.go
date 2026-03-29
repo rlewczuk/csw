@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"math"
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,6 +25,9 @@ import (
 
 // DefaultMaxTokens is the default maximum number of tokens to generate in the response.
 const DefaultMaxTokens = 32000
+
+// usageLimitResetAtPattern matches usage-limit reset timestamps in provider error messages.
+var usageLimitResetAtPattern = regexp.MustCompile(`(?i)reset at\s+(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})`)
 
 // OpenAIClient is a client for interacting with OpenAI-compatible API
 type OpenAIClient struct {
@@ -1033,16 +1038,78 @@ func (c *OpenAIClient) handleRateLimitErrorWithBody(resp *http.Response, bodyByt
 	// Try to parse error response for retry information
 	var errResp OpenaiErrorResponse
 	if json.Unmarshal(bodyBytes, &errResp) == nil && errResp.Error != nil {
+		usageLimitRetryAfter := parseUsageLimitRetryAfterSeconds(errResp.Error.Message, time.Now())
+		retryAfter = mergeOpenAIRetryAfterForUsageLimit(retryAfter, usageLimitRetryAfter, errResp.Error.Message, errResp.Error.Code)
 		return &RateLimitError{
 			RetryAfterSeconds: retryAfter,
 			Message:           errResp.Error.Message,
 		}
 	}
 
+	usageLimitRetryAfter := parseUsageLimitRetryAfterSeconds(bodyStr, time.Now())
+	retryAfter = mergeOpenAIRetryAfterForUsageLimit(retryAfter, usageLimitRetryAfter, bodyStr, nil)
+
 	return &RateLimitError{
 		RetryAfterSeconds: retryAfter,
 		Message:           bodyStr,
 	}
+}
+
+// mergeOpenAIRetryAfterForUsageLimit merges retry-after values for usage-limit errors.
+func mergeOpenAIRetryAfterForUsageLimit(retryAfter int, usageLimitRetryAfter int, message string, code interface{}) int {
+	if !isOpenAIUsageLimitError(message, code) {
+		return retryAfter
+	}
+
+	if usageLimitRetryAfter > retryAfter {
+		return usageLimitRetryAfter
+	}
+
+	return retryAfter
+}
+
+// isOpenAIUsageLimitError returns true when OpenAI protocol error indicates usage limit reached.
+func isOpenAIUsageLimitError(message string, code interface{}) bool {
+	if strings.Contains(strings.ToLower(message), "usage limit") {
+		return true
+	}
+
+	switch typedCode := code.(type) {
+	case string:
+		return strings.TrimSpace(typedCode) == "1308"
+	case float64:
+		return int(typedCode) == 1308
+	case int:
+		return typedCode == 1308
+	default:
+		return false
+	}
+}
+
+// parseUsageLimitRetryAfterSeconds parses usage-limit reset timestamp and returns seconds until reset.
+func parseUsageLimitRetryAfterSeconds(message string, now time.Time) int {
+	if strings.TrimSpace(message) == "" {
+		return 0
+	}
+
+	matches := usageLimitResetAtPattern.FindStringSubmatch(message)
+	if len(matches) != 2 {
+		return 0
+	}
+
+	const resetAtLayout = "2006-01-02 15:04:05"
+
+	parsedResetAt, err := time.ParseInLocation(resetAtLayout, matches[1], time.Local)
+	if err != nil {
+		return 0
+	}
+
+	untilReset := parsedResetAt.Sub(now)
+	if untilReset <= 0 {
+		return 0
+	}
+
+	return int(math.Ceil(untilReset.Seconds()))
 }
 
 // convertToOpenAIMessage converts a models.ChatMessage to OpenAI OpenaiChatCompletionMessage format

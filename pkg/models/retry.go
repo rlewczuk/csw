@@ -110,6 +110,7 @@ func (r *RetryChatModel) calculateDelay(attempt int, err error) time.Duration {
 		if isUsageLimit {
 			backoffSeconds += usageLimitRetryBufferSeconds
 		}
+		return time.Duration(backoffSeconds) * time.Second
 	}
 
 	if backoffSeconds <= 0 {

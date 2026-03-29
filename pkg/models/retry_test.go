@@ -380,8 +380,8 @@ func TestRetryChatModel_CalculateDelay_RateLimitRetryAfter(t *testing.T) {
 
 	err := &RateLimitError{RetryAfterSeconds: 30, Message: "rate exceeded"}
 
-	// When RetryAfterSeconds is set, use it directly (multiplied by InitialDelay)
-	assert.Equal(t, 300*time.Second, model.calculateDelay(1, err))
+	// When RetryAfterSeconds is set, use it directly as seconds.
+	assert.Equal(t, 30*time.Second, model.calculateDelay(1, err))
 }
 
 func TestRetryChatModel_CalculateDelay_UsageLimitRetryAfter(t *testing.T) {
@@ -395,8 +395,8 @@ func TestRetryChatModel_CalculateDelay_UsageLimitRetryAfter(t *testing.T) {
 
 	err := &RateLimitError{RetryAfterSeconds: 30, Message: "Usage limit reached"}
 
-	// Usage limit adds buffer: (30 + 10) * 10s = 400s
-	assert.Equal(t, 400*time.Second, model.calculateDelay(1, err))
+	// Usage limit adds safety buffer: 30s + 10s = 40s.
+	assert.Equal(t, 40*time.Second, model.calculateDelay(1, err))
 }
 
 func TestRetryChatModel_CalculateDelay_NetworkErrorUsesExponentialBackoff(t *testing.T) {
