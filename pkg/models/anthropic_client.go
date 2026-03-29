@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +30,8 @@ type AnthropicClient struct {
 	config     *conf.ModelProviderConfig
 	// verbose enables logging of HTTP requests and responses.
 	verbose bool
+	// rawLLMCallback receives raw, line-based LLM communication logs.
+	rawLLMCallback func(string)
 }
 
 // AnthropicChatModel is a chat model implementation for Anthropic
@@ -123,10 +126,67 @@ func (c *AnthropicClient) SetVerbose(verbose bool) {
 	c.verbose = verbose
 }
 
-// SetRawLLMCallback sets callback for raw LLM communication lines.
-// Anthropic client does not currently emit raw lines through this callback.
+// SetRawLLMCallback sets callback for raw, line-based LLM communication logs.
 func (c *AnthropicClient) SetRawLLMCallback(callback func(string)) {
-	_ = callback
+	c.rawLLMCallback = callback
+}
+
+func (c *AnthropicClient) emitRawLLMLine(line string) {
+	if c == nil || c.rawLLMCallback == nil {
+		return
+	}
+	c.rawLLMCallback(line)
+}
+
+func (c *AnthropicClient) emitRawRequest(req *http.Request, body []byte) {
+	if c == nil || c.rawLLMCallback == nil || req == nil {
+		return
+	}
+
+	c.emitRawLLMLine(">>> REQUEST " + req.Method + " " + req.URL.String())
+	obfuscatedHeaders := obfuscateHeaders(req.Header)
+	headerKeys := make([]string, 0, len(obfuscatedHeaders))
+	for key := range obfuscatedHeaders {
+		headerKeys = append(headerKeys, key)
+	}
+	sort.Strings(headerKeys)
+	for _, key := range headerKeys {
+		for _, value := range obfuscatedHeaders.Values(key) {
+			c.emitRawLLMLine(">>> HEADER " + key + ": " + value)
+		}
+	}
+	if len(body) > 0 {
+		c.emitRawLLMLine(">>> BODY " + obfuscateJSONBody(body))
+	}
+}
+
+func (c *AnthropicClient) emitRawResponse(resp *http.Response, body []byte) {
+	if c == nil || c.rawLLMCallback == nil || resp == nil {
+		return
+	}
+
+	c.emitRawLLMLine("<<< RESPONSE " + strconv.Itoa(resp.StatusCode))
+	obfuscatedHeaders := obfuscateHeaders(resp.Header)
+	headerKeys := make([]string, 0, len(obfuscatedHeaders))
+	for key := range obfuscatedHeaders {
+		headerKeys = append(headerKeys, key)
+	}
+	sort.Strings(headerKeys)
+	for _, key := range headerKeys {
+		for _, value := range obfuscatedHeaders.Values(key) {
+			c.emitRawLLMLine("<<< HEADER " + key + ": " + value)
+		}
+	}
+	if len(body) > 0 {
+		c.emitRawLLMLine("<<< BODY " + obfuscateJSONBody(body))
+	}
+}
+
+func (c *AnthropicClient) emitRawStreamChunk(line string) {
+	if c == nil || c.rawLLMCallback == nil {
+		return
+	}
+	c.emitRawLLMLine("<<< CHUNK " + obfuscateBodyWithRegex(line))
 }
 
 func (c *AnthropicClient) applyConfiguredHeaders(req *http.Request) {
@@ -344,6 +404,8 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	if effectiveOptions != nil && effectiveOptions.Logger != nil {
 		logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
 	}
+
+	m.client.emitRawRequest(req, body)
 
 	resp, err := m.client.httpClient.Do(req)
 	if err != nil {
