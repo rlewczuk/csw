@@ -48,13 +48,13 @@ func TestCLIContainerFlagsPropagation(t *testing.T) {
 		},
 		{
 			name:                   "container enabled rejected with resume",
-			args:                   []string{"--container-enabled", "--resume=last", "--resume-continue", "prompt"},
+			args:                   []string{"--container-enabled", "--resume=last", "prompt"},
 			expectError:            true,
 			expectedErrorSubstring: "container mode options are not supported with --resume",
 		},
 		{
 			name:                   "container mount rejected with resume",
-			args:                   []string{"--container-mount=/host:/container", "--resume=last", "--resume-continue", "prompt"},
+			args:                   []string{"--container-mount=/host:/container", "--resume=last", "prompt"},
 			expectError:            true,
 			expectedErrorSubstring: "container mode options are not supported with --resume",
 		},

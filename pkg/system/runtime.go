@@ -146,7 +146,7 @@ func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessi
 			}
 		} else {
 			if !params.ForceResume && !session.HasPendingWork() {
-				return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: resumed session has no pending work (use --resume-continue to add a prompt or --force to run anyway)")
+				return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: resumed session has no pending work (provide prompt with --resume to continue or use --force to run anyway)")
 			}
 			if err := thread.ResumePending(); err != nil {
 				return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to resume pending work: %w", err)

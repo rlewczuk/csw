@@ -91,6 +91,8 @@ var runGitCommandFunc = runGitCommand
 var listGitConflictFilesFunc = listGitConflictFiles
 var executeConflictSubAgentFunc = executeConflictSubAgentTask
 
+var resumeUUIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
 // CliCommand creates the cli command.
 func CliCommand() *cobra.Command {
 	var (
@@ -120,7 +122,6 @@ func CliCommand() *cobra.Command {
 		cliContainerEnv   []string
 		cliResume         string
 		cliContinue       string
-		cliResumeContinue bool
 		cliForce          bool
 		cliBashRunTimeout string
 		cliMaxThreads     int
@@ -133,7 +134,7 @@ func CliCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--continue <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last>] [--resume-continue] [--force] [\"prompt\"] [command-args...]",
+		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--continue <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last|branch|workdir>] [--force] [\"prompt\"] [command-args...]",
 		Short: "Start a CLI chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.ArbitraryArgs,
@@ -148,12 +149,8 @@ func CliCommand() *cobra.Command {
 			}
 
 			continueWorktreeBranch := strings.TrimSpace(cliContinue)
-			if continueWorktreeBranch != "" && cliResumeContinue {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: --continue <branch> cannot be used with --resume-continue")
-			}
-
-			if cliResumeContinue && resumeTarget == "" {
-				resumeTarget = "last"
+			if continueWorktreeBranch != "" && resumeTarget != "" {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: --continue <branch> cannot be used with --resume")
 			}
 
 			prompt := ""
@@ -234,16 +231,12 @@ func CliCommand() *cobra.Command {
 				return fmt.Errorf("CliCommand.RunE() [cli.go]: --continue and --worktree cannot be used together")
 			}
 
-			if continueWorktreeBranch != "" && resumeTarget != "" {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: --continue <branch> cannot be used with --resume")
+			if resumeTarget != "" && cmd.Flags().Changed("worktree") {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: --worktree cannot be used with --resume")
 			}
 
-			if resumeTarget != "" && !cliResumeContinue && prompt != "" {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt requires --resume-continue when --resume is set")
-			}
-
-			if cliResumeContinue && prompt == "" {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty when --resume-continue is set")
+			if resumeTarget == "" && prompt == "" {
+				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
 			}
 
 			bashRunTimeout, err := parseBashRunTimeout(cliBashRunTimeout)
@@ -316,7 +309,7 @@ func CliCommand() *cobra.Command {
 				LSPServer:             cliLSPServer,
 				Thinking:              cliThinking,
 				ResumeTarget:          resumeTarget,
-				ContinueSession:       cliResumeContinue,
+				ContinueSession:       resumeTarget != "" && prompt != "",
 				ForceResume:           cliForce,
 				BashRunTimeout:        bashRunTimeout,
 				MaxThreads:            cliMaxThreads,
@@ -354,9 +347,8 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliThinking, "thinking", "", "Thinking/reasoning mode: low, medium, high, xhigh (effort-based) or true/false (boolean)")
 	cmd.Flags().StringVar(&cliGitUser, "git-user", "", "Git user name for git operations (default: from git config)")
 	cmd.Flags().StringVar(&cliGitEmail, "git-email", "", "Git user email for git operations (default: from git config)")
-	cmd.Flags().StringVar(&cliResume, "resume", "", "Resume session by id (UUID) or 'last'. If value is omitted, resumes last session")
+	cmd.Flags().StringVar(&cliResume, "resume", "", "Resume session by id (UUID), 'last', branch name, workdir name, or workdir path. If value is omitted, resumes last session")
 	cmd.Flags().StringVar(&cliContinue, "continue", "", "Continue work in an existing git worktree branch")
-	cmd.Flags().BoolVar(&cliResumeContinue, "resume-continue", false, "Continue resumed session with a new user message")
 	cmd.Flags().BoolVar(&cliForce, "force", false, "Force resume even when there is no pending work")
 	cmd.Flags().StringVar(&cliBashRunTimeout, "bash-run-timeout", "120", "Default runBash command timeout (duration; plain number means seconds)")
 	cmd.Flags().IntVar(&cliMaxThreads, "max-threads", 0, "Maximum number of tool calls executed in parallel")
@@ -461,6 +453,11 @@ func runCLI(params *CLIParams) error {
 		return fmt.Errorf("runCLI() [cli.go]: --merge requires --worktree")
 	}
 
+	if params.ResumeTarget != "" {
+		params.WorktreeBranch = ""
+		params.ContinueWorktree = false
+	}
+
 	if (params.ContainerEnabled || len(params.ContainerMounts) > 0 || len(params.ContainerEnv) > 0) && params.ResumeTarget != "" {
 		return fmt.Errorf("runCLI() [cli.go]: container mode options are not supported with --resume")
 	}
@@ -538,6 +535,15 @@ func runCLI(params *CLIParams) error {
 	if cliSlug == "" {
 		cliSlug = "main"
 	}
+
+	if params.ResumeTarget != "" {
+		resolvedResumeTarget, err := resolveResumeTargetToSessionID(params.ResumeTarget, buildResult.WorkDirRoot, buildResult.LogsDir)
+		if err != nil {
+			return err
+		}
+		params.ResumeTarget = resolvedResumeTarget
+	}
+
 	if params.LSPServer != "" {
 		lspStatus := "disabled"
 		if buildResult.LSPStarted {
@@ -1558,18 +1564,221 @@ func normalizeResumeTarget(raw string) (string, error) {
 	if value == "" {
 		return "", nil
 	}
-	value = strings.ToLower(value)
 
-	if value == "last" {
-		return value, nil
+	if strings.EqualFold(value, "last") {
+		return "last", nil
 	}
 
-	uuidPattern := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	if !uuidPattern.MatchString(value) {
-		return "", fmt.Errorf("normalizeResumeTarget() [cli.go]: invalid --resume value: %q (expected UUID or 'last')", raw)
+	if resumeUUIDPattern.MatchString(value) {
+		return strings.ToLower(value), nil
 	}
 
 	return value, nil
+}
+
+func resolveResumeTargetToSessionID(resumeTarget string, workDir string, logsDir string) (string, error) {
+	trimmedTarget := strings.TrimSpace(resumeTarget)
+	if trimmedTarget == "" {
+		return "", nil
+	}
+
+	if strings.EqualFold(trimmedTarget, "last") {
+		return "last", nil
+	}
+
+	if strings.TrimSpace(logsDir) == "" {
+		return "", fmt.Errorf("resolveResumeTargetToSessionID() [cli.go]: logs directory is empty")
+	}
+
+	if resumeUUIDPattern.MatchString(trimmedTarget) {
+		return strings.ToLower(trimmedTarget), nil
+	}
+
+	entries, err := os.ReadDir(filepath.Join(logsDir, "sessions"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("resolveResumeTargetToSessionID() [cli.go]: no persisted sessions found")
+		}
+		return "", fmt.Errorf("resolveResumeTargetToSessionID() [cli.go]: failed to read sessions directory: %w", err)
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() > entries[j].Name()
+	})
+
+	if candidateID, ok := resolveResumeTargetAsPath(trimmedTarget, logsDir, entries); ok {
+		return candidateID, nil
+	}
+
+	if candidateID, ok := resolveResumeTargetAsBranchOrWorktree(trimmedTarget, workDir, logsDir, entries); ok {
+		return candidateID, nil
+	}
+
+	return "", fmt.Errorf("resolveResumeTargetToSessionID() [cli.go]: no session found for --resume value %q", resumeTarget)
+}
+
+func resolveResumeTargetAsPath(target string, logsDir string, sessionEntries []os.DirEntry) (string, bool) {
+	if !filepath.IsAbs(target) {
+		return "", false
+	}
+
+	info, err := os.Stat(target)
+	if err != nil || !info.IsDir() {
+		return "", false
+	}
+
+	if sessionID, ok := findSessionIDByWorkDirPath(target, logsDir, sessionEntries); ok {
+		return sessionID, true
+	}
+
+	return "", false
+}
+
+func resolveResumeTargetAsBranchOrWorktree(target string, workDir string, logsDir string, sessionEntries []os.DirEntry) (string, bool) {
+	resolvedWorkDir, err := system.ResolveWorkDir(workDir)
+	if err != nil {
+		return "", false
+	}
+
+	branchExists, err := gitBranchExists(resolvedWorkDir, target)
+	if err == nil && branchExists {
+		worktreeExists, worktreeName := gitWorktreeForBranch(resolvedWorkDir, target)
+		if worktreeExists && strings.TrimSpace(worktreeName) != "" {
+			if sessionID, ok := findSessionIDByWorkDirName(worktreeName, logsDir, sessionEntries); ok {
+				return sessionID, true
+			}
+		}
+	}
+
+	return findSessionIDByWorkDirName(target, logsDir, sessionEntries)
+}
+
+func findSessionIDByWorkDirPath(workDirPath string, logsDir string, sessionEntries []os.DirEntry) (string, bool) {
+	expectedPath := filepath.Clean(strings.TrimSpace(workDirPath))
+	if expectedPath == "" {
+		return "", false
+	}
+
+	for _, entry := range sessionEntries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		statePath := filepath.Join(logsDir, "sessions", entry.Name(), "session.json")
+		stateBytes, err := os.ReadFile(statePath)
+		if err != nil {
+			continue
+		}
+
+		var state core.PersistedSessionState
+		if err := json.Unmarshal(stateBytes, &state); err != nil {
+			continue
+		}
+
+		sessionWorkDir := filepath.Clean(strings.TrimSpace(state.WorkDir))
+		if sessionWorkDir == expectedPath {
+			return entry.Name(), true
+		}
+	}
+
+	return "", false
+}
+
+func findSessionIDByWorkDirName(workDirName string, logsDir string, sessionEntries []os.DirEntry) (string, bool) {
+	trimmedName := strings.TrimSpace(workDirName)
+	if trimmedName == "" {
+		return "", false
+	}
+
+	for _, entry := range sessionEntries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		statePath := filepath.Join(logsDir, "sessions", entry.Name(), "session.json")
+		stateBytes, err := os.ReadFile(statePath)
+		if err != nil {
+			continue
+		}
+
+		var state core.PersistedSessionState
+		if err := json.Unmarshal(stateBytes, &state); err != nil {
+			continue
+		}
+
+		sessionWorkDir := strings.TrimSpace(state.WorkDir)
+		if sessionWorkDir == "" {
+			continue
+		}
+
+		if filepath.Base(filepath.Clean(sessionWorkDir)) == trimmedName {
+			return entry.Name(), true
+		}
+	}
+
+	return "", false
+}
+
+func gitBranchExists(repoDir string, branch string) (bool, error) {
+	_, err := runGitCommandFunc(repoDir, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
+	if err == nil {
+		return true, nil
+	}
+
+	if strings.Contains(err.Error(), "exit status 1") {
+		return false, nil
+	}
+
+	return false, err
+}
+
+func gitWorktreeForBranch(repoDir string, branch string) (bool, string) {
+	output, err := runGitCommandFunc(repoDir, "worktree", "list", "--porcelain")
+	if err != nil {
+		return false, ""
+	}
+
+	targetRef := "refs/heads/" + strings.TrimSpace(branch)
+	currentPath := ""
+	currentBranchRef := ""
+
+	flush := func() (bool, string) {
+		if strings.TrimSpace(currentPath) == "" {
+			return false, ""
+		}
+		if strings.TrimSpace(currentBranchRef) != targetRef {
+			return false, ""
+		}
+		worktreePath := filepath.Clean(strings.TrimSpace(currentPath))
+		return true, filepath.Base(worktreePath)
+	}
+
+	for _, line := range strings.Split(output, "\n") {
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "" {
+			if ok, name := flush(); ok {
+				return true, name
+			}
+			currentPath = ""
+			currentBranchRef = ""
+			continue
+		}
+
+		if strings.HasPrefix(trimmedLine, "worktree ") {
+			currentPath = strings.TrimPrefix(trimmedLine, "worktree ")
+			continue
+		}
+
+		if strings.HasPrefix(trimmedLine, "branch ") {
+			currentBranchRef = strings.TrimPrefix(trimmedLine, "branch ")
+		}
+	}
+
+	if ok, name := flush(); ok {
+		return true, name
+	}
+
+	return false, ""
 }
 
 func resolveHostGitConfigValue(key string) string {

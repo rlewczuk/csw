@@ -2,9 +2,13 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,8 +23,9 @@ func TestCLINormalizeResumeTarget(t *testing.T) {
 		{name: "empty", input: "", expected: ""},
 		{name: "last", input: "last", expected: "last"},
 		{name: "last uppercase", input: "LAST", expected: "last"},
-		{name: "valid uuid", input: "018f6e30-3acb-7f24-bede-8d96cd157152", expected: "018f6e30-3acb-7f24-bede-8d96cd157152"},
-		{name: "invalid", input: "abc", expectError: true},
+		{name: "valid uuid", input: "018F6E30-3ACB-7F24-BEDE-8D96CD157152", expected: "018f6e30-3acb-7f24-bede-8d96cd157152"},
+		{name: "branch name", input: "feature/existing", expected: "feature/existing"},
+		{name: "workdir name", input: "0145-resume-by-branch-dir", expected: "0145-resume-by-branch-dir"},
 	}
 
 	for _, tc := range tests {
@@ -50,23 +55,21 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 		expectContinueWt bool
 	}{
 		{
-			name:          "resume continue defaults to last",
-			args:          []string{"--resume-continue", "next message"},
-			expectedResume: "last",
-			expectedPrompt: "next message",
-			expectedCont:   true,
-		},
-		{
 			name:          "resume no value defaults to last",
-			args:          []string{"--resume", "--resume-continue", "next message"},
+			args:          []string{"--resume"},
+			expectedResume: "last",
+		},
+		{
+			name:          "resume with prompt continues session",
+			args:          []string{"--resume", "next message"},
 			expectedResume: "last",
 			expectedPrompt: "next message",
 			expectedCont:   true,
 		},
 		{
-			name:          "resume explicit uuid",
-			args:          []string{"--resume=018f6e30-3acb-7f24-bede-8d96cd157152", "--resume-continue", "next"},
-			expectedResume: "018f6e30-3acb-7f24-bede-8d96cd157152",
+			name:          "resume explicit branch value",
+			args:          []string{"--resume=feature/existing", "next"},
+			expectedResume: "feature/existing",
 			expectedPrompt: "next",
 			expectedCont:   true,
 		},
@@ -93,24 +96,6 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 			expectedError: "prompt cannot be empty",
 		},
 		{
-			name:          "resume continue without prompt error",
-			args:          []string{"--resume-continue"},
-			expectError:   true,
-			expectedError: "prompt cannot be empty when --resume-continue is set",
-		},
-		{
-			name:          "resume with prompt but no continue error",
-			args:          []string{"--resume=last", "hello"},
-			expectError:   true,
-			expectedError: "prompt requires --resume-continue when --resume is set",
-		},
-		{
-			name:          "invalid resume value",
-			args:          []string{"--resume=bad", "--resume-continue", "hello"},
-			expectError:   true,
-			expectedError: "invalid --resume value",
-		},
-		{
 			name:          "continue worktree branch",
 			args:          []string{"--continue", "feature/existing", "hello"},
 			expectedPrompt: "hello",
@@ -130,10 +115,10 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 			expectedError: "--continue <branch> cannot be used with --resume",
 		},
 		{
-			name:          "continue branch cannot be used with resume continue",
-			args:          []string{"--continue=feature/existing", "--resume-continue", "hello"},
+			name:          "resume cannot be used with worktree",
+			args:          []string{"--resume=last", "--worktree", "feature/new", "hello"},
 			expectError:   true,
-			expectedError: "--continue <branch> cannot be used with --resume-continue",
+			expectedError: "--worktree cannot be used with --resume",
 		},
 	}
 
@@ -173,4 +158,91 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 			assert.Contains(t, capturedCall, fmt.Sprintf("continuewt=%t", tc.expectContinueWt))
 		})
 	}
+}
+
+func TestCLIResolveResumeTargetToSessionID(t *testing.T) {
+	tmpRoot := filepath.Join("..", "..", "tmp", "cli_resume", t.Name())
+	require.NoError(t, os.MkdirAll(tmpRoot, 0755))
+	defer os.RemoveAll(tmpRoot)
+	absTmpRoot, err := filepath.Abs(tmpRoot)
+	require.NoError(t, err)
+
+	logsDir := filepath.Join(absTmpRoot, ".cswdata", "logs")
+	sessionsDir := filepath.Join(logsDir, "sessions")
+	require.NoError(t, os.MkdirAll(sessionsDir, 0755))
+
+	repoDir := filepath.Join(absTmpRoot, "repo")
+	require.NoError(t, os.MkdirAll(repoDir, 0755))
+
+	worktreeDir := filepath.Join(absTmpRoot, ".cswdata", "work", "0145-feature-work")
+	require.NoError(t, os.MkdirAll(worktreeDir, 0755))
+
+	directWorkDir := filepath.Join(repoDir)
+
+	writeState := func(id string, workdir string) {
+		sessionPath := filepath.Join(sessionsDir, id)
+		require.NoError(t, os.MkdirAll(sessionPath, 0755))
+		state := core.PersistedSessionState{
+			SessionID:    id,
+			ProviderName: "ollama",
+			Model:        "test-model",
+			WorkDir:      workdir,
+		}
+		bytes, err := json.Marshal(state)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(sessionPath, "session.json"), bytes, 0644))
+	}
+
+	writeState("018f6e30-3acb-7f24-bede-8d96cd157150", directWorkDir)
+	writeState("018f6e30-3acb-7f24-bede-8d96cd157151", worktreeDir)
+	writeState("018f6e30-3acb-7f24-bede-8d96cd157152", worktreeDir)
+
+	t.Run("uuid passthrough", func(t *testing.T) {
+		id, err := resolveResumeTargetToSessionID("018f6e30-3acb-7f24-bede-8d96cd157150", repoDir, logsDir)
+		require.NoError(t, err)
+		assert.Equal(t, "018f6e30-3acb-7f24-bede-8d96cd157150", id)
+	})
+
+	t.Run("last passthrough", func(t *testing.T) {
+		id, err := resolveResumeTargetToSessionID("last", repoDir, logsDir)
+		require.NoError(t, err)
+		assert.Equal(t, "last", id)
+	})
+
+	t.Run("absolute workdir path resolves to matching session", func(t *testing.T) {
+		id, err := resolveResumeTargetToSessionID(worktreeDir, repoDir, logsDir)
+		require.NoError(t, err)
+		assert.Equal(t, "018f6e30-3acb-7f24-bede-8d96cd157152", id)
+	})
+
+	t.Run("workdir name resolves newest session", func(t *testing.T) {
+		id, err := resolveResumeTargetToSessionID("0145-feature-work", repoDir, logsDir)
+		require.NoError(t, err)
+		assert.Equal(t, "018f6e30-3acb-7f24-bede-8d96cd157152", id)
+	})
+
+	t.Run("branch resolves by worktree name", func(t *testing.T) {
+		originalRunGit := runGitCommandFunc
+		t.Cleanup(func() {
+			runGitCommandFunc = originalRunGit
+		})
+
+		runGitCommandFunc = func(workDir string, args ...string) (string, error) {
+			cleanWorkDir := filepath.Clean(workDir)
+			require.Equal(t, filepath.Clean(repoDir), cleanWorkDir)
+			joinedArgs := fmt.Sprintf("%v", args)
+			switch joinedArgs {
+			case "[show-ref --verify --quiet refs/heads/feature/existing]":
+				return "", nil
+			case "[worktree list --porcelain]":
+				return fmt.Sprintf("worktree %s\nbranch refs/heads/feature/existing\n\n", worktreeDir), nil
+			default:
+				return "", fmt.Errorf("unexpected git command: %s | %s", cleanWorkDir, joinedArgs)
+			}
+		}
+
+		id, err := resolveResumeTargetToSessionID("feature/existing", repoDir, logsDir)
+		require.NoError(t, err)
+		assert.Equal(t, "018f6e30-3acb-7f24-bede-8d96cd157152", id)
+	})
 }
