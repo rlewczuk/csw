@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	defaultLLMRetryMaxAttempts        = 10
-	defaultLLMRetryMaxBackoffSeconds  = 60
+	defaultLLMRetryMaxAttempts       = 10
+	defaultLLMRetryMaxBackoffSeconds = 60
 	// usageLimitRetryBufferSeconds adds a safety margin after provider reset time.
 	usageLimitRetryBufferSeconds      = 10
 	defaultContextCompactionThreshold = 0.95
@@ -242,6 +242,7 @@ type persistedSessionState struct {
 	Slug                       string                  `json:"slug,omitempty"`
 	ProviderName               string                  `json:"provider_name"`
 	Model                      string                  `json:"model"`
+	Thinking                   string                  `json:"thinking,omitempty"`
 	RolesUsed                  []string                `json:"roles_used,omitempty"`
 	ToolsUsed                  []string                `json:"tools_used,omitempty"`
 	RoleName                   string                  `json:"role_name,omitempty"`
@@ -1072,6 +1073,16 @@ func (s *SweSession) ThinkingLevel() string {
 	return strings.TrimSpace(s.thinking)
 }
 
+// SetThinkingLevel updates configured thinking mode for this session.
+func (s *SweSession) SetThinkingLevel(thinking string) {
+	if s == nil {
+		return
+	}
+
+	s.thinking = strings.TrimSpace(thinking)
+	s.persistSessionState()
+}
+
 // UsedRoles returns roles used during this session in first-seen order.
 func (s *SweSession) UsedRoles() []string {
 	if s == nil || len(s.rolesUsed) == 0 {
@@ -1479,6 +1490,7 @@ func (s *SweSession) buildPersistedSessionState() persistedSessionState {
 		Slug:                       s.slug,
 		ProviderName:               s.providerName,
 		Model:                      s.model,
+		Thinking:                   strings.TrimSpace(s.thinking),
 		RolesUsed:                  append([]string(nil), s.rolesUsed...),
 		ToolsUsed:                  append([]string(nil), s.toolsUsed...),
 		WorkDir:                    s.workDir,
@@ -1606,6 +1618,15 @@ func (s *SweSession) compactContext(statusMessage string) error {
 	s.persistSessionState()
 
 	return nil
+}
+
+// ForceCompactContext compacts session context regardless of current threshold.
+func (s *SweSession) ForceCompactContext() error {
+	if s == nil {
+		return fmt.Errorf("SweSession.ForceCompactContext() [session.go]: session is nil")
+	}
+
+	return s.compactContext("Compacting resumed session context...")
 }
 
 func (s *SweSession) contextCompactionThreshold() float64 {
@@ -1808,7 +1829,13 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 		WorkDir:         state.WorkDir,
 		ShadowDir:       params.ShadowDir,
 		LogBaseDir:      params.LogBaseDir,
-		Thinking:        params.Thinking,
+		Thinking: func() string {
+			if strings.TrimSpace(state.Thinking) != "" {
+				return strings.TrimSpace(state.Thinking)
+			}
+
+			return params.Thinking
+		}(),
 		Logger:          params.Logger,
 		LLMLogger:       params.LLMLogger,
 		TodoList:        state.TodoList,

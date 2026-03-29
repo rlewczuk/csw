@@ -209,10 +209,10 @@ func TestSweSystemLoadSessionInvalidState(t *testing.T) {
 
 		sessionID := "018f6e30-3acb-7f24-bede-8d96cd157152"
 		state := persistedSessionState{
-			SessionID:    sessionID,
-			ProviderName: "ollama",
-			Model:        "test-model:latest",
-			WorkDir:      ".",
+			SessionID:              sessionID,
+			ProviderName:           "ollama",
+			Model:                  "test-model:latest",
+			WorkDir:                ".",
 			ContextCompactionCount: 3,
 		}
 		stateBytes, err := json.Marshal(state)
@@ -259,4 +259,110 @@ func TestSessionResumeRoundTripRun(t *testing.T) {
 		require.NotEmpty(t, messages)
 		assert.Equal(t, "second done", messages[len(messages)-1].GetText())
 	})
+}
+
+func TestSessionResumeRestoresRoleThinkingAndTodoList(t *testing.T) {
+	tmpDir := filepath.Join("../../tmp", "session_resume", t.Name())
+	require.NoError(t, os.MkdirAll(tmpDir, 0755))
+	defer os.RemoveAll(tmpDir)
+
+	configStore := impl.NewMockConfigStore()
+	configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		"developer": {
+			Name:        "developer",
+			Description: "dev",
+		},
+	})
+	roles := NewAgentRoleRegistry(configStore)
+
+	fixture := newSweSystemFixture(
+		t,
+		"You are a helper.",
+		withLogBaseDir(tmpDir),
+		withRoles(roles),
+		withConfigStore(configStore),
+		withThinking("global-thinking"),
+	)
+	system := fixture.system
+	handler := testutil.NewMockSessionOutputHandler()
+
+	session, err := system.NewSession("ollama/test-model:latest", handler)
+	require.NoError(t, err)
+	require.NoError(t, session.SetRole("developer"))
+	session.SetThinkingLevel("high")
+
+	todos := []tool.TodoItem{{
+		ID:       "0195d6da-4ca1-7a57-a17a-f00000000001",
+		Content:  "resume me",
+		Status:   "in_progress",
+		Priority: "high",
+	}}
+	session.SetTodoList(todos)
+
+	system.Shutdown()
+
+	loaded, err := system.LoadSession(session.ID(), testutil.NewMockSessionOutputHandler())
+	require.NoError(t, err)
+	require.NotNil(t, loaded.Role())
+	assert.Equal(t, "developer", loaded.Role().Name)
+	assert.Equal(t, "high", loaded.ThinkingLevel())
+	assert.Equal(t, todos, loaded.GetTodoList())
+}
+
+func TestSessionResumeFallsBackToSystemThinkingWhenStateMissing(t *testing.T) {
+	tmpDir := filepath.Join("../../tmp", "session_resume", t.Name())
+	require.NoError(t, os.MkdirAll(tmpDir, 0755))
+	defer os.RemoveAll(tmpDir)
+
+	fixture := newSweSystemFixture(t, "You are a helper.", withLogBaseDir(tmpDir), withThinking("fallback-thinking"))
+	system := fixture.system
+
+	session, err := system.NewSession("ollama/test-model:latest", testutil.NewMockSessionOutputHandler())
+	require.NoError(t, err)
+
+	statePath := filepath.Join(tmpDir, "sessions", session.ID(), "session.json")
+	stateBytes, err := os.ReadFile(statePath)
+	require.NoError(t, err)
+
+	var state persistedSessionState
+	require.NoError(t, json.Unmarshal(stateBytes, &state))
+	state.Thinking = ""
+
+	rewrittenState, err := json.MarshalIndent(state, "", "  ")
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(statePath, rewrittenState, 0644))
+
+	system.Shutdown()
+
+	loaded, err := system.LoadSession(session.ID(), testutil.NewMockSessionOutputHandler())
+	require.NoError(t, err)
+	assert.Equal(t, "fallback-thinking", loaded.ThinkingLevel())
+}
+
+func TestSessionForceCompactContext(t *testing.T) {
+	tmpDir := filepath.Join("../../tmp", "session_resume", t.Name())
+	require.NoError(t, os.MkdirAll(tmpDir, 0755))
+	defer os.RemoveAll(tmpDir)
+
+	fixture := newSweSystemFixture(t, "You are a helper.", withLogBaseDir(tmpDir))
+	system := fixture.system
+
+	session, err := system.NewSession("ollama/test-model:latest", testutil.NewMockSessionOutputHandler())
+	require.NoError(t, err)
+
+	longText := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	for i := 0; i < 40; i++ {
+		require.NoError(t, session.UserPrompt(longText))
+	}
+
+	initialCompactions := session.CompactionCount()
+	require.NoError(t, session.ForceCompactContext())
+	assert.Greater(t, session.CompactionCount(), initialCompactions)
+
+	preSnapshot := filepath.Join(tmpDir, "sessions", session.ID(), "messages-pre-1.jsonl")
+	postSnapshot := filepath.Join(tmpDir, "sessions", session.ID(), "messages-post-1.jsonl")
+	_, preErr := os.Stat(preSnapshot)
+	_, postErr := os.Stat(postSnapshot)
+	assert.NoError(t, preErr)
+	assert.NoError(t, postErr)
 }

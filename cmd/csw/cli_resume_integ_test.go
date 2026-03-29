@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,50 +45,67 @@ func TestCLINormalizeResumeTarget(t *testing.T) {
 
 func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 	tests := []struct {
-		name            string
-		args            []string
-		expectError     bool
-		expectedError   string
-		expectedResume  string
-		expectedPrompt  string
-		expectedCont    bool
-		expectedForce   bool
-		expectedWorktree string
-		expectContinueWt bool
+		name                     string
+		args                     []string
+		expectError              bool
+		expectedError            string
+		expectedResume           string
+		expectedPrompt           string
+		expectedCont             bool
+		expectedForce            bool
+		expectedForceCompact     bool
+		expectedModelOverride    bool
+		expectedRoleOverride     bool
+		expectedThinkingOverride bool
+		expectedThinking         string
+		expectedWorktree         string
+		expectContinueWt         bool
 	}{
 		{
-			name:          "resume no value defaults to last",
-			args:          []string{"--resume"},
+			name:           "resume no value defaults to last",
+			args:           []string{"--resume"},
 			expectedResume: "last",
 		},
 		{
-			name:          "resume with prompt continues session",
-			args:          []string{"--resume", "next message"},
+			name:           "resume with prompt continues session",
+			args:           []string{"--resume", "next message"},
 			expectedResume: "last",
 			expectedPrompt: "next message",
 			expectedCont:   true,
 		},
 		{
-			name:          "resume explicit branch value",
-			args:          []string{"--resume=feature/existing", "next"},
+			name:           "resume explicit branch value",
+			args:           []string{"--resume=feature/existing", "next"},
 			expectedResume: "feature/existing",
 			expectedPrompt: "next",
 			expectedCont:   true,
 		},
 		{
-			name:          "resume force without prompt",
-			args:          []string{"--resume", "--force"},
-			expectedResume: "last",
-			expectedForce:  true,
+			name:                 "resume force without prompt",
+			args:                 []string{"--resume", "--force", "--force-compact"},
+			expectedResume:       "last",
+			expectedForce:        true,
+			expectedForceCompact: true,
 		},
 		{
-			name:          "resume as is without force",
-			args:          []string{"--resume"},
+			name:                     "resume overrides model role and thinking mode",
+			args:                     []string{"--resume=last", "--model=ollama/custom", "--role=developer", "--thinking-mode=high", "next"},
+			expectedResume:           "last",
+			expectedPrompt:           "next",
+			expectedCont:             true,
+			expectedModelOverride:    true,
+			expectedRoleOverride:     true,
+			expectedThinkingOverride: true,
+			expectedThinking:         "high",
+		},
+		{
+			name:           "resume as is without force",
+			args:           []string{"--resume"},
 			expectedResume: "last",
 		},
 		{
-			name:          "fresh session prompt",
-			args:          []string{"hello"},
+			name:           "fresh session prompt",
+			args:           []string{"hello"},
 			expectedPrompt: "hello",
 		},
 		{
@@ -96,9 +115,9 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 			expectedError: "prompt cannot be empty",
 		},
 		{
-			name:          "continue worktree branch",
-			args:          []string{"--continue", "feature/existing", "hello"},
-			expectedPrompt: "hello",
+			name:             "continue worktree branch",
+			args:             []string{"--continue", "feature/existing", "hello"},
+			expectedPrompt:   "hello",
 			expectedWorktree: "feature/existing",
 			expectContinueWt: true,
 		},
@@ -126,12 +145,17 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var capturedCall string
 			originalRun := runCLIFunc
+			originalResolveDefaults := resolveCLIDefaultsFunc
 			t.Cleanup(func() {
 				runCLIFunc = originalRun
+				resolveCLIDefaultsFunc = originalResolveDefaults
 			})
+			resolveCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+				return conf.CLIDefaultsConfig{}, nil
+			}
 
 			runCLIFunc = func(params *CLIParams) error {
-				capturedCall = fmt.Sprintf("prompt=%s,resume=%s,continue=%t,force=%t,worktree=%s,continuewt=%t", params.Prompt, params.ResumeTarget, params.ContinueSession, params.ForceResume, params.WorktreeBranch, params.ContinueWorktree)
+				capturedCall = fmt.Sprintf("prompt=%s,resume=%s,continue=%t,force=%t,forcecompact=%t,modeloverride=%t,roleoverride=%t,thinkingoverride=%t,thinking=%s,worktree=%s,continuewt=%t", params.Prompt, params.ResumeTarget, params.ContinueSession, params.ForceResume, params.ForceCompact, params.ModelOverridden, params.RoleOverridden, params.ThinkingOverridden, params.Thinking, params.WorktreeBranch, params.ContinueWorktree)
 				return nil
 			}
 
@@ -154,6 +178,11 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 			assert.Contains(t, capturedCall, "resume="+tc.expectedResume)
 			assert.Contains(t, capturedCall, fmt.Sprintf("continue=%t", tc.expectedCont))
 			assert.Contains(t, capturedCall, fmt.Sprintf("force=%t", tc.expectedForce))
+			assert.Contains(t, capturedCall, fmt.Sprintf("forcecompact=%t", tc.expectedForceCompact))
+			assert.Contains(t, capturedCall, fmt.Sprintf("modeloverride=%t", tc.expectedModelOverride))
+			assert.Contains(t, capturedCall, fmt.Sprintf("roleoverride=%t", tc.expectedRoleOverride))
+			assert.Contains(t, capturedCall, fmt.Sprintf("thinkingoverride=%t", tc.expectedThinkingOverride))
+			assert.Contains(t, capturedCall, "thinking="+tc.expectedThinking)
 			assert.Contains(t, capturedCall, "worktree="+tc.expectedWorktree)
 			assert.Contains(t, capturedCall, fmt.Sprintf("continuewt=%t", tc.expectContinueWt))
 		})

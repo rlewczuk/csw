@@ -65,9 +65,13 @@ type CLIParams struct {
 	LogLLMRequestsRaw     bool
 	LSPServer             string
 	Thinking              string
+	ModelOverridden       bool
+	RoleOverridden        bool
+	ThinkingOverridden    bool
 	ResumeTarget          string
 	ContinueSession       bool
 	ForceResume           bool
+	ForceCompact          bool
 	BashRunTimeout        time.Duration
 	MaxThreads            int
 	OutputFormat          string
@@ -96,41 +100,42 @@ var resumeUUIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a
 // CliCommand creates the cli command.
 func CliCommand() *cobra.Command {
 	var (
-		cliModel          string
-		cliRole           string
-		cliWorkDir        string
-		cliWorktree       string
-		cliShadowDir      string
-		cliAllowAllPerms  bool
-		cliInteractive    bool
-		cliConfigPath     string
-		cliProjectConfig  string
-		cliSaveSessionTo  string
-		cliSaveSession    bool
-		cliLogLLMRequests bool
+		cliModel             string
+		cliRole              string
+		cliWorkDir           string
+		cliWorktree          string
+		cliShadowDir         string
+		cliAllowAllPerms     bool
+		cliInteractive       bool
+		cliConfigPath        string
+		cliProjectConfig     string
+		cliSaveSessionTo     string
+		cliSaveSession       bool
+		cliLogLLMRequests    bool
 		cliLogLLMRequestsRaw bool
-		cliLSPServer      string
-		cliThinking       string
-		cliGitUser        string
-		cliGitEmail       string
-		cliCommitMessage  string
-		cliMerge          bool
-		cliContainerImage string
-		cliContainerOn    bool
-		cliContainerOff   bool
-		cliContainerMount []string
-		cliContainerEnv   []string
-		cliResume         string
-		cliContinue       string
-		cliForce          bool
-		cliBashRunTimeout string
-		cliMaxThreads     int
-		cliOutputFormat   string
-		cliVFSAllow       []string
-		cliMCPEnable      []string
-		cliMCPDisable     []string
-		cliHooks          []string
-		cliContext        []string
+		cliLSPServer         string
+		cliThinking          string
+		cliGitUser           string
+		cliGitEmail          string
+		cliCommitMessage     string
+		cliMerge             bool
+		cliContainerImage    string
+		cliContainerOn       bool
+		cliContainerOff      bool
+		cliContainerMount    []string
+		cliContainerEnv      []string
+		cliResume            string
+		cliContinue          string
+		cliForce             bool
+		cliForceCompact      bool
+		cliBashRunTimeout    string
+		cliMaxThreads        int
+		cliOutputFormat      string
+		cliVFSAllow          []string
+		cliMCPEnable         []string
+		cliMCPDisable        []string
+		cliHooks             []string
+		cliContext           []string
 	)
 
 	cmd := &cobra.Command{
@@ -248,6 +253,9 @@ func CliCommand() *cobra.Command {
 				return err
 			}
 			cliLogLLMRequests = cliLogLLMRequests || cliLogLLMRequestsRaw
+			modelOverridden := cmd.Flags().Changed("model")
+			roleOverridden := cmd.Flags().Changed("role")
+			thinkingOverridden := isThinkingFlagChanged(cmd)
 
 			if invocation != nil {
 				if !cmd.Flags().Changed("model") && commandModelOverride != "" {
@@ -308,9 +316,13 @@ func CliCommand() *cobra.Command {
 				LogLLMRequestsRaw:     cliLogLLMRequestsRaw,
 				LSPServer:             cliLSPServer,
 				Thinking:              cliThinking,
+				ModelOverridden:       modelOverridden,
+				RoleOverridden:        roleOverridden,
+				ThinkingOverridden:    thinkingOverridden,
 				ResumeTarget:          resumeTarget,
 				ContinueSession:       resumeTarget != "" && prompt != "",
 				ForceResume:           cliForce,
+				ForceCompact:          cliForceCompact,
 				BashRunTimeout:        bashRunTimeout,
 				MaxThreads:            cliMaxThreads,
 				OutputFormat:          cliOutputFormat,
@@ -345,11 +357,13 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliLogLLMRequestsRaw, "log-llm-requests-raw", false, "Log raw line-based LLM requests and responses")
 	cmd.Flags().StringVar(&cliLSPServer, "lsp-server", "", "Path to LSP server binary (empty to disable LSP)")
 	cmd.Flags().StringVar(&cliThinking, "thinking", "", "Thinking/reasoning mode: low, medium, high, xhigh (effort-based) or true/false (boolean)")
+	cmd.Flags().StringVar(&cliThinking, "thinking-mode", "", "Thinking/reasoning mode override when starting or resuming a session")
 	cmd.Flags().StringVar(&cliGitUser, "git-user", "", "Git user name for git operations (default: from git config)")
 	cmd.Flags().StringVar(&cliGitEmail, "git-email", "", "Git user email for git operations (default: from git config)")
 	cmd.Flags().StringVar(&cliResume, "resume", "", "Resume session by id (UUID), 'last', branch name, workdir name, or workdir path. If value is omitted, resumes last session")
 	cmd.Flags().StringVar(&cliContinue, "continue", "", "Continue work in an existing git worktree branch")
 	cmd.Flags().BoolVar(&cliForce, "force", false, "Force resume even when there is no pending work")
+	cmd.Flags().BoolVar(&cliForceCompact, "force-compact", false, "Force context compaction after loading a resumed session")
 	cmd.Flags().StringVar(&cliBashRunTimeout, "bash-run-timeout", "120", "Default runBash command timeout (duration; plain number means seconds)")
 	cmd.Flags().IntVar(&cliMaxThreads, "max-threads", 0, "Maximum number of tool calls executed in parallel")
 	cmd.Flags().StringVar(&cliOutputFormat, "output-format", "short", "Console output format: short, full, jsonl")
@@ -413,7 +427,7 @@ func applyCLIDefaults(
 	if !cmd.Flags().Changed("log-llm-requests") && defaults.LogLLMRequests {
 		*logLLMRequests = true
 	}
-	if !cmd.Flags().Changed("thinking") && defaults.Thinking != "" {
+	if !isThinkingFlagChanged(cmd) && defaults.Thinking != "" {
 		*thinking = defaults.Thinking
 	}
 	if !cmd.Flags().Changed("lsp-server") && defaults.LSPServer != "" {
@@ -434,6 +448,14 @@ func applyCLIDefaults(
 	}
 
 	return nil
+}
+
+func isThinkingFlagChanged(cmd *cobra.Command) bool {
+	if cmd == nil {
+		return false
+	}
+
+	return cmd.Flags().Changed("thinking") || cmd.Flags().Changed("thinking-mode")
 }
 
 func runCLI(params *CLIParams) error {
@@ -556,18 +578,23 @@ func runCLI(params *CLIParams) error {
 	}
 
 	runtimeResult, err := sweSystem.StartCLISession(system.StartCLISessionParams{
-		ModelName:       params.ModelName,
-		RoleName:        params.RoleName,
-		Prompt:          params.Prompt,
-		ResumeTarget:    params.ResumeTarget,
-		ContinueSession: params.ContinueSession,
-		ForceResume:     params.ForceResume,
-		Interactive:     params.Interactive,
-		AllowAllPerms:   params.AllowAllPerms,
-		OutputFormat:    params.OutputFormat,
-		AppOutput:       os.Stdout,
-		ChatOutput:      os.Stdout,
-		ChatInput:       os.Stdin,
+		ModelName:          params.ModelName,
+		RoleName:           params.RoleName,
+		Thinking:           params.Thinking,
+		ModelOverridden:    params.ModelOverridden,
+		RoleOverridden:     params.RoleOverridden,
+		ThinkingOverridden: params.ThinkingOverridden,
+		Prompt:             params.Prompt,
+		ResumeTarget:       params.ResumeTarget,
+		ContinueSession:    params.ContinueSession,
+		ForceResume:        params.ForceResume,
+		ForceCompact:       params.ForceCompact,
+		Interactive:        params.Interactive,
+		AllowAllPerms:      params.AllowAllPerms,
+		OutputFormat:       params.OutputFormat,
+		AppOutput:          os.Stdout,
+		ChatOutput:         os.Stdout,
+		ChatInput:          os.Stdin,
 		AppViewFactory: func(output io.Writer) system.SessionLoggerAppView {
 			return cli.NewAppView(output, cliSlug)
 		},

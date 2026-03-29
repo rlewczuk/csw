@@ -36,6 +36,7 @@ type sweSystemFixtureConfig struct {
 	lspInstance      lsp.LSP
 	logBaseDir       string
 	logLLMRequests   *bool
+	thinking         string
 	registerVFSTools bool
 	globalConfig     *conf.GlobalConfig
 }
@@ -99,6 +100,7 @@ func newSweSystemFixture(t *testing.T, prompt string, opts ...sweSystemFixtureOp
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		WorkDir:              config.workDir,
 		LogBaseDir:           config.logBaseDir,
+		Thinking:             config.thinking,
 	}
 	if config.globalConfig != nil {
 		cfgStore := impl.NewMockConfigStore()
@@ -218,6 +220,12 @@ func withLogBaseDir(logBaseDir string) sweSystemFixtureOption {
 func withLogLLMRequests(enabled bool) sweSystemFixtureOption {
 	return func(config *sweSystemFixtureConfig) {
 		config.logLLMRequests = &enabled
+	}
+}
+
+func withThinking(thinking string) sweSystemFixtureOption {
+	return func(config *sweSystemFixtureConfig) {
+		config.thinking = thinking
 	}
 }
 

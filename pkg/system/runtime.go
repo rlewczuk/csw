@@ -43,10 +43,15 @@ type ChatViewFactory func(presenter ui.IChatPresenter, output io.Writer, input i
 type StartCLISessionParams struct {
 	ModelName            string
 	RoleName             string
+	Thinking             string
+	ModelOverridden      bool
+	RoleOverridden       bool
+	ThinkingOverridden   bool
 	Prompt               string
 	ResumeTarget         string
 	ContinueSession      bool
 	ForceResume          bool
+	ForceCompact         bool
 	Interactive          bool
 	AllowAllPerms        bool
 	OutputFormat         string
@@ -111,6 +116,27 @@ func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessi
 
 	if session == nil {
 		return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: session is not available")
+	}
+
+	if params.ResumeTarget != "" {
+		if params.ModelOverridden {
+			if err := session.SetModel(params.ModelName); err != nil {
+				return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to override model: %w", err)
+			}
+		}
+		if params.RoleOverridden {
+			if err := session.SetRole(params.RoleName); err != nil {
+				return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to override role: %w", err)
+			}
+		}
+		if params.ThinkingOverridden {
+			session.SetThinkingLevel(params.Thinking)
+		}
+		if params.ForceCompact {
+			if err := session.ForceCompactContext(); err != nil {
+				return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to compact resumed session: %w", err)
+			}
+		}
 	}
 
 	appView.SetSessionLogger(logging.GetSessionLogger(session.ID(), logging.LogTypeSession))
