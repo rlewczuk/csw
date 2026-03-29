@@ -551,10 +551,10 @@ func TestRunBashTool_Render(t *testing.T) {
 			name: "command with output",
 			args: &ToolCall{
 				Function:  "runBash",
-				Arguments: NewToolValue(map[string]any{"command": "ls -la", "output": "file1.txt\nfile2.txt\n"}),
+				Arguments: NewToolValue(map[string]any{"command": "ls -la", "stdout": "file1.txt\nfile2.txt\n"}),
 			},
 			wantInSummary: "bash: ls -la",
-			wantInDetails: "ls -la\n\nfile1.txt\nfile2.txt\n",
+			wantInDetails: "ls -la\n\nSTDOUT:\nfile1.txt\nfile2.txt\n",
 		},
 		{
 			name: "long command should be truncated in summary",
@@ -607,17 +607,16 @@ func TestRunBashTool_Render_WithError(t *testing.T) {
 				Arguments: NewToolValue(map[string]any{"command": "cmd", "exit_code": int64(2), "stderr": "permission denied"}),
 			},
 			wantInSummary: "ERROR: exit code 2, permission denied",
-			wantInDetails: "ERROR: exit code 2, permission denied\n",
+			wantInDetails: "ERROR: exit code 2, permission denied\nSTDERR:\npermission denied",
 		},
 		{
-			name: "error with multi-line stderr - stderr not included",
+			name: "error with multi-line stderr",
 			args: &ToolCall{
 				Function:  "runBash",
 				Arguments: NewToolValue(map[string]any{"command": "cmd", "exit_code": int64(3), "stderr": "line1\nline2"}),
 			},
 			wantInSummary: "ERROR: exit code 3",
-			wantInDetails: "ERROR: exit code 3\n",
-			wantNotInDetails: "line1",
+			wantInDetails: "ERROR: exit code 3\nSTDERR:\nline1\nline2",
 		},
 		{
 			name: "error with output",
@@ -637,6 +636,15 @@ func TestRunBashTool_Render_WithError(t *testing.T) {
 			wantInSummary: "bash: echo hello",
 			wantInDetails: "echo hello\n\nhello",
 			wantNotInDetails: "ERROR:",
+		},
+		{
+			name: "permission denied error from tool response is rendered",
+			args: &ToolCall{
+				Function:  "runBash",
+				Arguments: NewToolValue(map[string]any{"command": "go test", "error": "RunCommandError [run.go]: permission denied: go test"}),
+			},
+			wantInSummary: "ERROR: RunCommandError [run.go]: permission denied: go test",
+			wantInDetails: "ERROR: RunCommandError [run.go]: permission denied: go test",
 		},
 	}
 

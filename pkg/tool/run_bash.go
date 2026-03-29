@@ -378,11 +378,26 @@ func cropOutputToLastLines(output string, maxLines int) (string, bool) {
 func (t *RunBashTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	command, _ := call.Arguments.StringOK("command")
 	exitCode := call.Arguments.Int("exit_code")
+	stdout := call.Arguments.String("stdout")
 	output := call.Arguments.String("output")
 	stderr := call.Arguments.String("stderr")
+	renderErr := call.Arguments.String("error")
 
 	oneLiner := truncateString("bash: "+command, 128)
 	full := command + "\n\n"
+
+	if renderErr != "" {
+		errorLine := fmt.Sprintf("ERROR: %s", renderErr)
+		oneLiner = truncateString("bash: "+command+" ("+errorLine+")", 128)
+		full += errorLine + "\n"
+
+		jsonl := buildToolRenderJSONL("runBash", call, map[string]any{
+			"command": command,
+			"error":   renderErr,
+		})
+
+		return oneLiner, full, jsonl, make(map[string]string)
+	}
 
 	// Check if there was an error (non-zero exit code)
 	if exitCode != 0 {
@@ -400,8 +415,24 @@ func (t *RunBashTool) Render(call *ToolCall) (string, string, string, map[string
 		full += errorLine + "\n"
 	}
 
-	// Add output if available
-	if output != "" {
+	if stdout != "" {
+		full += "STDOUT:\n" + stdout
+		if !strings.HasSuffix(stdout, "\n") {
+			full += "\n"
+		}
+	}
+
+	if stderr != "" {
+		if stdout != "" {
+			full += "\n"
+		}
+		full += "STDERR:\n" + stderr
+		if !strings.HasSuffix(stderr, "\n") {
+			full += "\n"
+		}
+	}
+
+	if stdout == "" && stderr == "" && output != "" {
 		full += output
 	}
 

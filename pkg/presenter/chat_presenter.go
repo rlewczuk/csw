@@ -318,20 +318,77 @@ func (p *ChatPresenter) buildChatSession(session *core.SweSession) *ui.ChatSessi
 		Messages: []*ui.ChatMessageUI{},
 	}
 
+	toolStatesByID := make(map[string]*ui.ToolUI)
+
 	// Set role name if available
 	if session.Role() != nil {
 		chatSession.Role = session.Role().Name
 	}
 
-	// Convert messages
+	// Convert messages and merge persisted tool responses into prior assistant tool calls.
 	for _, msg := range session.ChatMessages() {
+		if msg == nil || msg.Role == models.ChatRoleSystem {
+			continue
+		}
+
+		toolResponses := msg.GetToolResponses()
+		if len(toolResponses) > 0 {
+			p.mergeToolResponsesIntoSession(chatSession, toolStatesByID, toolResponses)
+			if msg.GetText() == "" {
+				continue
+			}
+		}
+
 		chatMsg := p.convertMessage(msg)
 		if chatMsg != nil {
+			for _, toolState := range chatMsg.Tools {
+				if toolState != nil && toolState.Id != "" {
+					toolStatesByID[toolState.Id] = toolState
+				}
+			}
 			chatSession.Messages = append(chatSession.Messages, chatMsg)
 		}
 	}
 
 	return chatSession
+}
+
+// mergeToolResponsesIntoSession applies persisted tool responses onto already converted tool call UI state.
+func (p *ChatPresenter) mergeToolResponsesIntoSession(chatSession *ui.ChatSessionUI, toolStatesByID map[string]*ui.ToolUI, responses []*tool.ToolResponse) {
+	for _, response := range responses {
+		if response == nil || response.Call == nil {
+			continue
+		}
+
+		toolState := toolStatesByID[response.Call.ID]
+		if toolState == nil {
+			toolState = &ui.ToolUI{
+				Id:      response.Call.ID,
+				Name:    response.Call.Function,
+				Message: formatToolArguments(response.Call),
+				Props:   buildToolProps(response.Call),
+			}
+			toolStatesByID[toolState.Id] = toolState
+
+			placeholder := &ui.ChatMessageUI{
+				Id:    generateMessageID(p.messageCounter + 1),
+				Role:  ui.ChatRoleAssistant,
+				Tools: []*ui.ToolUI{toolState},
+			}
+			p.messageCounter++
+			chatSession.Messages = append(chatSession.Messages, placeholder)
+		}
+
+		if response.Error != nil {
+			toolState.Status = ui.ToolStatusFailed
+			toolState.Message = response.Error.Error()
+		} else {
+			toolState.Status = ui.ToolStatusSucceeded
+		}
+
+		callForRender := copyToolCallWithResult(response.Call, response)
+		toolState.Summary, toolState.Details, toolState.JSONL, toolState.Meta = p.renderToolResult(callForRender)
+	}
 }
 
 // convertMessage converts a models.ChatMessage to a ui.ChatMessageUI.

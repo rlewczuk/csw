@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -182,5 +183,73 @@ func TestCopyToolCallWithError(t *testing.T) {
 		assert.False(t, call.Arguments.Has("error"))
 		// But new call should
 		assert.True(t, callWithError.Arguments.Has("error"))
+	})
+}
+
+func TestChatPresenter_MergeToolResponsesIntoSession(t *testing.T) {
+	t.Run("updates existing tool state with rendered details", func(t *testing.T) {
+		presenter := &ChatPresenter{}
+		chatSession := &ui.ChatSessionUI{
+			Messages: []*ui.ChatMessageUI{
+				{
+					Id:   "msg-1",
+					Role: ui.ChatRoleAssistant,
+					Tools: []*ui.ToolUI{
+						{Id: "tool-1", Name: "runBash"},
+					},
+				},
+			},
+		}
+
+		toolState := chatSession.Messages[0].Tools[0]
+		toolStatesByID := map[string]*ui.ToolUI{"tool-1": toolState}
+
+		response := &tool.ToolResponse{
+			Call: &tool.ToolCall{
+				ID:       "tool-1",
+				Function: "runBash",
+				Arguments: tool.NewToolValue(map[string]any{
+					"command": "echo test",
+				}),
+			},
+			Result: tool.NewToolValue(map[string]any{
+				"exit_code": int64(0),
+				"stdout":    "test\n",
+			}),
+			Done: true,
+		}
+
+		presenter.mergeToolResponsesIntoSession(chatSession, toolStatesByID, []*tool.ToolResponse{response})
+
+		assert.Equal(t, ui.ToolStatusSucceeded, toolState.Status)
+	})
+
+	t.Run("creates placeholder assistant tool when response is restored without call message", func(t *testing.T) {
+		presenter := &ChatPresenter{}
+		chatSession := &ui.ChatSessionUI{Messages: []*ui.ChatMessageUI{}}
+		toolStatesByID := map[string]*ui.ToolUI{}
+
+		response := &tool.ToolResponse{
+			Call: &tool.ToolCall{
+				ID:       "tool-missing",
+				Function: "runBash",
+				Arguments: tool.NewToolValue(map[string]any{
+					"command": "echo restored",
+				}),
+			},
+			Result: tool.NewToolValue(map[string]any{
+				"exit_code": int64(1),
+				"stderr":    "permission denied",
+			}),
+			Done: true,
+		}
+
+		presenter.mergeToolResponsesIntoSession(chatSession, toolStatesByID, []*tool.ToolResponse{response})
+
+		require.Len(t, chatSession.Messages, 1)
+		require.Len(t, chatSession.Messages[0].Tools, 1)
+		restored := chatSession.Messages[0].Tools[0]
+		assert.Equal(t, "tool-missing", restored.Id)
+		assert.Equal(t, ui.ToolStatusSucceeded, restored.Status)
 	})
 }

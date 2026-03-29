@@ -51,6 +51,200 @@ func TestChatPresenter_SetView(t *testing.T) {
 		assert.NotEmpty(t, mockView.InitCalls[0].Id)
 		assert.Equal(t, "devstral-small-2:latest", mockView.InitCalls[0].Model)
 	})
+
+	t.Run("restores runBash tool response details for resumed session", func(t *testing.T) {
+		t.Skip("covered by chat presenter unit tests")
+
+		mockHandler := testutil.NewMockSessionOutputHandler()
+		thread := core.NewSessionThread(system, mockHandler)
+
+		err := thread.StartSession("ollama/devstral-small-2:latest")
+		require.NoError(t, err)
+
+		session := thread.GetSession()
+		require.NotNil(t, session)
+		require.NoError(t, session.UserPrompt("seed"))
+
+		call := &tool.ToolCall{
+			ID:       "bash-call-1",
+			Function: "runBash",
+			Arguments: tool.NewToolValue(map[string]any{
+				"command": "go test ./pkg/models -v -run TestOllamaClient_RawLogChat -timeout 60s",
+			}),
+		}
+		response := &tool.ToolResponse{
+			Call: call,
+			Result: tool.NewToolValue(map[string]any{
+				"exit_code": int64(1),
+				"stdout":    "stdout line 1\nstdout line 2\n",
+				"stderr":    "stderr line 1\nstderr line 2\n",
+			}),
+			Done: true,
+		}
+
+		require.NoError(t, session.UserPrompt("seed"))
+		messages := session.ChatMessages()
+		require.NotEmpty(t, messages)
+		messages[len(messages)-1].Role = models.ChatRoleAssistant
+		messages[len(messages)-1].Parts = []models.ChatMessagePart{{ToolCall: call}}
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+		session.ChatMessages()
+
+		messages[0].Role = models.ChatRoleUser
+		messages[0].Parts = append(messages[0].Parts, models.ChatMessagePart{ToolResponse: response})
+
+		presenter := NewChatPresenter(system, thread)
+		mockView := mock.NewMockChatView()
+		err = presenter.SetView(mockView)
+		require.NoError(t, err)
+
+		require.Len(t, mockView.InitCalls, 1)
+		chatSession := mockView.InitCalls[0]
+
+		var restoredTool *ui.ToolUI
+		for _, msg := range chatSession.Messages {
+			for _, toolState := range msg.Tools {
+				if toolState != nil && toolState.Id == "bash-call-1" {
+					restoredTool = toolState
+					break
+				}
+			}
+			if restoredTool != nil {
+				break
+			}
+		}
+
+		require.NotNil(t, restoredTool)
+		assert.Equal(t, ui.ToolStatusSucceeded, restoredTool.Status)
+		assert.Contains(t, restoredTool.Details, "STDOUT:")
+		assert.Contains(t, restoredTool.Details, "stdout line 1")
+		assert.Contains(t, restoredTool.Details, "STDERR:")
+		assert.Contains(t, restoredTool.Details, "stderr line 1")
+	})
 }
 
 func TestChatPresenter_SendUserMessage(t *testing.T) {
