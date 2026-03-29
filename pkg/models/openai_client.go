@@ -43,6 +43,8 @@ type OpenAIClient struct {
 	configUpdater ConfigUpdater
 	// verbose enables logging of HTTP requests and responses.
 	verbose bool
+	// rawLLMCallback receives raw, line-based LLM communication logs.
+	rawLLMCallback func(string)
 }
 
 // OpenAIChatModel is a chat model implementation for OpenAI
@@ -148,10 +150,73 @@ func (c *OpenAIClient) SetVerbose(verbose bool) {
 	c.verbose = verbose
 }
 
-// SetRawLLMCallback sets callback for raw LLM communication lines.
-// OpenAI client does not currently emit raw lines through this callback.
+// SetRawLLMCallback sets callback for raw, line-based LLM communication logs.
 func (c *OpenAIClient) SetRawLLMCallback(callback func(string)) {
-	_ = callback
+	c.rawLLMCallback = callback
+}
+
+// emitRawLLMLine emits a single raw line to the callback if set.
+func (c *OpenAIClient) emitRawLLMLine(line string) {
+	if c == nil || c.rawLLMCallback == nil {
+		return
+	}
+	c.rawLLMCallback(line)
+}
+
+// emitRawRequest emits raw request details (method, URL, headers, body) to the callback.
+func (c *OpenAIClient) emitRawRequest(req *http.Request, body []byte) {
+	if c == nil || c.rawLLMCallback == nil || req == nil {
+		return
+	}
+
+	c.emitRawLLMLine(">>> REQUEST " + req.Method + " " + req.URL.String())
+	obfuscatedHeaders := obfuscateHeaders(req.Header)
+	headerKeys := make([]string, 0, len(obfuscatedHeaders))
+	for key := range obfuscatedHeaders {
+		headerKeys = append(headerKeys, key)
+	}
+	sort.Strings(headerKeys)
+	for _, key := range headerKeys {
+		for _, value := range obfuscatedHeaders.Values(key) {
+			c.emitRawLLMLine(">>> HEADER " + key + ": " + value)
+		}
+	}
+
+	if len(body) > 0 {
+		c.emitRawLLMLine(">>> BODY " + obfuscateJSONBody(body))
+	}
+}
+
+// emitRawResponse emits raw response details (status, headers, body) to the callback.
+func (c *OpenAIClient) emitRawResponse(resp *http.Response, body []byte) {
+	if c == nil || c.rawLLMCallback == nil || resp == nil {
+		return
+	}
+
+	c.emitRawLLMLine("<<< RESPONSE " + strconv.Itoa(resp.StatusCode))
+	obfuscatedHeaders := obfuscateHeaders(resp.Header)
+	headerKeys := make([]string, 0, len(obfuscatedHeaders))
+	for key := range obfuscatedHeaders {
+		headerKeys = append(headerKeys, key)
+	}
+	sort.Strings(headerKeys)
+	for _, key := range headerKeys {
+		for _, value := range obfuscatedHeaders.Values(key) {
+			c.emitRawLLMLine("<<< HEADER " + key + ": " + value)
+		}
+	}
+
+	if len(body) > 0 {
+		c.emitRawLLMLine("<<< BODY " + obfuscateJSONBody(body))
+	}
+}
+
+// emitRawStreamChunk emits a raw streaming chunk line to the callback.
+func (c *OpenAIClient) emitRawStreamChunk(line string) {
+	if c == nil || c.rawLLMCallback == nil {
+		return
+	}
+	c.emitRawLLMLine("<<< CHUNK " + obfuscateBodyWithRegex(line))
 }
 
 // RefreshTokenIfNeeded checks if the OAuth2 access token needs to be refreshed
