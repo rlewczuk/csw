@@ -485,6 +485,7 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	if effectiveOptions != nil && effectiveOptions.Logger != nil {
 		logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
 	}
+	m.client.emitRawRequest(req, body)
 
 	resp, err := m.client.httpClient.Do(req)
 	if err != nil {
@@ -502,6 +503,7 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 	if effectiveOptions != nil && effectiveOptions.Verbose {
 		logVerboseResponseFromBytes(resp, bodyBytes)
 	}
+	m.client.emitRawResponse(resp, bodyBytes)
 
 	// Check status code and log error response if needed
 	if err := m.client.checkStatusCodeWithBody(resp, bodyBytes); err != nil {
@@ -647,6 +649,7 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 		if effectiveOptions != nil && effectiveOptions.Logger != nil {
 			logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
 		}
+		m.client.emitRawRequest(req, body)
 
 		resp, err := m.client.httpClient.Do(req)
 		if err != nil {
@@ -657,6 +660,7 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 
 		// Log response headers before checking status (so errors are also logged)
 		logVerboseStreamResponseHeaders(resp, effectiveOptions != nil && effectiveOptions.Verbose)
+		m.client.emitRawResponse(resp, nil)
 
 		if err := m.client.checkStatusCode(resp); err != nil {
 			// Read and log error response body
@@ -693,6 +697,7 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 			if line == "" {
 				continue
 			}
+			m.client.emitRawStreamChunk(line)
 
 			// Print raw line in verbose mode
 			if effectiveOptions != nil && effectiveOptions.Verbose {
