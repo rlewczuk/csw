@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
@@ -27,8 +29,6 @@ import (
 const (
 	defaultLLMRetryMaxAttempts       = 10
 	defaultLLMRetryMaxBackoffSeconds = 60
-	// usageLimitRetryBufferSeconds adds a safety margin after provider reset time.
-	usageLimitRetryBufferSeconds      = 10
 	defaultContextCompactionThreshold = 0.95
 	defaultMaxToolThreads             = 8
 	toolExecutionStartDelay           = 250 * time.Millisecond
@@ -422,16 +422,8 @@ func (s *SweSession) emitAssistantMessage(responseMsg *models.ChatMessage) {
 // runNonStreamingChat executes a non-streaming chat request and returns the response.
 func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.ChatModel, tools []tool.ToolInfo, chatOptions *models.ChatOptions) (*models.ChatMessage, error) {
 	maxAttempts := s.llmRetryMaxAttempts()
-	maxBackoffSeconds := s.llmRetryMaxBackoffSeconds()
-	backoffScale := models.DefaultRetryBackoffScale
-	if configProvider, ok := s.provider.(interface {
-		GetConfig() *conf.ModelProviderConfig
-	}); ok {
-		config := configProvider.GetConfig()
-		if config != nil && config.RateLimitBackoffScale > 0 {
-			backoffScale = config.RateLimitBackoffScale
-		}
-	}
+	retryPolicy := s.llmRetryPolicy()
+	retryingChatModel := models.NewRetryChatModel(chatModel, &retryPolicy, s.handleRetryChatModelMessage)
 
 	for {
 		for attempt := 1; attempt <= maxAttempts; attempt++ {
@@ -439,7 +431,7 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 				s.logger.Debug("chat_non_streaming_request", "num_messages", len(s.messages), "num_tools", len(tools), "attempt", attempt)
 			}
 
-			responseMsg, err := chatModel.Chat(ctx, s.messages, chatOptions, tools)
+			responseMsg, err := retryingChatModel.Chat(ctx, s.messages, chatOptions, tools)
 			if err == nil {
 				if s.logger != nil {
 					s.logger.Debug("chat_non_streaming_complete", "num_parts", len(responseMsg.Parts))
@@ -469,67 +461,64 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 				continue
 			}
 
-			if !isTemporaryLLMError(err) {
-				if s.logger != nil {
-					s.logLLMRequestError("chat_non_streaming_error", err)
-				}
-				return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: chat request failed: %w", err)
+			if s.logger != nil {
+				s.logLLMRequestError("chat_non_streaming_error", err)
 			}
-
-			retryAfterSeconds := 0
-			rateLimitRetryAfterSeconds := 0
-			var rateLimitErr *models.RateLimitError
-			if errors.As(err, &rateLimitErr) {
-				retryAfterSeconds = rateLimitErr.RetryAfterSeconds
-				rateLimitRetryAfterSeconds = rateLimitErr.RetryAfterSeconds
-				if s.outputHandler != nil {
-					s.outputHandler.OnRateLimitError(retryAfterSeconds)
-					if retryAfterSeconds > 0 {
-						s.outputHandler.ShowMessage(buildRateLimitResetMessage(rateLimitErr), sessionMessageTypeWarning)
-					}
-				}
-			}
-
 			if s.outputHandler != nil {
-				s.outputHandler.ShowMessage(fmt.Sprintf("LLM API temporary error (attempt %d/%d): %v", attempt, maxAttempts, err), sessionMessageTypeError)
-			}
-
-			if attempt >= maxAttempts {
-				if s.logger != nil {
-					s.logLLMRequestError("chat_non_streaming_error", err)
+				if s.outputHandler.ShouldRetryAfterFailure(fmt.Sprintf("LLM API request failed after %d attempts: %v", maxAttempts, err)) {
+					s.outputHandler.ShowMessage("Retry requested by user. Starting another retry cycle.", sessionMessageTypeInfo)
+					break
 				}
-				if s.outputHandler != nil {
-					if s.outputHandler.ShouldRetryAfterFailure(fmt.Sprintf("LLM API request failed after %d attempts: %v", maxAttempts, err)) {
-						s.outputHandler.ShowMessage("Retry requested by user. Starting another retry cycle.", sessionMessageTypeInfo)
-						break
-					}
-				}
-				return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: temporary LLM API failure after %d attempts: %w", maxAttempts, err)
 			}
 
-			backoffSeconds := retryAfterSeconds
-			if rateLimitRetryAfterSeconds > 0 {
-				backoffSeconds = rateLimitRetryAfterSeconds + usageLimitRetryBufferSeconds
-			}
-			if backoffSeconds <= 0 {
-				backoffSeconds = 1 << (attempt - 1)
-			}
-			if rateLimitRetryAfterSeconds <= 0 && backoffSeconds > maxBackoffSeconds {
-				backoffSeconds = maxBackoffSeconds
-			}
-			backoffDuration := time.Duration(backoffSeconds) * backoffScale
-
-			if s.outputHandler != nil {
-				s.outputHandler.ShowMessage(fmt.Sprintf("Retrying in %s...", backoffDuration.Round(time.Second)), sessionMessageTypeWarning)
-			}
-
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(backoffDuration):
-			}
+			return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: chat request failed: %w", err)
 		}
 	}
+}
+
+func (s *SweSession) handleRetryChatModelMessage(message string, msgType shared.MessageType) {
+	if s == nil {
+		return
+	}
+
+	if s.outputHandler != nil {
+		s.outputHandler.ShowMessage(message, mapSharedMessageTypeToSessionMessageType(msgType))
+	}
+
+	if msgType == shared.MessageTypeWarning {
+		if retryAfterSeconds, ok := extractRetryAfterSeconds(message); ok && s.outputHandler != nil {
+			s.outputHandler.OnRateLimitError(retryAfterSeconds)
+		}
+	}
+}
+
+func mapSharedMessageTypeToSessionMessageType(msgType shared.MessageType) string {
+	switch msgType {
+	case shared.MessageTypeError:
+		return sessionMessageTypeError
+	case shared.MessageTypeWarning:
+		return sessionMessageTypeWarning
+	default:
+		return sessionMessageTypeInfo
+	}
+}
+
+func extractRetryAfterSeconds(message string) (int, bool) {
+	if strings.TrimSpace(message) == "" {
+		return 0, false
+	}
+
+	matches := regexp.MustCompile(`\(in\s+(\d+)\s+seconds\)`).FindStringSubmatch(message)
+	if len(matches) < 2 {
+		return 0, false
+	}
+
+	retryAfterSeconds, err := strconv.Atoi(matches[1])
+	if err != nil || retryAfterSeconds < 0 {
+		return 0, false
+	}
+
+	return retryAfterSeconds, true
 }
 
 // buildRateLimitResetMessage creates a readable message with expected reset time.
@@ -1740,6 +1729,39 @@ func (s *SweSession) llmRetryMaxBackoffSeconds() int {
 		}
 	}
 	return defaultLLMRetryMaxBackoffSeconds
+}
+
+func (s *SweSession) llmRetryPolicy() models.RetryPolicy {
+	attempts := s.llmRetryMaxAttempts()
+	if attempts <= 0 {
+		attempts = defaultLLMRetryMaxAttempts
+	}
+
+	retries := attempts - 1
+	if retries < 0 {
+		retries = 0
+	}
+
+	backoffScale := models.DefaultRetryBackoffScale
+	if configProvider, ok := s.provider.(interface {
+		GetConfig() *conf.ModelProviderConfig
+	}); ok {
+		config := configProvider.GetConfig()
+		if config != nil && config.RateLimitBackoffScale > 0 {
+			backoffScale = config.RateLimitBackoffScale
+		}
+	}
+
+	maxBackoffDuration := time.Duration(s.llmRetryMaxBackoffSeconds()) * backoffScale
+	if maxBackoffDuration <= 0 {
+		maxBackoffDuration = 60 * backoffScale
+	}
+
+	return models.RetryPolicy{
+		InitialDelay: backoffScale,
+		MaxRetries:   retries,
+		MaxDelay:     maxBackoffDuration,
+	}
 }
 
 // maxToolThreadsLimit returns max number of parallel tool executions.

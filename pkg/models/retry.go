@@ -69,6 +69,11 @@ func (r *RetryChatModel) Chat(ctx context.Context, messages []*ChatMessage, opti
 			return nil, err
 		}
 
+		var rateLimitErr *RateLimitError
+		if errors.As(err, &rateLimitErr) && rateLimitErr.RetryAfterSeconds > 0 {
+			r.logMessage(buildRateLimitResetMessage(rateLimitErr), shared.MessageTypeWarning)
+		}
+
 		r.logMessage(fmt.Sprintf("LLM API temporary error (attempt %d/%d): %v", attempt, totalAttempts, err), shared.MessageTypeError)
 
 		if attempt >= totalAttempts {
@@ -76,6 +81,7 @@ func (r *RetryChatModel) Chat(ctx context.Context, messages []*ChatMessage, opti
 		}
 
 		delay := r.calculateDelay(attempt, err)
+		r.logMessage(fmt.Sprintf("Retrying in %s...", delay.Round(time.Second)), shared.MessageTypeWarning)
 
 		select {
 		case <-ctx.Done():
@@ -139,6 +145,23 @@ func isUsageLimitError(err *RateLimitError) bool {
 		return false
 	}
 	return strings.Contains(strings.ToLower(err.Message), "usage limit")
+}
+
+// buildRateLimitResetMessage creates a readable message with expected reset time.
+func buildRateLimitResetMessage(rateLimitErr *RateLimitError) string {
+	if rateLimitErr == nil || rateLimitErr.RetryAfterSeconds <= 0 {
+		return ""
+	}
+
+	resetTime := time.Now().Add(time.Duration(rateLimitErr.RetryAfterSeconds) * time.Second)
+	resetAt := resetTime.Format("2006-01-02 15:04:05 MST")
+	messageLower := strings.ToLower(rateLimitErr.Message)
+
+	if strings.Contains(messageLower, "usage limit") {
+		return fmt.Sprintf("Usage limit has been reached. Reset expected at %s (in %d seconds).", resetAt, rateLimitErr.RetryAfterSeconds)
+	}
+
+	return fmt.Sprintf("Rate limit has been reached. Reset expected at %s (in %d seconds).", resetAt, rateLimitErr.RetryAfterSeconds)
 }
 
 // isRetryableError returns true when an error indicates a temporary condition
