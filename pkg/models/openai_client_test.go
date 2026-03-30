@@ -1448,7 +1448,7 @@ func TestOpenAIClient_RawLLMCallback_LogsStreamingChunks(t *testing.T) {
 		require.NoError(t, err)
 		_, err = w.Write([]byte("data: [DONE]\n"))
 		require.NoError(t, err)
-	})
+	}))
 	defer server.Close()
 
 	client, err := NewOpenAIClient(&conf.ModelProviderConfig{
@@ -1471,6 +1471,8 @@ func TestOpenAIClient_RawLLMCallback_LogsStreamingChunks(t *testing.T) {
 	assert.Contains(t, joined, "<<< CHUNK data: {\"id\":\"chatcmpl-stream-B\"")
 	assert.Contains(t, joined, "<<< CHUNK data: [DONE]")
 }
+
+func TestOpenAIClient_ListModelsIncludesConfiguredQueryParams(t *testing.T) {
 	t.Run("list models includes configured query params", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(t, "/models", r.URL.Path)
@@ -1498,77 +1500,7 @@ func TestOpenAIClient_RawLLMCallback_LogsStreamingChunks(t *testing.T) {
 	})
 }
 
-func TestOpenAIClient_RawLLMCallback_ObfuscatesRequestAndResponse(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Authorization", "Bearer response-secret-token")
-		_, err := w.Write([]byte(`{"id":"chatcmpl-raw","object":"chat.completion","api_key":"response-secret-key","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}]}`))
-		require.NoError(t, err)
-	}))
-	defer server.Close()
-
-	client, err := NewOpenAIClient(&conf.ModelProviderConfig{
-		URL:    server.URL,
-		APIKey: "request-secret-api-key",
-	})
-	require.NoError(t, err)
-
-	rawLines := make([]string, 0)
-	client.SetRawLLMCallback(func(line string) {
-		rawLines = append(rawLines, line)
-	})
-
-	chatModel := client.ChatModel("test-model", nil)
-	_, err = chatModel.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "hello")}, nil, nil) {
-		require.NoError(t, err)
-
-	joined := strings.Join(rawLines, "\n")
-	assert.Contains(t, joined, ">>> REQUEST POST ")
-	assert.Contains(t, joined, ">>> HEADER Authorization: Bear...-key")
-	assert.NotContains(t, joined, "request-secret-api-key")
-	assert.Contains(t, joined, "<<< RESPONSE 200")
-	assert.Contains(t, joined, ">>> HEADER Authorization: Bear...oken")
-	assert.NotContains(t, joined, "response-secret-token")
-	assert.Contains(t, joined, "api_key")
-	assert.NotContains(t, joined, "response-secret-key")
-}
-
-)
-
-func TestOpenAIClient_RawLLMCallback_LogsStreamingChunks(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		_, err := w.Write([]byte("data: {\"id\":\"chatcmpl-stream-A\",\"object\":\"chat.completion.chunk\",\"created\":1640000000,\"model\":\"test-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"A\"}}]\n"))
-		require.NoError(t, err)
-		_, err = w.Write([]byte("data: {\"id\":\"chatcmpl-stream-B\",\"object\":\"chat.completion.chunk\",\"created\":1640000001,\"model\":\"test-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"B\"}}]\n"))
-		require.NoError(t, err)
-		_, err = w.Write([]byte("data: [DONE]\n"))
-		require.NoError(t, err)
-	})
-	defer server.Close()
-
-	client, err := NewOpenAIClient(&conf.ModelProviderConfig{
-		URL:    server.URL,
-		APIKey: "stream-secret-key",
-	})
-	require.NoError(t, err)
-
-	rawLines := make([]string, 0)
-	client.SetRawLLMCallback(func(line string) {
-		rawLines = append(rawLines, line)
-	})
-
-	chatModel := client.ChatModel("test-model", nil)
-	for range chatModel.ChatStream(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "hello")}, nil, nil) {
-	}
-
-	joined := strings.Join(rawLines, "\n")
-	assert.Contains(t, joined, "<<< CHUNK data: {\"id\":\"chatcmpl-stream-A\",\"object\":\"chat.completion.chunk\",\"created\":1640000000,\"model\":\"test-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"A\"}}]}\n")
-	assert.Contains(t, joined, "<<< CHUNK data: {\"id\":\"chatcmpl-stream-B\",\"object\":\"chat.completion.chunk\",\"created\":1640000001,\"model\":\"test-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"B\"}}]}\n")
-	assert.Contains(t, joined, "<<< CHUNK data: [DONE]")
-	}
-}
-}
+func TestOpenAIClient_OptionsHeaders(t *testing.T) {
 	mock := testutil.NewMockHTTPServer()
 	defer mock.Close()
 
