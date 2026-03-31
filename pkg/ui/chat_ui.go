@@ -128,6 +128,7 @@ type IChatPresenter interface {
 	PermissionResponse(response string) error
 
 	// SetModel sets the model used for the chat session.
-	// model string should be formatted as `provider/model-name`.
+	// model string should be formatted as `provider/model-name`
+	// or a comma-separated `provider/model-name` list for fallback.
 	SetModel(model string) error
 }

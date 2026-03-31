@@ -170,15 +170,22 @@ func (s *SweSystem) NewSession(model string, outputHandler core.SessionThreadOut
 }
 
 func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.SessionThreadOutput, parentID string, slug string, thinking string, hookFeedbackExecutor tool.HookFeedbackExecutor) (*core.SweSession, error) {
-	providerName, modelName, err := parseProviderModel(model)
-	if err != nil {
-		return nil, err
+	modelRefs, err := models.ParseProviderModelChain(model)
+	if err != nil || len(modelRefs) == 0 {
+		return nil, fmt.Errorf("SweSystem.NewSession() [system.go]: invalid model format, expected 'provider/model' or comma-separated provider/model list, got '%s'", model)
 	}
 
-	provider, ok := s.ModelProviders[providerName]
-	if !ok {
-		return nil, fmt.Errorf("SweSystem.NewSession() [system.go]: provider not found: %s", providerName)
+	for _, ref := range modelRefs {
+		if _, exists := s.ModelProviders[ref.Provider]; !exists {
+			return nil, fmt.Errorf("SweSystem.NewSession() [system.go]: provider not found: %s", ref.Provider)
+		}
 	}
+
+	primaryRef := modelRefs[0]
+	providerName := primaryRef.Provider
+	modelName := primaryRef.Model
+
+	provider := s.ModelProviders[providerName]
 
 	sessionID := shared.GenerateUUIDv7()
 
@@ -195,6 +202,7 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 		ID:                   sessionID,
 		ParentID:             strings.TrimSpace(parentID),
 		Slug:                 strings.TrimSpace(slug),
+		ModelSpec:            strings.TrimSpace(model),
 		Provider:             provider,
 		ProviderName:         providerName,
 		Model:                modelName,
@@ -223,7 +231,7 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 	})
 
 	if sessionLogger != nil {
-		sessionLogger.Info("session_created", "session_id", sessionID, "provider", providerName, "model", modelName)
+		sessionLogger.Info("session_created", "session_id", sessionID, "provider", providerName, "model", modelName, "model_spec", strings.TrimSpace(model))
 	}
 
 	defaultRole, err := s.resolveDefaultRole()
@@ -623,21 +631,6 @@ func (s *SweSystem) buildSessionParams() *core.SweSessionParams {
 		MaxToolThreads:  s.MaxToolThreads,
 		SubAgentRunner:  s,
 	}
-}
-
-func parseProviderModel(model string) (string, string, error) {
-	for i, c := range model {
-		if c == '/' {
-			providerName := model[:i]
-			modelName := model[i+1:]
-			if providerName == "" || modelName == "" {
-				break
-			}
-			return providerName, modelName, nil
-		}
-	}
-
-	return "", "", fmt.Errorf("SweSystem.NewSession() [system.go]: invalid model format, expected 'provider/model', got '%s'", model)
 }
 
 func firstNonEmpty(values ...string) string {

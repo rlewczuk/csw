@@ -286,7 +286,8 @@ func (c *SessionThread) PermissionResponse(response string) error {
 }
 
 // SetModel sets the model for the current session.
-// model string should be formatted as `provider/model-name`.
+// model string should be formatted as `provider/model-name`
+// or a comma-separated `provider/model-name` list for fallback.
 func (c *SessionThread) SetModel(model string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

@@ -48,6 +48,76 @@ func TestSweSystemSessionManagement(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestSweSystemNewSession_ModelChainUsesPrimaryProviderMetadata(t *testing.T) {
+	providerOne := models.NewMockProvider([]models.ModelInfo{{Name: "model1"}})
+	providerTwo := models.NewMockProvider([]models.ModelInfo{{Name: "model2"}})
+
+	fixture := coretestfixture.NewSweSystemFixture(
+		t,
+		coretestfixture.WithModelProviders(map[string]models.ModelProvider{
+			"provider1": providerOne,
+			"provider2": providerTwo,
+		}),
+	)
+
+	session, err := fixture.System.NewSession("provider1/model1,provider2/model2", testutil.NewMockSessionOutputHandler())
+	require.NoError(t, err)
+	require.NotNil(t, session)
+	assert.Equal(t, "provider1", session.ProviderName())
+	assert.Equal(t, "model1", session.Model())
+	assert.Equal(t, "provider1/model1,provider2/model2", session.ModelWithProvider())
+}
+
+func TestSweSystemRun_UsesFallbackModelChain(t *testing.T) {
+	rateLimitCount := 1
+	providerOne := models.NewMockProvider([]models.ModelInfo{{Name: "model1"}})
+	providerOne.RateLimitError = &models.RateLimitError{RetryAfterSeconds: 5, Message: "rate limited"}
+	providerOne.RateLimitErrorCount = &rateLimitCount
+
+	providerTwo := models.NewMockProvider([]models.ModelInfo{{Name: "model2"}})
+	providerTwo.SetChatResponse("model2", &models.MockChatResponse{
+		Response: models.NewTextMessage(models.ChatRoleAssistant, "fallback-response"),
+	})
+
+	handler := testutil.NewMockSessionOutputHandler()
+	fixture := coretestfixture.NewSweSystemFixture(
+		t,
+		coretestfixture.WithModelProviders(map[string]models.ModelProvider{
+			"provider1": providerOne,
+			"provider2": providerTwo,
+		}),
+	)
+
+	session, err := fixture.System.NewSession("provider1/model1,provider2/model2", handler)
+	require.NoError(t, err)
+
+	err = session.UserPrompt("hello")
+	require.NoError(t, err)
+	err = session.Run(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, handler.AssistantMessages, 1)
+	assert.Equal(t, "fallback-response", handler.AssistantMessages[0].Text)
+	assert.Len(t, providerOne.RecordedMessages, 1)
+	assert.Len(t, providerTwo.RecordedMessages, 1)
+}
+
+func TestSweSystemNewSession_ModelChainFailsWhenFallbackProviderMissing(t *testing.T) {
+	providerOne := models.NewMockProvider([]models.ModelInfo{{Name: "model1"}})
+
+	fixture := coretestfixture.NewSweSystemFixture(
+		t,
+		coretestfixture.WithModelProviders(map[string]models.ModelProvider{
+			"provider1": providerOne,
+		}),
+	)
+
+	session, err := fixture.System.NewSession("provider1/model1,provider2/model2", testutil.NewMockSessionOutputHandler())
+	require.Error(t, err)
+	assert.Nil(t, session)
+	assert.Contains(t, err.Error(), "provider not found: provider2")
+}
+
 func TestSweSystemShutdownClearsSessions(t *testing.T) {
 	fixture := coretestfixture.NewSweSystemFixture(t)
 	system := fixture.System

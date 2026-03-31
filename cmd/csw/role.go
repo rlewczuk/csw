@@ -102,7 +102,7 @@ func roleShowCommand() *cobra.Command {
 
 	cmd.Flags().BoolVar(&useJSON, "json", false, "Output in JSON format")
 	cmd.Flags().BoolVar(&showSystemPrompt, "system-prompt", false, "Render and output system prompt")
-	cmd.Flags().StringVar(&modelName, "model", "", "Model name to use for prompt rendering (provider/model format)")
+	cmd.Flags().StringVar(&modelName, "model", "", "Model name to use for prompt rendering (provider/model format; fallback lists not supported)")
 
 	return cmd
 }
@@ -390,7 +390,7 @@ func outputSystemPrompt(store conf.ConfigStore, roleConfig *conf.AgentRoleConfig
 		// Parse model name (provider/model format)
 		parts := strings.SplitN(modelName, "/", 2)
 		if len(parts) != 2 {
-			return fmt.Errorf("outputSystemPrompt() [role.go]: invalid model format: %s, expected provider/model", modelName)
+			return fmt.Errorf("outputSystemPrompt() [role.go]: invalid model format: %s, expected single provider/model", modelName)
 		}
 		providerName := parts[0]
 		actualModelName := parts[1]
@@ -425,4 +425,3 @@ func outputSystemPrompt(store conf.ConfigStore, roleConfig *conf.AgentRoleConfig
 	fmt.Print(prompt)
 	return nil
 }
-

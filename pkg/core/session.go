@@ -47,6 +47,7 @@ type SweSession struct {
 	provider      models.ModelProvider
 	providerName  string
 	model         string
+	modelSpec     string
 	rolesUsed     []string
 	toolsUsed     []string
 	messages      []*models.ChatMessage
@@ -99,6 +100,7 @@ type SweSessionParams struct {
 	Provider     models.ModelProvider
 	ProviderName string
 	Model        string
+	ModelSpec    string
 
 	VFS         vfs.VFS
 	BaseVFS     vfs.VFS
@@ -152,6 +154,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		provider:        params.Provider,
 		providerName:    params.ProviderName,
 		model:           params.Model,
+		modelSpec:       strings.TrimSpace(params.ModelSpec),
 		rolesUsed:       append([]string(nil), params.RolesUsed...),
 		toolsUsed:       append([]string(nil), params.ToolsUsed...),
 		messages:        make([]*models.ChatMessage, 0, len(params.Messages)),
@@ -186,6 +189,10 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		subAgentSlugs:              make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
 		subAgentRunner:             params.SubAgentRunner,
 		hookFeedbackExec:           params.HookFeedbackExecutor,
+	}
+
+	if session.modelSpec == "" {
+		session.modelSpec = composeProviderModel(session.providerName, session.model)
 	}
 
 	if session.baseVFS == nil {
@@ -238,6 +245,7 @@ type persistedSessionState struct {
 	SessionID                  string                  `json:"session_id"`
 	ParentSessionID            string                  `json:"parent_session_id,omitempty"`
 	Slug                       string                  `json:"slug,omitempty"`
+	ModelSpec                  string                  `json:"model_spec,omitempty"`
 	ProviderName               string                  `json:"provider_name"`
 	Model                      string                  `json:"model"`
 	Thinking                   string                  `json:"thinking,omitempty"`
@@ -278,7 +286,19 @@ func (s *SweSession) Run(ctx context.Context) error {
 
 	chatOptions := s.buildChatOptions()
 
-	chatModel := models.NewUnstreamingChatModel(s.provider.ChatModel(s.model, chatOptions))
+	providerMap := s.modelProviders
+	if providerMap == nil {
+		providerMap = map[string]models.ModelProvider{}
+		if strings.TrimSpace(s.providerName) != "" && s.provider != nil {
+			providerMap[s.providerName] = s.provider
+		}
+	}
+
+	chatModelImpl, chatModelErr := models.NewChatModelFromProviderChain(s.ModelWithProvider(), providerMap, chatOptions)
+	if chatModelErr != nil {
+		return fmt.Errorf("SweSession.Run() [session.go]: failed to create chat model chain: %w", chatModelErr)
+	}
+	chatModel := models.NewUnstreamingChatModel(chatModelImpl)
 
 	// Build tools list using PromptGenerator.GetToolInfo()
 	tools := []tool.ToolInfo{}
@@ -954,6 +974,10 @@ func (s *SweSession) Model() string {
 
 // ModelWithProvider returns the provider-qualified model name used for this session.
 func (s *SweSession) ModelWithProvider() string {
+	if strings.TrimSpace(s.modelSpec) != "" {
+		return s.modelSpec
+	}
+
 	if strings.TrimSpace(s.providerName) == "" {
 		return s.model
 	}
@@ -963,6 +987,19 @@ func (s *SweSession) ModelWithProvider() string {
 	}
 
 	return s.providerName + "/" + s.model
+}
+
+func composeProviderModel(providerName string, modelName string) string {
+	trimmedProvider := strings.TrimSpace(providerName)
+	trimmedModel := strings.TrimSpace(modelName)
+	if trimmedProvider == "" {
+		return trimmedModel
+	}
+	if trimmedModel == "" {
+		return trimmedProvider
+	}
+
+	return trimmedProvider + "/" + trimmedModel
 }
 
 // GetState returns the current agent state for this session.
@@ -1087,33 +1124,37 @@ func (s *SweSession) GetModelTags() []string {
 }
 
 // SetModel sets the model used for the session.
-// model string should be formatted as `provider/model-name`.
+// model string should be formatted as `provider/model-name`
+// or a comma-separated `provider/model-name` list for fallback.
 func (s *SweSession) SetModel(modelStr string) error {
 	if s.logger != nil {
 		s.logger.Info("set_model", "model", modelStr)
 	}
 
-	parts := strings.SplitN(modelStr, "/", 2)
-	if len(parts) != 2 {
+	refs, parseErr := models.ParseProviderModelChain(modelStr)
+	if parseErr != nil || len(refs) == 0 {
 		if s.logger != nil {
 			s.logger.Error("set_model_failed", "model", modelStr, "error", "invalid format")
 		}
-		return fmt.Errorf("SweSession.SetModel() [session.go]: invalid model format: %s, expected provider/model-name", modelStr)
+		return fmt.Errorf("SweSession.SetModel() [session.go]: invalid model format: %s, expected provider/model or comma-separated provider/model list", modelStr)
 	}
-	providerName := parts[0]
-	modelName := parts[1]
 
-	provider, ok := s.modelProviders[providerName]
-	if !ok {
-		if s.logger != nil {
-			s.logger.Error("set_model_failed", "model", modelStr, "error", "provider not found")
+	for _, ref := range refs {
+		if _, exists := s.modelProviders[ref.Provider]; !exists {
+			if s.logger != nil {
+				s.logger.Error("set_model_failed", "model", modelStr, "error", "provider not found")
+			}
+			return fmt.Errorf("SweSession.SetModel() [session.go]: provider not found: %s", ref.Provider)
 		}
-		return fmt.Errorf("SweSession.SetModel() [session.go]: provider not found: %s", providerName)
 	}
+	providerName := refs[0].Provider
+	modelName := refs[0].Model
+	provider := s.modelProviders[providerName]
 
 	s.provider = provider
 	s.providerName = providerName
 	s.model = modelName
+	s.modelSpec = strings.TrimSpace(modelStr)
 	s.applyModelTagToolSelection()
 	if s.role != nil && s.role.ToolsAccess != nil {
 		s.Tools = wrapToolsWithAccessControl(s.Tools, s.role.ToolsAccess)
@@ -1459,6 +1500,7 @@ func (s *SweSession) buildPersistedSessionState() persistedSessionState {
 		SessionID:                  s.id,
 		ParentSessionID:            s.parentID,
 		Slug:                       s.slug,
+		ModelSpec:                  s.ModelWithProvider(),
 		ProviderName:               s.providerName,
 		Model:                      s.model,
 		Thinking:                   strings.TrimSpace(s.thinking),
@@ -1812,6 +1854,13 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 		ID:              state.SessionID,
 		ParentID:        state.ParentSessionID,
 		Slug:            state.Slug,
+		ModelSpec: func() string {
+			if strings.TrimSpace(state.ModelSpec) != "" {
+				return strings.TrimSpace(state.ModelSpec)
+			}
+
+			return composeProviderModel(state.ProviderName, state.Model)
+		}(),
 		Provider:        provider,
 		ProviderName:    state.ProviderName,
 		Model:           state.Model,

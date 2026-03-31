@@ -342,7 +342,7 @@ func CliCommand() *cobra.Command {
 	}
 
 	// Define flags
-	cmd.Flags().StringVar(&cliModel, "model", "", "Model name in provider/model format (if not set, uses default provider)")
+	cmd.Flags().StringVar(&cliModel, "model", "", "Model name in provider/model format or comma-separated provider/model list for fallback (if not set, uses default provider)")
 	cmd.Flags().StringVar(&cliRole, "role", "developer", "Agent role name")
 	cmd.Flags().StringVar(&cliWorkDir, "workdir", "", "Working directory (default: current directory)")
 	cmd.Flags().StringVar(&cliShadowDir, "shadow-dir", "", "Shadow directory for agent files overlay (AGENTS.md, .agents*, .csw*, .cswdata)")

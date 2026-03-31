@@ -26,9 +26,16 @@ func GenerateWorktreeBranchName(ctx context.Context, modelProviders map[string]m
 		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: config store cannot be nil")
 	}
 
-	providerName, modelName, err := parseProviderModel(model)
-	if err != nil {
-		return "", err
+	modelRefs, err := models.ParseProviderModelChain(model)
+	if err != nil || len(modelRefs) == 0 {
+		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: invalid model format, expected 'provider/model' or comma-separated provider/model list, got '%s'", model)
+	}
+	providerName := modelRefs[0].Provider
+	modelName := modelRefs[0].Model
+	for _, ref := range modelRefs {
+		if _, ok := modelProviders[ref.Provider]; !ok {
+			return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: provider not found: %s", ref.Provider)
+		}
 	}
 
 	provider, ok := modelProviders[providerName]
@@ -124,19 +131,4 @@ func NormalizeWorktreeBranchSymbolicName(input string) string {
 	}
 
 	return normalized
-}
-
-func parseProviderModel(model string) (string, string, error) {
-	for i, c := range model {
-		if c == '/' {
-			providerName := model[:i]
-			modelName := model[i+1:]
-			if providerName == "" || modelName == "" {
-				break
-			}
-			return providerName, modelName, nil
-		}
-	}
-
-	return "", "", fmt.Errorf("parseProviderModel() [worktree_branch.go]: invalid model format, expected 'provider/model', got '%s'", model)
 }
