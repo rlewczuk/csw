@@ -2,9 +2,7 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"iter"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -266,38 +264,6 @@ func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 		assert.Contains(t, err.Error(), "too many input tokens after 2 attempts")
 		assert.Equal(t, 2, session.compactionCount)
 		require.Len(t, chatModel.callSizes, 2)
-	})
-}
-
-func TestIsTemporaryLLMError(t *testing.T) {
-	t.Run("returns true for wrapped unexpected EOF", func(t *testing.T) {
-		err := fmt.Errorf("wrapped: %w", io.ErrUnexpectedEOF)
-		assert.True(t, isTemporaryLLMError(err))
-	})
-
-	t.Run("returns true for wrapped retryable network error", func(t *testing.T) {
-		err := fmt.Errorf("read failed: %w", &models.NetworkError{Message: "unexpected stream EOF", IsRetryable: true})
-		assert.True(t, isTemporaryLLMError(err))
-	})
-}
-
-func TestBuildRateLimitResetMessage(t *testing.T) {
-	t.Run("returns usage limit reset message", func(t *testing.T) {
-		message := buildRateLimitResetMessage(&models.RateLimitError{RetryAfterSeconds: 120, Message: "The usage limit has been reached"})
-		assert.Contains(t, message, "Usage limit has been reached")
-		assert.Contains(t, message, "in 120 seconds")
-		assert.Contains(t, message, "Reset expected at")
-	})
-
-	t.Run("returns generic rate limit reset message", func(t *testing.T) {
-		message := buildRateLimitResetMessage(&models.RateLimitError{RetryAfterSeconds: 90, Message: "rate limit exceeded"})
-		assert.Contains(t, message, "Rate limit has been reached")
-		assert.Contains(t, message, "in 90 seconds")
-	})
-
-	t.Run("returns empty message when retry-after is unavailable", func(t *testing.T) {
-		message := buildRateLimitResetMessage(&models.RateLimitError{RetryAfterSeconds: 0, Message: "rate limit exceeded"})
-		assert.Equal(t, "", message)
 	})
 }
 

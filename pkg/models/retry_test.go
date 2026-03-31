@@ -271,14 +271,18 @@ func TestRetryChatModel_Chat_LogsTemporaryErrors(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "success", resp.GetText())
 
-	require.Len(t, logMessages, 2)
+	require.Len(t, logMessages, 4)
 	assert.Contains(t, logMessages[0], "attempt 1/6")
 	assert.Contains(t, logMessages[0], "rate exceeded")
 	assert.Equal(t, shared.MessageTypeError, logTypes[0])
+	assert.Contains(t, logMessages[1], "Retrying in")
+	assert.Equal(t, shared.MessageTypeWarning, logTypes[1])
 
-	assert.Contains(t, logMessages[1], "attempt 2/6")
-	assert.Contains(t, logMessages[1], "connection reset")
-	assert.Equal(t, shared.MessageTypeError, logTypes[1])
+	assert.Contains(t, logMessages[2], "attempt 2/6")
+	assert.Contains(t, logMessages[2], "connection reset")
+	assert.Equal(t, shared.MessageTypeError, logTypes[2])
+	assert.Contains(t, logMessages[3], "Retrying in")
+	assert.Equal(t, shared.MessageTypeWarning, logTypes[3])
 }
 
 func TestRetryChatModel_Chat_DoesNotLogOnSuccess(t *testing.T) {
