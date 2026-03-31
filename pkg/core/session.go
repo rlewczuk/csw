@@ -294,7 +294,14 @@ func (s *SweSession) Run(ctx context.Context) error {
 		}
 	}
 
-	chatModelImpl, chatModelErr := models.NewChatModelFromProviderChain(s.ModelWithProvider(), providerMap, chatOptions)
+	retryPolicy := s.llmRetryPolicy()
+	chatModelImpl, chatModelErr := models.NewChatModelFromProviderChain(
+		s.ModelWithProvider(),
+		providerMap,
+		chatOptions,
+		&retryPolicy,
+		s.handleRetryChatModelMessage,
+	)
 	if chatModelErr != nil {
 		return fmt.Errorf("SweSession.Run() [session.go]: failed to create chat model chain: %w", chatModelErr)
 	}
@@ -440,8 +447,6 @@ func (s *SweSession) emitAssistantMessage(responseMsg *models.ChatMessage) {
 // runNonStreamingChat executes a non-streaming chat request and returns the response.
 func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.ChatModel, tools []tool.ToolInfo, chatOptions *models.ChatOptions) (*models.ChatMessage, error) {
 	maxAttempts := s.llmRetryMaxAttempts()
-	retryPolicy := s.llmRetryPolicy()
-	retryingChatModel := models.NewRetryChatModel(chatModel, &retryPolicy, s.handleRetryChatModelMessage)
 	attempt := 0
 
 	for {
@@ -450,7 +455,7 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 			s.logger.Debug("chat_non_streaming_request", "num_messages", len(s.messages), "num_tools", len(tools), "attempt", attempt)
 		}
 
-		responseMsg, err := retryingChatModel.Chat(ctx, s.messages, chatOptions, tools)
+		responseMsg, err := chatModel.Chat(ctx, s.messages, chatOptions, tools)
 		if err == nil {
 			if s.logger != nil {
 				s.logger.Debug("chat_non_streaming_complete", "num_parts", len(responseMsg.Parts))

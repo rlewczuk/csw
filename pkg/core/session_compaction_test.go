@@ -229,7 +229,9 @@ func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 			},
 		}
 
-		response, err := session.runNonStreamingChat(t.Context(), chatModel, nil, nil)
+		retryPolicy := session.llmRetryPolicy()
+		retryingChatModel := models.NewRetryChatModel(chatModel, &retryPolicy, session.handleRetryChatModelMessage)
+		response, err := session.runNonStreamingChat(t.Context(), retryingChatModel, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		assert.Equal(t, "done", response.GetText())
@@ -258,7 +260,9 @@ func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 			errors: []error{models.ErrTooManyInputTokens, models.ErrTooManyInputTokens},
 		}
 
-		response, err := session.runNonStreamingChat(t.Context(), chatModel, nil, nil)
+		retryPolicy := session.llmRetryPolicy()
+		retryingChatModel := models.NewRetryChatModel(chatModel, &retryPolicy, session.handleRetryChatModelMessage)
+		response, err := session.runNonStreamingChat(t.Context(), retryingChatModel, nil, nil)
 		require.Nil(t, response)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "too many input tokens after 2 attempts")
@@ -290,7 +294,9 @@ func TestSweSessionRunNonStreamingChat_UsageLimitWait(t *testing.T) {
 		}
 
 		start := time.Now()
-		response, err := session.runNonStreamingChat(t.Context(), chatModel, nil, nil)
+		retryPolicy := session.llmRetryPolicy()
+		retryingChatModel := models.NewRetryChatModel(chatModel, &retryPolicy, session.handleRetryChatModelMessage)
+		response, err := session.runNonStreamingChat(t.Context(), retryingChatModel, nil, nil)
 		elapsed := time.Since(start)
 
 		require.NoError(t, err)

@@ -3,6 +3,8 @@ package models
 import (
 	"fmt"
 	"strings"
+
+	"github.com/rlewczuk/csw/pkg/shared"
 )
 
 // ProviderModelRef represents a single provider/model selection.
@@ -41,7 +43,13 @@ func ParseProviderModelChain(modelSpec string) ([]ProviderModelRef, error) {
 }
 
 // NewChatModelFromProviderChain creates chat model from provider/model chain.
-func NewChatModelFromProviderChain(modelSpec string, providers map[string]ModelProvider, options *ChatOptions) (ChatModel, error) {
+func NewChatModelFromProviderChain(
+	modelSpec string,
+	providers map[string]ModelProvider,
+	options *ChatOptions,
+	retryPolicy *RetryPolicy,
+	retryLogFn func(string, shared.MessageType),
+) (ChatModel, error) {
 	refs, err := ParseProviderModelChain(modelSpec)
 	if err != nil {
 		return nil, fmt.Errorf("NewChatModelFromProviderChain() [model_chain_factory.go]: %w", err)
@@ -57,9 +65,16 @@ func NewChatModelFromProviderChain(modelSpec string, providers map[string]ModelP
 		modelsList = append(modelsList, provider.ChatModel(ref.Model, options))
 	}
 
+	var model ChatModel
 	if len(modelsList) == 1 {
-		return modelsList[0], nil
+		model = modelsList[0]
+	} else {
+		model = NewFallbackChatModel(modelsList, 0)
 	}
 
-	return NewFallbackChatModel(modelsList, 0), nil
+	if retryPolicy != nil {
+		model = NewRetryChatModel(model, retryPolicy, retryLogFn)
+	}
+
+	return model, nil
 }

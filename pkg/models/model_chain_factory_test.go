@@ -100,7 +100,7 @@ func TestNewChatModelFromProviderChain(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chatModel, err := NewChatModelFromProviderChain(tt.modelSpec, tt.providers, nil)
+			chatModel, err := NewChatModelFromProviderChain(tt.modelSpec, tt.providers, nil, nil, nil)
 			if tt.expectedErrText != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErrText)
@@ -126,4 +126,23 @@ func TestNewChatModelFromProviderChain(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewChatModelFromProviderChain_WithRetryPolicyWrapsModel(t *testing.T) {
+	retryPolicy := RetryPolicy{InitialDelay: 0, MaxRetries: 1, MaxDelay: 0}
+
+	chatModel, err := NewChatModelFromProviderChain(
+		"provider1/model1",
+		map[string]ModelProvider{
+			"provider1": NewMockProvider([]ModelInfo{{Name: "model1"}}),
+		},
+		nil,
+		&retryPolicy,
+		nil,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, chatModel)
+
+	_, isRetry := chatModel.(*RetryChatModel)
+	assert.True(t, isRetry)
 }
