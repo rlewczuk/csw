@@ -27,11 +27,13 @@ package impl
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -71,7 +73,9 @@ func NewLocalConfigStore(configDir string) (*LocalConfigStore, error) {
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return nil, fmt.Errorf("NewLocalConfigStore(): failed to create file watcher: %w", err)
+		if !errors.Is(err, syscall.EMFILE) && !errors.Is(err, syscall.ENFILE) {
+			return nil, fmt.Errorf("NewLocalConfigStore(): failed to create file watcher: %w", err)
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -96,22 +100,29 @@ func NewLocalConfigStore(configDir string) (*LocalConfigStore, error) {
 	}
 
 	// Start watching for changes
-	if err := store.setupWatchers(); err != nil {
-		cancel()
-		watcher.Close()
-		return nil, fmt.Errorf("NewLocalConfigStore(): failed to setup file watchers: %w", err)
-	}
+	if watcher != nil {
+		if err := store.setupWatchers(); err != nil {
+			cancel()
+			watcher.Close()
+			return nil, fmt.Errorf("NewLocalConfigStore(): failed to setup file watchers: %w", err)
+		}
 
-	store.watcherWg.Add(1)
-	go store.watchLoop()
+		store.watcherWg.Add(1)
+		go store.watchLoop()
+	}
 
 	return store, nil
 }
 
 // Close stops the file watcher and releases resources.
 func (s *LocalConfigStore) Close() error {
-	s.watcherCancel()
+	if s.watcherCancel != nil {
+		s.watcherCancel()
+	}
 	s.watcherWg.Wait()
+	if s.watcher == nil {
+		return nil
+	}
 	return s.watcher.Close()
 }
 

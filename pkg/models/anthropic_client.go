@@ -423,6 +423,7 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	if effectiveOptions != nil && effectiveOptions.Verbose {
 		logVerboseResponseFromBytes(resp, bodyBytes)
 	}
+	m.client.emitRawResponse(resp, bodyBytes)
 
 	// Check status code and log error response if needed
 	if err := m.client.checkStatusCodeWithBody(resp, bodyBytes); err != nil {
@@ -559,6 +560,7 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		if effectiveOptions != nil && effectiveOptions.Logger != nil {
 			logHTTPRequestWithObfuscation(effectiveOptions.Logger, req, chatReq)
 		}
+		m.client.emitRawRequest(req, body)
 
 		resp, err := m.client.httpClient.Do(req)
 		if err != nil {
@@ -566,6 +568,7 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			return
 		}
 		defer resp.Body.Close()
+		m.client.emitRawResponse(resp, nil)
 
 		// Log response headers before checking status (so errors are also logged)
 		logVerboseStreamResponseHeaders(resp, effectiveOptions != nil && effectiveOptions.Verbose)
@@ -594,6 +597,7 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			}
 
 			line := scanner.Text()
+			m.client.emitRawStreamChunk(line)
 
 			// Print raw line in verbose mode
 			if effectiveOptions != nil && effectiveOptions.Verbose {
