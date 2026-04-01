@@ -6,10 +6,12 @@ Package `pkg/presenter` connects core session/system behavior to UI interfaces. 
 
 * `app_presenter.go` - App-level presenter for session lifecycle actions
 * `chat_presenter.go` - Chat presenter bridging session events to UI updates
+* `testfixture/fixture.go` - Presenter test fixture with helper methods
 
 ## Important public API objects
 
 * `AppPresenter` - App-level presenter implementing ui.IAppPresenter
 * `NewAppPresenter` - Creates AppPresenter with system and defaults
-* `ChatPresenter` - Chat presenter implementing ui.IChatPresenter
+* `ChatPresenter` - Chat presenter implementing ui.IChatPresenter and core.SessionThreadOutput
 * `NewChatPresenter` - Creates ChatPresenter for a session thread
+* `PresenterFixture` - Shared setup for presenter integration tests (in testfixture subpackage)

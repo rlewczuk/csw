@@ -17,9 +17,9 @@ Package `pkg/ui` contains frontend-agnostic UI contracts and view models for pre
 * `IChatView` - Interface for rendering chat conversation
 * `IChatPresenter` - Interface for propagating user input to chat
 * `CompositeWidget` - Interface for composable widgets
-* `MessageType` - Type for user-facing status messages
-* `ToolStatusUI` - Represents status of a tool call
-* `ChatRoleUI` - Represents message sender role
+* `MessageType` - Type for user-facing status messages (info, warning, error)
+* `ToolStatusUI` - Enum for tool call status (started, executing, succeeded, failed)
+* `ChatRoleUI` - Enum for message sender role (assistant, user)
 * `ToolUI` - State of a tool call for UI rendering
 * `ChatMessageUI` - Chat message for UI rendering
 * `ChatSessionUI` - Chat session for UI rendering

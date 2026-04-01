@@ -14,6 +14,7 @@ Package `pkg/tool` is the agent tool execution layer. It defines the common tool
 * `subagent.go` - Subagent task delegation tool
 * `skill.go` - Skill loading from .agents/skills
 * `web_fetch.go` - Web content fetching tool
+* `hook_feedback.go` - Hook feedback tool for subagent sessions
 * `vfs_read.go` - File read with offset/limit
 * `vfs_write.go` - File write with LSP validation
 * `vfs_edit.go` - String replacement edit tool
@@ -34,12 +35,14 @@ Package `pkg/tool` is the agent tool execution layer. It defines the common tool
 * `ToolInfo` - Tool metadata and schema
 * `ToolSchema` - JSON Schema for tool arguments
 * `PropertySchema` - Schema for single property
-* `SchemaType` - JSON Schema type constants
+* `SchemaType` - JSON Schema type constants (`string`, `number`, `integer`, `boolean`, `array`, `object`)
 * `ToolRegistry` - Tool registration and lookup
 * `AccessControlTool` - Permission wrapper for tools
 * `ToolPermissionsQuery` - User permission request
 * `LoggerSetter` - Interface for logger injection
+* `RoleRestrictedTool` - Interface for role-restricted tools
 * `RunBashTool` - Bash execution implementation
+* `RunCommandError` - Permission error for command execution
 * `TodoWriteTool` - Todo list update tool
 * `TodoReadTool` - Todo list retrieval tool
 * `TodoItem` - Single todo task representation
@@ -48,6 +51,10 @@ Package `pkg/tool` is the agent tool execution layer. It defines the common tool
 * `SubAgentExecutor` - Interface for subagent execution
 * `SubAgentTaskRequest` - Subagent task input
 * `SubAgentTaskResult` - Subagent task output
+* `HookFeedbackTool` - Hook feedback execution tool
+* `HookFeedbackExecutor` - Interface for hook feedback handling
+* `HookFeedbackRequest` - Hook feedback message payload
+* `HookFeedbackResponse` - Hook feedback result
 * `SkillTool` - Skill loading tool
 * `WebFetchTool` - Web fetching tool
 * `VFSReadTool` - File read tool
@@ -60,12 +67,12 @@ Package `pkg/tool` is the agent tool execution layer. It defines the common tool
 * `VFSFindTool` - File find tool
 * `VFSGrepTool` - Content search tool
 * `CustomCommandTool` - User-defined custom tool
-* `RoleRestrictedTool` - Role-based tool restriction
 * `NewToolRegistry()` - Creates tool registry
 * `NewToolValue()` - Creates tool value
 * `NewToolSchema()` - Creates tool schema
 * `NewPermissionQuery()` - Creates permission query
 * `NewVFSPermissionQuery()` - Creates VFS permission query
+* `NewHookFeedbackTool()` - Creates hook feedback tool
 * `RegisterVFSTools()` - Registers all VFS tools
 * `RegisterRunBashTool()` - Registers bash tool
 * `RegisterWebFetchTool()` - Registers web fetch tool

@@ -4,7 +4,7 @@ Package `pkg/conf` defines the configuration domain for CSW and the config-store
 
 ## Important files
 
-* `conf.go` - Core public configuration API and interfaces
+* `conf.go` - Core configuration types and interfaces
 * `merge.go` - Config merge and clone operations
 
 ## Important public API objects
@@ -17,10 +17,15 @@ Package `pkg/conf` defines the configuration domain for CSW and the config-store
 * `ToolSelectionConfig` - Tool availability rules across model tags
 * `ContainerConfig` - Default container execution settings
 * `CLIDefaultsConfig` - Default values for CLI command flags
-* `AccessFlag` - Access control flag type (auto/allow/deny/ask)
-* `AuthMode` - Authentication mode for model providers
-* `ModelTagMapping` - Model-to-tag mapping rule
+* `MCPServerConfig` - MCP server configuration
+* `HookConfig` - Hook extension point binding configuration
 * `FileAccess` - File access permissions struct
+* `ModelTagMapping` - Model-to-tag mapping rule
 * `ModelProviderCost` - Token pricing for context tier
 * `ModelProviderModalities` - Model input/output modalities
 * `ModelVendorFamilyTemplateOverride` - Vendor and family template overrides
+* `AccessFlag` - Access control flag type (auto/allow/deny/ask)
+* `AuthMode` - Authentication mode for model providers (none/api_key/oauth2)
+* `MCPTransportType` - MCP server transport type (stdio/http/https)
+* `HookType` - Hook execution backend type (shell/llm/subagent)
+* `HookRunOn` - Shell hook execution target (host/sandbox)

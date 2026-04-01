@@ -15,6 +15,9 @@ Package `pkg/models` is the model/provider abstraction layer for chat and embedd
 * `config_updater.go` - Config persistence callback for providers
 * `mock.go` - Test doubles for provider/chat/embedding
 * `unstreaming_chat_model.go` - Wrapper for non-streaming chat
+* `fallback.go` - Multi-model fallback wrapper
+* `retry.go` - Retry wrapper with exponential backoff
+* `model_chain_factory.go` - Provider/model chain parser and factory
 * `anthropic_client.go` - Anthropic API client implementation
 * `anthropic_dto.go` - Anthropic API DTO types
 * `openai_client.go` - OpenAI-compatible API client
@@ -37,12 +40,18 @@ Package `pkg/models` is the model/provider abstraction layer for chat and embedd
 * `ChatMessagePart` - Part of a message (text, tool call, response)
 * `ChatOptions` - Options for chat requests (temperature, etc.)
 * `TokenUsage` - Token accounting from LLM responses
-* `ChatRole` - Role constants (user, assistant, system, developer)
+* `ChatRole` - Role constants: `ChatRoleAssistant`, `ChatRoleDeveloper`, `ChatRoleSystem`, `ChatRoleUser`
 * `ModelInfo` - Information about available models
+* `ModelType` - Model type enum: `ModelTypeChat`, `ModelTypeEmbed`
 * `ConfigUpdater` - Callback for persisting config changes
 * `LLMRequestError` - Error type with raw HTTP response
 * `RateLimitError` - Rate limit error with retry info
 * `NetworkError` - Retryable network error wrapper
+* `APIRequestError` - Structured API request validation error
+* `RetryPolicy` - Controls retry behavior for LLM errors
+* `RetryChatModel` - Wrapper adding retry logic to chat models
+* `FallbackChatModel` - Multi-model fallback wrapper
+* `UnstreamingChatModel` - Wrapper for sync chat over streaming models
 * `OpenAIClient` - OpenAI-compatible provider client
 * `AnthropicClient` - Anthropic API provider client
 * `OllamaClient` - Ollama API provider client
@@ -55,4 +64,11 @@ Package `pkg/models` is the model/provider abstraction layer for chat and embedd
 * `NewToolCallMessage` - Creates message with tool calls
 * `NewToolResponseMessage` - Creates message with tool responses
 * `NewUnstreamingChatModel` - Wraps streaming model for sync use
+* `NewRetryChatModel` - Wraps chat model with retry logic
+* `NewFallbackChatModel` - Creates fallback wrapper for multiple models
+* `NewChatModelFromProviderChain` - Creates chat model from provider chain spec
 * `NewMockProvider` - Creates mock provider for testing
+* `DefaultRetryPolicy` - Returns default retry policy configuration
+* `IsRetryableError` - Checks if error is retryable
+* `IsOAuth2Provider` - Checks if provider uses OAuth2
+* `ExtractJWTExpiry` - Extracts expiry from JWT token

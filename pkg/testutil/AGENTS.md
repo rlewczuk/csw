@@ -7,6 +7,7 @@ Package `pkg/testutil` provides reusable test doubles and fixtures used by integ
 * `integ.go` - integration test configuration helpers
 * `llm_mock.go` - mock HTTP server for testing REST endpoints
 * `soh_mock.go` - mock session output handler for tests
+* `soh_mock_test.go` - tests for mock session output handler
 
 ## Important public API objects
 

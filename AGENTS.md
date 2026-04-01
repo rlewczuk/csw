@@ -46,6 +46,36 @@ Other rules:
 - When generating summary after performing a task, DO NOT save it to file, just put it in chat.
 - this is big project, to not list all existing files, always use scoped search and use hints from `AGENTS.md` files across project;
 
+## Packages Overview
+
+* `cmd/csw` - Main CLI application with Cobra commands and session execution
+* `pkg/apis` - Core VFS and VCS abstraction interfaces
+* `pkg/commands` - Slash command parsing and template expansion
+* `pkg/conf` - Configuration domain and config-store abstractions
+* `pkg/conf/impl` - Configuration store implementations (local, embedded, composite, mock)
+* `pkg/core` - Runtime orchestration layer for agent sessions
+* `pkg/core/testfixture` - Core integration test fixtures for SweSystem
+* `pkg/logging` - Structured logging infrastructure for events and session logs
+* `pkg/lsp` - Language Server Protocol integration layer
+* `pkg/mcp` - MCP client for external MCP servers via stdio/HTTP
+* `pkg/models` - Model/provider abstraction layer for chat and embedding backends
+* `pkg/presenter` - Presenter layer connecting core to UI interfaces
+* `pkg/presenter/testfixture` - Presenter integration test fixtures
+* `pkg/runner` - Command execution abstractions for bash and containers
+* `pkg/shared` - Cross-cutting utilities (file copy, UUIDv7, HTML to Markdown)
+* `pkg/shared/godown` - HTML to Markdown converter with customizable options
+* `pkg/system` - Core system orchestration for sessions, models, tools
+* `pkg/testutil` - Reusable test doubles and fixtures for integration tests
+* `pkg/testutil/cfg` - Integration test configuration helpers
+* `pkg/testutil/fixture` - Project path utilities and temp directory helpers
+* `pkg/tool` - Agent tool execution layer with registry and concrete tools
+* `pkg/ui` - Frontend-agnostic UI contracts and view models
+* `pkg/ui/cli` - CLI implementations of UI interfaces for terminal interaction
+* `pkg/ui/cli/testfixture` - CLI integration test fixtures
+* `pkg/ui/mock` - Mock implementations of UI interfaces for testing
+* `pkg/vcs` - VCS interface implementations for git and null/no-op
+* `pkg/vfs` - Filesystem and VCS abstractions with local/git implementations
+
 ## Code Organization
 
 - `cmd/csw` - Main CLI application with Cobra commands, CLI session execution, configuration management, and worktree cleanup functionality.
@@ -70,4 +100,5 @@ Other rules:
 - `pkg/ui/cli` - CLI implementations of UI interfaces for terminal-based interaction.
 - `pkg/ui/cli/testfixture` - CLI integration test fixtures for setting up test environments.
 - `pkg/ui/mock` - Mock implementations of UI interfaces for testing purposes.
+- `pkg/vcs` - VCS interface implementations for git repositories and null/no-op version control.
 - `pkg/vfs` - Filesystem and VCS abstractions with local/git implementations, access control, search/filter, patching, and mocks.

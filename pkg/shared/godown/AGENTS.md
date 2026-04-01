@@ -5,6 +5,7 @@ Package `pkg/shared/godown` contains HTML to Markdown converter with customizabl
 ## Important files
 
 * `godown.go` - HTML to Markdown conversion logic
+* `godown_test.go` - Unit tests for conversion functionality
 
 ## Important public API objects
 
@@ -13,4 +14,10 @@ Package `pkg/shared/godown` contains HTML to Markdown converter with customizabl
 * `Option` - Configuration options for conversion
 * `CustomRule` - Interface for custom HTML element handlers
 * `WalkFunc` - Function signature for HTML node traversal
-* `Option.Clone` - Creates a copy of options
+* `Option.GuessLang` - Optional language detection function for code blocks
+* `Option.Script` - Include script tags in output (bool)
+* `Option.Style` - Include style tags in output (bool)
+* `Option.TrimSpace` - Trim whitespace from text nodes (bool)
+* `Option.CustomRules` - Custom HTML element handlers ([]CustomRule)
+* `Option.IgnoreComments` - Skip HTML comments in output (bool)
+* `Option.ItalicsAsterix` - Use * instead of _ for italics (bool)
