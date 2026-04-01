@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/apis"
-	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1148,7 +1147,6 @@ func TestMockVCS_ListWorktrees(t *testing.T) {
 
 // TestVCSInterfaceCompliance verifies that all VCS implementations implement the interface.
 func TestVCSInterfaceCompliance(t *testing.T) {
-	var _ apis.VCS = (*vcs.NullVCS)(nil)
 	var _ apis.VCS = (*MockVCS)(nil)
-	// Note: GitVCS requires a real git repository, so we can't easily test it here
+	// Note: NullVCS compliance is covered in pkg/vcs to avoid import cycles.
 }
