@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
@@ -43,6 +44,61 @@ func TestParseContainerMountSpec(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedHost, hostPath)
 			assert.Equal(t, tc.expectedMount, containerPath)
+		})
+	}
+}
+
+func TestBuildSystemParamsThinking(t *testing.T) {
+	params := BuildSystemParams{
+		Thinking: "high",
+	}
+	assert.Equal(t, "high", params.Thinking)
+}
+
+func TestBuildSystemParamsMaxToolThreads(t *testing.T) {
+	params := BuildSystemParams{
+		MaxToolThreads: 9,
+	}
+	assert.Equal(t, 9, params.MaxToolThreads)
+}
+
+func TestKimiTagResolution(t *testing.T) {
+	store, err := confimpl.NewEmbeddedConfigStore()
+	require.NoError(t, err)
+
+	providerRegistry := models.NewProviderRegistry(store)
+
+	registry, err := CreateModelTagRegistry(store, providerRegistry)
+	require.NoError(t, err)
+
+	tests := []struct {
+		modelName     string
+		expectedTag   string
+		shouldContain bool
+	}{
+		{modelName: "kimi/kimi-for-coding", expectedTag: "kimi", shouldContain: true},
+		{modelName: "kimi/moonshot-v1-8k", expectedTag: "kimi", shouldContain: true},
+		{modelName: "openai/gpt-4", expectedTag: "openai", shouldContain: true},
+		{modelName: "anthropic/claude-3-opus", expectedTag: "anthropic", shouldContain: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.modelName, func(t *testing.T) {
+			var provider, model string
+			parts := strings.Split(tc.modelName, "/")
+			if len(parts) == 2 {
+				provider = parts[0]
+				model = parts[1]
+			} else {
+				model = tc.modelName
+			}
+
+			tags := registry.GetTagsForModel(provider, model)
+			if tc.shouldContain {
+				assert.Contains(t, tags, tc.expectedTag, "Model %s (provider=%s, model=%s) should have tag %s. Got: %v", tc.modelName, provider, model, tc.expectedTag, tags)
+			} else {
+				assert.NotContains(t, tags, tc.expectedTag, "Model %s should NOT have tag %s", tc.modelName, tc.expectedTag)
+			}
 		})
 	}
 }

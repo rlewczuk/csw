@@ -1,4 +1,4 @@
-package main
+package system
 
 import (
 	"errors"
@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/core"
-	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,26 +48,26 @@ func TestEmitSessionSummary(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			originalSaveSummary := system.SaveSessionSummaryMarkdownFunc
-			originalSaveSummaryJSON := system.SaveSessionSummaryJSONFunc
+			originalSaveSummary := SaveSessionSummaryMarkdownFunc
+			originalSaveSummaryJSON := SaveSessionSummaryJSONFunc
 			t.Cleanup(func() {
-				system.SaveSessionSummaryMarkdownFunc = originalSaveSummary
-				system.SaveSessionSummaryJSONFunc = originalSaveSummaryJSON
+				SaveSessionSummaryMarkdownFunc = originalSaveSummary
+				SaveSessionSummaryJSONFunc = originalSaveSummaryJSON
 			})
 
-			system.SaveSessionSummaryMarkdownFunc = func(logsDir string, session *core.SweSession, sessionInfo string) error {
+			SaveSessionSummaryMarkdownFunc = func(logsDir string, session *core.SweSession, sessionInfo string) error {
 				return tc.saveErr
 			}
-			system.SaveSessionSummaryJSONFunc = func(logsDir string, session *core.SweSession, buildResult system.BuildSystemResult, startTime time.Time, endTime time.Time, baseCommitID string, headCommitID string) error {
+			SaveSessionSummaryJSONFunc = func(logsDir string, session *core.SweSession, buildResult BuildSystemResult, startTime time.Time, endTime time.Time, baseCommitID string, headCommitID string) error {
 				return nil
 			}
 
 			view := &summaryCaptureAppView{}
-			err := system.EmitSessionSummary(
+			err := EmitSessionSummary(
 				time.Now().Add(-5*time.Second),
 				time.Now(),
 				nil,
-				system.BuildSystemResult{LogsDir: "any"},
+				BuildSystemResult{LogsDir: "any"},
 				view.ShowMessage,
 				tc.sessionRunErr,
 				"",
@@ -92,6 +91,28 @@ func TestEmitSessionSummary(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuildSessionSummaryMessage(t *testing.T) {
+	t.Run("includes token and context stats", func(t *testing.T) {
+		session := &core.SweSession{}
+		summary := BuildSessionSummaryMessage(5*time.Second, session, BuildSystemResult{})
+		assert.Contains(t, summary, "Session completed in 5s | tokens(input=0[cached=0,noncached=0], output=0, total=0) | context=0")
+		assert.Contains(t, summary, "Model: -")
+		assert.Contains(t, summary, "Thinking: -")
+		assert.Contains(t, summary, "LSP server: -")
+		assert.Contains(t, summary, "Container image: -")
+		assert.Contains(t, summary, "Roles used: -")
+		assert.Contains(t, summary, "Tools used: -")
+		assert.Contains(t, summary, "Edited files:\n-")
+	})
+
+	t.Run("nil session returns base summary", func(t *testing.T) {
+		assert.Equal(t,
+			"Session completed in 5s",
+			BuildSessionSummaryMessage(5*time.Second, nil, BuildSystemResult{}),
+		)
+	})
 }
 
 type summaryCaptureAppView struct {

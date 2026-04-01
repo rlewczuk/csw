@@ -436,6 +436,34 @@ func TestConfPromptGenerator_GetPrompt_Ordering(t *testing.T) {
 	assert.NotContains(t, prompt, "Bash Tool Instructions")
 }
 
+func TestSystemPromptGenerationForKimi(t *testing.T) {
+	store, err := confimpl.NewEmbeddedConfigStore()
+	require.NoError(t, err)
+
+	vfsInstance := vfs.NewMockVFS()
+
+	generator, err := NewConfPromptGenerator(store, vfsInstance)
+	require.NoError(t, err)
+
+	tags := []string{"kimi"}
+
+	roleConfigs, err := store.GetAgentRoleConfigs()
+	require.NoError(t, err)
+	developerRole := roleConfigs["developer"]
+
+	state := AgentState{
+		Info: AgentStateCommonInfo{
+			AgentName: "Kimi",
+		},
+	}
+
+	prompt, err := generator.GetPrompt(tags, developerRole, &state)
+	require.NoError(t, err)
+
+	assert.Contains(t, prompt, "interactive general AI agent")
+	assert.NotContains(t, prompt, "an interactive CLI tool")
+}
+
 func TestConfPromptGenerator_GetPrompt_ToolsFiltering(t *testing.T) {
 	// Create mock store with fragments
 	mockStore := newMockConfigStoreWithFragments()

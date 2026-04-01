@@ -3,10 +3,7 @@ package main
 import (
 	"bytes"
 	"testing"
-	"time"
 
-	"github.com/rlewczuk/csw/pkg/core"
-	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/spf13/cobra"
@@ -131,59 +128,6 @@ func TestThinkingModeValidation(t *testing.T) {
 			assert.Equal(t, tt.expectValid, true)
 		})
 	}
-}
-
-// TestBuildSystemParamsThinking tests that BuildSystemParams includes Thinking field
-func TestBuildSystemParamsThinking(t *testing.T) {
-	params := system.BuildSystemParams{
-		Thinking: "high",
-	}
-	assert.Equal(t, "high", params.Thinking)
-}
-
-func TestBuildSystemParamsMaxToolThreads(t *testing.T) {
-	params := system.BuildSystemParams{
-		MaxToolThreads: 9,
-	}
-	assert.Equal(t, 9, params.MaxToolThreads)
-}
-
-// TestChatOptionsThinkingField tests that ChatOptions has the Thinking field
-func TestChatOptionsThinkingField(t *testing.T) {
-	opts := &models.ChatOptions{
-		Thinking: "high",
-	}
-	assert.Equal(t, "high", opts.Thinking)
-
-	opts2 := &models.ChatOptions{
-		Thinking: "true",
-	}
-	assert.Equal(t, "true", opts2.Thinking)
-
-	opts3 := &models.ChatOptions{}
-	assert.Equal(t, "", opts3.Thinking)
-}
-
-func TestBuildSessionSummaryMessage(t *testing.T) {
-	t.Run("includes token and context stats", func(t *testing.T) {
-		session := &core.SweSession{}
-		summary := system.BuildSessionSummaryMessage(5*time.Second, session, system.BuildSystemResult{})
-		assert.Contains(t, summary, "Session completed in 5s | tokens(input=0[cached=0,noncached=0], output=0, total=0) | context=0")
-		assert.Contains(t, summary, "Model: -")
-		assert.Contains(t, summary, "Thinking: -")
-		assert.Contains(t, summary, "LSP server: -")
-		assert.Contains(t, summary, "Container image: -")
-		assert.Contains(t, summary, "Roles used: -")
-		assert.Contains(t, summary, "Tools used: -")
-		assert.Contains(t, summary, "Edited files:\n-")
-	})
-
-	t.Run("nil session returns base summary", func(t *testing.T) {
-		assert.Equal(t,
-			"Session completed in 5s",
-			system.BuildSessionSummaryMessage(5*time.Second, nil, system.BuildSystemResult{}),
-		)
-	})
 }
 
 func TestBuildContainerStartupInfoMessage(t *testing.T) {

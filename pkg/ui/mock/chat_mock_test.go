@@ -5,7 +5,89 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/ui"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// TestMockChatViewAutoPermissionResponse tests the MockChatView's automatic permission response functionality.
+func TestMockChatViewAutoPermissionResponse(t *testing.T) {
+	tests := []struct {
+		name             string
+		autoResponse     string
+		options          []string
+		expectedResponse string
+	}{
+		{
+			name:             "Auto deny selects Deny option",
+			autoResponse:     "Deny",
+			options:          []string{"Allow", "Ask", "Deny"},
+			expectedResponse: "Deny",
+		},
+		{
+			name:             "Auto deny falls back to last option",
+			autoResponse:     "Deny",
+			options:          []string{"Allow", "Ask", "Reject"},
+			expectedResponse: "Reject",
+		},
+		{
+			name:             "Auto accept selects first option",
+			autoResponse:     "Accept",
+			options:          []string{"Allow", "Ask", "Deny"},
+			expectedResponse: "Allow",
+		},
+		{
+			name:             "Custom response",
+			autoResponse:     "CustomAnswer",
+			options:          []string{"Option1", "Option2"},
+			expectedResponse: "CustomAnswer",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockPresenter := NewMockChatPresenter()
+
+			mockView := NewMockChatView()
+			mockView.AutoPermissionResponse = tc.autoResponse
+			mockView.Presenter = mockPresenter
+
+			query := &ui.PermissionQueryUI{
+				Id:      "test-query-1",
+				Title:   "Test Permission",
+				Details: "Test details",
+				Options: tc.options,
+			}
+
+			err := mockView.QueryPermission(query)
+			require.NoError(t, err)
+
+			assert.Equal(t, 1, len(mockView.QueryPermissionCalls), "Query should have been recorded")
+			assert.Equal(t, 1, len(mockPresenter.PermissionResponseCalls), "Permission response should have been sent")
+			assert.Equal(t, tc.expectedResponse, mockPresenter.PermissionResponseCalls[0], "Response should match expected")
+		})
+	}
+}
+
+// TestMockChatViewNoAutoResponse tests that MockChatView without auto-response just records the query.
+func TestMockChatViewNoAutoResponse(t *testing.T) {
+	mockPresenter := NewMockChatPresenter()
+
+	mockView := NewMockChatView()
+	mockView.Presenter = mockPresenter
+
+	query := &ui.PermissionQueryUI{
+		Id:      "test-query-1",
+		Title:   "Test Permission",
+		Details: "Test details",
+		Options: []string{"Allow", "Deny"},
+	}
+
+	err := mockView.QueryPermission(query)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, len(mockView.QueryPermissionCalls), "Query should have been recorded")
+	assert.Equal(t, 0, len(mockPresenter.PermissionResponseCalls), "No permission response should have been sent without auto-response")
+}
 
 func TestMockChatView_Init(t *testing.T) {
 	view := NewMockChatView()
