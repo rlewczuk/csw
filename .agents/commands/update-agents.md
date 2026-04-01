@@ -1,6 +1,6 @@
 ---
-name: agents-update
 description: Update AGENTS.md files across project
+agent: build
 ---
 
 Analyze all packagfes of this project (`pkg/*`, `cmd/*`) and generate/update package-level `AGENTS.md` files with information for future agent operation:
