@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -193,7 +194,7 @@ func TestListWorktrees(t *testing.T) {
 // TestNullVCS_ListWorktrees tests that NullVCS returns empty list.
 func TestNullVCS_ListWorktrees(t *testing.T) {
 	mockVFS := vfs.NewMockVFS()
-	nullVCS, err := vfs.NewNullVFS(mockVFS)
+	nullVCS, err := vcs.NewNullVFS(mockVFS)
 	require.NoError(t, err)
 
 	worktrees, err := nullVCS.ListWorktrees()

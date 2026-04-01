@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/lsp"
-	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // DiagnosticWithURI wraps a diagnostic with its file URI for proper grouping.
@@ -197,7 +197,7 @@ func formatLineNumber(num int64) string {
 // makeRelativePath converts an absolute path to a path relative to the VFS worktree root.
 // If the path is already relative, cannot be made relative, or is outside the worktree,
 // it returns the original path.
-func makeRelativePath(path string, v vfs.VFS) string {
+func makeRelativePath(path string, v apis.VFS) string {
 	if v == nil {
 		return path
 	}

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/rlewczuk/csw/pkg/apis"
 )
 
 // fileEntry represents a file or directory in the mock filesystem.
@@ -32,7 +34,7 @@ func (m *MockVFS) WorktreePath() string {
 	return "/path/to/worktree"
 }
 
-func (m *MockVFS) GetRepo() VCS {
+func (m *MockVFS) GetRepo() apis.VCS {
 	return nil // TODO to be implemented
 }
 
@@ -57,13 +59,13 @@ func NewMockVFSFromDir(dir string) (*MockVFS, error) {
 	info, err := os.Stat(absDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("NewMockVFSFromDir() [mock.go]: %w", ErrFileNotFound)
+			return nil, fmt.Errorf("NewMockVFSFromDir() [mock.go]: %w", apis.ErrFileNotFound)
 		}
 		return nil, err
 	}
 
 	if !info.IsDir() {
-		return nil, fmt.Errorf("NewMockVFSFromDir() [mock.go]: %w", ErrNotADir)
+		return nil, fmt.Errorf("NewMockVFSFromDir() [mock.go]: %w", apis.ErrNotADir)
 	}
 
 	mock := NewMockVFS()
@@ -113,7 +115,7 @@ func NewMockVFSFromDir(dir string) (*MockVFS, error) {
 // It returns the cleaned path if valid.
 func (m *MockVFS) validatePath(path string) (string, error) {
 	if path == "" {
-		return "", fmt.Errorf("MockVFS.validatePath() [mock.go]: %w", ErrInvalidPath)
+		return "", fmt.Errorf("MockVFS.validatePath() [mock.go]: %w", apis.ErrInvalidPath)
 	}
 
 	// Clean the path to remove any .. or . components
@@ -121,12 +123,12 @@ func (m *MockVFS) validatePath(path string) (string, error) {
 
 	// Prevent absolute paths or paths that try to escape
 	if filepath.IsAbs(cleanPath) {
-		return "", fmt.Errorf("MockVFS.validatePath() [mock.go]: %w", ErrPermissionDenied)
+		return "", fmt.Errorf("MockVFS.validatePath() [mock.go]: %w", apis.ErrPermissionDenied)
 	}
 
 	// Check for path traversal attempts
 	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, string(filepath.Separator)+"..") {
-		return "", fmt.Errorf("MockVFS.validatePath() [mock.go]: %w", ErrPermissionDenied)
+		return "", fmt.Errorf("MockVFS.validatePath() [mock.go]: %w", apis.ErrPermissionDenied)
 	}
 
 	return cleanPath, nil
@@ -148,12 +150,12 @@ func (m *MockVFS) getEntry(path string) (*fileEntry, error) {
 		}
 
 		if !current.isDir {
-			return nil, fmt.Errorf("MockVFS.getEntry() [mock.go]: %w", ErrNotADir)
+			return nil, fmt.Errorf("MockVFS.getEntry() [mock.go]: %w", apis.ErrNotADir)
 		}
 
 		next, exists := current.children[part]
 		if !exists {
-			return nil, fmt.Errorf("MockVFS.getEntry() [mock.go]: %w", ErrFileNotFound)
+			return nil, fmt.Errorf("MockVFS.getEntry() [mock.go]: %w", apis.ErrFileNotFound)
 		}
 
 		current = next
@@ -177,7 +179,7 @@ func (m *MockVFS) createDir(path string) error {
 		}
 
 		if !current.isDir {
-			return fmt.Errorf("MockVFS.createDir() [mock.go]: %w", ErrNotADir)
+			return fmt.Errorf("MockVFS.createDir() [mock.go]: %w", apis.ErrNotADir)
 		}
 
 		next, exists := current.children[part]
@@ -188,7 +190,7 @@ func (m *MockVFS) createDir(path string) error {
 			}
 			current.children[part] = next
 		} else if !next.isDir {
-			return fmt.Errorf("MockVFS.createDir() [mock.go]: %w", ErrNotADir)
+			return fmt.Errorf("MockVFS.createDir() [mock.go]: %w", apis.ErrNotADir)
 		}
 
 		current = next
@@ -213,7 +215,7 @@ func (m *MockVFS) ReadFile(path string) ([]byte, error) {
 	}
 
 	if entry.isDir {
-		return nil, fmt.Errorf("MockVFS.ReadFile() [mock.go]: %w", ErrNotAFile)
+		return nil, fmt.Errorf("MockVFS.ReadFile() [mock.go]: %w", apis.ErrNotAFile)
 	}
 
 	// Return a copy to prevent external modification
@@ -257,7 +259,7 @@ func (m *MockVFS) WriteFile(path string, content []byte) error {
 	}
 
 	if !parent.isDir {
-		return fmt.Errorf("MockVFS.WriteFile() [mock.go]: %w", ErrNotADir)
+		return fmt.Errorf("MockVFS.WriteFile() [mock.go]: %w", apis.ErrNotADir)
 	}
 
 	// Create or update the file
@@ -292,7 +294,7 @@ func (m *MockVFS) DeleteFile(path string, recursive bool, force bool) error {
 
 	// If it's a directory and recursive is false, return error
 	if entry.isDir && !recursive {
-		return fmt.Errorf("MockVFS.DeleteFile() [mock.go]: %w", ErrNotAFile)
+		return fmt.Errorf("MockVFS.DeleteFile() [mock.go]: %w", apis.ErrNotAFile)
 	}
 
 	// Navigate to parent and remove the entry
@@ -332,7 +334,7 @@ func (m *MockVFS) ListFiles(path string, recursive bool) ([]string, error) {
 	}
 
 	if !entry.isDir {
-		return nil, fmt.Errorf("MockVFS.ListFiles() [mock.go]: %w", ErrNotADir)
+		return nil, fmt.Errorf("MockVFS.ListFiles() [mock.go]: %w", apis.ErrNotADir)
 	}
 
 	var result []string
@@ -382,7 +384,7 @@ func (m *MockVFS) ListFiles(path string, recursive bool) ([]string, error) {
 // Returns paths relative to the VFS root.
 func (m *MockVFS) FindFiles(query string, recursive bool) ([]string, error) {
 	if query == "" {
-		return nil, fmt.Errorf("MockVFS.FindFiles() [mock.go]: %w", ErrInvalidPath)
+		return nil, fmt.Errorf("MockVFS.FindFiles() [mock.go]: %w", apis.ErrInvalidPath)
 	}
 
 	m.mutex.RLock()
@@ -465,11 +467,11 @@ func (m *MockVFS) MoveFile(src, dst string) error {
 	// Check if destination already exists
 	_, err = m.getEntry(cleanDst)
 	if err == nil {
-		return fmt.Errorf("MockVFS.MoveFile() [mock.go]: %w", ErrFileExists)
+		return fmt.Errorf("MockVFS.MoveFile() [mock.go]: %w", apis.ErrFileExists)
 	}
 	// Check if error is something other than file not found (which we expect when the destination doesn't exist yet)
 	// We use errors.Is since we wrapped the error with %w
-	if !errors.Is(err, ErrFileNotFound) {
+	if !errors.Is(err, apis.ErrFileNotFound) {
 		return err
 	}
 
@@ -533,7 +535,7 @@ type MockVCSMergeCall struct {
 // MockVCS is a lightweight VCS test double backed by MockVFS.
 type MockVCS struct {
 	mutex       sync.RWMutex
-	worktrees   map[string]VFS
+	worktrees   map[string]apis.VFS
 	commitCalls []MockVCSCommitCall
 	dropCalls   []string
 	mergeCalls  []MockVCSMergeCall
@@ -545,13 +547,13 @@ type MockVCS struct {
 }
 
 // NewMockVCS creates a new MockVCS with an optional base VFS.
-func NewMockVCS(base VFS) *MockVCS {
+func NewMockVCS(base apis.VFS) *MockVCS {
 	if base == nil {
 		base = NewMockVFS()
 	}
 
 	return &MockVCS{
-		worktrees: map[string]VFS{"": base},
+		worktrees: map[string]apis.VFS{"": base},
 	}
 }
 
@@ -620,7 +622,7 @@ func (m *MockVCS) GetDeleteCalls() []string {
 }
 
 // GetWorktree returns a worktree VFS for the provided branch.
-func (m *MockVCS) GetWorktree(branch string) (VFS, error) {
+func (m *MockVCS) GetWorktree(branch string) (apis.VFS, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	v, ok := m.worktrees[branch]

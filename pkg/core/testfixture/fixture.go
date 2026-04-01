@@ -4,6 +4,7 @@ package testfixture
 import (
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/logging"
@@ -49,7 +50,7 @@ func (g *StaticPromptGenerator) GetAgentFiles(dir string) (map[string]string, er
 type SweSystemFixture struct {
 	Server *testutil.MockHTTPServer
 	Client models.ModelProvider
-	VFS    vfs.VFS
+	VFS    apis.VFS
 	Tools  *tool.ToolRegistry
 	System *system.SweSystem
 }
@@ -63,7 +64,7 @@ type SweSystemFixtureConfig struct {
 	ModelProvider    models.ModelProvider
 	ModelProviders   map[string]models.ModelProvider
 	PromptGenerator  core.PromptGenerator
-	VFS              vfs.VFS
+	VFS              apis.VFS
 	Tools            *tool.ToolRegistry
 	WorkDir          string
 	SessionLogger    system.SessionLoggerFactory
@@ -161,7 +162,7 @@ func WithPromptGenerator(generator core.PromptGenerator) SweSystemFixtureOption 
 }
 
 // WithVFS sets a custom VFS implementation.
-func WithVFS(vfsInstance vfs.VFS) SweSystemFixtureOption {
+func WithVFS(vfsInstance apis.VFS) SweSystemFixtureOption {
 	return func(config *SweSystemFixtureConfig) {
 		config.VFS = vfsInstance
 	}

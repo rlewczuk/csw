@@ -4,19 +4,21 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/rlewczuk/csw/pkg/apis"
 )
 
 // ShadowVFS routes configured paths to a shadow filesystem while keeping all other paths on base VFS.
 type ShadowVFS struct {
-	base      VFS
-	shadow    VFS
-	baseRoot  string
+	base       apis.VFS
+	shadow     apis.VFS
+	baseRoot   string
 	shadowRoot string
-	filter    GlobFilter
+	filter     GlobFilter
 }
 
 // NewShadowVFS creates a VFS wrapper that redirects matching paths to shadow VFS.
-func NewShadowVFS(base VFS, shadow VFS, shadowPatterns []string) (*ShadowVFS, error) {
+func NewShadowVFS(base apis.VFS, shadow apis.VFS, shadowPatterns []string) (*ShadowVFS, error) {
 	if base == nil {
 		return nil, fmt.Errorf("NewShadowVFS() [shadow.go]: base VFS cannot be nil")
 	}
@@ -146,7 +148,7 @@ func (s *ShadowVFS) MoveFile(src, dst string) error {
 	dstShadowed := s.isShadowed(dst)
 
 	if srcShadowed != dstShadowed {
-		return fmt.Errorf("ShadowVFS.MoveFile() [shadow.go]: %w", ErrPermissionDenied)
+		return fmt.Errorf("ShadowVFS.MoveFile() [shadow.go]: %w", apis.ErrPermissionDenied)
 	}
 
 	if srcShadowed {
@@ -157,7 +159,7 @@ func (s *ShadowVFS) MoveFile(src, dst string) error {
 }
 
 // GetRepo returns repository from base VFS.
-func (s *ShadowVFS) GetRepo() VCS {
+func (s *ShadowVFS) GetRepo() apis.VCS {
 	return s.base.GetRepo()
 }
 

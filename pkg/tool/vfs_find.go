@@ -3,6 +3,7 @@ package tool
 import (
 	"path/filepath"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
@@ -14,7 +15,7 @@ const (
 
 // VFSFindTool implements the vfsFind tool.
 type VFSFindTool struct {
-	vfs vfs.VFS
+	vfs apis.VFS
 }
 
 func (t *VFSFindTool) GetDescription() (string, bool) {
@@ -22,7 +23,7 @@ func (t *VFSFindTool) GetDescription() (string, bool) {
 }
 
 // NewVFSFindTool creates a new VFSFindTool instance.
-func NewVFSFindTool(v vfs.VFS) *VFSFindTool {
+func NewVFSFindTool(v apis.VFS) *VFSFindTool {
 	return &VFSFindTool{vfs: v}
 }
 
@@ -49,12 +50,12 @@ func (t *VFSFindTool) Execute(args *ToolCall) *ToolResponse {
 
 	if filepath.IsAbs(path) {
 		files, err = t.findFilesInPath(path, query, recursive)
-		if err == vfs.ErrAskPermission {
+		if err == apis.ErrAskPermission {
 			return NewVFSPermissionQuery(args, path, "finding files", "find")
 		}
 	} else {
 		files, err = t.vfs.FindFiles(query, recursive)
-		if err == vfs.ErrAskPermission {
+		if err == apis.ErrAskPermission {
 			return NewVFSPermissionQuery(args, query, "finding files", "find")
 		}
 	}

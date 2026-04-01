@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
@@ -80,7 +81,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 			worktreeBranch:     "feature/conflict",
 			merge:              true,
 			llmMessage:         "trigger conflict",
-			mergeErr:           vfs.ErrMergeConflict,
+			mergeErr:           apis.ErrMergeConflict,
 			expectCommit:       true,
 			expectMerge:        true,
 			expectDeleteBranch: false,
@@ -150,7 +151,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 			name:               "commit no changes error is tolerated and drops worktree",
 			worktreeBranch:     "feature/no-changes",
 			llmMessage:         "no changes msg",
-			commitErr:          vfs.ErrNoChangesToCommit,
+			commitErr:          apis.ErrNoChangesToCommit,
 			expectCommit:       true,
 			expectDropWorktree: true,
 			expectedMessage:    "[feature/no-changes] no changes msg",
@@ -255,10 +256,10 @@ func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
 	sandboxRunner.SetResponseDetailed("echo merge-hook /repo/.csw/conf/hooks/merge-custom", "merge ok\n", "", 0, nil)
 	hookEngine := core.NewHookEngine(configStore, hostRunner, sandboxRunner, sweSystem.ModelProviders)
 	hookEngine.MergeContext(map[string]string{
-		"branch":  "feature/hook",
-		"workdir": "/repo/work",
-		"rootdir": "/repo",
-		"status":  string(core.HookSessionStatusRunning),
+		"branch":      "feature/hook",
+		"workdir":     "/repo/work",
+		"rootdir":     "/repo",
+		"status":      string(core.HookSessionStatusRunning),
 		"user_prompt": "merge via hook",
 	})
 	appView := mock.NewMockAppView()

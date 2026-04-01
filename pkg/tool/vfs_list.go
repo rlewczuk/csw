@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // VFSListTool implements the vfsList tool.
 type VFSListTool struct {
-	vfs vfs.VFS
+	vfs apis.VFS
 }
 
 func (t *VFSListTool) GetDescription() (string, bool) {
@@ -17,7 +18,7 @@ func (t *VFSListTool) GetDescription() (string, bool) {
 }
 
 // NewVFSListTool creates a new VFSListTool instance.
-func NewVFSListTool(v vfs.VFS) *VFSListTool {
+func NewVFSListTool(v apis.VFS) *VFSListTool {
 	return &VFSListTool{vfs: v}
 }
 
@@ -53,7 +54,7 @@ func (t *VFSListTool) Execute(args *ToolCall) *ToolResponse {
 	}
 
 	files, err := t.vfs.ListFiles(path, recursive)
-	if err == vfs.ErrAskPermission {
+	if err == apis.ErrAskPermission {
 		return NewVFSPermissionQuery(args, path, "listing files", "list")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {

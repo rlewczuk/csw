@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/rlewczuk/csw/pkg/apis"
 )
 
 var (
@@ -21,11 +23,11 @@ type FilePatcher interface {
 
 // filePatcher implements the FilePatcher interface.
 type filePatcher struct {
-	vfs VFS
+	vfs apis.VFS
 }
 
 // NewFilePatcher creates a new FilePatcher instance.
-func NewFilePatcher(vfs VFS) FilePatcher {
+func NewFilePatcher(vfs apis.VFS) FilePatcher {
 	return &filePatcher{
 		vfs: vfs,
 	}
@@ -38,7 +40,7 @@ func (p *filePatcher) ApplyEdits(path string, oldString string, newString string
 	content, err := p.vfs.ReadFile(path)
 	if err != nil {
 		// Propagate permission errors and file not found errors without wrapping
-		if errors.Is(err, ErrFileNotFound) || errors.Is(err, ErrAskPermission) || errors.Is(err, ErrPermissionDenied) {
+		if errors.Is(err, apis.ErrFileNotFound) || errors.Is(err, apis.ErrAskPermission) || errors.Is(err, apis.ErrPermissionDenied) {
 			return "", err
 		}
 		// Check for PermissionError type
@@ -79,7 +81,7 @@ func (p *filePatcher) ApplyEdits(path string, oldString string, newString string
 	err = p.vfs.WriteFile(path, []byte(newContent))
 	if err != nil {
 		// Propagate permission errors without wrapping
-		if errors.Is(err, ErrAskPermission) || errors.Is(err, ErrPermissionDenied) {
+		if errors.Is(err, apis.ErrAskPermission) || errors.Is(err, apis.ErrPermissionDenied) {
 			return "", err
 		}
 		// Check for PermissionError type

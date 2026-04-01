@@ -3,12 +3,13 @@ package tool
 import (
 	"fmt"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // VFSDeleteTool implements the vfsDelete tool.
 type VFSDeleteTool struct {
-	vfs vfs.VFS
+	vfs apis.VFS
 }
 
 func (t *VFSDeleteTool) GetDescription() (string, bool) {
@@ -16,7 +17,7 @@ func (t *VFSDeleteTool) GetDescription() (string, bool) {
 }
 
 // NewVFSDeleteTool creates a new VFSDeleteTool instance.
-func NewVFSDeleteTool(v vfs.VFS) *VFSDeleteTool {
+func NewVFSDeleteTool(v apis.VFS) *VFSDeleteTool {
 	return &VFSDeleteTool{vfs: v}
 }
 
@@ -32,7 +33,7 @@ func (t *VFSDeleteTool) Execute(args *ToolCall) *ToolResponse {
 	}
 
 	err := t.vfs.DeleteFile(path, false, false)
-	if err == vfs.ErrAskPermission {
+	if err == apis.ErrAskPermission {
 		return NewVFSPermissionQuery(args, path, "deleting file", "delete")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {

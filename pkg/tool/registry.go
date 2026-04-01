@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/runner"
-	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // ToolRegistry implements a registry for tools that can be registered and retrieved by name.
@@ -28,7 +28,6 @@ type LoggerSetter interface {
 	// SetLogger assigns the logger instance used by the tool.
 	SetLogger(logger *slog.Logger)
 }
-
 
 // NewToolRegistry creates a new ToolRegistry instance.
 func NewToolRegistry() *ToolRegistry {
@@ -136,7 +135,7 @@ func (r *ToolRegistry) Execute(args *ToolCall) *ToolResponse {
 // Line numbers are enabled by default for the vfsRead tool.
 // lspClient is optional and can be nil.
 // logger is optional and can be nil.
-func RegisterVFSTools(registry *ToolRegistry, vfsImpl vfs.VFS, lspClient lsp.LSP, logger *slog.Logger) {
+func RegisterVFSTools(registry *ToolRegistry, vfsImpl apis.VFS, lspClient lsp.LSP, logger *slog.Logger) {
 	registry.Register("vfsRead", NewVFSReadTool(vfsImpl, true))
 
 	writeTool := NewVFSWriteTool(vfsImpl, lspClient)

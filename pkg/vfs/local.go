@@ -5,13 +5,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/rlewczuk/csw/pkg/apis"
 )
 
 // LocalVFS implements VFS interface for local filesystem operations.
 // It provides sandboxed access to files within a root directory.
 type LocalVFS struct {
 	root   string
-	repo   VCS
+	Repo   apis.VCS
 	filter GlobFilter
 	// allowedPaths contains additional absolute paths that are allowed for access
 	// outside of the root directory. Paths must be absolute and are matched using
@@ -27,8 +29,8 @@ func (l *LocalVFS) WorktreePath() string {
 	return l.root
 }
 
-func (l *LocalVFS) GetRepo() VCS {
-	return l.repo
+func (l *LocalVFS) GetRepo() apis.VCS {
+	return l.Repo
 }
 
 // NewLocalVFS creates a new LocalVFS instance rooted at the given directory.
@@ -47,13 +49,13 @@ func NewLocalVFS(root string, hidePatterns []string, allowedPaths []string) (*Lo
 	info, err := os.Stat(absRoot)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("NewLocalVFS() [local.go]: %w", ErrFileNotFound)
+			return nil, fmt.Errorf("NewLocalVFS() [local.go]: %w", apis.ErrFileNotFound)
 		}
 		return nil, err
 	}
 
 	if !info.IsDir() {
-		return nil, fmt.Errorf("NewLocalVFS() [local.go]: %w", ErrNotADir)
+		return nil, fmt.Errorf("NewLocalVFS() [local.go]: %w", apis.ErrNotADir)
 	}
 
 	// Create filter with defaultMatch=false (don't hide anything by default)
@@ -81,7 +83,7 @@ func NewLocalVFS(root string, hidePatterns []string, allowedPaths []string) (*Lo
 // It returns the absolute filesystem path if valid.
 func (l *LocalVFS) validatePath(path string) (string, error) {
 	if path == "" {
-		return "", fmt.Errorf("LocalVFS.validatePath() [local.go]: %w", ErrInvalidPath)
+		return "", fmt.Errorf("LocalVFS.validatePath() [local.go]: %w", apis.ErrInvalidPath)
 	}
 
 	if !filepath.IsAbs(path) {
@@ -106,7 +108,7 @@ func (l *LocalVFS) validatePath(path string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("LocalVFS.validatePath() [local.go]: %w", ErrPermissionDenied)
+	return "", fmt.Errorf("LocalVFS.validatePath() [local.go]: %w", apis.ErrPermissionDenied)
 }
 
 // ReadFile reads the content of the file located at the given path and returns its data as a byte slice.
@@ -119,10 +121,10 @@ func (l *LocalVFS) ReadFile(path string) ([]byte, error) {
 	data, err := os.ReadFile(absPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("LocalVFS.ReadFile() [local.go]: %w", ErrFileNotFound)
+			return nil, fmt.Errorf("LocalVFS.ReadFile() [local.go]: %w", apis.ErrFileNotFound)
 		}
 		if os.IsPermission(err) {
-			return nil, fmt.Errorf("LocalVFS.ReadFile() [local.go]: %w", ErrPermissionDenied)
+			return nil, fmt.Errorf("LocalVFS.ReadFile() [local.go]: %w", apis.ErrPermissionDenied)
 		}
 		return nil, err
 	}
@@ -142,7 +144,7 @@ func (l *LocalVFS) WriteFile(path string, content []byte) error {
 	dir := filepath.Dir(absPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		if os.IsPermission(err) {
-			return fmt.Errorf("LocalVFS.WriteFile() [local.go]: %w", ErrPermissionDenied)
+			return fmt.Errorf("LocalVFS.WriteFile() [local.go]: %w", apis.ErrPermissionDenied)
 		}
 		return err
 	}
@@ -150,7 +152,7 @@ func (l *LocalVFS) WriteFile(path string, content []byte) error {
 	// Write the file
 	if err := os.WriteFile(absPath, content, 0644); err != nil {
 		if os.IsPermission(err) {
-			return fmt.Errorf("LocalVFS.WriteFile() [local.go]: %w", ErrPermissionDenied)
+			return fmt.Errorf("LocalVFS.WriteFile() [local.go]: %w", apis.ErrPermissionDenied)
 		}
 		return err
 	}
@@ -171,17 +173,17 @@ func (l *LocalVFS) DeleteFile(path string, recursive bool, force bool) error {
 	info, err := os.Stat(absPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("LocalVFS.DeleteFile() [local.go]: %w", ErrFileNotFound)
+			return fmt.Errorf("LocalVFS.DeleteFile() [local.go]: %w", apis.ErrFileNotFound)
 		}
 		if os.IsPermission(err) {
-			return fmt.Errorf("LocalVFS.DeleteFile() [local.go]: %w", ErrPermissionDenied)
+			return fmt.Errorf("LocalVFS.DeleteFile() [local.go]: %w", apis.ErrPermissionDenied)
 		}
 		return err
 	}
 
 	// If it's a directory and recursive is false, return error
 	if info.IsDir() && !recursive {
-		return fmt.Errorf("LocalVFS.DeleteFile() [local.go]: %w", ErrNotAFile)
+		return fmt.Errorf("LocalVFS.DeleteFile() [local.go]: %w", apis.ErrNotAFile)
 	}
 
 	// If force is true, make writable before deletion
@@ -201,7 +203,7 @@ func (l *LocalVFS) DeleteFile(path string, recursive bool, force bool) error {
 
 	if deleteErr != nil {
 		if os.IsPermission(deleteErr) {
-			return fmt.Errorf("LocalVFS.DeleteFile() [local.go]: %w", ErrPermissionDenied)
+			return fmt.Errorf("LocalVFS.DeleteFile() [local.go]: %w", apis.ErrPermissionDenied)
 		}
 		return deleteErr
 	}
@@ -222,16 +224,16 @@ func (l *LocalVFS) ListFiles(path string, recursive bool) ([]string, error) {
 	info, err := os.Stat(absPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("LocalVFS.ListFiles() [local.go]: %w", ErrFileNotFound)
+			return nil, fmt.Errorf("LocalVFS.ListFiles() [local.go]: %w", apis.ErrFileNotFound)
 		}
 		if os.IsPermission(err) {
-			return nil, fmt.Errorf("LocalVFS.ListFiles() [local.go]: %w", ErrPermissionDenied)
+			return nil, fmt.Errorf("LocalVFS.ListFiles() [local.go]: %w", apis.ErrPermissionDenied)
 		}
 		return nil, err
 	}
 
 	if !info.IsDir() {
-		return nil, fmt.Errorf("LocalVFS.ListFiles() [local.go]: %w", ErrNotADir)
+		return nil, fmt.Errorf("LocalVFS.ListFiles() [local.go]: %w", apis.ErrNotADir)
 	}
 
 	var result []string
@@ -268,7 +270,7 @@ func (l *LocalVFS) ListFiles(path string, recursive bool) ([]string, error) {
 
 		if err != nil {
 			if os.IsPermission(err) {
-				return nil, fmt.Errorf("LocalVFS.ListFiles() [local.go]: %w", ErrPermissionDenied)
+				return nil, fmt.Errorf("LocalVFS.ListFiles() [local.go]: %w", apis.ErrPermissionDenied)
 			}
 			return nil, err
 		}
@@ -276,7 +278,7 @@ func (l *LocalVFS) ListFiles(path string, recursive bool) ([]string, error) {
 		entries, err := os.ReadDir(absPath)
 		if err != nil {
 			if os.IsPermission(err) {
-				return nil, fmt.Errorf("LocalVFS.ListFiles() [local.go]: %w", ErrPermissionDenied)
+				return nil, fmt.Errorf("LocalVFS.ListFiles() [local.go]: %w", apis.ErrPermissionDenied)
 			}
 			return nil, err
 		}
@@ -312,7 +314,7 @@ func (l *LocalVFS) ListFiles(path string, recursive bool) ([]string, error) {
 // Returns paths relative to the VFS root.
 func (l *LocalVFS) FindFiles(query string, recursive bool) ([]string, error) {
 	if query == "" {
-		return nil, fmt.Errorf("LocalVFS.FindFiles() [local.go]: %w", ErrInvalidPath)
+		return nil, fmt.Errorf("LocalVFS.FindFiles() [local.go]: %w", apis.ErrInvalidPath)
 	}
 
 	var result []string
@@ -369,7 +371,7 @@ func (l *LocalVFS) FindFiles(query string, recursive bool) ([]string, error) {
 		entries, err := os.ReadDir(searchRoot)
 		if err != nil {
 			if os.IsPermission(err) {
-				return nil, fmt.Errorf("LocalVFS.FindFiles() [local.go]: %w", ErrPermissionDenied)
+				return nil, fmt.Errorf("LocalVFS.FindFiles() [local.go]: %w", apis.ErrPermissionDenied)
 			}
 			return nil, err
 		}
@@ -412,10 +414,10 @@ func (l *LocalVFS) MoveFile(src, dst string) error {
 	_, err = os.Stat(absSrc)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("LocalVFS.MoveFile() [local.go]: %w", ErrFileNotFound)
+			return fmt.Errorf("LocalVFS.MoveFile() [local.go]: %w", apis.ErrFileNotFound)
 		}
 		if os.IsPermission(err) {
-			return fmt.Errorf("LocalVFS.MoveFile() [local.go]: %w", ErrPermissionDenied)
+			return fmt.Errorf("LocalVFS.MoveFile() [local.go]: %w", apis.ErrPermissionDenied)
 		}
 		return err
 	}
@@ -423,11 +425,11 @@ func (l *LocalVFS) MoveFile(src, dst string) error {
 	// Check if destination already exists
 	_, err = os.Stat(absDst)
 	if err == nil {
-		return fmt.Errorf("LocalVFS.MoveFile() [local.go]: %w", ErrFileExists)
+		return fmt.Errorf("LocalVFS.MoveFile() [local.go]: %w", apis.ErrFileExists)
 	}
 	if !os.IsNotExist(err) {
 		if os.IsPermission(err) {
-			return fmt.Errorf("LocalVFS.MoveFile() [local.go]: %w", ErrPermissionDenied)
+			return fmt.Errorf("LocalVFS.MoveFile() [local.go]: %w", apis.ErrPermissionDenied)
 		}
 		return err
 	}
@@ -436,7 +438,7 @@ func (l *LocalVFS) MoveFile(src, dst string) error {
 	dstDir := filepath.Dir(absDst)
 	if err := os.MkdirAll(dstDir, 0755); err != nil {
 		if os.IsPermission(err) {
-			return fmt.Errorf("LocalVFS.MoveFile() [local.go]: %w", ErrPermissionDenied)
+			return fmt.Errorf("LocalVFS.MoveFile() [local.go]: %w", apis.ErrPermissionDenied)
 		}
 		return err
 	}
@@ -444,7 +446,7 @@ func (l *LocalVFS) MoveFile(src, dst string) error {
 	// Perform the move
 	if err := os.Rename(absSrc, absDst); err != nil {
 		if os.IsPermission(err) {
-			return fmt.Errorf("LocalVFS.MoveFile() [local.go]: %w", ErrPermissionDenied)
+			return fmt.Errorf("LocalVFS.MoveFile() [local.go]: %w", apis.ErrPermissionDenied)
 		}
 		return err
 	}

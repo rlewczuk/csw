@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -208,7 +209,7 @@ func TestLocalVFS_ReadFile_AllowedPaths(t *testing.T) {
 
 		// Try to read file outside allowed path
 		_, err = localVFS.ReadFile(testFile)
-		assert.ErrorIs(t, err, ErrPermissionDenied)
+		assert.ErrorIs(t, err, apis.ErrPermissionDenied)
 	})
 
 	t.Run("ReadFileWithMultipleAllowedPaths", func(t *testing.T) {
@@ -291,7 +292,7 @@ func TestLocalVFS_WriteFile_AllowedPaths(t *testing.T) {
 		// Try to write file outside allowed path
 		testFile := filepath.Join(outsideDir, "test.txt")
 		err = localVFS.WriteFile(testFile, []byte("content"))
-		assert.ErrorIs(t, err, ErrPermissionDenied)
+		assert.ErrorIs(t, err, apis.ErrPermissionDenied)
 	})
 }
 
@@ -343,7 +344,7 @@ func TestLocalVFS_DeleteFile_AllowedPaths(t *testing.T) {
 
 		// Try to delete file outside allowed path
 		err = localVFS.DeleteFile(testFile, false, false)
-		assert.ErrorIs(t, err, ErrPermissionDenied)
+		assert.ErrorIs(t, err, apis.ErrPermissionDenied)
 	})
 }
 
@@ -390,7 +391,7 @@ func TestLocalVFS_ListFiles_AllowedPaths(t *testing.T) {
 
 		// Try to list files outside allowed path
 		_, err = localVFS.ListFiles(outsideDir, false)
-		assert.ErrorIs(t, err, ErrPermissionDenied)
+		assert.ErrorIs(t, err, apis.ErrPermissionDenied)
 	})
 }
 
@@ -447,7 +448,7 @@ func TestLocalVFS_MoveFile_AllowedPaths(t *testing.T) {
 
 		// Try to move file from allowed to outside
 		err = localVFS.MoveFile(srcFile, dstFile)
-		assert.ErrorIs(t, err, ErrPermissionDenied)
+		assert.ErrorIs(t, err, apis.ErrPermissionDenied)
 	})
 
 	t.Run("MoveFileFromOutsideToAllowed", func(t *testing.T) {
@@ -473,7 +474,7 @@ func TestLocalVFS_MoveFile_AllowedPaths(t *testing.T) {
 
 		// Try to move file from outside to allowed
 		err = localVFS.MoveFile(srcFile, dstFile)
-		assert.ErrorIs(t, err, ErrPermissionDenied)
+		assert.ErrorIs(t, err, apis.ErrPermissionDenied)
 	})
 }
 
@@ -571,6 +572,6 @@ func TestLocalVFS_PathTraversalWithAllowedPaths(t *testing.T) {
 		traversalPath := filepath.Join(allowedDir, "..", "outside.txt")
 		_, err = localVFS.ReadFile(traversalPath)
 		// Should be denied because the resolved path is outside allowed paths
-		assert.ErrorIs(t, err, ErrPermissionDenied)
+		assert.ErrorIs(t, err, apis.ErrPermissionDenied)
 	})
 }

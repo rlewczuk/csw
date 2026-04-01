@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // VFSWriteTool implements the vfsWrite tool.
 type VFSWriteTool struct {
-	vfs    vfs.VFS
+	vfs    apis.VFS
 	lsp    lsp.LSP
 	logger *slog.Logger
 }
@@ -21,7 +22,7 @@ func (t *VFSWriteTool) GetDescription() (string, bool) {
 
 // NewVFSWriteTool creates a new VFSWriteTool instance.
 // lsp parameter is optional and can be nil.
-func NewVFSWriteTool(v vfs.VFS, l lsp.LSP) *VFSWriteTool {
+func NewVFSWriteTool(v apis.VFS, l lsp.LSP) *VFSWriteTool {
 	return &VFSWriteTool{vfs: v, lsp: l}
 }
 
@@ -56,7 +57,7 @@ func (t *VFSWriteTool) Execute(args *ToolCall) *ToolResponse {
 	}
 
 	err := t.vfs.WriteFile(path, []byte(content))
-	if err == vfs.ErrAskPermission {
+	if err == apis.ErrAskPermission {
 		if t.logger != nil {
 			t.logger.Info("vfsWrite_permission_required", "path", path)
 		}

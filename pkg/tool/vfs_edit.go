@@ -5,13 +5,14 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // VFSEditTool implements the vfsEdit tool.
 type VFSEditTool struct {
-	vfs    vfs.VFS
+	vfs    apis.VFS
 	lsp    lsp.LSP
 	logger *slog.Logger
 }
@@ -22,7 +23,7 @@ func (t *VFSEditTool) GetDescription() (string, bool) {
 
 // NewVFSEditTool creates a new VFSEditTool instance.
 // lsp parameter is optional and can be nil.
-func NewVFSEditTool(v vfs.VFS, l lsp.LSP) *VFSEditTool {
+func NewVFSEditTool(v apis.VFS, l lsp.LSP) *VFSEditTool {
 	return &VFSEditTool{vfs: v, lsp: l}
 }
 
@@ -71,7 +72,7 @@ func (t *VFSEditTool) Execute(args *ToolCall) *ToolResponse {
 	// Create patcher and apply edits
 	patcher := vfs.NewFilePatcher(t.vfs)
 	_, err := patcher.ApplyEdits(path, oldString, newString, replaceAll)
-	if err == vfs.ErrAskPermission {
+	if err == apis.ErrAskPermission {
 		if t.logger != nil {
 			t.logger.Info("vfsEdit_permission_required", "path", path)
 		}

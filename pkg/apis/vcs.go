@@ -1,4 +1,4 @@
-package vfs
+package apis
 
 // VCS represents a repository for VFS. It can be a local filesystem, a remote filesystem, a git repository etc.
 // This interface is responsible only for repository operations (cloning, pulling, pushing, status, extracting worktree etc.)

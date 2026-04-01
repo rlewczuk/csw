@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -59,7 +60,7 @@ func TestShadowVFS_ShadowedPathMissingInShadowIsInvisible(t *testing.T) {
 
 	_, err = overlay.ReadFile("AGENTS.md")
 	require.Error(t, err)
-	assert.ErrorIs(t, err, ErrFileNotFound)
+	assert.ErrorIs(t, err, apis.ErrFileNotFound)
 }
 
 func TestShadowVFS_ListAndFindMerge(t *testing.T) {

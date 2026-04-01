@@ -1,14 +1,16 @@
-package vfs
+package vcs
 
 import (
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
+	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewNullVCS(t *testing.T) {
-	mockVFS := NewMockVFS()
+	mockVFS := vfs.NewMockVFS()
 
 	nullVCS, err := NewNullVFS(mockVFS)
 	require.NoError(t, err)
@@ -17,7 +19,7 @@ func TestNewNullVCS(t *testing.T) {
 }
 
 func TestNullVCS_GetWorktree(t *testing.T) {
-	mockVFS := NewMockVFS()
+	mockVFS := vfs.NewMockVFS()
 	nullVCS, err := NewNullVFS(mockVFS)
 	require.NoError(t, err)
 
@@ -49,7 +51,7 @@ func TestNullVCS_GetWorktree(t *testing.T) {
 }
 
 func TestNullVCS_DropWorktree(t *testing.T) {
-	mockVFS := NewMockVFS()
+	mockVFS := vfs.NewMockVFS()
 	nullVCS, err := NewNullVFS(mockVFS)
 	require.NoError(t, err)
 
@@ -80,7 +82,7 @@ func TestNullVCS_DropWorktree(t *testing.T) {
 }
 
 func TestNullVCS_CommitWorktree(t *testing.T) {
-	mockVFS := NewMockVFS()
+	mockVFS := vfs.NewMockVFS()
 	nullVCS, err := NewNullVFS(mockVFS)
 	require.NoError(t, err)
 
@@ -115,7 +117,7 @@ func TestNullVCS_CommitWorktree(t *testing.T) {
 }
 
 func TestNullVCS_NewBranch(t *testing.T) {
-	mockVFS := NewMockVFS()
+	mockVFS := vfs.NewMockVFS()
 	nullVCS, err := NewNullVFS(mockVFS)
 	require.NoError(t, err)
 
@@ -150,7 +152,7 @@ func TestNullVCS_NewBranch(t *testing.T) {
 }
 
 func TestNullVCS_DeleteBranch(t *testing.T) {
-	mockVFS := NewMockVFS()
+	mockVFS := vfs.NewMockVFS()
 	nullVCS, err := NewNullVFS(mockVFS)
 	require.NoError(t, err)
 
@@ -181,7 +183,7 @@ func TestNullVCS_DeleteBranch(t *testing.T) {
 }
 
 func TestNullVCS_ListBranches(t *testing.T) {
-	mockVFS := NewMockVFS()
+	mockVFS := vfs.NewMockVFS()
 	nullVCS, err := NewNullVFS(mockVFS)
 	require.NoError(t, err)
 
@@ -222,7 +224,7 @@ func TestNullVCS_ListBranches(t *testing.T) {
 }
 
 func TestNullVCS_ListWorktrees(t *testing.T) {
-	mockVFS := NewMockVFS()
+	mockVFS := vfs.NewMockVFS()
 	nullVCS, err := NewNullVFS(mockVFS)
 	require.NoError(t, err)
 
@@ -233,7 +235,7 @@ func TestNullVCS_ListWorktrees(t *testing.T) {
 }
 
 func TestNullVCS_MergeBranches(t *testing.T) {
-	mockVFS := NewMockVFS()
+	mockVFS := vfs.NewMockVFS()
 	nullVCS, err := NewNullVFS(mockVFS)
 	require.NoError(t, err)
 
@@ -269,17 +271,17 @@ func TestNullVCS_MergeBranches(t *testing.T) {
 
 func TestNullVCS_VCSInterface(t *testing.T) {
 	// Verify NullVCS implements VCS interface
-	mockVFS := NewMockVFS()
+	mockVFS := vfs.NewMockVFS()
 	nullVCS, err := NewNullVFS(mockVFS)
 	require.NoError(t, err)
 
 	// This will fail at compile time if NullVCS doesn't implement VCS
-	var _ VCS = nullVCS
+	var _ apis.VCS = nullVCS
 }
 
 func TestNullVCS_MultipleCalls(t *testing.T) {
 	// Test that multiple calls to methods don't cause issues
-	mockVFS := NewMockVFS()
+	mockVFS := vfs.NewMockVFS()
 	nullVCS, err := NewNullVFS(mockVFS)
 	require.NoError(t, err)
 

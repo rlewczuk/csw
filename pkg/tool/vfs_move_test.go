@@ -3,6 +3,7 @@ package tool
 import (
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +37,7 @@ func TestVFSMoveTool(t *testing.T) {
 		// Verify file was moved
 		_, err = mockVFS.ReadFile("source.txt")
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, vfs.ErrFileNotFound)
+		assert.ErrorIs(t, err, apis.ErrFileNotFound)
 
 		content, err := mockVFS.ReadFile("dest.txt")
 		require.NoError(t, err)
@@ -218,7 +219,7 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 
 		// Verify file was moved
 		_, err = mockVFS.ReadFile("source.txt")
-		assert.ErrorIs(t, err, vfs.ErrFileNotFound)
+		assert.ErrorIs(t, err, apis.ErrFileNotFound)
 		content, err := mockVFS.ReadFile("dest.txt")
 		require.NoError(t, err)
 		assert.Equal(t, "hello", string(content))
@@ -250,7 +251,7 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		// Assert
 		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
-		assert.ErrorIs(t, response.Error, vfs.ErrPermissionDenied)
+		assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 		assert.True(t, response.Done)
 	})
 }

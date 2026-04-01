@@ -1,4 +1,4 @@
-package shared
+package vfs
 
 import (
 	"fmt"
@@ -43,10 +43,10 @@ func (UpdateFile) isHunk() {}
 
 // UpdateFileChunk represents a single change block within an update operation.
 type UpdateFileChunk struct {
-	OldLines       []string
-	NewLines       []string
-	ChangeContext  string // Optional context line (content after @@)
-	IsEndOfFile    bool   // True if this chunk is anchored at end of file
+	OldLines      []string
+	NewLines      []string
+	ChangeContext string // Optional context line (content after @@)
+	IsEndOfFile   bool   // True if this chunk is anchored at end of file
 }
 
 // ParsePatch parses a patch string and returns the structured Patch representation.
@@ -257,9 +257,9 @@ func parseUpdateFileChunks(lines []string, startIdx, endIdx int) ([]UpdateFileCh
 			}
 
 			chunk := UpdateFileChunk{
-				OldLines:      oldLines,
-				NewLines:      newLines,
-				IsEndOfFile:   isEndOfFile,
+				OldLines:    oldLines,
+				NewLines:    newLines,
+				IsEndOfFile: isEndOfFile,
 			}
 			if contextLine != "" {
 				chunk.ChangeContext = contextLine

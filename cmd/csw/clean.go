@@ -5,8 +5,9 @@ import (
 	"io"
 	"os"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/system"
-	"github.com/rlewczuk/csw/pkg/vfs"
+	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/spf13/cobra"
 )
 
@@ -84,10 +85,10 @@ Currently supports cleaning up worktrees:
 }
 
 // createCleanVCS creates a VCS instance for cleaning worktrees.
-func createCleanVCS(workDir string) (vfs.VCS, error) {
+func createCleanVCS(workDir string) (apis.VCS, error) {
 	// Check if this is a git repository
 	worktreesRoot := workDir + "/.cswdata/work"
-	gitRepo, err := vfs.NewGitRepo(workDir, worktreesRoot, nil, nil, "", "")
+	gitRepo, err := vcs.NewGitRepo(workDir, worktreesRoot, nil, nil, "", "")
 	if err != nil {
 		return nil, fmt.Errorf("createCleanVCS() [clean.go]: not a git repository: %w", err)
 	}
@@ -95,7 +96,7 @@ func createCleanVCS(workDir string) (vfs.VCS, error) {
 }
 
 // cleanSingleWorktree cleans up a specific worktree.
-func cleanSingleWorktree(vcs vfs.VCS, branchName string, output io.Writer) error {
+func cleanSingleWorktree(vcs apis.VCS, branchName string, output io.Writer) error {
 	// Check if worktree exists
 	worktrees, err := vcs.ListWorktrees()
 	if err != nil {
@@ -131,7 +132,7 @@ func cleanSingleWorktree(vcs vfs.VCS, branchName string, output io.Writer) error
 }
 
 // cleanAllWorktrees cleans up all worktrees.
-func cleanAllWorktrees(vcs vfs.VCS, output io.Writer) error {
+func cleanAllWorktrees(vcs apis.VCS, output io.Writer) error {
 	worktrees, err := vcs.ListWorktrees()
 	if err != nil {
 		return fmt.Errorf("cleanAllWorktrees() [clean.go]: failed to list worktrees: %w", err)

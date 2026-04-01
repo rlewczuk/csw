@@ -1,4 +1,4 @@
-package vfs
+package vcs
 
 import (
 	"os"
@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/testutil/fixture"
+	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +18,7 @@ import (
 type GitTestFixture struct {
 	Root         string
 	WorktreesDir string
-	Repo         VCS
+	Repo         apis.VCS
 }
 
 // setupGitRepoFixture creates a temporary git repository for testing
@@ -138,14 +140,14 @@ func TestNewGitRepo(t *testing.T) {
 
 	t.Run("NonExistentDirectory", func(t *testing.T) {
 		_, err := NewGitRepo("/path/that/does/not/exist", fixture.ProjectPath("tmp", "worktrees"), nil, nil, "", "")
-		assert.ErrorIs(t, err, ErrFileNotFound)
+		assert.ErrorIs(t, err, apis.ErrFileNotFound)
 	})
 
 	t.Run("NotAGitRepository", func(t *testing.T) {
 		tempDir := fixture.MkProjectTempDir(t, "not-git-*")
 
 		_, err := NewGitRepo(tempDir, fixture.ProjectPath("tmp", "worktrees"), nil, nil, "", "")
-		assert.ErrorIs(t, err, ErrFileNotFound)
+		assert.ErrorIs(t, err, apis.ErrFileNotFound)
 	})
 
 	t.Run("PathIsFile", func(t *testing.T) {
@@ -158,7 +160,7 @@ func TestNewGitRepo(t *testing.T) {
 		tempFile.Close()
 
 		_, err = NewGitRepo(tempFile.Name(), fixture.ProjectPath("tmp", "worktrees"), nil, nil, "", "")
-		assert.ErrorIs(t, err, ErrNotADir)
+		assert.ErrorIs(t, err, apis.ErrNotADir)
 	})
 }
 
@@ -187,7 +189,7 @@ func TestGetWorktree(t *testing.T) {
 	t.Run("GetNonExistentBranch", func(t *testing.T) {
 		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			_, err := fixture.Repo.GetWorktree("nonexistent-branch")
-			assert.ErrorIs(t, err, ErrFileNotFound)
+			assert.ErrorIs(t, err, apis.ErrFileNotFound)
 		})
 	})
 
@@ -227,7 +229,7 @@ func TestDropWorktree(t *testing.T) {
 	t.Run("DropNonExistentWorktree", func(t *testing.T) {
 		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			err := fixture.Repo.DropWorktree("nonexistent-worktree")
-			assert.ErrorIs(t, err, ErrFileNotFound)
+			assert.ErrorIs(t, err, apis.ErrFileNotFound)
 		})
 	})
 
@@ -269,7 +271,7 @@ func TestNewBranch(t *testing.T) {
 	t.Run("CreateBranchFromNonExistent", func(t *testing.T) {
 		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			err := fixture.Repo.NewBranch("new-branch", "nonexistent")
-			assert.ErrorIs(t, err, ErrFileNotFound)
+			assert.ErrorIs(t, err, apis.ErrFileNotFound)
 		})
 	})
 
@@ -283,7 +285,7 @@ func TestNewBranch(t *testing.T) {
 
 			// Try to create it again
 			err = fixture.Repo.NewBranch("duplicate-branch", sourceBranch)
-			assert.ErrorIs(t, err, ErrFileExists)
+			assert.ErrorIs(t, err, apis.ErrFileExists)
 		})
 	})
 }
@@ -311,7 +313,7 @@ func TestDeleteBranch(t *testing.T) {
 	t.Run("DeleteNonExistentBranch", func(t *testing.T) {
 		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			err := fixture.Repo.DeleteBranch("nonexistent-branch")
-			assert.ErrorIs(t, err, ErrFileNotFound)
+			assert.ErrorIs(t, err, apis.ErrFileNotFound)
 		})
 	})
 }
@@ -363,7 +365,7 @@ func TestCommitWorktree(t *testing.T) {
 	t.Run("CommitNonExistentWorktree", func(t *testing.T) {
 		runTestWithGitVCS(t, func(t *testing.T, fixture *GitTestFixture) {
 			err := fixture.Repo.CommitWorktree("nonexistent", "message")
-			assert.ErrorIs(t, err, ErrFileNotFound)
+			assert.ErrorIs(t, err, apis.ErrFileNotFound)
 		})
 	})
 
@@ -420,7 +422,7 @@ func TestMergeBranches(t *testing.T) {
 			targetBranch := getDefaultBranch(t, fixture)
 
 			err := fixture.Repo.MergeBranches(targetBranch, "nonexistent")
-			assert.ErrorIs(t, err, ErrFileNotFound)
+			assert.ErrorIs(t, err, apis.ErrFileNotFound)
 		})
 	})
 
@@ -434,7 +436,7 @@ func TestMergeBranches(t *testing.T) {
 			require.NoError(t, err)
 
 			err = fixture.Repo.MergeBranches("nonexistent", "source-branch2")
-			assert.ErrorIs(t, err, ErrFileNotFound)
+			assert.ErrorIs(t, err, apis.ErrFileNotFound)
 		})
 	})
 
@@ -467,7 +469,7 @@ func TestMergeBranches(t *testing.T) {
 		require.NoError(t, err)
 
 		err = repo.MergeBranches(sourceBranch, "feature-conflict")
-		assert.ErrorIs(t, err, ErrMergeConflict)
+		assert.ErrorIs(t, err, apis.ErrMergeConflict)
 	})
 
 	t.Run("GitVCSFastForwardWhenPossible", func(t *testing.T) {
@@ -588,7 +590,7 @@ func TestMergeBranches(t *testing.T) {
 		require.NoError(t, err)
 
 		err = repo.MergeBranches(targetBranch, "feature-rebase-fail")
-		assert.ErrorIs(t, err, ErrMergeConflict)
+		assert.ErrorIs(t, err, apis.ErrMergeConflict)
 	})
 
 	t.Run("GitVCSUpdatesCheckedOutFilesAfterMerge", func(t *testing.T) {
@@ -661,6 +663,6 @@ func TestMergeBranches(t *testing.T) {
 
 func TestRepoInterfaceCompliance(t *testing.T) {
 	// This test ensures GitVCS and MockVCS implement the VCS interface
-	var _ VCS = (*GitVCS)(nil)
-	var _ VCS = (*MockVCS)(nil)
+	var _ apis.VCS = (*GitVCS)(nil)
+	var _ apis.VCS = (*vfs.MockVCS)(nil)
 }

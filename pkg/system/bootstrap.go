@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
@@ -21,6 +22,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
@@ -131,7 +133,7 @@ type BuildSystemResult struct {
 	ConfigStore           conf.ConfigStore
 	ProviderRegistry      *models.ProviderRegistry
 	LogsDir               string
-	VCS                   vfs.VCS
+	VCS                   apis.VCS
 	WorktreeBranch        string
 	LSPServer             string
 	ShellRunner           runner.CommandRunner
@@ -311,22 +313,22 @@ func resolveWorktreeBranchNameFromHook(ctx context.Context, configStore conf.Con
 }
 
 // PrepareSessionVFS creates session VCS/VFS with optional worktree handling.
-func PrepareSessionVFS(workDir string, worktreesBaseDir string, worktreeBranch string, continueWorktree bool, hidePatterns []string, gitUserName string, gitUserEmail string, allowedPaths []string) (vfs.VCS, vfs.VFS, error) {
+func PrepareSessionVFS(workDir string, worktreesBaseDir string, worktreeBranch string, continueWorktree bool, hidePatterns []string, gitUserName string, gitUserEmail string, allowedPaths []string) (apis.VCS, apis.VFS, error) {
 	localVFS, err := vfs.NewLocalVFS(workDir, hidePatterns, allowedPaths)
 	if err != nil {
 		return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create local VFS: %w", err)
 	}
 
-	nullVCS, err := vfs.NewNullVFS(localVFS)
+	nullVCS, err := vcs.NewNullVFS(localVFS)
 	if err != nil {
 		return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create NullVCS: %w", err)
 	}
 
-	var selectedVCS vfs.VCS = nullVCS
+	var selectedVCS apis.VCS = nullVCS
 
 	if worktreeBranch != "" {
 		worktreesRoot := filepath.Join(worktreesBaseDir, ".cswdata", "work")
-		gitRepo, err := vfs.NewGitRepo(workDir, worktreesRoot, hidePatterns, allowedPaths, gitUserName, gitUserEmail)
+		gitRepo, err := vcs.NewGitRepo(workDir, worktreesRoot, hidePatterns, allowedPaths, gitUserName, gitUserEmail)
 		if err != nil {
 			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create GitVCS: %w", err)
 		}
@@ -346,18 +348,18 @@ func PrepareSessionVFS(workDir string, worktreesBaseDir string, worktreeBranch s
 			}
 
 			if !branchExists {
-				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: worktree branch %q not found: %w", worktreeBranch, vfs.ErrFileNotFound)
+				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: worktree branch %q not found: %w", worktreeBranch, apis.ErrFileNotFound)
 			}
 		} else {
 			if err := os.RemoveAll(filepath.Join(worktreesRoot, worktreeBranch)); err != nil {
 				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to remove existing worktree path: %w", err)
 			}
 
-			if err := gitRepo.DropWorktree(worktreeBranch); err != nil && !errors.Is(err, vfs.ErrFileNotFound) {
+			if err := gitRepo.DropWorktree(worktreeBranch); err != nil && !errors.Is(err, apis.ErrFileNotFound) {
 				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to drop existing worktree: %w", err)
 			}
 
-			if err := gitRepo.DeleteBranch(worktreeBranch); err != nil && !errors.Is(err, vfs.ErrFileNotFound) {
+			if err := gitRepo.DeleteBranch(worktreeBranch); err != nil && !errors.Is(err, apis.ErrFileNotFound) {
 				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to delete existing worktree branch: %w", err)
 			}
 
@@ -631,22 +633,22 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	}
 
 	sweSystem := &SweSystem{
-		ModelProviders:  modelProviders,
-		ModelTags:       modelTagRegistry,
-		ToolSelection:   globalConfig.ToolSelection,
-		PromptGenerator: promptGenerator,
-		Tools:           toolRegistry,
-		VFS:             toolVFS,
-		Roles:           roleRegistry,
-		LSP:             lspClient,
-		ConfigStore:     configStore,
-		mcpManager:      mcpManager,
-		LogBaseDir:      logsDir,
-		WorkDir:         effectiveWorkDir,
-		ShadowDir:       shadowDir,
-		LogLLMRequests:  params.LogLLMRequests,
+		ModelProviders:    modelProviders,
+		ModelTags:         modelTagRegistry,
+		ToolSelection:     globalConfig.ToolSelection,
+		PromptGenerator:   promptGenerator,
+		Tools:             toolRegistry,
+		VFS:               toolVFS,
+		Roles:             roleRegistry,
+		LSP:               lspClient,
+		ConfigStore:       configStore,
+		mcpManager:        mcpManager,
+		LogBaseDir:        logsDir,
+		WorkDir:           effectiveWorkDir,
+		ShadowDir:         shadowDir,
+		LogLLMRequests:    params.LogLLMRequests,
 		LogLLMRequestsRaw: params.LogLLMRequestsRaw,
-		Thinking:        params.Thinking,
+		Thinking:          params.Thinking,
 		MaxToolThreads: func() int {
 			if params.MaxToolThreads > 0 {
 				return params.MaxToolThreads

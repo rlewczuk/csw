@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/vfs"
@@ -404,7 +405,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		// Assert
 		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
-		assert.ErrorIs(t, response.Error, vfs.ErrPermissionDenied)
+		assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 		assert.True(t, response.Done)
 	})
 
@@ -435,7 +436,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		// Assert
 		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
-		assert.ErrorIs(t, response.Error, vfs.ErrPermissionDenied)
+		assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 		assert.True(t, response.Done)
 	})
 }

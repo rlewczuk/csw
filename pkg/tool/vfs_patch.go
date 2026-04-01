@@ -7,8 +7,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/lsp"
-	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
@@ -16,7 +16,7 @@ const maxVFSPatchDiagnosticsPerFile = 20
 
 // VFSPatchTool implements the vfsPatch tool.
 type VFSPatchTool struct {
-	vfs    vfs.VFS
+	vfs    apis.VFS
 	lsp    lsp.LSP
 	logger *slog.Logger
 }
@@ -27,7 +27,7 @@ func (t *VFSPatchTool) GetDescription() (string, bool) {
 
 // NewVFSPatchTool creates a new VFSPatchTool instance.
 // lsp parameter is optional and can be nil.
-func NewVFSPatchTool(v vfs.VFS, l lsp.LSP) *VFSPatchTool {
+func NewVFSPatchTool(v apis.VFS, l lsp.LSP) *VFSPatchTool {
 	return &VFSPatchTool{vfs: v, lsp: l}
 }
 
@@ -47,7 +47,7 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 		}
 	}
 
-	parsed, err := shared.ParsePatch(patchText)
+	parsed, err := vfs.ParsePatch(patchText)
 	if err != nil {
 		return &ToolResponse{
 			Call:  args,
@@ -83,7 +83,7 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 	changes := make([]fileChange, 0, len(parsed.Hunks))
 	for _, h := range parsed.Hunks {
 		switch hunk := h.(type) {
-		case shared.AddFile:
+		case vfs.AddFile:
 			newBody := hunk.Contents
 			if len(hunk.Contents) != 0 && !strings.HasSuffix(hunk.Contents, "\n") {
 				newBody += "\n"
@@ -94,10 +94,10 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 				newBody:  newBody,
 				typeName: "add",
 			})
-		case shared.UpdateFile:
+		case vfs.UpdateFile:
 			body, readErr := t.vfs.ReadFile(hunk.Path)
 			if readErr != nil {
-				if readErr == vfs.ErrAskPermission {
+				if readErr == apis.ErrAskPermission {
 					return NewVFSPermissionQuery(args, hunk.Path, "reading file", "read")
 				}
 				if perr, ok := readErr.(*vfs.PermissionError); ok {
@@ -132,10 +132,10 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 				newBody:  newBody,
 				typeName: map[bool]string{true: "move", false: "update"}[hunk.MovePath != ""],
 			})
-		case shared.DeleteFile:
+		case vfs.DeleteFile:
 			body, readErr := t.vfs.ReadFile(hunk.Path)
 			if readErr != nil {
-				if readErr == vfs.ErrAskPermission {
+				if readErr == apis.ErrAskPermission {
 					return NewVFSPermissionQuery(args, hunk.Path, "reading file", "read")
 				}
 				if perr, ok := readErr.(*vfs.PermissionError); ok {
@@ -166,7 +166,7 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 		switch change.typeName {
 		case "add", "update":
 			if writeErr := t.vfs.WriteFile(change.path, []byte(change.newBody)); writeErr != nil {
-				if writeErr == vfs.ErrAskPermission {
+				if writeErr == apis.ErrAskPermission {
 					return NewVFSPermissionQuery(args, change.path, "writing to file", "write")
 				}
 				if perr, ok := writeErr.(*vfs.PermissionError); ok {
@@ -183,7 +183,7 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 		case "move":
 			target := change.movePath
 			if writeErr := t.vfs.WriteFile(target, []byte(change.newBody)); writeErr != nil {
-				if writeErr == vfs.ErrAskPermission {
+				if writeErr == apis.ErrAskPermission {
 					return NewVFSPermissionQuery(args, target, "writing to file", "write")
 				}
 				if perr, ok := writeErr.(*vfs.PermissionError); ok {
@@ -198,7 +198,7 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 				return &ToolResponse{Call: args, Error: writeErr, Done: true}
 			}
 			if delErr := t.vfs.DeleteFile(change.path, false, false); delErr != nil {
-				if delErr == vfs.ErrAskPermission {
+				if delErr == apis.ErrAskPermission {
 					return NewVFSPermissionQuery(args, change.path, "deleting file", "delete")
 				}
 				if perr, ok := delErr.(*vfs.PermissionError); ok {
@@ -214,7 +214,7 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 			}
 		case "delete":
 			if delErr := t.vfs.DeleteFile(change.path, false, false); delErr != nil {
-				if delErr == vfs.ErrAskPermission {
+				if delErr == apis.ErrAskPermission {
 					return NewVFSPermissionQuery(args, change.path, "deleting file", "delete")
 				}
 				if perr, ok := delErr.(*vfs.PermissionError); ok {
@@ -306,7 +306,7 @@ func (t *VFSPatchTool) Render(call *ToolCall) (string, string, string, map[strin
 
 	oneLiner := "apply patch"
 	if patchText != "" {
-		parsed, err := shared.ParsePatch(patchText)
+		parsed, err := vfs.ParsePatch(patchText)
 		if err == nil && len(parsed.Hunks) > 0 {
 			oneLiner = renderPatchOneLiner(parsed, t.vfs)
 		}
@@ -333,18 +333,18 @@ func (t *VFSPatchTool) Render(call *ToolCall) (string, string, string, map[strin
 }
 
 // renderPatchOneLiner generates a one-line summary of patch operations.
-func renderPatchOneLiner(parsed *shared.Patch, v vfs.VFS) string {
+func renderPatchOneLiner(parsed *vfs.Patch, v apis.VFS) string {
 	parts := make([]string, 0, len(parsed.Hunks))
 	for _, h := range parsed.Hunks {
 		switch hunk := h.(type) {
-		case shared.AddFile:
+		case vfs.AddFile:
 			linesAdded := countLines(hunk.Contents)
 			path := makeRelativePath(hunk.Path, v)
 			parts = append(parts, fmt.Sprintf("A:%s(+%d)", path, linesAdded))
-		case shared.DeleteFile:
+		case vfs.DeleteFile:
 			path := makeRelativePath(hunk.Path, v)
 			parts = append(parts, fmt.Sprintf("D:%s", path))
-		case shared.UpdateFile:
+		case vfs.UpdateFile:
 			if hunk.MovePath != "" {
 				added, removed := countUpdateLines(hunk.Chunks)
 				target := makeRelativePath(hunk.MovePath, v)
@@ -368,7 +368,7 @@ func countLines(s string) int {
 }
 
 // countUpdateLines counts added and removed lines from update chunks.
-func countUpdateLines(chunks []shared.UpdateFileChunk) (added, removed int) {
+func countUpdateLines(chunks []vfs.UpdateFileChunk) (added, removed int) {
 	for _, chunk := range chunks {
 		for _, line := range chunk.NewLines {
 			if line != "" {
@@ -390,7 +390,7 @@ type vfsReplacement struct {
 	lines  []string
 }
 
-func deriveUpdatedContent(originalContent string, filePath string, chunks []shared.UpdateFileChunk) (string, error) {
+func deriveUpdatedContent(originalContent string, filePath string, chunks []vfs.UpdateFileChunk) (string, error) {
 	originalLines := strings.Split(originalContent, "\n")
 	if len(originalLines) > 0 && originalLines[len(originalLines)-1] == "" {
 		originalLines = originalLines[:len(originalLines)-1]
@@ -408,7 +408,7 @@ func deriveUpdatedContent(originalContent string, filePath string, chunks []shar
 	return strings.Join(newLines, "\n"), nil
 }
 
-func computeReplacements(originalLines []string, filePath string, chunks []shared.UpdateFileChunk) ([]vfsReplacement, error) {
+func computeReplacements(originalLines []string, filePath string, chunks []vfs.UpdateFileChunk) ([]vfsReplacement, error) {
 	replacements := make([]vfsReplacement, 0, len(chunks))
 	lineIndex := 0
 

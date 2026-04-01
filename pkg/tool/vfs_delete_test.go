@@ -3,6 +3,7 @@ package tool
 import (
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +36,7 @@ func TestVFSDeleteTool(t *testing.T) {
 		// Verify file was deleted
 		_, err = mockVFS.ReadFile("test.txt")
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, vfs.ErrFileNotFound)
+		assert.ErrorIs(t, err, apis.ErrFileNotFound)
 	})
 
 	t.Run("should return error for missing path argument", func(t *testing.T) {
@@ -148,7 +149,7 @@ func TestVFSDeleteToolPermissionQuery(t *testing.T) {
 
 		// Verify file was deleted
 		_, err = mockVFS.ReadFile("test.txt")
-		assert.ErrorIs(t, err, vfs.ErrFileNotFound)
+		assert.ErrorIs(t, err, apis.ErrFileNotFound)
 	})
 
 	t.Run("should fail when access is deny", func(t *testing.T) {
@@ -176,7 +177,7 @@ func TestVFSDeleteToolPermissionQuery(t *testing.T) {
 		// Assert
 		assert.Equal(t, "test-id", response.Call.ID)
 		assert.Error(t, response.Error)
-		assert.ErrorIs(t, response.Error, vfs.ErrPermissionDenied)
+		assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 		assert.True(t, response.Done)
 	})
 }

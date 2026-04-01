@@ -3,6 +3,7 @@ package core
 import (
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/logging"
@@ -16,7 +17,7 @@ import (
 type sweSystemFixture struct {
 	server *testutil.MockHTTPServer
 	client models.ModelProvider
-	vfs    vfs.VFS
+	vfs    apis.VFS
 	tools  *tool.ToolRegistry
 	system *SweSystem
 }
@@ -28,7 +29,7 @@ type sweSystemFixtureConfig struct {
 	modelProvider    models.ModelProvider
 	modelProviders   map[string]models.ModelProvider
 	promptGenerator  PromptGenerator
-	vfsInstance      vfs.VFS
+	vfsInstance      apis.VFS
 	tools            *tool.ToolRegistry
 	workDir          string
 	roles            *AgentRoleRegistry
@@ -175,7 +176,7 @@ func withProviderName(name string) sweSystemFixtureOption {
 	}
 }
 
-func withVFS(vfsInstance vfs.VFS) sweSystemFixtureOption {
+func withVFS(vfsInstance apis.VFS) sweSystemFixtureOption {
 	return func(config *sweSystemFixtureConfig) {
 		config.vfsInstance = vfsInstance
 	}

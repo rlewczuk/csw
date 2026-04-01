@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
+	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,7 +14,7 @@ import (
 // TestFixture provides a temporary directory for testing
 type TestFixture struct {
 	Root string
-	VFS  VFS
+	VFS  apis.VFS
 }
 
 // Setup creates a temporary directory and VFS instance (either LocalVFS or MockVFS)
@@ -76,7 +78,7 @@ func TestNewLocalVFS(t *testing.T) {
 
 	t.Run("NonExistentDirectory", func(t *testing.T) {
 		_, err := NewLocalVFS("/path/that/does/not/exist", nil, nil)
-		assert.ErrorIs(t, err, ErrFileNotFound)
+		assert.ErrorIs(t, err, apis.ErrFileNotFound)
 	})
 
 	t.Run("RootIsFile", func(t *testing.T) {
@@ -86,7 +88,7 @@ func TestNewLocalVFS(t *testing.T) {
 		tempFile.Close()
 
 		_, err = NewLocalVFS(tempFile.Name(), nil, nil)
-		assert.ErrorIs(t, err, ErrNotADir)
+		assert.ErrorIs(t, err, apis.ErrNotADir)
 	})
 
 	t.Run("RelativePath", func(t *testing.T) {
@@ -146,7 +148,7 @@ func TestMoveFile(t *testing.T) {
 
 			// Verify source file no longer exists
 			_, err = fixture.VFS.ReadFile(srcPath)
-			assert.ErrorIs(t, err, ErrFileNotFound, "Expected source file to be deleted")
+			assert.ErrorIs(t, err, apis.ErrFileNotFound, "Expected source file to be deleted")
 		})
 	})
 
@@ -170,7 +172,7 @@ func TestMoveFile(t *testing.T) {
 
 			// Verify original file no longer exists
 			_, err = fixture.VFS.ReadFile(srcPath)
-			assert.ErrorIs(t, err, ErrFileNotFound, "Expected original file to be deleted")
+			assert.ErrorIs(t, err, apis.ErrFileNotFound, "Expected original file to be deleted")
 		})
 	})
 
@@ -194,7 +196,7 @@ func TestMoveFile(t *testing.T) {
 
 			// Verify source file no longer exists
 			_, err = fixture.VFS.ReadFile(srcPath)
-			assert.ErrorIs(t, err, ErrFileNotFound, "Expected source file to be deleted")
+			assert.ErrorIs(t, err, apis.ErrFileNotFound, "Expected source file to be deleted")
 		})
 	})
 
@@ -218,7 +220,7 @@ func TestMoveFile(t *testing.T) {
 
 			// Verify source file no longer exists
 			_, err = fixture.VFS.ReadFile(srcPath)
-			assert.ErrorIs(t, err, ErrFileNotFound, "Expected source file to be deleted")
+			assert.ErrorIs(t, err, apis.ErrFileNotFound, "Expected source file to be deleted")
 		})
 	})
 
@@ -248,7 +250,7 @@ func TestMoveFile(t *testing.T) {
 
 			// Verify old directory no longer accessible
 			_, err = fixture.VFS.ReadFile("olddir/file1.txt")
-			assert.ErrorIs(t, err, ErrFileNotFound, "Expected old directory to be moved")
+			assert.ErrorIs(t, err, apis.ErrFileNotFound, "Expected old directory to be moved")
 		})
 	})
 
@@ -268,14 +270,14 @@ func TestMoveFile(t *testing.T) {
 
 			// Verify old directory no longer exists
 			_, err = fixture.VFS.ReadFile("movedir/file.txt")
-			assert.ErrorIs(t, err, ErrFileNotFound, "Expected old directory to be moved")
+			assert.ErrorIs(t, err, apis.ErrFileNotFound, "Expected old directory to be moved")
 		})
 	})
 
 	t.Run("MoveNonExistentFile", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			err := fixture.VFS.MoveFile("nonexistent.txt", "newname.txt")
-			assert.ErrorIs(t, err, ErrFileNotFound, "Expected ErrFileNotFound for non-existent source")
+			assert.ErrorIs(t, err, apis.ErrFileNotFound, "Expected ErrFileNotFound for non-existent source")
 		})
 	})
 
@@ -287,14 +289,14 @@ func TestMoveFile(t *testing.T) {
 
 			// Try to move to existing destination
 			err := fixture.VFS.MoveFile("src.txt", "dst.txt")
-			assert.ErrorIs(t, err, ErrFileExists, "Expected ErrFileExists for existing destination")
+			assert.ErrorIs(t, err, apis.ErrFileExists, "Expected ErrFileExists for existing destination")
 		})
 	})
 
 	t.Run("MoveWithInvalidSourcePath", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			err := fixture.VFS.MoveFile("../../../etc/passwd", "newname.txt")
-			assert.ErrorIs(t, err, ErrPermissionDenied, "Expected ErrPermissionDenied for path traversal")
+			assert.ErrorIs(t, err, apis.ErrPermissionDenied, "Expected ErrPermissionDenied for path traversal")
 		})
 	})
 
@@ -303,14 +305,14 @@ func TestMoveFile(t *testing.T) {
 			require.NoError(t, fixture.VFS.WriteFile("file.txt", []byte("content")), "Failed to create test file")
 
 			err := fixture.VFS.MoveFile("file.txt", "../../../tmp/evil.txt")
-			assert.ErrorIs(t, err, ErrPermissionDenied, "Expected ErrPermissionDenied for path traversal")
+			assert.ErrorIs(t, err, apis.ErrPermissionDenied, "Expected ErrPermissionDenied for path traversal")
 		})
 	})
 
 	t.Run("MoveWithAbsoluteSourcePath", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			err := fixture.VFS.MoveFile("/etc/passwd", "newname.txt")
-			assert.ErrorIs(t, err, ErrPermissionDenied, "Expected ErrInvalidPath for absolute source path")
+			assert.ErrorIs(t, err, apis.ErrPermissionDenied, "Expected ErrInvalidPath for absolute source path")
 		})
 	})
 
@@ -319,14 +321,14 @@ func TestMoveFile(t *testing.T) {
 			require.NoError(t, fixture.VFS.WriteFile("file.txt", []byte("content")), "Failed to create test file")
 
 			err := fixture.VFS.MoveFile("file.txt", "/tmp/newfile.txt")
-			assert.ErrorIs(t, err, ErrPermissionDenied, "Expected ErrInvalidPath for absolute destination path")
+			assert.ErrorIs(t, err, apis.ErrPermissionDenied, "Expected ErrInvalidPath for absolute destination path")
 		})
 	})
 
 	t.Run("MoveWithEmptySourcePath", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			err := fixture.VFS.MoveFile("", "newname.txt")
-			assert.ErrorIs(t, err, ErrInvalidPath, "Expected ErrInvalidPath for empty source path")
+			assert.ErrorIs(t, err, apis.ErrInvalidPath, "Expected ErrInvalidPath for empty source path")
 		})
 	})
 
@@ -335,7 +337,7 @@ func TestMoveFile(t *testing.T) {
 			require.NoError(t, fixture.VFS.WriteFile("file.txt", []byte("content")), "Failed to create test file")
 
 			err := fixture.VFS.MoveFile("file.txt", "")
-			assert.ErrorIs(t, err, ErrInvalidPath, "Expected ErrInvalidPath for empty destination path")
+			assert.ErrorIs(t, err, apis.ErrInvalidPath, "Expected ErrInvalidPath for empty destination path")
 		})
 	})
 
@@ -359,7 +361,7 @@ func TestMoveFile(t *testing.T) {
 
 			// Verify source file no longer exists
 			_, err = fixture.VFS.ReadFile(srcPath)
-			assert.ErrorIs(t, err, ErrFileNotFound, "Expected source file to be deleted")
+			assert.ErrorIs(t, err, apis.ErrFileNotFound, "Expected source file to be deleted")
 		})
 	})
 }
@@ -417,21 +419,21 @@ func TestWriteFile(t *testing.T) {
 	t.Run("PathTraversalAttack", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			err := fixture.VFS.WriteFile("../../../tmp/evil.txt", []byte("evil"))
-			assert.ErrorIs(t, err, ErrPermissionDenied, "Expected ErrPermissionDenied for path traversal")
+			assert.ErrorIs(t, err, apis.ErrPermissionDenied, "Expected ErrPermissionDenied for path traversal")
 		})
 	})
 
 	t.Run("AbsolutePath", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			err := fixture.VFS.WriteFile("/tmp/evil.txt", []byte("evil"))
-			assert.ErrorIs(t, err, ErrPermissionDenied, "Expected ErrInvalidPath for absolute path")
+			assert.ErrorIs(t, err, apis.ErrPermissionDenied, "Expected ErrInvalidPath for absolute path")
 		})
 	})
 
 	t.Run("EmptyPath", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			err := fixture.VFS.WriteFile("", []byte("content"))
-			assert.ErrorIs(t, err, ErrInvalidPath, "Expected ErrInvalidPath for empty path")
+			assert.ErrorIs(t, err, apis.ErrInvalidPath, "Expected ErrInvalidPath for empty path")
 		})
 	})
 }
@@ -447,14 +449,14 @@ func TestDeleteFile(t *testing.T) {
 
 			// Verify file was deleted
 			_, err = fixture.VFS.ReadFile(testPath)
-			assert.ErrorIs(t, err, ErrFileNotFound, "Expected ErrFileNotFound after deletion")
+			assert.ErrorIs(t, err, apis.ErrFileNotFound, "Expected ErrFileNotFound after deletion")
 		})
 	})
 
 	t.Run("DeleteNonExistentFile", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			err := fixture.VFS.DeleteFile("nonexistent.txt", false, false)
-			assert.ErrorIs(t, err, ErrFileNotFound)
+			assert.ErrorIs(t, err, apis.ErrFileNotFound)
 		})
 	})
 
@@ -466,7 +468,7 @@ func TestDeleteFile(t *testing.T) {
 			require.NoError(t, fixture.VFS.DeleteFile(filepath.Join(testDir, "dummy.txt"), false, false), "Failed to delete dummy file")
 
 			err := fixture.VFS.DeleteFile(testDir, false, false)
-			assert.ErrorIs(t, err, ErrNotAFile)
+			assert.ErrorIs(t, err, apis.ErrNotAFile)
 		})
 	})
 
@@ -482,7 +484,7 @@ func TestDeleteFile(t *testing.T) {
 
 			// Verify directory was deleted
 			_, err = fixture.VFS.ListFiles(testDir, false)
-			assert.ErrorIs(t, err, ErrFileNotFound, "Expected directory to be deleted")
+			assert.ErrorIs(t, err, apis.ErrFileNotFound, "Expected directory to be deleted")
 		})
 	})
 
@@ -497,7 +499,7 @@ func TestDeleteFile(t *testing.T) {
 
 			// Verify directory was deleted
 			_, err = fixture.VFS.ListFiles(testDir, false)
-			assert.ErrorIs(t, err, ErrFileNotFound, "Expected directory to be deleted")
+			assert.ErrorIs(t, err, apis.ErrFileNotFound, "Expected directory to be deleted")
 		})
 	})
 
@@ -531,14 +533,14 @@ func TestDeleteFile(t *testing.T) {
 
 			// Verify file was deleted
 			_, err = fixture.VFS.ReadFile(testPath)
-			assert.ErrorIs(t, err, ErrFileNotFound, "Expected file to be deleted")
+			assert.ErrorIs(t, err, apis.ErrFileNotFound, "Expected file to be deleted")
 		})
 	})
 
 	t.Run("PathTraversalAttack", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			err := fixture.VFS.DeleteFile("../../../tmp/important.txt", false, false)
-			assert.ErrorIs(t, err, ErrPermissionDenied, "Expected ErrPermissionDenied for path traversal")
+			assert.ErrorIs(t, err, apis.ErrPermissionDenied, "Expected ErrPermissionDenied for path traversal")
 		})
 	})
 }
@@ -606,7 +608,7 @@ func TestListFiles(t *testing.T) {
 	t.Run("ListNonExistentDirectory", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			_, err := fixture.VFS.ListFiles("nonexistent", false)
-			assert.ErrorIs(t, err, ErrFileNotFound)
+			assert.ErrorIs(t, err, apis.ErrFileNotFound)
 		})
 	})
 
@@ -616,14 +618,14 @@ func TestListFiles(t *testing.T) {
 			require.NoError(t, fixture.VFS.WriteFile(testPath, []byte("content")), "Failed to create test file")
 
 			_, err := fixture.VFS.ListFiles(testPath, false)
-			assert.ErrorIs(t, err, ErrNotADir)
+			assert.ErrorIs(t, err, apis.ErrNotADir)
 		})
 	})
 
 	t.Run("PathTraversalAttack", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			_, err := fixture.VFS.ListFiles("../../../etc", false)
-			assert.ErrorIs(t, err, ErrPermissionDenied, "Expected ErrPermissionDenied for path traversal")
+			assert.ErrorIs(t, err, apis.ErrPermissionDenied, "Expected ErrPermissionDenied for path traversal")
 		})
 	})
 }
@@ -685,7 +687,7 @@ func TestFindFiles(t *testing.T) {
 	t.Run("FindEmptyQuery", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
 			_, err := fixture.VFS.FindFiles("", false)
-			assert.ErrorIs(t, err, ErrInvalidPath, "Expected ErrInvalidPath for empty query")
+			assert.ErrorIs(t, err, apis.ErrInvalidPath, "Expected ErrInvalidPath for empty query")
 		})
 	})
 
@@ -943,8 +945,8 @@ func TestFindFiles(t *testing.T) {
 
 func TestInterfaceCompliance(t *testing.T) {
 	// This test ensures LocalVFS and MockVFS implement the VFS interface
-	var _ VFS = (*LocalVFS)(nil)
-	var _ VFS = (*MockVFS)(nil)
+	var _ apis.VFS = (*LocalVFS)(nil)
+	var _ apis.VFS = (*MockVFS)(nil)
 }
 
 func TestMockVFSPrepopulation(t *testing.T) {
@@ -982,7 +984,7 @@ func TestMockVFSPrepopulation(t *testing.T) {
 
 	t.Run("PrepopulateFromNonExistentDirectory", func(t *testing.T) {
 		_, err := NewMockVFSFromDir("/path/that/does/not/exist")
-		assert.ErrorIs(t, err, ErrFileNotFound, "Expected ErrFileNotFound for non-existent directory")
+		assert.ErrorIs(t, err, apis.ErrFileNotFound, "Expected ErrFileNotFound for non-existent directory")
 	})
 
 	t.Run("PrepopulateFromFile", func(t *testing.T) {
@@ -992,7 +994,7 @@ func TestMockVFSPrepopulation(t *testing.T) {
 		tempFile.Close()
 
 		_, err = NewMockVFSFromDir(tempFile.Name())
-		assert.ErrorIs(t, err, ErrNotADir, "Expected ErrNotADir when prepopulating from a file")
+		assert.ErrorIs(t, err, apis.ErrNotADir, "Expected ErrNotADir when prepopulating from a file")
 	})
 }
 
@@ -1146,7 +1148,7 @@ func TestMockVCS_ListWorktrees(t *testing.T) {
 
 // TestVCSInterfaceCompliance verifies that all VCS implementations implement the interface.
 func TestVCSInterfaceCompliance(t *testing.T) {
-	var _ VCS = (*NullVCS)(nil)
-	var _ VCS = (*MockVCS)(nil)
+	var _ apis.VCS = (*vcs.NullVCS)(nil)
+	var _ apis.VCS = (*MockVCS)(nil)
 	// Note: GitVCS requires a real git repository, so we can't easily test it here
 }

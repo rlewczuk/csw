@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +18,7 @@ func TestFilePatcher_ApplyEdits(t *testing.T) {
 		newString   string
 		replaceAll  bool
 		expectedErr error
-		validate    func(t *testing.T, vfs VFS, diff string)
+		validate    func(t *testing.T, vfs apis.VFS, diff string)
 	}{
 		{
 			name:        "simple replacement",
@@ -26,7 +27,7 @@ func TestFilePatcher_ApplyEdits(t *testing.T) {
 			newString:   "Universe",
 			replaceAll:  false,
 			expectedErr: nil,
-			validate: func(t *testing.T, vfs VFS, diff string) {
+			validate: func(t *testing.T, vfs apis.VFS, diff string) {
 				content, err := vfs.ReadFile("test.txt")
 				require.NoError(t, err)
 				assert.Equal(t, "Hello Universe\nThis is a test\n", string(content))
@@ -40,8 +41,8 @@ func TestFilePatcher_ApplyEdits(t *testing.T) {
 			oldString:   "test",
 			newString:   "new",
 			replaceAll:  false,
-			expectedErr: ErrFileNotFound,
-			validate: func(t *testing.T, vfs VFS, diff string) {
+			expectedErr: apis.ErrFileNotFound,
+			validate: func(t *testing.T, vfs apis.VFS, diff string) {
 				assert.Empty(t, diff)
 			},
 		},
@@ -52,7 +53,7 @@ func TestFilePatcher_ApplyEdits(t *testing.T) {
 			newString:   "Something",
 			replaceAll:  false,
 			expectedErr: ErrOldStringNotFound,
-			validate: func(t *testing.T, vfs VFS, diff string) {
+			validate: func(t *testing.T, vfs apis.VFS, diff string) {
 				assert.Empty(t, diff)
 				// File should not be modified
 				content, err := vfs.ReadFile("test.txt")
@@ -67,7 +68,7 @@ func TestFilePatcher_ApplyEdits(t *testing.T) {
 			newString:   "qux",
 			replaceAll:  false,
 			expectedErr: ErrOldStringMultipleMatch,
-			validate: func(t *testing.T, vfs VFS, diff string) {
+			validate: func(t *testing.T, vfs apis.VFS, diff string) {
 				assert.Empty(t, diff)
 				// File should not be modified
 				content, err := vfs.ReadFile("test.txt")
@@ -82,7 +83,7 @@ func TestFilePatcher_ApplyEdits(t *testing.T) {
 			newString:   "qux",
 			replaceAll:  true,
 			expectedErr: nil,
-			validate: func(t *testing.T, vfs VFS, diff string) {
+			validate: func(t *testing.T, vfs apis.VFS, diff string) {
 				content, err := vfs.ReadFile("test.txt")
 				require.NoError(t, err)
 				assert.Equal(t, "qux bar qux baz qux\n", string(content))
@@ -107,7 +108,7 @@ func main() {
 }`,
 			replaceAll:  false,
 			expectedErr: nil,
-			validate: func(t *testing.T, vfs VFS, diff string) {
+			validate: func(t *testing.T, vfs apis.VFS, diff string) {
 				content, err := vfs.ReadFile("test.txt")
 				require.NoError(t, err)
 				expected := `package main
@@ -130,7 +131,7 @@ func main() {
 			newString:   "qux bar\nline 2",
 			replaceAll:  false,
 			expectedErr: nil,
-			validate: func(t *testing.T, vfs VFS, diff string) {
+			validate: func(t *testing.T, vfs apis.VFS, diff string) {
 				content, err := vfs.ReadFile("test.txt")
 				require.NoError(t, err)
 				assert.Equal(t, "line 1\nqux bar\nline 2\nfoo baz\nline 3\n", string(content))
@@ -145,7 +146,7 @@ func main() {
 			newString:   "test",
 			replaceAll:  false,
 			expectedErr: ErrOldStringMultipleMatch,
-			validate: func(t *testing.T, vfs VFS, diff string) {
+			validate: func(t *testing.T, vfs apis.VFS, diff string) {
 				// Empty string matches at every position, so should fail
 				assert.Empty(t, diff)
 			},
@@ -157,7 +158,7 @@ func main() {
 			newString:   "World",
 			replaceAll:  false,
 			expectedErr: nil,
-			validate: func(t *testing.T, vfs VFS, diff string) {
+			validate: func(t *testing.T, vfs apis.VFS, diff string) {
 				content, err := vfs.ReadFile("test.txt")
 				require.NoError(t, err)
 				assert.Equal(t, "Hello World\n", string(content))

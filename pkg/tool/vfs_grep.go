@@ -5,12 +5,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // VFSGrepTool implements the vfsGrep tool.
 type VFSGrepTool struct {
-	vfs vfs.VFS
+	vfs apis.VFS
 }
 
 func (t *VFSGrepTool) GetDescription() (string, bool) {
@@ -18,7 +19,7 @@ func (t *VFSGrepTool) GetDescription() (string, bool) {
 }
 
 // NewVFSGrepTool creates a new VFSGrepTool instance.
-func NewVFSGrepTool(v vfs.VFS) *VFSGrepTool {
+func NewVFSGrepTool(v apis.VFS) *VFSGrepTool {
 	return &VFSGrepTool{vfs: v}
 }
 
@@ -73,7 +74,7 @@ func (t *VFSGrepTool) Execute(args *ToolCall) *ToolResponse {
 
 	// Perform the search
 	matches, err := grepFilter.Search()
-	if err == vfs.ErrAskPermission {
+	if err == apis.ErrAskPermission {
 		return NewVFSPermissionQuery(args, path, "searching files", "read")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {

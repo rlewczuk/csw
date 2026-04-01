@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/logging"
@@ -339,7 +340,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 		// Test that write is denied
 		err = session.VFS.WriteFile("test.txt", []byte("content"))
 		assert.Error(t, err)
-		assert.Equal(t, vfs.ErrPermissionDenied, err)
+		assert.Equal(t, apis.ErrPermissionDenied, err)
 
 		// Test that read is allowed
 		mockVFS.WriteFile("existing.txt", []byte("content"))

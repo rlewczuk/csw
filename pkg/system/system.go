@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/logging"
@@ -18,7 +19,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 type subAgentSummaryJSON struct {
@@ -43,7 +43,7 @@ type SweSystem struct {
 	ToolSelection   conf.ToolSelectionConfig
 	PromptGenerator core.PromptGenerator
 	Tools           *tool.ToolRegistry
-	VFS             vfs.VFS
+	VFS             apis.VFS
 	Roles           *core.AgentRoleRegistry
 	LSP             lsp.LSP
 	ConfigStore     conf.ConfigStore

@@ -13,7 +13,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/conf"
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
-	"github.com/rlewczuk/csw/pkg/vfs"
+	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -256,7 +256,7 @@ func TestPrepareSessionVFSWithoutWorktree(t *testing.T) {
 	require.NotNil(t, repo)
 	require.NotNil(t, selectedVFS)
 
-	_, isNull := repo.(*vfs.NullVCS)
+	_, isNull := repo.(*vcs.NullVCS)
 	assert.True(t, isNull)
 	assert.Equal(t, tmpDir, selectedVFS.WorktreePath())
 }
@@ -269,7 +269,7 @@ func TestPrepareSessionVFSWithWorktreeCreatesBranchAndWorktree(t *testing.T) {
 	require.NotNil(t, repo)
 	require.NotNil(t, selectedVFS)
 
-	_, isGit := repo.(*vfs.GitVCS)
+	_, isGit := repo.(*vcs.GitVCS)
 	assert.True(t, isGit)
 
 	expectedWorktreePath := filepath.Join(repoDir, ".cswdata", "work", "feature", "worktree")

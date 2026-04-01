@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/vfs"
@@ -116,9 +117,9 @@ func TestVFSPatchTool(t *testing.T) {
 		assert.Equal(t, "after\n", string(moved))
 
 		_, err = mockVFS.ReadFile("rename.txt")
-		assert.ErrorIs(t, err, vfs.ErrFileNotFound)
+		assert.ErrorIs(t, err, apis.ErrFileNotFound)
 		_, err = mockVFS.ReadFile("old.txt")
-		assert.ErrorIs(t, err, vfs.ErrFileNotFound)
+		assert.ErrorIs(t, err, apis.ErrFileNotFound)
 	})
 
 	t.Run("should include lsp diagnostics for changed files", func(t *testing.T) {

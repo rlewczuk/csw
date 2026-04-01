@@ -11,9 +11,9 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // PromptGenerator generates a prompt for the given tags, role and state.
@@ -36,7 +36,7 @@ type PromptGenerator interface {
 // It uses conf.ConfigStore to get prompt fragments from AgentRoleConfig.PromptFragments.
 type ConfPromptGenerator struct {
 	store conf.ConfigStore
-	vfs   vfs.VFS
+	vfs   apis.VFS
 }
 
 // promptFragment represents a single prompt fragment file.
@@ -52,7 +52,7 @@ type promptFragment struct {
 
 // NewConfPromptGenerator creates a new ConfPromptGenerator with the given ConfigStore and VFS.
 // If vfs is nil, GetAgentFiles() will return an error.
-func NewConfPromptGenerator(store conf.ConfigStore, filesystem vfs.VFS) (*ConfPromptGenerator, error) {
+func NewConfPromptGenerator(store conf.ConfigStore, filesystem apis.VFS) (*ConfPromptGenerator, error) {
 	if store == nil {
 		return nil, fmt.Errorf("NewConfPromptGenerator() [prompt.go]: store cannot be nil")
 	}
@@ -287,7 +287,7 @@ func (g *ConfPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfi
 				combined.WriteString("\n\n")
 			}
 			combined.WriteString(string(agentsContent))
-		} else if !errors.Is(err, vfs.ErrFileNotFound) {
+		} else if !errors.Is(err, apis.ErrFileNotFound) {
 			// Error other than file not found
 			return "", fmt.Errorf("GetPrompt() [prompt.go]: failed to read AGENTS.md: %w", err)
 		}
@@ -579,7 +579,7 @@ func (g *ConfPromptGenerator) GetAgentFiles(dir string) (map[string]string, erro
 		agentsPath := filepath.Join(current, "AGENTS.md")
 		content, err := g.vfs.ReadFile(agentsPath)
 		if err != nil {
-			if errors.Is(err, vfs.ErrFileNotFound) {
+			if errors.Is(err, apis.ErrFileNotFound) {
 				if filepath.Dir(current) == current {
 					break
 				}

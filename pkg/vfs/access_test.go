@@ -3,6 +3,7 @@ package vfs
 import (
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,7 @@ func TestAccessControlVFS_ReadFile(t *testing.T) {
 			},
 			path:    "test.txt",
 			wantErr: true,
-			errType: ErrPermissionDenied,
+			errType: apis.ErrPermissionDenied,
 		},
 		{
 			name: "allow read with wildcard pattern",
@@ -48,7 +49,7 @@ func TestAccessControlVFS_ReadFile(t *testing.T) {
 			},
 			path:    "test.txt",
 			wantErr: true,
-			errType: ErrPermissionDenied,
+			errType: apis.ErrPermissionDenied,
 		},
 		{
 			name: "allow read with default wildcard",
@@ -65,7 +66,7 @@ func TestAccessControlVFS_ReadFile(t *testing.T) {
 			},
 			path:    "test.txt",
 			wantErr: true,
-			errType: ErrAskPermission,
+			errType: apis.ErrAskPermission,
 		},
 	}
 
@@ -112,7 +113,7 @@ func TestAccessControlVFS_WriteFile(t *testing.T) {
 			},
 			path:    "test.txt",
 			wantErr: true,
-			errType: ErrPermissionDenied,
+			errType: apis.ErrPermissionDenied,
 		},
 		{
 			name: "deny write by default",
@@ -121,7 +122,7 @@ func TestAccessControlVFS_WriteFile(t *testing.T) {
 			},
 			path:    "test.txt",
 			wantErr: true,
-			errType: ErrPermissionDenied,
+			errType: apis.ErrPermissionDenied,
 		},
 	}
 
@@ -166,7 +167,7 @@ func TestAccessControlVFS_DeleteFile(t *testing.T) {
 			},
 			path:    "test.txt",
 			wantErr: true,
-			errType: ErrPermissionDenied,
+			errType: apis.ErrPermissionDenied,
 		},
 	}
 
@@ -213,7 +214,7 @@ func TestAccessControlVFS_ListFiles(t *testing.T) {
 			},
 			path:    "dir",
 			wantErr: true,
-			errType: ErrPermissionDenied,
+			errType: apis.ErrPermissionDenied,
 		},
 	}
 
@@ -261,7 +262,7 @@ func TestAccessControlVFS_FindFiles(t *testing.T) {
 			},
 			query:   "*.txt",
 			wantErr: true,
-			errType: ErrPermissionDenied,
+			errType: apis.ErrPermissionDenied,
 		},
 	}
 
@@ -311,7 +312,7 @@ func TestAccessControlVFS_MoveFile(t *testing.T) {
 			src:     "src.txt",
 			dst:     "dst.txt",
 			wantErr: true,
-			errType: ErrPermissionDenied,
+			errType: apis.ErrPermissionDenied,
 		},
 		{
 			name: "deny write on destination",
@@ -322,7 +323,7 @@ func TestAccessControlVFS_MoveFile(t *testing.T) {
 			src:     "src.txt",
 			dst:     "dst.txt",
 			wantErr: true,
-			errType: ErrPermissionDenied,
+			errType: apis.ErrPermissionDenied,
 		},
 		{
 			name: "deny both",
@@ -333,7 +334,7 @@ func TestAccessControlVFS_MoveFile(t *testing.T) {
 			src:     "src.txt",
 			dst:     "dst.txt",
 			wantErr: true,
-			errType: ErrPermissionDenied,
+			errType: apis.ErrPermissionDenied,
 		},
 	}
 
@@ -525,11 +526,11 @@ func TestAccessControlVFS_MultipleOperations(t *testing.T) {
 
 	err = acVFS.WriteFile("read-only.txt", []byte("new content"))
 	require.Error(t, err)
-	assert.ErrorIs(t, err, ErrPermissionDenied)
+	assert.ErrorIs(t, err, apis.ErrPermissionDenied)
 
 	err = acVFS.DeleteFile("read-only.txt", false, false)
 	require.Error(t, err)
-	assert.ErrorIs(t, err, ErrPermissionDenied)
+	assert.ErrorIs(t, err, apis.ErrPermissionDenied)
 
 	// Test read-write file
 	err = acVFS.WriteFile("read-write.txt", []byte("content"))
@@ -779,7 +780,7 @@ func TestNuancedGlobPatterns(t *testing.T) {
 
 			if tt.wantErr {
 				require.Error(t, err, tt.desc)
-				assert.ErrorIs(t, err, ErrPermissionDenied, tt.desc)
+				assert.ErrorIs(t, err, apis.ErrPermissionDenied, tt.desc)
 			} else {
 				require.NoError(t, err, tt.desc)
 			}

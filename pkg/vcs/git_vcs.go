@@ -1,4 +1,4 @@
-package vfs
+package vcs
 
 import (
 	"bytes"
@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/rlewczuk/csw/pkg/apis"
+	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // GitVCS implements the VCS interface for git repositories.
@@ -28,7 +31,7 @@ type GitVCS struct {
 type gitWorktree struct {
 	branch string
 	path   string
-	vfs    VFS
+	vfs    apis.VFS
 }
 
 // NewGitRepo creates a new GitVCS instance from an existing git repository path.
@@ -45,13 +48,13 @@ func NewGitRepo(path string, worktreesPath string, hidePatterns []string, allowe
 	info, err := os.Stat(absPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", ErrFileNotFound)
+			return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", apis.ErrFileNotFound)
 		}
 		return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", err)
 	}
 
 	if !info.IsDir() {
-		return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", ErrNotADir)
+		return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", apis.ErrNotADir)
 	}
 
 	// Resolve worktreesPath to absolute path
@@ -73,14 +76,14 @@ func NewGitRepo(path string, worktreesPath string, hidePatterns []string, allowe
 	showTopLevelOutput, err := g.runGitOutput("rev-parse", "--show-toplevel")
 	if err != nil {
 		if isExitCode(err, 128) {
-			return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", ErrFileNotFound)
+			return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", apis.ErrFileNotFound)
 		}
 		return nil, fmt.Errorf("NewGitRepo() [git.go]: %w", err)
 	}
 
 	repoTopLevelPath := filepath.Clean(strings.TrimSpace(showTopLevelOutput))
 	if repoTopLevelPath != absPath {
-		return nil, fmt.Errorf("NewGitRepo() [git.go]: path %q is not a git repository root: %w", absPath, ErrFileNotFound)
+		return nil, fmt.Errorf("NewGitRepo() [git.go]: path %q is not a git repository root: %w", absPath, apis.ErrFileNotFound)
 	}
 
 	return g, nil
@@ -88,7 +91,7 @@ func NewGitRepo(path string, worktreesPath string, hidePatterns []string, allowe
 
 // GetWorktree extracts the worktree for the given branch and returns a VFS instance for it.
 // If worktree is already extracted, it returns the existing VFS instance.
-func (g *GitVCS) GetWorktree(branch string) (VFS, error) {
+func (g *GitVCS) GetWorktree(branch string) (apis.VFS, error) {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
@@ -106,18 +109,18 @@ func (g *GitVCS) GetWorktree(branch string) (VFS, error) {
 		return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", err)
 	}
 	if !branchExists {
-		return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: branch %q not found: %w", branch, ErrFileNotFound)
+		return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: branch %q not found: %w", branch, apis.ErrFileNotFound)
 	}
 
 	worktreeInfo, statErr := os.Stat(worktreePath)
 	if statErr == nil && worktreeInfo.IsDir() {
 		currentBranch, branchErr := g.currentBranchInWorktree(worktreePath)
 		if branchErr == nil && currentBranch == branch {
-			localVFS, localErr := NewLocalVFS(worktreePath, g.hidePatterns, g.allowedPaths)
+			localVFS, localErr := vfs.NewLocalVFS(worktreePath, g.hidePatterns, g.allowedPaths)
 			if localErr != nil {
 				return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", localErr)
 			}
-			localVFS.repo = g
+			localVFS.Repo = g
 
 			wt := &gitWorktree{
 				branch: branch,
@@ -143,13 +146,13 @@ func (g *GitVCS) GetWorktree(branch string) (VFS, error) {
 		return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", err)
 	}
 
-	localVFS, err := NewLocalVFS(worktreePath, g.hidePatterns, g.allowedPaths)
+	localVFS, err := vfs.NewLocalVFS(worktreePath, g.hidePatterns, g.allowedPaths)
 	if err != nil {
 		_ = g.runGit("worktree", "remove", "--force", worktreePath)
 		_ = os.RemoveAll(worktreePath)
 		return nil, fmt.Errorf("GitVCS.GetWorktree() [git.go]: %w", err)
 	}
-	localVFS.repo = g
+	localVFS.Repo = g
 
 	wt := &gitWorktree{
 		branch: branch,
@@ -174,12 +177,12 @@ func (g *GitVCS) DropWorktree(branch string) error {
 		worktreeInfo, err := os.Stat(worktreePath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return fmt.Errorf("GitVCS.DropWorktree() [git.go]: worktree for branch %q not found: %w", branch, ErrFileNotFound)
+				return fmt.Errorf("GitVCS.DropWorktree() [git.go]: worktree for branch %q not found: %w", branch, apis.ErrFileNotFound)
 			}
 			return fmt.Errorf("GitVCS.DropWorktree() [git.go]: %w", err)
 		}
 		if !worktreeInfo.IsDir() {
-			return fmt.Errorf("GitVCS.DropWorktree() [git.go]: worktree for branch %q not found: %w", branch, ErrFileNotFound)
+			return fmt.Errorf("GitVCS.DropWorktree() [git.go]: worktree for branch %q not found: %w", branch, apis.ErrFileNotFound)
 		}
 	}
 
@@ -202,7 +205,7 @@ func (g *GitVCS) CommitWorktree(branch string, message string) error {
 	g.mutex.RUnlock()
 
 	if !exists {
-		return fmt.Errorf("GitVCS.CommitWorktree() [git.go]: worktree for branch %q not found: %w", branch, ErrFileNotFound)
+		return fmt.Errorf("GitVCS.CommitWorktree() [git.go]: worktree for branch %q not found: %w", branch, apis.ErrFileNotFound)
 	}
 
 	if err := g.runGitInWorktree(wt.path, "add", "-A"); err != nil {
@@ -215,7 +218,7 @@ func (g *GitVCS) CommitWorktree(branch string, message string) error {
 	}
 
 	if strings.TrimSpace(statusOutput) == "" {
-		return fmt.Errorf("GitVCS.CommitWorktree() [git.go]: %w", ErrNoChangesToCommit)
+		return fmt.Errorf("GitVCS.CommitWorktree() [git.go]: %w", apis.ErrNoChangesToCommit)
 	}
 
 	if err := g.runGitInWorktree(wt.path, "commit", "-m", message); err != nil {
@@ -239,7 +242,7 @@ func (g *GitVCS) NewBranch(name string, from string) error {
 		return fmt.Errorf("GitVCS.NewBranch() [git.go]: %w", err)
 	}
 	if !revisionExists {
-		return fmt.Errorf("GitVCS.NewBranch() [git.go]: source branch %q not found: %w", from, ErrFileNotFound)
+		return fmt.Errorf("GitVCS.NewBranch() [git.go]: source branch %q not found: %w", from, apis.ErrFileNotFound)
 	}
 
 	branchExists, err := g.branchExists(name)
@@ -247,7 +250,7 @@ func (g *GitVCS) NewBranch(name string, from string) error {
 		return fmt.Errorf("GitVCS.NewBranch() [git.go]: %w", err)
 	}
 	if branchExists {
-		return fmt.Errorf("GitVCS.NewBranch() [git.go]: branch %q already exists: %w", name, ErrFileExists)
+		return fmt.Errorf("GitVCS.NewBranch() [git.go]: branch %q already exists: %w", name, apis.ErrFileExists)
 	}
 
 	if err := g.runGit("branch", name, from); err != nil {
@@ -268,7 +271,7 @@ func (g *GitVCS) DeleteBranch(name string) error {
 		return fmt.Errorf("GitVCS.DeleteBranch() [git.go]: %w", err)
 	}
 	if currentBranch == name {
-		return fmt.Errorf("GitVCS.DeleteBranch() [git.go]: cannot delete current branch: %w", ErrPermissionDenied)
+		return fmt.Errorf("GitVCS.DeleteBranch() [git.go]: cannot delete current branch: %w", apis.ErrPermissionDenied)
 	}
 
 	// Check if branch exists
@@ -277,7 +280,7 @@ func (g *GitVCS) DeleteBranch(name string) error {
 		return fmt.Errorf("GitVCS.DeleteBranch() [git.go]: %w", err)
 	}
 	if !branchExists {
-		return fmt.Errorf("GitVCS.DeleteBranch() [git.go]: branch %q not found: %w", name, ErrFileNotFound)
+		return fmt.Errorf("GitVCS.DeleteBranch() [git.go]: branch %q not found: %w", name, apis.ErrFileNotFound)
 	}
 
 	// Remove the worktree if it exists
@@ -355,7 +358,7 @@ func (g *GitVCS) MergeBranches(into string, from string) error {
 		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 	if !intoBranchExists {
-		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: target branch %q not found: %w", into, ErrFileNotFound)
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: target branch %q not found: %w", into, apis.ErrFileNotFound)
 	}
 
 	fromBranchExists, err := g.branchExists(from)
@@ -363,7 +366,7 @@ func (g *GitVCS) MergeBranches(into string, from string) error {
 		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}
 	if !fromBranchExists {
-		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: source branch %q not found: %w", from, ErrFileNotFound)
+		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: source branch %q not found: %w", from, apis.ErrFileNotFound)
 	}
 
 	g.mutex.RLock()
@@ -426,7 +429,7 @@ func (g *GitVCS) MergeBranches(into string, from string) error {
 		errText := err.Error()
 		if strings.Contains(errText, "CONFLICT") || strings.Contains(errText, "would be overwritten by merge") {
 			_ = g.runGitInWorktree(fromMergePath, "rebase", "--abort")
-			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w: %w", err, ErrMergeConflict)
+			return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w: %w", err, apis.ErrMergeConflict)
 		}
 		return fmt.Errorf("GitVCS.MergeBranches() [git.go]: %w", err)
 	}

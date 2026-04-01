@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // SessionLoggerFactory creates session logger used by tests.
@@ -25,15 +25,15 @@ type SessionLoggerFactory func(sessionID string, logBaseDir string) (*slog.Logge
 
 // SweSystem is a test-only system implementation used by core package tests.
 type SweSystem struct {
-	ModelProviders map[string]models.ModelProvider
-	ModelTags      *models.ModelTagRegistry
-	ToolSelection  conf.ToolSelectionConfig
+	ModelProviders  map[string]models.ModelProvider
+	ModelTags       *models.ModelTagRegistry
+	ToolSelection   conf.ToolSelectionConfig
 	PromptGenerator PromptGenerator
-	Tools          *tool.ToolRegistry
-	VFS            vfs.VFS
-	Roles          *AgentRoleRegistry
-	LSP            lsp.LSP
-	ConfigStore    conf.ConfigStore
+	Tools           *tool.ToolRegistry
+	VFS             apis.VFS
+	Roles           *AgentRoleRegistry
+	LSP             lsp.LSP
+	ConfigStore     conf.ConfigStore
 
 	sessions   map[string]*SweSession
 	threads    map[string]*SessionThread

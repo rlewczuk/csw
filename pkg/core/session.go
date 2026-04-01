@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/lsp"
@@ -25,8 +26,8 @@ import (
 )
 
 const (
-	defaultLLMRetryMaxAttempts       = 10
-	defaultLLMRetryMaxBackoffSeconds = 60
+	defaultLLMRetryMaxAttempts        = 10
+	defaultLLMRetryMaxBackoffSeconds  = 60
 	defaultContextCompactionThreshold = 0.95
 	defaultMaxToolThreads             = 8
 	toolExecutionStartDelay           = 250 * time.Millisecond
@@ -52,8 +53,8 @@ type SweSession struct {
 	toolsUsed     []string
 	messages      []*models.ChatMessage
 	role          *conf.AgentRoleConfig
-	VFS           vfs.VFS
-	baseVFS       vfs.VFS
+	VFS           apis.VFS
+	baseVFS       apis.VFS
 	LSP           lsp.LSP
 	Tools         *tool.ToolRegistry
 	outputHandler SessionThreadOutput
@@ -102,8 +103,8 @@ type SweSessionParams struct {
 	Model        string
 	ModelSpec    string
 
-	VFS         vfs.VFS
-	BaseVFS     vfs.VFS
+	VFS         apis.VFS
+	BaseVFS     apis.VFS
 	LSP         lsp.LSP
 	SystemTools *tool.ToolRegistry
 
@@ -1409,7 +1410,7 @@ func (s *SweSession) ExecuteSubAgentTask(request tool.SubAgentTaskRequest) (tool
 	return s.subAgentRunner.ExecuteSubAgentTask(s, request)
 }
 
-func buildSessionToolRegistry(systemTools *tool.ToolRegistry, vfsImpl vfs.VFS, lspClient lsp.LSP, session *SweSession) *tool.ToolRegistry {
+func buildSessionToolRegistry(systemTools *tool.ToolRegistry, vfsImpl apis.VFS, lspClient lsp.LSP, session *SweSession) *tool.ToolRegistry {
 	registry := tool.NewToolRegistry()
 	if systemTools != nil {
 		for _, name := range systemTools.List() {
@@ -1856,9 +1857,9 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 	}
 
 	session := NewSweSession(&SweSessionParams{
-		ID:              state.SessionID,
-		ParentID:        state.ParentSessionID,
-		Slug:            state.Slug,
+		ID:       state.SessionID,
+		ParentID: state.ParentSessionID,
+		Slug:     state.Slug,
 		ModelSpec: func() string {
 			if strings.TrimSpace(state.ModelSpec) != "" {
 				return strings.TrimSpace(state.ModelSpec)

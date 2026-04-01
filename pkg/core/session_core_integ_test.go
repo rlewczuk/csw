@@ -10,19 +10,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type agentFilePromptGenerator struct {
-	vfs vfs.VFS
+	vfs apis.VFS
 }
 
 func (g *agentFilePromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error) {
@@ -39,7 +39,7 @@ func (g *agentFilePromptGenerator) GetAgentFiles(dir string) (map[string]string,
 	path := filepath.Join(dir, "AGENTS.md")
 	content, err := g.vfs.ReadFile(path)
 	if err != nil {
-		if strings.Contains(err.Error(), vfs.ErrFileNotFound.Error()) {
+		if strings.Contains(err.Error(), apis.ErrFileNotFound.Error()) {
 			return result, nil
 		}
 		return nil, err

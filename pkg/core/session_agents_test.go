@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/tool"
@@ -35,7 +36,7 @@ func (s *roleLimitedToolStub) IsRoleAllowed(roleName string) bool {
 }
 
 type sessionAgentTestPromptGenerator struct {
-	vfs vfs.VFS
+	vfs apis.VFS
 }
 
 func (g *sessionAgentTestPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfig, state *AgentState) (string, error) {
@@ -52,7 +53,7 @@ func (g *sessionAgentTestPromptGenerator) GetAgentFiles(dir string) (map[string]
 		path := filepath.Join(current, "AGENTS.md")
 		content, err := g.vfs.ReadFile(path)
 		if err != nil {
-			if errors.Is(err, vfs.ErrFileNotFound) {
+			if errors.Is(err, apis.ErrFileNotFound) {
 				if filepath.Dir(current) == current {
 					break
 				}
@@ -121,12 +122,12 @@ func TestBuildAdditionalAgentMessageForDir(t *testing.T) {
 		assert.Nil(t, nextMsgs)
 	})
 
-		t.Run("deduplicates parent files across subsequent directory reads", func(t *testing.T) {
-			freshSession := &SweSession{
-				promptGenerator: &sessionAgentTestPromptGenerator{vfs: mockVFS},
-				VFS:             mockVFS,
-				workDir:         ".",
-			}
+	t.Run("deduplicates parent files across subsequent directory reads", func(t *testing.T) {
+		freshSession := &SweSession{
+			promptGenerator: &sessionAgentTestPromptGenerator{vfs: mockVFS},
+			VFS:             mockVFS,
+			workDir:         ".",
+		}
 
 		firstMsgs, err := freshSession.buildAdditionalAgentMessageForDir("pkg/foo/bar")
 		require.NoError(t, err)

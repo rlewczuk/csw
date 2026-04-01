@@ -1,20 +1,24 @@
-package vfs
+package vcs
+
+import (
+	"github.com/rlewczuk/csw/pkg/apis"
+)
 
 // NullVCS represents a plain unversioned directory.
 // It satisfies the VCS interface but has no actual version control functionality.
 type NullVCS struct {
-	vfs VFS
+	vfs apis.VFS
 }
 
 // NewNullVCS creates a new NullVCS instance with the given VFS.
 // It accepts a VFS and returns a pointer to NullVCS or an error.
-func NewNullVFS(vfs VFS) (*NullVCS, error) {
+func NewNullVFS(vfs apis.VFS) (*NullVCS, error) {
 	return &NullVCS{vfs: vfs}, nil
 }
 
 // GetWorktree returns the VFS for the given root path.
 // For NullVCS, it simply returns the underlying VFS.
-func (n *NullVCS) GetWorktree(branch string) (VFS, error) {
+func (n *NullVCS) GetWorktree(branch string) (apis.VFS, error) {
 	return n.vfs, nil
 }
 

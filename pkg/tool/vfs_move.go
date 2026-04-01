@@ -3,12 +3,13 @@ package tool
 import (
 	"fmt"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // VFSMoveTool implements the vfsMove tool.
 type VFSMoveTool struct {
-	vfs vfs.VFS
+	vfs apis.VFS
 }
 
 func (t *VFSMoveTool) GetDescription() (string, bool) {
@@ -16,7 +17,7 @@ func (t *VFSMoveTool) GetDescription() (string, bool) {
 }
 
 // NewVFSMoveTool creates a new VFSMoveTool instance.
-func NewVFSMoveTool(v vfs.VFS) *VFSMoveTool {
+func NewVFSMoveTool(v apis.VFS) *VFSMoveTool {
 	return &VFSMoveTool{vfs: v}
 }
 
@@ -45,7 +46,7 @@ func (t *VFSMoveTool) Execute(args *ToolCall) *ToolResponse {
 	result.Set("destination", destination)
 
 	err := t.vfs.MoveFile(path, destination)
-	if err == vfs.ErrAskPermission {
+	if err == apis.ErrAskPermission {
 		return NewVFSPermissionQuery(args, path, "moving file", "move")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {

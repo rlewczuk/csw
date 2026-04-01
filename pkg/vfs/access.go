@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 )
 
@@ -19,7 +20,7 @@ func (e *PermissionError) Error() string {
 
 // Is implements errors.Is interface to allow checking if PermissionError is ErrAskPermission.
 func (e *PermissionError) Is(target error) bool {
-	return target == ErrAskPermission
+	return target == apis.ErrAskPermission
 }
 
 type FileOperation string
@@ -35,7 +36,7 @@ var denyAll = conf.FileAccess{
 
 type AccessControlVFS struct {
 	// underlying VFS implementation
-	vfs VFS
+	vfs apis.VFS
 
 	// map of glob patterns to FileAccess
 	privileges map[string]conf.FileAccess
@@ -49,12 +50,12 @@ func (ac *AccessControlVFS) WorktreePath() string {
 	return ac.vfs.WorktreePath()
 }
 
-func (ac *AccessControlVFS) GetRepo() VCS {
+func (ac *AccessControlVFS) GetRepo() apis.VCS {
 	return ac.vfs.GetRepo()
 }
 
 // NewAccessControlVFS creates a new AccessControlVFS with the given underlying VFS and privileges map.
-func NewAccessControlVFS(vfs VFS, privileges map[string]conf.FileAccess) *AccessControlVFS {
+func NewAccessControlVFS(vfs apis.VFS, privileges map[string]conf.FileAccess) *AccessControlVFS {
 	return &AccessControlVFS{
 		vfs:        vfs,
 		privileges: privileges,
@@ -64,7 +65,7 @@ func NewAccessControlVFS(vfs VFS, privileges map[string]conf.FileAccess) *Access
 // checkAccess checks if the given operation is allowed for the given path.
 func (ac *AccessControlVFS) checkAccess(path string, op string, flag conf.AccessFlag) error {
 	if flag == conf.AccessDeny {
-		return ErrPermissionDenied
+		return apis.ErrPermissionDenied
 	}
 	if flag == conf.AccessAsk {
 		return &PermissionError{Path: path, Operation: op}

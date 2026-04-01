@@ -3,12 +3,13 @@ package tool
 import (
 	"fmt"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 // VFSReadTool implements the vfsRead tool.
 type VFSReadTool struct {
-	vfs         vfs.VFS
+	vfs         apis.VFS
 	lineNumbers bool
 }
 
@@ -18,7 +19,7 @@ func (t *VFSReadTool) GetDescription() (string, bool) {
 
 // NewVFSReadTool creates a new VFSReadTool instance.
 // If lineNumbers is true, the tool will format content with line numbers (cat -n style).
-func NewVFSReadTool(v vfs.VFS, lineNumbers bool) *VFSReadTool {
+func NewVFSReadTool(v apis.VFS, lineNumbers bool) *VFSReadTool {
 	return &VFSReadTool{vfs: v, lineNumbers: lineNumbers}
 }
 
@@ -50,7 +51,7 @@ func (t *VFSReadTool) Execute(args *ToolCall) *ToolResponse {
 	}
 
 	content, err := t.vfs.ReadFile(path)
-	if err == vfs.ErrAskPermission {
+	if err == apis.ErrAskPermission {
 		return NewVFSPermissionQuery(args, path, "reading file", "read")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {

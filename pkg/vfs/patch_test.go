@@ -1,4 +1,4 @@
-package shared
+package vfs
 
 import (
 	"testing"

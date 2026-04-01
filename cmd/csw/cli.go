@@ -18,6 +18,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
@@ -29,7 +30,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/ui/cli"
-	"github.com/rlewczuk/csw/pkg/vfs"
+	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/spf13/cobra"
 )
 
@@ -719,7 +720,7 @@ func validateMergeCLIParams(params *CLIParams) error {
 	return nil
 }
 
-func resolveResumeMergeWorktreeContext(buildResult system.BuildSystemResult, params *CLIParams, session *core.SweSession) (vfs.VCS, string, string, error) {
+func resolveResumeMergeWorktreeContext(buildResult system.BuildSystemResult, params *CLIParams, session *core.SweSession) (apis.VCS, string, string, error) {
 	if params == nil {
 		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: params cannot be nil")
 	}
@@ -743,7 +744,7 @@ func resolveResumeMergeWorktreeContext(buildResult system.BuildSystemResult, par
 	}
 	worktreesRoot := filepath.Join(worktreesBaseDir, ".cswdata", "work")
 
-	resumeVCS, err := vfs.NewGitRepo(buildResult.WorkDirRoot, worktreesRoot, nil, nil, params.GitUserName, params.GitUserEmail)
+	resumeVCS, err := vcs.NewGitRepo(buildResult.WorkDirRoot, worktreesRoot, nil, nil, params.GitUserName, params.GitUserEmail)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: failed to create git vcs for resumed worktree: %w", err)
 	}
@@ -1963,7 +1964,7 @@ type worktreeFinalizeResult struct {
 	HeadCommitID string
 }
 
-func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer, repoDir string, worktreeDir string, originalPrompt string, hookEngine *core.HookEngine, appView ui.IAppView) (worktreeFinalizeResult, error) {
+func finalizeWorktreeSession(ctx context.Context, vcs apis.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *system.SweSystem, session *core.SweSession, stderr io.Writer, repoDir string, worktreeDir string, originalPrompt string, hookEngine *core.HookEngine, appView ui.IAppView) (worktreeFinalizeResult, error) {
 	result := worktreeFinalizeResult{}
 	if worktreeBranch == "" || vcs == nil {
 		return result, nil
@@ -1996,7 +1997,7 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 			commitMessage = generatedMessage
 		}
 
-		if commitErr := vcs.CommitWorktree(worktreeBranch, commitMessage); commitErr != nil && !errors.Is(commitErr, vfs.ErrNoChangesToCommit) {
+		if commitErr := vcs.CommitWorktree(worktreeBranch, commitMessage); commitErr != nil && !errors.Is(commitErr, apis.ErrNoChangesToCommit) {
 			_, _ = fmt.Fprintf(stderr, "worktree commit failed: %v\n", commitErr)
 			if merge {
 				_, _ = fmt.Fprintln(stderr, "merge skipped because commit failed. Resolve issues and merge manually.")
@@ -2030,7 +2031,7 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 		} else if strings.TrimSpace(repoDir) == "" || strings.TrimSpace(worktreeDir) == "" || sweSystem == nil || session == nil {
 			mergeErr := vcs.MergeBranches(baseBranch, worktreeBranch)
 			if mergeErr != nil {
-				if errors.Is(mergeErr, vfs.ErrMergeConflict) {
+				if errors.Is(mergeErr, apis.ErrMergeConflict) {
 					_, _ = fmt.Fprintf(stderr, "automatic merge failed due to conflicts: %v\n", mergeErr)
 					_, _ = fmt.Fprintf(stderr, "resolve conflicts manually and merge branch '%s' into %s.\n", worktreeBranch, baseBranch)
 					_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual conflict resolution.")
@@ -2067,7 +2068,7 @@ func finalizeWorktreeSession(ctx context.Context, vcs vfs.VCS, worktreeBranch st
 	return result, nil
 }
 
-func handleCommitHookResponse(ctx context.Context, hookEngine *core.HookEngine, vcs vfs.VCS, worktreeBranch string, repoDir string, worktreeDir string, session *core.SweSession, appView ui.IAppView) (string, bool, error) {
+func handleCommitHookResponse(ctx context.Context, hookEngine *core.HookEngine, vcs apis.VCS, worktreeBranch string, repoDir string, worktreeDir string, session *core.SweSession, appView ui.IAppView) (string, bool, error) {
 	if hookEngine == nil {
 		return "", false, nil
 	}

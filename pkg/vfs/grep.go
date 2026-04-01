@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/rlewczuk/csw/pkg/apis"
 )
 
 // GrepMatch represents a single file match with line numbers where the pattern was found.
@@ -27,7 +29,7 @@ type GrepFilter interface {
 // grepFilter implements GrepFilter interface.
 type grepFilter struct {
 	pattern    *regexp.Regexp
-	vfs        VFS
+	vfs        apis.VFS
 	rootDir    string
 	globFilter GlobFilter
 }
@@ -40,7 +42,7 @@ type grepFilter struct {
 //   - globFilter: optional GlobFilter to filter files (can be nil to include all files)
 //
 // Returns an error if the pattern is invalid.
-func NewGrepFilter(pattern string, vfs VFS, rootDir string, globFilter GlobFilter) (GrepFilter, error) {
+func NewGrepFilter(pattern string, vfs apis.VFS, rootDir string, globFilter GlobFilter) (GrepFilter, error) {
 	if vfs == nil {
 		return nil, fmt.Errorf("NewGrepFilter() [grep.go]: VFS cannot be nil")
 	}
