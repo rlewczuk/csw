@@ -167,7 +167,7 @@ func TestChatOptionsThinkingField(t *testing.T) {
 func TestBuildSessionSummaryMessage(t *testing.T) {
 	t.Run("includes token and context stats", func(t *testing.T) {
 		session := &core.SweSession{}
-		summary := buildSessionSummaryMessage(5*time.Second, session, system.BuildSystemResult{})
+		summary := system.BuildSessionSummaryMessage(5*time.Second, session, system.BuildSystemResult{})
 		assert.Contains(t, summary, "Session completed in 5s | tokens(input=0[cached=0,noncached=0], output=0, total=0) | context=0")
 		assert.Contains(t, summary, "Model: -")
 		assert.Contains(t, summary, "Thinking: -")
@@ -181,17 +181,17 @@ func TestBuildSessionSummaryMessage(t *testing.T) {
 	t.Run("nil session returns base summary", func(t *testing.T) {
 		assert.Equal(t,
 			"Session completed in 5s",
-			buildSessionSummaryMessage(5*time.Second, nil, system.BuildSystemResult{}),
+			system.BuildSessionSummaryMessage(5*time.Second, nil, system.BuildSystemResult{}),
 		)
 	})
 }
 
 func TestBuildContainerStartupInfoMessage(t *testing.T) {
-	message := buildContainerStartupInfoMessage(system.BuildSystemResult{
+	message := BuildContainerStartupInfoMessage(system.BuildSystemResult{
 		ContainerImageName:    "busybox",
 		ContainerImageTag:     "1.36",
 		ContainerImageVersion: "1.36",
-		ContainerIdentity: runner.ContainerIdentity{UID: 1000, GID: 100, UserName: "alice", GroupName: "users"},
+		ContainerIdentity:     runner.ContainerIdentity{UID: 1000, GID: 100, UserName: "alice", GroupName: "users"},
 	})
 
 	assert.Equal(t, "[INFO] Container: image=busybox tag=1.36 version=1.36 user=alice(uid=1000) group=users(gid=100)", message)

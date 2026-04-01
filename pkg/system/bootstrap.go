@@ -37,7 +37,7 @@ const (
 var gitLookPathFunc = exec.LookPath
 
 // gitConfigValueFunc resolves git config values and can be overridden in tests.
-var gitConfigValueFunc = ReadGitConfigValue
+var gitConfigValueFunc = vcs.ReadGitConfigValue
 
 var newCompositeConfigStoreFunc = impl.NewCompositeConfigStore
 var resolveModelNameFunc = ResolveModelName
@@ -1068,17 +1068,6 @@ func ResolveContainerGitAuthorIdentity() (string, string) {
 	}
 
 	return name, email
-}
-
-// ReadGitConfigValue reads a single git configuration key from host git config.
-func ReadGitConfigValue(key string) (string, error) {
-	cmd := exec.Command("git", "config", "--get", key)
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("ReadGitConfigValue() [bootstrap.go]: failed to read git config key %q: %w", key, err)
-	}
-
-	return strings.TrimSpace(string(output)), nil
 }
 
 // BuildConfigPath builds a config path hierarchy string from base and optional custom paths.

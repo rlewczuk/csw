@@ -7,6 +7,7 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/system"
+	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,13 +50,13 @@ func TestCLIGitIdentityPropagation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			originalRun := runCLIFunc
 			originalDefaultsResolver := resolveCLIDefaultsFunc
-			originalLookPath := gitLookPathFunc
-			originalConfigValue := gitConfigValueFunc
+			originalLookPath := vcs.GitLookPath
+			originalConfigValue := vcs.GitConfigValue
 			t.Cleanup(func() {
 				runCLIFunc = originalRun
 				resolveCLIDefaultsFunc = originalDefaultsResolver
-				gitLookPathFunc = originalLookPath
-				gitConfigValueFunc = originalConfigValue
+				vcs.GitLookPath = originalLookPath
+				vcs.GitConfigValue = originalConfigValue
 			})
 
 			resolveCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
@@ -63,13 +64,13 @@ func TestCLIGitIdentityPropagation(t *testing.T) {
 				return conf.CLIDefaultsConfig{}, nil
 			}
 
-			gitLookPathFunc = func(file string) (string, error) {
+			vcs.GitLookPath = func(file string) (string, error) {
 				if tt.lookPathErr != nil {
 					return "", tt.lookPathErr
 				}
 				return "/usr/bin/git", nil
 			}
-			gitConfigValueFunc = func(key string) (string, error) {
+			vcs.GitConfigValue = func(key string) (string, error) {
 				switch key {
 				case "user.name":
 					return tt.gitName, tt.gitNameErr
@@ -153,24 +154,24 @@ func TestResolveGitIdentity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			originalLookPath := gitLookPathFunc
-			originalConfigValue := gitConfigValueFunc
+			originalLookPath := vcs.GitLookPath
+			originalConfigValue := vcs.GitConfigValue
 			t.Cleanup(func() {
-				gitLookPathFunc = originalLookPath
-				gitConfigValueFunc = originalConfigValue
+				vcs.GitLookPath = originalLookPath
+				vcs.GitConfigValue = originalConfigValue
 			})
 
-			gitLookPathFunc = func(file string) (string, error) {
+			vcs.GitLookPath = func(file string) (string, error) {
 				if tt.lookPathErr != nil {
 					return "", tt.lookPathErr
 				}
 				return "/usr/bin/git", nil
 			}
-			gitConfigValueFunc = func(key string) (string, error) {
+			vcs.GitConfigValue = func(key string) (string, error) {
 				return tt.gitConfigValue, tt.gitConfigErr
 			}
 
-			result := resolveGitIdentity(tt.value, tt.gitConfigKey)
+			result := vcs.ResolveGitIdentity(tt.value, tt.gitConfigKey)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

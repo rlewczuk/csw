@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +31,7 @@ func TestFormatEditedFilesSummaryUsesWorktreeDir(t *testing.T) {
 
 	require.NoError(t, os.WriteFile(filepath.Join(worktreeDir, "test.txt"), []byte("old\nnew\n"), 0644))
 
-	summary := formatEditedFilesSummary(repoDir, worktreeDir)
+	summary := system.FormatEditedFilesSummary(repoDir, worktreeDir)
 	assert.NotEqual(t, "-", summary)
 	assert.Contains(t, summary, "test.txt")
 }
@@ -43,7 +44,7 @@ func TestFormatEditedFilesSummaryIncludesUntrackedFiles(t *testing.T) {
 	newFile := filepath.Join(repoDir, "new.txt")
 	require.NoError(t, os.WriteFile(newFile, []byte("content\n"), 0644))
 
-	summary := formatEditedFilesSummary(repoDir, repoDir)
+	summary := system.FormatEditedFilesSummary(repoDir, repoDir)
 	assert.NotEqual(t, "-", summary)
 	assert.Contains(t, summary, "new.txt (new file)")
 }

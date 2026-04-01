@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/shared"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -74,7 +76,7 @@ func TestParseCLIContextEntries(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual, err := parseCLIContextEntries(tt.input)
+			actual, err := system.ParseCLIContextEntries(tt.input)
 			if tt.expectError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorText)
@@ -109,11 +111,11 @@ func TestRenderPromptWithContext(t *testing.T) {
 			expected: "Fix tests in csw",
 		},
 		{
-			name:      "missing key returns error",
-			prompt:    "Hello {{.MISSING}}",
-			context:   map[string]string{"NAME": "World"},
+			name:        "missing key returns error",
+			prompt:      "Hello {{.MISSING}}",
+			context:     map[string]string{"NAME": "World"},
 			expectError: true,
-			errorText: "failed to render prompt template",
+			errorText:   "failed to render prompt template",
 		},
 		{
 			name:        "invalid template returns error",
@@ -126,7 +128,7 @@ func TestRenderPromptWithContext(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual, err := renderPromptWithContext(tt.prompt, tt.context)
+			actual, err := shared.RenderTextWithContext(tt.prompt, tt.context)
 			if tt.expectError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorText)

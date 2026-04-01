@@ -9,11 +9,11 @@ import (
 	"sort"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/spf13/cobra"
@@ -27,14 +27,14 @@ type hookRunOutput struct {
 
 type noopSessionOutputHandler struct{}
 
-func (noopSessionOutputHandler) ShowMessage(string, string)                 {}
-func (noopSessionOutputHandler) AddAssistantMessage(string, string)         {}
-func (noopSessionOutputHandler) AddToolCall(*tool.ToolCall)                 {}
-func (noopSessionOutputHandler) AddToolCallResult(*tool.ToolResponse)       {}
-func (noopSessionOutputHandler) RunFinished(error)                          {}
+func (noopSessionOutputHandler) ShowMessage(string, string)                   {}
+func (noopSessionOutputHandler) AddAssistantMessage(string, string)           {}
+func (noopSessionOutputHandler) AddToolCall(*tool.ToolCall)                   {}
+func (noopSessionOutputHandler) AddToolCallResult(*tool.ToolResponse)         {}
+func (noopSessionOutputHandler) RunFinished(error)                            {}
 func (noopSessionOutputHandler) OnPermissionQuery(*tool.ToolPermissionsQuery) {}
-func (noopSessionOutputHandler) OnRateLimitError(int)                       {}
-func (noopSessionOutputHandler) ShouldRetryAfterFailure(string) bool        { return false }
+func (noopSessionOutputHandler) OnRateLimitError(int)                         {}
+func (noopSessionOutputHandler) ShouldRetryAfterFailure(string) bool          { return false }
 
 // HookCommand creates commands for hook diagnostics and execution.
 func HookCommand() *cobra.Command {
@@ -114,14 +114,14 @@ func hookRunCommand() *cobra.Command {
 				return fmt.Errorf("hookRunCommand() [hook.go]: hook name cannot be empty")
 			}
 
-			contextData, err := parseCLIContextEntries(contextPairs)
+			contextData, err := system.ParseCLIContextEntries(contextPairs)
 			if err != nil {
 				return fmt.Errorf("hookRunCommand() [hook.go]: failed to parse --context values: %w", err)
 			}
 			if contextData == nil {
 				contextData = map[string]string{}
 			}
-			contextFromData, err := parseCLIContextFromEntries(contextFiles)
+			contextFromData, err := system.ParseCLIContextFromEntries(contextFiles)
 			if err != nil {
 				return fmt.Errorf("hookRunCommand() [hook.go]: failed to parse --context-from values: %w", err)
 			}
@@ -164,11 +164,7 @@ func runOneHook(ctx context.Context, hookName string, contextData map[string]str
 		return nil, fmt.Errorf("runOneHook() [hook.go]: hook %q is disabled", hookName)
 	}
 
-	selectedStore := &runtimeHookConfigStore{
-		base:           store,
-		hookConfigs:    map[string]*conf.HookConfig{hookName: hookCfg.Clone()},
-		hookConfigsNow: time.Now(),
-	}
+	selectedStore := system.NewRuntimeConfigStore(store, map[string]*conf.HookConfig{hookName: hookCfg.Clone()})
 
 	providers := map[string]models.ModelProvider{}
 	var (
@@ -226,12 +222,12 @@ func simulateModelHookRun(engine *core.HookEngine, hookCfg *conf.HookConfig) (*c
 		return &core.HookExecutionResult{}, nil
 	}
 
-	prompt, err := renderPromptWithContext(hookCfg.Prompt, engine.ContextData())
+	prompt, err := shared.RenderTextWithContext(hookCfg.Prompt, engine.ContextData())
 	if err != nil {
 		return nil, fmt.Errorf("simulateModelHookRun() [hook.go]: failed to render prompt: %w", err)
 	}
 	if strings.TrimSpace(hookCfg.SystemPrompt) != "" {
-		renderedSystem, renderErr := renderPromptWithContext(hookCfg.SystemPrompt, engine.ContextData())
+		renderedSystem, renderErr := shared.RenderTextWithContext(hookCfg.SystemPrompt, engine.ContextData())
 		if renderErr != nil {
 			return nil, fmt.Errorf("simulateModelHookRun() [hook.go]: failed to render system prompt: %w", renderErr)
 		}
@@ -251,39 +247,6 @@ func simulateModelHookRun(engine *core.HookEngine, hookCfg *conf.HookConfig) (*c
 		toField = "result"
 	}
 	engine.SetContextValue(toField, "")
-
-	return result, nil
-}
-
-func parseCLIContextFromEntries(values []string) (map[string]string, error) {
-	if len(values) == 0 {
-		return nil, nil
-	}
-
-	result := make(map[string]string, len(values))
-	for _, entry := range values {
-		trimmed := strings.TrimSpace(entry)
-		if trimmed == "" {
-			return nil, fmt.Errorf("parseCLIContextFromEntries() [hook.go]: context-from entry cannot be empty")
-		}
-		parts := strings.SplitN(trimmed, "=", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("parseCLIContextFromEntries() [hook.go]: invalid context-from entry %q: expected KEY=FILENAME format", entry)
-		}
-		key := strings.TrimSpace(parts[0])
-		if key == "" {
-			return nil, fmt.Errorf("parseCLIContextFromEntries() [hook.go]: invalid context-from entry %q: key cannot be empty", entry)
-		}
-		fileName := strings.TrimSpace(parts[1])
-		if fileName == "" {
-			return nil, fmt.Errorf("parseCLIContextFromEntries() [hook.go]: invalid context-from entry %q: filename cannot be empty", entry)
-		}
-		data, err := os.ReadFile(fileName)
-		if err != nil {
-			return nil, fmt.Errorf("parseCLIContextFromEntries() [hook.go]: failed to read %q: %w", fileName, err)
-		}
-		result[key] = string(data)
-	}
 
 	return result, nil
 }

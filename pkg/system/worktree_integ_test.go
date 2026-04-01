@@ -1,4 +1,4 @@
-package main
+package system
 
 import (
 	"bytes"
@@ -14,31 +14,13 @@ import (
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
-	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui/mock"
+	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestCliWorktreeAndCommitMessageFlagsDefinition(t *testing.T) {
-	cmd := CliCommand()
-
-	worktreeFlag := cmd.Flags().Lookup("worktree")
-	require.NotNil(t, worktreeFlag)
-	assert.Equal(t, "", worktreeFlag.DefValue)
-
-	commitMessageFlag := cmd.Flags().Lookup("commit-message")
-	require.NotNil(t, commitMessageFlag)
-	assert.Equal(t, "", commitMessageFlag.DefValue)
-	assert.Equal(t, "string", commitMessageFlag.Value.Type())
-
-	mergeFlag := cmd.Flags().Lookup("merge")
-	require.NotNil(t, mergeFlag)
-	assert.Equal(t, "false", mergeFlag.DefValue)
-	assert.Equal(t, "bool", mergeFlag.Value.Type())
-}
 
 func TestFinalizeWorktreeSession(t *testing.T) {
 	tests := []struct {
@@ -169,7 +151,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 			}
 
 			var stderr bytes.Buffer
-			_, _ = finalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.merge, tt.customTemplate, system, session, &stderr, "", "", "", nil, nil)
+			_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.merge, tt.customTemplate, system, session, &stderr, "", "", "", nil, nil)
 
 			commitCalls := mockVCS.GetCommitCalls()
 			if tt.expectCommit {
@@ -215,19 +197,19 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 func TestFinalizeWorktreeSessionUsesDetectedBaseBranch(t *testing.T) {
 	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge into detected base branch", true)
 
-	originalRunGit := runGitCommandFunc
+	originalRunGit := vcs.RunGitCommand
 	defer func() {
-		runGitCommandFunc = originalRunGit
+		vcs.RunGitCommand = originalRunGit
 	}()
 
-	runGitCommandFunc = func(workDir string, args ...string) (string, error) {
+	vcs.RunGitCommand = func(workDir string, args ...string) (string, error) {
 		if len(args) == 3 && args[0] == "rev-parse" && args[1] == "--abbrev-ref" && args[2] == "HEAD" {
 			return "develop", nil
 		}
 		return "", nil
 	}
 
-	_, _ = finalizeWorktreeSession(context.Background(), mockVCS, "feature/detect-base", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "", "", nil, nil)
+	_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, "feature/detect-base", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "", "", nil, nil)
 
 	mergeCalls := mockVCS.GetMergeCalls()
 	require.Len(t, mergeCalls, 1)
@@ -264,7 +246,7 @@ func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
 	})
 	appView := mock.NewMockAppView()
 
-	result, err := finalizeWorktreeSession(context.Background(), mockVCS, "feature/hook", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, appView)
+	result, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/hook", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, appView)
 	require.NoError(t, err)
 
 	assert.Equal(t, "", result.HeadCommitID)
@@ -303,7 +285,7 @@ func TestFinalizeWorktreeSessionMergeLLMHookUsesUserPromptContext(t *testing.T) 
 		"user_prompt": "merge via llm hook",
 	})
 
-	_, err := finalizeWorktreeSession(context.Background(), mockVCS, "feature/hook", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "merge via llm hook", hookEngine, nil)
+	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/hook", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "merge via llm hook", hookEngine, nil)
 	require.NoError(t, err)
 	require.Len(t, provider.RecordedMessages, 2)
 	require.Len(t, provider.RecordedMessages[1], 1)
@@ -345,7 +327,7 @@ func TestFinalizeWorktreeSessionMergeHookProcessesFeedbackRequests(t *testing.T)
 	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
 	appView := mock.NewMockAppView()
 
-	_, _ = finalizeWorktreeSession(context.Background(), mockVCS, "feature/hook-feedback", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, appView)
+	_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, "feature/hook-feedback", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, appView)
 
 	assert.Equal(t, "ready", hookEngine.ContextData()["feedback-state"])
 	executions := hostRunner.GetExecutions()
@@ -382,7 +364,7 @@ func TestFinalizeWorktreeSessionCommitHookUsesReturnedCommitMessage(t *testing.T
 	)
 	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
 
-	_, err := finalizeWorktreeSession(context.Background(), mockVCS, "feature/commit-hook", false, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, nil)
+	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/commit-hook", false, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, nil)
 	require.NoError(t, err)
 
 	commitCalls := mockVCS.GetCommitCalls()
@@ -415,13 +397,13 @@ func TestFinalizeWorktreeSessionCommitHookCommittedStatusSkipsBuiltinCommit(t *t
 	)
 	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
 
-	originalRunGit := runGitCommandFunc
+	originalRunGit := vcs.RunGitCommand
 	defer func() {
-		runGitCommandFunc = originalRunGit
+		vcs.RunGitCommand = originalRunGit
 	}()
 
 	commands := make([]string, 0)
-	runGitCommandFunc = func(workDir string, args ...string) (string, error) {
+	vcs.RunGitCommand = func(workDir string, args ...string) (string, error) {
 		commands = append(commands, fmt.Sprintf("%s::%s", workDir, strings.Join(args, " ")))
 		if len(args) == 3 && args[0] == "rev-parse" && args[1] == "--abbrev-ref" && args[2] == "HEAD" {
 			return "main", nil
@@ -429,7 +411,7 @@ func TestFinalizeWorktreeSessionCommitHookCommittedStatusSkipsBuiltinCommit(t *t
 		return "", nil
 	}
 
-	_, err := finalizeWorktreeSession(context.Background(), mockVCS, "feature/commit-hook", false, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, nil)
+	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/commit-hook", false, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, nil)
 	require.NoError(t, err)
 
 	assert.Empty(t, mockVCS.GetCommitCalls())
@@ -462,13 +444,13 @@ func TestFinalizeWorktreeSessionCommitHookErrorStatusAborts(t *testing.T) {
 	)
 	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
 
-	_, err := finalizeWorktreeSession(context.Background(), mockVCS, "feature/commit-hook", false, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, nil)
+	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/commit-hook", false, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "commit hook")
 	assert.Empty(t, mockVCS.GetCommitCalls())
 }
 
-func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTemplate bool) (*system.SweSystem, *core.SweSession, *vfs.MockVCS) {
+func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTemplate bool) (*SweSystem, *core.SweSession, *vfs.MockVCS) {
 	t.Helper()
 
 	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
@@ -483,7 +465,7 @@ func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTe
 	configStore.SetAgentConfigFile("commit", "prompt.md", []byte("{{- range .Messages }}{{ . }}\n{{- end }}"))
 	configStore.SetAgentConfigFile("commit", "message.md", []byte("[{{ .Branch }}] {{ .Message }}"))
 
-	system := &system.SweSystem{
+	system := &SweSystem{
 		ModelProviders: map[string]models.ModelProvider{"mock": provider},
 		ConfigStore:    configStore,
 	}
@@ -502,13 +484,13 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 		repoDir := t.TempDir()
 		worktreeDir := filepath.Join(repoDir, ".cswdata", "work", "feature", "test")
 		baseBranch := "develop"
-		originalRunGit := runGitCommandFunc
+		originalRunGit := vcs.RunGitCommand
 		originalSubAgent := executeConflictSubAgentFunc
-		originalListConflicts := listGitConflictFilesFunc
+		originalListConflicts := vcs.ListGitConflictFiles
 		defer func() {
-			runGitCommandFunc = originalRunGit
+			vcs.RunGitCommand = originalRunGit
 			executeConflictSubAgentFunc = originalSubAgent
-			listGitConflictFilesFunc = originalListConflicts
+			vcs.ListGitConflictFiles = originalListConflicts
 		}()
 
 		commands := make([]string, 0)
@@ -516,7 +498,7 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 		checkedOutBasePath := filepath.Join(repoDir, "develop")
 		mergeWorktreePath := ""
 		rebaseCalls := 0
-		runGitCommandFunc = func(workDir string, args ...string) (string, error) {
+		vcs.RunGitCommand = func(workDir string, args ...string) (string, error) {
 			joined := fmt.Sprintf("%s::git %s", workDir, strings.Join(args, " "))
 			commands = append(commands, joined)
 
@@ -556,7 +538,7 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 			}
 		}
 
-		listGitConflictFilesFunc = func(workDir string) []string {
+		vcs.ListGitConflictFiles = func(workDir string) []string {
 			return []string{"pkg/core/session.go"}
 		}
 
@@ -585,23 +567,23 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 		sweSystem, session := newConflictResolutionFixture(t)
 		repoDir := t.TempDir()
 		worktreeDir := filepath.Join(repoDir, ".cswdata", "work", "feature", "test")
-		originalRunGit := runGitCommandFunc
+		originalRunGit := vcs.RunGitCommand
 		originalSubAgent := executeConflictSubAgentFunc
-		originalListConflicts := listGitConflictFilesFunc
+		originalListConflicts := vcs.ListGitConflictFiles
 		defer func() {
-			runGitCommandFunc = originalRunGit
+			vcs.RunGitCommand = originalRunGit
 			executeConflictSubAgentFunc = originalSubAgent
-			listGitConflictFilesFunc = originalListConflicts
+			vcs.ListGitConflictFiles = originalListConflicts
 		}()
 
-		runGitCommandFunc = func(workDir string, args ...string) (string, error) {
+		vcs.RunGitCommand = func(workDir string, args ...string) (string, error) {
 			if len(args) == 2 && args[0] == "rebase" && args[1] == "develop" {
 				return "", fmt.Errorf("runGitCommand() [cli.go]: git rebase develop failed: CONFLICT (content): Merge conflict in file.txt")
 			}
 			return "", nil
 		}
 
-		listGitConflictFilesFunc = func(workDir string) []string { return []string{"file.txt"} }
+		vcs.ListGitConflictFiles = func(workDir string) []string { return []string{"file.txt"} }
 		executeConflictSubAgentFunc = func(parent *core.SweSession, request tool.SubAgentTaskRequest) (tool.SubAgentTaskResult, error) {
 			return tool.SubAgentTaskResult{Status: "error", Summary: "failed"}, nil
 		}
@@ -614,9 +596,9 @@ func TestMergeWorktreeWithConflictResolution(t *testing.T) {
 
 func TestSyncCheckedOutBranchWorktrees(t *testing.T) {
 	t.Run("updates checked-out target branch worktrees except skipped path", func(t *testing.T) {
-		originalRunGit := runGitCommandFunc
+		originalRunGit := vcs.RunGitCommand
 		defer func() {
-			runGitCommandFunc = originalRunGit
+			vcs.RunGitCommand = originalRunGit
 		}()
 
 		worktreeListOutput := strings.Join([]string{
@@ -634,7 +616,7 @@ func TestSyncCheckedOutBranchWorktrees(t *testing.T) {
 		}, "\n")
 
 		resetCalls := make([]string, 0)
-		runGitCommandFunc = func(workDir string, args ...string) (string, error) {
+		vcs.RunGitCommand = func(workDir string, args ...string) (string, error) {
 			if len(args) == 3 && args[0] == "worktree" && args[1] == "list" && args[2] == "--porcelain" {
 				assert.Equal(t, "/repo", workDir)
 				return worktreeListOutput, nil
@@ -655,9 +637,9 @@ func TestSyncCheckedOutBranchWorktrees(t *testing.T) {
 	})
 
 	t.Run("returns error when checked-out branch worktree reset fails", func(t *testing.T) {
-		originalRunGit := runGitCommandFunc
+		originalRunGit := vcs.RunGitCommand
 		defer func() {
-			runGitCommandFunc = originalRunGit
+			vcs.RunGitCommand = originalRunGit
 		}()
 
 		worktreeListOutput := strings.Join([]string{
@@ -667,7 +649,7 @@ func TestSyncCheckedOutBranchWorktrees(t *testing.T) {
 			"",
 		}, "\n")
 
-		runGitCommandFunc = func(workDir string, args ...string) (string, error) {
+		vcs.RunGitCommand = func(workDir string, args ...string) (string, error) {
 			if len(args) == 3 && args[0] == "worktree" && args[1] == "list" && args[2] == "--porcelain" {
 				return worktreeListOutput, nil
 			}
@@ -685,14 +667,14 @@ func TestSyncCheckedOutBranchWorktrees(t *testing.T) {
 	})
 }
 
-func newConflictResolutionFixture(t *testing.T) (*system.SweSystem, *core.SweSession) {
+func newConflictResolutionFixture(t *testing.T) (*SweSystem, *core.SweSession) {
 	t.Helper()
 
 	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
 	configStore := confimpl.NewMockConfigStore()
 	configStore.SetAgentConfigFile("conflict", "prompt.md", []byte("You are running in a conflict resolution session.\n{{ .OriginalPrompt }}\n{{ .ConflictFiles }}\n{{ .ConflictOutput }}"))
 
-	sweSystem := &system.SweSystem{
+	sweSystem := &SweSystem{
 		ModelProviders: map[string]models.ModelProvider{"mock": provider},
 		ConfigStore:    configStore,
 	}

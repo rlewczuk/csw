@@ -11,6 +11,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/system"
+	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,7 +33,7 @@ func TestCLINormalizeResumeTarget(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			actual, err := normalizeResumeTarget(tc.input)
+			actual, err := system.NormalizeResumeTarget(tc.input)
 			if tc.expectError {
 				require.Error(t, err)
 				return
@@ -239,36 +240,36 @@ func TestCLIResolveResumeTargetToSessionID(t *testing.T) {
 	writeState("018f6e30-3acb-7f24-bede-8d96cd157152", worktreeDir)
 
 	t.Run("uuid passthrough", func(t *testing.T) {
-		id, err := resolveResumeTargetToSessionID("018f6e30-3acb-7f24-bede-8d96cd157150", repoDir, logsDir)
+		id, err := system.ResolveResumeTargetToSessionID("018f6e30-3acb-7f24-bede-8d96cd157150", repoDir, logsDir)
 		require.NoError(t, err)
 		assert.Equal(t, "018f6e30-3acb-7f24-bede-8d96cd157150", id)
 	})
 
 	t.Run("last passthrough", func(t *testing.T) {
-		id, err := resolveResumeTargetToSessionID("last", repoDir, logsDir)
+		id, err := system.ResolveResumeTargetToSessionID("last", repoDir, logsDir)
 		require.NoError(t, err)
 		assert.Equal(t, "last", id)
 	})
 
 	t.Run("absolute workdir path resolves to matching session", func(t *testing.T) {
-		id, err := resolveResumeTargetToSessionID(worktreeDir, repoDir, logsDir)
+		id, err := system.ResolveResumeTargetToSessionID(worktreeDir, repoDir, logsDir)
 		require.NoError(t, err)
 		assert.Equal(t, "018f6e30-3acb-7f24-bede-8d96cd157152", id)
 	})
 
 	t.Run("workdir name resolves newest session", func(t *testing.T) {
-		id, err := resolveResumeTargetToSessionID("0145-feature-work", repoDir, logsDir)
+		id, err := system.ResolveResumeTargetToSessionID("0145-feature-work", repoDir, logsDir)
 		require.NoError(t, err)
 		assert.Equal(t, "018f6e30-3acb-7f24-bede-8d96cd157152", id)
 	})
 
 	t.Run("branch resolves by worktree name", func(t *testing.T) {
-		originalRunGit := runGitCommandFunc
+		originalRunGit := vcs.RunGitCommand
 		t.Cleanup(func() {
-			runGitCommandFunc = originalRunGit
+			vcs.RunGitCommand = originalRunGit
 		})
 
-		runGitCommandFunc = func(workDir string, args ...string) (string, error) {
+		vcs.RunGitCommand = func(workDir string, args ...string) (string, error) {
 			cleanWorkDir := filepath.Clean(workDir)
 			require.Equal(t, filepath.Clean(repoDir), cleanWorkDir)
 			joinedArgs := fmt.Sprintf("%v", args)
@@ -282,7 +283,7 @@ func TestCLIResolveResumeTargetToSessionID(t *testing.T) {
 			}
 		}
 
-		id, err := resolveResumeTargetToSessionID("feature/existing", repoDir, logsDir)
+		id, err := system.ResolveResumeTargetToSessionID("feature/existing", repoDir, logsDir)
 		require.NoError(t, err)
 		assert.Equal(t, "018f6e30-3acb-7f24-bede-8d96cd157152", id)
 	})

@@ -8,6 +8,7 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/conf/impl"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -143,7 +144,7 @@ func TestApplyHookOverridesToConfigs(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := applyHookOverridesToConfigs(tc.configs, tc.overrides)
+			result, err := system.ApplyHookOverridesToConfigs(tc.configs, tc.overrides)
 			if tc.expectErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.expectErr)
@@ -160,11 +161,11 @@ func TestApplyHookOverridesToConfigs(t *testing.T) {
 func TestBuildRuntimeHookConfigStoreOverridesAreEphemeral(t *testing.T) {
 	base := impl.NewMockConfigStore()
 	base.SetHookConfigs(map[string]*conf.HookConfig{
-		"commit": {Name: "commit", Hook: "commit", Command: "echo before", Enabled: false, Type: conf.HookTypeShell, RunOn: conf.HookRunOnSandbox},
+		"commit":  {Name: "commit", Hook: "commit", Command: "echo before", Enabled: false, Type: conf.HookTypeShell, RunOn: conf.HookRunOnSandbox},
 		"summary": {Name: "summary", Hook: "summary", Type: conf.HookTypeLLM, Prompt: "old", OutputTo: "result", Enabled: true},
 	})
 
-	runtimeStore, err := buildRuntimeHookConfigStore(base, []string{"commit:command=echo after", "summary:prompt=new,output_to=hook_result"})
+	runtimeStore, err := system.BuildRuntimeHookConfigStore(base, []string{"commit:command=echo after", "summary:prompt=new,output_to=hook_result"})
 	require.NoError(t, err)
 
 	runtimeHooks, err := runtimeStore.GetHookConfigs()

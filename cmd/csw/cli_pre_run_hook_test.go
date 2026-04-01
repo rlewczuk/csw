@@ -14,13 +14,13 @@ import (
 
 func TestPreparePromptWithPreRunHook(t *testing.T) {
 	tests := []struct {
-		name          string
-		params        *CLIParams
-		withHook      bool
-		runnerSetup   func(*runner.MockRunner)
+		name           string
+		params         *CLIParams
+		withHook       bool
+		runnerSetup    func(*runner.MockRunner)
 		expectedPrompt string
-		expectError   string
-		expectedRuns  int
+		expectError    string
+		expectedRuns   int
 	}{
 		{
 			name: "pre_run hook updates context before template rendering",
@@ -62,8 +62,8 @@ func TestPreparePromptWithPreRunHook(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				hookEngine  *core.HookEngine
-				mockRunner  *runner.MockRunner
+				hookEngine *core.HookEngine
+				mockRunner *runner.MockRunner
 			)
 
 			if tc.withHook {
@@ -87,7 +87,7 @@ func TestPreparePromptWithPreRunHook(t *testing.T) {
 				hookEngine = core.NewHookEngine(configStore, mockRunner, nil, nil)
 			}
 
-			err := preparePromptWithPreRunHook(context.Background(), tc.params, "/repo", hookEngine)
+			err := PreparePromptWithPreRunHook(context.Background(), tc.params, "/repo", hookEngine)
 			if tc.expectError != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.expectError)

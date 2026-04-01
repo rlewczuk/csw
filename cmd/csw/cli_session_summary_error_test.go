@@ -41,7 +41,7 @@ func TestEmitSessionSummary(t *testing.T) {
 		{
 			name:                   "no session error and summary save failure returns wrapped error",
 			saveErr:                errors.New("disk full"),
-			expectErr:              "emitSessionSummary() [cli.go]: failed to save session summary: disk full",
+			expectErr:              "EmitSessionSummary() [cli.go]: failed to save session summary: disk full",
 			expectInfoMessageCount: 0,
 			expectWarnMessageCount: 0,
 		},
@@ -49,27 +49,27 @@ func TestEmitSessionSummary(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			originalSaveSummary := saveSessionSummaryMarkdownFunc
-			originalSaveSummaryJSON := saveSessionSummaryJSONFunc
+			originalSaveSummary := system.SaveSessionSummaryMarkdownFunc
+			originalSaveSummaryJSON := system.SaveSessionSummaryJSONFunc
 			t.Cleanup(func() {
-				saveSessionSummaryMarkdownFunc = originalSaveSummary
-				saveSessionSummaryJSONFunc = originalSaveSummaryJSON
+				system.SaveSessionSummaryMarkdownFunc = originalSaveSummary
+				system.SaveSessionSummaryJSONFunc = originalSaveSummaryJSON
 			})
 
-			saveSessionSummaryMarkdownFunc = func(logsDir string, session *core.SweSession, sessionInfo string) error {
+			system.SaveSessionSummaryMarkdownFunc = func(logsDir string, session *core.SweSession, sessionInfo string) error {
 				return tc.saveErr
 			}
-			saveSessionSummaryJSONFunc = func(logsDir string, session *core.SweSession, buildResult system.BuildSystemResult, startTime time.Time, endTime time.Time, baseCommitID string, headCommitID string) error {
+			system.SaveSessionSummaryJSONFunc = func(logsDir string, session *core.SweSession, buildResult system.BuildSystemResult, startTime time.Time, endTime time.Time, baseCommitID string, headCommitID string) error {
 				return nil
 			}
 
 			view := &summaryCaptureAppView{}
-			err := emitSessionSummary(
+			err := system.EmitSessionSummary(
 				time.Now().Add(-5*time.Second),
 				time.Now(),
 				nil,
 				system.BuildSystemResult{LogsDir: "any"},
-				view,
+				view.ShowMessage,
 				tc.sessionRunErr,
 				"",
 				"",

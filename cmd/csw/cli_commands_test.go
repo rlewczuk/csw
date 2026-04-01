@@ -14,6 +14,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCliWorktreeAndCommitMessageFlagsDefinition(t *testing.T) {
+	cmd := CliCommand()
+
+	worktreeFlag := cmd.Flags().Lookup("worktree")
+	require.NotNil(t, worktreeFlag)
+	assert.Equal(t, "", worktreeFlag.DefValue)
+
+	commitMessageFlag := cmd.Flags().Lookup("commit-message")
+	require.NotNil(t, commitMessageFlag)
+	assert.Equal(t, "", commitMessageFlag.DefValue)
+	assert.Equal(t, "string", commitMessageFlag.Value.Type())
+
+	mergeFlag := cmd.Flags().Lookup("merge")
+	require.NotNil(t, mergeFlag)
+	assert.Equal(t, "false", mergeFlag.DefValue)
+	assert.Equal(t, "bool", mergeFlag.Value.Type())
+}
+
 func TestCLICommandInvocation(t *testing.T) {
 	tests := []struct {
 		name                    string
