@@ -30,6 +30,8 @@ const DefaultMaxTokens = 32000
 // usageLimitResetAtPattern matches usage-limit reset timestamps in provider error messages.
 var usageLimitResetAtPattern = regexp.MustCompile(`(?i)reset at\s+(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})`)
 
+const openAIPromptCacheRetentionOptionKey = "prompt_cache_retention"
+
 // OpenAIClient is a client for interacting with OpenAI-compatible API
 type OpenAIClient struct {
 	baseURL    string
@@ -288,7 +290,14 @@ func (c *OpenAIClient) applyConfiguredHeaders(req *http.Request) {
 		return
 	}
 
-	for name, value := range c.config.Headers {
+	headerNames := make([]string, 0, len(c.config.Headers))
+	for name := range c.config.Headers {
+		headerNames = append(headerNames, name)
+	}
+	sort.Strings(headerNames)
+
+	for _, name := range headerNames {
+		value := c.config.Headers[name]
 		if name == "" || value == "" {
 			continue
 		}
@@ -305,7 +314,14 @@ func (c *OpenAIClient) applyConfiguredQueryParams(req *http.Request) {
 	}
 
 	query := req.URL.Query()
-	for key, value := range c.config.QueryParams {
+	queryKeys := make([]string, 0, len(c.config.QueryParams))
+	for key := range c.config.QueryParams {
+		queryKeys = append(queryKeys, key)
+	}
+	sort.Strings(queryKeys)
+
+	for _, key := range queryKeys {
+		value := c.config.QueryParams[key]
 		if key == "" || value == "" {
 			continue
 		}
@@ -456,9 +472,9 @@ func (m *OpenAIChatModel) Chat(ctx context.Context, messages []*ChatMessage, opt
 
 	url := m.client.baseURL + "/chat/completions"
 
-	body, err := json.Marshal(chatReq)
+	body, err := m.client.marshalChatCompletionRequest(chatReq, effectiveOptions)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
@@ -616,9 +632,9 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 
 		url := m.client.baseURL + "/chat/completions"
 
-		body, err := json.Marshal(chatReq)
+		body, err := m.client.marshalChatCompletionRequest(chatReq, effectiveOptions)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: OpenAIChatModel.ChatStream() [openai_client.go]: failed to marshal request: %v\n", err)
+			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 			return
 		}
 
@@ -898,6 +914,67 @@ func (m *OpenAIChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 		if err := scanner.Err(); err != nil {
 			return
 		}
+	}
+}
+
+// marshalChatCompletionRequest marshals chat-completions request with optional prompt cache fields.
+func (c *OpenAIClient) marshalChatCompletionRequest(req OpenaiChatCompletionRequest, options *ChatOptions) ([]byte, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("OpenAIClient.marshalChatCompletionRequest() [openai_client.go]: failed to marshal base request: %w", err)
+	}
+
+	retention := c.promptCacheRetention()
+	promptCacheKey := ""
+	if options != nil {
+		promptCacheKey = strings.TrimSpace(options.SessionID)
+	}
+
+	if retention == "" && promptCacheKey == "" {
+		return body, nil
+	}
+
+	var requestMap map[string]any
+	if err := json.Unmarshal(body, &requestMap); err != nil {
+		return nil, fmt.Errorf("OpenAIClient.marshalChatCompletionRequest() [openai_client.go]: failed to unmarshal base request: %w", err)
+	}
+
+	if promptCacheKey != "" {
+		requestMap["prompt_cache_key"] = promptCacheKey
+	}
+	if retention != "" {
+		requestMap["prompt_cache_retention"] = retention
+	}
+
+	stableBody, err := json.Marshal(requestMap)
+	if err != nil {
+		return nil, fmt.Errorf("OpenAIClient.marshalChatCompletionRequest() [openai_client.go]: failed to marshal request map: %w", err)
+	}
+
+	return stableBody, nil
+}
+
+// promptCacheRetention resolves prompt cache retention policy from provider options.
+func (c *OpenAIClient) promptCacheRetention() string {
+	if c == nil || c.config == nil || c.config.Options == nil {
+		return ""
+	}
+
+	retentionRaw, ok := c.config.Options[openAIPromptCacheRetentionOptionKey]
+	if !ok || retentionRaw == nil {
+		return ""
+	}
+
+	retention := strings.TrimSpace(fmt.Sprint(retentionRaw))
+	if retention == "" {
+		return ""
+	}
+
+	switch retention {
+	case "in_memory", "24h":
+		return retention
+	default:
+		return ""
 	}
 }
 
@@ -1223,7 +1300,7 @@ func convertToOpenAIMessage(msg *ChatMessage) OpenaiChatCompletionMessage {
 				openaiMsg.Content = part.Text
 			} else if part.ToolCall != nil {
 				// Add tool call
-				argsJSON, _ := json.Marshal(part.ToolCall.Arguments.Raw())
+				argsJSON, _ := marshalStableJSON(part.ToolCall.Arguments.Raw())
 				openaiMsg.ToolCalls = append(openaiMsg.ToolCalls, OpenaiToolCall{
 					ID:   part.ToolCall.ID,
 					Type: "function",
@@ -1241,7 +1318,7 @@ func convertToOpenAIMessage(msg *ChatMessage) OpenaiChatCompletionMessage {
 				if part.ToolResponse.Error != nil {
 					openaiMsg.Content = part.ToolResponse.Error.Error()
 				} else {
-					resultJSON, _ := json.Marshal(part.ToolResponse.Result.Raw())
+					resultJSON, _ := marshalStableJSON(part.ToolResponse.Result.Raw())
 					openaiMsg.Content = string(resultJSON)
 				}
 			}
@@ -1312,10 +1389,20 @@ func convertToolsToOpenAI(tools []tool.ToolInfo) []OpenaiTool {
 		return nil
 	}
 
-	openaiTools := make([]OpenaiTool, len(tools))
-	for i, t := range tools {
+	orderedTools := make([]tool.ToolInfo, len(tools))
+	copy(orderedTools, tools)
+	sort.SliceStable(orderedTools, func(i, j int) bool {
+		if orderedTools[i].Name == orderedTools[j].Name {
+			return orderedTools[i].Description < orderedTools[j].Description
+		}
+		return orderedTools[i].Name < orderedTools[j].Name
+	})
+
+	openaiTools := make([]OpenaiTool, len(orderedTools))
+	for i, t := range orderedTools {
 		// Convert ToolSchema to map[string]interface{}
-		schemaJSON, _ := json.Marshal(t.Schema)
+		normalizedSchema := normalizeToolSchemaForPromptCaching(t.Schema)
+		schemaJSON, _ := marshalStableJSON(normalizedSchema)
 		var schemaMap map[string]interface{}
 		json.Unmarshal(schemaJSON, &schemaMap)
 
@@ -1329,4 +1416,59 @@ func convertToolsToOpenAI(tools []tool.ToolInfo) []OpenaiTool {
 		}
 	}
 	return openaiTools
+}
+
+// normalizeToolSchemaForPromptCaching normalizes schema slices to reduce prompt-cache misses.
+func normalizeToolSchemaForPromptCaching(schema tool.ToolSchema) tool.ToolSchema {
+	normalized := schema
+	normalized.Required = sortedStringsCopy(schema.Required)
+	normalized.Properties = normalizePropertySchemaMapForPromptCaching(schema.Properties)
+	return normalized
+}
+
+// normalizePropertySchemaMapForPromptCaching normalizes nested property schemas.
+func normalizePropertySchemaMapForPromptCaching(properties map[string]tool.PropertySchema) map[string]tool.PropertySchema {
+	if len(properties) == 0 {
+		return properties
+	}
+
+	normalized := make(map[string]tool.PropertySchema, len(properties))
+	for key, property := range properties {
+		nested := property
+		nested.Enum = sortedStringsCopy(property.Enum)
+		nested.Required = sortedStringsCopy(property.Required)
+		nested.Properties = normalizePropertySchemaMapForPromptCaching(property.Properties)
+		if property.Items != nil {
+			nestedItem := *property.Items
+			nestedItem.Enum = sortedStringsCopy(property.Items.Enum)
+			nestedItem.Required = sortedStringsCopy(property.Items.Required)
+			nestedItem.Properties = normalizePropertySchemaMapForPromptCaching(property.Items.Properties)
+			nested.Items = &nestedItem
+		}
+		normalized[key] = nested
+	}
+
+	return normalized
+}
+
+// sortedStringsCopy returns a sorted copy of input strings.
+func sortedStringsCopy(input []string) []string {
+	if len(input) == 0 {
+		return input
+	}
+
+	cloned := make([]string, len(input))
+	copy(cloned, input)
+	sort.Strings(cloned)
+	return cloned
+}
+
+// marshalStableJSON marshals values deterministically by using encoding/json map key ordering.
+func marshalStableJSON(value any) ([]byte, error) {
+	body, err := json.Marshal(value)
+	if err != nil {
+		return nil, fmt.Errorf("marshalStableJSON() [openai_client.go]: failed to marshal value: %w", err)
+	}
+
+	return body, nil
 }
