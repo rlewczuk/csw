@@ -2,12 +2,14 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -92,4 +94,203 @@ func TestAnthropicClient_RawLLMCallback_LogsStreamingChunks(t *testing.T) {
 	assert.Contains(t, joined, "<<< CHUNK event: message_start")
 	assert.Contains(t, joined, `<<< CHUNK data: {"type":"content_block_delta"`)
 	assert.NotContains(t, joined, "stream-secret-key")
+}
+
+func TestMarshalAnthropicMessagesRequest_PrefixStableForEquivalentInputs(t *testing.T) {
+	requestOne := AnthropicMessagesRequest{
+		Model: "claude-test",
+		Messages: []AnthropicMessageParam{
+			{
+				Role: "user",
+				Content: []AnthropicContentBlock{
+					{
+						Type: "tool_use",
+						ID:   "call_1",
+						Name: "search",
+						Input: map[string]interface{}{
+							"query": "hello",
+							"limit": 3,
+						},
+					},
+				},
+			},
+		},
+		MaxTokens: 1000,
+		System:    "system prompt",
+		Tools: []AnthropicTool{
+			{
+				Name:        "search",
+				Description: "Search the web",
+				InputSchema: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"query": map[string]interface{}{"type": "string"},
+						"limit": map[string]interface{}{"type": "integer"},
+					},
+					"required": []interface{}{"query", "limit"},
+				},
+			},
+		},
+	}
+
+	requestTwo := AnthropicMessagesRequest{
+		Model: "claude-test",
+		Messages: []AnthropicMessageParam{
+			{
+				Role: "user",
+				Content: []AnthropicContentBlock{
+					{
+						Type: "tool_use",
+						ID:   "call_1",
+						Name: "search",
+						Input: map[string]interface{}{
+							"limit": 3,
+							"query": "hello",
+						},
+					},
+				},
+			},
+		},
+		MaxTokens: 1000,
+		System:    "system prompt",
+		Tools: []AnthropicTool{
+			{
+				Name:        "search",
+				Description: "Search the web",
+				InputSchema: map[string]interface{}{
+					"required": []interface{}{"query", "limit"},
+					"properties": map[string]interface{}{
+						"limit": map[string]interface{}{"type": "integer"},
+						"query": map[string]interface{}{"type": "string"},
+					},
+					"type": "object",
+				},
+			},
+		},
+	}
+
+	bodyOne, err := marshalAnthropicMessagesRequest(requestOne)
+	require.NoError(t, err)
+	bodyTwo, err := marshalAnthropicMessagesRequest(requestTwo)
+	require.NoError(t, err)
+
+	assert.Equal(t, string(bodyOne), string(bodyTwo))
+}
+
+func TestMarshalAnthropicMessagesRequest_AddsPromptCachingBreakpoints(t *testing.T) {
+	t.Run("marks last tool when tools are present", func(t *testing.T) {
+		request := AnthropicMessagesRequest{
+			Model:     "claude-test",
+			MaxTokens: 1000,
+			Messages:  []AnthropicMessageParam{{Role: "user", Content: "hello"}},
+			System:    "system prompt",
+			Tools: []AnthropicTool{
+				{Name: "first", InputSchema: map[string]interface{}{"type": "object"}},
+				{Name: "second", InputSchema: map[string]interface{}{"type": "object"}},
+			},
+		}
+
+		body, err := marshalAnthropicMessagesRequest(request)
+		require.NoError(t, err)
+
+		var payload map[string]interface{}
+		require.NoError(t, json.Unmarshal(body, &payload))
+
+		toolsPayload, ok := payload["tools"].([]interface{})
+		require.True(t, ok)
+		require.Len(t, toolsPayload, 2)
+
+		firstTool, ok := toolsPayload[0].(map[string]interface{})
+		require.True(t, ok)
+		_, hasFirstCacheControl := firstTool["cache_control"]
+		assert.False(t, hasFirstCacheControl)
+
+		secondTool, ok := toolsPayload[1].(map[string]interface{})
+		require.True(t, ok)
+		cacheControl, ok := secondTool["cache_control"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "ephemeral", cacheControl["type"])
+	})
+
+	t.Run("marks system when no tools are present", func(t *testing.T) {
+		request := AnthropicMessagesRequest{
+			Model:     "claude-test",
+			MaxTokens: 1000,
+			Messages:  []AnthropicMessageParam{{Role: "user", Content: "hello"}},
+			System:    "system prompt",
+		}
+
+		body, err := marshalAnthropicMessagesRequest(request)
+		require.NoError(t, err)
+
+		var payload map[string]interface{}
+		require.NoError(t, json.Unmarshal(body, &payload))
+
+		systemPayload, ok := payload["system"].([]interface{})
+		require.True(t, ok)
+		require.Len(t, systemPayload, 1)
+
+		block, ok := systemPayload[0].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "text", block["type"])
+		assert.Equal(t, "system prompt", block["text"])
+
+		cacheControl, ok := block["cache_control"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "ephemeral", cacheControl["type"])
+	})
+}
+
+func TestAnthropicClient_ChatAndChatStream_SendPromptCachingBetaHeader(t *testing.T) {
+	tests := []struct {
+		name      string
+		streaming bool
+	}{
+		{name: "chat", streaming: false},
+		{name: "chat_stream", streaming: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			receivedBeta := ""
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				receivedBeta = r.Header.Get("anthropic-beta")
+				if tc.streaming {
+					w.Header().Set("Content-Type", "text/event-stream")
+					_, err := w.Write([]byte("event: message_delta\n"))
+					require.NoError(t, err)
+					_, err = w.Write([]byte("data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":1}}\n\n"))
+					require.NoError(t, err)
+					_, err = w.Write([]byte("event: message_stop\n"))
+					require.NoError(t, err)
+					_, err = w.Write([]byte("data: {\"type\":\"message_stop\"}\n\n"))
+					require.NoError(t, err)
+					return
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				_, err := w.Write([]byte(`{"id":"msg_raw","type":"message","role":"assistant","model":"test-model","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":10,"output_tokens":5}}`))
+				require.NoError(t, err)
+			}))
+			defer server.Close()
+
+			client, err := NewAnthropicClient(&conf.ModelProviderConfig{URL: server.URL, APIKey: "test-key"})
+			require.NoError(t, err)
+			model := client.ChatModel("test-model", nil)
+
+			if tc.streaming {
+				for range model.ChatStream(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "hello")}, nil, []tool.ToolInfo{
+					{Name: "tool1", Description: "desc", Schema: tool.NewToolSchema()},
+				}) {
+				}
+			} else {
+				_, err = model.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "hello")}, nil, []tool.ToolInfo{
+					{Name: "tool1", Description: "desc", Schema: tool.NewToolSchema()},
+				})
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, anthropicPromptCachingBetaHeaderValue, receivedBeta)
+		})
+	}
 }

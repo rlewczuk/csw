@@ -21,6 +21,8 @@ import (
 	"github.com/rlewczuk/csw/pkg/tool"
 )
 
+const anthropicPromptCachingBetaHeaderValue = "prompt-caching-2024-07-31"
+
 // AnthropicClient is a client for interacting with Anthropic API
 type AnthropicClient struct {
 	baseURL    string
@@ -194,7 +196,14 @@ func (c *AnthropicClient) applyConfiguredHeaders(req *http.Request) {
 		return
 	}
 
-	for name, value := range c.config.Headers {
+	headerNames := make([]string, 0, len(c.config.Headers))
+	for name := range c.config.Headers {
+		headerNames = append(headerNames, name)
+	}
+	sort.Strings(headerNames)
+
+	for _, name := range headerNames {
+		value := c.config.Headers[name]
 		if name == "" || value == "" {
 			continue
 		}
@@ -211,7 +220,14 @@ func (c *AnthropicClient) applyConfiguredQueryParams(req *http.Request) {
 	}
 
 	query := req.URL.Query()
-	for key, value := range c.config.QueryParams {
+	queryParamKeys := make([]string, 0, len(c.config.QueryParams))
+	for key := range c.config.QueryParams {
+		queryParamKeys = append(queryParamKeys, key)
+	}
+	sort.Strings(queryParamKeys)
+
+	for _, key := range queryParamKeys {
+		value := c.config.QueryParams[key]
 		if key == "" || value == "" {
 			continue
 		}
@@ -380,9 +396,9 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 
 	url := m.client.baseURL + "/v1/messages"
 
-	body, err := json.Marshal(chatReq)
+	body, err := marshalAnthropicMessagesRequest(chatReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
@@ -392,6 +408,7 @@ func (m *AnthropicChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", m.client.apiKey)
 	req.Header.Set("anthropic-version", m.client.apiVersion)
+	req.Header.Set("anthropic-beta", anthropicPromptCachingBetaHeaderValue)
 	setUserAgentHeader(req)
 	m.client.applyConfiguredHeaders(req)
 	m.client.applyConfiguredQueryParams(req)
@@ -534,9 +551,9 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 
 		url := m.client.baseURL + "/v1/messages"
 
-		body, err := json.Marshal(chatReq)
+		body, err := marshalAnthropicMessagesRequest(chatReq)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: AnthropicChatModel.ChatStream() [anthropic_client.go]: failed to marshal request: %v\n", err)
+			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 			return
 		}
 
@@ -548,6 +565,7 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("x-api-key", m.client.apiKey)
 		req.Header.Set("anthropic-version", m.client.apiVersion)
+		req.Header.Set("anthropic-beta", anthropicPromptCachingBetaHeaderValue)
 		setUserAgentHeader(req)
 		m.client.applyConfiguredHeaders(req)
 		m.client.applyConfiguredQueryParams(req)
@@ -916,12 +934,16 @@ func convertToAnthropicMessage(msg *ChatMessage) AnthropicMessageParam {
 				Text: part.Text,
 			})
 		} else if part.ToolCall != nil {
+			toolInput := map[string]interface{}{}
+			if rawInput, ok := part.ToolCall.Arguments.Raw().(map[string]interface{}); ok {
+				toolInput = rawInput
+			}
 			// AnthropicTool use block
 			contentBlocks = append(contentBlocks, AnthropicContentBlock{
 				Type:  "tool_use",
 				ID:    part.ToolCall.ID,
 				Name:  part.ToolCall.Function,
-				Input: part.ToolCall.Arguments.Raw().(map[string]interface{}),
+				Input: toolInput,
 			})
 		} else if part.ToolResponse != nil {
 			// AnthropicTool result block
@@ -1031,10 +1053,20 @@ func convertToolsToAnthropic(tools []tool.ToolInfo) []AnthropicTool {
 		return nil
 	}
 
-	anthropicTools := make([]AnthropicTool, len(tools))
-	for i, t := range tools {
+	orderedTools := make([]tool.ToolInfo, len(tools))
+	copy(orderedTools, tools)
+	sort.SliceStable(orderedTools, func(i, j int) bool {
+		if orderedTools[i].Name == orderedTools[j].Name {
+			return orderedTools[i].Description < orderedTools[j].Description
+		}
+		return orderedTools[i].Name < orderedTools[j].Name
+	})
+
+	anthropicTools := make([]AnthropicTool, len(orderedTools))
+	for i, t := range orderedTools {
 		// Convert ToolSchema to map[string]interface{}
-		schemaJSON, _ := json.Marshal(t.Schema)
+		normalizedSchema := normalizeAnthropicToolSchemaForPromptCaching(t.Schema)
+		schemaJSON, _ := marshalStableAnthropicJSON(normalizedSchema)
 		var schemaMap map[string]interface{}
 		json.Unmarshal(schemaJSON, &schemaMap)
 
@@ -1045,4 +1077,150 @@ func convertToolsToAnthropic(tools []tool.ToolInfo) []AnthropicTool {
 		}
 	}
 	return anthropicTools
+}
+
+// marshalAnthropicMessagesRequest marshals Anthropic request in a deterministic format with prompt-caching hints.
+func marshalAnthropicMessagesRequest(req AnthropicMessagesRequest) ([]byte, error) {
+	body, err := marshalStableAnthropicJSON(req)
+	if err != nil {
+		return nil, fmt.Errorf("AnthropicChatModel.marshalAnthropicMessagesRequest() [anthropic_client.go]: failed to marshal base request: %w", err)
+	}
+
+	var requestMap map[string]any
+	if err := json.Unmarshal(body, &requestMap); err != nil {
+		return nil, fmt.Errorf("AnthropicChatModel.marshalAnthropicMessagesRequest() [anthropic_client.go]: failed to unmarshal base request: %w", err)
+	}
+
+	applyAnthropicPromptCachingBreakpoints(requestMap)
+
+	stableBody, err := marshalStableAnthropicJSON(requestMap)
+	if err != nil {
+		return nil, fmt.Errorf("AnthropicChatModel.marshalAnthropicMessagesRequest() [anthropic_client.go]: failed to marshal request map: %w", err)
+	}
+
+	return stableBody, nil
+}
+
+// applyAnthropicPromptCachingBreakpoints adds cache-control breakpoints for stable prompt-prefix caching.
+func applyAnthropicPromptCachingBreakpoints(requestMap map[string]any) {
+	if requestMap == nil {
+		return
+	}
+
+	if markLastToolWithCacheControl(requestMap) {
+		return
+	}
+
+	markSystemPromptWithCacheControl(requestMap)
+}
+
+func markLastToolWithCacheControl(requestMap map[string]any) bool {
+	toolsRaw, ok := requestMap["tools"]
+	if !ok {
+		return false
+	}
+
+	tools, ok := toolsRaw.([]any)
+	if !ok || len(tools) == 0 {
+		return false
+	}
+
+	lastIdx := len(tools) - 1
+	toolMap, ok := tools[lastIdx].(map[string]any)
+	if !ok {
+		return false
+	}
+
+	toolMap["cache_control"] = map[string]any{"type": "ephemeral"}
+	tools[lastIdx] = toolMap
+	requestMap["tools"] = tools
+	return true
+}
+
+func markSystemPromptWithCacheControl(requestMap map[string]any) {
+	systemRaw, exists := requestMap["system"]
+	if !exists {
+		return
+	}
+
+	switch system := systemRaw.(type) {
+	case string:
+		if strings.TrimSpace(system) == "" {
+			return
+		}
+		requestMap["system"] = []any{
+			map[string]any{
+				"type":          "text",
+				"text":          system,
+				"cache_control": map[string]any{"type": "ephemeral"},
+			},
+		}
+	case []any:
+		if len(system) == 0 {
+			return
+		}
+		lastIdx := len(system) - 1
+		blockMap, ok := system[lastIdx].(map[string]any)
+		if !ok {
+			return
+		}
+		blockMap["cache_control"] = map[string]any{"type": "ephemeral"}
+		system[lastIdx] = blockMap
+		requestMap["system"] = system
+	}
+}
+
+// normalizeAnthropicToolSchemaForPromptCaching normalizes schema slices to reduce prompt-cache misses.
+func normalizeAnthropicToolSchemaForPromptCaching(schema tool.ToolSchema) tool.ToolSchema {
+	normalized := schema
+	normalized.Required = anthropicSortedStringsCopy(schema.Required)
+	normalized.Properties = normalizeAnthropicPropertySchemaMapForPromptCaching(schema.Properties)
+	return normalized
+}
+
+// normalizeAnthropicPropertySchemaMapForPromptCaching normalizes nested property schemas.
+func normalizeAnthropicPropertySchemaMapForPromptCaching(properties map[string]tool.PropertySchema) map[string]tool.PropertySchema {
+	if len(properties) == 0 {
+		return properties
+	}
+
+	normalized := make(map[string]tool.PropertySchema, len(properties))
+	for key, property := range properties {
+		nested := property
+		nested.Enum = anthropicSortedStringsCopy(property.Enum)
+		nested.Required = anthropicSortedStringsCopy(property.Required)
+		nested.Properties = normalizeAnthropicPropertySchemaMapForPromptCaching(property.Properties)
+		if property.Items != nil {
+			nestedItem := *property.Items
+			nestedItem.Enum = anthropicSortedStringsCopy(property.Items.Enum)
+			nestedItem.Required = anthropicSortedStringsCopy(property.Items.Required)
+			nestedItem.Properties = normalizeAnthropicPropertySchemaMapForPromptCaching(property.Items.Properties)
+			nested.Items = &nestedItem
+		}
+		normalized[key] = nested
+	}
+
+	return normalized
+}
+
+// anthropicSortedStringsCopy returns a sorted copy of input strings.
+func anthropicSortedStringsCopy(input []string) []string {
+	if len(input) == 0 {
+		return input
+	}
+
+	cloned := make([]string, len(input))
+	copy(cloned, input)
+	sort.Strings(cloned)
+	return cloned
+}
+
+// marshalStableAnthropicJSON marshals values deterministically by using encoding/json map key ordering.
+func marshalStableAnthropicJSON(value any) ([]byte, error) {
+	body, err := json.Marshal(value)
+	if err != nil {
+		return nil, fmt.Errorf("marshalStableAnthropicJSON() [anthropic_client.go]: failed to marshal value: %w", err)
+	}
+
+	return body, nil
 }
