@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Lists subtasks for a task, or top-level tasks when no task is provided.",
+  "type": "object",
+  "properties": {
+    "uuid": {
+      "type": "string",
+      "description": "Parent task UUID. Optional when listing top-level tasks or using current session task."
+    },
+    "name": {
+      "type": "string",
+      "description": "Parent task name/slug. Used when uuid is not provided."
+    },
+    "recursive": {
+      "type": "boolean",
+      "description": "When true, lists all nested subtasks recursively."
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

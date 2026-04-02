@@ -521,6 +521,22 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	toolRegistry := tool.NewToolRegistry()
 	tool.RegisterVFSTools(toolRegistry, toolVFS, lspClient, nil)
 
+	taskRunner, err := core.NewCLITaskSessionRunner(workDir, modelName, params.ConfigPath, params.ProjectConfig, params.Thinking)
+	if err != nil {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create task runner: %w", err)
+	}
+	taskManager, err := core.NewTaskManager(workDir, configStore, taskRunner)
+	if err != nil {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create task manager: %w", err)
+	}
+	taskBackend, err := core.NewTaskBackendAdapter(taskManager, selectedVCS, nil)
+	if err != nil {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create task backend: %w", err)
+	}
+
 	bashRunner := runner.CommandRunner(runner.NewBashRunner(effectiveWorkDir, params.BashRunTimeout))
 	cleanupFns := make([]func(), 0)
 	cleanupOnError := true
@@ -639,9 +655,11 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		PromptGenerator:   promptGenerator,
 		Tools:             toolRegistry,
 		VFS:               toolVFS,
+		VCS:               selectedVCS,
 		Roles:             roleRegistry,
 		LSP:               lspClient,
 		ConfigStore:       configStore,
+		TaskBackend:       taskBackend,
 		mcpManager:        mcpManager,
 		LogBaseDir:        logsDir,
 		WorkDir:           effectiveWorkDir,

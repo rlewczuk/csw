@@ -44,6 +44,7 @@ type SubAgentTaskRunner interface {
 type SweSession struct {
 	id            string
 	parentID      string
+	taskID        string
 	slug          string
 	provider      models.ModelProvider
 	providerName  string
@@ -91,12 +92,14 @@ type SweSession struct {
 	subAgentSlugsMu  sync.Mutex
 	subAgentRunner   SubAgentTaskRunner
 	hookFeedbackExec tool.HookFeedbackExecutor
+	taskBackend      tool.TaskBackend
 }
 
 // SweSessionParams stores dependencies and initial values used to create a SweSession.
 type SweSessionParams struct {
 	ID           string
 	ParentID     string
+	TaskID       string
 	Slug         string
 	Provider     models.ModelProvider
 	ProviderName string
@@ -140,6 +143,7 @@ type SweSessionParams struct {
 	UsedSubAgentSlugs          map[string]struct{}
 	SubAgentRunner             SubAgentTaskRunner
 	HookFeedbackExecutor       tool.HookFeedbackExecutor
+	TaskBackend                tool.TaskBackend
 }
 
 // NewSweSession creates a new SweSession from provided parameters.
@@ -151,6 +155,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 	session := &SweSession{
 		id:              params.ID,
 		parentID:        strings.TrimSpace(params.ParentID),
+		taskID:          strings.TrimSpace(params.TaskID),
 		slug:            strings.TrimSpace(params.Slug),
 		provider:        params.Provider,
 		providerName:    params.ProviderName,
@@ -190,6 +195,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		subAgentSlugs:              make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
 		subAgentRunner:             params.SubAgentRunner,
 		hookFeedbackExec:           params.HookFeedbackExecutor,
+		taskBackend:                params.TaskBackend,
 	}
 
 	if session.modelSpec == "" {
@@ -245,6 +251,7 @@ type persistedChatMessage struct {
 type persistedSessionState struct {
 	SessionID                  string                  `json:"session_id"`
 	ParentSessionID            string                  `json:"parent_session_id,omitempty"`
+	TaskID                     string                  `json:"task_id,omitempty"`
 	Slug                       string                  `json:"slug,omitempty"`
 	ModelSpec                  string                  `json:"model_spec,omitempty"`
 	ProviderName               string                  `json:"provider_name"`
@@ -879,6 +886,25 @@ func (s *SweSession) ID() string {
 	return s.id
 }
 
+// TaskID returns task identifier associated with this session.
+func (s *SweSession) TaskID() string {
+	if s == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(s.taskID)
+}
+
+// SetTaskID sets task identifier associated with this session.
+func (s *SweSession) SetTaskID(taskID string) {
+	if s == nil {
+		return
+	}
+
+	s.taskID = strings.TrimSpace(taskID)
+	s.persistSessionState()
+}
+
 // ParentID returns the parent session identifier for delegated child sessions.
 func (s *SweSession) ParentID() string {
 	if s == nil {
@@ -1392,6 +1418,14 @@ func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 	registry.Register("todoRead", tool.NewTodoReadTool(s))
 	registry.Register("todoWrite", tool.NewTodoWriteTool(s))
 	registry.Register("subAgent", tool.NewSubAgentTool(s))
+	if s.taskBackend != nil {
+		registry.Register("taskNew", tool.NewTaskNewTool(s.taskBackend, s))
+		registry.Register("taskUpdate", tool.NewTaskUpdateTool(s.taskBackend, s))
+		registry.Register("taskGet", tool.NewTaskGetTool(s.taskBackend, s))
+		registry.Register("taskRun", tool.NewTaskRunTool(s.taskBackend, s))
+		registry.Register("taskList", tool.NewTaskListTool(s.taskBackend, s))
+		registry.Register("taskMerge", tool.NewTaskMergeTool(s.taskBackend, s))
+	}
 	if s.hookFeedbackExec != nil {
 		registry.Register("hookFeedback", tool.NewHookFeedbackTool(s.hookFeedbackExec, s.ModelWithProvider, s.ThinkingLevel))
 	}
@@ -1505,6 +1539,7 @@ func (s *SweSession) buildPersistedSessionState() persistedSessionState {
 	state := persistedSessionState{
 		SessionID:                  s.id,
 		ParentSessionID:            s.parentID,
+		TaskID:                     strings.TrimSpace(s.taskID),
 		Slug:                       s.slug,
 		ModelSpec:                  s.ModelWithProvider(),
 		ProviderName:               s.providerName,
@@ -1859,6 +1894,7 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 	session := NewSweSession(&SweSessionParams{
 		ID:       state.SessionID,
 		ParentID: state.ParentSessionID,
+		TaskID:   state.TaskID,
 		Slug:     state.Slug,
 		ModelSpec: func() string {
 			if strings.TrimSpace(state.ModelSpec) != "" {
@@ -1912,6 +1948,7 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 			}
 			return result
 		}(),
+		TaskBackend: params.TaskBackend,
 	})
 
 	if strings.TrimSpace(state.RoleName) != "" {

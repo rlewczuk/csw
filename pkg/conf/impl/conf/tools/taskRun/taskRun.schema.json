@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Runs one task session in isolation and persists output/summary.",
+  "type": "object",
+  "properties": {
+    "uuid": {
+      "type": "string",
+      "description": "Task UUID. Optional if name is provided or current session belongs to a task."
+    },
+    "name": {
+      "type": "string",
+      "description": "Task name/slug. Used when uuid is not provided."
+    },
+    "merge": {
+      "type": "boolean",
+      "description": "If true, merge feature branch into parent branch after successful run and mark task as merged."
+    },
+    "reset": {
+      "type": "boolean",
+      "description": "If true, reset task branches to initial parent-branch state before running."
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

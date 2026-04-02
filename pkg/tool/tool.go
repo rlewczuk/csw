@@ -1,6 +1,7 @@
 package tool
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -536,6 +537,59 @@ type ToolInfo struct {
 
 	// Schema defines the JSON Schema for the tool's arguments.
 	Schema ToolSchema `json:"parameters"`
+}
+
+// TaskRecord stores task metadata used by task tools.
+type TaskRecord struct {
+	UUID          string
+	Name          string
+	Description   string
+	Status        string
+	FeatureBranch string
+	ParentBranch  string
+	Role          string
+	State         string
+	Deps          []string
+	SessionIDs    []string
+	SubtaskIDs    []string
+	ParentTaskID  string
+	CreatedAt     string
+	UpdatedAt     string
+}
+
+// TaskSessionSummary stores task session summary metadata.
+type TaskSessionSummary struct {
+	SessionID   string
+	Status      string
+	StartedAt   string
+	CompletedAt string
+	TaskID      string
+}
+
+// TaskRunOutcome stores task run operation outcome.
+type TaskRunOutcome struct {
+	Task           TaskRecord
+	SessionID      string
+	SummaryMeta    *TaskSessionSummary
+	SummaryText    string
+	Merged         bool
+	TaskBranchName string
+}
+
+// TaskBackend defines task management operations used by task tools.
+type TaskBackend interface {
+	CreateTask(ctx context.Context, params TaskRecord, prompt string, parentTaskID string) (TaskRecord, error)
+	UpdateTask(ctx context.Context, identifier string, params TaskRecord, prompt *string) (TaskRecord, error)
+	GetTask(ctx context.Context, identifier string, fallbackTaskID string, includeSummary bool) (TaskRecord, *TaskSessionSummary, string, error)
+	RunTask(ctx context.Context, identifier string, fallbackTaskID string, merge bool, reset bool) (TaskRunOutcome, error)
+	ListTasks(ctx context.Context, identifier string, fallbackTaskID string, recursive bool) ([]TaskRecord, error)
+	MergeTask(ctx context.Context, identifier string, fallbackTaskID string) (TaskRecord, error)
+}
+
+// TaskSessionRef exposes task ID from current session for task tools.
+type TaskSessionRef interface {
+	TaskID() string
+	SetTaskID(taskID string)
 }
 
 // ShortDescription returns the first line of the markdown description

@@ -46,6 +46,7 @@ func main() {
 	rootCmd.AddCommand(CleanCommand())
 	rootCmd.AddCommand(McpCommand())
 	rootCmd.AddCommand(HookCommand())
+	rootCmd.AddCommand(TaskCommand())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

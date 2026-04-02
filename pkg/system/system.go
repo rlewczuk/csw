@@ -33,9 +33,11 @@ type SweSystem struct {
 	PromptGenerator core.PromptGenerator
 	Tools           *tool.ToolRegistry
 	VFS             apis.VFS
+	VCS             apis.VCS
 	Roles           *core.AgentRoleRegistry
 	LSP             lsp.LSP
 	ConfigStore     conf.ConfigStore
+	TaskBackend     tool.TaskBackend
 	mcpManager      interface{ Close() error }
 
 	sessions   map[string]*core.SweSession
@@ -187,7 +189,7 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 			}
 		}
 	}
-	session := core.NewSweSession(&core.SweSessionParams{
+		session := core.NewSweSession(&core.SweSessionParams{
 		ID:                   sessionID,
 		ParentID:             strings.TrimSpace(parentID),
 		Slug:                 strings.TrimSpace(slug),
@@ -211,8 +213,9 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 		LogBaseDir:           s.LogBaseDir,
 		Thinking:             firstNonEmpty(strings.TrimSpace(thinking), strings.TrimSpace(s.Thinking)),
 		MaxToolThreads:       s.MaxToolThreads,
-		HookFeedbackExecutor: hookFeedbackExecutor,
-		Logger:               sessionLogger,
+			HookFeedbackExecutor: hookFeedbackExecutor,
+			TaskBackend:          s.TaskBackend,
+			Logger:               sessionLogger,
 		LLMLogger:            llmLogger,
 		Messages:             []*models.ChatMessage{},
 		TodoList:             []tool.TodoItem{},
@@ -563,6 +566,7 @@ func (s *SweSystem) buildSessionParams() *core.SweSessionParams {
 		Thinking:        s.Thinking,
 		MaxToolThreads:  s.MaxToolThreads,
 		SubAgentRunner:  s,
+		TaskBackend:     s.TaskBackend,
 	}
 }
 
