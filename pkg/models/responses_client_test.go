@@ -529,6 +529,137 @@ func TestResponsesClient_RequestHeadersAndSessionID(t *testing.T) {
 	assert.True(t, foundDeveloper, "expected developer role in request input")
 }
 
+func TestResponsesClient_RequestPrefixStability(t *testing.T) {
+	t.Run("chat request JSON is stable for equivalent map-backed inputs", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			URL:    mock.URL(),
+			APIKey: "test-key",
+			Options: map[string]any{
+				"prompt_cache_retention": "24h",
+			},
+		})
+		require.NoError(t, err)
+
+		mock.AddRestResponse("/responses", "POST", `{"id":"resp_a","object":"response","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}]}`)
+		mock.AddRestResponse("/responses", "POST", `{"id":"resp_b","object":"response","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}]}`)
+
+		options := &ChatOptions{SessionID: "session-1"}
+		chatModel := client.ChatModel("test-model", options)
+
+		messagesA := []*ChatMessage{
+			NewTextMessage(ChatRoleSystem, "Static system instructions"),
+			NewTextMessage(ChatRoleUser, "Run tool"),
+			NewToolCallMessage(&tool.ToolCall{
+				ID:       "call_1",
+				Function: "read",
+				Arguments: tool.NewToolValue(map[string]any{
+					"z": map[string]any{"b": 2, "a": 1},
+					"a": []any{map[string]any{"y": "2", "x": "1"}},
+				}),
+			}),
+			NewToolResponseMessage(&tool.ToolResponse{
+				Call: &tool.ToolCall{ID: "call_1", Function: "read"},
+				Result: tool.NewToolValue(map[string]any{
+					"meta": map[string]any{"m2": "two", "m1": "one"},
+					"list": []any{map[string]any{"k2": "v2", "k1": "v1"}},
+				}),
+			}),
+		}
+
+		messagesB := []*ChatMessage{
+			NewTextMessage(ChatRoleSystem, "Static system instructions"),
+			NewTextMessage(ChatRoleUser, "Run tool"),
+			NewToolCallMessage(&tool.ToolCall{
+				ID:       "call_1",
+				Function: "read",
+				Arguments: tool.NewToolValue(map[string]any{
+					"a": []any{map[string]any{"x": "1", "y": "2"}},
+					"z": map[string]any{"a": 1, "b": 2},
+				}),
+			}),
+			NewToolResponseMessage(&tool.ToolResponse{
+				Call: &tool.ToolCall{ID: "call_1", Function: "read"},
+				Result: tool.NewToolValue(map[string]any{
+					"list": []any{map[string]any{"k1": "v1", "k2": "v2"}},
+					"meta": map[string]any{"m1": "one", "m2": "two"},
+				}),
+			}),
+		}
+
+		toolsA := []tool.ToolInfo{
+			{
+				Name:        "read",
+				Description: "Read file",
+				Schema: tool.ToolSchema{
+					Type: tool.SchemaTypeObject,
+					Properties: map[string]tool.PropertySchema{
+						"path": {
+							Type: tool.SchemaTypeString,
+						},
+						"opts": {
+							Type: tool.SchemaTypeObject,
+							Properties: map[string]tool.PropertySchema{
+								"b": {Type: tool.SchemaTypeString},
+								"a": {Type: tool.SchemaTypeString},
+							},
+							Required:             []string{"b", "a"},
+							AdditionalProperties: boolPtr(false),
+						},
+					},
+					Required:             []string{"path", "opts"},
+					AdditionalProperties: false,
+				},
+			},
+		}
+
+		toolsB := []tool.ToolInfo{
+			{
+				Name:        "read",
+				Description: "Read file",
+				Schema: tool.ToolSchema{
+					Type: tool.SchemaTypeObject,
+					Properties: map[string]tool.PropertySchema{
+						"opts": {
+							Type: tool.SchemaTypeObject,
+							Properties: map[string]tool.PropertySchema{
+								"a": {Type: tool.SchemaTypeString},
+								"b": {Type: tool.SchemaTypeString},
+							},
+							Required:             []string{"a", "b"},
+							AdditionalProperties: boolPtr(false),
+						},
+						"path": {
+							Type: tool.SchemaTypeString,
+						},
+					},
+					Required:             []string{"opts", "path"},
+					AdditionalProperties: false,
+				},
+			},
+		}
+
+		_, err = chatModel.Chat(context.Background(), messagesA, options, toolsA)
+		require.NoError(t, err)
+		_, err = chatModel.Chat(context.Background(), messagesB, options, toolsB)
+		require.NoError(t, err)
+
+		reqs := mock.GetRequests()
+		require.Len(t, reqs, 2)
+		assert.JSONEq(t, string(reqs[0].Body), string(reqs[1].Body))
+
+		var payload ResponsesCreateRequest
+		require.NoError(t, json.Unmarshal(reqs[0].Body, &payload))
+		assert.Equal(t, "24h", payload.PromptCacheRetention)
+	})
+}
+
+func boolPtr(v bool) *bool {
+	return &v
+}
+
 func TestResponsesClient_ChatRequiresInstructions(t *testing.T) {
 	t.Run("chat request includes instructions when only user message is provided", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

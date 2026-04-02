@@ -26,6 +26,7 @@ import (
 const defaultTokenRefreshMargin = 5 * time.Minute
 
 const oauthRefreshMarginOptionKey = "oauth_refresh_margin"
+const responsesPromptCacheRetentionOptionKey = "prompt_cache_retention"
 
 // defaultResponsesInstructions is used when no explicit instructions are provided.
 const defaultResponsesInstructions string = "You are a helpful assistant."
@@ -350,6 +351,29 @@ func (c *ResponsesClient) tokenRefreshMargin() time.Duration {
 	return defaultTokenRefreshMargin
 }
 
+func (c *ResponsesClient) promptCacheRetention() string {
+	if c == nil || c.config == nil || c.config.Options == nil {
+		return ""
+	}
+
+	retentionRaw, ok := c.config.Options[responsesPromptCacheRetentionOptionKey]
+	if !ok || retentionRaw == nil {
+		return ""
+	}
+
+	retention := strings.TrimSpace(fmt.Sprint(retentionRaw))
+	if retention == "" {
+		return ""
+	}
+
+	switch retention {
+	case "in_memory", "24h":
+		return retention
+	default:
+		return ""
+	}
+}
+
 func (c *ResponsesClient) shouldRefreshAfterUnauthorized(resp *http.Response, bodyBytes []byte) bool {
 	if !IsOAuth2Provider(c.config) || c.config == nil || c.config.RefreshToken == "" || resp == nil {
 		return false
@@ -408,7 +432,14 @@ func (c *ResponsesClient) applyConfiguredHeaders(req *http.Request) {
 		return
 	}
 
-	for name, value := range c.config.Headers {
+	headerNames := make([]string, 0, len(c.config.Headers))
+	for name := range c.config.Headers {
+		headerNames = append(headerNames, name)
+	}
+	sort.Strings(headerNames)
+
+	for _, name := range headerNames {
+		value := c.config.Headers[name]
 		if name == "" || value == "" {
 			continue
 		}
@@ -425,7 +456,14 @@ func (c *ResponsesClient) applyConfiguredQueryParams(req *http.Request) {
 	}
 
 	query := req.URL.Query()
-	for key, value := range c.config.QueryParams {
+	queryParamKeys := make([]string, 0, len(c.config.QueryParams))
+	for key := range c.config.QueryParams {
+		queryParamKeys = append(queryParamKeys, key)
+	}
+	sort.Strings(queryParamKeys)
+
+	for _, key := range queryParamKeys {
+		value := c.config.QueryParams[key]
 		if key == "" || value == "" {
 			continue
 		}
@@ -610,6 +648,7 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 		Tools:           convertToolsToResponses(tools),
 		Stream:          stream,
 		MaxOutputTokens: maxOutputTokens,
+		PromptCacheRetention: m.client.promptCacheRetention(),
 	}
 
 	if !useCodexCompatibility && m.client.config != nil && m.client.config.MaxTokens > 0 {
@@ -792,6 +831,7 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			Tools:           convertToolsToResponses(tools),
 			Stream:          true,
 			MaxOutputTokens: maxOutputTokens,
+			PromptCacheRetention: m.client.promptCacheRetention(),
 		}
 
 		if !useCodexCompatibility && m.client.config != nil && m.client.config.MaxTokens > 0 {
@@ -1382,7 +1422,8 @@ func convertToResponsesItems(messages []*ChatMessage) ([]ResponsesItem, error) {
 			}
 			argsJSON := "{}"
 			if call.Arguments.Raw() != nil {
-				if bytes, err := json.Marshal(call.Arguments.Raw()); err == nil {
+				normalizedArgs := normalizeMapOrderValue(call.Arguments.Raw())
+				if bytes, err := json.Marshal(normalizedArgs); err == nil {
 					argsJSON = string(bytes)
 				}
 			}
@@ -1402,7 +1443,8 @@ func convertToResponsesItems(messages []*ChatMessage) ([]ResponsesItem, error) {
 			if resp.Error != nil {
 				output = resp.Error.Error()
 			} else if resp.Result.Raw() != nil {
-				if bytes, err := json.Marshal(resp.Result.Raw()); err == nil {
+				normalizedResult := normalizeMapOrderValue(resp.Result.Raw())
+				if bytes, err := json.Marshal(normalizedResult); err == nil {
 					output = string(bytes)
 				}
 			}
@@ -1722,7 +1764,8 @@ func convertToolsToResponses(tools []tool.ToolInfo) []ResponsesTool {
 
 	converted := make([]ResponsesTool, len(tools))
 	for i, t := range tools {
-		schemaJSON, _ := json.Marshal(t.Schema)
+		normalizedSchema := normalizeToolSchema(t.Schema)
+		schemaJSON, _ := json.Marshal(normalizedSchema)
 		var schemaMap map[string]interface{}
 		json.Unmarshal(schemaJSON, &schemaMap)
 
@@ -1735,6 +1778,84 @@ func convertToolsToResponses(tools []tool.ToolInfo) []ResponsesTool {
 	}
 
 	return converted
+}
+
+// normalizeMapOrderValue returns a recursively normalized representation where
+// map keys are emitted in lexical order during JSON marshaling.
+func normalizeMapOrderValue(v any) any {
+	switch value := v.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(value))
+		for key := range value {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		normalized := make(map[string]any, len(value))
+		for _, key := range keys {
+			normalized[key] = normalizeMapOrderValue(value[key])
+		}
+		return normalized
+	case []any:
+		normalized := make([]any, len(value))
+		for i := range value {
+			normalized[i] = normalizeMapOrderValue(value[i])
+		}
+		return normalized
+	default:
+		return value
+	}
+}
+
+// normalizeToolSchema returns schema with sorted object keys and required fields.
+func normalizeToolSchema(schema tool.ToolSchema) tool.ToolSchema {
+	normalized := schema
+	if len(normalized.Required) > 0 {
+		normalized.Required = append([]string(nil), normalized.Required...)
+		sort.Strings(normalized.Required)
+	}
+
+	normalized.Properties = normalizePropertySchemaMap(normalized.Properties)
+
+	return normalized
+}
+
+// normalizePropertySchemaMap returns map copy with recursively normalized property schemas.
+func normalizePropertySchemaMap(props map[string]tool.PropertySchema) map[string]tool.PropertySchema {
+	if len(props) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(props))
+	for key := range props {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	normalized := make(map[string]tool.PropertySchema, len(props))
+	for _, key := range keys {
+		normalized[key] = normalizePropertySchema(props[key])
+	}
+
+	return normalized
+}
+
+// normalizePropertySchema returns recursively normalized property schema.
+func normalizePropertySchema(schema tool.PropertySchema) tool.PropertySchema {
+	normalized := schema
+
+	if len(normalized.Required) > 0 {
+		normalized.Required = append([]string(nil), normalized.Required...)
+		sort.Strings(normalized.Required)
+	}
+
+	if normalized.Items != nil {
+		itemsCopy := normalizePropertySchema(*normalized.Items)
+		normalized.Items = &itemsCopy
+	}
+
+	normalized.Properties = normalizePropertySchemaMap(normalized.Properties)
+
+	return normalized
 }
 
 func wrapLLMRequestError(err error, resp *http.Response, bodyBytes []byte) error {

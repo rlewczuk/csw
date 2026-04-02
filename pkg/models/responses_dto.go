@@ -10,6 +10,7 @@ type ResponsesCreateRequest struct {
 	Instructions    string              `json:"instructions,omitempty"`
 	Include         []string            `json:"include,omitempty"`
 	PromptCacheKey  string              `json:"prompt_cache_key,omitempty"`
+	PromptCacheRetention string         `json:"prompt_cache_retention,omitempty"`
 	Reasoning       *ResponsesReasoning `json:"reasoning,omitempty"`
 	Stream          bool                `json:"stream,omitempty"`
 	Temperature     float64             `json:"temperature,omitempty"`
