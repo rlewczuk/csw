@@ -681,7 +681,13 @@ func runCLI(params *CLIParams) error {
 		hookEngine.SetSessionStatus(core.HookSessionStatusSuccess)
 	}
 
-	if err := system.EmitSessionSummary(startTime, endTime, session, buildResult, appView.ShowMessage, sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
+	if err := core.EmitSessionSummary(startTime, endTime, session, core.SessionSummaryBuildResult{
+		LogsDir:        buildResult.LogsDir,
+		WorkDirRoot:    buildResult.WorkDirRoot,
+		WorkDir:        buildResult.WorkDir,
+		LSPServer:      buildResult.LSPServer,
+		ContainerImage: buildResult.ContainerImage,
+	}, appView.ShowMessage, sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
 		return err
 	}
 

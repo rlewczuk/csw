@@ -21,17 +21,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/tool"
 )
 
-type subAgentSummaryJSON struct {
-	SessionID       string          `json:"session_id"`
-	ParentSessionID string          `json:"parent_session_id,omitempty"`
-	Status          string          `json:"status"`
-	Summary         string          `json:"summary,omitempty"`
-	FinalTodoList   []tool.TodoItem `json:"final_todo_list"`
-	ModelUsed       string          `json:"model_used,omitempty"`
-	ThinkingLevel   string          `json:"thinking_level,omitempty"`
-	CompletedAt     string          `json:"completed_at"`
-}
-
 // SessionLoggerFactory is a function that creates a session logger.
 // This allows tests to provide in-memory loggers instead of file-based ones.
 type SessionLoggerFactory func(sessionID string, logBaseDir string) (*slog.Logger, error)
@@ -345,7 +334,7 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *core.SweSession, request tool.Su
 	}
 
 	runErr := child.Run(context.Background())
-	summaryText := lastAssistantMessageText(child)
+	summaryText := core.LastAssistantMessageText(child)
 	responseSummaryText, responseStatus, responseError := lastHookFeedbackResponse(child)
 	if strings.TrimSpace(responseSummaryText) != "" {
 		summaryText = strings.TrimSpace(responseSummaryText)
@@ -374,7 +363,7 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *core.SweSession, request tool.Su
 		}
 	}
 
-	if err := writeSubAgentSummary(s.LogBaseDir, child, subAgentSummaryJSON{
+	if err := core.WriteSubAgentSummary(s.LogBaseDir, child, core.SubAgentSummaryJSON{
 		SessionID:       child.ID(),
 		ParentSessionID: parent.ID(),
 		Status:          status,
@@ -458,62 +447,6 @@ func lastHookFeedbackResponse(session *core.SweSession) (string, string, string)
 	}
 
 	return "", "", ""
-}
-
-func writeSubAgentSummary(logBaseDir string, session *core.SweSession, summary subAgentSummaryJSON) error {
-	if session == nil || strings.TrimSpace(logBaseDir) == "" {
-		return nil
-	}
-	dir := filepath.Join(logBaseDir, "sessions", session.ID())
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("writeSubAgentSummary() [system.go]: failed to create session summary dir: %w", err)
-	}
-	jsonData, err := json.MarshalIndent(summary, "", "  ")
-	if err != nil {
-		return fmt.Errorf("writeSubAgentSummary() [system.go]: failed to marshal summary json: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "summary.json"), jsonData, 0644); err != nil {
-		return fmt.Errorf("writeSubAgentSummary() [system.go]: failed to write summary json: %w", err)
-	}
-
-	markdown := strings.TrimSpace(summary.Summary)
-	if markdown == "" {
-		markdown = "(no summary)"
-	}
-	content := fmt.Sprintf("# Summary\n\n%s\n\n# Session Info\n\nSession ID: %s\nParent Session ID: %s\nStatus: %s\n", markdown, summary.SessionID, summary.ParentSessionID, summary.Status)
-	if err := os.WriteFile(filepath.Join(dir, "summary.md"), []byte(content), 0644); err != nil {
-		return fmt.Errorf("writeSubAgentSummary() [system.go]: failed to write summary markdown: %w", err)
-	}
-
-	return nil
-}
-
-func lastAssistantMessageText(session *core.SweSession) string {
-	if session == nil {
-		return ""
-	}
-	for i := len(session.ChatMessages()) - 1; i >= 0; i-- {
-		message := session.ChatMessages()[i]
-		if message == nil || message.Role != models.ChatRoleAssistant {
-			continue
-		}
-		var textBuilder strings.Builder
-		for _, part := range message.Parts {
-			if part.Text != "" {
-				textBuilder.WriteString(part.Text)
-			}
-		}
-		if textBuilder.Len() > 0 {
-			return textBuilder.String()
-		}
-		for _, part := range message.Parts {
-			if part.ReasoningContent != "" {
-				textBuilder.WriteString(part.ReasoningContent)
-			}
-		}
-		return textBuilder.String()
-	}
-	return ""
 }
 
 type subAgentOutputHandler struct {

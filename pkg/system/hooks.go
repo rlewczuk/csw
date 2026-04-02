@@ -1,11 +1,8 @@
 package system
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -387,53 +384,6 @@ func ParseHookTimeout(value string) (time.Duration, error) {
 	}
 
 	return parsed, nil
-}
-
-func FormatEditedFilesSummary(workDirRoot string, workDir string) string {
-	diffDir := vcs.ChooseGitDiffDir(workDirRoot, workDir)
-	cmd := exec.Command("git", "diff", "--numstat")
-	cmd.Dir = diffDir
-
-	output, err := cmd.Output()
-	if err != nil {
-		return "-"
-	}
-
-	scanner := bufio.NewScanner(bytes.NewReader(output))
-	lines := make([]string, 0)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-
-		parts := strings.Split(line, "\t")
-		if len(parts) != 3 {
-			continue
-		}
-
-		lines = append(lines, fmt.Sprintf("- %s (+%s/-%s)", parts[2], parts[0], parts[1]))
-	}
-
-	untrackedCmd := exec.Command("git", "ls-files", "--others", "--exclude-standard")
-	untrackedCmd.Dir = diffDir
-	untrackedOutput, untrackedErr := untrackedCmd.Output()
-	if untrackedErr == nil {
-		untrackedScanner := bufio.NewScanner(bytes.NewReader(untrackedOutput))
-		for untrackedScanner.Scan() {
-			path := strings.TrimSpace(untrackedScanner.Text())
-			if path == "" {
-				continue
-			}
-			lines = append(lines, fmt.Sprintf("- %s (new file)", path))
-		}
-	}
-
-	if len(lines) == 0 {
-		return "-"
-	}
-
-	return strings.Join(lines, "\n")
 }
 
 func NormalizeResumeTarget(raw string) (string, error) {
