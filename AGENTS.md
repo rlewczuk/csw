@@ -28,6 +28,10 @@ When you need to generate and run a test script, or generate and use some tempor
 - When adding new global object (eg. function, method, struct, interface, type, constant etc.), add short doc comment describing what it is and what it does;
   - comment should be compliant with godoc format (eg. start comment with object name)
   - when adding interface, also add godoc comment to each method describing what it is and what it does;
+- Keep source files focused on a given functionality or task, do not split logic of given functionality into multiple files unless it is really necessary (i.e. functionality spans across several layers);
+  - even in such case try to keep logic of given functionality in one file, by designing it in such way, that other files will be limited to contain plumbing code for this functionality
+- Avoid adding code to very big files (more than 1000 lines)
+  - If given wile would exceed size threshold, consider finding consistent piece of functionality inside this file that can be split to a new file
 
 Rules regarding implementing tests:
 - Testing: Use table-driven tests with `t.Run()` for subtests
