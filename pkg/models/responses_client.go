@@ -1815,6 +1815,9 @@ func normalizeToolSchema(schema tool.ToolSchema) tool.ToolSchema {
 	}
 
 	normalized.Properties = normalizePropertySchemaMap(normalized.Properties)
+	if normalized.Properties == nil {
+		normalized.Properties = map[string]tool.PropertySchema{}
+	}
 
 	return normalized
 }
