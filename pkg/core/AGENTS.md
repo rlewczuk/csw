@@ -10,6 +10,8 @@ Package `pkg/core` contains the runtime orchestration layer for agent sessions, 
 * `prompt.go` - Prompt and tool-info generator with role fragment merging
 * `role.go` - Role registry with cached config loading and role merging
 * `session.go` - Core session engine with chat/tool loops and retries
+* `session_agents.go` - AGENTS.md instruction injection helpers for VFS tool results
+* `session_persisted.go` - Persisted session state model for loading sessions
 * `session_thread.go` - Async thread wrapper for non-blocking UI interaction
 * `state.go` - Agent state structures for template processing
 * `worktree_branch.go` - Worktree branch name generation using models
