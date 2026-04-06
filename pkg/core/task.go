@@ -464,10 +464,6 @@ func (m *TaskManager) TasksRoot() string {
 
 // CreateTask creates a new persistent task and prompt file.
 func (m *TaskManager) CreateTask(params TaskCreateParams) (*Task, error) {
-	if strings.TrimSpace(params.Prompt) == "" {
-		return nil, fmt.Errorf("TaskManager.CreateTask() [task.go]: prompt cannot be empty")
-	}
-
 	now := m.nowFn().UTC().Format(time.RFC3339Nano)
 	taskID := m.uuidFn()
 	name := strings.TrimSpace(params.Name)
@@ -516,7 +512,12 @@ func (m *TaskManager) CreateTask(params TaskCreateParams) (*Task, error) {
 	if err := m.writeTaskFile(taskDir, task); err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(filepath.Join(taskDir, "task.md"), []byte(strings.TrimSpace(params.Prompt)+"\n"), 0644); err != nil {
+	promptContent := strings.TrimSpace(params.Prompt)
+	promptBytes := []byte{}
+	if promptContent != "" {
+		promptBytes = []byte(promptContent + "\n")
+	}
+	if err := os.WriteFile(filepath.Join(taskDir, "task.md"), promptBytes, 0644); err != nil {
 		return nil, fmt.Errorf("TaskManager.CreateTask() [task.go]: failed to write task prompt: %w", err)
 	}
 
@@ -675,6 +676,9 @@ func (m *TaskManager) RunTask(ctx context.Context, lookup TaskLookup, params Tas
 		return nil, fmt.Errorf("TaskManager.RunTask() [task.go]: failed to read task prompt: %w", err)
 	}
 	prompt := strings.TrimSpace(string(promptBytes))
+	if prompt == "" {
+		return nil, fmt.Errorf("TaskManager.RunTask() [task.go]: task is empty: task.md has no prompt")
+	}
 	if params.Continue {
 		prompt, err = m.renderContinuePrompt(task, prompt)
 		if err != nil {

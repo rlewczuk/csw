@@ -84,7 +84,6 @@ func taskNewCommand() *cobra.Command {
 	command.Flags().StringVarP(&prompt, "prompt", "p", "", "Task prompt")
 	command.Flags().StringVar(&parent, "parent", "", "Parent task name or UUID")
 	command.Flags().BoolVar(&run, "run", false, "Run created task immediately")
-	_ = command.MarkFlagRequired("prompt")
 
 	return command
 }
