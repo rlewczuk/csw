@@ -26,9 +26,21 @@ func GenerateWorktreeBranchName(ctx context.Context, modelProviders map[string]m
 		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: config store cannot be nil")
 	}
 
-	modelRefs, err := models.ParseProviderModelChain(model)
-	if err != nil || len(modelRefs) == 0 {
-		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: invalid model format, expected 'provider/model' or comma-separated provider/model list, got '%s'", model)
+	aliasValues, err := configStore.GetModelAliases()
+	if err != nil {
+		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: failed to load model aliases: %w", err)
+	}
+	aliases, err := models.NormalizeModelAliasMap(aliasValues)
+	if err != nil {
+		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: failed to normalize model aliases: %w", err)
+	}
+
+	modelRefs, err := models.ExpandProviderModelChain(model, aliases)
+	if err != nil {
+		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: failed to resolve model spec: %w", err)
+	}
+	if len(modelRefs) == 0 {
+		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: resolved model spec is empty")
 	}
 	providerName := modelRefs[0].Provider
 	modelName := modelRefs[0].Model

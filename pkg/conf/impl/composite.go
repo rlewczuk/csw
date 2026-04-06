@@ -49,6 +49,8 @@ type CompositeConfigStore struct {
 	globalConfigUpdate         time.Time
 	modelProviderConfigs       map[string]*conf.ModelProviderConfig
 	modelProviderConfigsUpdate time.Time
+	modelAliases               map[string]conf.ModelAliasValue
+	modelAliasesUpdate         time.Time
 	mcpServerConfigs           map[string]*conf.MCPServerConfig
 	mcpServerConfigsUpdate     time.Time
 	hookConfigs                map[string]*conf.HookConfig
@@ -59,6 +61,7 @@ type CompositeConfigStore struct {
 	// Track last known update times from stores
 	storeGlobalUpdates []time.Time
 	storeModelUpdates  []time.Time
+	storeAliasUpdates  []time.Time
 	storeMCPUpdates    []time.Time
 	storeHookUpdates   []time.Time
 	storeRoleUpdates   []time.Time
@@ -113,6 +116,7 @@ func NewCompositeConfigStore(projDir string, configPath string) (conf.ConfigStor
 		projDir:            projDir,
 		storeGlobalUpdates: make([]time.Time, len(stores)),
 		storeModelUpdates:  make([]time.Time, len(stores)),
+		storeAliasUpdates:  make([]time.Time, len(stores)),
 		storeMCPUpdates:    make([]time.Time, len(stores)),
 		storeHookUpdates:   make([]time.Time, len(stores)),
 		storeRoleUpdates:   make([]time.Time, len(stores)),
@@ -166,6 +170,32 @@ func (c *CompositeConfigStore) GetModelProviderConfigs() (map[string]*conf.Model
 	}
 
 	return configs, nil
+}
+
+// GetModelAliases returns merged model aliases from all sources.
+func (c *CompositeConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.needsRefreshModelAliases() {
+		if err := c.refreshModelAliases(); err != nil {
+			return nil, fmt.Errorf("CompositeConfigStore.GetModelAliases() [composite.go]: refresh failed: %w", err)
+		}
+	}
+
+	aliases := make(map[string]conf.ModelAliasValue, len(c.modelAliases))
+	for key, value := range c.modelAliases {
+		aliases[key] = conf.ModelAliasValue{Values: append([]string(nil), value.Values...)}
+	}
+
+	return aliases, nil
+}
+
+// LastModelAliasesUpdate returns timestamp of most recent model aliases update.
+func (c *CompositeConfigStore) LastModelAliasesUpdate() (time.Time, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.modelAliasesUpdate, nil
 }
 
 // GetMCPServerConfigs returns merged MCP server configurations from all sources.
@@ -299,6 +329,9 @@ func (c *CompositeConfigStore) refresh() error {
 	if err := c.refreshModelProviderConfigs(); err != nil {
 		return err
 	}
+	if err := c.refreshModelAliases(); err != nil {
+		return err
+	}
 	if err := c.refreshMCPServerConfigs(); err != nil {
 		return err
 	}
@@ -309,6 +342,24 @@ func (c *CompositeConfigStore) refresh() error {
 		return err
 	}
 	return nil
+}
+
+func (c *CompositeConfigStore) needsRefreshModelAliases() bool {
+	if len(c.storeAliasUpdates) != len(c.stores) {
+		return true
+	}
+
+	for i, store := range c.stores {
+		lastUpdate, err := store.LastModelAliasesUpdate()
+		if err != nil {
+			continue
+		}
+		if !lastUpdate.Equal(c.storeAliasUpdates[i]) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // needsRefreshGlobal checks if global config needs to be refreshed.
@@ -447,6 +498,39 @@ func (c *CompositeConfigStore) refreshModelProviderConfigs() error {
 
 	c.modelProviderConfigs = merged
 	c.modelProviderConfigsUpdate = latestUpdate
+	return nil
+}
+
+func (c *CompositeConfigStore) refreshModelAliases() error {
+	if len(c.storeAliasUpdates) != len(c.stores) {
+		c.storeAliasUpdates = make([]time.Time, len(c.stores))
+	}
+
+	merged := make(map[string]conf.ModelAliasValue)
+	var latestUpdate time.Time
+
+	for i, store := range c.stores {
+		aliases, err := store.GetModelAliases()
+		if err != nil {
+			return fmt.Errorf("CompositeConfigStore.refreshModelAliases() [composite.go]: failed to get aliases from store %d: %w", i, err)
+		}
+
+		for key, value := range aliases {
+			merged[key] = conf.ModelAliasValue{Values: append([]string(nil), value.Values...)}
+		}
+
+		lastUpdate, err := store.LastModelAliasesUpdate()
+		if err == nil {
+			c.storeAliasUpdates[i] = lastUpdate
+			if lastUpdate.After(latestUpdate) {
+				latestUpdate = lastUpdate
+			}
+		}
+	}
+
+	c.modelAliases = merged
+	c.modelAliasesUpdate = latestUpdate
+
 	return nil
 }
 

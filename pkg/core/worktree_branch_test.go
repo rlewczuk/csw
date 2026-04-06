@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/stretchr/testify/assert"
@@ -79,12 +80,12 @@ func TestGenerateWorktreeBranchNameErrors(t *testing.T) {
 			expectedErrSub: "generated branch name is empty",
 		},
 		{
-			name: "fails on invalid model format",
+			name: "fails on unknown model alias",
 			setupSystem: func(t *testing.T) *SweSystem {
 				sweSystem, _ := newWorktreeBranchTestSystem(t, "valid-name")
 				return sweSystem
 			},
-			modelName:      "test-model",
+			modelName:      "unknown-alias",
 			expectedErrSub: "invalid model format",
 		},
 	}
@@ -97,6 +98,31 @@ func TestGenerateWorktreeBranchNameErrors(t *testing.T) {
 			assert.Contains(t, err.Error(), tt.expectedErrSub)
 		})
 	}
+}
+
+func TestGenerateWorktreeBranchNameAliasModel(t *testing.T) {
+	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}, {Name: "backup-model"}})
+	provider.SetChatResponse("test-model", &models.MockChatResponse{
+		Response: models.NewTextMessage(models.ChatRoleAssistant, "alias-branch-name"),
+	})
+
+	store := confimpl.NewMockConfigStore()
+	store.SetAgentConfigFile("worktree", "system.md", []byte("system worktree prompt"))
+	store.SetAgentConfigFile("worktree", "message.md", []byte("input:\n{{ .Input }}"))
+	store.SetModelAliases(map[string]conf.ModelAliasValue{
+		"default": {Values: []string{"mock/test-model", "mock/backup-model"}},
+	})
+
+	branch, err := GenerateWorktreeBranchName(
+		context.Background(),
+		map[string]models.ModelProvider{"mock": provider},
+		store,
+		"default",
+		"Fix branch naming",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "alias-branch-name", branch)
+	require.NotEmpty(t, provider.RecordedMessages)
 }
 
 func TestRenderWorktreeBranchPrompt(t *testing.T) {

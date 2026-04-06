@@ -65,6 +65,7 @@ type SweSession struct {
 	llmLogger     *slog.Logger
 
 	modelProviders  map[string]models.ModelProvider
+	modelAliases    map[string][]string
 	modelTags       *models.ModelTagRegistry
 	toolSelection   conf.ToolSelectionConfig
 	promptGenerator PromptGenerator
@@ -110,6 +111,7 @@ type SweSessionParams struct {
 	SystemTools *tool.ToolRegistry
 
 	ModelProviders  map[string]models.ModelProvider
+	ModelAliases    map[string][]string
 	ModelTags       *models.ModelTagRegistry
 	ToolSelection   conf.ToolSelectionConfig
 	PromptGenerator PromptGenerator
@@ -174,6 +176,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		logger:          params.Logger,
 		llmLogger:       params.LLMLogger,
 		modelProviders:  params.ModelProviders,
+		modelAliases:    params.ModelAliases,
 		modelTags:       params.ModelTags,
 		toolSelection:   params.ToolSelection,
 		promptGenerator: params.PromptGenerator,
@@ -260,6 +263,7 @@ func (s *SweSession) Run(ctx context.Context) error {
 		chatOptions,
 		&retryPolicy,
 		s.handleRetryChatModelMessage,
+		s.modelAliases,
 	)
 	if chatModelErr != nil {
 		return fmt.Errorf("SweSession.Run() [session.go]: failed to create chat model chain: %w", chatModelErr)
@@ -970,12 +974,12 @@ func (s *SweSession) SetModel(modelStr string) error {
 		s.logger.Info("set_model", "model", modelStr)
 	}
 
-	refs, parseErr := models.ParseProviderModelChain(modelStr)
+	refs, parseErr := models.ExpandProviderModelChain(modelStr, s.modelAliases)
 	if parseErr != nil || len(refs) == 0 {
 		if s.logger != nil {
 			s.logger.Error("set_model_failed", "model", modelStr, "error", "invalid format")
 		}
-		return fmt.Errorf("SweSession.SetModel() [session.go]: invalid model format: %s, expected provider/model or comma-separated provider/model list", modelStr)
+		return fmt.Errorf("SweSession.SetModel() [session.go]: invalid model format: %s, expected provider/model, comma-separated provider/model list, or model alias", modelStr)
 	}
 
 	for _, ref := range refs {
@@ -993,7 +997,7 @@ func (s *SweSession) SetModel(modelStr string) error {
 	s.provider = provider
 	s.providerName = providerName
 	s.model = modelName
-	s.modelSpec = strings.TrimSpace(modelStr)
+	s.modelSpec = models.ComposeProviderModelSpec(refs)
 	s.applyModelTagToolSelection()
 	if s.role != nil && s.role.ToolsAccess != nil {
 		s.Tools = wrapToolsWithAccessControl(s.Tools, s.role.ToolsAccess)

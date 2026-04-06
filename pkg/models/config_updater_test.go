@@ -35,6 +35,14 @@ func (m *mockWritableStore) LastModelProviderConfigsUpdate() (time.Time, error) 
 	return time.Time{}, nil
 }
 
+func (m *mockWritableStore) GetModelAliases() (map[string]conf.ModelAliasValue, error) {
+	return map[string]conf.ModelAliasValue{}, nil
+}
+
+func (m *mockWritableStore) LastModelAliasesUpdate() (time.Time, error) {
+	return time.Time{}, nil
+}
+
 func (m *mockWritableStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
 	return nil, nil
 }

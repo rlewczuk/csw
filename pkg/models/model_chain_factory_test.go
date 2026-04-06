@@ -100,7 +100,7 @@ func TestNewChatModelFromProviderChain(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chatModel, err := NewChatModelFromProviderChain(tt.modelSpec, tt.providers, nil, nil, nil)
+			chatModel, err := NewChatModelFromProviderChain(tt.modelSpec, tt.providers, nil, nil, nil, nil)
 			if tt.expectedErrText != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErrText)
@@ -139,10 +139,92 @@ func TestNewChatModelFromProviderChain_WithRetryPolicyWrapsModel(t *testing.T) {
 		nil,
 		&retryPolicy,
 		nil,
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, chatModel)
 
 	_, isRetry := chatModel.(*RetryChatModel)
 	assert.True(t, isRetry)
+}
+
+func TestExpandProviderModelChain(t *testing.T) {
+	tests := []struct {
+		name      string
+		modelSpec string
+		aliases   map[string][]string
+		expected  []ProviderModelRef
+		errText   string
+	}{
+		{
+			name:      "direct provider model chain",
+			modelSpec: "p1/m1,p2/m2",
+			expected:  []ProviderModelRef{{Provider: "p1", Model: "m1"}, {Provider: "p2", Model: "m2"}},
+		},
+		{
+			name:      "single alias",
+			modelSpec: "fast",
+			aliases: map[string][]string{
+				"fast": {"p1/m1"},
+			},
+			expected: []ProviderModelRef{{Provider: "p1", Model: "m1"}},
+		},
+		{
+			name:      "alias with fallback targets",
+			modelSpec: "balanced",
+			aliases: map[string][]string{
+				"balanced": {"p1/m1", "p2/m2"},
+			},
+			expected: []ProviderModelRef{{Provider: "p1", Model: "m1"}, {Provider: "p2", Model: "m2"}},
+		},
+		{
+			name:      "nested alias",
+			modelSpec: "default",
+			aliases: map[string][]string{
+				"default": {"fast", "p2/m2"},
+				"fast":    {"p1/m1"},
+			},
+			expected: []ProviderModelRef{{Provider: "p1", Model: "m1"}, {Provider: "p2", Model: "m2"}},
+		},
+		{
+			name:      "cyclic aliases",
+			modelSpec: "a",
+			aliases: map[string][]string{
+				"a": {"b"},
+				"b": {"a"},
+			},
+			errText: "cyclic alias reference",
+		},
+		{
+			name:      "unknown alias",
+			modelSpec: "unknown",
+			aliases: map[string][]string{
+				"known": {"p/m"},
+			},
+			errText: "unknown model alias",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			refs, err := ExpandProviderModelChain(tt.modelSpec, tt.aliases)
+			if tt.errText != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errText)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, refs)
+		})
+	}
+}
+
+func TestComposeProviderModelSpec(t *testing.T) {
+	assert.Equal(t, "", ComposeProviderModelSpec(nil))
+	assert.Equal(
+		t,
+		"p1/m1,p2/m2",
+		ComposeProviderModelSpec([]ProviderModelRef{{Provider: "p1", Model: "m1"}, {Provider: "p2", Model: "m2"}}),
+	)
 }

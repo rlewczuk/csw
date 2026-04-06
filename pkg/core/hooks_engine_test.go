@@ -401,6 +401,60 @@ func TestHookEngineExecuteLLMHookUsesConfiguredOptionsAndOutputTo(t *testing.T) 
 	assert.Equal(t, "Prompt: Initial request", strings.TrimSpace(provider.RecordedMessages[0][1].GetText()))
 }
 
+func TestHookEngineExecuteLLMHookUsesModelAliasFallback(t *testing.T) {
+	provider := models.NewMockProvider([]models.ModelInfo{{Name: "primary-model"}, {Name: "backup-model"}})
+	provider.SetChatResponse("primary-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "from-primary")})
+
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetModelAliases(map[string]conf.ModelAliasValue{
+		"smart": {Values: []string{"mock/primary-model", "mock/backup-model"}},
+	})
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"summary-llm": {
+			Name:    "summary-llm",
+			Hook:    "summary",
+			Enabled: true,
+			Type:    conf.HookTypeLLM,
+			Prompt:  "Prompt: {{.user_prompt}}",
+			Model:   "smart",
+		},
+	})
+
+	engine := NewHookEngine(configStore, nil, nil, map[string]models.ModelProvider{"mock": provider})
+	engine.SetContextValue("user_prompt", "Initial request")
+	engine.SetContextValue("rootdir", t.TempDir())
+
+	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary"})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "from-primary", engine.ContextData()["result"])
+	require.Len(t, provider.RecordedMessages, 1)
+}
+
+func TestHookEngineExecuteLLMHookFailsWhenAliasResolvesMissingProvider(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetModelAliases(map[string]conf.ModelAliasValue{
+		"broken": {Values: []string{"missing/model"}},
+	})
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"summary-llm": {
+			Name:    "summary-llm",
+			Hook:    "summary",
+			Enabled: true,
+			Type:    conf.HookTypeLLM,
+			Prompt:  "Prompt",
+			Model:   "broken",
+		},
+	})
+
+	engine := NewHookEngine(configStore, nil, nil, map[string]models.ModelProvider{"mock": models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})})
+	engine.SetContextValue("rootdir", t.TempDir())
+
+	_, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "provider not found")
+}
+
 func TestHookEngineExecuteLLMHookFailsWhenPromptMissing(t *testing.T) {
 	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
 	configStore := confimpl.NewMockConfigStore()
@@ -418,6 +472,43 @@ func TestHookEngineExecuteLLMHookFailsWhenPromptMissing(t *testing.T) {
 	_, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "summary", Session: session})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "empty prompt")
+}
+
+func TestHookEngineExecuteShellProcessesLLMFeedbackWithModelAlias(t *testing.T) {
+	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+	provider.SetChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "aliased")})
+
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetModelAliases(map[string]conf.ModelAliasValue{
+		"fast": {Values: []string{"mock/test-model"}},
+	})
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-hook": {
+			Name:    "merge-hook",
+			Hook:    "merge",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo feedback-llm-alias",
+			RunOn:   conf.HookRunOnHost,
+		},
+	})
+
+	hostRunner := runner.NewMockRunner()
+	hostRunner.SetResponseDetailed(
+		"echo feedback-llm-alias",
+		"CSWFEEDBACK: {\"fn\":\"llm\",\"args\":{\"prompt\":\"first\",\"model\":\"fast\"},\"response\":\"none\",\"id\":\"r1\"}\n",
+		"",
+		0,
+		nil,
+	)
+
+	engine := NewHookEngine(configStore, hostRunner, nil, map[string]models.ModelProvider{"mock": provider})
+	result, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "merge"})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, result.FeedbackResponses, 1)
+	assert.True(t, result.FeedbackResponses[0].OK)
+	require.Len(t, provider.RecordedMessages, 1)
 }
 
 func TestParseHookFeedbackRequestsIgnoresInvalidLines(t *testing.T) {

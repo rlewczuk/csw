@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/logging"
@@ -128,6 +129,13 @@ func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessi
 			if err := session.SetRole(params.RoleName); err != nil {
 				return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to override role: %w", err)
 			}
+			if !params.ModelOverridden {
+				if roleConfig := session.Role(); roleConfig != nil && strings.TrimSpace(roleConfig.Model) != "" {
+					if err := session.SetModel(roleConfig.Model); err != nil {
+						return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to apply role model override: %w", err)
+					}
+				}
+			}
 		}
 		if params.ThinkingOverridden {
 			session.SetThinkingLevel(params.Thinking)
@@ -144,6 +152,13 @@ func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessi
 	if params.ResumeTarget == "" {
 		if err := session.SetRole(params.RoleName); err != nil {
 			return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to set role: %w", err)
+		}
+		if !params.ModelOverridden {
+			if roleConfig := session.Role(); roleConfig != nil && strings.TrimSpace(roleConfig.Model) != "" {
+				if err := session.SetModel(roleConfig.Model); err != nil {
+					return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to apply role model: %w", err)
+				}
+			}
 		}
 		session.SetWorkDir(s.WorkDir)
 	}

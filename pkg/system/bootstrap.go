@@ -447,6 +447,17 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 
+	modelAliasValues, err := configStore.GetModelAliases()
+	if err != nil {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to load model aliases: %w", err)
+	}
+	modelAliases, err := models.NormalizeModelAliasMap(modelAliasValues)
+	if err != nil {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to normalize model aliases: %w", err)
+	}
+
 	roleRegistry := core.NewAgentRoleRegistry(configStore)
 	if len(roleRegistry.List()) == 0 {
 		logging.FlushLogs()
@@ -457,6 +468,16 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	if !ok {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: role not found: %s (available: %v)", params.RoleName, roleRegistry.List())
+	}
+
+	if strings.TrimSpace(params.ModelName) == "" {
+		if strings.TrimSpace(roleConfig.Model) != "" {
+			modelName, err = ResolveModelSpec(roleConfig.Model, configStore)
+			if err != nil {
+				logging.FlushLogs()
+				return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve role model: %w", err)
+			}
+		}
 	}
 
 	configStore, err = buildRuntimeMCPConfigStore(configStore, roleConfig.MCPServers, params.MCPEnable, params.MCPDisable)
@@ -650,6 +671,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 
 	sweSystem := &SweSystem{
 		ModelProviders:    modelProviders,
+		ModelAliases:      modelAliases,
 		ModelTags:         modelTagRegistry,
 		ToolSelection:     globalConfig.ToolSelection,
 		PromptGenerator:   promptGenerator,
@@ -716,6 +738,14 @@ type runtimeMCPConfigStore struct {
 	base                 conf.ConfigStore
 	mcpServerConfigs     map[string]*conf.MCPServerConfig
 	mcpServerConfigsTime time.Time
+}
+
+func (s *runtimeMCPConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, error) {
+	return s.base.GetModelAliases()
+}
+
+func (s *runtimeMCPConfigStore) LastModelAliasesUpdate() (time.Time, error) {
+	return s.base.LastModelAliasesUpdate()
 }
 
 func (s *runtimeMCPConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelProviderConfig, error) {
@@ -1170,7 +1200,7 @@ func ResolveWorkDir(dirPath string) (string, error) {
 // ResolveModelName determines the model name to use.
 func ResolveModelName(modelName string, configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (string, error) {
 	if modelName != "" {
-		return modelName, nil
+		return ResolveModelSpec(modelName, configStore)
 	}
 
 	globalConfig, err := configStore.GetGlobalConfig()
@@ -1188,6 +1218,38 @@ func ResolveModelName(modelName string, configStore conf.ConfigStore, providerRe
 	}
 
 	return "", fmt.Errorf("ResolveModelName() [bootstrap.go]: no default provider configured and no providers available")
+}
+
+// ResolveModelSpec resolves model alias or provider/model chain to normalized provider/model chain.
+func ResolveModelSpec(modelSpec string, configStore conf.ConfigStore) (string, error) {
+	trimmedModelSpec := strings.TrimSpace(modelSpec)
+	if trimmedModelSpec == "" {
+		return "", fmt.Errorf("ResolveModelSpec() [bootstrap.go]: model spec cannot be empty")
+	}
+
+	if configStore == nil {
+		refs, err := models.ParseProviderModelChain(trimmedModelSpec)
+		if err != nil {
+			return "", fmt.Errorf("ResolveModelSpec() [bootstrap.go]: %w", err)
+		}
+		return models.ComposeProviderModelSpec(refs), nil
+	}
+
+	aliasValues, err := configStore.GetModelAliases()
+	if err != nil {
+		return "", fmt.Errorf("ResolveModelSpec() [bootstrap.go]: failed to load model aliases: %w", err)
+	}
+	aliases, err := models.NormalizeModelAliasMap(aliasValues)
+	if err != nil {
+		return "", fmt.Errorf("ResolveModelSpec() [bootstrap.go]: failed to normalize model aliases: %w", err)
+	}
+
+	refs, err := models.ExpandProviderModelChain(trimmedModelSpec, aliases)
+	if err != nil {
+		return "", fmt.Errorf("ResolveModelSpec() [bootstrap.go]: %w", err)
+	}
+
+	return models.ComposeProviderModelSpec(refs), nil
 }
 
 // CreateProviderMap creates a map of provider names to ModelProvider instances from a registry.

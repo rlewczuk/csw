@@ -51,6 +51,8 @@ type LocalConfigStore struct {
 	globalConfigUpdate         time.Time
 	modelProviderConfigs       map[string]*conf.ModelProviderConfig
 	modelProviderConfigsUpdate time.Time
+	modelAliases               map[string]conf.ModelAliasValue
+	modelAliasesUpdate         time.Time
 	mcpServerConfigs           map[string]*conf.MCPServerConfig
 	mcpServerConfigsUpdate     time.Time
 	hookConfigs                map[string]*conf.HookConfig
@@ -84,6 +86,7 @@ func NewLocalConfigStore(configDir string) (*LocalConfigStore, error) {
 		configDir:            configDir,
 		globalConfig:         &conf.GlobalConfig{},
 		modelProviderConfigs: make(map[string]*conf.ModelProviderConfig),
+		modelAliases:         make(map[string]conf.ModelAliasValue),
 		mcpServerConfigs:     make(map[string]*conf.MCPServerConfig),
 		hookConfigs:          make(map[string]*conf.HookConfig),
 		agentRoleConfigs:     make(map[string]*conf.AgentRoleConfig),
@@ -160,6 +163,26 @@ func (s *LocalConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.modelProviderConfigsUpdate, nil
+}
+
+// GetModelAliases returns configured model aliases.
+func (s *LocalConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	aliases := make(map[string]conf.ModelAliasValue, len(s.modelAliases))
+	for key, value := range s.modelAliases {
+		aliases[key] = conf.ModelAliasValue{Values: append([]string(nil), value.Values...)}
+	}
+
+	return aliases, nil
+}
+
+// LastModelAliasesUpdate returns timestamp of model aliases updates.
+func (s *LocalConfigStore) LastModelAliasesUpdate() (time.Time, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.modelAliasesUpdate, nil
 }
 
 // GetMCPServerConfigs returns a map of MCP server configurations.
@@ -295,6 +318,9 @@ func (s *LocalConfigStore) loadAllConfig() error {
 	}
 	if err := s.loadModelProviderConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load model provider configs: %w", err)
+	}
+	if err := s.loadModelAliases(); err != nil {
+		return fmt.Errorf("loadAllConfig(): failed to load model aliases: %w", err)
 	}
 	if err := s.loadMCPServerConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load MCP server configs: %w", err)
@@ -557,6 +583,106 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 	s.modelProviderConfigsUpdate = time.Now()
 
 	return nil
+}
+
+// loadModelAliases loads model aliases from model_aliases.yaml/yml/jsonl files.
+// YAML takes precedence over JSONL.
+func (s *LocalConfigStore) loadModelAliases() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	yamlPath := filepath.Join(s.configDir, "model_aliases.yaml")
+	ymlPath := filepath.Join(s.configDir, "model_aliases.yml")
+	jsonlPath := filepath.Join(s.configDir, "model_aliases.jsonl")
+
+	aliases, loaded, err := loadModelAliasesFromFiles(yamlPath, ymlPath, jsonlPath)
+	if err != nil {
+		return err
+	}
+	if !loaded {
+		aliases = make(map[string]conf.ModelAliasValue)
+	}
+
+	s.modelAliases = aliases
+	s.modelAliasesUpdate = time.Now()
+
+	return nil
+}
+
+func loadModelAliasesFromFiles(yamlPath string, ymlPath string, jsonlPath string) (map[string]conf.ModelAliasValue, bool, error) {
+	if data, err := os.ReadFile(yamlPath); err == nil {
+		aliases, parseErr := parseModelAliasesYAML(data, yamlPath)
+		if parseErr != nil {
+			return nil, false, parseErr
+		}
+		return aliases, true, nil
+	} else if !os.IsNotExist(err) {
+		return nil, false, fmt.Errorf("loadModelAliasesFromFiles() [local.go]: failed to read %s: %w", yamlPath, err)
+	}
+
+	if data, err := os.ReadFile(ymlPath); err == nil {
+		aliases, parseErr := parseModelAliasesYAML(data, ymlPath)
+		if parseErr != nil {
+			return nil, false, parseErr
+		}
+		return aliases, true, nil
+	} else if !os.IsNotExist(err) {
+		return nil, false, fmt.Errorf("loadModelAliasesFromFiles() [local.go]: failed to read %s: %w", ymlPath, err)
+	}
+
+	if data, err := os.ReadFile(jsonlPath); err == nil {
+		aliases, parseErr := parseModelAliasesJSONL(data, jsonlPath)
+		if parseErr != nil {
+			return nil, false, parseErr
+		}
+		return aliases, true, nil
+	} else if !os.IsNotExist(err) {
+		return nil, false, fmt.Errorf("loadModelAliasesFromFiles() [local.go]: failed to read %s: %w", jsonlPath, err)
+	}
+
+	return nil, false, nil
+}
+
+func parseModelAliasesYAML(data []byte, source string) (map[string]conf.ModelAliasValue, error) {
+	aliases := make(map[string]conf.ModelAliasValue)
+	if err := yaml.Unmarshal(data, &aliases); err != nil {
+		return nil, fmt.Errorf("parseModelAliasesYAML() [local.go]: failed to parse %s: %w", source, err)
+	}
+
+	return aliases, nil
+}
+
+func parseModelAliasesJSONL(data []byte, source string) (map[string]conf.ModelAliasValue, error) {
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" {
+		return map[string]conf.ModelAliasValue{}, nil
+	}
+
+	aliases := make(map[string]conf.ModelAliasValue)
+	if strings.HasPrefix(trimmed, "{") {
+		if err := json.Unmarshal([]byte(trimmed), &aliases); err != nil {
+			return nil, fmt.Errorf("parseModelAliasesJSONL() [local.go]: failed to parse %s: %w", source, err)
+		}
+		return aliases, nil
+	}
+
+	lines := strings.Split(trimmed, "\n")
+	for lineIndex, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "" {
+			continue
+		}
+
+		entry := make(map[string]conf.ModelAliasValue)
+		if err := json.Unmarshal([]byte(trimmedLine), &entry); err != nil {
+			return nil, fmt.Errorf("parseModelAliasesJSONL() [local.go]: failed to parse %s line %d: %w", source, lineIndex+1, err)
+		}
+		for key, value := range entry {
+			aliases[key] = value
+		}
+	}
+
+	return aliases, nil
 }
 
 // loadMCPServerConfigs loads MCP server configurations from mcp directory.
@@ -987,6 +1113,9 @@ func (s *LocalConfigStore) setupWatchers() error {
 
 	// Watch models directory
 	modelsDir := filepath.Join(s.configDir, "models")
+	modelAliasesYAMLPath := filepath.Join(s.configDir, "model_aliases.yaml")
+	modelAliasesYMLPath := filepath.Join(s.configDir, "model_aliases.yml")
+	modelAliasesJSONLPath := filepath.Join(s.configDir, "model_aliases.jsonl")
 	if _, err := os.Stat(modelsDir); err == nil {
 		if err := s.watcher.Add(modelsDir); err != nil {
 			return fmt.Errorf("setupWatchers(): failed to watch models directory: %w", err)
@@ -998,6 +1127,14 @@ func (s *LocalConfigStore) setupWatchers() error {
 				if err := s.watcher.Add(nestedDir); err != nil {
 					return fmt.Errorf("setupWatchers(): failed to watch %s directory: %w", nestedDir, err)
 				}
+			}
+		}
+	}
+
+	for _, aliasesPath := range []string{modelAliasesYAMLPath, modelAliasesYMLPath, modelAliasesJSONLPath} {
+		if _, err := os.Stat(aliasesPath); err == nil {
+			if err := s.watcher.Add(aliasesPath); err != nil {
+				return fmt.Errorf("setupWatchers() [local.go]: failed to watch %s: %w", aliasesPath, err)
 			}
 		}
 	}
@@ -1108,6 +1245,9 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 	globalYAMLPath := filepath.Join(s.configDir, "global.yml")
 	globalJSONPath := filepath.Join(s.configDir, "global.json")
 	modelsDir := filepath.Join(s.configDir, "models")
+	modelAliasesYAMLPath := filepath.Join(s.configDir, "model_aliases.yaml")
+	modelAliasesYMLPath := filepath.Join(s.configDir, "model_aliases.yml")
+	modelAliasesJSONLPath := filepath.Join(s.configDir, "model_aliases.jsonl")
 	mcpDir := filepath.Join(s.configDir, "mcp")
 	hooksDir := filepath.Join(s.configDir, "hooks")
 	modelFamiliesDir := filepath.Join(modelsDir, "families")
@@ -1120,6 +1260,13 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 	if event.Name == globalYAMLPath || event.Name == globalJSONPath {
 		if err := s.loadGlobalConfig(); err != nil {
 			fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload global config: %v\n", err)
+		}
+		return
+	}
+
+	if event.Name == modelAliasesYAMLPath || event.Name == modelAliasesYMLPath || event.Name == modelAliasesJSONLPath {
+		if err := s.loadModelAliases(); err != nil {
+			fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent() [local.go]: failed to reload model aliases: %v\n", err)
 		}
 		return
 	}

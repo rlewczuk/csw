@@ -54,6 +54,7 @@ type EmbeddedConfigStore struct {
 	mu                   sync.RWMutex
 	globalConfig         *conf.GlobalConfig
 	modelProviderConfigs map[string]*conf.ModelProviderConfig
+	modelAliases         map[string]conf.ModelAliasValue
 	mcpServerConfigs     map[string]*conf.MCPServerConfig
 	hookConfigs          map[string]*conf.HookConfig
 	agentRoleConfigs     map[string]*conf.AgentRoleConfig
@@ -66,6 +67,7 @@ func NewEmbeddedConfigStore() (conf.ConfigStore, error) {
 	store := &EmbeddedConfigStore{
 		globalConfig:         &conf.GlobalConfig{},
 		modelProviderConfigs: make(map[string]*conf.ModelProviderConfig),
+		modelAliases:         make(map[string]conf.ModelAliasValue),
 		mcpServerConfigs:     make(map[string]*conf.MCPServerConfig),
 		hookConfigs:          make(map[string]*conf.HookConfig),
 		agentRoleConfigs:     make(map[string]*conf.AgentRoleConfig),
@@ -110,6 +112,24 @@ func (s *EmbeddedConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelP
 // LastModelProviderConfigsUpdate returns the timestamp of the last model provider configs update.
 // For embedded configuration, this always returns a constant timestamp.
 func (s *EmbeddedConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
+	return embeddedTimestamp, nil
+}
+
+// GetModelAliases returns configured model aliases.
+func (s *EmbeddedConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	aliases := make(map[string]conf.ModelAliasValue, len(s.modelAliases))
+	for key, value := range s.modelAliases {
+		aliases[key] = conf.ModelAliasValue{Values: append([]string(nil), value.Values...)}
+	}
+
+	return aliases, nil
+}
+
+// LastModelAliasesUpdate returns timestamp of last model aliases update.
+func (s *EmbeddedConfigStore) LastModelAliasesUpdate() (time.Time, error) {
 	return embeddedTimestamp, nil
 }
 
@@ -245,6 +265,9 @@ func (s *EmbeddedConfigStore) loadAllConfig() error {
 	if err := s.loadModelProviderConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load model provider configs: %w", err)
 	}
+	if err := s.loadModelAliases(); err != nil {
+		return fmt.Errorf("loadAllConfig(): failed to load model aliases: %w", err)
+	}
 	if err := s.loadMCPServerConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load MCP server configs: %w", err)
 	}
@@ -257,6 +280,57 @@ func (s *EmbeddedConfigStore) loadAllConfig() error {
 
 	s.loaded = true
 	return nil
+}
+
+func (s *EmbeddedConfigStore) loadModelAliases() error {
+	aliases, loaded, err := loadEmbeddedModelAliases()
+	if err != nil {
+		return err
+	}
+	if !loaded {
+		aliases = make(map[string]conf.ModelAliasValue)
+	}
+	s.modelAliases = aliases
+
+	return nil
+}
+
+func loadEmbeddedModelAliases() (map[string]conf.ModelAliasValue, bool, error) {
+	yamlPath := "conf/model_aliases.yaml"
+	ymlPath := "conf/model_aliases.yml"
+	jsonlPath := "conf/model_aliases.jsonl"
+
+	if data, err := embeddedConfigFS.ReadFile(yamlPath); err == nil {
+		aliases, parseErr := parseModelAliasesYAML(data, yamlPath)
+		if parseErr != nil {
+			return nil, false, parseErr
+		}
+		return aliases, true, nil
+	} else if !isNotExist(err) {
+		return nil, false, fmt.Errorf("loadEmbeddedModelAliases() [embedded.go]: failed to read %s: %w", yamlPath, err)
+	}
+
+	if data, err := embeddedConfigFS.ReadFile(ymlPath); err == nil {
+		aliases, parseErr := parseModelAliasesYAML(data, ymlPath)
+		if parseErr != nil {
+			return nil, false, parseErr
+		}
+		return aliases, true, nil
+	} else if !isNotExist(err) {
+		return nil, false, fmt.Errorf("loadEmbeddedModelAliases() [embedded.go]: failed to read %s: %w", ymlPath, err)
+	}
+
+	if data, err := embeddedConfigFS.ReadFile(jsonlPath); err == nil {
+		aliases, parseErr := parseModelAliasesJSONL(data, jsonlPath)
+		if parseErr != nil {
+			return nil, false, parseErr
+		}
+		return aliases, true, nil
+	} else if !isNotExist(err) {
+		return nil, false, fmt.Errorf("loadEmbeddedModelAliases() [embedded.go]: failed to read %s: %w", jsonlPath, err)
+	}
+
+	return nil, false, nil
 }
 
 // loadGlobalConfig loads the global configuration from embedded global.yml or global.json.

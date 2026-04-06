@@ -42,6 +42,108 @@ func ParseProviderModelChain(modelSpec string) ([]ProviderModelRef, error) {
 	return refs, nil
 }
 
+// ExpandProviderModelChain expands comma-separated model spec into provider/model refs.
+// Each segment may be a direct provider/model ref or an alias key from aliases map.
+func ExpandProviderModelChain(modelSpec string, aliases map[string][]string) ([]ProviderModelRef, error) {
+	trimmedSpec := strings.TrimSpace(modelSpec)
+	if trimmedSpec == "" {
+		return nil, fmt.Errorf("ExpandProviderModelChain() [model_chain_factory.go]: model spec cannot be empty")
+	}
+
+	segments := strings.Split(trimmedSpec, ",")
+	refs := make([]ProviderModelRef, 0, len(segments))
+	for _, segment := range segments {
+		resolvedRefs, err := expandProviderModelSegment(strings.TrimSpace(segment), aliases, nil)
+		if err != nil {
+			return nil, err
+		}
+		refs = append(refs, resolvedRefs...)
+	}
+
+	if len(refs) == 0 {
+		return nil, fmt.Errorf("ExpandProviderModelChain() [model_chain_factory.go]: model spec cannot be empty")
+	}
+
+	return refs, nil
+}
+
+func expandProviderModelSegment(segment string, aliases map[string][]string, stack map[string]struct{}) ([]ProviderModelRef, error) {
+	if segment == "" {
+		return nil, fmt.Errorf("expandProviderModelSegment() [model_chain_factory.go]: model spec contains empty model segment")
+	}
+
+	if ref, ok := parseSingleProviderModelRef(segment); ok {
+		return []ProviderModelRef{ref}, nil
+	}
+
+	if len(aliases) == 0 {
+		return nil, fmt.Errorf("expandProviderModelSegment() [model_chain_factory.go]: invalid model format, expected 'provider/model', got '%s'", segment)
+	}
+
+	aliasValues, ok := aliases[segment]
+	if !ok {
+		return nil, fmt.Errorf("expandProviderModelSegment() [model_chain_factory.go]: unknown model alias: %s", segment)
+	}
+	if len(aliasValues) == 0 {
+		return nil, fmt.Errorf("expandProviderModelSegment() [model_chain_factory.go]: alias %q has no targets", segment)
+	}
+
+	if stack == nil {
+		stack = make(map[string]struct{})
+	}
+	if _, exists := stack[segment]; exists {
+		return nil, fmt.Errorf("expandProviderModelSegment() [model_chain_factory.go]: cyclic alias reference detected for %q", segment)
+	}
+
+	nextStack := make(map[string]struct{}, len(stack)+1)
+	for key := range stack {
+		nextStack[key] = struct{}{}
+	}
+	nextStack[segment] = struct{}{}
+
+	refs := make([]ProviderModelRef, 0, len(aliasValues))
+	for _, aliasValue := range aliasValues {
+		parts := strings.Split(aliasValue, ",")
+		for _, part := range parts {
+			resolvedRefs, err := expandProviderModelSegment(strings.TrimSpace(part), aliases, nextStack)
+			if err != nil {
+				return nil, err
+			}
+			refs = append(refs, resolvedRefs...)
+		}
+	}
+
+	return refs, nil
+}
+
+func parseSingleProviderModelRef(segment string) (ProviderModelRef, bool) {
+	parts := strings.SplitN(segment, "/", 2)
+	if len(parts) != 2 {
+		return ProviderModelRef{}, false
+	}
+	providerName := strings.TrimSpace(parts[0])
+	modelName := strings.TrimSpace(parts[1])
+	if providerName == "" || modelName == "" {
+		return ProviderModelRef{}, false
+	}
+
+	return ProviderModelRef{Provider: providerName, Model: modelName}, true
+}
+
+// ComposeProviderModelSpec joins provider/model refs into a comma-separated model spec.
+func ComposeProviderModelSpec(refs []ProviderModelRef) string {
+	if len(refs) == 0 {
+		return ""
+	}
+
+	parts := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		parts = append(parts, ref.Provider+"/"+ref.Model)
+	}
+
+	return strings.Join(parts, ",")
+}
+
 // NewChatModelFromProviderChain creates chat model from provider/model chain.
 func NewChatModelFromProviderChain(
 	modelSpec string,
@@ -49,8 +151,9 @@ func NewChatModelFromProviderChain(
 	options *ChatOptions,
 	retryPolicy *RetryPolicy,
 	retryLogFn func(string, shared.MessageType),
+	aliases map[string][]string,
 ) (ChatModel, error) {
-	refs, err := ParseProviderModelChain(modelSpec)
+	refs, err := ExpandProviderModelChain(modelSpec, aliases)
 	if err != nil {
 		return nil, fmt.Errorf("NewChatModelFromProviderChain() [model_chain_factory.go]: %w", err)
 	}

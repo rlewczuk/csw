@@ -351,6 +351,7 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 		name           string
 		prompt         string
 		modelName      string
+		aliases        map[string]conf.ModelAliasValue
 		worktree       string
 		generatorError error
 		expected       string
@@ -360,6 +361,7 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 		{name: "returns unchanged branch when no placeholder suffix", prompt: "Implement feature", modelName: "mock/test-model", worktree: "feature/fixed", expected: "feature/fixed", generateCalls: 0},
 		{name: "returns error when placeholder used with empty prompt", prompt: "   ", modelName: "mock/test-model", worktree: "sp-1234-%", expectError: "requires non-empty prompt"},
 		{name: "generates and appends branch suffix", prompt: "Fix worktree cleanup issue", modelName: "mock/test-model", worktree: "sp-1234-%", expected: "sp-1234-worktree-cleanup", generateCalls: 1},
+		{name: "generates and appends branch suffix with model alias", prompt: "Fix worktree cleanup issue", modelName: "default", aliases: map[string]conf.ModelAliasValue{"default": {Values: []string{"mock/test-model"}}}, worktree: "sp-1234-%", expected: "sp-1234-worktree-cleanup", generateCalls: 1},
 		{name: "propagates generator error", prompt: "Fix worktree cleanup issue", modelName: "mock/test-model", worktree: "sp-1234-%", generatorError: errors.New("generation failed"), expectError: "generation failed", generateCalls: 1},
 	}
 
@@ -369,6 +371,9 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 			store.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{
 				"mock": {Name: "mock", Type: "openai", URL: "http://example.com", ModelTags: []conf.ModelTagMapping{}},
 			})
+			if len(tt.aliases) > 0 {
+				store.SetModelAliases(tt.aliases)
+			}
 
 			originalNewComposite := newCompositeConfigStoreFunc
 			originalResolveModel := resolveModelNameFunc
@@ -385,7 +390,7 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 				return store, nil
 			}
 			resolveModelNameFunc = func(modelName string, configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (string, error) {
-				return "mock/test-model", nil
+				return ResolveModelName(modelName, configStore, providerRegistry)
 			}
 			createProviderMapFunc = func(providerRegistry *models.ProviderRegistry) (map[string]models.ModelProvider, error) {
 				provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})

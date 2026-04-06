@@ -19,6 +19,8 @@ type MockConfigStore struct {
 	globalConfigUpdate         time.Time
 	modelProviderConfigs       map[string]*conf.ModelProviderConfig
 	modelProviderConfigsUpdate time.Time
+	modelAliases               map[string]conf.ModelAliasValue
+	modelAliasesUpdate         time.Time
 	mcpServerConfigs           map[string]*conf.MCPServerConfig
 	mcpServerConfigsUpdate     time.Time
 	hookConfigs                map[string]*conf.HookConfig
@@ -33,6 +35,8 @@ type MockConfigStore struct {
 	GetAgentRoleConfigsErr            error
 	LastGlobalConfigUpdateErr         error
 	LastModelProviderConfigsUpdateErr error
+	GetModelAliasesErr                error
+	LastModelAliasesUpdateErr         error
 	GetMCPServerConfigsErr            error
 	LastMCPServerConfigsUpdateErr     error
 	GetHookConfigsErr                 error
@@ -51,6 +55,8 @@ func NewMockConfigStore() *MockConfigStore {
 		globalConfigUpdate:         time.Now(),
 		modelProviderConfigs:       make(map[string]*conf.ModelProviderConfig),
 		modelProviderConfigsUpdate: time.Now(),
+		modelAliases:               make(map[string]conf.ModelAliasValue),
+		modelAliasesUpdate:         time.Now(),
 		mcpServerConfigs:           make(map[string]*conf.MCPServerConfig),
 		mcpServerConfigsUpdate:     time.Now(),
 		hookConfigs:                make(map[string]*conf.HookConfig),
@@ -103,6 +109,14 @@ func (m *MockConfigStore) SetModelProviderConfigs(configs map[string]*conf.Model
 	m.modelProviderConfigsUpdate = time.Now()
 }
 
+// SetModelAliases sets model aliases and updates timestamp.
+func (m *MockConfigStore) SetModelAliases(aliases map[string]conf.ModelAliasValue) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.modelAliases = aliases
+	m.modelAliasesUpdate = time.Now()
+}
+
 // SetAgentRoleConfigs sets the agent role configurations and updates the timestamp.
 func (m *MockConfigStore) SetAgentRoleConfigs(configs map[string]*conf.AgentRoleConfig) {
 	m.mu.Lock()
@@ -123,6 +137,13 @@ func (m *MockConfigStore) UpdateModelProviderConfigsTimestamp() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.modelProviderConfigsUpdate = time.Now()
+}
+
+// UpdateModelAliasesTimestamp updates model aliases timestamp.
+func (m *MockConfigStore) UpdateModelAliasesTimestamp() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.modelAliasesUpdate = time.Now()
 }
 
 // UpdateMCPServerConfigsTimestamp updates MCP server configs timestamp.
@@ -198,6 +219,35 @@ func (m *MockConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
 	}
 
 	return m.modelProviderConfigsUpdate, nil
+}
+
+// GetModelAliases returns configured model aliases.
+func (m *MockConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m.GetModelAliasesErr != nil {
+		return nil, m.GetModelAliasesErr
+	}
+
+	aliases := make(map[string]conf.ModelAliasValue, len(m.modelAliases))
+	for key, value := range m.modelAliases {
+		aliases[key] = conf.ModelAliasValue{Values: append([]string(nil), value.Values...)}
+	}
+
+	return aliases, nil
+}
+
+// LastModelAliasesUpdate returns timestamp of last model aliases update.
+func (m *MockConfigStore) LastModelAliasesUpdate() (time.Time, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m.LastModelAliasesUpdateErr != nil {
+		return time.Time{}, m.LastModelAliasesUpdateErr
+	}
+
+	return m.modelAliasesUpdate, nil
 }
 
 // GetMCPServerConfigs returns MCP server configurations.

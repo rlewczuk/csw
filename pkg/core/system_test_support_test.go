@@ -26,6 +26,7 @@ type SessionLoggerFactory func(sessionID string, logBaseDir string) (*slog.Logge
 // SweSystem is a test-only system implementation used by core package tests.
 type SweSystem struct {
 	ModelProviders  map[string]models.ModelProvider
+	ModelAliases    map[string][]string
 	ModelTags       *models.ModelTagRegistry
 	ToolSelection   conf.ToolSelectionConfig
 	PromptGenerator PromptGenerator
@@ -157,9 +158,9 @@ func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) 
 }
 
 func (s *SweSystem) newSessionWithOptions(model string, outputHandler SessionThreadOutput, parentID string, slug string, thinking string) (*SweSession, error) {
-	modelRefs, err := models.ParseProviderModelChain(model)
+	modelRefs, err := models.ExpandProviderModelChain(model, s.ModelAliases)
 	if err != nil || len(modelRefs) == 0 {
-		return nil, fmt.Errorf("SweSystem.NewSession() [system_test_support_test.go]: invalid model format, expected 'provider/model' or comma-separated provider/model list, got '%s'", model)
+		return nil, fmt.Errorf("SweSystem.NewSession() [system_test_support_test.go]: invalid model format, expected provider/model, comma-separated provider/model list, or model alias, got '%s'", model)
 	}
 	for _, ref := range modelRefs {
 		if _, ok := s.ModelProviders[ref.Provider]; !ok {
@@ -188,6 +189,7 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler SessionThr
 		LSP:             s.LSP,
 		SystemTools:     s.Tools,
 		ModelProviders:  s.ModelProviders,
+		ModelAliases:    s.ModelAliases,
 		ModelTags:       s.ModelTags,
 		ToolSelection:   s.ToolSelection,
 		PromptGenerator: s.PromptGenerator,

@@ -708,14 +708,9 @@ func (e *HookEngine) executeLLM(ctx context.Context, hookConfig *conf.HookConfig
 		return nil, fmt.Errorf("HookEngine.executeLLM() [hooks_engine.go]: unable to resolve model for hook %q", hookConfig.Name)
 	}
 
-	providerName, modelName, err := parseFeedbackModelRef(modelRef)
+	resolvedModelSpec, err := e.resolveHookModelSpec(modelRef)
 	if err != nil {
-		return nil, fmt.Errorf("HookEngine.executeLLM() [hooks_engine.go]: failed to parse model for hook %q: %w", hookConfig.Name, err)
-	}
-
-	provider, ok := e.providers[providerName]
-	if !ok || provider == nil {
-		return nil, fmt.Errorf("HookEngine.executeLLM() [hooks_engine.go]: provider not found for hook %q: %s", hookConfig.Name, providerName)
+		return nil, fmt.Errorf("HookEngine.executeLLM() [hooks_engine.go]: failed to resolve model for hook %q: %w", hookConfig.Name, err)
 	}
 
 	thinking := strings.TrimSpace(hookConfig.Thinking)
@@ -737,7 +732,10 @@ func (e *HookEngine) executeLLM(ctx context.Context, hookConfig *conf.HookConfig
 		defer cancel()
 	}
 
-	chatModel := provider.ChatModel(modelName, nil)
+	chatModel, err := models.NewChatModelFromProviderChain(resolvedModelSpec, e.providers, nil, nil, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("HookEngine.executeLLM() [hooks_engine.go]: failed to build chat model for hook %q: %w", hookConfig.Name, err)
+	}
 	chatResponse, err := chatModel.Chat(chatCtx, messages, &models.ChatOptions{Thinking: thinking}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("HookEngine.executeLLM() [hooks_engine.go]: llm request failed for hook %q: %w", hookConfig.Name, err)
@@ -755,7 +753,7 @@ func (e *HookEngine) executeLLM(ctx context.Context, hookConfig *conf.HookConfig
 	e.SetContextValue(toField, responseText)
 
 	if request.View != nil {
-		request.View.ShowMessage(fmt.Sprintf("[hook:%s][llm] model=%s", hookConfig.Name, providerName+"/"+modelName), ui.MessageTypeInfo)
+		request.View.ShowMessage(fmt.Sprintf("[hook:%s][llm] model=%s", hookConfig.Name, resolvedModelSpec), ui.MessageTypeInfo)
 		if responseText != "" {
 			request.View.ShowMessage(fmt.Sprintf("[hook:%s][llm-response]\n%s", hookConfig.Name, responseText), ui.MessageTypeInfo)
 		}
@@ -914,14 +912,9 @@ func (e *HookEngine) handleHookFeedbackLLM(ctx context.Context, hookRequest Hook
 		return nil, fmt.Errorf("HookEngine.handleHookFeedbackLLM() [hooks_engine.go]: unable to resolve model")
 	}
 
-	providerName, modelName, err := parseFeedbackModelRef(modelRef)
+	resolvedModelSpec, err := e.resolveHookModelSpec(modelRef)
 	if err != nil {
 		return nil, err
-	}
-
-	provider, ok := e.providers[providerName]
-	if !ok || provider == nil {
-		return nil, fmt.Errorf("HookEngine.handleHookFeedbackLLM() [hooks_engine.go]: provider not found: %s", providerName)
 	}
 
 	thinking := strings.TrimSpace(hookFeedbackArgString(args, "thinking"))
@@ -936,14 +929,17 @@ func (e *HookEngine) handleHookFeedbackLLM(ctx context.Context, hookRequest Hook
 	}
 	messages = append(messages, models.NewTextMessage(models.ChatRoleUser, prompt))
 
-	chatModel := provider.ChatModel(modelName, nil)
+	chatModel, err := models.NewChatModelFromProviderChain(resolvedModelSpec, e.providers, nil, nil, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("HookEngine.handleHookFeedbackLLM() [hooks_engine.go]: failed to build chat model: %w", err)
+	}
 	chatResponse, err := chatModel.Chat(ctx, messages, &models.ChatOptions{Thinking: thinking}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("HookEngine.handleHookFeedbackLLM() [hooks_engine.go]: llm request failed: %w", err)
 	}
 
 	result := map[string]any{
-		"model":    providerName + "/" + modelName,
+		"model":    resolvedModelSpec,
 		"thinking": strings.TrimSpace(thinking),
 		"text":     "",
 	}
@@ -952,6 +948,50 @@ func (e *HookEngine) handleHookFeedbackLLM(ctx context.Context, hookRequest Hook
 	}
 
 	return result, nil
+}
+
+func (e *HookEngine) resolveHookModelSpec(modelRef string) (string, error) {
+	trimmedModelRef := strings.TrimSpace(modelRef)
+	if trimmedModelRef == "" {
+		return "", fmt.Errorf("HookEngine.resolveHookModelSpec() [hooks_engine.go]: model cannot be empty")
+	}
+
+	aliasValues, err := e.loadModelAliases()
+	if err != nil {
+		return "", err
+	}
+
+	refs, err := models.ExpandProviderModelChain(trimmedModelRef, aliasValues)
+	if err != nil {
+		return "", err
+	}
+
+	for _, ref := range refs {
+		provider, ok := e.providers[ref.Provider]
+		if !ok || provider == nil {
+			return "", fmt.Errorf("HookEngine.resolveHookModelSpec() [hooks_engine.go]: provider not found: %s", ref.Provider)
+		}
+	}
+
+	return models.ComposeProviderModelSpec(refs), nil
+}
+
+func (e *HookEngine) loadModelAliases() (map[string][]string, error) {
+	if e == nil || e.configStore == nil {
+		return nil, nil
+	}
+
+	aliasValues, err := e.configStore.GetModelAliases()
+	if err != nil {
+		return nil, fmt.Errorf("HookEngine.loadModelAliases() [hooks_engine.go]: failed to load model aliases: %w", err)
+	}
+
+	aliases, err := models.NormalizeModelAliasMap(aliasValues)
+	if err != nil {
+		return nil, fmt.Errorf("HookEngine.loadModelAliases() [hooks_engine.go]: failed to normalize model aliases: %w", err)
+	}
+
+	return aliases, nil
 }
 
 func hookFeedbackArgString(args map[string]any, key string) string {
@@ -1153,23 +1193,6 @@ func singleQuoteShellValue(value string) string {
 
 func buildRerunCommand(command string, responseLine string) string {
 	return fmt.Sprintf("CSW_RESPONSE=%s %s", singleQuoteShellValue(responseLine), command)
-}
-
-func parseFeedbackModelRef(model string) (string, string, error) {
-	trimmed := strings.TrimSpace(model)
-	for index, char := range trimmed {
-		if char != '/' {
-			continue
-		}
-		provider := strings.TrimSpace(trimmed[:index])
-		modelName := strings.TrimSpace(trimmed[index+1:])
-		if provider == "" || modelName == "" {
-			break
-		}
-		return provider, modelName, nil
-	}
-
-	return "", "", fmt.Errorf("parseFeedbackModelRef() [hooks_engine.go]: invalid model format, expected provider/model: %q", model)
 }
 
 func (e *HookEngine) selectRunner(runOn conf.HookRunOn) shellCommandRunner {

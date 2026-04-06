@@ -92,6 +92,14 @@ func (s *RuntimeHookConfigStore) GetModelProviderConfigs() (map[string]*conf.Mod
 	return s.base.GetModelProviderConfigs()
 }
 
+func (s *RuntimeHookConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, error) {
+	return s.base.GetModelAliases()
+}
+
+func (s *RuntimeHookConfigStore) LastModelAliasesUpdate() (time.Time, error) {
+	return s.base.LastModelAliasesUpdate()
+}
+
 func (s *RuntimeHookConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
 	return s.base.LastModelProviderConfigsUpdate()
 }

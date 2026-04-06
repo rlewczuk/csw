@@ -28,6 +28,7 @@ type SessionLoggerFactory func(sessionID string, logBaseDir string) (*slog.Logge
 // SweSystem represents the core system for managing conversations, tools, and models.
 type SweSystem struct {
 	ModelProviders  map[string]models.ModelProvider
+	ModelAliases    map[string][]string
 	ModelTags       *models.ModelTagRegistry
 	ToolSelection   conf.ToolSelectionConfig
 	PromptGenerator core.PromptGenerator
@@ -161,10 +162,11 @@ func (s *SweSystem) NewSession(model string, outputHandler core.SessionThreadOut
 }
 
 func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.SessionThreadOutput, parentID string, slug string, thinking string, hookFeedbackExecutor tool.HookFeedbackExecutor) (*core.SweSession, error) {
-	modelRefs, err := models.ParseProviderModelChain(model)
+	modelRefs, err := models.ExpandProviderModelChain(model, s.ModelAliases)
 	if err != nil || len(modelRefs) == 0 {
-		return nil, fmt.Errorf("SweSystem.NewSession() [system.go]: invalid model format, expected 'provider/model' or comma-separated provider/model list, got '%s'", model)
+		return nil, fmt.Errorf("SweSystem.NewSession() [system.go]: invalid model format, expected provider/model, comma-separated provider/model list, or model alias, got '%s'", model)
 	}
+	modelSpec := models.ComposeProviderModelSpec(modelRefs)
 
 	for _, ref := range modelRefs {
 		if _, exists := s.ModelProviders[ref.Provider]; !exists {
@@ -193,7 +195,7 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 		ID:                   sessionID,
 		ParentID:             strings.TrimSpace(parentID),
 		Slug:                 strings.TrimSpace(slug),
-		ModelSpec:            strings.TrimSpace(model),
+		ModelSpec:            modelSpec,
 		Provider:             provider,
 		ProviderName:         providerName,
 		Model:                modelName,
@@ -202,6 +204,7 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 		LSP:                  s.LSP,
 		SystemTools:          s.Tools,
 		ModelProviders:       s.ModelProviders,
+		ModelAliases:         s.ModelAliases,
 		ModelTags:            s.ModelTags,
 		ToolSelection:        s.ToolSelection,
 		PromptGenerator:      s.PromptGenerator,
@@ -223,7 +226,7 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 	})
 
 	if sessionLogger != nil {
-		sessionLogger.Info("session_created", "session_id", sessionID, "provider", providerName, "model", modelName, "model_spec", strings.TrimSpace(model))
+		sessionLogger.Info("session_created", "session_id", sessionID, "provider", providerName, "model", modelName, "model_spec", modelSpec)
 	}
 
 	defaultRole, err := s.resolveDefaultRole()
@@ -305,6 +308,18 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *core.SweSession, request tool.Su
 	}
 
 	modelName := strings.TrimSpace(request.Model)
+	resolvedRoleName := strings.TrimSpace(request.Role)
+	if resolvedRoleName == "" {
+		if parentRole := parent.Role(); parentRole != nil {
+			resolvedRoleName = strings.TrimSpace(parentRole.Name)
+		}
+	}
+
+	if modelName == "" && resolvedRoleName != "" && s.Roles != nil {
+		if roleConfig, ok := s.Roles.Get(resolvedRoleName); ok {
+			modelName = strings.TrimSpace(roleConfig.Model)
+		}
+	}
 	if modelName == "" {
 		modelName = strings.TrimSpace(parent.ModelWithProvider())
 	}
@@ -592,6 +607,7 @@ func (s *SweSystem) buildSessionParams() *core.SweSessionParams {
 		LSP:             s.LSP,
 		SystemTools:     s.Tools,
 		ModelProviders:  s.ModelProviders,
+		ModelAliases:    s.ModelAliases,
 		ModelTags:       s.ModelTags,
 		ToolSelection:   s.ToolSelection,
 		PromptGenerator: s.PromptGenerator,
