@@ -475,14 +475,24 @@ func (h *subAgentOutputHandler) AddToolCall(call *tool.ToolCall) {
 	if h.delegate == nil {
 		return
 	}
-	h.delegate.AddToolCall(call)
+	h.delegate.AddToolCall(withSubAgentSlugOnToolCall(call, h.slug))
 }
 
 func (h *subAgentOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
 	if h.delegate == nil {
 		return
 	}
-	h.delegate.AddToolCallResult(result)
+	if result == nil {
+		h.delegate.AddToolCallResult(nil)
+		return
+	}
+
+	h.delegate.AddToolCallResult(&tool.ToolResponse{
+		Call:   withSubAgentSlugOnToolCall(result.Call, h.slug),
+		Error:  result.Error,
+		Result: result.Result,
+		Done:   result.Done,
+	})
 }
 
 func (h *subAgentOutputHandler) RunFinished(err error) {
@@ -526,6 +536,32 @@ func prefixSubAgentMessage(slug string, message string) string {
 		lines[i] = fmt.Sprintf("*%s* %s", trimmedSlug, line)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func withSubAgentSlugOnToolCall(call *tool.ToolCall, slug string) *tool.ToolCall {
+	if call == nil {
+		return nil
+	}
+
+	trimmedSlug := strings.TrimSpace(slug)
+	if trimmedSlug == "" {
+		return call
+	}
+
+	args := make(map[string]any)
+	if obj := call.Arguments.Object(); obj != nil {
+		for key, value := range obj {
+			args[key] = value.Raw()
+		}
+	}
+	args["__subagent_slug"] = trimmedSlug
+
+	return &tool.ToolCall{
+		ID:        call.ID,
+		Function:  call.Function,
+		Arguments: tool.NewToolValue(args),
+		Access:    call.Access,
+	}
 }
 
 func (s *SweSystem) createSessionLoggers(sessionID string) (*slog.Logger, *slog.Logger) {
