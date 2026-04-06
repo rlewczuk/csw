@@ -43,6 +43,7 @@ type SweSession struct {
 	id            string
 	parentID      string
 	taskID        string
+	taskInfo      *TaskInfo
 	slug          string
 	provider      models.ModelProvider
 	providerName  string
@@ -99,6 +100,7 @@ type SweSessionParams struct {
 	ID           string
 	ParentID     string
 	TaskID       string
+	TaskInfo     *TaskInfo
 	Slug         string
 	Provider     models.ModelProvider
 	ProviderName string
@@ -156,6 +158,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		id:              params.ID,
 		parentID:        strings.TrimSpace(params.ParentID),
 		taskID:          strings.TrimSpace(params.TaskID),
+		taskInfo:        cloneTaskInfo(params.TaskInfo),
 		slug:            strings.TrimSpace(params.Slug),
 		provider:        params.Provider,
 		providerName:    params.ProviderName,
@@ -716,6 +719,16 @@ func (s *SweSession) SetTaskID(taskID string) {
 	s.persistSessionState()
 }
 
+// SetTaskInfo sets task context associated with this session.
+func (s *SweSession) SetTaskInfo(taskInfo *TaskInfo) {
+	if s == nil {
+		return
+	}
+
+	s.taskInfo = cloneTaskInfo(taskInfo)
+	s.persistSessionState()
+}
+
 // ParentID returns the parent session identifier for delegated child sessions.
 func (s *SweSession) ParentID() string {
 	if s == nil {
@@ -872,7 +885,19 @@ func (s *SweSession) GetState() AgentState {
 			TokenUsage:          s.tokenUsage,
 			ContextLengthTokens: s.contextLength,
 		},
-		Role: s.role.Clone(),
+		Role:     s.role.Clone(),
+		TaskInfo: cloneTaskInfo(s.taskInfo),
+	}
+}
+
+func cloneTaskInfo(info *TaskInfo) *TaskInfo {
+	if info == nil {
+		return nil
+	}
+
+	return &TaskInfo{
+		Task:    cloneTask(info.Task),
+		TaskDir: strings.TrimSpace(info.TaskDir),
 	}
 }
 

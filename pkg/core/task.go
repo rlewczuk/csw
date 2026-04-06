@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -43,20 +44,20 @@ const (
 
 // Task stores persistent task metadata.
 type Task struct {
-	UUID         string   `json:"uuid" yaml:"uuid"`
-	Name         string   `json:"name,omitempty" yaml:"name,omitempty"`
-	Description  string   `json:"description,omitempty" yaml:"description,omitempty"`
-	Status       string   `json:"status" yaml:"status"`
-	FeatureBranch string  `json:"feature_branch" yaml:"feature_branch"`
-	ParentBranch string   `json:"parent_branch" yaml:"parent_branch"`
-	Role         string   `json:"role,omitempty" yaml:"role,omitempty"`
-	State        string   `json:"state" yaml:"state"`
-	Deps         []string `json:"deps,omitempty" yaml:"deps,omitempty"`
-	SessionIDs   []string `json:"session_ids,omitempty" yaml:"session_ids,omitempty"`
-	SubtaskIDs   []string `json:"subtask_ids,omitempty" yaml:"subtask_ids,omitempty"`
-	ParentTaskID string   `json:"parent_task_id,omitempty" yaml:"parent_task_id,omitempty"`
-	CreatedAt    string   `json:"created_at,omitempty" yaml:"created_at,omitempty"`
-	UpdatedAt    string   `json:"updated_at,omitempty" yaml:"updated_at,omitempty"`
+	UUID          string   `json:"uuid" yaml:"uuid"`
+	Name          string   `json:"name,omitempty" yaml:"name,omitempty"`
+	Description   string   `json:"description,omitempty" yaml:"description,omitempty"`
+	Status        string   `json:"status" yaml:"status"`
+	FeatureBranch string   `json:"feature_branch" yaml:"feature_branch"`
+	ParentBranch  string   `json:"parent_branch" yaml:"parent_branch"`
+	Role          string   `json:"role,omitempty" yaml:"role,omitempty"`
+	State         string   `json:"state" yaml:"state"`
+	Deps          []string `json:"deps,omitempty" yaml:"deps,omitempty"`
+	SessionIDs    []string `json:"session_ids,omitempty" yaml:"session_ids,omitempty"`
+	SubtaskIDs    []string `json:"subtask_ids,omitempty" yaml:"subtask_ids,omitempty"`
+	ParentTaskID  string   `json:"parent_task_id,omitempty" yaml:"parent_task_id,omitempty"`
+	CreatedAt     string   `json:"created_at,omitempty" yaml:"created_at,omitempty"`
+	UpdatedAt     string   `json:"updated_at,omitempty" yaml:"updated_at,omitempty"`
 }
 
 // TaskSessionSummary stores persisted session summary metadata.
@@ -70,11 +71,11 @@ type TaskSessionSummary struct {
 
 // TaskOutputMetadata stores metadata section for task output file.
 type TaskOutputMetadata struct {
-	TaskID       string `json:"task_id" yaml:"task_id"`
-	TaskName     string `json:"task_name,omitempty" yaml:"task_name,omitempty"`
-	State        string `json:"state" yaml:"state"`
-	Status       string `json:"status" yaml:"status"`
-	UpdatedAt    string `json:"updated_at" yaml:"updated_at"`
+	TaskID        string `json:"task_id" yaml:"task_id"`
+	TaskName      string `json:"task_name,omitempty" yaml:"task_name,omitempty"`
+	State         string `json:"state" yaml:"state"`
+	Status        string `json:"status" yaml:"status"`
+	UpdatedAt     string `json:"updated_at" yaml:"updated_at"`
 	LastSessionID string `json:"last_session_id,omitempty" yaml:"last_session_id,omitempty"`
 }
 
@@ -112,17 +113,17 @@ type TaskRunParams struct {
 
 // TaskRunResult stores run outcome information.
 type TaskRunResult struct {
-	Task            *Task
-	SessionID       string
-	SummaryMeta     *TaskSessionSummary
-	SummaryText     string
-	Merged          bool
-	TaskBranchName  string
+	Task           *Task
+	SessionID      string
+	SummaryMeta    *TaskSessionSummary
+	SummaryText    string
+	Merged         bool
+	TaskBranchName string
 }
 
 // TaskLookup identifies a task by name, UUID, or fallback current task.
 type TaskLookup struct {
-	Identifier    string
+	Identifier     string
 	FallbackTaskID string
 }
 
@@ -135,6 +136,8 @@ type TaskSessionRunner interface {
 type TaskSessionRunRequest struct {
 	TaskID        string
 	TaskName      string
+	Task          *Task
+	TaskDir       string
 	TaskBranch    string
 	FeatureBranch string
 	ParentBranch  string
@@ -162,11 +165,11 @@ type CLITaskSessionRunner struct {
 
 // TaskManager manages persistent hierarchical tasks.
 type TaskManager struct {
-	baseDir      string
-	configStore  conf.ConfigStore
-	runner       TaskSessionRunner
-	uuidFn       func() string
-	nowFn        func() time.Time
+	baseDir     string
+	configStore conf.ConfigStore
+	runner      TaskSessionRunner
+	uuidFn      func() string
+	nowFn       func() time.Time
 }
 
 // TaskBackendAdapter exposes TaskManager through tool.TaskBackend interface.
@@ -224,20 +227,10 @@ func (r *CLITaskSessionRunner) RunTaskSession(ctx context.Context, request TaskS
 	}
 
 	startTime := time.Now().UTC()
-	args := []string{"run", "./cmd/csw", "cli", "--workdir", r.BaseDir, "--worktree", strings.TrimSpace(request.TaskBranch), "--role", firstNonEmptyTask(request.Role, "developer")}
-	if strings.TrimSpace(r.ModelName) != "" {
-		args = append(args, "--model", r.ModelName)
+	args, err := r.buildCLIArgs(request)
+	if err != nil {
+		return TaskSessionRunResult{}, err
 	}
-	if strings.TrimSpace(r.ConfigPath) != "" {
-		args = append(args, "--config-path", r.ConfigPath)
-	}
-	if strings.TrimSpace(r.ProjectConfig) != "" {
-		args = append(args, "--project-config", r.ProjectConfig)
-	}
-	if strings.TrimSpace(r.Thinking) != "" {
-		args = append(args, "--thinking", r.Thinking)
-	}
-	args = append(args, "--output-format", "full", strings.TrimSpace(request.Prompt))
 
 	command := exec.CommandContext(ctx, "go", args...)
 	command.Dir = r.BaseDir
@@ -258,6 +251,36 @@ func (r *CLITaskSessionRunner) RunTaskSession(ctx context.Context, request TaskS
 	}
 
 	return result, nil
+}
+
+func (r *CLITaskSessionRunner) buildCLIArgs(request TaskSessionRunRequest) ([]string, error) {
+	args := []string{"run", "./cmd/csw", "cli", "--workdir", r.BaseDir, "--worktree", strings.TrimSpace(request.TaskBranch), "--role", firstNonEmptyTask(request.Role, "developer")}
+	if strings.TrimSpace(r.ModelName) != "" {
+		args = append(args, "--model", r.ModelName)
+	}
+	if strings.TrimSpace(r.ConfigPath) != "" {
+		args = append(args, "--config-path", r.ConfigPath)
+	}
+	if strings.TrimSpace(r.ProjectConfig) != "" {
+		args = append(args, "--project-config", r.ProjectConfig)
+	}
+	if strings.TrimSpace(r.Thinking) != "" {
+		args = append(args, "--thinking", r.Thinking)
+	}
+	if request.Task != nil {
+		taskJSON, err := json.Marshal(request.Task)
+		if err != nil {
+			return nil, fmt.Errorf("CLITaskSessionRunner.buildCLIArgs() [task.go]: failed to marshal task metadata: %w", err)
+		}
+		args = append(args, "--task-json", string(taskJSON))
+	}
+	if strings.TrimSpace(request.TaskDir) != "" {
+		args = append(args, "--task-dir", strings.TrimSpace(request.TaskDir))
+	}
+
+	args = append(args, "--output-format", "full", strings.TrimSpace(request.Prompt))
+
+	return args, nil
 }
 
 // CreateTask creates task through backend interface.
@@ -706,6 +729,8 @@ func (m *TaskManager) RunTask(ctx context.Context, lookup TaskLookup, params Tas
 	runResult, runErr := m.runner.RunTaskSession(ctx, TaskSessionRunRequest{
 		TaskID:        task.UUID,
 		TaskName:      task.Name,
+		Task:          cloneTask(task),
+		TaskDir:       taskDir,
 		TaskBranch:    taskBranchName,
 		FeatureBranch: task.FeatureBranch,
 		ParentBranch:  task.ParentBranch,

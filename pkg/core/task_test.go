@@ -312,6 +312,10 @@ func TestTaskManagerRunTaskSuccessWritesSummaryAndOutput(t *testing.T) {
 
 	assert.Equal(t, 1, runner.calls)
 	assert.Equal(t, "developer", runner.lastRequest.Role)
+	require.NotNil(t, runner.lastRequest.Task)
+	assert.Equal(t, created.UUID, runner.lastRequest.Task.UUID)
+	assert.Equal(t, created.Name, runner.lastRequest.Task.Name)
+	assert.Equal(t, filepath.Join(baseDir, ".csw", "tasks", created.UUID), runner.lastRequest.TaskDir)
 	assert.Equal(t, TaskStateCompleted, outcome.Task.State)
 	assert.Equal(t, TaskStatusOpen, outcome.Task.Status)
 	assert.Equal(t, "ses-123", outcome.SessionID)
@@ -440,4 +444,25 @@ func TestReadCLISessionSummary(t *testing.T) {
 	summary, err := readCLISessionSummary(baseDir, sessionID)
 	require.NoError(t, err)
 	assert.Equal(t, "done", summary)
+}
+
+func TestCLITaskSessionRunnerIncludesTaskFlags(t *testing.T) {
+	runner, err := NewCLITaskSessionRunner("/tmp/project", "model-name", "/tmp/conf", "/tmp/project/.csw/config", "high")
+	require.NoError(t, err)
+
+	request := TaskSessionRunRequest{
+		TaskBranch: "feature/task",
+		Role:       "developer",
+		Prompt:     "do work",
+		Task:       &Task{UUID: "task-uuid", Name: "task-name"},
+		TaskDir:    ".csw/tasks/task-uuid",
+	}
+
+	args, err := runner.buildCLIArgs(request)
+	require.NoError(t, err)
+
+	assert.Contains(t, args, "--task-json")
+	assert.Contains(t, args, "--task-dir")
+	assert.Contains(t, args, ".csw/tasks/task-uuid")
+	assert.Equal(t, "do work", args[len(args)-1])
 }

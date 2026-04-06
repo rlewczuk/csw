@@ -44,6 +44,7 @@ type ChatViewFactory func(presenter ui.IChatPresenter, output io.Writer, input i
 type StartCLISessionParams struct {
 	ModelName            string
 	RoleName             string
+	TaskInfo             *core.TaskInfo
 	Thinking             string
 	ModelOverridden      bool
 	RoleOverridden       bool
@@ -162,6 +163,8 @@ func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessi
 		}
 		session.SetWorkDir(s.WorkDir)
 	}
+
+	session.SetTaskInfo(params.TaskInfo)
 
 	chatPresenter := params.ChatPresenterFactory(s, thread)
 	chatPresenter.SetAppView(appView)

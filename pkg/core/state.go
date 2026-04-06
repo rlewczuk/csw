@@ -16,10 +16,17 @@ type AgentStateCommonInfo struct {
 	ContextLengthTokens int
 }
 
+// TaskInfo contains task context bound to current session.
+type TaskInfo struct {
+	Task    *Task
+	TaskDir string
+}
+
 // TODO decide if this is still needed
 type AgentState struct {
 	Info        AgentStateCommonInfo
 	Role        *conf.AgentRoleConfig
+	TaskInfo    *TaskInfo
 	HookContext HookContext
 }
 
@@ -28,6 +35,12 @@ func (s AgentState) Clone() AgentState {
 	cloned := s
 	if s.Role != nil {
 		cloned.Role = s.Role.Clone()
+	}
+	if s.TaskInfo != nil {
+		cloned.TaskInfo = &TaskInfo{
+			Task:    cloneTask(s.TaskInfo.Task),
+			TaskDir: s.TaskInfo.TaskDir,
+		}
 	}
 	if s.HookContext != nil {
 		cloned.HookContext = make(HookContext, len(s.HookContext))

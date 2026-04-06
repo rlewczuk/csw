@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -33,6 +34,7 @@ type CLIParams struct {
 	ContextData           map[string]string
 	ModelName             string
 	RoleName              string
+	TaskInfo              *core.TaskInfo
 	WorkDir               string
 	ShadowDir             string
 	WorktreeBranch        string
@@ -118,6 +120,8 @@ func CliCommand() *cobra.Command {
 		cliMCPDisable        []string
 		cliHooks             []string
 		cliContext           []string
+		cliTaskJSON          string
+		cliTaskDir           string
 	)
 
 	cmd := &cobra.Command{
@@ -214,6 +218,15 @@ func CliCommand() *cobra.Command {
 				return err
 			}
 
+			var taskInfo *core.TaskInfo
+			if strings.TrimSpace(cliTaskJSON) != "" {
+				var task core.Task
+				if unmarshalErr := json.Unmarshal([]byte(cliTaskJSON), &task); unmarshalErr != nil {
+					return fmt.Errorf("CliCommand.RunE() [cli.go]: failed to parse --task-json: %w", unmarshalErr)
+				}
+				taskInfo = &core.TaskInfo{Task: &task, TaskDir: strings.TrimSpace(cliTaskDir)}
+			}
+
 			if resumeTarget == "" {
 				if prompt == "" {
 					return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
@@ -281,6 +294,7 @@ func CliCommand() *cobra.Command {
 				ContextData:           contextData,
 				ModelName:             cliModel,
 				RoleName:              cliRole,
+				TaskInfo:              taskInfo,
 				WorkDir:               cliWorkDir,
 				ShadowDir:             cliShadowDir,
 				WorktreeBranch:        firstNonEmpty(continueWorktreeBranch, cliWorktree),
@@ -360,6 +374,10 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().StringArrayVar(&cliMCPDisable, "mcp-disable", nil, "Disable MCP server by name (repeatable, accepts comma-separated list)")
 	cmd.Flags().StringArrayVar(&cliHooks, "hook", nil, "Ephemeral hook override: --hook name | --hook name:disable | --hook name:key=value,key2=value2")
 	cmd.Flags().StringArrayVarP(&cliContext, "context", "c", nil, "Template context value in KEY=VAL format (repeatable)")
+	cmd.Flags().StringVar(&cliTaskJSON, "task-json", "", "Task metadata payload used for task session state")
+	cmd.Flags().StringVar(&cliTaskDir, "task-dir", "", "Task directory path used for task session state")
+	_ = cmd.Flags().MarkHidden("task-json")
+	_ = cmd.Flags().MarkHidden("task-dir")
 	resumeFlag := cmd.Flags().Lookup("resume")
 	if resumeFlag != nil {
 		resumeFlag.NoOptDefVal = "last"
@@ -605,6 +623,7 @@ func runCLI(params *CLIParams) error {
 	runtimeResult, err := sweSystem.StartCLISession(system.StartCLISessionParams{
 		ModelName:          params.ModelName,
 		RoleName:           params.RoleName,
+		TaskInfo:           params.TaskInfo,
 		Thinking:           params.Thinking,
 		ModelOverridden:    params.ModelOverridden,
 		RoleOverridden:     params.RoleOverridden,
