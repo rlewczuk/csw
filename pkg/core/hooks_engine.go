@@ -116,7 +116,7 @@ type HookEngine struct {
 	configStore conf.ConfigStore
 	hostRunner  shellCommandRunner
 	shellRunner shellCommandRunner
-	contextData HookContext
+	agentState  AgentState
 	providers   map[string]models.ModelProvider
 	mu          sync.RWMutex
 }
@@ -127,11 +127,36 @@ func NewHookEngine(configStore conf.ConfigStore, hostRunner shellCommandRunner, 
 		configStore: configStore,
 		hostRunner:  hostRunner,
 		shellRunner: shellRunner,
-		contextData: make(HookContext),
+		agentState: AgentState{HookContext: make(HookContext)},
 		providers:   providers,
 	}
-	engine.contextData["status"] = string(HookSessionStatusNone)
+	engine.agentState.SetHookContextValue("status", string(HookSessionStatusNone))
 	return engine
+}
+
+// AgentState returns a copy of current hook engine agent state.
+func (e *HookEngine) AgentState() AgentState {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	return e.agentState.Clone()
+}
+
+// MergeAgentState merges given state into current hook engine state.
+func (e *HookEngine) MergeAgentState(state AgentState) {
+	if e == nil {
+		return
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.agentState.Info = state.Info
+	e.agentState.Role = nil
+	if state.Role != nil {
+		e.agentState.Role = state.Role.Clone()
+	}
+	e.agentState.MergeHookContext(state.HookContext)
 }
 
 // ContextData returns a copy of current hook context data.
@@ -139,11 +164,7 @@ func (e *HookEngine) ContextData() HookContext {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	result := make(HookContext, len(e.contextData))
-	for key, value := range e.contextData {
-		result[key] = value
-	}
-	return result
+	return e.agentState.HookContextData()
 }
 
 // SetContextValue sets one context field.
@@ -155,7 +176,7 @@ func (e *HookEngine) SetContextValue(key string, value string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	e.contextData[key] = value
+	e.agentState.SetHookContextValue(key, value)
 }
 
 // MergeContext merges values into cumulative hook context.
@@ -167,12 +188,7 @@ func (e *HookEngine) MergeContext(values map[string]string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	for key, value := range values {
-		if strings.TrimSpace(key) == "" {
-			continue
-		}
-		e.contextData[key] = value
-	}
+	e.agentState.MergeHookContext(values)
 }
 
 // SetSessionStatus updates status field in hook context.
@@ -244,6 +260,9 @@ func (e *HookEngine) Execute(ctx context.Context, request HookExecutionRequest) 
 
 	aggregated := &HookExecutionResult{}
 	for _, hookConfig := range hookConfigs {
+		if request.Session != nil {
+			e.MergeAgentState(request.Session.GetState())
+		}
 		e.SetContextValue("hook", hookName)
 		hookDir, prepareErr := e.resolveAndPrepareHookDir(hookConfig)
 		if prepareErr != nil {
@@ -1225,14 +1244,19 @@ func (e *HookEngine) renderTemplate(templateName string, templateText string) (s
 		return "", fmt.Errorf("HookEngine.renderTemplate() [hooks_engine.go]: failed to parse template: %w", err)
 	}
 
-	contextData := e.ContextData()
-	data := make(map[string]string, len(contextData))
-	for key, value := range contextData {
-		data[key] = value
+	state := e.AgentState()
+	templateData := map[string]any{
+		"AgentState":  state,
+		"Info":        state.Info,
+		"Role":        state.Role,
+		"HookContext": state.HookContext,
+	}
+	for key, value := range state.HookContext {
+		templateData[key] = value
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
+	if err := tmpl.Execute(&buf, templateData); err != nil {
 		return "", fmt.Errorf("HookEngine.renderTemplate() [hooks_engine.go]: failed to execute template: %w", err)
 	}
 

@@ -872,6 +872,7 @@ func (s *SweSession) GetState() AgentState {
 			TokenUsage:          s.tokenUsage,
 			ContextLengthTokens: s.contextLength,
 		},
+		Role: s.role.Clone(),
 	}
 }
 

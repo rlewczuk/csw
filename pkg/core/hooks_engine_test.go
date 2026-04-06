@@ -94,6 +94,34 @@ func TestHookEngineExecuteShell(t *testing.T) {
 	assert.Contains(t, view.ShowMessageCalls[2].Message, "[hook:merge-hook][stderr]")
 }
 
+func TestHookEngineExecuteShellTemplateHasAccessToFullAgentState(t *testing.T) {
+	configStore := confimpl.NewMockConfigStore()
+	configStore.SetHookConfigs(map[string]*conf.HookConfig{
+		"merge-hook": {
+			Name:    "merge-hook",
+			Hook:    "merge",
+			Enabled: true,
+			Type:    conf.HookTypeShell,
+			Command: "echo role={{.AgentState.Role.Name}} wd={{.AgentState.Info.WorkDir}} prompt={{index .AgentState.HookContext \"user_prompt\"}}",
+			RunOn:   conf.HookRunOnHost,
+		},
+	})
+
+	hostRunner := runner.NewMockRunner()
+	hostRunner.SetResponseDetailed("echo role=developer wd=/repo/work prompt=Initial-request", "", "", 0, nil)
+
+	engine := NewHookEngine(configStore, hostRunner, nil, nil)
+	engine.MergeContext(map[string]string{"user_prompt": "Initial-request"})
+	session := &SweSession{workDir: "/repo/work", role: &conf.AgentRoleConfig{Name: "developer"}}
+
+	_, err := engine.Execute(context.Background(), HookExecutionRequest{Name: "merge", Session: session})
+	require.NoError(t, err)
+
+	executions := hostRunner.GetExecutions()
+	require.Len(t, executions, 1)
+	assert.Equal(t, "echo role=developer wd=/repo/work prompt=Initial-request", executions[0].Command)
+}
+
 func TestHookEngineExecuteShellExitCodeFailure(t *testing.T) {
 	configStore := confimpl.NewMockConfigStore()
 	configStore.SetHookConfigs(map[string]*conf.HookConfig{
