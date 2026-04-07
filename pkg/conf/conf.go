@@ -585,7 +585,7 @@ type CLIDefaultsConfig struct {
 	// MaxToolThreads is the default --max-threads value.
 	MaxToolThreads int `json:"max_tool_threads,omitempty" yaml:"max_tool_threads,omitempty"`
 	// Container defines default container execution settings.
-	Container ContainerConfig `json:"container,omitempty" yaml:"container,omitempty"`
+	Container *ContainerConfig `json:"container,omitempty" yaml:"container,omitempty"`
 	// Model is the default --model value.
 	Model string `json:"model,omitempty" yaml:"model,omitempty"`
 	// Worktree is the default --worktree value.
@@ -828,126 +828,6 @@ type GlobalConfig struct {
 	ModelTemplates map[string]map[string]ModelProviderConfig `json:"model_templates,omitempty" yaml:"model_templates,omitempty"`
 	// VendorFamilyOverrides contains per-provider vendor+family template overrides.
 	VendorFamilyOverrides map[string]ModelVendorFamilyTemplateOverride `json:"vendor_family_overrides,omitempty" yaml:"vendor_family_overrides,omitempty"`
-
-	containerConfigured        bool
-	containerMountsConfigured  bool
-	containerEnvConfigured     bool
-	containerImageConfigured   bool
-	containerEnabledConfigured bool
-}
-
-// UnmarshalJSON unmarshals GlobalConfig and tracks presence of container fields.
-func (c *GlobalConfig) UnmarshalJSON(data []byte) error {
-	type globalConfigAlias GlobalConfig
-
-	var alias globalConfigAlias
-	if err := json.Unmarshal(data, &alias); err != nil {
-		return fmt.Errorf("GlobalConfig.UnmarshalJSON() [conf.go]: failed to unmarshal global config: %w", err)
-	}
-
-	*c = GlobalConfig(alias)
-	c.resetContainerPresenceFlags()
-
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("GlobalConfig.UnmarshalJSON() [conf.go]: failed to unmarshal global config raw map: %w", err)
-	}
-
-	rawDefaults, ok := raw["defaults"]
-	if !ok {
-		return nil
-	}
-
-	var defaultsMap map[string]json.RawMessage
-	if err := json.Unmarshal(rawDefaults, &defaultsMap); err != nil {
-		return nil
-	}
-
-	rawContainer, ok := defaultsMap["container"]
-	if !ok {
-		return nil
-	}
-
-	c.containerConfigured = true
-
-	var containerMap map[string]json.RawMessage
-	if err := json.Unmarshal(rawContainer, &containerMap); err != nil {
-		return nil
-	}
-
-	_, c.containerMountsConfigured = containerMap["mounts"]
-	_, c.containerEnvConfigured = containerMap["env"]
-	_, c.containerImageConfigured = containerMap["image"]
-	_, c.containerEnabledConfigured = containerMap["enabled"]
-
-	return nil
-}
-
-// UnmarshalYAML unmarshals GlobalConfig and tracks presence of container fields.
-func (c *GlobalConfig) UnmarshalYAML(node *yaml.Node) error {
-	type globalConfigAlias GlobalConfig
-
-	var alias globalConfigAlias
-	if err := node.Decode(&alias); err != nil {
-		return fmt.Errorf("GlobalConfig.UnmarshalYAML() [conf.go]: failed to decode global config: %w", err)
-	}
-
-	*c = GlobalConfig(alias)
-	c.resetContainerPresenceFlags()
-
-	if node.Kind != yaml.MappingNode {
-		return nil
-	}
-
-	for i := 0; i+1 < len(node.Content); i += 2 {
-		keyNode := node.Content[i]
-		valueNode := node.Content[i+1]
-		if keyNode.Value != "defaults" {
-			continue
-		}
-		if valueNode.Kind != yaml.MappingNode {
-			return nil
-		}
-
-		for j := 0; j+1 < len(valueNode.Content); j += 2 {
-			subKeyNode := valueNode.Content[j]
-			subValueNode := valueNode.Content[j+1]
-			if subKeyNode.Value != "container" {
-				continue
-			}
-
-			c.containerConfigured = true
-			if subValueNode.Kind != yaml.MappingNode {
-				return nil
-			}
-
-			for k := 0; k+1 < len(subValueNode.Content); k += 2 {
-				nestedKey := subValueNode.Content[k].Value
-				switch nestedKey {
-				case "mounts":
-					c.containerMountsConfigured = true
-				case "env":
-					c.containerEnvConfigured = true
-				case "image":
-					c.containerImageConfigured = true
-				case "enabled":
-					c.containerEnabledConfigured = true
-				}
-			}
-
-			return nil
-		}
-	}
-
-	return nil
-}
-
-func (c *GlobalConfig) resetContainerPresenceFlags() {
-	c.containerConfigured = false
-	c.containerMountsConfigured = false
-	c.containerEnvConfigured = false
-	c.containerImageConfigured = false
-	c.containerEnabledConfigured = false
 }
 
 // ConfigStore is an interface for accessing configuration data.

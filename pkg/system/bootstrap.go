@@ -907,8 +907,12 @@ type containerRuntimeConfig struct {
 // ResolveContainerRuntimeConfig resolves effective container runtime setup.
 func ResolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params BuildSystemParams, effectiveWorkDir string, shadowDir string) (containerRuntimeConfig, error) {
 	var runtimeConfig containerRuntimeConfig
+	containerDefaults := conf.ContainerConfig{}
+	if globalConfig != nil && globalConfig.Defaults.Container != nil {
+		containerDefaults = globalConfig.Defaults.Container.Clone()
+	}
 
-	runtimeConfig.Enabled = globalConfig.Defaults.Container.Enabled
+	runtimeConfig.Enabled = containerDefaults.Enabled
 	if params.ContainerEnabled {
 		runtimeConfig.Enabled = true
 	}
@@ -922,14 +926,14 @@ func ResolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params Build
 
 	runtimeConfig.Image = strings.TrimSpace(params.ContainerImage)
 	if runtimeConfig.Image == "" {
-		runtimeConfig.Image = strings.TrimSpace(globalConfig.Defaults.Container.Image)
+		runtimeConfig.Image = strings.TrimSpace(containerDefaults.Image)
 	}
 	if runtimeConfig.Image == "" {
 		return runtimeConfig, fmt.Errorf("resolveContainerRuntimeConfig() [bootstrap.go]: container image is required when container mode is enabled")
 	}
 
-	mountSpecs := make([]string, 0, len(globalConfig.Defaults.Container.Mounts)+len(params.ContainerMounts))
-	mountSpecs = append(mountSpecs, globalConfig.Defaults.Container.Mounts...)
+	mountSpecs := make([]string, 0, len(containerDefaults.Mounts)+len(params.ContainerMounts))
+	mountSpecs = append(mountSpecs, containerDefaults.Mounts...)
 	mountSpecs = append(mountSpecs, params.ContainerMounts...)
 	runtimeConfig.Mounts = map[string]string{effectiveWorkDir: effectiveWorkDir}
 	if strings.TrimSpace(shadowDir) != "" {
@@ -952,8 +956,8 @@ func ResolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params Build
 		runtimeConfig.Mounts[containerPath] = hostPath
 	}
 
-	envSpecs := make([]string, 0, len(globalConfig.Defaults.Container.Env)+len(params.ContainerEnv))
-	envSpecs = append(envSpecs, globalConfig.Defaults.Container.Env...)
+	envSpecs := make([]string, 0, len(containerDefaults.Env)+len(params.ContainerEnv))
+	envSpecs = append(envSpecs, containerDefaults.Env...)
 	envSpecs = append(envSpecs, params.ContainerEnv...)
 	if len(envSpecs) > 0 {
 		runtimeConfig.Env = make(map[string]string, len(envSpecs))

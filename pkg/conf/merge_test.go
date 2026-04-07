@@ -1,6 +1,7 @@
 package conf
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -101,7 +102,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		DefaultProvider: "provider1",
 		DefaultRole:     "role1",
 		MaxToolThreads:  3,
-		Container:       ContainerConfig{Image: "image1", Mounts: []string{"/a:/b"}, Env: []string{"A=1"}},
+		Container:       &ContainerConfig{Image: "image1", Mounts: []string{"/a:/b"}, Env: []string{"A=1"}},
 		Model:          "provider1/model",
 		Worktree:       "feature/one",
 		Merge:          false,
@@ -116,7 +117,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		DefaultProvider: "provider2",
 		DefaultRole:     "role2",
 		MaxToolThreads:  12,
-		Container:       ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
+		Container:       &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
 		Model:          "provider2/model",
 		Merge:          true,
 		LogLLMRequests: true,
@@ -132,7 +133,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		DefaultProvider: "provider2",
 		DefaultRole:     "role2",
 		MaxToolThreads:  12,
-		Container:       ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
+		Container:       &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
 		Model:          "provider2/model",
 		Worktree:       "feature/one",
 		Merge:          true,
@@ -199,7 +200,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 			DefaultProvider: "provider1",
 			DefaultRole:     "role1",
 			MaxToolThreads:  3,
-			Container:       ContainerConfig{Image: "image1", Mounts: []string{"/a:/b"}, Env: []string{"A=1"}},
+			Container:       &ContainerConfig{Image: "image1", Mounts: []string{"/a:/b"}, Env: []string{"A=1"}},
 			Model:           "m1",
 			Worktree:        "w1",
 			Thinking:        "low",
@@ -220,7 +221,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 			DefaultProvider: "provider2",
 			DefaultRole:     "role2",
 			MaxToolThreads:  12,
-			Container:       ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
+			Container:       &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
 			Model:           "m2",
 			Merge:           true,
 			LogLLMRequests:  true,
@@ -241,14 +242,15 @@ func TestGlobalConfig_Merge(t *testing.T) {
 	assert.Equal(t, 10, base.LLMRetryMaxAttempts)
 	assert.Equal(t, 60, base.LLMRetryMaxBackoffSeconds)
 	assert.Equal(t, 12, base.Defaults.MaxToolThreads)
-	assert.Equal(t, ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, base.Defaults.Container)
-	assert.Equal(t, CLIDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxToolThreads: 12, Container: ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2"}, base.Defaults)
+	require.NotNil(t, base.Defaults.Container)
+	assert.Equal(t, ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, *base.Defaults.Container)
+	assert.Equal(t, CLIDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxToolThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2"}, base.Defaults)
 	assert.Equal(t, []string{".cswdata/**", ".agents/**"}, base.ShadowPaths)
 }
 
-func TestGlobalConfig_Merge_ContainerExplicitFalseOverride(t *testing.T) {
+func TestGlobalConfig_Merge_ContainerFalseDoesNotOverride(t *testing.T) {
 	base := &GlobalConfig{}
-	require.NoError(t, base.UnmarshalJSON([]byte(`{
+	require.NoError(t, json.Unmarshal([]byte(`{
 		"defaults": {
 			"container": {
 			"enabled": true,
@@ -257,20 +259,21 @@ func TestGlobalConfig_Merge_ContainerExplicitFalseOverride(t *testing.T) {
 			"mounts": ["/a:/b"]
 			}
 		}
-	}`)))
+	}`), base))
 
 	override := &GlobalConfig{}
-	require.NoError(t, override.UnmarshalJSON([]byte(`{
+	require.NoError(t, json.Unmarshal([]byte(`{
 		"defaults": {
 			"container": {
 			"enabled": false
 			}
 		}
-	}`)))
+	}`), override))
 
 	base.Merge(override)
 
-	assert.False(t, base.Defaults.Container.Enabled)
+	require.NotNil(t, base.Defaults.Container)
+	assert.True(t, base.Defaults.Container.Enabled)
 	assert.Equal(t, "base-image", base.Defaults.Container.Image)
 	assert.Equal(t, []string{"A=1"}, base.Defaults.Container.Env)
 	assert.Equal(t, []string{"/a:/b"}, base.Defaults.Container.Mounts)
@@ -327,7 +330,7 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 				Default: map[string]bool{"runBash": true},
 				Tags:    map[string]map[string]bool{"safe": {"vfsRead": true}},
 			},
-			Defaults: CLIDefaultsConfig{Container: ContainerConfig{Mounts: []string{"a"}, Env: []string{"A=1"}}},
+			Defaults: CLIDefaultsConfig{Container: &ContainerConfig{Mounts: []string{"a"}, Env: []string{"A=1"}}},
 		}
 
 		clone := cfg.Clone()
@@ -336,6 +339,8 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 		clone.ModelTags[0].Tag = "changed"
 		clone.ToolSelection.Default["runBash"] = false
 		clone.ToolSelection.Tags["safe"]["vfsRead"] = false
+		require.NotNil(t, clone.Defaults.Container)
+		require.NotNil(t, cfg.Defaults.Container)
 		clone.Defaults.Container.Mounts[0] = "b"
 
 		assert.Equal(t, "all", cfg.ModelTags[0].Tag)

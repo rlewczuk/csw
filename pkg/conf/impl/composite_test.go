@@ -375,6 +375,7 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 	assert.True(t, globalConfig.Defaults.LogLLMRequests)
 	assert.Equal(t, "high", globalConfig.Defaults.Thinking)
 	assert.Equal(t, "source2-lsp", globalConfig.Defaults.LSPServer)
+	require.NotNil(t, globalConfig.Defaults.Container)
 	assert.True(t, globalConfig.Defaults.Container.Enabled)
 	assert.Equal(t, "busybox:latest", globalConfig.Defaults.Container.Image)
 	assert.Equal(t, []string{"/var:/mnt/var"}, globalConfig.Defaults.Container.Mounts)
@@ -1175,6 +1176,7 @@ func TestCompositeConfigStore_ContainerConfigFromGlobalSource(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify container config from global source is preserved
+	require.NotNil(t, mergedConfig.Defaults.Container)
 	assert.True(t, mergedConfig.Defaults.Container.Enabled, "Container.Enabled should be true from global config")
 	assert.Equal(t, "golang:1.25-trixie", mergedConfig.Defaults.Container.Image, "Container.Image should be preserved from global config")
 	assert.Equal(t, []string{"FOO=bar", "BAZ=qux"}, mergedConfig.Defaults.Container.Env, "Container.Env should be preserved from global config")
@@ -1225,7 +1227,8 @@ func TestCompositeConfigStore_LocalContainerOverridesUserConfig(t *testing.T) {
 	globalConfig, err := store.GetGlobalConfig()
 	require.NoError(t, err)
 
-	assert.False(t, globalConfig.Defaults.Container.Enabled)
+	require.NotNil(t, globalConfig.Defaults.Container)
+	assert.True(t, globalConfig.Defaults.Container.Enabled)
 	assert.Equal(t, "local-image", globalConfig.Defaults.Container.Image)
 	assert.Equal(t, []string{"LOCAL=1"}, globalConfig.Defaults.Container.Env)
 	assert.Equal(t, []string{"/local:/mnt/local"}, globalConfig.Defaults.Container.Mounts)

@@ -67,7 +67,7 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 	globalConfig := conf.GlobalConfig{
 		ContextCompactionThreshold: 0.8,
 		Defaults: conf.CLIDefaultsConfig{
-			Container: conf.ContainerConfig{
+			Container: &conf.ContainerConfig{
 				Enabled: true,
 				Image:   "busybox:latest",
 				Mounts:  []string{"/tmp:/mnt/tmp"},
@@ -106,6 +106,7 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 	assert.Equal(t, "^claude-.*", config.ModelTags[0].Model)
 	assert.Equal(t, "anthropic", config.ModelTags[0].Tag)
 	assert.Equal(t, false, config.ToolSelection.Default["runBash"])
+	require.NotNil(t, config.Defaults.Container)
 	assert.True(t, config.Defaults.Container.Enabled)
 	assert.Equal(t, "busybox:latest", config.Defaults.Container.Image)
 	assert.Equal(t, []string{"/tmp:/mnt/tmp"}, config.Defaults.Container.Mounts)

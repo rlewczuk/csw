@@ -90,18 +90,20 @@ func (c *CLIDefaultsConfig) MergeFrom(override CLIDefaultsConfig) {
 	if override.MaxToolThreads > 0 {
 		c.MaxToolThreads = override.MaxToolThreads
 	}
-	if override.Container.Enabled {
-		c.Container.Enabled = true
+	if override.Container != nil {
+		overrideHasValue := override.Container.Enabled || override.Container.Image != "" || len(override.Container.Mounts) > 0 || len(override.Container.Env) > 0
+		if c.Container == nil {
+			if !overrideHasValue {
+				goto mergeOtherFields
+			}
+			containerCopy := override.Container.Clone()
+			c.Container = &containerCopy
+		} else {
+			c.Container.Merge(*override.Container)
+		}
 	}
-	if override.Container.Image != "" {
-		c.Container.Image = override.Container.Image
-	}
-	if len(override.Container.Mounts) > 0 {
-		c.Container.Mounts = append([]string(nil), override.Container.Mounts...)
-	}
-	if len(override.Container.Env) > 0 {
-		c.Container.Env = append([]string(nil), override.Container.Env...)
-	}
+
+mergeOtherFields:
 	if override.Model != "" {
 		c.Model = override.Model
 	}
@@ -149,13 +151,11 @@ func (c *GlobalConfig) Clone() *GlobalConfig {
 		ModelVendors:               cloneModelProviderMapValue(c.ModelVendors),
 		ModelTemplates:             cloneModelTemplateGroups(c.ModelTemplates),
 		VendorFamilyOverrides:      cloneVendorFamilyOverrides(c.VendorFamilyOverrides),
-		containerConfigured:        c.containerConfigured,
-		containerMountsConfigured:  c.containerMountsConfigured,
-		containerEnvConfigured:     c.containerEnvConfigured,
-		containerImageConfigured:   c.containerImageConfigured,
-		containerEnabledConfigured: c.containerEnabledConfigured,
 	}
-	cloned.Defaults.Container = c.Defaults.Container.Clone()
+	if c.Defaults.Container != nil {
+		containerCopy := c.Defaults.Container.Clone()
+		cloned.Defaults.Container = &containerCopy
+	}
 	copy(cloned.ModelTags, c.ModelTags)
 
 	return cloned
@@ -180,22 +180,6 @@ func (c *GlobalConfig) Merge(override *GlobalConfig) {
 		c.LLMRetryMaxBackoffSeconds = override.LLMRetryMaxBackoffSeconds
 	}
 
-	if override.containerConfigured {
-		if override.containerMountsConfigured {
-			c.Defaults.Container.Mounts = append([]string(nil), override.Defaults.Container.Mounts...)
-		}
-		if override.containerEnvConfigured {
-			c.Defaults.Container.Env = append([]string(nil), override.Defaults.Container.Env...)
-		}
-		if override.containerImageConfigured {
-			c.Defaults.Container.Image = override.Defaults.Container.Image
-		}
-		if override.containerEnabledConfigured {
-			c.Defaults.Container.Enabled = override.Defaults.Container.Enabled
-		}
-	} else {
-		c.Defaults.Container.Merge(override.Defaults.Container)
-	}
 	c.Defaults.MergeFrom(override.Defaults)
 	if len(override.ShadowPaths) > 0 {
 		c.ShadowPaths = append([]string(nil), override.ShadowPaths...)
