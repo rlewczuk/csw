@@ -333,40 +333,50 @@ func ParseGitFileList(output []byte) []string {
 }
 
 func CollectEditedFiles(workDirRoot string, workDir string, baseCommitID string, headCommitID string) []string {
-	diffDir := ChooseGitDiffDir(workDirRoot, workDir)
-	if diffDir == "" {
-		return nil
-	}
-
 	trimmedBase := strings.TrimSpace(baseCommitID)
 	trimmedHead := strings.TrimSpace(headCommitID)
-	if trimmedBase != "" && trimmedHead != "" && trimmedBase != trimmedHead {
-		files := GitDiffNameOnly(diffDir, trimmedBase+".."+trimmedHead)
-		if len(files) > 0 {
-			return files
-		}
-	}
 
-	tracked := GitDiffNameOnly(diffDir, "")
-	untracked := GitUntrackedFiles(diffDir)
-	combined := append(tracked, untracked...)
-	if len(combined) == 0 {
-		return nil
-	}
-
-	unique := make(map[string]struct{}, len(combined))
-	for _, file := range combined {
-		if strings.TrimSpace(file) == "" {
+	candidateDirs := []string{strings.TrimSpace(workDir), strings.TrimSpace(workDirRoot), "."}
+	seen := make(map[string]struct{}, len(candidateDirs))
+	for _, candidateDir := range candidateDirs {
+		if candidateDir == "" {
 			continue
 		}
-		unique[file] = struct{}{}
+		if _, exists := seen[candidateDir]; exists {
+			continue
+		}
+		seen[candidateDir] = struct{}{}
+
+		if trimmedBase != "" && trimmedHead != "" && trimmedBase != trimmedHead {
+			files := GitDiffNameOnly(candidateDir, trimmedBase+".."+trimmedHead)
+			if len(files) > 0 {
+				return files
+			}
+		}
+
+		tracked := GitDiffNameOnly(candidateDir, "")
+		untracked := GitUntrackedFiles(candidateDir)
+		combined := append(tracked, untracked...)
+		if len(combined) == 0 {
+			continue
+		}
+
+		unique := make(map[string]struct{}, len(combined))
+		for _, file := range combined {
+			if strings.TrimSpace(file) == "" {
+				continue
+			}
+			unique[file] = struct{}{}
+		}
+
+		result := make([]string, 0, len(unique))
+		for file := range unique {
+			result = append(result, file)
+		}
+		sort.Strings(result)
+
+		return result
 	}
 
-	result := make([]string, 0, len(unique))
-	for file := range unique {
-		result = append(result, file)
-	}
-	sort.Strings(result)
-
-	return result
+	return nil
 }
