@@ -589,12 +589,7 @@ func (c *CompositeConfigStore) refreshHookConfigs() error {
 		}
 
 		for key, value := range configs {
-			existing, ok := merged[key]
-			if !ok {
-				merged[key] = value.Clone()
-				continue
-			}
-			existing.Merge(value)
+			merged[key] = value.Clone()
 		}
 
 		lastUpdate, err := store.LastHookConfigsUpdate()

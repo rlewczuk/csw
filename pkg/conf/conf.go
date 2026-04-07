@@ -371,52 +371,33 @@ type HookConfig struct {
 	// EmbeddedSource indicates that hook came from embedded config source and may require
 	// materialization of EmbeddedFiles before execution.
 	EmbeddedSource bool `json:"-" yaml:"-"`
-
-	enabledConfigured  bool
-	descriptionConfigured bool
-	hookConfigured     bool
-	nameConfigured     bool
-	typeConfigured     bool
-	commandConfigured  bool
-	promptConfigured   bool
-	systemConfigured   bool
-	modelConfigured    bool
-	thinkingConfigured bool
-	roleConfigured     bool
-	outputToConfigured bool
-	errorToConfigured  bool
-	timeoutConfigured  bool
-	runOnConfigured    bool
 }
 
-// UnmarshalJSON unmarshals HookConfig, applies defaults and tracks configured fields.
+// UnmarshalJSON unmarshals HookConfig and applies defaults.
 func (c *HookConfig) UnmarshalJSON(data []byte) error {
 	aux := struct {
-		Enabled  *bool     `json:"enabled,omitempty"`
+		Enabled     *bool     `json:"enabled,omitempty"`
 		Description string `json:"description,omitempty"`
-		Hook     string    `json:"hook,omitempty"`
-		Name     string    `json:"name,omitempty"`
-		Type     HookType  `json:"type,omitempty"`
-		Command  string    `json:"command,omitempty"`
-		Prompt   string    `json:"prompt,omitempty"`
-		System   string    `json:"system_prompt,omitempty"`
-		Model    string    `json:"model,omitempty"`
-		Thinking string    `json:"thinking,omitempty"`
-		Role     string    `json:"role,omitempty"`
-		OutputTo string    `json:"output_to,omitempty"`
-		ErrorTo  string    `json:"error_to,omitempty"`
-		Timeout  string    `json:"timeout,omitempty"`
-		RunOn    HookRunOn `json:"run-on,omitempty"`
+		Hook        string    `json:"hook,omitempty"`
+		Name        string    `json:"name,omitempty"`
+		Type        HookType  `json:"type,omitempty"`
+		Command     string    `json:"command,omitempty"`
+		Prompt      string    `json:"prompt,omitempty"`
+		System      string    `json:"system_prompt,omitempty"`
+		Model       string    `json:"model,omitempty"`
+		Thinking    string    `json:"thinking,omitempty"`
+		Role        string    `json:"role,omitempty"`
+		OutputTo    string    `json:"output_to,omitempty"`
+		ErrorTo     string    `json:"error_to,omitempty"`
+		Timeout     string    `json:"timeout,omitempty"`
+		RunOn       HookRunOn `json:"run-on,omitempty"`
 	}{}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("HookConfig.UnmarshalJSON() [conf.go]: failed to unmarshal hook config: %w", err)
 	}
 
-	if aux.Enabled != nil {
-		c.Enabled = *aux.Enabled
-		c.enabledConfigured = true
-	}
+	c.Enabled = aux.Enabled == nil || *aux.Enabled
 	c.Description = aux.Description
 	c.Hook = aux.Hook
 	c.Name = aux.Name
@@ -431,34 +412,12 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 	c.ErrorTo = aux.ErrorTo
 	c.RunOn = aux.RunOn
 
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("HookConfig.UnmarshalJSON() [conf.go]: failed to unmarshal hook config raw map: %w", err)
-	}
-
-	_, c.enabledConfigured = raw["enabled"]
-	_, c.descriptionConfigured = raw["description"]
-	_, c.hookConfigured = raw["hook"]
-	_, c.nameConfigured = raw["name"]
-	_, c.typeConfigured = raw["type"]
-	_, c.commandConfigured = raw["command"]
-	_, c.promptConfigured = raw["prompt"]
-	_, c.systemConfigured = raw["system_prompt"]
-	_, c.modelConfigured = raw["model"]
-	_, c.thinkingConfigured = raw["thinking"]
-	_, c.roleConfigured = raw["role"]
-	_, c.outputToConfigured = raw["output_to"]
-	_, c.errorToConfigured = raw["error_to"]
-	_, c.timeoutConfigured = raw["timeout"]
-	_, c.runOnConfigured = raw["run-on"]
-
 	if strings.TrimSpace(aux.Timeout) != "" {
 		d, err := time.ParseDuration(strings.TrimSpace(aux.Timeout))
 		if err != nil {
 			return fmt.Errorf("HookConfig.UnmarshalJSON() [conf.go]: invalid timeout: %w", err)
 		}
 		c.Timeout = d
-		c.timeoutConfigured = true
 	}
 
 	c.applyDefaults()
@@ -466,34 +425,31 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// UnmarshalYAML unmarshals HookConfig, applies defaults and tracks configured fields.
+// UnmarshalYAML unmarshals HookConfig and applies defaults.
 func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 	aux := struct {
-		Enabled  *bool     `yaml:"enabled,omitempty"`
+		Enabled     *bool     `yaml:"enabled,omitempty"`
 		Description string `yaml:"description,omitempty"`
-		Hook     string    `yaml:"hook,omitempty"`
-		Name     string    `yaml:"name,omitempty"`
-		Type     HookType  `yaml:"type,omitempty"`
-		Command  string    `yaml:"command,omitempty"`
-		Prompt   string    `yaml:"prompt,omitempty"`
-		System   string    `yaml:"system_prompt,omitempty"`
-		Model    string    `yaml:"model,omitempty"`
-		Thinking string    `yaml:"thinking,omitempty"`
-		Role     string    `yaml:"role,omitempty"`
-		OutputTo string    `yaml:"output_to,omitempty"`
-		ErrorTo  string    `yaml:"error_to,omitempty"`
-		Timeout  string    `yaml:"timeout,omitempty"`
-		RunOn    HookRunOn `yaml:"run-on,omitempty"`
+		Hook        string    `yaml:"hook,omitempty"`
+		Name        string    `yaml:"name,omitempty"`
+		Type        HookType  `yaml:"type,omitempty"`
+		Command     string    `yaml:"command,omitempty"`
+		Prompt      string    `yaml:"prompt,omitempty"`
+		System      string    `yaml:"system_prompt,omitempty"`
+		Model       string    `yaml:"model,omitempty"`
+		Thinking    string    `yaml:"thinking,omitempty"`
+		Role        string    `yaml:"role,omitempty"`
+		OutputTo    string    `yaml:"output_to,omitempty"`
+		ErrorTo     string    `yaml:"error_to,omitempty"`
+		Timeout     string    `yaml:"timeout,omitempty"`
+		RunOn       HookRunOn `yaml:"run-on,omitempty"`
 	}{}
 
 	if err := node.Decode(&aux); err != nil {
 		return fmt.Errorf("HookConfig.UnmarshalYAML() [conf.go]: failed to decode hook config: %w", err)
 	}
 
-	if aux.Enabled != nil {
-		c.Enabled = *aux.Enabled
-		c.enabledConfigured = true
-	}
+	c.Enabled = aux.Enabled == nil || *aux.Enabled
 	c.Description = aux.Description
 	c.Hook = aux.Hook
 	c.Name = aux.Name
@@ -514,57 +470,14 @@ func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 			return fmt.Errorf("HookConfig.UnmarshalYAML() [conf.go]: invalid timeout: %w", err)
 		}
 		c.Timeout = d
-		c.timeoutConfigured = true
 	}
 
-	if node.Kind != yaml.MappingNode {
-		c.applyDefaults()
-		return nil
-	}
-
-	for i := 0; i+1 < len(node.Content); i += 2 {
-		switch node.Content[i].Value {
-		case "enabled":
-			c.enabledConfigured = true
-		case "hook":
-			c.hookConfigured = true
-		case "description":
-			c.descriptionConfigured = true
-		case "name":
-			c.nameConfigured = true
-		case "type":
-			c.typeConfigured = true
-		case "command":
-			c.commandConfigured = true
-		case "prompt":
-			c.promptConfigured = true
-		case "system_prompt":
-			c.systemConfigured = true
-		case "model":
-			c.modelConfigured = true
-		case "thinking":
-			c.thinkingConfigured = true
-		case "role":
-			c.roleConfigured = true
-		case "output_to":
-			c.outputToConfigured = true
-		case "error_to":
-			c.errorToConfigured = true
-		case "timeout":
-			c.timeoutConfigured = true
-		case "run-on":
-			c.runOnConfigured = true
-		}
-	}
 	c.applyDefaults()
 
 	return nil
 }
 
 func (c *HookConfig) applyDefaults() {
-	if c.Enabled == false && !c.enabledConfigured {
-		c.Enabled = true
-	}
 	if c.Type == "" {
 		c.Type = HookTypeShell
 	}

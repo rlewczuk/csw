@@ -541,23 +541,6 @@ func TestAgentRoleConfig_Clone_Aliases(t *testing.T) {
 	assert.Equal(t, []string{"dev", "build"}, original.Aliases)
 }
 
-func TestHookConfig_Merge_SubAgentRoleAndPromptFields(t *testing.T) {
-	base := &HookConfig{}
-	require.NoError(t, yaml.Unmarshal([]byte("name: summary-hook\ndescription: base desc\nhook: summary\ntype: subagent\nprompt: base prompt\nsystem_prompt: base system\nmodel: mock/base\nthinking: medium\nrole: developer\n"), base))
-
-	override := &HookConfig{}
-	require.NoError(t, yaml.Unmarshal([]byte("name: summary-hook\ndescription: override desc\nrole: reviewer\nprompt: override prompt\n"), override))
-
-	base.Merge(override)
-
-	assert.Equal(t, "override prompt", base.Prompt)
-	assert.Equal(t, "override desc", base.Description)
-	assert.Equal(t, "base system", base.SystemPrompt)
-	assert.Equal(t, "mock/base", base.Model)
-	assert.Equal(t, "medium", base.Thinking)
-	assert.Equal(t, "reviewer", base.Role)
-}
-
 func TestModelProviderConfig_Clone_NilReceiver(t *testing.T) {
 	var cfg *ModelProviderConfig
 	assert.Nil(t, cfg.Clone())

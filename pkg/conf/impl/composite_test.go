@@ -250,7 +250,7 @@ func TestCompositeConfigStore_AgentRolesMerging(t *testing.T) {
 	assert.Equal(t, conf.AccessAllow, roleConfigs["role1"].VFSPrivileges["/"].Write)
 }
 
-func TestCompositeConfigStore_HooksMergingByName(t *testing.T) {
+func TestCompositeConfigStore_HooksOverrideByName(t *testing.T) {
 	tmpDir := t.TempDir()
 	dir1 := filepath.Join(tmpDir, "source1")
 	dir2 := filepath.Join(tmpDir, "source2")
@@ -271,9 +271,9 @@ func TestCompositeConfigStore_HooksMergingByName(t *testing.T) {
 	require.Len(t, hooks, 2)
 	require.Contains(t, hooks, "merge-hook")
 	require.Contains(t, hooks, "summary-hook")
-	assert.Equal(t, "merge", hooks["merge-hook"].Hook)
+	assert.Equal(t, "", hooks["merge-hook"].Hook)
 	assert.Equal(t, "echo two", hooks["merge-hook"].Command)
-	assert.Equal(t, conf.HookRunOnHost, hooks["merge-hook"].RunOn)
+	assert.Equal(t, conf.HookRunOnSandbox, hooks["merge-hook"].RunOn)
 }
 
 func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
