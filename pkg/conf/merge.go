@@ -603,16 +603,15 @@ func (c *MCPServerConfig) Clone() *MCPServerConfig {
 	}
 
 	cloned := &MCPServerConfig{
-		Name:      c.Name,
+		Name:        c.Name,
 		Description: c.Description,
-		Transport: c.Transport,
-		URL:       c.URL,
-		APIKey:    c.APIKey,
-		Cmd:       c.Cmd,
-		Enabled:   c.Enabled,
-		Args:      append([]string(nil), c.Args...),
-		Tools:     append([]string(nil), c.Tools...),
-		enabledConfigured: c.enabledConfigured,
+		Transport:   c.Transport,
+		URL:         c.URL,
+		APIKey:      c.APIKey,
+		Cmd:         c.Cmd,
+		Enabled:     c.Enabled,
+		Args:        append([]string(nil), c.Args...),
+		Tools:       append([]string(nil), c.Tools...),
 	}
 
 	if c.Env != nil {
@@ -623,51 +622,6 @@ func (c *MCPServerConfig) Clone() *MCPServerConfig {
 	}
 
 	return cloned
-}
-
-// Merge merges override into MCPServerConfig.
-//
-// Scalar and collection fields are replaced by override values when present.
-// Enabled is merged only when explicitly configured in override.
-func (c *MCPServerConfig) Merge(override *MCPServerConfig) {
-	if override == nil {
-		return
-	}
-
-	if strings.TrimSpace(override.Description) != "" {
-		c.Description = override.Description
-	}
-	if strings.TrimSpace(override.Name) != "" {
-		c.Name = override.Name
-	}
-	if strings.TrimSpace(string(override.Transport)) != "" {
-		c.Transport = override.Transport
-	}
-	if strings.TrimSpace(override.URL) != "" {
-		c.URL = override.URL
-	}
-	if strings.TrimSpace(override.APIKey) != "" {
-		c.APIKey = override.APIKey
-	}
-	if strings.TrimSpace(override.Cmd) != "" {
-		c.Cmd = override.Cmd
-	}
-	if override.enabledConfigured {
-		c.Enabled = override.Enabled
-		c.enabledConfigured = true
-	}
-	if len(override.Args) > 0 {
-		c.Args = append([]string(nil), override.Args...)
-	}
-	if len(override.Env) > 0 {
-		c.Env = make(map[string]string, len(override.Env))
-		for key, value := range override.Env {
-			c.Env[key] = value
-		}
-	}
-	if override.Tools != nil {
-		c.Tools = append([]string(nil), override.Tools...)
-	}
 }
 
 func cloneVendorFamilyOverrides(input map[string]ModelVendorFamilyTemplateOverride) map[string]ModelVendorFamilyTemplateOverride {

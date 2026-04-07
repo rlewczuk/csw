@@ -10,7 +10,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 func TestParseConfigPath(t *testing.T) {
@@ -615,7 +614,7 @@ func TestCompositeConfigStore_GetMCPServerConfigs_MergesWithTransportFields(t *t
 	assert.Equal(t, "token", configs2["srv"].APIKey)
 }
 
-func TestCompositeConfigStore_GetMCPServerConfigs_MergesEnabledFieldOnlyWhenConfigured(t *testing.T) {
+func TestCompositeConfigStore_GetMCPServerConfigs_OverridesWholeConfigByKey(t *testing.T) {
 	store1 := NewMockConfigStore()
 	store2 := NewMockConfigStore()
 
@@ -623,13 +622,14 @@ func TestCompositeConfigStore_GetMCPServerConfigs_MergesEnabledFieldOnlyWhenConf
 		"srv": {
 			Enabled: true,
 			Cmd:     "base",
+			Tools:   []string{"^read_"},
 		},
 	})
-
-	// override with field omitted should keep base enabled=true
-	overrideNoEnabled := &conf.MCPServerConfig{}
-	require.NoError(t, yaml.Unmarshal([]byte("cmd: override\n"), overrideNoEnabled))
-	store2.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{"srv": overrideNoEnabled})
+	store2.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{
+		"srv": {
+			Cmd: "override",
+		},
+	})
 
 	composite := &CompositeConfigStore{
 		stores:             []conf.ConfigStore{store1, store2},
@@ -643,18 +643,9 @@ func TestCompositeConfigStore_GetMCPServerConfigs_MergesEnabledFieldOnlyWhenConf
 	configs, err := composite.GetMCPServerConfigs()
 	require.NoError(t, err)
 	require.Contains(t, configs, "srv")
-	assert.True(t, configs["srv"].Enabled)
-	assert.Equal(t, "override", configs["srv"].Cmd)
-
-	// explicit false should override
-	overrideDisabled := &conf.MCPServerConfig{}
-	require.NoError(t, yaml.Unmarshal([]byte("enabled: false\n"), overrideDisabled))
-	store2.SetMCPServerConfigs(map[string]*conf.MCPServerConfig{"srv": overrideDisabled})
-
-	require.NoError(t, composite.refresh())
-	configs, err = composite.GetMCPServerConfigs()
-	require.NoError(t, err)
 	assert.False(t, configs["srv"].Enabled)
+	assert.Equal(t, "override", configs["srv"].Cmd)
+	assert.Nil(t, configs["srv"].Tools)
 }
 
 func TestCompositeConfigStore_CopyProtection(t *testing.T) {
