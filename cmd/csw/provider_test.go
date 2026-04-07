@@ -239,14 +239,14 @@ func TestProviderCommand_SetDefault(t *testing.T) {
 	// Set as default
 	globalConfig, err := store.GetGlobalConfig()
 	require.NoError(t, err)
-	globalConfig.DefaultProvider = "test-provider"
+	globalConfig.Defaults.DefaultProvider = "test-provider"
 	err = store.SaveGlobalConfig(globalConfig)
 	require.NoError(t, err)
 
 	// Verify default is set
 	loadedConfig, err := store.GetGlobalConfig()
 	require.NoError(t, err)
-	assert.Equal(t, "test-provider", loadedConfig.DefaultProvider)
+	assert.Equal(t, "test-provider", loadedConfig.Defaults.DefaultProvider)
 }
 
 func TestMaskAPIKey(t *testing.T) {
@@ -489,14 +489,14 @@ func TestProviderCommandWithCustomPathSetDefault(t *testing.T) {
 	// Set as default
 	globalConfig, err := store.GetGlobalConfig()
 	require.NoError(t, err)
-	globalConfig.DefaultProvider = "custom-default-provider"
+	globalConfig.Defaults.DefaultProvider = "custom-default-provider"
 	err = store.SaveGlobalConfig(globalConfig)
 	require.NoError(t, err)
 
 	// Verify default is set
 	loadedConfig, err := store.GetGlobalConfig()
 	require.NoError(t, err)
-	assert.Equal(t, "custom-default-provider", loadedConfig.DefaultProvider)
+	assert.Equal(t, "custom-default-provider", loadedConfig.Defaults.DefaultProvider)
 }
 
 func TestProviderListShowComposite(t *testing.T) {

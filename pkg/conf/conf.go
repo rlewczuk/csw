@@ -578,6 +578,14 @@ func (c *HookConfig) applyDefaults() {
 
 // CLIDefaultsConfig defines default values for the cli command flags.
 type CLIDefaultsConfig struct {
+	// DefaultProvider is the default model provider to use.
+	DefaultProvider string `json:"default_provider,omitempty" yaml:"default_provider,omitempty"`
+	// DefaultRole is the default agent role to use.
+	DefaultRole string `json:"default_role,omitempty" yaml:"default_role,omitempty"`
+	// MaxToolThreads is the default --max-threads value.
+	MaxToolThreads int `json:"max_tool_threads,omitempty" yaml:"max_tool_threads,omitempty"`
+	// Container defines default container execution settings.
+	Container ContainerConfig `json:"container,omitempty" yaml:"container,omitempty"`
 	// Model is the default --model value.
 	Model string `json:"model,omitempty" yaml:"model,omitempty"`
 	// Worktree is the default --worktree value.
@@ -802,21 +810,12 @@ type GlobalConfig struct {
 	// ContextCompactionThreshold defines the ratio of current context length to max context length
 	// at which message compaction is triggered. Defaults to 0.95 when unset or invalid.
 	ContextCompactionThreshold float64 `json:"context_compaction_threshold,omitempty" yaml:"context_compaction_threshold,omitempty"`
-	// DefaultProvider is the name of the default model provider to use
-	DefaultProvider string `json:"default_provider,omitempty" yaml:"default_provider,omitempty"`
-	// DefaultRole is the name of the default agent role to use
-	DefaultRole string `json:"default_role,omitempty" yaml:"default_role,omitempty"`
 	// LLMRetryMaxAttempts is the maximum number of attempts for temporary LLM API failures.
 	// Defaults to 10 when unset or invalid.
 	LLMRetryMaxAttempts int `json:"llm_retry_max_attempts,omitempty" yaml:"llm_retry_max_attempts,omitempty"`
 	// LLMRetryMaxBackoffSeconds caps exponential backoff delay in seconds.
 	// Defaults to 60 when unset or invalid.
 	LLMRetryMaxBackoffSeconds int `json:"llm_retry_max_backoff_seconds,omitempty" yaml:"llm_retry_max_backoff_seconds,omitempty"`
-	// MaxToolThreads is the maximum number of tool calls executed in parallel.
-	// Defaults to 8 when unset or invalid.
-	MaxToolThreads int `json:"max_tool_threads,omitempty" yaml:"max_tool_threads,omitempty"`
-	// Container defines default container execution settings.
-	Container ContainerConfig `json:"container,omitempty" yaml:"container,omitempty"`
 	// Defaults defines default values for cli command flags.
 	Defaults CLIDefaultsConfig `json:"defaults,omitempty" yaml:"defaults,omitempty"`
 	// ShadowPaths defines glob patterns redirected to shadow directory when --shadow-dir is enabled.
@@ -854,7 +853,17 @@ func (c *GlobalConfig) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("GlobalConfig.UnmarshalJSON() [conf.go]: failed to unmarshal global config raw map: %w", err)
 	}
 
-	rawContainer, ok := raw["container"]
+	rawDefaults, ok := raw["defaults"]
+	if !ok {
+		return nil
+	}
+
+	var defaultsMap map[string]json.RawMessage
+	if err := json.Unmarshal(rawDefaults, &defaultsMap); err != nil {
+		return nil
+	}
+
+	rawContainer, ok := defaultsMap["container"]
 	if !ok {
 		return nil
 	}
@@ -893,30 +902,41 @@ func (c *GlobalConfig) UnmarshalYAML(node *yaml.Node) error {
 	for i := 0; i+1 < len(node.Content); i += 2 {
 		keyNode := node.Content[i]
 		valueNode := node.Content[i+1]
-		if keyNode.Value != "container" {
+		if keyNode.Value != "defaults" {
 			continue
 		}
-
-		c.containerConfigured = true
 		if valueNode.Kind != yaml.MappingNode {
 			return nil
 		}
 
 		for j := 0; j+1 < len(valueNode.Content); j += 2 {
-			subKey := valueNode.Content[j].Value
-			switch subKey {
-			case "mounts":
-				c.containerMountsConfigured = true
-			case "env":
-				c.containerEnvConfigured = true
-			case "image":
-				c.containerImageConfigured = true
-			case "enabled":
-				c.containerEnabledConfigured = true
+			subKeyNode := valueNode.Content[j]
+			subValueNode := valueNode.Content[j+1]
+			if subKeyNode.Value != "container" {
+				continue
 			}
-		}
 
-		return nil
+			c.containerConfigured = true
+			if subValueNode.Kind != yaml.MappingNode {
+				return nil
+			}
+
+			for k := 0; k+1 < len(subValueNode.Content); k += 2 {
+				nestedKey := subValueNode.Content[k].Value
+				switch nestedKey {
+				case "mounts":
+					c.containerMountsConfigured = true
+				case "env":
+					c.containerEnvConfigured = true
+				case "image":
+					c.containerImageConfigured = true
+				case "enabled":
+					c.containerEnabledConfigured = true
+				}
+			}
+
+			return nil
+		}
 	}
 
 	return nil

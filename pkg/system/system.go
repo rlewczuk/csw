@@ -635,10 +635,10 @@ func firstNonEmpty(values ...string) string {
 func (s *SweSystem) resolveDefaultRole() (string, error) {
 	if s.ConfigStore != nil {
 		globalConfig, err := s.ConfigStore.GetGlobalConfig()
-		if err == nil && globalConfig != nil && globalConfig.DefaultRole != "" {
+		if err == nil && globalConfig != nil && globalConfig.Defaults.DefaultRole != "" {
 			if s.Roles != nil {
-				if _, ok := s.Roles.Get(globalConfig.DefaultRole); ok {
-					return globalConfig.DefaultRole, nil
+				if _, ok := s.Roles.Get(globalConfig.Defaults.DefaultRole); ok {
+					return globalConfig.Defaults.DefaultRole, nil
 				}
 			}
 		}

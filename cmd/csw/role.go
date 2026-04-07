@@ -171,7 +171,7 @@ func roleSetDefaultCommand() *cobra.Command {
 			}
 
 			// Update default role
-			globalConfig.DefaultRole = resolvedRole.Name
+			globalConfig.Defaults.DefaultRole = resolvedRole.Name
 
 			// Save global config
 			if err := store.SaveGlobalConfig(globalConfig); err != nil {
@@ -208,14 +208,14 @@ func roleGetDefaultCommand() *cobra.Command {
 			}
 
 			if useJSON {
-				result := map[string]string{"default_role": globalConfig.DefaultRole}
+				result := map[string]string{"default_role": globalConfig.Defaults.DefaultRole}
 				return outputJSON(result)
 			}
 
-			if globalConfig.DefaultRole == "" {
+			if globalConfig.Defaults.DefaultRole == "" {
 				fmt.Println("No default role set")
 			} else {
-				fmt.Printf("Default role: %s\n", globalConfig.DefaultRole)
+				fmt.Printf("Default role: %s\n", globalConfig.Defaults.DefaultRole)
 			}
 			return nil
 		},

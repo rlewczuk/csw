@@ -118,14 +118,14 @@ func TestRoleCommand_SetGetDefault(t *testing.T) {
 	// Set default role to "developer" (which exists in embedded defaults)
 	globalConfig, err := store.GetGlobalConfig()
 	require.NoError(t, err)
-	globalConfig.DefaultRole = "developer"
+	globalConfig.Defaults.DefaultRole = "developer"
 	err = store.SaveGlobalConfig(globalConfig)
 	require.NoError(t, err)
 
 	// Verify default is set
 	loadedConfig, err := store.GetGlobalConfig()
 	require.NoError(t, err)
-	assert.Equal(t, "developer", loadedConfig.DefaultRole)
+	assert.Equal(t, "developer", loadedConfig.Defaults.DefaultRole)
 }
 
 func TestOutputRoleList(t *testing.T) {

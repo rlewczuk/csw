@@ -153,7 +153,7 @@ func TestLocalConfigStore_SaveGlobalConfig(t *testing.T) {
 
 	// Create global config
 	globalConfig := &conf.GlobalConfig{
-		DefaultProvider:            "test-provider",
+		Defaults:                   conf.CLIDefaultsConfig{DefaultProvider: "test-provider"},
 		ContextCompactionThreshold: 0.9,
 		ModelTags: []conf.ModelTagMapping{
 			{Model: "gpt-4", Tag: "large"},
@@ -171,7 +171,7 @@ func TestLocalConfigStore_SaveGlobalConfig(t *testing.T) {
 	// Reload and verify
 	loadedConfig, err := store.GetGlobalConfig()
 	require.NoError(t, err)
-	assert.Equal(t, "test-provider", loadedConfig.DefaultProvider)
+	assert.Equal(t, "test-provider", loadedConfig.Defaults.DefaultProvider)
 	assert.Equal(t, 0.9, loadedConfig.ContextCompactionThreshold)
 	assert.Len(t, loadedConfig.ModelTags, 1)
 	assert.Equal(t, "gpt-4", loadedConfig.ModelTags[0].Model)
@@ -190,20 +190,20 @@ func TestLocalConfigStore_SaveGlobalConfig_Update(t *testing.T) {
 
 	// Create initial config
 	globalConfig := &conf.GlobalConfig{
-		DefaultProvider: "provider1",
+		Defaults: conf.CLIDefaultsConfig{DefaultProvider: "provider1"},
 	}
 	err = store.SaveGlobalConfig(globalConfig)
 	require.NoError(t, err)
 
 	// Update config
-	globalConfig.DefaultProvider = "provider2"
+	globalConfig.Defaults.DefaultProvider = "provider2"
 	err = store.SaveGlobalConfig(globalConfig)
 	require.NoError(t, err)
 
 	// Verify update
 	loadedConfig, err := store.GetGlobalConfig()
 	require.NoError(t, err)
-	assert.Equal(t, "provider2", loadedConfig.DefaultProvider)
+	assert.Equal(t, "provider2", loadedConfig.Defaults.DefaultProvider)
 }
 
 func TestLocalConfigStore_SaveModelProviderConfig_NilConfig(t *testing.T) {

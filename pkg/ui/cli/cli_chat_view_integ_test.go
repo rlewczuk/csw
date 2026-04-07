@@ -321,7 +321,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		// Create a mock config store with custom default role
 		configStore := impl.NewMockConfigStore()
 		configStore.SetGlobalConfig(&conf.GlobalConfig{
-			DefaultRole: "tester",
+			Defaults: conf.CLIDefaultsConfig{DefaultRole: "tester"},
 		})
 		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
 			"developer": {

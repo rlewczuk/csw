@@ -81,6 +81,27 @@ func (c *ContainerConfig) Merge(override ContainerConfig) {
 
 // MergeFrom merges overrides into CLIDefaultsConfig.
 func (c *CLIDefaultsConfig) MergeFrom(override CLIDefaultsConfig) {
+	if override.DefaultProvider != "" {
+		c.DefaultProvider = override.DefaultProvider
+	}
+	if override.DefaultRole != "" {
+		c.DefaultRole = override.DefaultRole
+	}
+	if override.MaxToolThreads > 0 {
+		c.MaxToolThreads = override.MaxToolThreads
+	}
+	if override.Container.Enabled {
+		c.Container.Enabled = true
+	}
+	if override.Container.Image != "" {
+		c.Container.Image = override.Container.Image
+	}
+	if len(override.Container.Mounts) > 0 {
+		c.Container.Mounts = append([]string(nil), override.Container.Mounts...)
+	}
+	if len(override.Container.Env) > 0 {
+		c.Container.Env = append([]string(nil), override.Container.Env...)
+	}
 	if override.Model != "" {
 		c.Model = override.Model
 	}
@@ -120,12 +141,8 @@ func (c *GlobalConfig) Clone() *GlobalConfig {
 		ModelTags:                  make([]ModelTagMapping, len(c.ModelTags)),
 		ToolSelection:              c.ToolSelection.Clone(),
 		ContextCompactionThreshold: c.ContextCompactionThreshold,
-		DefaultProvider:            c.DefaultProvider,
-		DefaultRole:                c.DefaultRole,
 		LLMRetryMaxAttempts:        c.LLMRetryMaxAttempts,
 		LLMRetryMaxBackoffSeconds:  c.LLMRetryMaxBackoffSeconds,
-		MaxToolThreads:             c.MaxToolThreads,
-		Container:                  c.Container.Clone(),
 		Defaults:                   c.Defaults,
 		ShadowPaths:                append([]string(nil), c.ShadowPaths...),
 		ModelFamilies:              cloneModelProviderMapValue(c.ModelFamilies),
@@ -138,6 +155,7 @@ func (c *GlobalConfig) Clone() *GlobalConfig {
 		containerImageConfigured:   c.containerImageConfigured,
 		containerEnabledConfigured: c.containerEnabledConfigured,
 	}
+	cloned.Defaults.Container = c.Defaults.Container.Clone()
 	copy(cloned.ModelTags, c.ModelTags)
 
 	return cloned
@@ -152,14 +170,8 @@ func (c *GlobalConfig) Merge(override *GlobalConfig) {
 	c.ModelTags = append(c.ModelTags, override.ModelTags...)
 	c.ToolSelection.Merge(override.ToolSelection)
 
-	if override.DefaultProvider != "" {
-		c.DefaultProvider = override.DefaultProvider
-	}
 	if override.ContextCompactionThreshold > 0 {
 		c.ContextCompactionThreshold = override.ContextCompactionThreshold
-	}
-	if override.DefaultRole != "" {
-		c.DefaultRole = override.DefaultRole
 	}
 	if override.LLMRetryMaxAttempts > 0 {
 		c.LLMRetryMaxAttempts = override.LLMRetryMaxAttempts
@@ -167,25 +179,22 @@ func (c *GlobalConfig) Merge(override *GlobalConfig) {
 	if override.LLMRetryMaxBackoffSeconds > 0 {
 		c.LLMRetryMaxBackoffSeconds = override.LLMRetryMaxBackoffSeconds
 	}
-	if override.MaxToolThreads > 0 {
-		c.MaxToolThreads = override.MaxToolThreads
-	}
 
 	if override.containerConfigured {
 		if override.containerMountsConfigured {
-			c.Container.Mounts = append([]string(nil), override.Container.Mounts...)
+			c.Defaults.Container.Mounts = append([]string(nil), override.Defaults.Container.Mounts...)
 		}
 		if override.containerEnvConfigured {
-			c.Container.Env = append([]string(nil), override.Container.Env...)
+			c.Defaults.Container.Env = append([]string(nil), override.Defaults.Container.Env...)
 		}
 		if override.containerImageConfigured {
-			c.Container.Image = override.Container.Image
+			c.Defaults.Container.Image = override.Defaults.Container.Image
 		}
 		if override.containerEnabledConfigured {
-			c.Container.Enabled = override.Container.Enabled
+			c.Defaults.Container.Enabled = override.Defaults.Container.Enabled
 		}
 	} else {
-		c.Container.Merge(override.Container)
+		c.Defaults.Container.Merge(override.Defaults.Container)
 	}
 	c.Defaults.MergeFrom(override.Defaults)
 	if len(override.ShadowPaths) > 0 {

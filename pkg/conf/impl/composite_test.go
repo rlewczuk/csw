@@ -296,13 +296,13 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 			"merge": true,
 			"log-llm-requests": true,
 			"thinking": "medium",
-			"lsp-server": "source1-lsp"
-		},
-		"container": {
-			"enabled": true,
-			"image": "alpine:latest",
-			"mounts": ["/tmp:/mnt/tmp"],
-			"env": ["FOO=bar"]
+			"lsp-server": "source1-lsp",
+			"container": {
+				"enabled": true,
+				"image": "alpine:latest",
+				"mounts": ["/tmp:/mnt/tmp"],
+				"env": ["FOO=bar"]
+			}
 		},
 		"tool_selection": {
 			"default": {
@@ -327,12 +327,12 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 			"model": "provider2/default",
 			"worktree": "feature/override",
 			"thinking": "high",
-			"lsp-server": "source2-lsp"
-		},
-		"container": {
-			"image": "busybox:latest",
-			"mounts": ["/var:/mnt/var"],
-			"env": ["BAR=baz"]
+			"lsp-server": "source2-lsp",
+			"container": {
+				"image": "busybox:latest",
+				"mounts": ["/var:/mnt/var"],
+				"env": ["BAR=baz"]
+			}
 		},
 		"tool_selection": {
 			"default": {
@@ -375,10 +375,10 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 	assert.True(t, globalConfig.Defaults.LogLLMRequests)
 	assert.Equal(t, "high", globalConfig.Defaults.Thinking)
 	assert.Equal(t, "source2-lsp", globalConfig.Defaults.LSPServer)
-	assert.True(t, globalConfig.Container.Enabled)
-	assert.Equal(t, "busybox:latest", globalConfig.Container.Image)
-	assert.Equal(t, []string{"/var:/mnt/var"}, globalConfig.Container.Mounts)
-	assert.Equal(t, []string{"BAR=baz"}, globalConfig.Container.Env)
+	assert.True(t, globalConfig.Defaults.Container.Enabled)
+	assert.Equal(t, "busybox:latest", globalConfig.Defaults.Container.Image)
+	assert.Equal(t, []string{"/var:/mnt/var"}, globalConfig.Defaults.Container.Mounts)
+	assert.Equal(t, []string{"BAR=baz"}, globalConfig.Defaults.Container.Env)
 
 	// Verify per-tag rule from later source overrides earlier one
 	safeRule, exists := globalConfig.ToolSelection.Tags["safe"]
@@ -1145,19 +1145,23 @@ func TestCompositeConfigStore_ContainerConfigFromGlobalSource(t *testing.T) {
 
 	// Global config with full container configuration
 	globalConfig := `{
-		"default_role": "developer",
-		"container": {
+		"defaults": {
+			"default_role": "developer",
+			"container": {
 			"image": "golang:1.25-trixie",
 			"enabled": true,
 			"env": ["FOO=bar", "BAZ=qux"],
 			"mounts": ["/tmp:/mnt/tmp"]
+			}
 		}
 	}`
 	require.NoError(t, os.WriteFile(filepath.Join(globalDir, "global.json"), []byte(globalConfig), 0644))
 
 	// Local config WITHOUT container section - only has default_role
 	localConfig := `{
-		"default_role": "custom-role"
+		"defaults": {
+			"default_role": "custom-role"
+		}
 	}`
 	require.NoError(t, os.WriteFile(filepath.Join(localDir, "global.json"), []byte(localConfig), 0644))
 
@@ -1171,13 +1175,13 @@ func TestCompositeConfigStore_ContainerConfigFromGlobalSource(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify container config from global source is preserved
-	assert.True(t, mergedConfig.Container.Enabled, "Container.Enabled should be true from global config")
-	assert.Equal(t, "golang:1.25-trixie", mergedConfig.Container.Image, "Container.Image should be preserved from global config")
-	assert.Equal(t, []string{"FOO=bar", "BAZ=qux"}, mergedConfig.Container.Env, "Container.Env should be preserved from global config")
-	assert.Equal(t, []string{"/tmp:/mnt/tmp"}, mergedConfig.Container.Mounts, "Container.Mounts should be preserved from global config")
+	assert.True(t, mergedConfig.Defaults.Container.Enabled, "Container.Enabled should be true from global config")
+	assert.Equal(t, "golang:1.25-trixie", mergedConfig.Defaults.Container.Image, "Container.Image should be preserved from global config")
+	assert.Equal(t, []string{"FOO=bar", "BAZ=qux"}, mergedConfig.Defaults.Container.Env, "Container.Env should be preserved from global config")
+	assert.Equal(t, []string{"/tmp:/mnt/tmp"}, mergedConfig.Defaults.Container.Mounts, "Container.Mounts should be preserved from global config")
 
 	// Verify local config overrides other fields
-	assert.Equal(t, "custom-role", mergedConfig.DefaultRole, "DefaultRole should be overridden by local config")
+	assert.Equal(t, "custom-role", mergedConfig.Defaults.DefaultRole, "DefaultRole should be overridden by local config")
 }
 
 // TestCompositeConfigStore_LocalContainerOverridesUserConfig ensures that
@@ -1192,21 +1196,25 @@ func TestCompositeConfigStore_LocalContainerOverridesUserConfig(t *testing.T) {
 	require.NoError(t, os.MkdirAll(localConfigDir, 0755))
 
 	userGlobalConfig := `{
-		"container": {
+		"defaults": {
+			"container": {
 			"enabled": true,
 			"image": "user-image",
 			"env": ["USER=1"],
 			"mounts": ["/user:/mnt/user"]
+			}
 		}
 	}`
 	require.NoError(t, os.WriteFile(filepath.Join(userConfigDir, "global.json"), []byte(userGlobalConfig), 0644))
 
 	localGlobalConfig := `{
-		"container": {
+		"defaults": {
+			"container": {
 			"enabled": false,
 			"image": "local-image",
 			"env": ["LOCAL=1"],
 			"mounts": ["/local:/mnt/local"]
+			}
 		}
 	}`
 	require.NoError(t, os.WriteFile(filepath.Join(localConfigDir, "global.json"), []byte(localGlobalConfig), 0644))
@@ -1217,8 +1225,8 @@ func TestCompositeConfigStore_LocalContainerOverridesUserConfig(t *testing.T) {
 	globalConfig, err := store.GetGlobalConfig()
 	require.NoError(t, err)
 
-	assert.False(t, globalConfig.Container.Enabled)
-	assert.Equal(t, "local-image", globalConfig.Container.Image)
-	assert.Equal(t, []string{"LOCAL=1"}, globalConfig.Container.Env)
-	assert.Equal(t, []string{"/local:/mnt/local"}, globalConfig.Container.Mounts)
+	assert.False(t, globalConfig.Defaults.Container.Enabled)
+	assert.Equal(t, "local-image", globalConfig.Defaults.Container.Image)
+	assert.Equal(t, []string{"LOCAL=1"}, globalConfig.Defaults.Container.Env)
+	assert.Equal(t, []string{"/local:/mnt/local"}, globalConfig.Defaults.Container.Mounts)
 }

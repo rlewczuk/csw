@@ -43,7 +43,7 @@ func TestSessionCustomToolIntegration(t *testing.T) {
 			},
 		},
 	})
-	store.SetGlobalConfig(&conf.GlobalConfig{DefaultRole: "developer"})
+	store.SetGlobalConfig(&conf.GlobalConfig{Defaults: conf.CLIDefaultsConfig{DefaultRole: "developer"}})
 
 	promptGenerator, err := NewConfPromptGenerator(store, nil)
 	require.NoError(t, err)

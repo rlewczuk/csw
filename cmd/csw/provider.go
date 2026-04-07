@@ -544,7 +544,7 @@ func providerSetDefaultCommand(scope *ConfigScope) *cobra.Command {
 			}
 
 			// Update default provider
-			globalConfig.DefaultProvider = providerName
+			globalConfig.Defaults.DefaultProvider = providerName
 
 			// Save global config
 			if err := store.SaveGlobalConfig(globalConfig); err != nil {

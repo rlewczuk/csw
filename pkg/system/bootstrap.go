@@ -693,7 +693,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 			if params.MaxToolThreads > 0 {
 				return params.MaxToolThreads
 			}
-			return globalConfig.MaxToolThreads
+			return globalConfig.Defaults.MaxToolThreads
 		}(),
 	}
 
@@ -908,7 +908,7 @@ type containerRuntimeConfig struct {
 func ResolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params BuildSystemParams, effectiveWorkDir string, shadowDir string) (containerRuntimeConfig, error) {
 	var runtimeConfig containerRuntimeConfig
 
-	runtimeConfig.Enabled = globalConfig.Container.Enabled
+	runtimeConfig.Enabled = globalConfig.Defaults.Container.Enabled
 	if params.ContainerEnabled {
 		runtimeConfig.Enabled = true
 	}
@@ -922,14 +922,14 @@ func ResolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params Build
 
 	runtimeConfig.Image = strings.TrimSpace(params.ContainerImage)
 	if runtimeConfig.Image == "" {
-		runtimeConfig.Image = strings.TrimSpace(globalConfig.Container.Image)
+		runtimeConfig.Image = strings.TrimSpace(globalConfig.Defaults.Container.Image)
 	}
 	if runtimeConfig.Image == "" {
 		return runtimeConfig, fmt.Errorf("resolveContainerRuntimeConfig() [bootstrap.go]: container image is required when container mode is enabled")
 	}
 
-	mountSpecs := make([]string, 0, len(globalConfig.Container.Mounts)+len(params.ContainerMounts))
-	mountSpecs = append(mountSpecs, globalConfig.Container.Mounts...)
+	mountSpecs := make([]string, 0, len(globalConfig.Defaults.Container.Mounts)+len(params.ContainerMounts))
+	mountSpecs = append(mountSpecs, globalConfig.Defaults.Container.Mounts...)
 	mountSpecs = append(mountSpecs, params.ContainerMounts...)
 	runtimeConfig.Mounts = map[string]string{effectiveWorkDir: effectiveWorkDir}
 	if strings.TrimSpace(shadowDir) != "" {
@@ -952,8 +952,8 @@ func ResolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params Build
 		runtimeConfig.Mounts[containerPath] = hostPath
 	}
 
-	envSpecs := make([]string, 0, len(globalConfig.Container.Env)+len(params.ContainerEnv))
-	envSpecs = append(envSpecs, globalConfig.Container.Env...)
+	envSpecs := make([]string, 0, len(globalConfig.Defaults.Container.Env)+len(params.ContainerEnv))
+	envSpecs = append(envSpecs, globalConfig.Defaults.Container.Env...)
 	envSpecs = append(envSpecs, params.ContainerEnv...)
 	if len(envSpecs) > 0 {
 		runtimeConfig.Env = make(map[string]string, len(envSpecs))
@@ -1208,8 +1208,8 @@ func ResolveModelName(modelName string, configStore conf.ConfigStore, providerRe
 		return "", fmt.Errorf("ResolveModelName() [bootstrap.go]: failed to get global config: %w", err)
 	}
 
-	if globalConfig.DefaultProvider != "" {
-		return globalConfig.DefaultProvider + "/default", nil
+	if globalConfig.Defaults.DefaultProvider != "" {
+		return globalConfig.Defaults.DefaultProvider + "/default", nil
 	}
 
 	providers := providerRegistry.List()

@@ -66,11 +66,13 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 	// Create global.json
 	globalConfig := conf.GlobalConfig{
 		ContextCompactionThreshold: 0.8,
-		Container: conf.ContainerConfig{
-			Enabled: true,
-			Image:   "busybox:latest",
-			Mounts:  []string{"/tmp:/mnt/tmp"},
-			Env:     []string{"TEST_ENV=value"},
+		Defaults: conf.CLIDefaultsConfig{
+			Container: conf.ContainerConfig{
+				Enabled: true,
+				Image:   "busybox:latest",
+				Mounts:  []string{"/tmp:/mnt/tmp"},
+				Env:     []string{"TEST_ENV=value"},
+			},
 		},
 		ModelTags: []conf.ModelTagMapping{
 			{Model: "^claude-.*", Tag: "anthropic"},
@@ -104,10 +106,10 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 	assert.Equal(t, "^claude-.*", config.ModelTags[0].Model)
 	assert.Equal(t, "anthropic", config.ModelTags[0].Tag)
 	assert.Equal(t, false, config.ToolSelection.Default["runBash"])
-	assert.True(t, config.Container.Enabled)
-	assert.Equal(t, "busybox:latest", config.Container.Image)
-	assert.Equal(t, []string{"/tmp:/mnt/tmp"}, config.Container.Mounts)
-	assert.Equal(t, []string{"TEST_ENV=value"}, config.Container.Env)
+	assert.True(t, config.Defaults.Container.Enabled)
+	assert.Equal(t, "busybox:latest", config.Defaults.Container.Image)
+	assert.Equal(t, []string{"/tmp:/mnt/tmp"}, config.Defaults.Container.Mounts)
+	assert.Equal(t, []string{"TEST_ENV=value"}, config.Defaults.Container.Env)
 	safeRule, exists := config.ToolSelection.Tags["safe"]
 	require.True(t, exists)
 	assert.True(t, safeRule["vfsRead"])
@@ -1209,8 +1211,9 @@ func TestLocalConfigStore_YAMLGlobalConfig(t *testing.T) {
 	globalYAML := `model_tags:
   - model: "^claude-.*"
     tag: "anthropic"
-default_provider: "test-provider"
-default_role: "test-role"
+defaults:
+  default_provider: "test-provider"
+  default_role: "test-role"
 `
 	err = os.WriteFile(filepath.Join(tmpDir, "global.yml"), []byte(globalYAML), 0644)
 	require.NoError(t, err)
@@ -1225,8 +1228,8 @@ default_role: "test-role"
 	assert.Len(t, config.ModelTags, 1)
 	assert.Equal(t, "^claude-.*", config.ModelTags[0].Model)
 	assert.Equal(t, "anthropic", config.ModelTags[0].Tag)
-	assert.Equal(t, "test-provider", config.DefaultProvider)
-	assert.Equal(t, "test-role", config.DefaultRole)
+	assert.Equal(t, "test-provider", config.Defaults.DefaultProvider)
+	assert.Equal(t, "test-role", config.Defaults.DefaultRole)
 }
 
 func TestLocalConfigStore_YAMLPrecedence_Global(t *testing.T) {
@@ -1238,13 +1241,16 @@ func TestLocalConfigStore_YAMLPrecedence_Global(t *testing.T) {
 	globalYAML := `model_tags:
   - model: "^gpt-.*"
     tag: "openai"
-default_provider: "yaml-provider"
+defaults:
+  default_provider: "yaml-provider"
 `
 	globalJSON := `{
   "model_tags": [
     {"model": "^claude-.*", "tag": "anthropic"}
   ],
-  "default_provider": "json-provider"
+  "defaults": {
+    "default_provider": "json-provider"
+  }
 }`
 
 	err = os.WriteFile(filepath.Join(tmpDir, "global.yml"), []byte(globalYAML), 0644)
@@ -1262,7 +1268,7 @@ default_provider: "yaml-provider"
 	assert.Len(t, config.ModelTags, 1)
 	assert.Equal(t, "^gpt-.*", config.ModelTags[0].Model)
 	assert.Equal(t, "openai", config.ModelTags[0].Tag)
-	assert.Equal(t, "yaml-provider", config.DefaultProvider)
+	assert.Equal(t, "yaml-provider", config.Defaults.DefaultProvider)
 }
 
 func TestLocalConfigStore_YAMLModelProvider(t *testing.T) {

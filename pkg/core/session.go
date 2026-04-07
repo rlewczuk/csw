@@ -1500,8 +1500,8 @@ func (s *SweSession) maxToolThreadsLimit() int {
 
 	if s.configStore != nil {
 		globalConfig, err := s.configStore.GetGlobalConfig()
-		if err == nil && globalConfig != nil && globalConfig.MaxToolThreads > 0 {
-			return globalConfig.MaxToolThreads
+		if err == nil && globalConfig != nil && globalConfig.Defaults.MaxToolThreads > 0 {
+			return globalConfig.Defaults.MaxToolThreads
 		}
 	}
 
