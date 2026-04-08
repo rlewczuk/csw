@@ -267,6 +267,7 @@ func TestMockChatView_Reset(t *testing.T) {
 	view.UpdateMessage(&ui.ChatMessageUI{Id: "msg-2"})
 	view.UpdateTool(&ui.ToolUI{Id: "tool-1"})
 	view.MoveToBottom()
+	view.ShowMessage("status", ui.MessageTypeWarning)
 
 	// Reset
 	view.Reset()
@@ -290,6 +291,22 @@ func TestMockChatView_Reset(t *testing.T) {
 	if view.MoveToBottomCalls != 0 {
 		t.Errorf("Reset() did not clear MoveToBottomCalls")
 	}
+	if len(view.ShowMessageCalls) != 0 {
+		t.Errorf("Reset() did not clear ShowMessageCalls")
+	}
+}
+
+func TestMockChatView_ShowMessage(t *testing.T) {
+	view := NewMockChatView()
+
+	view.ShowMessage("hello", ui.MessageTypeInfo)
+	view.ShowMessage("careful", ui.MessageTypeWarning)
+
+	require.Len(t, view.ShowMessageCalls, 2)
+	assert.Equal(t, "hello", view.ShowMessageCalls[0].Message)
+	assert.Equal(t, ui.MessageTypeInfo, view.ShowMessageCalls[0].Type)
+	assert.Equal(t, "careful", view.ShowMessageCalls[1].Message)
+	assert.Equal(t, ui.MessageTypeWarning, view.ShowMessageCalls[1].Type)
 }
 
 func TestMockChatPresenter_SetView(t *testing.T) {

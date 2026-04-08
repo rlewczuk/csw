@@ -10,11 +10,10 @@ import (
 	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
-	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/vcs"
 )
 
-func HandleCommitHookResponse(ctx context.Context, hookEngine *core.HookEngine, gitVcs apis.VCS, worktreeBranch string, repoDir string, worktreeDir string, session *core.SweSession, appView ui.IAppView) (string, bool, error) {
+func HandleCommitHookResponse(ctx context.Context, hookEngine *core.HookEngine, gitVcs apis.VCS, worktreeBranch string, repoDir string, worktreeDir string, session *core.SweSession, appView core.HookOutputView) (string, bool, error) {
 	if hookEngine == nil {
 		return "", false, nil
 	}

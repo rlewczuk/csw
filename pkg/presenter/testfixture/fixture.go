@@ -31,11 +31,6 @@ func (f *PresenterFixture) NewSessionThreadWithSession(session *core.SweSession,
 	return core.NewSessionThreadWithSession(f.System, session, handler)
 }
 
-// NewAppPresenter creates an AppPresenter for the fixture system.
-func (f *PresenterFixture) NewAppPresenter(model string, role string) *presenter.AppPresenter {
-	return presenter.NewAppPresenter(f.System, model, role)
-}
-
 // NewChatPresenter creates a ChatPresenter for the fixture system.
 func (f *PresenterFixture) NewChatPresenter(thread *core.SessionThread) *presenter.ChatPresenter {
 	return presenter.NewChatPresenter(f.System, thread)

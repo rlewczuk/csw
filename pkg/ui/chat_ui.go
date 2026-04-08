@@ -105,6 +105,9 @@ type IChatView interface {
 
 	// QueryPermission queries user for permission to use a tool.
 	QueryPermission(query *PermissionQueryUI) error
+
+	// ShowMessage shows a status message to the user.
+	ShowMessage(message string, messageType MessageType)
 }
 
 // IChatPresenter is an interface for propagating user input from UI to the chat session.

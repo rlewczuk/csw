@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"sync"
 
@@ -44,6 +45,16 @@ type CliChatView struct {
 	// renderedTools tracks the last rendered output for each tool
 	// Key is tool ID, value is the output line that was last printed
 	renderedTools map[string]string
+
+	// sessionLogger is used for diagnostic ShowMessage entries.
+	sessionLogger *slog.Logger
+	// pendingLogs stores diagnostic messages received before session logger is configured.
+	pendingLogs []diagnosticLogMessage
+}
+
+type diagnosticLogMessage struct {
+	message     string
+	messageType ui.MessageType
 }
 
 // NewCliChatView creates a new CLI chat view.
@@ -246,6 +257,67 @@ func (v *CliChatView) UpdateTool(tool *ui.ToolUI) error {
 func (v *CliChatView) MoveToBottom() error {
 	// No-op for CLI view
 	return nil
+}
+
+// SetSessionLogger configures session logger used for diagnostic message entries.
+func (v *CliChatView) SetSessionLogger(logger *slog.Logger) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	v.sessionLogger = logger
+	if logger == nil {
+		return
+	}
+
+	for _, pending := range v.pendingLogs {
+		v.logDiagnosticMessage(logger, pending.message, pending.messageType)
+	}
+	v.pendingLogs = nil
+}
+
+// ShowMessage prints a prefixed status message to output.
+func (v *CliChatView) ShowMessage(message string, messageType ui.MessageType) {
+	prefix := "[INFO]"
+
+	switch messageType {
+	case ui.MessageTypeWarning:
+		prefix = "[WARNING]"
+	case ui.MessageTypeError:
+		prefix = "[ERROR]"
+	}
+
+	v.writef("%s %s\n", prefix, message)
+
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	if v.sessionLogger == nil {
+		v.pendingLogs = append(v.pendingLogs, diagnosticLogMessage{message: message, messageType: messageType})
+		return
+	}
+
+	v.logDiagnosticMessage(v.sessionLogger, message, messageType)
+}
+
+func (v *CliChatView) logDiagnosticMessage(logger *slog.Logger, message string, messageType ui.MessageType) {
+	if logger == nil {
+		return
+	}
+
+	attrs := []any{
+		"diagnostic", true,
+		"message", message,
+		"message_type", string(messageType),
+	}
+
+	switch messageType {
+	case ui.MessageTypeWarning:
+		logger.Warn("diagnostic_message", attrs...)
+	case ui.MessageTypeError:
+		logger.Error("diagnostic_message", attrs...)
+	default:
+		logger.Info("diagnostic_message", attrs...)
+	}
 }
 
 // QueryPermission queries user for permission to use a tool.

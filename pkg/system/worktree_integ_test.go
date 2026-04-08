@@ -15,7 +15,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/ui/mock"
+	uimock "github.com/rlewczuk/csw/pkg/ui/mock"
 	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
@@ -244,18 +244,18 @@ func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
 		"status":      string(core.HookSessionStatusRunning),
 		"user_prompt": "merge via hook",
 	})
-	appView := mock.NewMockAppView()
+	chatView := uimock.NewMockChatView()
 
-	result, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/hook", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, appView)
+	result, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/hook", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, chatView)
 	require.NoError(t, err)
 
 	assert.Equal(t, "", result.HeadCommitID)
 	require.Empty(t, mockVCS.GetMergeCalls())
 	require.Len(t, sandboxRunner.GetExecutions(), 1)
 	assert.Equal(t, "echo merge-hook /repo/.csw/conf/hooks/merge-custom", sandboxRunner.GetExecutions()[0].Command)
-	require.Len(t, appView.ShowMessageCalls, 2)
-	assert.Contains(t, appView.ShowMessageCalls[0].Message, "[hook:merge-custom] command")
-	assert.Contains(t, appView.ShowMessageCalls[1].Message, "[hook:merge-custom][stdout]")
+	require.Len(t, chatView.ShowMessageCalls, 2)
+	assert.Contains(t, chatView.ShowMessageCalls[0].Message, "[hook:merge-custom] command")
+	assert.Contains(t, chatView.ShowMessageCalls[1].Message, "[hook:merge-custom][stdout]")
 }
 
 func TestFinalizeWorktreeSessionMergeLLMHookUsesUserPromptContext(t *testing.T) {
@@ -325,9 +325,9 @@ func TestFinalizeWorktreeSessionMergeHookProcessesFeedbackRequests(t *testing.T)
 		nil,
 	)
 	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
-	appView := mock.NewMockAppView()
+	chatView := uimock.NewMockChatView()
 
-	_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, "feature/hook-feedback", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, appView)
+	_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, "feature/hook-feedback", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, chatView)
 
 	assert.Equal(t, "ready", hookEngine.ContextData()["feedback-state"])
 	executions := hostRunner.GetExecutions()

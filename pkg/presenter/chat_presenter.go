@@ -15,20 +15,12 @@ import (
 type ChatPresenter struct {
 	mu      sync.Mutex
 	view    ui.IChatView
-	appView ui.IAppView
 	thread  *core.SessionThread
 
 	// Tracking state for current run
 	currentAssistantMessage *ui.ChatMessageUI
 	messageCounter          int
 	toolCallCounter         int
-}
-
-// SetAppView sets app-level view for status messages and retry prompts.
-func (p *ChatPresenter) SetAppView(view ui.IAppView) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.appView = view
 }
 
 // NewChatPresenter creates a new ChatPresenter with the given session thread.
@@ -270,13 +262,13 @@ func (p *ChatPresenter) OnRateLimitError(retryAfterSeconds int) {
 	// when all retries are exhausted.
 }
 
-// ShowMessage displays session status messages on app view.
+// ShowMessage displays session status messages on chat view.
 func (p *ChatPresenter) ShowMessage(message string, messageType string) {
 	p.mu.Lock()
-	appView := p.appView
+	view := p.view
 	p.mu.Unlock()
 
-	if appView == nil {
+	if view == nil {
 		return
 	}
 
@@ -288,25 +280,14 @@ func (p *ChatPresenter) ShowMessage(message string, messageType string) {
 		uiMessageType = ui.MessageTypeError
 	}
 
-	appView.ShowMessage(message, uiMessageType)
+	view.ShowMessage(message, uiMessageType)
 }
 
-// ShouldRetryAfterFailure asks app view whether retries should continue after exhaustion.
+// ShouldRetryAfterFailure asks output handler whether exhausted failures should be retried.
+// CLI flow does not provide retry prompt and always returns false.
 func (p *ChatPresenter) ShouldRetryAfterFailure(message string) bool {
-	p.mu.Lock()
-	appView := p.appView
-	p.mu.Unlock()
-
-	if appView == nil {
-		return false
-	}
-
-	retryPrompter, ok := appView.(ui.IRetryPromptView)
-	if !ok {
-		return false
-	}
-
-	return retryPrompter.AskRetry(message)
+	_ = message
+	return false
 }
 
 // buildChatSession converts a SweSession to a ui.ChatSessionUI.

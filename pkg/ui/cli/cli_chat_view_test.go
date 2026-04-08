@@ -322,6 +322,29 @@ func TestCliChatView_AddMessage(t *testing.T) {
 	})
 }
 
+func TestCliChatView_ShowMessage(t *testing.T) {
+	tests := []struct {
+		name        string
+		messageType ui.MessageType
+		expected    string
+	}{
+		{name: "info", messageType: ui.MessageTypeInfo, expected: "\x1b[90m[main]\x1b[0m [INFO] hello\n"},
+		{name: "warning", messageType: ui.MessageTypeWarning, expected: "\x1b[90m[main]\x1b[0m [WARNING] hello\n"},
+		{name: "error", messageType: ui.MessageTypeError, expected: "\x1b[90m[main]\x1b[0m [ERROR] hello\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := &bytes.Buffer{}
+			view := NewCliChatView(nil, output, nil, false, false, false)
+
+			view.ShowMessage("hello", tt.messageType)
+
+			assert.Equal(t, tt.expected, output.String())
+		})
+	}
+}
+
 func TestCliChatView_UpdateMessage(t *testing.T) {
 	t.Run("updates message by ID", func(t *testing.T) {
 		output := &bytes.Buffer{}

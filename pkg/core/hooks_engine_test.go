@@ -71,7 +71,7 @@ func TestHookEngineExecuteShell(t *testing.T) {
 	hostRunner := runner.NewMockRunner()
 	sandboxRunner := runner.NewMockRunner()
 	sandboxRunner.SetResponseDetailed("echo feature/one merge", "ok\n", "warn\n", 0, nil)
-	view := uimock.NewMockAppView()
+	view := uimock.NewMockChatView()
 
 	engine := NewHookEngine(configStore, hostRunner, sandboxRunner, nil)
 	engine.MergeContext(map[string]string{

@@ -17,7 +17,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/vcs"
 )
 
@@ -30,7 +29,7 @@ type WorktreeFinalizeResult struct {
 	HeadCommitID string
 }
 
-func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *SweSystem, session *core.SweSession, stderr io.Writer, repoDir string, worktreeDir string, originalPrompt string, hookEngine *core.HookEngine, appView ui.IAppView) (WorktreeFinalizeResult, error) {
+func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *SweSystem, session *core.SweSession, stderr io.Writer, repoDir string, worktreeDir string, originalPrompt string, hookEngine *core.HookEngine, appView core.HookOutputView) (WorktreeFinalizeResult, error) {
 	result := WorktreeFinalizeResult{}
 	if worktreeBranch == "" || gitVcs == nil {
 		return result, nil

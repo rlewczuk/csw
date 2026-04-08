@@ -12,17 +12,10 @@ import (
 	"github.com/rlewczuk/csw/pkg/ui"
 )
 
-// SessionLoggerAppView is app view supporting session logger binding.
-type SessionLoggerAppView interface {
-	ui.IAppView
-	SetSessionLogger(logger *slog.Logger)
-}
-
 // ChatPresenter is runtime presenter contract required by system runtime wiring.
 type ChatPresenter interface {
 	ui.IChatPresenter
 	core.SessionThreadOutput
-	SetAppView(view ui.IAppView)
 }
 
 // ChatView is runtime chat view contract required by system runtime wiring.
@@ -31,8 +24,9 @@ type ChatView interface {
 	StartReadingInput()
 }
 
-// AppViewFactory builds app view for CLI runtime.
-type AppViewFactory func(output io.Writer) SessionLoggerAppView
+type sessionLoggerChatView interface {
+	SetSessionLogger(logger *slog.Logger)
+}
 
 // ChatPresenterFactory builds presenter for session thread.
 type ChatPresenterFactory func(system core.SessionFactory, thread *core.SessionThread) ChatPresenter
@@ -57,37 +51,30 @@ type StartCLISessionParams struct {
 	Interactive          bool
 	AllowAllPerms        bool
 	OutputFormat         string
-	AppOutput            io.Writer
 	ChatOutput           io.Writer
 	ChatInput            io.Reader
-	AppViewFactory       AppViewFactory
 	ChatPresenterFactory ChatPresenterFactory
 	ChatViewFactory      ChatViewFactory
 }
 
 // StartCLISessionResult contains initialized CLI runtime components.
 type StartCLISessionResult struct {
-	AppView ui.IAppView
-	Thread  *core.SessionThread
-	Session *core.SweSession
-	Done    <-chan error
+	ChatView ui.IChatView
+	Thread   *core.SessionThread
+	Session  *core.SweSession
+	Done     <-chan error
 }
 
-// StartCLISession creates app view, thread, presenter, chat view and starts requested flow.
+// StartCLISession creates thread, presenter, chat view and starts requested flow.
 func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessionResult, error) {
 	var result StartCLISessionResult
 
-	if params.AppViewFactory == nil {
-		return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: app view factory is nil")
-	}
 	if params.ChatPresenterFactory == nil {
 		return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: chat presenter factory is nil")
 	}
 	if params.ChatViewFactory == nil {
 		return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: chat view factory is nil")
 	}
-
-	appView := params.AppViewFactory(params.AppOutput)
 
 	var (
 		thread  *core.SessionThread
@@ -148,8 +135,6 @@ func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessi
 		}
 	}
 
-	appView.SetSessionLogger(logging.GetSessionLogger(session.ID(), logging.LogTypeSession))
-
 	if params.ResumeTarget == "" {
 		if err := session.SetRole(params.RoleName); err != nil {
 			return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to set role: %w", err)
@@ -167,8 +152,10 @@ func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessi
 	session.SetTaskInfo(params.TaskInfo)
 
 	chatPresenter := params.ChatPresenterFactory(s, thread)
-	chatPresenter.SetAppView(appView)
 	chatView := params.ChatViewFactory(chatPresenter, params.ChatOutput, params.ChatInput, params.Interactive, params.AllowAllPerms, params.OutputFormat)
+	if loggerAwareView, ok := chatView.(sessionLoggerChatView); ok {
+		loggerAwareView.SetSessionLogger(logging.GetSessionLogger(session.ID(), logging.LogTypeSession))
+	}
 
 	if err := chatPresenter.SetView(chatView); err != nil {
 		return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to set view: %w", err)
@@ -203,7 +190,7 @@ func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessi
 		}
 	}
 
-	result = StartCLISessionResult{AppView: appView, Thread: thread, Session: session, Done: done}
+	result = StartCLISessionResult{ChatView: chatView, Thread: thread, Session: session, Done: done}
 
 	return result, nil
 }

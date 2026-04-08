@@ -19,13 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type runtimeTestAppView struct{}
-
-func (v *runtimeTestAppView) ShowChat(_ ui.IChatPresenter) ui.IChatView { return nil }
-func (v *runtimeTestAppView) ShowSettings()                             {}
-func (v *runtimeTestAppView) ShowMessage(_ string, _ ui.MessageType)    {}
-func (v *runtimeTestAppView) SetSessionLogger(_ *slog.Logger)           {}
-
 type runtimeTestChatView struct{}
 
 func (v *runtimeTestChatView) Init(_ *ui.ChatSessionUI) error                { return nil }
@@ -34,6 +27,8 @@ func (v *runtimeTestChatView) UpdateMessage(_ *ui.ChatMessageUI) error       { r
 func (v *runtimeTestChatView) UpdateTool(_ *ui.ToolUI) error                 { return nil }
 func (v *runtimeTestChatView) MoveToBottom() error                           { return nil }
 func (v *runtimeTestChatView) QueryPermission(_ *ui.PermissionQueryUI) error { return nil }
+func (v *runtimeTestChatView) ShowMessage(_ string, _ ui.MessageType)        {}
+func (v *runtimeTestChatView) SetSessionLogger(_ *slog.Logger)               {}
 func (v *runtimeTestChatView) StartReadingInput()                            {}
 
 type runtimeTestChatPresenter struct{}
@@ -45,7 +40,6 @@ func (p *runtimeTestChatPresenter) Pause() error                                
 func (p *runtimeTestChatPresenter) Resume() error                                  { return nil }
 func (p *runtimeTestChatPresenter) PermissionResponse(_ string) error              { return nil }
 func (p *runtimeTestChatPresenter) SetModel(_ string) error                        { return nil }
-func (p *runtimeTestChatPresenter) SetAppView(_ ui.IAppView)                       {}
 func (p *runtimeTestChatPresenter) AddAssistantMessage(_ string, _ string)         {}
 func (p *runtimeTestChatPresenter) ShowMessage(_ string, _ string)                 {}
 func (p *runtimeTestChatPresenter) AddToolCall(_ *tool.ToolCall)                   {}
@@ -104,12 +98,8 @@ func TestStartCLISessionResumeAppliesOverridesAndForceCompact(t *testing.T) {
 		ResumeTarget:       sessionID,
 		ContinueSession:    true,
 		ForceCompact:       true,
-		AppOutput:          io.Discard,
 		ChatOutput:         io.Discard,
 		ChatInput:          nil,
-		AppViewFactory: func(_ io.Writer) system.SessionLoggerAppView {
-			return &runtimeTestAppView{}
-		},
 		ChatPresenterFactory: func(_ core.SessionFactory, _ *core.SessionThread) system.ChatPresenter {
 			return &runtimeTestChatPresenter{}
 		},

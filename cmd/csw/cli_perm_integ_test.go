@@ -65,6 +65,11 @@ func (v *autoAllowPermissionTrackingView) QueryPermission(query *ui.PermissionQu
 	return nil
 }
 
+func (v *autoAllowPermissionTrackingView) ShowMessage(message string, messageType ui.MessageType) {
+	_ = message
+	_ = messageType
+}
+
 func (v *autoAllowPermissionTrackingView) PermissionQueries() int {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -92,6 +97,11 @@ func (m *permissionTrackingMockView) QueryPermission(query *ui.PermissionQueryUI
 		return m.onQueryPermission(query)
 	}
 	return nil
+}
+
+func (m *permissionTrackingMockView) ShowMessage(message string, messageType ui.MessageType) {
+	_ = message
+	_ = messageType
 }
 
 // autoDenyPermissionMockView is a mock view that automatically denies permissions
@@ -123,6 +133,11 @@ func (m *autoDenyPermissionMockView) QueryPermission(query *ui.PermissionQueryUI
 		return m.presenter.PermissionResponse(response)
 	}
 	return nil
+}
+
+func (m *autoDenyPermissionMockView) ShowMessage(message string, messageType ui.MessageType) {
+	_ = message
+	_ = messageType
 }
 
 // TestCLIPermissionQueryHandling tests that CLI mode handles permission queries correctly.

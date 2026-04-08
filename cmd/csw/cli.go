@@ -641,12 +641,8 @@ func runCLI(params *CLIParams) error {
 		Interactive:        params.Interactive,
 		AllowAllPerms:      params.AllowAllPerms,
 		OutputFormat:       params.OutputFormat,
-		AppOutput:          os.Stdout,
 		ChatOutput:         os.Stdout,
 		ChatInput:          os.Stdin,
-		AppViewFactory: func(output io.Writer) system.SessionLoggerAppView {
-			return cli.NewAppView(output, cliSlug)
-		},
 		ChatPresenterFactory: func(factory core.SessionFactory, thread *core.SessionThread) system.ChatPresenter {
 			return presenter.NewChatPresenter(factory, thread)
 		},
@@ -657,7 +653,7 @@ func runCLI(params *CLIParams) error {
 	if err != nil {
 		return fmt.Errorf("runCLI() [cli.go]: failed to start CLI session runtime: %w", err)
 	}
-	appView := runtimeResult.AppView
+	chatView := runtimeResult.ChatView
 	session := runtimeResult.Session
 
 	finalizeVCS := buildResult.VCS
@@ -693,7 +689,7 @@ func runCLI(params *CLIParams) error {
 	}
 
 	var finalizeResult system.WorktreeFinalizeResult
-	finalizeResult, finalizeErr := system.FinalizeWorktreeSession(ctx, finalizeVCS, finalizeWorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, finalizeWorktreeDir, params.Prompt, hookEngine, appView)
+	finalizeResult, finalizeErr := system.FinalizeWorktreeSession(ctx, finalizeVCS, finalizeWorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, finalizeWorktreeDir, params.Prompt, hookEngine, chatView)
 	if finalizeErr != nil {
 		sessionRunErr = finalizeErr
 	}
@@ -711,7 +707,7 @@ func runCLI(params *CLIParams) error {
 		WorkDir:        buildResult.WorkDir,
 		LSPServer:      buildResult.LSPServer,
 		ContainerImage: buildResult.ContainerImage,
-	}, appView.ShowMessage, sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
+	}, chatView.ShowMessage, sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
 		return err
 	}
 

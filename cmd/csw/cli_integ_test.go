@@ -63,6 +63,11 @@ func (m *mockChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 	return nil
 }
 
+func (m *mockChatView) ShowMessage(message string, messageType ui.MessageType) {
+	_ = message
+	_ = messageType
+}
+
 func (m *mockChatView) GetMessages() []*ui.ChatMessageUI {
 	m.mu.Lock()
 	defer m.mu.Unlock()

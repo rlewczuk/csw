@@ -22,6 +22,11 @@ import (
 	"github.com/rlewczuk/csw/pkg/ui"
 )
 
+// HookOutputView describes a hook output sink used for diagnostic hook messages.
+type HookOutputView interface {
+	ShowMessage(message string, messageType ui.MessageType)
+}
+
 // HookSessionStatus describes lifecycle status exposed to hook context.
 type HookSessionStatus string
 
@@ -42,7 +47,7 @@ type HookContext map[string]string
 // HookExecutionRequest defines one hook execution.
 type HookExecutionRequest struct {
 	Name    string
-	View    ui.IAppView
+	View    HookOutputView
 	VCS     interface{}
 	Session *SweSession
 }
@@ -1263,7 +1268,7 @@ func (e *HookEngine) renderTemplate(templateName string, templateText string) (s
 	return strings.TrimSpace(buf.String()), nil
 }
 
-func (e *HookEngine) showHookOutput(view ui.IAppView, hookConfig *conf.HookConfig, command string, stdout string, stderr string) {
+func (e *HookEngine) showHookOutput(view HookOutputView, hookConfig *conf.HookConfig, command string, stdout string, stderr string) {
 	if view == nil || hookConfig == nil {
 		return
 	}

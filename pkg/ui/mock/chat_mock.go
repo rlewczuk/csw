@@ -21,6 +21,7 @@ type MockChatView struct {
 	UpdateToolCalls      []*ui.ToolUI
 	MoveToBottomCalls    int
 	QueryPermissionCalls []*ui.PermissionQueryUI
+	ShowMessageCalls     []MockChatMessageCall
 
 	// Automatic permission response configuration
 	// When set, QueryPermission will automatically respond with this value
@@ -31,6 +32,12 @@ type MockChatView struct {
 
 	// Presenter for sending automatic permission responses
 	Presenter ui.IChatPresenter
+}
+
+// MockChatMessageCall stores one ShowMessage invocation.
+type MockChatMessageCall struct {
+	Message string
+	Type    ui.MessageType
 }
 
 // NewMockChatView creates a new MockChatView instance.
@@ -98,6 +105,14 @@ func (m *MockChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 	return m.QueryPermissionErr
 }
 
+// ShowMessage stores a user-facing status message call.
+func (m *MockChatView) ShowMessage(message string, messageType ui.MessageType) {
+	m.ShowMessageCalls = append(m.ShowMessageCalls, MockChatMessageCall{
+		Message: message,
+		Type:    messageType,
+	})
+}
+
 // Reset clears all recorded calls and errors.
 func (m *MockChatView) Reset() {
 	m.InitErr = nil
@@ -113,6 +128,7 @@ func (m *MockChatView) Reset() {
 	m.UpdateToolCalls = nil
 	m.MoveToBottomCalls = 0
 	m.QueryPermissionCalls = nil
+	m.ShowMessageCalls = nil
 
 	m.AutoPermissionResponse = ""
 	m.Presenter = nil
