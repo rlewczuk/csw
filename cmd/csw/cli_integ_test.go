@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/ui"
 )
 
@@ -63,7 +64,7 @@ func (m *mockChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 	return nil
 }
 
-func (m *mockChatView) ShowMessage(message string, messageType ui.MessageType) {
+func (m *mockChatView) ShowMessage(message string, messageType shared.MessageType) {
 	_ = message
 	_ = messageType
 }

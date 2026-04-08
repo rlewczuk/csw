@@ -11,6 +11,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/core"
 	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
 	"github.com/rlewczuk/csw/pkg/presenter"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/vfs"
@@ -65,7 +66,7 @@ func (v *autoAllowPermissionTrackingView) QueryPermission(query *ui.PermissionQu
 	return nil
 }
 
-func (v *autoAllowPermissionTrackingView) ShowMessage(message string, messageType ui.MessageType) {
+func (v *autoAllowPermissionTrackingView) ShowMessage(message string, messageType shared.MessageType) {
 	_ = message
 	_ = messageType
 }
@@ -99,7 +100,7 @@ func (m *permissionTrackingMockView) QueryPermission(query *ui.PermissionQueryUI
 	return nil
 }
 
-func (m *permissionTrackingMockView) ShowMessage(message string, messageType ui.MessageType) {
+func (m *permissionTrackingMockView) ShowMessage(message string, messageType shared.MessageType) {
 	_ = message
 	_ = messageType
 }
@@ -135,7 +136,7 @@ func (m *autoDenyPermissionMockView) QueryPermission(query *ui.PermissionQueryUI
 	return nil
 }
 
-func (m *autoDenyPermissionMockView) ShowMessage(message string, messageType ui.MessageType) {
+func (m *autoDenyPermissionMockView) ShowMessage(message string, messageType shared.MessageType) {
 	_ = message
 	_ = messageType
 }

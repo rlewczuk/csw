@@ -11,6 +11,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
 	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/rlewczuk/csw/pkg/tool"
@@ -27,7 +28,7 @@ func (v *runtimeTestChatView) UpdateMessage(_ *ui.ChatMessageUI) error       { r
 func (v *runtimeTestChatView) UpdateTool(_ *ui.ToolUI) error                 { return nil }
 func (v *runtimeTestChatView) MoveToBottom() error                           { return nil }
 func (v *runtimeTestChatView) QueryPermission(_ *ui.PermissionQueryUI) error { return nil }
-func (v *runtimeTestChatView) ShowMessage(_ string, _ ui.MessageType)        {}
+func (v *runtimeTestChatView) ShowMessage(_ string, _ shared.MessageType)    {}
 func (v *runtimeTestChatView) SetSessionLogger(_ *slog.Logger)               {}
 func (v *runtimeTestChatView) StartReadingInput()                            {}
 

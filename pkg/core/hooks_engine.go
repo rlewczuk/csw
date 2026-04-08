@@ -18,13 +18,13 @@ import (
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/ui"
 )
 
 // HookOutputView describes a hook output sink used for diagnostic hook messages.
 type HookOutputView interface {
-	ShowMessage(message string, messageType ui.MessageType)
+	ShowMessage(message string, messageType shared.MessageType)
 }
 
 // HookSessionStatus describes lifecycle status exposed to hook context.
@@ -132,7 +132,7 @@ func NewHookEngine(configStore conf.ConfigStore, hostRunner shellCommandRunner, 
 		configStore: configStore,
 		hostRunner:  hostRunner,
 		shellRunner: shellRunner,
-		agentState: AgentState{HookContext: make(HookContext)},
+		agentState:  AgentState{HookContext: make(HookContext)},
 		providers:   providers,
 	}
 	engine.agentState.SetHookContextValue("status", string(HookSessionStatusNone))
@@ -536,12 +536,12 @@ func (e *HookEngine) executeSubAgent(ctx context.Context, hookConfig *conf.HookC
 		}
 
 		if request.View != nil {
-			request.View.ShowMessage(fmt.Sprintf("[hook:%s][subagent] model=%s", hookConfig.Name, modelRef), ui.MessageTypeInfo)
+			request.View.ShowMessage(fmt.Sprintf("[hook:%s][subagent] model=%s", hookConfig.Name, modelRef), shared.MessageTypeInfo)
 			if result.Stdout != "" {
-				request.View.ShowMessage(fmt.Sprintf("[hook:%s][subagent-summary]\n%s", hookConfig.Name, result.Stdout), ui.MessageTypeInfo)
+				request.View.ShowMessage(fmt.Sprintf("[hook:%s][subagent-summary]\n%s", hookConfig.Name, result.Stdout), shared.MessageTypeInfo)
 			}
 			if result.Stderr != "" {
-				request.View.ShowMessage(fmt.Sprintf("[hook:%s][subagent-error]\n%s", hookConfig.Name, result.Stderr), ui.MessageTypeWarning)
+				request.View.ShowMessage(fmt.Sprintf("[hook:%s][subagent-error]\n%s", hookConfig.Name, result.Stderr), shared.MessageTypeWarning)
 			}
 		}
 
@@ -777,9 +777,9 @@ func (e *HookEngine) executeLLM(ctx context.Context, hookConfig *conf.HookConfig
 	e.SetContextValue(toField, responseText)
 
 	if request.View != nil {
-		request.View.ShowMessage(fmt.Sprintf("[hook:%s][llm] model=%s", hookConfig.Name, resolvedModelSpec), ui.MessageTypeInfo)
+		request.View.ShowMessage(fmt.Sprintf("[hook:%s][llm] model=%s", hookConfig.Name, resolvedModelSpec), shared.MessageTypeInfo)
 		if responseText != "" {
-			request.View.ShowMessage(fmt.Sprintf("[hook:%s][llm-response]\n%s", hookConfig.Name, responseText), ui.MessageTypeInfo)
+			request.View.ShowMessage(fmt.Sprintf("[hook:%s][llm-response]\n%s", hookConfig.Name, responseText), shared.MessageTypeInfo)
 		}
 	}
 
@@ -1273,12 +1273,12 @@ func (e *HookEngine) showHookOutput(view HookOutputView, hookConfig *conf.HookCo
 		return
 	}
 
-	view.ShowMessage(fmt.Sprintf("[hook:%s] command: %s", hookConfig.Name, command), ui.MessageTypeInfo)
+	view.ShowMessage(fmt.Sprintf("[hook:%s] command: %s", hookConfig.Name, command), shared.MessageTypeInfo)
 	if strings.TrimSpace(stdout) != "" {
-		view.ShowMessage(fmt.Sprintf("[hook:%s][stdout]\n%s", hookConfig.Name, strings.TrimRight(stdout, "\n")), ui.MessageTypeInfo)
+		view.ShowMessage(fmt.Sprintf("[hook:%s][stdout]\n%s", hookConfig.Name, strings.TrimRight(stdout, "\n")), shared.MessageTypeInfo)
 	}
 	if strings.TrimSpace(stderr) != "" {
-		view.ShowMessage(fmt.Sprintf("[hook:%s][stderr]\n%s", hookConfig.Name, strings.TrimRight(stderr, "\n")), ui.MessageTypeWarning)
+		view.ShowMessage(fmt.Sprintf("[hook:%s][stderr]\n%s", hookConfig.Name, strings.TrimRight(stderr, "\n")), shared.MessageTypeWarning)
 	}
 }
 

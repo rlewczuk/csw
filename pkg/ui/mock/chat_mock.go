@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/ui"
 )
 
@@ -37,7 +38,7 @@ type MockChatView struct {
 // MockChatMessageCall stores one ShowMessage invocation.
 type MockChatMessageCall struct {
 	Message string
-	Type    ui.MessageType
+	Type    shared.MessageType
 }
 
 // NewMockChatView creates a new MockChatView instance.
@@ -106,7 +107,7 @@ func (m *MockChatView) QueryPermission(query *ui.PermissionQueryUI) error {
 }
 
 // ShowMessage stores a user-facing status message call.
-func (m *MockChatView) ShowMessage(message string, messageType ui.MessageType) {
+func (m *MockChatView) ShowMessage(message string, messageType shared.MessageType) {
 	m.ShowMessageCalls = append(m.ShowMessageCalls, MockChatMessageCall{
 		Message: message,
 		Type:    messageType,

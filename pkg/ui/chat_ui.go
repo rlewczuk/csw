@@ -1,5 +1,7 @@
 package ui
 
+import "github.com/rlewczuk/csw/pkg/shared"
+
 type ToolStatusUI string
 
 // ToolStatusUI represents the status of a tool call.
@@ -107,7 +109,7 @@ type IChatView interface {
 	QueryPermission(query *PermissionQueryUI) error
 
 	// ShowMessage shows a status message to the user.
-	ShowMessage(message string, messageType MessageType)
+	ShowMessage(message string, messageType shared.MessageType)
 }
 
 // IChatPresenter is an interface for propagating user input from UI to the chat session.

@@ -8,6 +8,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
@@ -643,7 +644,7 @@ func TestChatPresenter_ShowMessageAndRetryPrompt(t *testing.T) {
 
 		require.Len(t, chatView.ShowMessageCalls, 1)
 		assert.Equal(t, "temporary failure", chatView.ShowMessageCalls[0].Message)
-		assert.Equal(t, ui.MessageTypeError, chatView.ShowMessageCalls[0].Type)
+		assert.Equal(t, shared.MessageTypeError, chatView.ShowMessageCalls[0].Type)
 	})
 
 	t.Run("should retry after failure returns false", func(t *testing.T) {

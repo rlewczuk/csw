@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -267,7 +268,7 @@ func TestMockChatView_Reset(t *testing.T) {
 	view.UpdateMessage(&ui.ChatMessageUI{Id: "msg-2"})
 	view.UpdateTool(&ui.ToolUI{Id: "tool-1"})
 	view.MoveToBottom()
-	view.ShowMessage("status", ui.MessageTypeWarning)
+	view.ShowMessage("status", shared.MessageTypeWarning)
 
 	// Reset
 	view.Reset()
@@ -299,14 +300,14 @@ func TestMockChatView_Reset(t *testing.T) {
 func TestMockChatView_ShowMessage(t *testing.T) {
 	view := NewMockChatView()
 
-	view.ShowMessage("hello", ui.MessageTypeInfo)
-	view.ShowMessage("careful", ui.MessageTypeWarning)
+	view.ShowMessage("hello", shared.MessageTypeInfo)
+	view.ShowMessage("careful", shared.MessageTypeWarning)
 
 	require.Len(t, view.ShowMessageCalls, 2)
 	assert.Equal(t, "hello", view.ShowMessageCalls[0].Message)
-	assert.Equal(t, ui.MessageTypeInfo, view.ShowMessageCalls[0].Type)
+	assert.Equal(t, shared.MessageTypeInfo, view.ShowMessageCalls[0].Type)
 	assert.Equal(t, "careful", view.ShowMessageCalls[1].Message)
-	assert.Equal(t, ui.MessageTypeWarning, view.ShowMessageCalls[1].Type)
+	assert.Equal(t, shared.MessageTypeWarning, view.ShowMessageCalls[1].Type)
 }
 
 func TestMockChatPresenter_SetView(t *testing.T) {

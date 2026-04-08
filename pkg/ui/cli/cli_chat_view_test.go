@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/ui/mock"
 	"github.com/stretchr/testify/assert"
@@ -325,12 +326,12 @@ func TestCliChatView_AddMessage(t *testing.T) {
 func TestCliChatView_ShowMessage(t *testing.T) {
 	tests := []struct {
 		name        string
-		messageType ui.MessageType
+		messageType shared.MessageType
 		expected    string
 	}{
-		{name: "info", messageType: ui.MessageTypeInfo, expected: "\x1b[90m[main]\x1b[0m [INFO] hello\n"},
-		{name: "warning", messageType: ui.MessageTypeWarning, expected: "\x1b[90m[main]\x1b[0m [WARNING] hello\n"},
-		{name: "error", messageType: ui.MessageTypeError, expected: "\x1b[90m[main]\x1b[0m [ERROR] hello\n"},
+		{name: "info", messageType: shared.MessageTypeInfo, expected: "\x1b[90m[main]\x1b[0m [INFO] hello\n"},
+		{name: "warning", messageType: shared.MessageTypeWarning, expected: "\x1b[90m[main]\x1b[0m [WARNING] hello\n"},
+		{name: "error", messageType: shared.MessageTypeError, expected: "\x1b[90m[main]\x1b[0m [ERROR] hello\n"},
 	}
 
 	for _, tt := range tests {

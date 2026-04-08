@@ -5,6 +5,7 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/ui"
 )
@@ -13,9 +14,9 @@ import (
 // It acts as a bridge between the SessionThread and the IChatView,
 // translating session events into UI updates.
 type ChatPresenter struct {
-	mu      sync.Mutex
-	view    ui.IChatView
-	thread  *core.SessionThread
+	mu     sync.Mutex
+	view   ui.IChatView
+	thread *core.SessionThread
 
 	// Tracking state for current run
 	currentAssistantMessage *ui.ChatMessageUI
@@ -272,12 +273,12 @@ func (p *ChatPresenter) ShowMessage(message string, messageType string) {
 		return
 	}
 
-	uiMessageType := ui.MessageTypeInfo
+	uiMessageType := shared.MessageTypeInfo
 	switch messageType {
 	case "warning":
-		uiMessageType = ui.MessageTypeWarning
+		uiMessageType = shared.MessageTypeWarning
 	case "error":
-		uiMessageType = ui.MessageTypeError
+		uiMessageType = shared.MessageTypeError
 	}
 
 	view.ShowMessage(message, uiMessageType)

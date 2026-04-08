@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/ui"
 )
 
@@ -54,7 +55,7 @@ type CliChatView struct {
 
 type diagnosticLogMessage struct {
 	message     string
-	messageType ui.MessageType
+	messageType shared.MessageType
 }
 
 // NewCliChatView creates a new CLI chat view.
@@ -276,13 +277,13 @@ func (v *CliChatView) SetSessionLogger(logger *slog.Logger) {
 }
 
 // ShowMessage prints a prefixed status message to output.
-func (v *CliChatView) ShowMessage(message string, messageType ui.MessageType) {
+func (v *CliChatView) ShowMessage(message string, messageType shared.MessageType) {
 	prefix := "[INFO]"
 
 	switch messageType {
-	case ui.MessageTypeWarning:
+	case shared.MessageTypeWarning:
 		prefix = "[WARNING]"
-	case ui.MessageTypeError:
+	case shared.MessageTypeError:
 		prefix = "[ERROR]"
 	}
 
@@ -299,7 +300,7 @@ func (v *CliChatView) ShowMessage(message string, messageType ui.MessageType) {
 	v.logDiagnosticMessage(v.sessionLogger, message, messageType)
 }
 
-func (v *CliChatView) logDiagnosticMessage(logger *slog.Logger, message string, messageType ui.MessageType) {
+func (v *CliChatView) logDiagnosticMessage(logger *slog.Logger, message string, messageType shared.MessageType) {
 	if logger == nil {
 		return
 	}
@@ -311,9 +312,9 @@ func (v *CliChatView) logDiagnosticMessage(logger *slog.Logger, message string, 
 	}
 
 	switch messageType {
-	case ui.MessageTypeWarning:
+	case shared.MessageTypeWarning:
 		logger.Warn("diagnostic_message", attrs...)
-	case ui.MessageTypeError:
+	case shared.MessageTypeError:
 		logger.Error("diagnostic_message", attrs...)
 	default:
 		logger.Info("diagnostic_message", attrs...)
