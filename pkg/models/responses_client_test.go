@@ -884,6 +884,23 @@ func TestConvertFromResponsesStreamBody_HandlesStreamErrorEvent(t *testing.T) {
 		assert.Contains(t, err.Error(), "unsupported_parameter")
 		assert.Contains(t, err.Error(), "foo")
 	})
+
+	t.Run("returns RateLimitError for overloaded service", func(t *testing.T) {
+		body := strings.Join([]string{
+			"event: error",
+			"data: {\"type\":\"error\",\"error\":{\"type\":\"service_unavailable_error\",\"code\":\"server_is_overloaded\",\"message\":\"Our servers are currently overloaded. Please try again later.\",\"param\":null},\"sequence_number\":2}",
+			"",
+		}, "\n")
+
+		_, err := convertFromResponsesStreamBody([]byte(body))
+		require.Error(t, err)
+
+		var rateLimitErr *RateLimitError
+		require.ErrorAs(t, err, &rateLimitErr)
+		assert.Equal(t, 60, rateLimitErr.RetryAfterSeconds)
+		assert.Equal(t, "Our servers are currently overloaded. Please try again later.", rateLimitErr.Message)
+		assert.ErrorIs(t, err, ErrRateExceeded)
+	})
 }
 
 func TestFormatRawHTTPResponse(t *testing.T) {

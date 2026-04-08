@@ -27,6 +27,7 @@ const defaultTokenRefreshMargin = 5 * time.Minute
 
 const oauthRefreshMarginOptionKey = "oauth_refresh_margin"
 const responsesPromptCacheRetentionOptionKey = "prompt_cache_retention"
+const responsesOverloadedRetryAfterSeconds = 60
 
 // defaultResponsesInstructions is used when no explicit instructions are provided.
 const defaultResponsesInstructions string = "You are a helpful assistant."
@@ -1901,6 +1902,13 @@ func mapResponsesStreamError(apiErr *OpenaiAPIError) error {
 	errorCode := fmt.Sprint(apiErr.Code)
 	if errorCode == "context_length_exceeded" {
 		return fmt.Errorf("%w: %s", ErrTooManyInputTokens, apiErr.Message)
+	}
+
+	if strings.EqualFold(apiErr.Type, "service_unavailable_error") && errorCode == "server_is_overloaded" {
+		return &RateLimitError{
+			RetryAfterSeconds: responsesOverloadedRetryAfterSeconds,
+			Message:           apiErr.Message,
+		}
 	}
 
 	return &APIRequestError{
