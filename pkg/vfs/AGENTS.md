@@ -1,65 +1,53 @@
 # Package `pkg/vfs` Overview
 
-Package `pkg/vfs` provides filesystem and VCS abstractions used by tools and core runtime code. It includes interface definitions, local and git-backed implementations, access-control wrappers, search/filter utilities, patch/edit helpers, and in-memory mocks for testing.
+Package `pkg/vfs` provides filesystem abstractions and helpers in package `pkg/vfs`.
 
 ## Important files
 
-* `local.go` - local filesystem VFS implementation
-* `access.go` - permission-enforcing VFS wrapper
-* `glob.go` - glob pattern matching and filtering
-* `grep.go` - regex content search over VFS
-* `patcher.go` - text patching with unified diff
-* `patch.go` - patch parsing for file operations
-* `config.go` - hide pattern configuration
-* `shadow.go` - shadow filesystem routing
-* `mock.go` - in-memory VFS/VCS test doubles
+* `local.go` - Local filesystem VFS implementation.
+* `access.go` - Access-control VFS wrapper.
+* `glob.go` - Glob matching and filtering.
+* `grep.go` - Regex file content search.
+* `patcher.go` - Text patching and unified diff.
+* `patch.go` - Patch parsing for file operations.
+* `config.go` - Hide-pattern configuration helpers.
+* `shadow.go` - Shadow filesystem routing wrapper.
+* `mock.go` - In-memory VFS and VCS doubles.
 
 ## Important public API objects
 
-### Types
-
-* `LocalVFS` - local filesystem implementation
-* `AccessControlVFS` - permission wrapper for VFS
-* `PermissionError` - permission error with context
-* `GlobFilter` - glob pattern filter interface
-* `GrepFilter` - regex search interface
-* `GrepMatch` - file match with line numbers
-* `FilePatcher` - file patching interface
-* `ShadowVFS` - routes paths to shadow filesystem
-* `MockVFS` - in-memory VFS for testing
-* `MockVCS` - in-memory VCS for testing
-* `MockVCSCommitCall` - records commit invocation
-* `MockVCSMergeCall` - records merge invocation
-* `Patch` - parsed patch with file operations
-* `Hunk` - single file operation interface
-* `AddFile` - file creation operation
-* `DeleteFile` - file deletion operation
-* `UpdateFile` - file modification operation
-* `UpdateFileChunk` - change block within update
-
-### Constructors
-
-* `NewLocalVFS` - creates local VFS instance
-* `NewAccessControlVFS` - creates access-controlled VFS
-* `NewGlobFilter` - creates glob filter instance
-* `NewGrepFilter` - creates grep filter instance
-* `NewFilePatcher` - creates file patcher instance
-* `NewShadowVFS` - creates shadow VFS wrapper
-* `NewMockVFS` - creates mock VFS instance
-* `NewMockVFSFromDir` - creates mock VFS from directory
-* `NewMockVCS` - creates mock VCS instance
-
-### Functions
-
-* `BuildHidePatterns` - builds hide patterns from config
-* `DefaultShadowPatterns` - returns default shadow patterns
-* `ParsePatch` - parses patch string into Patch struct
-* `matchGlob` - matches path against glob pattern
-
-### Errors
-
-* `ErrOldStringNotFound` - old string not found in content
-* `ErrOldStringMultipleMatch` - ambiguous old string match
+* `PermissionError` - Permission-required operation error.
+* `AccessControlVFS` - VFS wrapper enforcing access rules.
+* `GlobFilter` - Interface for glob path matching.
+* `GrepMatch` - Path and matching line numbers.
+* `GrepFilter` - Interface for regex file search.
+* `LocalVFS` - Local filesystem VFS implementation.
+* `MockVFS` - In-memory VFS test double.
+* `MockVCSCommitCall` - Recorded CommitWorktree invocation.
+* `MockVCSMergeCall` - Recorded MergeBranches invocation.
+* `MockVCS` - In-memory VCS test double.
+* `Patch` - Parsed patch containing hunks.
+* `Hunk` - Interface for patch operations.
+* `AddFile` - Patch add-file operation.
+* `DeleteFile` - Patch delete-file operation.
+* `UpdateFile` - Patch update-file operation.
+* `UpdateFileChunk` - Single update-file chunk.
+* `FilePatcher` - Interface for file text edits.
+* `ShadowVFS` - Routes selected paths to shadow VFS.
+* `ErrOldStringNotFound` - Error when old text missing.
+* `ErrOldStringMultipleMatch` - Error when old text ambiguous.
+* `NewAccessControlVFS` - Creates access-controlled VFS wrapper.
+* `BuildHidePatterns` - Builds hide patterns from ignore files.
+* `DefaultShadowPatterns` - Returns default shadowed path globs.
+* `NewGlobFilter` - Creates glob filter instance.
+* `NewGrepFilter` - Creates grep filter instance.
+* `NewLocalVFS` - Creates LocalVFS from root path.
+* `NewMockVFS` - Creates empty in-memory VFS.
+* `NewMockVFSFromDir` - Creates MockVFS from directory contents.
+* `NewMockVCS` - Creates in-memory VCS double.
+* `ParsePatch` - Parses patch text into operations.
+* `NewFilePatcher` - Creates file patcher instance.
+* `NewShadowVFS` - Creates shadow-routing VFS wrapper.
 
 # Additional sections
 

@@ -1,74 +1,73 @@
 # Package `pkg/models` Overview
 
-Package `pkg/models` is the model/provider abstraction layer for chat and embedding backends. It defines common model interfaces, provider registry/factory behavior, concrete provider clients, OAuth/token helpers, tagging logic, and shared DTO/error/logging utilities.
+Package `pkg/models` provides model/provider abstractions and clients for `pkg/models`.
 
 ## Important files
 
-* `api.go` - Core public model API and message types
-* `providers.go` - Provider registry and config factory
-* `tags.go` - Model-tag resolution from config mappings
-* `errors.go` - Shared model/provider error taxonomy
-* `logging.go` - HTTP request/response logging utilities
-* `oauth.go` - OAuth2 PKCE, token refresh, JWT helpers
-* `useragent.go` - User-Agent header generation
-* `verbose.go` - Verbose HTTP logging with obfuscation
-* `config_updater.go` - Config persistence callback for providers
-* `mock.go` - Test doubles for provider/chat/embedding
-* `unstreaming_chat_model.go` - Wrapper for non-streaming chat
-* `fallback.go` - Multi-model fallback wrapper
-* `retry.go` - Retry wrapper with exponential backoff
-* `model_chain_factory.go` - Provider/model chain parser and factory
-* `anthropic_client.go` - Anthropic API client implementation
-* `anthropic_dto.go` - Anthropic API DTO types
-* `openai_client.go` - OpenAI-compatible API client
-* `openai_dto.go` - OpenAI API DTO types
-* `ollama_client.go` - Ollama API client implementation
-* `ollama_dto.go` - Ollama API DTO types
-* `jetbrains_client.go` - JetBrains AI client implementation
-* `responses_client.go` - OpenAI Responses API client
-* `responses_dto.go` - Responses API DTO types
-* `interface_check.go` - Compile-time interface assertions
+* `api.go` - Core interfaces, messages, roles, and options.
+* `providers.go` - Provider registry and config-based factory.
+* `errors.go` - Shared API, rate-limit, and network errors.
+* `tags.go` - Model tag mappings and lookup registry.
+* `model_chain_factory.go` - Provider/model chain parsing and construction.
+* `retry.go` - Retry wrapper policy and backoff handling.
+* `fallback.go` - Multi-provider fallback chat model wrapper.
+* `unstreaming_chat_model.go` - Stream aggregation for sync chat calls.
+* `oauth.go` - OAuth PKCE, token exchange, renewal helpers.
+* `config_updater.go` - Config update callback implementation.
+* `openai_client.go` - OpenAI-compatible provider client implementation.
+* `anthropic_client.go` - Anthropic provider client implementation.
+* `ollama_client.go` - Ollama provider client implementation.
+* `responses_client.go` - OpenAI Responses provider client implementation.
+* `jetbrains_client.go` - JetBrains provider client implementation.
+* `mock.go` - Mock provider and chat/embedding models.
 
 ## Important public API objects
 
-* `ChatModel` - Interface for chat-capable models
-* `EmbeddingModel` - Interface for embedding generation
-* `ModelProvider` - Interface for model provider factories
-* `ProviderRegistry` - Manages provider instances from config
-* `ModelTagRegistry` - Resolves model tags from config mappings
-* `ChatMessage` - Message structure for chat conversations
-* `ChatMessagePart` - Part of a message (text, tool call, response)
-* `ChatOptions` - Options for chat requests (temperature, etc.)
-* `TokenUsage` - Token accounting from LLM responses
-* `ChatRole` - Role constants: `ChatRoleAssistant`, `ChatRoleDeveloper`, `ChatRoleSystem`, `ChatRoleUser`
-* `ModelInfo` - Information about available models
-* `ModelType` - Model type enum: `ModelTypeChat`, `ModelTypeEmbed`
-* `ConfigUpdater` - Callback for persisting config changes
-* `LLMRequestError` - Error type with raw HTTP response
-* `RateLimitError` - Rate limit error with retry info
-* `NetworkError` - Retryable network error wrapper
-* `APIRequestError` - Structured API request validation error
-* `RetryPolicy` - Controls retry behavior for LLM errors
-* `RetryChatModel` - Wrapper adding retry logic to chat models
-* `FallbackChatModel` - Multi-model fallback wrapper
-* `UnstreamingChatModel` - Wrapper for sync chat over streaming models
-* `OpenAIClient` - OpenAI-compatible provider client
-* `AnthropicClient` - Anthropic API provider client
-* `OllamaClient` - Ollama API provider client
-* `ResponsesClient` - OpenAI Responses API client
-* `JetBrainsClient` - JetBrains AI provider client
-* `MockClient` - Test double for ModelProvider
-* `NewProviderRegistry` - Creates provider registry from config
-* `ModelFromConfig` - Factory for creating providers from config
-* `NewTextMessage` - Creates text-only chat message
-* `NewToolCallMessage` - Creates message with tool calls
-* `NewToolResponseMessage` - Creates message with tool responses
-* `NewUnstreamingChatModel` - Wraps streaming model for sync use
-* `NewRetryChatModel` - Wraps chat model with retry logic
-* `NewFallbackChatModel` - Creates fallback wrapper for multiple models
-* `NewChatModelFromProviderChain` - Creates chat model from provider chain spec
-* `NewMockProvider` - Creates mock provider for testing
-* `DefaultRetryPolicy` - Returns default retry policy configuration
-* `IsRetryableError` - Checks if error is retryable
-* `IsOAuth2Provider` - Checks if provider uses OAuth2
-* `ExtractJWTExpiry` - Extracts expiry from JWT token
+* `ChatModel` - Interface for sync and streaming chat requests.
+* `EmbeddingModel` - Interface for text embedding generation.
+* `ModelProvider` - Interface for model listing and builders.
+* `ChatRole` - Enum: Assistant, Developer, System, User.
+* `ModelType` - Enum: `ModelTypeChat`, `ModelTypeEmbed`.
+* `ChatMessage` - Chat message with role and parts.
+* `ChatMessagePart` - Text, reasoning, tool call, or response part.
+* `ChatOptions` - Runtime options and request headers.
+* `TokenUsage` - Input/output/total token accounting.
+* `ModelInfo` - Provider model metadata entry.
+* `ProviderRegistry` - Lazy-loading provider cache from config store.
+* `ModelTagRegistry` - Resolves tags using regex mappings.
+* `ConfigUpdater` - Callback type for persisting provider config.
+* `ConfigUpdaterImpl` - Writable config-store callback adapter.
+* `LLMRequestError` - Request error with optional raw response.
+* `RateLimitError` - Retryable rate-limit error details.
+* `NetworkError` - Retryable network error details.
+* `APIRequestError` - Structured request validation error.
+* `RetryPolicy` - Retry delays, caps, and limits.
+* `RetryChatModel` - Chat wrapper adding retry behavior.
+* `FallbackChatModel` - Chat wrapper switching between models.
+* `UnstreamingChatModel` - Aggregates stream fragments into one response.
+* `OpenAIClient` - OpenAI-compatible provider client.
+* `AnthropicClient` - Anthropic provider client.
+* `OllamaClient` - Ollama provider client.
+* `ResponsesClient` - OpenAI Responses provider client.
+* `JetBrainsClient` - JetBrains provider client.
+* `MockClient` - In-memory test provider implementation.
+* `ProviderModelRef` - Parsed provider/model chain entry.
+* `NewProviderRegistry` - Creates registry backed by config store.
+* `ModelFromConfig` - Creates provider from config type.
+* `NewModelTagRegistry` - Creates empty model tag registry.
+* `NewConfigUpdater` - Creates provider config updater.
+* `NewTextMessage` - Builds text-only chat message.
+* `NewToolCallMessage` - Builds assistant tool-call message.
+* `NewToolResponseMessage` - Builds user tool-response message.
+* `NewRetryChatModel` - Wraps chat model with retries.
+* `DefaultRetryPolicy` - Returns standard retry policy values.
+* `NewFallbackChatModel` - Wraps model chain for fallback.
+* `NewUnstreamingChatModel` - Wraps model for sync aggregation.
+* `NewChatModelFromProviderChain` - Builds wrapped model chain from spec.
+* `ParseProviderModelChain` - Parses provider/model comma-chain.
+* `ExpandProviderModelChain` - Expands aliases in provider/model chain.
+* `ComposeProviderModelSpec` - Joins refs into provider/model spec.
+* `NormalizeModelAliasMap` - Converts config aliases to chain aliases.
+* `NewMockProvider` - Creates mock provider with model list.
+* `IsOAuth2Provider` - Reports whether provider uses OAuth2.
+* `ExtractJWTExpiry` - Extracts expiry timestamp from JWT.

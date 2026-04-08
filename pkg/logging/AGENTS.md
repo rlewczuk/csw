@@ -1,35 +1,35 @@
 # Package `pkg/logging` Overview
 
-Package `pkg/logging` contains structured logging infrastructure for global runtime events and per-session logs. It manages logger creation/caching, file-backed JSONL logging, in-memory fallback behavior, flush/close lifecycle, and standardized event helpers for chat and tool activity.
+Package `pkg/logging` provides structured runtime and session logging for `pkg/logging`.
 
 ## Important files
 
-* `logger.go` - Primary logging implementation with global and session loggers
-* `test_logger.go` - In-memory logger utilities for tests
+* `logger.go` - Global and session JSONL loggers.
+* `test_logger.go` - In-memory test logger buffers.
 
 ## Important public API objects
 
-* `LogType` - Type of session log (session or llm)
-* `SetLogsDirectory` - Configures logging to write logs to files
-* `GetSessionLogDirectory` - Returns path to session log directory
-* `GetGlobalLogger` - Returns global logger instance
-* `GetSessionLogger` - Returns logger for session and log type
-* `CloseSessionLogger` - Closes all loggers for session
-* `CloseSessionLoggers` - Closes all session loggers
-* `FlushLogs` - Flushes all loggers to disk
-* `LogUserInput` - Logs user input to session logs
-* `LogAssistantOutput` - Logs assistant output chunks
-* `LogToolCall` - Logs a tool call
-* `LogToolResult` - Logs a tool execution result
-* `LogLLMRequest` - Logs raw LLM request
-* `LogLLMResponse` - Logs raw LLM response
-* `LogLLMStreamChunk` - Logs chunk from LLM streaming response
-* `LogPermissionQuery` - Logs a permission query
-* `LogPermissionResponse` - Logs a permission response
-* `LogChatMessages` - Logs chat messages in internal format
-* `TestLoggerData` - Holds in-memory log data for test session
-* `NewTestLogger` - Creates test loggers that store logs in memory
-* `NewTestLoggerFactory` - Creates SessionLoggerFactory for test loggers
-* `FlushTestLogger` - Prints buffered logs to test output
-* `GetTestSessionBuffer` - Returns session log buffer for inspection
-* `GetTestLLMBuffer` - Returns LLM log buffer for inspection
+* `LogType` - Enum: `LogTypeSession`, `LogTypeLLM`.
+* `SetLogsDirectory` - Sets log directory and sync mode.
+* `GetSessionLogDirectory` - Returns session log directory path.
+* `GetGlobalLogger` - Returns global slog logger.
+* `GetSessionLogger` - Returns session logger by type.
+* `CloseSessionLogger` - Closes one session's loggers.
+* `CloseSessionLoggers` - Closes all session loggers.
+* `FlushLogs` - Flushes all logger writers.
+* `LogUserInput` - Logs user message event.
+* `LogAssistantOutput` - Logs assistant chunk event.
+* `LogToolCall` - Logs tool call payload.
+* `LogToolResult` - Logs tool response payload.
+* `LogLLMRequest` - Logs raw LLM request payload.
+* `LogLLMResponse` - Logs raw LLM response payload.
+* `LogLLMStreamChunk` - Logs LLM stream chunk payload.
+* `LogPermissionQuery` - Logs permission query event.
+* `LogPermissionResponse` - Logs permission response event.
+* `LogChatMessages` - Logs serialized chat messages.
+* `TestLoggerData` - Stores in-memory test buffers.
+* `NewTestLogger` - Creates in-memory test loggers.
+* `NewTestLoggerFactory` - Creates test logger factory.
+* `FlushTestLogger` - Flushes buffered test logs.
+* `GetTestSessionBuffer` - Returns session test buffer.
+* `GetTestLLMBuffer` - Returns LLM test buffer.

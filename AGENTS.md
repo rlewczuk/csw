@@ -57,6 +57,7 @@ Other rules:
 * `pkg/commands` - Slash command parsing and template expansion
 * `pkg/conf` - Configuration domain and config-store abstractions
 * `pkg/conf/impl` - Configuration store implementations (local, embedded, composite, mock)
+* `pkg/conf/impl/conf/tools` - Embedded tool directory names for bundled configuration
 * `pkg/core` - Runtime orchestration layer for agent sessions
 * `pkg/core/testfixture` - Core integration test fixtures for SweSystem
 * `pkg/logging` - Structured logging infrastructure for events and session logs

@@ -1,21 +1,21 @@
 # Package `pkg/conf/impl` Overview
 
-Package `pkg/conf/impl` contains configuration store implementations for the conf package. It provides local filesystem-based, embedded, composite (multi-source), and mock config stores.
+Package `pkg/conf/impl` implements configuration store backends.
 
 ## Important files
 
-* `composite.go` - Multi-source config store merging layered sources
-* `embedded.go` - Read-only embedded defaults config store
-* `local.go` - Filesystem-backed config store with file watching
-* `mock.go` - Test double config store with controllable data
+* `composite.go` - Composite merged config store
+* `embedded.go` - Embedded read-only config store
+* `local.go` - Local filesystem config store
+* `mock.go` - Mock config store for tests
 
 ## Important public API objects
 
-* `CompositeConfigStore` - Merges configurations from multiple sources
-* `EmbeddedConfigStore` - Read-only access to embedded configuration
-* `LocalConfigStore` - Filesystem-based config with auto-reload
-* `MockConfigStore` - Test double for conf.ConfigStore interface
-* `NewCompositeConfigStore()` - Creates composite store from config path
+* `CompositeConfigStore` - Multi-source merged configuration store
+* `EmbeddedConfigStore` - Embedded configuration store
+* `LocalConfigStore` - Local configuration store
+* `MockConfigStore` - Mock configuration store
+* `NewCompositeConfigStore()` - Creates composite config store
 * `NewEmbeddedConfigStore()` - Creates embedded config store
-* `NewLocalConfigStore()` - Creates local filesystem config store
-* `NewMockConfigStore()` - Creates mock config store for testing
+* `NewLocalConfigStore()` - Creates local config store
+* `NewMockConfigStore()` - Creates mock config store

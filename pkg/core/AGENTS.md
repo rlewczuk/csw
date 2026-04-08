@@ -1,53 +1,63 @@
 # Package `pkg/core` Overview
 
-Package `pkg/core` contains the runtime orchestration layer for agent sessions, managing session lifecycle, prompt/tool assembly, role/model switching, the run loop, tool-call execution flow, permission pauses, and async session threading used by UI layers.
+Package `pkg/core` contains runtime orchestration for `pkg/core` agent sessions and tasks.
 
 ## Important files
 
-* `commit_message.go` - Commit message generation using model-backed templates
-* `compact.go` - Context compaction for chat messages to manage token limits
-* `hooks_engine.go` - Hook execution engine for lifecycle extension points
-* `prompt.go` - Prompt and tool-info generator with role fragment merging
-* `role.go` - Role registry with cached config loading and role merging
-* `session.go` - Core session engine with chat/tool loops and retries
-* `session_agents.go` - AGENTS.md instruction injection helpers for VFS tool results
-* `session_persisted.go` - Persisted session state model for loading sessions
-* `session_thread.go` - Async thread wrapper for non-blocking UI interaction
-* `state.go` - Agent state structures for template processing
-* `worktree_branch.go` - Worktree branch name generation using models
+* `session.go` - Main session loop and tool execution
+* `session_thread.go` - Thread-safe async session controller
+* `prompt.go` - Prompt fragments and tool info builder
+* `role.go` - Cached agent role registry
+* `hooks_engine.go` - Hook execution and feedback handling
+* `task.go` - Persistent task management backend
+* `session_persistence.go` - Session state persistence and restore
+* `session_summary.go` - Session summary JSON and markdown output
+* `commit_message.go` - LLM-based commit message generation
+* `worktree_branch.go` - LLM-based branch suffix generation
+* `compact.go` - Conversation compaction pipeline
+* `state.go` - Shared agent state types
 
 ## Important public API objects
 
-* `SweSession` - Core session engine managing chat loops and tool execution
-* `SweSessionParams` - Parameters for creating a new SweSession
-* `SessionThread` - Async wrapper for session with pause/resume/interrupt control
-* `SessionThreadInput` - Interface for handling input to the session
-* `SessionThreadOutput` - Interface for handling output from the session
-* `SessionFactory` - Interface for creating new sessions
-* `AgentRoleRegistry` - Registry for agent role configurations with caching
-* `PromptGenerator` - Interface for generating prompts and tool info
-* `ConfPromptGenerator` - Prompt generator using ConfigStore
-* `AgentState` - Agent state structure for template processing
-* `AgentStateCommonInfo` - Common agent state information
-* `SubAgentTaskRunner` - Interface for executing delegated subagent tasks
-* `HookEngine` - Executes configured hooks against session context
-* `HookContext` - Cumulative hook context values for one session
-* `HookExecutionRequest` - Defines one hook execution
-* `HookExecutionResult` - Contains hook command execution details
-* `HookExecutionError` - Represents non-zero hook exit code
-* `HookSessionStatus` - Lifecycle status exposed to hook context (none, running, success, failed)
-* `HookFeedbackRequest` - Defines one feedback command emitted by script
-* `HookFeedbackResponse` - Defines processed feedback result
-* `HookFeedbackResponseMode` - Response delivery mode for feedback (none, stdin, rerun)
-* `PersistedSessionState` - Persisted session state model for loading sessions
-* `GenerateCommitMessage()` - Generates commit messages using LLM
-* `GenerateWorktreeBranchName()` - Generates worktree branch names using LLM
-* `CompactMessages()` - Applies multi-step compaction to chat messages
-* `RestoreSessionFromPersistedState()` - Restores session from persisted state
-* `NewHookEngine()` - Creates a new hook execution engine
-* `NewAgentRoleRegistry()` - Creates a new AgentRoleRegistry
-* `NewConfPromptGenerator()` - Creates a new ConfPromptGenerator
-* `NewSweSession()` - Creates a new SweSession from parameters
-* `NewSessionThread()` - Creates a new SessionThread
-* `NewSessionThreadWithSession()` - Creates SessionThread with existing session
-* `IsHookExecutionError()` - Reports whether error indicates non-zero hook exit
+* `SweSession` - In-memory session runtime object
+* `SweSessionParams` - SweSession construction inputs
+* `SessionThread` - Async session execution wrapper
+* `SessionThreadInput` - Input operations for session threads
+* `SessionThreadOutput` - Output callbacks for session threads
+* `SessionFactory` - Creates sessions for threads
+* `PromptGenerator` - Builds prompts and tool docs
+* `ConfPromptGenerator` - ConfigStore-backed prompt generator
+* `AgentRoleRegistry` - Cached role lookup service
+* `AgentState` - Runtime prompt template state
+* `AgentStateCommonInfo` - Shared runtime metadata fields
+* `TaskInfo` - Task metadata attached to sessions
+* `HookEngine` - Executes configured lifecycle hooks
+* `HookContext` - Hook context key-value map
+* `HookExecutionRequest` - Hook invocation request payload
+* `HookExecutionResult` - Hook execution output data
+* `HookExecutionError` - Hook non-zero exit error
+* `HookSessionStatus` - none, running, success, failed
+* `HookFeedbackResponseMode` - none, stdin, rerun
+* `Task` - Persistent task metadata record
+* `TaskManager` - Persistent task lifecycle manager
+* `TaskBackendAdapter` - Tool backend adapter for tasks
+* `PersistedSessionState` - Serialized session state alias
+* `SessionSummaryJSON` - Persisted session summary schema
+* `SubAgentSummaryJSON` - Persisted subagent summary schema
+* `NewSweSession()` - Create new session instance
+* `NewSessionThread()` - Create thread for new session
+* `NewSessionThreadWithSession()` - Create thread for existing session
+* `NewConfPromptGenerator()` - Create config prompt generator
+* `NewAgentRoleRegistry()` - Create role registry
+* `NewHookEngine()` - Create hook engine
+* `NewTaskManager()` - Create task manager
+* `NewTaskBackendAdapter()` - Create task backend adapter
+* `NewCLITaskSessionRunner()` - Create CLI task runner
+* `CompactMessages()` - Compact chat history messages
+* `GenerateCommitMessage()` - Produce commit message via model
+* `GenerateWorktreeBranchName()` - Produce worktree branch suffix
+* `RestoreSessionFromPersistedState()` - Rebuild session from persisted state
+* `BuildSessionSummaryJSON()` - Build session summary payload
+* `SaveSessionSummaryJSON()` - Save session summary JSON file
+* `EmitSessionSummary()` - Emit and persist session summary
+* `WriteSubAgentSummary()` - Persist subagent summary files

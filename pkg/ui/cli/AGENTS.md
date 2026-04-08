@@ -1,17 +1,17 @@
 # Package `pkg/ui/cli` Overview
 
-Package `pkg/ui/cli` contains CLI implementations of UI interfaces for terminal-based interaction. It provides plain-text chat and app views for non-interactive and interactive command-line modes.
+Package `pkg/ui/cli` provides terminal UI implementations for app and chat flows. It handles prefixed output, interaction modes, and tool rendering in `pkg/ui/cli`.
 
 ## Important files
 
-* `cli_app_view.go` - CLI app-level view implementation
-* `cli_chat_view.go` - CLI chat view with input/output handling
-* `slug_prefix.go` - CLI output prefix formatting utilities
+* `cli_app_view.go` - App diagnostics output and retry prompt behavior
+* `cli_chat_view.go` - Chat rendering, tool updates, input handling
+* `slug_prefix.go` - Slug normalization and per-line prefix formatting
 
 ## Important public API objects
 
-* `CliAppView` - CLI implementation of app-level view interface
-* `NewAppView` - Creates CLI app view with optional slug prefix
-* `NewCliAppView` - Creates new CLI app view writing to output
-* `CliChatView` - Text-based chat view for stdout/stdin
-* `NewCliChatView` - Creates CLI chat view with interactive options
+* `CliAppView` - CLI app view with diagnostic logging.
+* `NewAppView` - Creates app view with optional slug.
+* `NewCliAppView` - Creates CliAppView writing to output.
+* `CliChatView` - CLI chat view for rendering and input.
+* `NewCliChatView` - Creates chat view with runtime options.

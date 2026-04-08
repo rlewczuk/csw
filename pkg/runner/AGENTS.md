@@ -1,23 +1,25 @@
 # Package `pkg/runner` Overview
 
-Package `pkg/runner` provides command execution abstractions for running shell commands with support for bash execution, containerized environments, and testing mocks.
+Package `pkg/runner` provides command runners and test doubles in `pkg/runner`.
 
 ## Important files
 
-* `runner.go` - Core interfaces and configuration types
-* `bash.go` - Bash command runner implementation
-* `container.go` - Container-based command runner using testcontainers
-* `mock.go` - Mock runner for testing with programmable responses
+* `runner.go` - Shared runner interfaces and config types.
+* `bash.go` - Local bash command runner implementation.
+* `container.go` - Testcontainers-based container command runner.
+* `mock.go` - Programmable mock command runner for tests.
 
 ## Important public API objects
 
-* `CommandRunner` - Interface for running commands with output and exit codes
-* `ContainerRunner` - Interface for container-based command execution
-* `BashRunner` - Executes commands using local bash shell
-* `MockRunner` - Test double with programmable responses and execution tracking
-* `CommandOptions` - Optional parameters for command execution (workdir, timeout)
-* `ContainerConfig` - Configuration for creating container runners
-* `CommandExecution` - Record of a single command execution
-* `NewBashRunner` - Creates a new BashRunner instance
-* `NewContainerRunner` - Creates a new ContainerRunner instance
-* `NewMockRunner` - Creates a new MockRunner instance
+* `CommandRunner` - Runs commands with basic and detailed outputs.
+* `ContainerRunner` - Container command runner plus lifecycle methods.
+* `CommandOptions` - Per-command workdir and timeout overrides.
+* `ContainerConfig` - Container image, mounts, identity, environment settings.
+* `ContainerImageInfo` - Parsed image reference name and tag details.
+* `ContainerIdentity` - Effective UID/GID and user/group mapping.
+* `CommandExecution` - Recorded mock execution data.
+* `BashRunner` - Local bash-backed command runner.
+* `MockRunner` - In-memory configurable command runner mock.
+* `NewBashRunner` - Creates `BashRunner` with defaults.
+* `NewContainerRunner` - Creates and starts `ContainerRunner`.
+* `NewMockRunner` - Creates empty `MockRunner` instance.

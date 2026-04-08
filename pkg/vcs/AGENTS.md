@@ -1,36 +1,28 @@
 # Package `pkg/vcs` Overview
 
-Package `pkg/vcs` contains VCS interface implementations for git repositories and null/no-op version control.
+Package `pkg/vcs` implements git and null VCS behavior in package `pkg/vcs`.
 
 ## Important files
 
-* `git_vcs.go` - GitVCS implementation with worktree management
-* `git_merge.go` - Git merge utilities and helper functions
-* `null_vcs.go` - NullVCS no-op implementation for non-git directories
+* `git_vcs.go` - GitVCS repository and worktree operations.
+* `git_merge.go` - Git merge and diff helper functions.
+* `null_vcs.go` - NullVCS no-op implementation.
 
 ## Important public API objects
 
-### Structs
-
-* `GitVCS` - Git repository with worktree management
-* `NullVCS` - No-op VCS for plain directories
-
-### Constructor Functions
-
-* `NewGitRepo(path, worktreesPath, hidePatterns, allowedPaths, name, email)` - Creates GitVCS instance
-* `NewNullVFS(vfs)` - Creates NullVCS instance
-
-### Helper Functions
-
-* `ReadGitConfigValue(key)` - Reads git config value
-* `GitWorktreeForBranch(repoDir, branch)` - Finds worktree for branch
-* `HardResetWorktree(workDir)` - Hard resets worktree to HEAD
-* `DetectMergeBaseBranch(repoDir)` - Detects current branch name
-* `GitBranchExists(repoDir, branch)` - Checks if branch exists
-* `CreateMergeWorktree(repoDir, branch)` - Creates temporary merge worktree
-* `ExtractConflictFilesFromOutput(output)` - Parses conflict files from git output
-* `IsMergeConflictError(output)` - Detects merge conflict in output
-* `ResolveGitCommitID(workDir, rev)` - Resolves revision to commit ID
-* `ResolveHostGitConfigValue(key)` - Reads host git config
-* `ResolveGitIdentity(value, gitConfigKey)` - Resolves git identity with fallback
-* `CollectEditedFiles(workDirRoot, workDir, baseCommitID, headCommitID)` - Collects changed files
+* `GitVCS` - Git-backed VCS implementation.
+* `NullVCS` - No-op VCS implementation.
+* `NewGitRepo` - Creates GitVCS from repository path.
+* `NewNullVFS` - Creates NullVCS wrapper.
+* `ReadGitConfigValue` - Reads git config key value.
+* `GitWorktreeForBranch` - Finds worktree name for branch.
+* `HardResetWorktree` - Resets and cleans worktree.
+* `DetectMergeBaseBranch` - Detects current branch name.
+* `GitBranchExists` - Checks branch existence.
+* `CreateMergeWorktree` - Creates temporary merge worktree.
+* `ExtractConflictFilesFromOutput` - Extracts conflict file paths.
+* `IsMergeConflictError` - Detects merge conflict output.
+* `ResolveGitCommitID` - Resolves revision to commit hash.
+* `ResolveHostGitConfigValue` - Reads host git config value.
+* `ResolveGitIdentity` - Resolves configured git identity.
+* `CollectEditedFiles` - Collects edited file paths.

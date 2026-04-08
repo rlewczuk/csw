@@ -1,14 +1,14 @@
 # Package `pkg/testutil/cfg` Overview
 
-Package `pkg/testutil/cfg` provides integration test configuration helpers for managing test directories and feature flags via `_integ` directory files.
+Package `pkg/testutil/cfg` provides integration config helpers in package `pkg/testutil/cfg`.
 
 ## Important files
 
-* `integ.go` - integration test configuration helpers
+* `integ.go` - Integration configuration and temp dirs.
 
 ## Important public API objects
 
-* `Dir` - returns path to `_integ` directory at project root
-* `ReadFile` - reads and returns trimmed content from `_integ` file
-* `TestEnabled` - checks if feature is enabled via `.enabled` file
-* `MkTempDir` - creates temp directory with automatic cleanup
+* `Dir` - Returns `_integ` directory absolute path.
+* `ReadFile` - Reads trimmed `_integ` file content.
+* `TestEnabled` - Checks `<name>.enabled` or global flag.
+* `MkTempDir` - Creates temporary test directory.

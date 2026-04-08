@@ -1,49 +1,49 @@
 # Package `pkg/mcp` Overview
 
-Package `pkg/mcp` contains MCP (Model Context Protocol) client implementation for connecting to external MCP servers via stdio and HTTP transports, managing server lifecycle, and exposing remote tools to the agent's tool registry.
+Package `pkg/mcp` implements MCP clients and tool bridging in `pkg/mcp`.
 
 ## Important files
 
-* `mcp.go` - MCP clients, manager, and tool integration
-* `mcp_dto.go` - JSON-RPC DTOs and protocol constants
-* `mcp_mock.go` - Mock manager for testing
-* `mcp_test.go` - Unit tests for MCP functionality
+* `mcp.go` - Stdio/HTTP clients, manager, tool bridge.
+* `mcp_dto.go` - MCP and JSON-RPC DTOs.
+* `mcp_mock.go` - Mock manager for MCP tests.
+* `mcp_test.go` - MCP client and manager tests.
 
 ## Important public API objects
 
-* `Client` - stdio JSON-RPC client for MCP server
-* `HTTPClient` - streamable HTTP JSON-RPC client for MCP server
-* `Manager` - manages MCP server lifecycle and exposes MCP tools
-* `Tool` - wraps manager tool forwarding in tool.Tool interface
-* `PromptGenerator` - wraps prompt generator and injects MCP tool infos
-* `MockManager` - reusable MCP manager mock for tests
-* `NewClient()` - creates MCP client based on configured transport
-* `NewStdioClient()` - creates new MCP stdio client
-* `NewHTTPClient()` - creates new MCP streamable HTTP client
-* `NewManager()` - creates MCP manager from configuration store
-* `NewTool()` - creates MCP forwarding tool
-* `NewPromptGenerator()` - creates prompt generator wrapper for MCP tools
-* `NewMockManager()` - creates mock manager with initialized maps
-* `RegisterTools()` - registers all manager MCP tools into tool registry
-* `BuildQualifiedToolName()` - creates unique public tool name for MCP tool
-* `WriteMessage()` - writes framed JSON-RPC message to writer
-* `ReadMessage()` - reads framed JSON-RPC payload bytes from reader
-* `LatestProtocolVersion` - MCP protocol version constant ("2025-11-25")
-* `JSONRPCVersion` - JSON-RPC protocol version constant ("2.0")
-* `JSONRPCRequest` - JSON-RPC request message DTO
-* `JSONRPCResponse` - JSON-RPC response payload DTO
-* `JSONRPCNotification` - JSON-RPC notification message DTO
-* `JSONRPCError` - JSON-RPC error payload DTO
-* `InitializeRequestParams` - parameters for MCP initialize request
-* `InitializeResult` - MCP server initialization response DTO
-* `RemoteTool` - MCP tool metadata returned by tools/list
-* `RemoteResource` - MCP resource metadata returned by resources/list
-* `ListToolsResult` - result payload for tools/list request
-* `ListResourcesResult` - result payload for resources/list request
-* `ReadResourceRequestParams` - parameters for resources/read request
-* `ReadResourceResult` - result payload for resources/read request
-* `CallToolRequestParams` - parameters for tools/call request
-* `CallToolResult` - result payload for tools/call request
-* `ResourceContent` - resources/read response content entry
-* `MCPContentBlock` - tool result content block
-* `MCPImplementationInfo` - identifies MCP endpoint implementation
+* `Client` - Stdio JSON-RPC MCP client.
+* `HTTPClient` - Streamable HTTP MCP client.
+* `Manager` - MCP server lifecycle and tool routing.
+* `Tool` - Forwards calls through MCP manager.
+* `PromptGenerator` - Injects MCP tool metadata into prompts.
+* `MockManager` - In-memory MCP manager mock.
+* `NewClient()` - Selects stdio or HTTP transport.
+* `NewStdioClient()` - Creates stdio MCP client.
+* `NewHTTPClient()` - Creates HTTP MCP client.
+* `NewManager()` - Creates manager from config store.
+* `NewTool()` - Creates MCP forwarding tool.
+* `NewPromptGenerator()` - Wraps prompt generator for MCP.
+* `NewMockManager()` - Creates initialized `MockManager`.
+* `RegisterTools()` - Registers MCP tools in registry.
+* `BuildQualifiedToolName()` - Builds `mcp.server.tool` names.
+* `WriteMessage()` - Writes framed JSON-RPC message.
+* `ReadMessage()` - Reads framed JSON-RPC body.
+* `LatestProtocolVersion` - Constant: `2025-11-25`.
+* `JSONRPCVersion` - Constant: `2.0`.
+* `JSONRPCRequest` - JSON-RPC request DTO.
+* `JSONRPCResponse` - JSON-RPC response DTO.
+* `JSONRPCNotification` - JSON-RPC notification DTO.
+* `JSONRPCError` - JSON-RPC error DTO.
+* `InitializeRequestParams` - Initialize request parameters.
+* `InitializeResult` - Initialize response payload.
+* `RemoteTool` - Tool metadata from `tools/list`.
+* `RemoteResource` - Resource metadata from `resources/list`.
+* `ListToolsResult` - `tools/list` response payload.
+* `ListResourcesResult` - `resources/list` response payload.
+* `ReadResourceRequestParams` - `resources/read` request parameters.
+* `ReadResourceResult` - `resources/read` response payload.
+* `CallToolRequestParams` - `tools/call` request parameters.
+* `CallToolResult` - `tools/call` response payload.
+* `ResourceContent` - Resource content entry payload.
+* `MCPContentBlock` - Tool result content block.
+* `MCPImplementationInfo` - MCP implementation identity metadata.

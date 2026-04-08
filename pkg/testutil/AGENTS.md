@@ -1,22 +1,22 @@
 # Package `pkg/testutil` Overview
 
-Package `pkg/testutil` provides reusable test doubles and fixtures used by integration and package tests. It focuses on deterministic mocking of session outputs and HTTP model endpoints.
+Package `pkg/testutil` provides reusable testing helpers in package `pkg/testutil`.
 
 ## Important files
 
-* `integ.go` - integration test configuration helpers
-* `llm_mock.go` - mock HTTP server for testing REST endpoints
-* `soh_mock.go` - mock session output handler for tests
-* `soh_mock_test.go` - tests for mock session output handler
+* `integ.go` - Integration config helper wrappers.
+* `llm_mock.go` - Mock HTTP server utilities.
+* `soh_mock.go` - Mock session output handler.
+* `soh_mock_test.go` - Session output handler tests.
 
 ## Important public API objects
 
-* `MockHTTPServer` - mock HTTP server for testing REST endpoints
-* `NewMockHTTPServer` - creates a new mock HTTP server
-* `CapturedRequest` - represents a captured HTTP request
-* `MockSessionOutputHandler` - mock session output handler capturing events
-* `NewMockSessionOutputHandler` - creates a new mock session output handler
-* `AssistantMessageRecord` - stores assistant output captured from handler
-* `IntegCfgDir` - returns path to _integ directory at project root
-* `IntegCfgReadFile` - reads file from _integ directory
-* `IntegTestEnabled` - checks if feature is enabled via .enabled file
+* `AssistantMessageRecord` - Captured assistant message payload.
+* `MockHTTPServer` - In-memory HTTP endpoint mock.
+* `CapturedRequest` - Recorded incoming HTTP request.
+* `NewMockHTTPServer` - Creates mock HTTP server.
+* `MockSessionOutputHandler` - Captures session output events.
+* `NewMockSessionOutputHandler` - Creates session output mock.
+* `IntegCfgDir` - Returns `_integ` directory path.
+* `IntegCfgReadFile` - Reads `_integ` file content.
+* `IntegTestEnabled` - Checks feature `.enabled` flag.

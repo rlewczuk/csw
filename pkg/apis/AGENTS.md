@@ -1,28 +1,23 @@
 # Package `pkg/apis` Overview
 
-Package `pkg/apis` contains core abstraction interfaces for virtual filesystem (VFS) and version control system (VCS) operations used throughout the codebase.
+Package `pkg/apis` defines VFS and VCS abstractions.
 
 ## Important files
 
-* `vfs.go` - VFS interface and filesystem error definitions
-* `vcs.go` - VCS interface for repository operations
+* `vfs.go` - VFS interface and common errors
+* `vcs.go` - VCS repository interface
 
 ## Important public API objects
 
-### Interfaces
-
-* `VFS` - Virtual filesystem abstraction for file operations
-* `VCS` - Version control system abstraction for repository operations
-
-### Errors
-
-* `ErrFileNotFound` - File not found error
-* `ErrFileExists` - File already exists error
-* `ErrNotADir` - Not a directory error
-* `ErrNotAFile` - Not a file error
-* `ErrPermissionDenied` - Permission denied error
-* `ErrNotImplemented` - Not implemented error
-* `ErrInvalidPath` - Invalid path error
-* `ErrAskPermission` - Ask permission error
-* `ErrNoChangesToCommit` - No changes to commit error
-* `ErrMergeConflict` - Merge conflict error
+* `VFS` - Virtual filesystem interface
+* `VCS` - Version control interface
+* `ErrFileNotFound` - File not found
+* `ErrFileExists` - File already exists
+* `ErrNotADir` - Not a directory
+* `ErrNotAFile` - Not a file
+* `ErrPermissionDenied` - Permission denied
+* `ErrNotImplemented` - Not implemented
+* `ErrInvalidPath` - Invalid path
+* `ErrAskPermission` - Ask permission
+* `ErrNoChangesToCommit` - No changes to commit
+* `ErrMergeConflict` - Merge conflict

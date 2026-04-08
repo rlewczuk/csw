@@ -1,30 +1,21 @@
 # Package `pkg/shared` Overview
 
-Package `pkg/shared` contains cross-cutting utility code reused across packages, including file copy helpers, UUIDv7 generation, message types, and HTML to Markdown conversion.
+Package `pkg/shared` provides shared helpers used across package `pkg/shared` consumers.
 
 ## Important files
 
-* `fileutil.go` - Recursive directory and file copy utilities
-* `messagetype.go` - User-facing status message type enum
-* `util.go` - String formatting and template rendering utilities
-* `uuid.go` - UUIDv7 generator for time-sortable unique IDs
-* `godown/godown.go` - HTML to Markdown conversion logic
+* `fileutil.go` - Directory and file copy helpers.
+* `messagetype.go` - Message type enum definitions.
+* `util.go` - Sorting and template rendering helpers.
+* `uuid.go` - UUIDv7 generation helper.
 
 ## Important public API objects
 
-* `CopyDir` - Recursively copies a directory preserving permissions
-* `CopyFile` - Copies a file preserving permissions
-* `GenerateUUIDv7` - Generates time-sortable UUIDv7 string
-* `MessageType` - Enum for user-facing message types (info, warning, error)
-* `MessageTypeInfo` - Informational message type value
-* `MessageTypeWarning` - Warning message type value
-* `MessageTypeError` - Error message type value
-* `FormatList` - Formats string slice as sorted comma-separated list
-* `SortedList` - Returns sorted copy of string slice
-* `NullValue` - Returns "-" for empty strings
-* `RenderTextWithContext` - Renders text/template with context map
-* `Convert` - Converts HTML from reader to Markdown writer
-* `CovertStr` - Converts HTML string to Markdown string
-* `Option` - Configuration options for HTML to Markdown conversion
-* `CustomRule` - Interface for custom HTML element handlers
-* `WalkFunc` - Function signature for HTML node traversal
+* `MessageType` - Enum values: info, warning, error.
+* `CopyDir` - Recursively copies directory contents.
+* `CopyFile` - Copies file preserving permissions.
+* `FormatList` - Returns sorted comma-joined list.
+* `SortedList` - Returns sorted copy of values.
+* `NullValue` - Returns dash for empty strings.
+* `RenderTextWithContext` - Renders text template with context.
+* `GenerateUUIDv7` - Generates time-sortable UUIDv7 string.

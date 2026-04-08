@@ -1,19 +1,19 @@
 # Package `pkg/commands` Overview
 
-Package `pkg/commands` contains slash command parsing and expansion for agent prompts with YAML frontmatter support.
+Package `pkg/commands` parses and expands slash commands.
 
 ## Important files
 
-* `commands.go` - slash command parsing and template expansion
-* `commands_test.go` - unit tests for command functionality
+* `commands.go` - Command parsing and prompt expansion
+* `commands_test.go` - Command behavior tests
 
 ## Important public API objects
 
-* `Metadata` - YAML frontmatter fields for commands
-* `Command` - loaded command definition with template
-* `Invocation` - parsed slash command with arguments
-* `ParseInvocation` - parses slash command from prompt
-* `LoadFromDir` - loads command from .md file in directory
-* `ApplyArguments` - replaces $ARGUMENTS and $N placeholders
-* `ExpandPrompt` - expands shell and file references
-* `HasDefaultRuntimeShellExpansion` - checks for default runtime shell usage
+* `Metadata` - Command frontmatter fields
+* `Command` - Loaded command definition
+* `Invocation` - Parsed command invocation
+* `ParseInvocation()` - Parses slash command invocation
+* `LoadFromDir()` - Loads command from directory
+* `ApplyArguments()` - Replaces command argument placeholders
+* `ExpandPrompt()` - Expands shell and file references
+* `HasDefaultRuntimeShellExpansion()` - Detects default shell expansion
