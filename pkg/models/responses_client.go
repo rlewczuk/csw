@@ -247,6 +247,37 @@ func (c *ResponsesClient) RefreshTokenIfNeeded() error {
 
 func (c *ResponsesClient) refreshTokenIfNeeded(force bool, previousToken string) error {
 	if !IsOAuth2Provider(c.config) {
+		c.logRefreshDecision(
+			"skip-non-oauth2",
+			force,
+			"skip",
+			"provider auth mode is not oauth2",
+			time.Now(),
+			time.Time{},
+			0,
+			false,
+			false,
+		)
+		return nil
+	}
+
+	if c.isTokenRefreshDisabled() {
+		c.tokenMu.RLock()
+		currentToken := c.apiKey
+		expiry := c.tokenExpiry
+		c.tokenMu.RUnlock()
+
+		c.logRefreshDecision(
+			"refresh-disabled",
+			force,
+			"skip",
+			"token refresh disabled by provider config",
+			time.Now(),
+			expiry,
+			c.tokenRefreshMargin(),
+			currentToken != "",
+			c.hasRefreshToken(),
+		)
 		return nil
 	}
 
@@ -259,12 +290,46 @@ func (c *ResponsesClient) refreshTokenIfNeeded(force bool, previousToken string)
 		// When token expiry cannot be determined (opaque access token), avoid eager
 		// refresh and rely on 401-based refresh path.
 		if currentToken != "" && expiry.IsZero() {
+			c.logRefreshDecision(
+				"prelock-unknown-expiry",
+				force,
+				"skip",
+				"token expiry unknown for non-empty token; rely on 401 refresh",
+				time.Now(),
+				expiry,
+				c.tokenRefreshMargin(),
+				true,
+				c.hasRefreshToken(),
+			)
 			return nil
 		}
 
 		if !IsTokenExpired(expiry, c.tokenRefreshMargin()) {
+			c.logRefreshDecision(
+				"prelock-token-valid",
+				force,
+				"skip",
+				"token overlap above refresh margin",
+				time.Now(),
+				expiry,
+				c.tokenRefreshMargin(),
+				currentToken != "",
+				c.hasRefreshToken(),
+			)
 			return nil
 		}
+
+		c.logRefreshDecision(
+			"prelock-expired-or-near-expiry",
+			force,
+			"refresh",
+			"token expired or overlap below refresh margin",
+			time.Now(),
+			expiry,
+			c.tokenRefreshMargin(),
+			currentToken != "",
+			c.hasRefreshToken(),
+		)
 	}
 
 	c.tokenMu.Lock()
@@ -272,20 +337,76 @@ func (c *ResponsesClient) refreshTokenIfNeeded(force bool, previousToken string)
 
 	if force {
 		if previousToken != "" && c.apiKey != "" && c.apiKey != previousToken {
+			c.logRefreshDecision(
+				"postlock-force-token-changed",
+				force,
+				"skip",
+				"token changed by another goroutine",
+				time.Now(),
+				c.tokenExpiry,
+				c.tokenRefreshMargin(),
+				c.apiKey != "",
+				c.hasRefreshToken(),
+			)
 			return nil
 		}
 	} else {
 		if c.apiKey != "" && c.tokenExpiry.IsZero() {
+			c.logRefreshDecision(
+				"postlock-unknown-expiry",
+				force,
+				"skip",
+				"token expiry unknown for non-empty token; rely on 401 refresh",
+				time.Now(),
+				c.tokenExpiry,
+				c.tokenRefreshMargin(),
+				true,
+				c.hasRefreshToken(),
+			)
 			return nil
 		}
 		if !IsTokenExpired(c.tokenExpiry, c.tokenRefreshMargin()) {
+			c.logRefreshDecision(
+				"postlock-token-valid",
+				force,
+				"skip",
+				"token overlap above refresh margin",
+				time.Now(),
+				c.tokenExpiry,
+				c.tokenRefreshMargin(),
+				c.apiKey != "",
+				c.hasRefreshToken(),
+			)
 			return nil
 		}
 	}
 
+	c.logRefreshDecision(
+		"postlock-refresh-start",
+		force,
+		"refresh",
+		"attempting token renewal",
+		time.Now(),
+		c.tokenExpiry,
+		c.tokenRefreshMargin(),
+		c.apiKey != "",
+		c.hasRefreshToken(),
+	)
+
 	// Refresh the token
 	resp, err := RenewToken(c.config, c.httpClient)
 	if err != nil {
+		c.logRefreshDecision(
+			"refresh-failed",
+			force,
+			"error",
+			err.Error(),
+			time.Now(),
+			c.tokenExpiry,
+			c.tokenRefreshMargin(),
+			c.apiKey != "",
+			c.hasRefreshToken(),
+		)
 		return fmt.Errorf("ResponsesClient.RefreshTokenIfNeeded() [responses_client.go]: %w", err)
 	}
 
@@ -315,7 +436,82 @@ func (c *ResponsesClient) refreshTokenIfNeeded(force bool, previousToken string)
 		}
 	}
 
+	c.logRefreshDecision(
+		"refresh-success",
+		force,
+		"refresh",
+		"token renewed successfully",
+		time.Now(),
+		c.tokenExpiry,
+		c.tokenRefreshMargin(),
+		c.apiKey != "",
+		c.hasRefreshToken(),
+	)
+
 	return nil
+}
+
+func (c *ResponsesClient) isTokenRefreshDisabled() bool {
+	if c == nil || c.config == nil {
+		return false
+	}
+
+	return c.config.DisableRefresh
+}
+
+func (c *ResponsesClient) hasRefreshToken() bool {
+	return c != nil && c.config != nil && strings.TrimSpace(c.config.RefreshToken) != ""
+}
+
+func (c *ResponsesClient) logRefreshDecision(
+	stage string,
+	force bool,
+	decision string,
+	reason string,
+	now time.Time,
+	expiry time.Time,
+	minOverlap time.Duration,
+	hasAccessToken bool,
+	hasRefreshToken bool,
+) {
+	if now.IsZero() {
+		now = time.Now()
+	}
+
+	overlap := "unknown"
+	expiryText := "unknown"
+	if !expiry.IsZero() {
+		overlap = expiry.Sub(now).String()
+		expiryText = expiry.Format(time.RFC3339Nano)
+	}
+
+	providerName := ""
+	authMode := ""
+	disableRefresh := false
+	if c != nil && c.config != nil {
+		providerName = c.config.Name
+		authMode = string(c.config.AuthMode)
+		disableRefresh = c.config.DisableRefresh
+	}
+
+	fmt.Fprintf(
+		os.Stdout,
+		"[oauth-refresh-debug] provider=%q auth_mode=%q stage=%q decision=%q reason=%q force=%t now=%q token_expiration=%q overlap=%q min_overlap=%q token_expiry_known=%t has_access_token=%t has_refresh_token=%t disable_refresh=%t\n",
+		providerName,
+		authMode,
+		stage,
+		decision,
+		reason,
+		force,
+		now.Format(time.RFC3339Nano),
+		expiryText,
+		overlap,
+		minOverlap.String(),
+		!expiry.IsZero(),
+		hasAccessToken,
+		hasRefreshToken,
+		disableRefresh,
+	)
 }
 
 func (c *ResponsesClient) tokenRefreshMargin() time.Duration {
@@ -375,6 +571,21 @@ func (c *ResponsesClient) promptCacheRetention() string {
 }
 
 func (c *ResponsesClient) shouldRefreshAfterUnauthorized(resp *http.Response, bodyBytes []byte) bool {
+	if c.isTokenRefreshDisabled() {
+		c.logRefreshDecision(
+			"401-refresh-disabled",
+			true,
+			"skip",
+			"token refresh disabled by provider config",
+			time.Now(),
+			c.tokenExpiry,
+			c.tokenRefreshMargin(),
+			c.apiKey != "",
+			c.hasRefreshToken(),
+		)
+		return false
+	}
+
 	if !IsOAuth2Provider(c.config) || c.config == nil || c.config.RefreshToken == "" || resp == nil {
 		return false
 	}
@@ -641,13 +852,13 @@ func (m *ResponsesChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	}
 
 	chatReq := ResponsesCreateRequest{
-		Model:           m.model,
-		Input:           items,
-		Store:           &store,
-		Instructions:    buildResponsesInstructions(messages),
-		Tools:           convertToolsToResponses(tools),
-		Stream:          stream,
-		MaxOutputTokens: maxOutputTokens,
+		Model:                m.model,
+		Input:                items,
+		Store:                &store,
+		Instructions:         buildResponsesInstructions(messages),
+		Tools:                convertToolsToResponses(tools),
+		Stream:               stream,
+		MaxOutputTokens:      maxOutputTokens,
 		PromptCacheRetention: m.client.promptCacheRetention(),
 	}
 
@@ -824,13 +1035,13 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 		}
 
 		chatReq := ResponsesCreateRequest{
-			Model:           m.model,
-			Input:           items,
-			Store:           &store,
-			Instructions:    buildResponsesInstructions(messages),
-			Tools:           convertToolsToResponses(tools),
-			Stream:          true,
-			MaxOutputTokens: maxOutputTokens,
+			Model:                m.model,
+			Input:                items,
+			Store:                &store,
+			Instructions:         buildResponsesInstructions(messages),
+			Tools:                convertToolsToResponses(tools),
+			Stream:               true,
+			MaxOutputTokens:      maxOutputTokens,
 			PromptCacheRetention: m.client.promptCacheRetention(),
 		}
 

@@ -105,6 +105,7 @@ type BuildSystemParams struct {
 	LSPServer         string
 	LogLLMRequests    bool
 	LogLLMRequestsRaw bool
+	NoRefresh         bool
 	// Thinking controls the thinking/reasoning mode for LLM requests.
 	// Values like "low", "medium", "high", "xhigh" for effort-based thinking,
 	// or "true"/"false" for boolean thinking modes.
@@ -445,6 +446,9 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
+	}
+	if params.NoRefresh {
+		applyDisableRefreshToProviders(modelProviders)
 	}
 
 	modelAliasValues, err := configStore.GetModelAliases()
@@ -1284,6 +1288,22 @@ func CreateProviderMap(providerRegistry *models.ProviderRegistry) (map[string]mo
 		modelProviders[name] = provider
 	}
 	return modelProviders, nil
+}
+
+func applyDisableRefreshToProviders(modelProviders map[string]models.ModelProvider) {
+	for _, provider := range modelProviders {
+		providerConfigAccessor, ok := provider.(interface {
+			GetConfig() *conf.ModelProviderConfig
+		})
+		if !ok {
+			continue
+		}
+		providerConfig := providerConfigAccessor.GetConfig()
+		if providerConfig == nil {
+			continue
+		}
+		providerConfig.DisableRefresh = true
+	}
 }
 
 func resolveWritableStoresForProviders(configStore conf.ConfigStore) (map[string]conf.WritableConfigStore, error) {

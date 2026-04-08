@@ -32,3 +32,27 @@ func TestCliHookFlagPropagation(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, captured, "hooks=[commit merge:disable]")
 }
+
+func TestCliNoRefreshFlagPropagation(t *testing.T) {
+	originalRun := runCLIFunc
+	t.Cleanup(func() {
+		runCLIFunc = originalRun
+	})
+
+	var captured bool
+	runCLIFunc = func(params *CLIParams) error {
+		captured = params.NoRefresh
+		return nil
+	}
+
+	cmd := CliCommand()
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	cmd.SetArgs([]string{"--no-refresh", "prompt"})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.True(t, captured)
+}

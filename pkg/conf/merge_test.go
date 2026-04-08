@@ -102,28 +102,28 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		DefaultRole:     "role1",
 		MaxToolThreads:  3,
 		Container:       &ContainerConfig{Image: "image1", Mounts: []string{"/a:/b"}, Env: []string{"A=1"}},
-		Model:          "provider1/model",
-		Worktree:       "feature/one",
-		Merge:          false,
-		LogLLMRequests: false,
-		Thinking:       "medium",
-		LSPServer:      "first",
-		GitUserName:    "Base User",
-		GitUserEmail:   "base@example.com",
-		MaxThreads:     4,
+		Model:           "provider1/model",
+		Worktree:        "feature/one",
+		Merge:           false,
+		LogLLMRequests:  false,
+		Thinking:        "medium",
+		LSPServer:       "first",
+		GitUserName:     "Base User",
+		GitUserEmail:    "base@example.com",
+		MaxThreads:      4,
 	}
 	override := CLIDefaultsConfig{
 		DefaultProvider: "provider2",
 		DefaultRole:     "role2",
 		MaxToolThreads:  12,
 		Container:       &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
-		Model:          "provider2/model",
-		Merge:          true,
-		LogLLMRequests: true,
-		LSPServer:      "second",
-		GitUserName:    "Override User",
-		GitUserEmail:   "override@example.com",
-		MaxThreads:     12,
+		Model:           "provider2/model",
+		Merge:           true,
+		LogLLMRequests:  true,
+		LSPServer:       "second",
+		GitUserName:     "Override User",
+		GitUserEmail:    "override@example.com",
+		MaxThreads:      12,
 	}
 
 	base.MergeFrom(override)
@@ -133,15 +133,15 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		DefaultRole:     "role2",
 		MaxToolThreads:  12,
 		Container:       &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
-		Model:          "provider2/model",
-		Worktree:       "feature/one",
-		Merge:          true,
-		LogLLMRequests: true,
-		Thinking:       "medium",
-		LSPServer:      "second",
-		GitUserName:    "Override User",
-		GitUserEmail:   "override@example.com",
-		MaxThreads:     12,
+		Model:           "provider2/model",
+		Worktree:        "feature/one",
+		Merge:           true,
+		LogLLMRequests:  true,
+		Thinking:        "medium",
+		LSPServer:       "second",
+		GitUserName:     "Override User",
+		GitUserEmail:    "override@example.com",
+		MaxThreads:      12,
 	}, base)
 }
 
@@ -437,14 +437,14 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 	t.Run("mcp server clone preserves and copies transport fields", func(t *testing.T) {
 		cfg := &MCPServerConfig{
 			Description: "server description",
-			Transport: MCPTransportTypeHTTPS,
-			URL:       "https://example.com/mcp",
-			APIKey:    "secret",
-			Cmd:       "server",
-			Enabled:   true,
-			Args:      []string{"--x"},
-			Env:       map[string]string{"A": "1"},
-			Tools:     []string{"^read_"},
+			Transport:   MCPTransportTypeHTTPS,
+			URL:         "https://example.com/mcp",
+			APIKey:      "secret",
+			Cmd:         "server",
+			Enabled:     true,
+			Args:        []string{"--x"},
+			Env:         map[string]string{"A": "1"},
+			Tools:       []string{"^read_"},
 		}
 
 		clone := cfg.Clone()
@@ -554,9 +554,10 @@ func TestModelProviderConfig_Merge(t *testing.T) {
 			{Context: 0, Input: 1.5},
 			{Context: 200000, Input: 3.0, Output: 4.0},
 		},
-		Reasoning: map[string]string{"high": "deep"},
-		Headers:   map[string]string{"X-B": "2"},
-		Streaming: &streamingOverride,
+		Reasoning:      map[string]string{"high": "deep"},
+		Headers:        map[string]string{"X-B": "2"},
+		Streaming:      &streamingOverride,
+		DisableRefresh: true,
 	}
 
 	base.Merge(override)
@@ -574,4 +575,5 @@ func TestModelProviderConfig_Merge(t *testing.T) {
 	assert.Equal(t, "1", base.Headers["X-A"])
 	assert.Equal(t, "2", base.Headers["X-B"])
 	assert.False(t, *base.Streaming)
+	assert.True(t, base.DisableRefresh)
 }

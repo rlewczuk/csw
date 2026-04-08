@@ -56,6 +56,7 @@ type CLIParams struct {
 	SaveSession           bool
 	LogLLMRequests        bool
 	LogLLMRequestsRaw     bool
+	NoRefresh             bool
 	LSPServer             string
 	Thinking              string
 	ModelOverridden       bool
@@ -97,6 +98,7 @@ func CliCommand() *cobra.Command {
 		cliSaveSession       bool
 		cliLogLLMRequests    bool
 		cliLogLLMRequestsRaw bool
+		cliNoRefresh         bool
 		cliLSPServer         string
 		cliThinking          string
 		cliGitUser           string
@@ -316,6 +318,7 @@ func CliCommand() *cobra.Command {
 				SaveSession:           cliSaveSession,
 				LogLLMRequests:        cliLogLLMRequests,
 				LogLLMRequestsRaw:     cliLogLLMRequestsRaw,
+				NoRefresh:             cliNoRefresh,
 				LSPServer:             cliLSPServer,
 				Thinking:              cliThinking,
 				ModelOverridden:       modelOverridden,
@@ -357,6 +360,7 @@ func CliCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliSaveSession, "save-session", false, "Save session conversation")
 	cmd.Flags().BoolVar(&cliLogLLMRequests, "log-llm-requests", false, "Log LLM requests and responses")
 	cmd.Flags().BoolVar(&cliLogLLMRequestsRaw, "log-llm-requests-raw", false, "Log raw line-based LLM requests and responses")
+	cmd.Flags().BoolVar(&cliNoRefresh, "no-refresh", false, "Disable OAuth access-token refresh for this run")
 	cmd.Flags().StringVar(&cliLSPServer, "lsp-server", "", "Path to LSP server binary (empty to disable LSP)")
 	cmd.Flags().StringVar(&cliThinking, "thinking", "", "Thinking/reasoning mode: low, medium, high, xhigh (effort-based) or true/false (boolean)")
 	cmd.Flags().StringVar(&cliThinking, "thinking-mode", "", "Thinking/reasoning mode override when starting or resuming a session")
@@ -563,6 +567,7 @@ func runCLI(params *CLIParams) error {
 		LSPServer:         params.LSPServer,
 		LogLLMRequests:    params.LogLLMRequests,
 		LogLLMRequestsRaw: params.LogLLMRequestsRaw,
+		NoRefresh:         params.NoRefresh,
 		Thinking:          params.Thinking,
 		BashRunTimeout:    params.BashRunTimeout,
 		AllowedPaths:      params.VFSAllow,

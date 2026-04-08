@@ -395,6 +395,9 @@ func (c *ModelProviderConfig) Merge(override *ModelProviderConfig) {
 	if override.RefreshToken != "" {
 		c.RefreshToken = override.RefreshToken
 	}
+	if override.DisableRefresh {
+		c.DisableRefresh = true
+	}
 
 	if override.Streaming != nil {
 		streaming := *override.Streaming

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -37,6 +38,26 @@ func (r *unexpectedEOFReadCloser) Read(p []byte) (int, error) {
 
 func (r *unexpectedEOFReadCloser) Close() error {
 	return nil
+}
+
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	originalStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = writer
+
+	fn()
+
+	require.NoError(t, writer.Close())
+	os.Stdout = originalStdout
+
+	output, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	require.NoError(t, reader.Close())
+
+	return string(output)
 }
 
 const (
@@ -1733,6 +1754,74 @@ func TestResponsesClient_OAuthTokenRenewal(t *testing.T) {
 		assert.Equal(t, int32(0), atomic.LoadInt32(&refreshCalls))
 	})
 
+	t.Run("RefreshTokenIfNeeded skips refresh when disable-refresh is enabled and prints debug details", func(t *testing.T) {
+		var refreshCalls int32
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/oauth/token" {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			atomic.AddInt32(&refreshCalls, 1)
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"access_token":"new-token","expires_in":3600}`))
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			Name:           "responses-test",
+			URL:            server.URL,
+			APIKey:         "old-token",
+			AuthMode:       conf.AuthModeOAuth2,
+			TokenURL:       server.URL + "/oauth/token",
+			ClientID:       "test-client-id",
+			RefreshToken:   "test-refresh-token",
+			DisableRefresh: true,
+		})
+		require.NoError(t, err)
+		client.tokenExpiry = time.Now().Add(-1 * time.Hour)
+
+		stdout := captureStdout(t, func() {
+			err = client.RefreshTokenIfNeeded()
+		})
+		require.NoError(t, err)
+
+		assert.Equal(t, int32(0), atomic.LoadInt32(&refreshCalls))
+		assert.Contains(t, stdout, `[oauth-refresh-debug]`)
+		assert.Contains(t, stdout, `stage="refresh-disabled"`)
+		assert.Contains(t, stdout, `decision="skip"`)
+		assert.Contains(t, stdout, `disable_refresh=true`)
+		assert.Contains(t, stdout, `token_expiration=`)
+		assert.Contains(t, stdout, `overlap=`)
+		assert.Contains(t, stdout, `min_overlap=`)
+	})
+
+	t.Run("RefreshTokenIfNeeded prints overlap-based decision details when token is still valid", func(t *testing.T) {
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			Name:         "responses-test",
+			URL:          defaultResponsesTestURL,
+			APIKey:       "token",
+			AuthMode:     conf.AuthModeOAuth2,
+			TokenURL:     defaultResponsesTestURL + "/oauth/token",
+			ClientID:     "test-client-id",
+			RefreshToken: "test-refresh-token",
+		})
+		require.NoError(t, err)
+		client.tokenExpiry = time.Now().Add(10 * time.Minute)
+
+		stdout := captureStdout(t, func() {
+			err = client.RefreshTokenIfNeeded()
+		})
+		require.NoError(t, err)
+
+		assert.Contains(t, stdout, `stage="prelock-token-valid"`)
+		assert.Contains(t, stdout, `decision="skip"`)
+		assert.Contains(t, stdout, `token_expiration=`)
+		assert.Contains(t, stdout, `overlap=`)
+		assert.Contains(t, stdout, `min_overlap="5m0s"`)
+	})
+
 	t.Run("Chat retries on 401 expired token and refreshes once", func(t *testing.T) {
 		var tokenRefreshCalls int32
 		var responsesCalls int32
@@ -1848,6 +1937,50 @@ func TestResponsesClient_OAuthTokenRenewal(t *testing.T) {
 		}
 
 		assert.Equal(t, int32(1), atomic.LoadInt32(&tokenRefreshCalls))
+	})
+
+	t.Run("Chat does not retry token refresh on 401 when disable-refresh is enabled", func(t *testing.T) {
+		var tokenRefreshCalls int32
+		var responsesCalls int32
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/oauth/token":
+				atomic.AddInt32(&tokenRefreshCalls, 1)
+				w.Header().Set("Content-Type", "application/json")
+				_, err := w.Write([]byte(`{"access_token":"new-access-token","expires_in":3600}`))
+				require.NoError(t, err)
+			case "/responses":
+				atomic.AddInt32(&responsesCalls, 1)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_, err := w.Write([]byte(`{"error":{"message":"access token expired","code":"invalid_token"}}`))
+				require.NoError(t, err)
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		defer server.Close()
+
+		client, err := NewResponsesClient(&conf.ModelProviderConfig{
+			Name:           "responses-test",
+			URL:            server.URL,
+			APIKey:         "old-access-token",
+			AuthMode:       conf.AuthModeOAuth2,
+			TokenURL:       server.URL + "/oauth/token",
+			ClientID:       "test-client-id",
+			RefreshToken:   "test-refresh-token",
+			DisableRefresh: true,
+		})
+		require.NoError(t, err)
+		client.tokenExpiry = time.Now().Add(1 * time.Hour)
+
+		chatModel := client.ChatModel("test-model", nil)
+		_, err = chatModel.Chat(context.Background(), []*ChatMessage{NewTextMessage(ChatRoleUser, "hi")}, nil, nil)
+		require.Error(t, err)
+
+		assert.Equal(t, int32(0), atomic.LoadInt32(&tokenRefreshCalls))
+		assert.Equal(t, int32(1), atomic.LoadInt32(&responsesCalls))
 	})
 
 	t.Run("SetConfigUpdater can be called multiple times", func(t *testing.T) {

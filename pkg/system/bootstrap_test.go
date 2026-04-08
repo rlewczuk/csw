@@ -62,6 +62,27 @@ func TestBuildSystemParamsMaxToolThreads(t *testing.T) {
 	assert.Equal(t, 9, params.MaxToolThreads)
 }
 
+func TestBuildSystemParamsNoRefresh(t *testing.T) {
+	params := BuildSystemParams{
+		NoRefresh: true,
+	}
+	assert.True(t, params.NoRefresh)
+}
+
+func TestApplyDisableRefreshToProviders(t *testing.T) {
+	mockProvider := models.NewMockProvider(nil)
+	mockProvider.Config = &conf.ModelProviderConfig{Name: "mock-provider"}
+
+	providers := map[string]models.ModelProvider{
+		"mock": mockProvider,
+	}
+
+	applyDisableRefreshToProviders(providers)
+
+	assert.NotNil(t, mockProvider.GetConfig())
+	assert.True(t, mockProvider.GetConfig().DisableRefresh)
+}
+
 func TestKimiTagResolution(t *testing.T) {
 	store, err := confimpl.NewEmbeddedConfigStore()
 	require.NoError(t, err)

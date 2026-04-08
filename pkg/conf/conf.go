@@ -329,7 +329,7 @@ type HookConfig struct {
 func (c *HookConfig) UnmarshalJSON(data []byte) error {
 	aux := struct {
 		Enabled     *bool     `json:"enabled,omitempty"`
-		Description string `json:"description,omitempty"`
+		Description string    `json:"description,omitempty"`
 		Hook        string    `json:"hook,omitempty"`
 		Name        string    `json:"name,omitempty"`
 		Type        HookType  `json:"type,omitempty"`
@@ -381,7 +381,7 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 	aux := struct {
 		Enabled     *bool     `yaml:"enabled,omitempty"`
-		Description string `yaml:"description,omitempty"`
+		Description string    `yaml:"description,omitempty"`
 		Hook        string    `yaml:"hook,omitempty"`
 		Name        string    `yaml:"name,omitempty"`
 		Type        HookType  `yaml:"type,omitempty"`
@@ -556,6 +556,8 @@ type ModelProviderConfig struct {
 	ClientSecret string `json:"client_secret,omitempty" yaml:"client_secret,omitempty"`
 	// RefreshToken is the OAuth2 refresh token used to obtain new access tokens.
 	RefreshToken string `json:"refresh_token,omitempty" yaml:"refresh_token,omitempty"`
+	// DisableRefresh disables OAuth access token refresh for this provider.
+	DisableRefresh bool `json:"disable-refresh,omitempty" yaml:"disable-refresh,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for ModelProviderConfig.
