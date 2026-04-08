@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -47,6 +48,12 @@ func TestLocalConfigStore_SaveModelProviderConfig(t *testing.T) {
 	assert.Equal(t, "https://api.openai.com/v1", configs["test-provider"].URL)
 	assert.Equal(t, "Test provider", configs["test-provider"].Description)
 	assert.Equal(t, "test-key", configs["test-provider"].APIKey)
+
+	storedData, err := os.ReadFile(providerPath)
+	require.NoError(t, err)
+	var stored map[string]any
+	require.NoError(t, json.Unmarshal(storedData, &stored))
+	assert.NotContains(t, stored, "name")
 }
 
 func TestLocalConfigStore_SaveModelProviderConfig_Update(t *testing.T) {

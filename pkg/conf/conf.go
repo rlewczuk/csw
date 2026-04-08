@@ -475,8 +475,9 @@ type CLIDefaultsConfig struct {
 type ModelProviderConfig struct {
 	// Type specifies the provider type (e.g., "ollama", "openai", "anthropic")
 	Type string `json:"type" yaml:"type"`
-	// Name is a short computer-friendly name for the provider instance (eg. `ollama-local`)
-	Name string `json:"name" yaml:"name"`
+	// Name is a short computer-friendly name for the provider instance (eg. `ollama-local`).
+	// It is transient and derived from the configuration file basename.
+	Name string `json:"-" yaml:"-"`
 	// Family is the model family identifier.
 	Family string `json:"family,omitempty" yaml:"family,omitempty"`
 	// ReleaseDate is the model/template release date in string form.

@@ -512,54 +512,33 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 		return fmt.Errorf("loadModelProviderConfigs(): failed to read models directory: %w", err)
 	}
 
-	// Track which provider names have been loaded (YAML takes precedence)
-	loadedProviders := make(map[string]bool)
 	configs := make(map[string]*conf.ModelProviderConfig)
 
-	// First pass: load YAML files (takes precedence)
+	selectedByProviderName := make(map[string]os.DirEntry)
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
 
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if ext != ".yml" && ext != ".yaml" {
+		if !isAllowedModelProviderConfigExt(ext) {
 			continue
 		}
 
-		providerPath := filepath.Join(modelsDir, entry.Name())
-		data, err := os.ReadFile(providerPath)
-		if err != nil {
-			return fmt.Errorf("loadModelProviderConfigs(): failed to read %s: %w", providerPath, err)
+		providerName := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+		existingEntry, exists := selectedByProviderName[providerName]
+		if !exists {
+			selectedByProviderName[providerName] = entry
+			continue
 		}
 
-		var config conf.ModelProviderConfig
-		if err := yaml.Unmarshal(data, &config); err != nil {
-			return fmt.Errorf("loadModelProviderConfigs(): failed to parse %s: %w", providerPath, err)
+		existingExt := strings.ToLower(filepath.Ext(existingEntry.Name()))
+		if modelProviderConfigExtPriority(ext) < modelProviderConfigExtPriority(existingExt) {
+			selectedByProviderName[providerName] = entry
 		}
-
-		// If name is not set, use filename without extension
-		baseName := entry.Name()[:len(entry.Name())-len(ext)]
-		if config.Name == "" {
-			config.Name = baseName
-		}
-
-		configs[config.Name] = &config
-		loadedProviders[baseName] = true
 	}
 
-	// Second pass: load JSON files (only if no YAML version exists)
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
-			continue
-		}
-
-		baseName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
-		if loadedProviders[baseName] {
-			// Skip JSON if YAML version was already loaded
-			continue
-		}
-
+	for providerName, entry := range selectedByProviderName {
 		providerPath := filepath.Join(modelsDir, entry.Name())
 		data, err := os.ReadFile(providerPath)
 		if err != nil {
@@ -567,22 +546,49 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 		}
 
 		var config conf.ModelProviderConfig
-		if err := json.Unmarshal(data, &config); err != nil {
-			return fmt.Errorf("loadModelProviderConfigs(): failed to parse %s: %w", providerPath, err)
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if ext == ".json" {
+			if err := json.Unmarshal(data, &config); err != nil {
+				return fmt.Errorf("loadModelProviderConfigs(): failed to parse %s: %w", providerPath, err)
+			}
+		} else {
+			if err := yaml.Unmarshal(data, &config); err != nil {
+				return fmt.Errorf("loadModelProviderConfigs(): failed to parse %s: %w", providerPath, err)
+			}
 		}
 
-		// If name is not set, use filename without extension
-		if config.Name == "" {
-			config.Name = baseName
-		}
-
-		configs[config.Name] = &config
+		config.Name = providerName
+		configs[providerName] = &config
 	}
 
 	s.modelProviderConfigs = configs
 	s.modelProviderConfigsUpdate = time.Now()
 
 	return nil
+}
+
+func isAllowedModelProviderConfigExt(ext string) bool {
+	switch ext {
+	case ".yml", ".yaml", ".json", ".conf":
+		return true
+	default:
+		return false
+	}
+}
+
+func modelProviderConfigExtPriority(ext string) int {
+	switch ext {
+	case ".yml":
+		return 1
+	case ".yaml":
+		return 2
+	case ".json":
+		return 3
+	case ".conf":
+		return 4
+	default:
+		return 100
+	}
 }
 
 // loadModelAliases loads model aliases from model_aliases.yaml/yml/jsonl files.
@@ -1274,7 +1280,7 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 	// Check if it's in models directory
 	if filepath.Dir(event.Name) == modelsDir {
 		ext := strings.ToLower(filepath.Ext(event.Name))
-		if ext == ".json" || ext == ".yml" || ext == ".yaml" {
+		if isAllowedModelProviderConfigExt(ext) {
 			if err := s.loadModelProviderConfigs(); err != nil {
 				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload model provider configs: %v\n", err)
 			}
@@ -1378,6 +1384,7 @@ func (s *LocalConfigStore) SaveModelProviderConfig(config *conf.ModelProviderCon
 	yamlPath := filepath.Join(modelsDir, config.Name+".yaml")
 	ymlPath := filepath.Join(modelsDir, config.Name+".yml")
 	jsonPath := filepath.Join(modelsDir, config.Name+".json")
+	confPath := filepath.Join(modelsDir, config.Name+".conf")
 
 	providerPath := jsonPath
 	marshalYAML := false
@@ -1396,6 +1403,11 @@ func (s *LocalConfigStore) SaveModelProviderConfig(config *conf.ModelProviderCon
 		marshalYAML = false
 	} else if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to stat %s: %w", jsonPath, err)
+	} else if _, err := os.Stat(confPath); err == nil {
+		providerPath = confPath
+		marshalYAML = true
+	} else if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("LocalConfigStore.SaveModelProviderConfig() [local.go]: failed to stat %s: %w", confPath, err)
 	}
 
 	if existingData, err := os.ReadFile(providerPath); err == nil {

@@ -231,7 +231,7 @@ func TestConfigUpdaterImpl_Update_PreservesYAMLFormatAndCreatesBackup(t *testing
 	var persisted conf.ModelProviderConfig
 	require.NoError(t, yaml.Unmarshal(currentData, &persisted))
 	assert.Equal(t, "new-token", persisted.APIKey)
-	assert.Equal(t, "provider-yaml", persisted.Name)
+	assert.Empty(t, persisted.Name)
 
 	jsonPath := filepath.Join(modelsDir, "provider-yaml.json")
 	assert.NoFileExists(t, jsonPath)
@@ -284,7 +284,7 @@ func TestConfigUpdaterImpl_Update_PreservesJSONFormatAndCreatesBackup(t *testing
 	var persisted conf.ModelProviderConfig
 	require.NoError(t, json.Unmarshal(currentData, &persisted))
 	assert.Equal(t, "new-token", persisted.APIKey)
-	assert.Equal(t, "provider-json", persisted.Name)
+	assert.Empty(t, persisted.Name)
 
 	yamlPath := filepath.Join(modelsDir, "provider-json.yaml")
 	assert.NoFileExists(t, yamlPath)
@@ -299,8 +299,7 @@ func TestConfigUpdaterImpl_Update_PreservesDurationFieldsAfterReadBack(t *testin
 	require.NoError(t, os.MkdirAll(modelsDir, 0o755))
 
 	providerPath := filepath.Join(modelsDir, "provider-duration.json")
-	originalRaw := []byte(`{
-  "name": "provider-duration",
+ 	originalRaw := []byte(`{
   "type": "openai",
   "url": "https://api.example.com/v1",
   "api_key": "old-token",

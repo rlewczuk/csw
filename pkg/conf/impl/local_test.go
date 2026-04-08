@@ -1299,12 +1299,72 @@ api_key: yaml-key
 	require.NoError(t, err)
 	assert.Len(t, configs, 1)
 
-	openai, ok := configs["openai-yaml"]
+	openai, ok := configs["openai"]
 	require.True(t, ok)
 	assert.Equal(t, "openai", openai.Type)
+	assert.Equal(t, "openai", openai.Name)
 	assert.Equal(t, "OpenAI via YAML", openai.Description)
 	assert.Equal(t, "https://api.openai.com/v1", openai.URL)
 	assert.Equal(t, "yaml-key", openai.APIKey)
+}
+
+func TestLocalConfigStore_ModelProviderConfigs_AllowedExtensionsAndDeterministicSelection(t *testing.T) {
+	tmpDir := t.TempDir()
+	modelsDir := filepath.Join(tmpDir, "models")
+	require.NoError(t, os.Mkdir(modelsDir, 0o755))
+
+	// All allowed extensions should be loaded.
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "json-provider.json"), []byte(`{"type":"openai","url":"https://json.example"}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "yaml-provider.yaml"), []byte("type: openai\nurl: https://yaml.example\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "yml-provider.yml"), []byte("type: openai\nurl: https://yml.example\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "conf-provider.conf"), []byte("type: openai\nurl: https://conf.example\n"), 0o644))
+
+	// Files that are not exact allowed extensions should be ignored.
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "ignored.json.bkp"), []byte(`{"type":"openai","url":"https://ignored.example"}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "ignored.txt"), []byte("ignored"), 0o644))
+
+	// Same provider basename in multiple extensions should resolve deterministically.
+	// Expected priority: .yml > .yaml > .json > .conf
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "dupe.conf"), []byte("type: openai\nurl: https://dupe-conf.example\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "dupe.json"), []byte(`{"type":"openai","url":"https://dupe-json.example"}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "dupe.yaml"), []byte("type: openai\nurl: https://dupe-yaml.example\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "dupe.yml"), []byte("type: openai\nurl: https://dupe-yml.example\n"), 0o644))
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	configs, err := store.GetModelProviderConfigs()
+	require.NoError(t, err)
+	require.Len(t, configs, 5)
+
+	require.Contains(t, configs, "json-provider")
+	require.Contains(t, configs, "yaml-provider")
+	require.Contains(t, configs, "yml-provider")
+	require.Contains(t, configs, "conf-provider")
+	require.Contains(t, configs, "dupe")
+
+	assert.Equal(t, "https://dupe-yml.example", configs["dupe"].URL)
+	assert.Equal(t, "dupe", configs["dupe"].Name)
+	assert.NotContains(t, configs, "ignored")
+}
+
+func TestLocalConfigStore_ModelProviderConfigs_NameAlwaysFromFilename(t *testing.T) {
+	tmpDir := t.TempDir()
+	modelsDir := filepath.Join(tmpDir, "models")
+	require.NoError(t, os.Mkdir(modelsDir, 0o755))
+
+	require.NoError(t, os.WriteFile(filepath.Join(modelsDir, "from-file.json"), []byte(`{"name":"from-config","type":"openai","url":"https://example.com"}`), 0o644))
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	configs, err := store.GetModelProviderConfigs()
+	require.NoError(t, err)
+	require.Contains(t, configs, "from-file")
+	require.NotContains(t, configs, "from-config")
+	assert.Equal(t, "from-file", configs["from-file"].Name)
 }
 
 func TestLocalConfigStore_YAMLPrecedence_ModelProvider(t *testing.T) {
