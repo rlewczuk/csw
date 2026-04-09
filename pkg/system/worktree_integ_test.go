@@ -14,13 +14,26 @@ import (
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
-	uimock "github.com/rlewczuk/csw/pkg/ui/mock"
 	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type worktreeTestMessageCall struct {
+	Message string
+	Type    shared.MessageType
+}
+
+type worktreeTestOutputView struct {
+	ShowMessageCalls []worktreeTestMessageCall
+}
+
+func (v *worktreeTestOutputView) ShowMessage(message string, messageType shared.MessageType) {
+	v.ShowMessageCalls = append(v.ShowMessageCalls, worktreeTestMessageCall{Message: message, Type: messageType})
+}
 
 func TestFinalizeWorktreeSession(t *testing.T) {
 	tests := []struct {
@@ -244,7 +257,7 @@ func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
 		"status":      string(core.HookSessionStatusRunning),
 		"user_prompt": "merge via hook",
 	})
-	chatView := uimock.NewMockChatView()
+	chatView := &worktreeTestOutputView{}
 
 	result, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/hook", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, chatView)
 	require.NoError(t, err)
@@ -325,7 +338,7 @@ func TestFinalizeWorktreeSessionMergeHookProcessesFeedbackRequests(t *testing.T)
 		nil,
 	)
 	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
-	chatView := uimock.NewMockChatView()
+	chatView := &worktreeTestOutputView{}
 
 	_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, "feature/hook-feedback", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, chatView)
 

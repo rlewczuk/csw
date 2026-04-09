@@ -10,11 +10,10 @@ import (
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
+	sessionio "github.com/rlewczuk/csw/pkg/io"
 	"github.com/rlewczuk/csw/pkg/logging"
-	"github.com/rlewczuk/csw/pkg/presenter"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,41 +65,17 @@ func TestRunBashToolIntegration(t *testing.T) {
 	)
 
 	// Create thread
-	thread := core.NewSessionThread(system, nil)
+	handler := sessionio.NewTextSessionOutput(nil)
+	thread := core.NewSessionThread(system, handler)
 
 	// Start session
 	err = thread.StartSession("ollama/test-model")
 	require.NoError(t, err)
 
-	// Create presenter and view
-	basePresenter := presenter.NewChatPresenter(system, thread)
-	baseView := newMockChatView()
-
-	err = basePresenter.SetView(baseView)
+	err = thread.UserPrompt("Run echo hello")
 	require.NoError(t, err)
 
-	// Set output handler
-	thread.SetOutputHandler(basePresenter)
-
-	// Send user message
-	userMsg := &ui.ChatMessageUI{
-		Role: ui.ChatRoleUser,
-		Text: "Run echo hello",
-	}
-	err = basePresenter.SendUserMessage(userMsg)
-	require.NoError(t, err)
-
-	// Wait for completion
-	done := make(chan struct{})
-	go func() {
-		for {
-			if !thread.IsRunning() {
-				close(done)
-				return
-			}
-		}
-	}()
-	<-done
+	waitForThreadToFinish(t, thread)
 
 	// Verify that runBash tool was registered
 	toolNames := tools.List()
@@ -162,31 +137,15 @@ func TestWebFetchToolIntegration(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	thread := core.NewSessionThread(system, nil)
+	handler := sessionio.NewTextSessionOutput(nil)
+	thread := core.NewSessionThread(system, handler)
 	err = thread.StartSession("ollama/test-model")
 	require.NoError(t, err)
 
-	basePresenter := presenter.NewChatPresenter(system, thread)
-	baseView := newMockChatView()
-	err = basePresenter.SetView(baseView)
+	err = thread.UserPrompt("Can you fetch a page?")
 	require.NoError(t, err)
 
-	thread.SetOutputHandler(basePresenter)
-
-	userMsg := &ui.ChatMessageUI{Role: ui.ChatRoleUser, Text: "Can you fetch a page?"}
-	err = basePresenter.SendUserMessage(userMsg)
-	require.NoError(t, err)
-
-	done := make(chan struct{})
-	go func() {
-		for {
-			if !thread.IsRunning() {
-				close(done)
-				return
-			}
-		}
-	}()
-	<-done
+	waitForThreadToFinish(t, thread)
 
 	toolNames := tools.List()
 	assert.Contains(t, toolNames, "webFetch", "webFetch tool should be registered")
@@ -246,31 +205,15 @@ func TestSkillToolIntegration(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	thread := core.NewSessionThread(system, nil)
+	handler := sessionio.NewTextSessionOutput(nil)
+	thread := core.NewSessionThread(system, handler)
 	err = thread.StartSession("ollama/test-model")
 	require.NoError(t, err)
 
-	basePresenter := presenter.NewChatPresenter(system, thread)
-	baseView := newMockChatView()
-	err = basePresenter.SetView(baseView)
+	err = thread.UserPrompt("Load demo skill")
 	require.NoError(t, err)
 
-	thread.SetOutputHandler(basePresenter)
-
-	userMsg := &ui.ChatMessageUI{Role: ui.ChatRoleUser, Text: "Load demo skill"}
-	err = basePresenter.SendUserMessage(userMsg)
-	require.NoError(t, err)
-
-	done := make(chan struct{})
-	go func() {
-		for {
-			if !thread.IsRunning() {
-				close(done)
-				return
-			}
-		}
-	}()
-	<-done
+	waitForThreadToFinish(t, thread)
 
 	toolNames := tools.List()
 	assert.Contains(t, toolNames, "skill", "skill tool should be registered")
@@ -333,47 +276,17 @@ func TestCLIVFSToolLogging(t *testing.T) {
 	)
 
 	// Create thread
-	thread := core.NewSessionThread(system, nil)
+	handler := sessionio.NewTextSessionOutput(nil)
+	thread := core.NewSessionThread(system, handler)
 
 	// Start session
 	err = thread.StartSession("ollama/test-model")
 	require.NoError(t, err)
 
-	// Create presenter and view
-	basePresenter := presenter.NewChatPresenter(system, thread)
-	baseView := newMockChatView()
-
-	err = basePresenter.SetView(baseView)
+	err = thread.UserPrompt("Create a file and update it")
 	require.NoError(t, err)
 
-	// Set output handler
-	thread.SetOutputHandler(basePresenter)
-
-	// Send user message
-	userMsg := &ui.ChatMessageUI{
-		Role: ui.ChatRoleUser,
-		Text: "Create a file and update it",
-	}
-	err = basePresenter.SendUserMessage(userMsg)
-	require.NoError(t, err)
-
-	// Wait for completion with timeout
-	done := make(chan struct{})
-	go func() {
-		for {
-			if !thread.IsRunning() {
-				close(done)
-				return
-			}
-		}
-	}()
-
-	select {
-	case <-done:
-		// Session completed
-	case <-time.After(10 * time.Second):
-		t.Fatal("Test timed out - session did not complete")
-	}
+	waitForThreadToFinish(t, thread)
 
 	session := thread.GetSession()
 	require.NotNil(t, session)
@@ -410,31 +323,15 @@ func TestVFSListToolIntegration(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	thread := core.NewSessionThread(system, nil)
+	handler := sessionio.NewTextSessionOutput(nil)
+	thread := core.NewSessionThread(system, handler)
 	err = thread.StartSession("ollama/test-model")
 	require.NoError(t, err)
 
-	basePresenter := presenter.NewChatPresenter(system, thread)
-	baseView := newMockChatView()
-	err = basePresenter.SetView(baseView)
+	err = thread.UserPrompt("What tools are available?")
 	require.NoError(t, err)
 
-	thread.SetOutputHandler(basePresenter)
-
-	userMsg := &ui.ChatMessageUI{Role: ui.ChatRoleUser, Text: "What tools are available?"}
-	err = basePresenter.SendUserMessage(userMsg)
-	require.NoError(t, err)
-
-	done := make(chan struct{})
-	go func() {
-		for {
-			if !thread.IsRunning() {
-				close(done)
-				return
-			}
-		}
-	}()
-	<-done
+	waitForThreadToFinish(t, thread)
 
 	toolNames := tools.List()
 	assert.Contains(t, toolNames, "vfsList", "vfsList tool should be registered")

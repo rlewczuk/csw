@@ -3,17 +3,13 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
-	"github.com/rlewczuk/csw/pkg/presenter"
-	"github.com/rlewczuk/csw/pkg/shared"
+	sessionio "github.com/rlewczuk/csw/pkg/io"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,123 +19,6 @@ import (
 // These tests verify that CLI mode handles permission queries correctly,
 // including auto-deny behavior in non-interactive mode and proper handling
 // of allow-all-permissions mode.
-
-type autoAllowPermissionTrackingView struct {
-	presenter            ui.IChatPresenter
-	permissionQueryCount int
-	toolResultCount      int
-	mu                   sync.Mutex
-}
-
-func (v *autoAllowPermissionTrackingView) Init(session *ui.ChatSessionUI) error {
-	return nil
-}
-
-func (v *autoAllowPermissionTrackingView) AddMessage(msg *ui.ChatMessageUI) error {
-	return nil
-}
-
-func (v *autoAllowPermissionTrackingView) UpdateMessage(msg *ui.ChatMessageUI) error {
-	return nil
-}
-
-func (v *autoAllowPermissionTrackingView) UpdateTool(tool *ui.ToolUI) error {
-	if tool.Status == ui.ToolStatusSucceeded || tool.Status == ui.ToolStatusFailed {
-		v.mu.Lock()
-		v.toolResultCount++
-		v.mu.Unlock()
-	}
-	return nil
-}
-
-func (v *autoAllowPermissionTrackingView) MoveToBottom() error {
-	return nil
-}
-
-func (v *autoAllowPermissionTrackingView) QueryPermission(query *ui.PermissionQueryUI) error {
-	v.mu.Lock()
-	v.permissionQueryCount++
-	v.mu.Unlock()
-	if v.presenter != nil && len(query.Options) > 0 {
-		return v.presenter.PermissionResponse(query.Options[0])
-	}
-	return nil
-}
-
-func (v *autoAllowPermissionTrackingView) ShowMessage(message string, messageType shared.MessageType) {
-	_ = message
-	_ = messageType
-}
-
-func (v *autoAllowPermissionTrackingView) PermissionQueries() int {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	return v.permissionQueryCount
-}
-
-func (v *autoAllowPermissionTrackingView) ToolResults() int {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	return v.toolResultCount
-}
-
-// permissionTrackingMockView is a mock view that tracks permission queries
-type permissionTrackingMockView struct {
-	onQueryPermission func(*ui.PermissionQueryUI) error
-}
-
-func (m *permissionTrackingMockView) Init(session *ui.ChatSessionUI) error      { return nil }
-func (m *permissionTrackingMockView) AddMessage(msg *ui.ChatMessageUI) error    { return nil }
-func (m *permissionTrackingMockView) UpdateMessage(msg *ui.ChatMessageUI) error { return nil }
-func (m *permissionTrackingMockView) UpdateTool(tool *ui.ToolUI) error          { return nil }
-func (m *permissionTrackingMockView) MoveToBottom() error                       { return nil }
-func (m *permissionTrackingMockView) QueryPermission(query *ui.PermissionQueryUI) error {
-	if m.onQueryPermission != nil {
-		return m.onQueryPermission(query)
-	}
-	return nil
-}
-
-func (m *permissionTrackingMockView) ShowMessage(message string, messageType shared.MessageType) {
-	_ = message
-	_ = messageType
-}
-
-// autoDenyPermissionMockView is a mock view that automatically denies permissions
-// by calling PermissionResponse, simulating the real CLI view behavior
-type autoDenyPermissionMockView struct {
-	presenter         ui.IChatPresenter
-	onQueryPermission func(*ui.PermissionQueryUI)
-}
-
-func (m *autoDenyPermissionMockView) Init(session *ui.ChatSessionUI) error      { return nil }
-func (m *autoDenyPermissionMockView) AddMessage(msg *ui.ChatMessageUI) error    { return nil }
-func (m *autoDenyPermissionMockView) UpdateMessage(msg *ui.ChatMessageUI) error { return nil }
-func (m *autoDenyPermissionMockView) UpdateTool(tool *ui.ToolUI) error          { return nil }
-func (m *autoDenyPermissionMockView) MoveToBottom() error                       { return nil }
-func (m *autoDenyPermissionMockView) QueryPermission(query *ui.PermissionQueryUI) error {
-	if m.onQueryPermission != nil {
-		m.onQueryPermission(query)
-	}
-	// Automatically deny the permission (like CLI view does in non-interactive mode)
-	if m.presenter != nil && len(query.Options) > 0 {
-		// Find the "Deny" option or use the last option
-		response := query.Options[len(query.Options)-1]
-		for _, opt := range query.Options {
-			if opt == "Deny" {
-				response = opt
-				break
-			}
-		}
-		return m.presenter.PermissionResponse(response)
-	}
-	return nil
-}
-
-func (m *autoDenyPermissionMockView) ShowMessage(message string, messageType shared.MessageType) {
-	_ = message
-	_ = messageType
-}
 
 // TestCLIPermissionQueryHandling tests that CLI mode handles permission queries correctly.
 // When not in interactive mode and without --allow-all-permissions, permissions should be denied by default.
@@ -193,67 +72,20 @@ func TestCLIPermissionQueryHandling(t *testing.T) {
 	err = thread.StartSession("ollama/test-model")
 	require.NoError(t, err)
 
-	// Create presenter and view - non-interactive mode, no allow-all-permissions
-	basePresenter := presenter.NewChatPresenter(system, thread)
+	handler := sessionio.NewTextSessionOutput(nil)
+	thread.SetOutputHandler(handler)
 
-	// Track permission queries and responses
-	var permissionQueryReceived bool
-	var permissionResponse string
-	mockView := &permissionTrackingMockView{
-		onQueryPermission: func(query *ui.PermissionQueryUI) error {
-			permissionQueryReceived = true
-			// In non-interactive mode without --allow-all-permissions, the view should
-			// automatically deny permissions. We track what response would be sent.
-			if len(query.Options) > 0 {
-				// Find the "Deny" option or use the last option
-				response := query.Options[len(query.Options)-1]
-				for _, opt := range query.Options {
-					if opt == "Deny" {
-						response = opt
-						break
-					}
-				}
-				permissionResponse = response
-			}
-			return nil
-		},
-	}
-
-	err = basePresenter.SetView(mockView)
+	err = thread.UserPrompt("Read the file test.txt")
 	require.NoError(t, err)
 
-	// Set output handler
-	thread.SetOutputHandler(basePresenter)
+	waitForThreadToFinish(t, thread)
 
-	// Send user message that will trigger a tool call requiring permission
-	userMsg := &ui.ChatMessageUI{
-		Role: ui.ChatRoleUser,
-		Text: "Read the file test.txt",
-	}
-	err = basePresenter.SendUserMessage(userMsg)
-	require.NoError(t, err)
-
-	// Wait for completion with timeout
-	done := make(chan struct{})
-	go func() {
-		for {
-			if !thread.IsRunning() {
-				close(done)
-				return
-			}
-		}
-	}()
-
-	select {
-	case <-done:
-		// Success - session completed
-	case <-time.After(10 * time.Second):
-		t.Fatal("Test timed out - session did not complete, likely due to hanging on permission query")
-	}
-
-	// Verify that permission query was received and denied
-	assert.True(t, permissionQueryReceived, "Permission query should have been received")
-	assert.Equal(t, "Deny", permissionResponse, "Permission should have been denied in non-interactive mode")
+	session := thread.GetSession()
+	require.NotNil(t, session)
+	messages := session.ChatMessages()
+	require.NotEmpty(t, messages)
+	last := messages[len(messages)-1]
+	assert.Contains(t, last.GetText(), "cannot read that file without permission")
 }
 
 // TestCLIAllowAllPermissionsExecutesAllToolCalls verifies that allow-all-permissions
@@ -306,39 +138,22 @@ func TestCLIAllowAllPermissionsExecutesAllToolCalls(t *testing.T) {
 	err = thread.StartSession("ollama/test-model")
 	require.NoError(t, err)
 
-	basePresenter := presenter.NewChatPresenter(system, thread)
-	view := &autoAllowPermissionTrackingView{presenter: basePresenter}
+	handler := sessionio.NewTextSessionOutput(nil)
+	thread.SetOutputHandler(handler)
 
-	err = basePresenter.SetView(view)
+	err = thread.UserPrompt("Read and list files")
 	require.NoError(t, err)
 
-	thread.SetOutputHandler(basePresenter)
+	waitForThreadToFinish(t, thread)
 
-	userMsg := &ui.ChatMessageUI{
-		Role: ui.ChatRoleUser,
-		Text: "Read and list files",
+	session := thread.GetSession()
+	require.NotNil(t, session)
+
+	responses := 0
+	for _, msg := range session.ChatMessages() {
+		responses += len(msg.GetToolResponses())
 	}
-	err = basePresenter.SendUserMessage(userMsg)
-	require.NoError(t, err)
-
-	done := make(chan struct{})
-	go func() {
-		for {
-			if !thread.IsRunning() {
-				close(done)
-				return
-			}
-		}
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(10 * time.Second):
-		t.Fatal("Test timed out - session did not complete")
-	}
-
-	assert.Equal(t, 2, view.PermissionQueries(), "Should query permission for both tool calls")
-	assert.Equal(t, 2, view.ToolResults(), "Should execute and complete both tool calls")
+	assert.Equal(t, 2, responses, "Should execute and complete both tool calls")
 }
 
 // TestCLIPermissionQueryWithResponse tests that CLI mode properly handles permission queries
@@ -400,63 +215,18 @@ func TestCLIPermissionQueryWithResponse(t *testing.T) {
 	err = thread.StartSession("ollama/test-model")
 	require.NoError(t, err)
 
-	// Create presenter and view - non-interactive mode, no allow-all-permissions
-	basePresenter := presenter.NewChatPresenter(system, thread)
+	handler := sessionio.NewTextSessionOutput(nil)
+	thread.SetOutputHandler(handler)
 
-	// Use a mock view that actually calls PermissionResponse (like real CLI view does)
-	var permissionQueryReceived bool
-	var permissionResponse string
-	mockView := &autoDenyPermissionMockView{
-		presenter: basePresenter,
-		onQueryPermission: func(query *ui.PermissionQueryUI) {
-			permissionQueryReceived = true
-			// Find the "Deny" option or use the last option
-			if len(query.Options) > 0 {
-				response := query.Options[len(query.Options)-1]
-				for _, opt := range query.Options {
-					if opt == "Deny" {
-						response = opt
-						break
-					}
-				}
-				permissionResponse = response
-			}
-		},
-	}
-
-	err = basePresenter.SetView(mockView)
+	err = thread.UserPrompt("Read the file test.txt")
 	require.NoError(t, err)
 
-	// Set output handler
-	thread.SetOutputHandler(basePresenter)
+	waitForThreadToFinish(t, thread)
 
-	// Send user message that will trigger a tool call requiring permission
-	userMsg := &ui.ChatMessageUI{
-		Role: ui.ChatRoleUser,
-		Text: "Read the file test.txt",
-	}
-	err = basePresenter.SendUserMessage(userMsg)
-	require.NoError(t, err)
-
-	// Wait for completion with timeout
-	done := make(chan struct{})
-	go func() {
-		for {
-			if !thread.IsRunning() {
-				close(done)
-				return
-			}
-		}
-	}()
-
-	select {
-	case <-done:
-		// Success - session completed
-	case <-time.After(10 * time.Second):
-		t.Fatal("Test timed out - session did not complete, likely due to hanging on permission query")
-	}
-
-	// Verify that permission query was received and denied
-	assert.True(t, permissionQueryReceived, "Permission query should have been received")
-	assert.Equal(t, "Deny", permissionResponse, "Permission should have been denied in non-interactive mode")
+	session := thread.GetSession()
+	require.NotNil(t, session)
+	messages := session.ChatMessages()
+	require.NotEmpty(t, messages)
+	last := messages[len(messages)-1]
+	assert.Contains(t, last.GetText(), "cannot read that file without permission")
 }

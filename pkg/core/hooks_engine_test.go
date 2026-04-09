@@ -16,10 +16,23 @@ import (
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/tool"
-	uimock "github.com/rlewczuk/csw/pkg/ui/mock"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type hookTestMessageCall struct {
+	Message string
+	Type    shared.MessageType
+}
+
+type hookTestOutputView struct {
+	ShowMessageCalls []hookTestMessageCall
+}
+
+func (v *hookTestOutputView) ShowMessage(message string, messageType shared.MessageType) {
+	v.ShowMessageCalls = append(v.ShowMessageCalls, hookTestMessageCall{Message: message, Type: messageType})
+}
 
 type mockSubAgentTaskRunner struct {
 	mu       sync.Mutex
@@ -71,7 +84,7 @@ func TestHookEngineExecuteShell(t *testing.T) {
 	hostRunner := runner.NewMockRunner()
 	sandboxRunner := runner.NewMockRunner()
 	sandboxRunner.SetResponseDetailed("echo feature/one merge", "ok\n", "warn\n", 0, nil)
-	view := uimock.NewMockChatView()
+	view := &hookTestOutputView{}
 
 	engine := NewHookEngine(configStore, hostRunner, sandboxRunner, nil)
 	engine.MergeContext(map[string]string{

@@ -3,15 +3,12 @@ package main
 import (
 	"bytes"
 	"testing"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/core"
 	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
+	sessionio "github.com/rlewczuk/csw/pkg/io"
 	"github.com/rlewczuk/csw/pkg/models"
-	"github.com/rlewczuk/csw/pkg/presenter"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/ui"
-	"github.com/rlewczuk/csw/pkg/ui/cli"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,26 +46,14 @@ func TestCLINonStreamingAssistantMessageNotDuplicated(t *testing.T) {
 	)
 	system := fixture.System
 
-	thread := core.NewSessionThread(system, nil)
+	output := &bytes.Buffer{}
+	thread := core.NewSessionThread(system, sessionio.NewTextSessionOutput(output))
 	err = thread.StartSession("mock/test-model")
 	require.NoError(t, err)
-
-	chatPresenter := presenter.NewChatPresenter(system, thread)
-	output := &bytes.Buffer{}
-	view := cli.NewCliChatView(chatPresenter, output, nil, false, false, false)
-	err = chatPresenter.SetView(view)
+	err = thread.UserPrompt("Read notes.txt")
 	require.NoError(t, err)
 
-	userMsg := &ui.ChatMessageUI{
-		Role: ui.ChatRoleUser,
-		Text: "Read notes.txt",
-	}
-	err = chatPresenter.SendUserMessage(userMsg)
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		return !thread.IsRunning()
-	}, 5*time.Second, 10*time.Millisecond)
+	waitForThreadToFinish(t, thread)
 
 	outputStr := output.String()
 	assert.Equal(t, 1, bytes.Count([]byte(outputStr), []byte("Assistant: Let me read the file.")))
