@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
@@ -14,6 +15,79 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type autoPermissionOutputHandler struct {
+	delegate core.SessionThreadOutput
+	thread   *core.SessionThread
+	response string
+
+	mu sync.Mutex
+}
+
+func (h *autoPermissionOutputHandler) AddAssistantMessage(text string, thinking string) {
+	if h.delegate != nil {
+		h.delegate.AddAssistantMessage(text, thinking)
+	}
+}
+
+func (h *autoPermissionOutputHandler) ShowMessage(message string, messageType string) {
+	if h.delegate != nil {
+		h.delegate.ShowMessage(message, messageType)
+	}
+}
+
+func (h *autoPermissionOutputHandler) AddUserMessage(text string) {
+	if h.delegate != nil {
+		h.delegate.AddUserMessage(text)
+	}
+}
+
+func (h *autoPermissionOutputHandler) AddToolCall(call *tool.ToolCall) {
+	if h.delegate != nil {
+		h.delegate.AddToolCall(call)
+	}
+}
+
+func (h *autoPermissionOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
+	if h.delegate != nil {
+		h.delegate.AddToolCallResult(result)
+	}
+}
+
+func (h *autoPermissionOutputHandler) OnPermissionQuery(query *tool.ToolPermissionsQuery) {
+	if h.delegate != nil {
+		h.delegate.OnPermissionQuery(query)
+	}
+
+	h.mu.Lock()
+	thread := h.thread
+	response := h.response
+	h.mu.Unlock()
+
+	if thread != nil {
+		_ = thread.PermissionResponse(response)
+	}
+}
+
+func (h *autoPermissionOutputHandler) OnRateLimitError(retryAfterSeconds int) {
+	if h.delegate != nil {
+		h.delegate.OnRateLimitError(retryAfterSeconds)
+	}
+}
+
+func (h *autoPermissionOutputHandler) ShouldRetryAfterFailure(message string) bool {
+	if h.delegate != nil {
+		return h.delegate.ShouldRetryAfterFailure(message)
+	}
+
+	return false
+}
+
+func (h *autoPermissionOutputHandler) RunFinished(err error) {
+	if h.delegate != nil {
+		h.delegate.RunFinished(err)
+	}
+}
 
 // cli_perm_integ_test.go contains integration tests for permission handling.
 // These tests verify that CLI mode handles permission queries correctly,
@@ -72,8 +146,12 @@ func TestCLIPermissionQueryHandling(t *testing.T) {
 	err = thread.StartSession("ollama/test-model")
 	require.NoError(t, err)
 
-	handler := sessionio.NewTextSessionOutput(nil)
+	handler := &autoPermissionOutputHandler{
+		delegate: sessionio.NewTextSessionOutput(nil),
+		response: "deny",
+	}
 	thread.SetOutputHandler(handler)
+	handler.thread = thread
 
 	err = thread.UserPrompt("Read the file test.txt")
 	require.NoError(t, err)
@@ -138,8 +216,12 @@ func TestCLIAllowAllPermissionsExecutesAllToolCalls(t *testing.T) {
 	err = thread.StartSession("ollama/test-model")
 	require.NoError(t, err)
 
-	handler := sessionio.NewTextSessionOutput(nil)
+	handler := &autoPermissionOutputHandler{
+		delegate: sessionio.NewTextSessionOutput(nil),
+		response: "allow",
+	}
 	thread.SetOutputHandler(handler)
+	handler.thread = thread
 
 	err = thread.UserPrompt("Read and list files")
 	require.NoError(t, err)
@@ -215,8 +297,12 @@ func TestCLIPermissionQueryWithResponse(t *testing.T) {
 	err = thread.StartSession("ollama/test-model")
 	require.NoError(t, err)
 
-	handler := sessionio.NewTextSessionOutput(nil)
+	handler := &autoPermissionOutputHandler{
+		delegate: sessionio.NewTextSessionOutput(nil),
+		response: "deny",
+	}
 	thread.SetOutputHandler(handler)
+	handler.thread = thread
 
 	err = thread.UserPrompt("Read the file test.txt")
 	require.NoError(t, err)
