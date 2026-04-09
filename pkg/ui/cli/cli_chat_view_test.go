@@ -25,7 +25,6 @@ func TestCliChatView_NewCliChatView(t *testing.T) {
 		assert.False(t, view.acceptAllPermissions)
 		assert.False(t, view.verbose)
 		assert.NotNil(t, view.scanner)
-		assert.Len(t, presenter.SetViewCalls, 1)
 	})
 
 	t.Run("creates view with interactive=false", func(t *testing.T) {
@@ -40,7 +39,6 @@ func TestCliChatView_NewCliChatView(t *testing.T) {
 		assert.False(t, view.acceptAllPermissions)
 		assert.False(t, view.verbose)
 		assert.Nil(t, view.scanner)
-		assert.Len(t, presenter.SetViewCalls, 1)
 	})
 
 	t.Run("acceptAllPermissions implies interactive=false", func(t *testing.T) {
@@ -69,7 +67,6 @@ func TestCliChatView_NewCliChatView(t *testing.T) {
 		assert.False(t, view.acceptAllPermissions)
 		assert.True(t, view.verbose)
 		assert.Nil(t, view.scanner)
-		assert.Len(t, presenter.SetViewCalls, 1)
 	})
 
 	t.Run("uses provided slug prefix", func(t *testing.T) {

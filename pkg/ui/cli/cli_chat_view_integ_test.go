@@ -24,13 +24,8 @@ import (
 // mockCliPresenter is a minimal mock presenter for simple tests.
 type mockCliPresenter struct{}
 
-func (m *mockCliPresenter) SetView(view ui.IChatView) error                 { return nil }
 func (m *mockCliPresenter) SendUserMessage(message *ui.ChatMessageUI) error { return nil }
-func (m *mockCliPresenter) SaveUserMessage(message *ui.ChatMessageUI) error { return nil }
-func (m *mockCliPresenter) Pause() error                                    { return nil }
-func (m *mockCliPresenter) Resume() error                                   { return nil }
 func (m *mockCliPresenter) PermissionResponse(response string) error        { return nil }
-func (m *mockCliPresenter) SetModel(model string) error                     { return nil }
 
 func newCliFixture(t *testing.T) *testfixture.CliFixture {
 	return testfixture.NewCliFixture(t,
@@ -53,7 +48,8 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 
 		// Create CLI view in non-interactive mode
 		output := &bytes.Buffer{}
-		_ = NewCliChatView(chatPresenter, output, nil, false, false, false)
+		view := NewCliChatView(chatPresenter, output, nil, false, false, false)
+		require.NoError(t, chatPresenter.SetView(view))
 
 		// Setup LLM response
 		mockServer.AddStreamingResponse("/api/chat", "POST", true,
@@ -92,7 +88,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		// Create CLI view in non-interactive mode
 		output := &bytes.Buffer{}
 		view := NewCliChatView(chatPresenter, output, nil, false, false, false)
-		_ = view
+		require.NoError(t, chatPresenter.SetView(view))
 
 		// Setup LLM response with multiple chunks
 		mockServer.AddStreamingResponse("/api/chat", "POST", true,
@@ -174,6 +170,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		// Create CLI view with acceptAllPermissions=true
 		output := &bytes.Buffer{}
 		view := NewCliChatView(chatPresenter, output, nil, false, true, false)
+		require.NoError(t, chatPresenter.SetView(view))
 
 		// Verify interactive is false when acceptAllPermissions is true
 		assert.False(t, view.interactive)
@@ -215,7 +212,7 @@ func TestCliChatView_IntegrationWithSession(t *testing.T) {
 		// Create CLI view
 		output := &bytes.Buffer{}
 		view := NewCliChatView(chatPresenter, output, nil, false, false, false)
-		_ = view
+		require.NoError(t, chatPresenter.SetView(view))
 
 		// Setup first LLM response
 		mockServer.AddStreamingResponse("/api/chat", "POST", true,

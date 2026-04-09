@@ -5,16 +5,17 @@ import (
 	"testing"
 
 	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
+	presentertestfixture "github.com/rlewczuk/csw/pkg/presenter/testfixture"
 )
 
 // CliFixture provides shared setup for CLI integration tests.
 type CliFixture struct {
-	*coretestfixture.SweSystemFixture
+	*presentertestfixture.PresenterFixture
 }
 
 // NewCliFixture creates a CLI fixture with a SweSystem.
 func NewCliFixture(t *testing.T, opts ...coretestfixture.SweSystemFixtureOption) *CliFixture {
 	return &CliFixture{
-		SweSystemFixture: coretestfixture.NewSweSystemFixture(t, opts...),
+		PresenterFixture: presentertestfixture.NewPresenterFixture(t, opts...),
 	}
 }

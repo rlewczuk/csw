@@ -5,7 +5,12 @@ import (
 	"github.com/rlewczuk/csw/pkg/ui"
 )
 
-// MockChatView implements ui.IChatView interface for testing purposes.
+// PermissionResponder represents presenter callback needed for permission flow tests.
+type PermissionResponder interface {
+	PermissionResponse(response string) error
+}
+
+// MockChatView records chat view interactions for testing purposes.
 type MockChatView struct {
 	// Configurable errors for each method
 	InitErr            error
@@ -32,7 +37,7 @@ type MockChatView struct {
 	AutoPermissionResponse string
 
 	// Presenter for sending automatic permission responses
-	Presenter ui.IChatPresenter
+	Presenter PermissionResponder
 }
 
 // MockChatMessageCall stores one ShowMessage invocation.
@@ -135,22 +140,12 @@ func (m *MockChatView) Reset() {
 	m.Presenter = nil
 }
 
-// MockChatPresenter implements ui.IChatPresenter interface for testing purposes.
+// MockChatPresenter records chat presenter callbacks used by CLI chat view tests.
 type MockChatPresenter struct {
-	// Configurable errors for each method
-	SetViewErr            error
 	SendUserMessageErr    error
-	SaveUserMessageErr    error
-	PauseErr              error
-	ResumeErr             error
 	PermissionResponseErr error
 
-	// Recorded calls
-	SetViewCalls            []ui.IChatView
 	SendUserMessageCalls    []*ui.ChatMessageUI
-	SaveUserMessageCalls    []*ui.ChatMessageUI
-	PauseCalls              int
-	ResumeCalls             int
 	PermissionResponseCalls []string
 }
 
@@ -159,60 +154,22 @@ func NewMockChatPresenter() *MockChatPresenter {
 	return &MockChatPresenter{}
 }
 
-// SetView sets the view to render the chat conversation.
-func (m *MockChatPresenter) SetView(view ui.IChatView) error {
-	m.SetViewCalls = append(m.SetViewCalls, view)
-	return m.SetViewErr
-}
-
-// SendUserMessage sends a user message to the chat session and starts processing.
+// SendUserMessage records outgoing user message callback.
 func (m *MockChatPresenter) SendUserMessage(message *ui.ChatMessageUI) error {
 	m.SendUserMessageCalls = append(m.SendUserMessageCalls, message)
 	return m.SendUserMessageErr
 }
 
-// SaveUserMessage saves a user message to the chat session but doesn't start processing.
-func (m *MockChatPresenter) SaveUserMessage(message *ui.ChatMessageUI) error {
-	m.SaveUserMessageCalls = append(m.SaveUserMessageCalls, message)
-	return m.SaveUserMessageErr
-}
-
-// Pause pauses the chat session (i.e. stops processing).
-func (m *MockChatPresenter) Pause() error {
-	m.PauseCalls++
-	return m.PauseErr
-}
-
-// Resume resumes the chat session (i.e. starts processing).
-func (m *MockChatPresenter) Resume() error {
-	m.ResumeCalls++
-	return m.ResumeErr
-}
-
-// PermissionResponse sends user response to permission query.
+// PermissionResponse records permission response callback.
 func (m *MockChatPresenter) PermissionResponse(response string) error {
 	m.PermissionResponseCalls = append(m.PermissionResponseCalls, response)
 	return m.PermissionResponseErr
 }
 
-// SetModel sets the model used for the chat session.
-func (m *MockChatPresenter) SetModel(model string) error {
-	return nil
-}
-
-// Reset clears all recorded calls and errors.
+// Reset clears recorded calls and configured errors.
 func (m *MockChatPresenter) Reset() {
-	m.SetViewErr = nil
 	m.SendUserMessageErr = nil
-	m.SaveUserMessageErr = nil
-	m.PauseErr = nil
-	m.ResumeErr = nil
 	m.PermissionResponseErr = nil
-
-	m.SetViewCalls = nil
 	m.SendUserMessageCalls = nil
-	m.SaveUserMessageCalls = nil
-	m.PauseCalls = 0
-	m.ResumeCalls = 0
 	m.PermissionResponseCalls = nil
 }

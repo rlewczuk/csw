@@ -12,9 +12,25 @@ import (
 	"github.com/rlewczuk/csw/pkg/ui"
 )
 
+// PermissionResponder defines presenter callback needed by CLI chat view.
+type PermissionResponder interface {
+	PermissionResponse(response string) error
+}
+
+// UserMessageSender defines presenter callback used in interactive mode.
+type UserMessageSender interface {
+	SendUserMessage(message *ui.ChatMessageUI) error
+}
+
+// ChatPresenterInput groups presenter callbacks used by CliChatView.
+type ChatPresenterInput interface {
+	PermissionResponder
+	UserMessageSender
+}
+
 // CliChatView is a simple text-based chat view that prints to stdout and reads from stdin.
 type CliChatView struct {
-	presenter ui.IChatPresenter
+	presenter ChatPresenterInput
 	output    io.Writer
 	input     io.Reader
 	slug      string
@@ -62,7 +78,7 @@ type diagnosticLogMessage struct {
 // interactive controls whether to read user input.
 // acceptAllPermissions controls whether to automatically accept all permissions.
 // verbose controls whether to display full tool output instead of one-liners.
-func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Reader, options ...any) *CliChatView {
+func NewCliChatView(presenter ChatPresenterInput, output io.Writer, input io.Reader, options ...any) *CliChatView {
 	slug := defaultCLISlug
 	interactive := false
 	acceptAllPermissions := false
@@ -132,11 +148,6 @@ func NewCliChatView(presenter ui.IChatPresenter, output io.Writer, input io.Read
 	// Setup scanner only for interactive mode
 	if interactive && input != nil {
 		view.scanner = bufio.NewScanner(input)
-	}
-
-	// Set this view as the presenter's view
-	if presenter != nil {
-		presenter.SetView(view)
 	}
 
 	return view
@@ -546,5 +557,3 @@ func (v *CliChatView) write(message string) {
 	}
 	_, _ = fmt.Fprint(v.output, addCLISlugPrefix(v.slug, message))
 }
-
-var _ ui.IChatView = (*CliChatView)(nil)

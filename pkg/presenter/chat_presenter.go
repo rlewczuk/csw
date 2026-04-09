@@ -10,12 +10,23 @@ import (
 	"github.com/rlewczuk/csw/pkg/ui"
 )
 
-// ChatPresenter implements ui.IChatPresenter and core.SessionThreadOutput.
-// It acts as a bridge between the SessionThread and the IChatView,
+// ChatView defines chat view callbacks used by ChatPresenter.
+type ChatView interface {
+	Init(session *ui.ChatSessionUI) error
+	AddMessage(msg *ui.ChatMessageUI) error
+	UpdateMessage(msg *ui.ChatMessageUI) error
+	UpdateTool(tool *ui.ToolUI) error
+	MoveToBottom() error
+	QueryPermission(query *ui.PermissionQueryUI) error
+	ShowMessage(message string, messageType shared.MessageType)
+}
+
+// ChatPresenter implements core.SessionThreadOutput.
+// It acts as a bridge between the SessionThread and the ChatView,
 // translating session events into UI updates.
 type ChatPresenter struct {
 	mu     sync.Mutex
-	view   ui.IChatView
+	view   ChatView
 	thread *core.SessionThread
 
 	// Tracking state for current run
@@ -36,7 +47,7 @@ func NewChatPresenter(_ core.SessionFactory, thread *core.SessionThread) *ChatPr
 
 // SetView sets the view to render the chat conversation.
 // It initializes the view with the current session state.
-func (p *ChatPresenter) SetView(view ui.IChatView) error {
+func (p *ChatPresenter) SetView(view ChatView) error {
 	p.mu.Lock()
 	p.view = view
 	session := p.thread.GetSession()

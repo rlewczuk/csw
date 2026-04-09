@@ -4,11 +4,22 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/presenter"
 	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type mockPermissionResponder struct {
+	err   error
+	calls []string
+}
+
+func (m *mockPermissionResponder) PermissionResponse(response string) error {
+	m.calls = append(m.calls, response)
+	return m.err
+}
 
 // TestMockChatViewAutoPermissionResponse tests the MockChatView's automatic permission response functionality.
 func TestMockChatViewAutoPermissionResponse(t *testing.T) {
@@ -46,7 +57,7 @@ func TestMockChatViewAutoPermissionResponse(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mockPresenter := NewMockChatPresenter()
+			mockPresenter := &mockPermissionResponder{}
 
 			mockView := NewMockChatView()
 			mockView.AutoPermissionResponse = tc.autoResponse
@@ -63,15 +74,15 @@ func TestMockChatViewAutoPermissionResponse(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, 1, len(mockView.QueryPermissionCalls), "Query should have been recorded")
-			assert.Equal(t, 1, len(mockPresenter.PermissionResponseCalls), "Permission response should have been sent")
-			assert.Equal(t, tc.expectedResponse, mockPresenter.PermissionResponseCalls[0], "Response should match expected")
+			assert.Equal(t, 1, len(mockPresenter.calls), "Permission response should have been sent")
+			assert.Equal(t, tc.expectedResponse, mockPresenter.calls[0], "Response should match expected")
 		})
 	}
 }
 
 // TestMockChatViewNoAutoResponse tests that MockChatView without auto-response just records the query.
 func TestMockChatViewNoAutoResponse(t *testing.T) {
-	mockPresenter := NewMockChatPresenter()
+	mockPresenter := &mockPermissionResponder{}
 
 	mockView := NewMockChatView()
 	mockView.Presenter = mockPresenter
@@ -87,7 +98,7 @@ func TestMockChatViewNoAutoResponse(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, len(mockView.QueryPermissionCalls), "Query should have been recorded")
-	assert.Equal(t, 0, len(mockPresenter.PermissionResponseCalls), "No permission response should have been sent without auto-response")
+	assert.Equal(t, 0, len(mockPresenter.calls), "No permission response should have been sent without auto-response")
 }
 
 func TestMockChatView_Init(t *testing.T) {
@@ -310,192 +321,6 @@ func TestMockChatView_ShowMessage(t *testing.T) {
 	assert.Equal(t, shared.MessageTypeWarning, view.ShowMessageCalls[1].Type)
 }
 
-func TestMockChatPresenter_SetView(t *testing.T) {
-	presenter := NewMockChatPresenter()
-	view := NewMockChatView()
-
-	if err := presenter.SetView(view); err != nil {
-		t.Errorf("SetView() returned unexpected error: %v", err)
-	}
-
-	if len(presenter.SetViewCalls) != 1 {
-		t.Fatalf("expected 1 SetView call, got %d", len(presenter.SetViewCalls))
-	}
-	if presenter.SetViewCalls[0] != view {
-		t.Errorf("SetView() did not record view correctly")
-	}
-}
-
-func TestMockChatPresenter_SetView_WithError(t *testing.T) {
-	presenter := NewMockChatPresenter()
-	expectedErr := errors.New("set view error")
-	presenter.SetViewErr = expectedErr
-
-	err := presenter.SetView(NewMockChatView())
-	if err != expectedErr {
-		t.Errorf("SetView() expected error %v, got %v", expectedErr, err)
-	}
-}
-
-func TestMockChatPresenter_SendUserMessage(t *testing.T) {
-	presenter := NewMockChatPresenter()
-
-	msg := &ui.ChatMessageUI{
-		Id:   "msg-1",
-		Role: ui.ChatRoleUser,
-		Text: "Hello, assistant!",
-	}
-
-	if err := presenter.SendUserMessage(msg); err != nil {
-		t.Errorf("SendUserMessage() returned unexpected error: %v", err)
-	}
-
-	if len(presenter.SendUserMessageCalls) != 1 {
-		t.Fatalf("expected 1 SendUserMessage call, got %d", len(presenter.SendUserMessageCalls))
-	}
-	if presenter.SendUserMessageCalls[0] != msg {
-		t.Errorf("SendUserMessage() did not record message correctly")
-	}
-	if presenter.SendUserMessageCalls[0].Text != "Hello, assistant!" {
-		t.Errorf("SendUserMessage() did not preserve message Title field")
-	}
-}
-
-func TestMockChatPresenter_SendUserMessage_WithError(t *testing.T) {
-	presenter := NewMockChatPresenter()
-	expectedErr := errors.New("send user message error")
-	presenter.SendUserMessageErr = expectedErr
-
-	err := presenter.SendUserMessage(&ui.ChatMessageUI{})
-	if err != expectedErr {
-		t.Errorf("SendUserMessage() expected error %v, got %v", expectedErr, err)
-	}
-}
-
-func TestMockChatPresenter_SaveUserMessage(t *testing.T) {
-	presenter := NewMockChatPresenter()
-
-	msg := &ui.ChatMessageUI{
-		Id:   "msg-1",
-		Role: ui.ChatRoleUser,
-		Text: "Draft message",
-	}
-
-	if err := presenter.SaveUserMessage(msg); err != nil {
-		t.Errorf("SaveUserMessage() returned unexpected error: %v", err)
-	}
-
-	if len(presenter.SaveUserMessageCalls) != 1 {
-		t.Fatalf("expected 1 SaveUserMessage call, got %d", len(presenter.SaveUserMessageCalls))
-	}
-	if presenter.SaveUserMessageCalls[0] != msg {
-		t.Errorf("SaveUserMessage() did not record message correctly")
-	}
-	if presenter.SaveUserMessageCalls[0].Text != "Draft message" {
-		t.Errorf("SaveUserMessage() did not preserve message Title field")
-	}
-}
-
-func TestMockChatPresenter_SaveUserMessage_WithError(t *testing.T) {
-	presenter := NewMockChatPresenter()
-	expectedErr := errors.New("save user message error")
-	presenter.SaveUserMessageErr = expectedErr
-
-	err := presenter.SaveUserMessage(&ui.ChatMessageUI{})
-	if err != expectedErr {
-		t.Errorf("SaveUserMessage() expected error %v, got %v", expectedErr, err)
-	}
-}
-
-func TestMockChatPresenter_Pause(t *testing.T) {
-	presenter := NewMockChatPresenter()
-
-	for i := 0; i < 2; i++ {
-		if err := presenter.Pause(); err != nil {
-			t.Errorf("Pause() returned unexpected error: %v", err)
-		}
-	}
-
-	if presenter.PauseCalls != 2 {
-		t.Errorf("expected 2 Pause calls, got %d", presenter.PauseCalls)
-	}
-}
-
-func TestMockChatPresenter_Pause_WithError(t *testing.T) {
-	presenter := NewMockChatPresenter()
-	expectedErr := errors.New("pause error")
-	presenter.PauseErr = expectedErr
-
-	err := presenter.Pause()
-	if err != expectedErr {
-		t.Errorf("Pause() expected error %v, got %v", expectedErr, err)
-	}
-}
-
-func TestMockChatPresenter_Resume(t *testing.T) {
-	presenter := NewMockChatPresenter()
-
-	for i := 0; i < 4; i++ {
-		if err := presenter.Resume(); err != nil {
-			t.Errorf("Resume() returned unexpected error: %v", err)
-		}
-	}
-
-	if presenter.ResumeCalls != 4 {
-		t.Errorf("expected 4 Resume calls, got %d", presenter.ResumeCalls)
-	}
-}
-
-func TestMockChatPresenter_Resume_WithError(t *testing.T) {
-	presenter := NewMockChatPresenter()
-	expectedErr := errors.New("resume error")
-	presenter.ResumeErr = expectedErr
-
-	err := presenter.Resume()
-	if err != expectedErr {
-		t.Errorf("Resume() expected error %v, got %v", expectedErr, err)
-	}
-}
-
-func TestMockChatPresenter_Reset(t *testing.T) {
-	presenter := NewMockChatPresenter()
-
-	// Set up some state
-	presenter.SetViewErr = errors.New("some error")
-	presenter.SetView(NewMockChatView())
-	presenter.SendUserMessage(&ui.ChatMessageUI{Id: "msg-1"})
-	presenter.SaveUserMessage(&ui.ChatMessageUI{Id: "msg-2"})
-	presenter.Pause()
-	presenter.Resume()
-
-	// Reset
-	presenter.Reset()
-
-	// Verify everything is cleared
-	if presenter.SetViewErr != nil {
-		t.Errorf("Reset() did not clear SetViewErr")
-	}
-	if len(presenter.SetViewCalls) != 0 {
-		t.Errorf("Reset() did not clear SetViewCalls")
-	}
-	if len(presenter.SendUserMessageCalls) != 0 {
-		t.Errorf("Reset() did not clear SendUserMessageCalls")
-	}
-	if len(presenter.SaveUserMessageCalls) != 0 {
-		t.Errorf("Reset() did not clear SaveUserMessageCalls")
-	}
-	if presenter.PauseCalls != 0 {
-		t.Errorf("Reset() did not clear PauseCalls")
-	}
-	if presenter.ResumeCalls != 0 {
-		t.Errorf("Reset() did not clear ResumeCalls")
-	}
-}
-
-func TestMockChatView_ImplementsChatViewInterface(t *testing.T) {
-	var _ ui.IChatView = (*MockChatView)(nil)
-}
-
-func TestMockChatPresenter_ImplementsChatPresenterInterface(t *testing.T) {
-	var _ ui.IChatPresenter = (*MockChatPresenter)(nil)
+func TestMockChatView_ImplementsPresenterChatView(t *testing.T) {
+	var _ presenter.ChatView = (*MockChatView)(nil)
 }
