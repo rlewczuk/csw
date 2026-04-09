@@ -495,24 +495,26 @@ func (c *ResponsesClient) logRefreshDecision(
 		disableRefresh = c.config.DisableRefresh
 	}
 
-	fmt.Fprintf(
-		os.Stdout,
-		"[oauth-refresh-debug] provider=%q auth_mode=%q stage=%q decision=%q reason=%q force=%t now=%q token_expiration=%q overlap=%q min_overlap=%q token_expiry_known=%t has_access_token=%t has_refresh_token=%t disable_refresh=%t\n",
-		providerName,
-		authMode,
-		stage,
-		decision,
-		reason,
-		force,
-		now.Format(time.RFC3339Nano),
-		expiryText,
-		overlap,
-		minOverlap.String(),
-		!expiry.IsZero(),
-		hasAccessToken,
-		hasRefreshToken,
-		disableRefresh,
-	)
+	if decision != "skip" {
+		fmt.Fprintf(
+			os.Stdout,
+			"[oauth-refresh-debug] provider=%q auth_mode=%q stage=%q decision=%q reason=%q force=%t now=%q token_expiration=%q overlap=%q min_overlap=%q token_expiry_known=%t has_access_token=%t has_refresh_token=%t disable_refresh=%t\n",
+			providerName,
+			authMode,
+			stage,
+			decision,
+			reason,
+			force,
+			now.Format(time.RFC3339Nano),
+			expiryText,
+			overlap,
+			minOverlap.String(),
+			!expiry.IsZero(),
+			hasAccessToken,
+			hasRefreshToken,
+			disableRefresh,
+		)
+	}
 }
 
 func (c *ResponsesClient) tokenRefreshMargin() time.Duration {
