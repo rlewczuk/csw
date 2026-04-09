@@ -19,8 +19,11 @@ type JsonlSessionInput struct {
 }
 
 type jsonlSessionInputLine struct {
-	Action string `json:"action"`
-	Input  string `json:"input"`
+	Type     string `json:"type"`
+	Action   string `json:"action"`
+	Input    string `json:"input"`
+	QueryID  string `json:"query_id"`
+	Response string `json:"response"`
 }
 
 // NewJsonlSessionInput creates a JSONL input adapter for session thread input callbacks.
@@ -49,6 +52,12 @@ func (i *JsonlSessionInput) readLoop() {
 
 		var payload jsonlSessionInputLine
 		if err := json.Unmarshal([]byte(line), &payload); err != nil {
+			continue
+		}
+
+		lineType := strings.TrimSpace(payload.Type)
+		if lineType == "query_response" {
+			_ = i.thread.PermissionResponse(strings.TrimSpace(payload.QueryID), strings.TrimSpace(payload.Response))
 			continue
 		}
 

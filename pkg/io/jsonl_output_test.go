@@ -2,6 +2,7 @@ package io
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -141,4 +142,27 @@ func TestJsonlSessionOutput_NoPanicsOnNilInputs(t *testing.T) {
 		output.RunFinished(nil)
 	})
 	assert.False(t, output.ShouldRetryAfterFailure("failed"))
+}
+
+func TestJsonlSessionOutput_OnPermissionQueryRendersJSONObject(t *testing.T) {
+	buffer := &bytes.Buffer{}
+	output := NewJsonlSessionOutput(buffer)
+	query := &tool.ToolPermissionsQuery{
+		Id:      "019d7138-dbf1-7fc6-bdfd-7e8bece29727",
+		Title:   "Permission Required",
+		Details: "Tool runBash requires permission",
+		Options: []string{"Allow", "Deny"},
+	}
+
+	output.OnPermissionQuery(query)
+
+	line := strings.TrimSpace(buffer.String())
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal([]byte(line), &payload))
+	assert.Equal(t, "permission_query", payload["type"])
+
+	queryObj, ok := payload["query"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, query.Id, queryObj["Id"])
+	assert.Equal(t, query.Title, queryObj["Title"])
 }

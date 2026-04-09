@@ -2,7 +2,9 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/rlewczuk/csw/pkg/tool"
@@ -22,7 +24,13 @@ type SessionThreadInput interface {
 
 	// Interrupt is called when user interrupts the current task.
 	Interrupt() error
+
+	// PermissionResponse is called when user responds to a pending permission query.
+	// queryID can be empty for text mode and then the currently pending query is used.
+	PermissionResponse(queryID string, response string) error
 }
+
+var ErrNoPendingPermissionQuery = errors.New("no pending permission query")
 
 // SessionThreadOutput is an interface for handling output from the session.
 type SessionThreadOutput interface {
@@ -82,6 +90,7 @@ type SessionThread struct {
 	paused                 bool
 	resumePending          bool
 	pendingPermissionQuery *tool.ToolPermissionsQuery
+	autoPermissionResponse string
 }
 
 // NewSessionThread creates a new SessionThread with the given system and output handler.
@@ -262,19 +271,31 @@ func (c *SessionThread) SetOutputHandler(handler SessionThreadOutput) {
 }
 
 // PermissionResponse handles the user's response to a permission query.
-func (c *SessionThread) PermissionResponse(response string) error {
+func (c *SessionThread) PermissionResponse(queryID string, response string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.permissionResponseLocked(queryID, response)
+}
+
+func (c *SessionThread) permissionResponseLocked(queryID string, response string) error {
+	trimmedQueryID := strings.TrimSpace(queryID)
+	trimmedResponse := strings.TrimSpace(response)
+	if trimmedResponse == "" {
+		return fmt.Errorf("SessionThread.PermissionResponse() [session_thread.go]: response cannot be empty")
+	}
 
 	if c.pendingPermissionQuery == nil {
-		return fmt.Errorf("SessionThread.PermissionResponse() [session_thread.go]: no pending permission query")
+		return fmt.Errorf("SessionThread.PermissionResponse() [session_thread.go]: %w", ErrNoPendingPermissionQuery)
 	}
 
 	query := c.pendingPermissionQuery
+	if trimmedQueryID != "" && !strings.EqualFold(query.Id, trimmedQueryID) {
+		return fmt.Errorf("SessionThread.PermissionResponse() [session_thread.go]: query id mismatch: expected %s, got %s", query.Id, trimmedQueryID)
+	}
 	c.pendingPermissionQuery = nil
 
 	// Update privileges based on response
-	if err := c.session.UpdatePermission(query, response); err != nil {
+	if err := c.session.UpdatePermission(query, trimmedResponse); err != nil {
 		return err
 	}
 
@@ -286,6 +307,14 @@ func (c *SessionThread) PermissionResponse(response string) error {
 	}
 
 	return nil
+}
+
+// SetAutoPermissionResponse configures automatic response for permission queries.
+// Empty response disables automatic handling.
+func (c *SessionThread) SetAutoPermissionResponse(response string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.autoPermissionResponse = strings.TrimSpace(response)
 }
 
 // SetModel sets the model for the current session.
@@ -361,15 +390,27 @@ func (c *SessionThread) runSessionLoop() {
 
 				// Run the session without new input (processing pending state/tools)
 				err := c.session.Run(ctx)
-				if err != nil {
-					// Handle session error (which could be another permission query)
-					if permErr, ok := err.(*tool.ToolPermissionsQuery); ok {
-						c.mu.Lock()
-						c.pendingPermissionQuery = permErr
-						c.paused = true
-						c.mu.Unlock()
+		if err != nil {
+			// Handle session error (which could be another permission query)
+			if permErr, ok := err.(*tool.ToolPermissionsQuery); ok {
+				c.mu.Lock()
+				c.pendingPermissionQuery = permErr
+				c.paused = true
+				autoResponse := c.autoPermissionResponse
+				c.mu.Unlock()
 
-						c.outputHandler.OnPermissionQuery(permErr)
+				if autoResponse != "" {
+					c.mu.Lock()
+					responseErr := c.permissionResponseLocked(permErr.Id, autoResponse)
+					c.mu.Unlock()
+					if responseErr != nil {
+						c.outputHandler.RunFinished(responseErr)
+						return
+					}
+					continue
+				}
+
+				c.outputHandler.OnPermissionQuery(permErr)
 
 						// Check if the permission was immediately responded to (e.g., by CLI view)
 						// If resumePending is true, the permission was handled synchronously and
@@ -445,7 +486,19 @@ func (c *SessionThread) runSessionLoop() {
 			c.mu.Lock()
 			c.pendingPermissionQuery = permErr
 			c.paused = true
+			autoResponse := c.autoPermissionResponse
 			c.mu.Unlock()
+
+			if autoResponse != "" {
+				c.mu.Lock()
+				responseErr := c.permissionResponseLocked(permErr.Id, autoResponse)
+				c.mu.Unlock()
+				if responseErr != nil {
+					c.outputHandler.RunFinished(responseErr)
+					return
+				}
+				continue
+			}
 
 			c.outputHandler.OnPermissionQuery(permErr)
 

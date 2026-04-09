@@ -13,6 +13,7 @@ type StartCLISessionParams struct {
 	ModelName            string
 	RoleName             string
 	TaskInfo             *core.TaskInfo
+	AutoPermissionResponse string
 	Thinking             string
 	ModelOverridden      bool
 	RoleOverridden       bool
@@ -114,6 +115,7 @@ func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessi
 	done := make(chan error, 1)
 	wrappedHandler := &cliOutputHandler{delegate: params.OutputHandler, done: done}
 	thread.SetOutputHandler(wrappedHandler)
+	thread.SetAutoPermissionResponse(params.AutoPermissionResponse)
 
 	if params.ResumeTarget != "" {
 		if params.ContinueSession {

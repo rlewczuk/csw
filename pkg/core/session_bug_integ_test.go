@@ -129,7 +129,7 @@ func (h *autoAllowPermissionHandler) OnPermissionQuery(query *tool.ToolPermissio
 
 	// Automatically allow the permission
 	if h.thread != nil {
-		h.thread.PermissionResponse("Allow")
+		h.thread.PermissionResponse("", "Allow")
 	}
 }
 

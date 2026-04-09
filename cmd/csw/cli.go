@@ -619,10 +619,15 @@ func runCLI(params *CLIParams) error {
 	}
 
 	sessionOutput := buildCLISessionOutput(params, os.Stdout)
+	autoPermissionResponse := ""
+	if params.AllowAllPerms {
+		autoPermissionResponse = "Allow"
+	}
 	runtimeResult, err := sweSystem.StartCLISession(system.StartCLISessionParams{
 		ModelName:          params.ModelName,
 		RoleName:           params.RoleName,
 		TaskInfo:           params.TaskInfo,
+		AutoPermissionResponse: autoPermissionResponse,
 		Thinking:           params.Thinking,
 		ModelOverridden:    params.ModelOverridden,
 		RoleOverridden:     params.RoleOverridden,
@@ -638,7 +643,6 @@ func runCLI(params *CLIParams) error {
 		return fmt.Errorf("runCLI() [cli.go]: failed to start CLI session runtime: %w", err)
 	}
 	session := runtimeResult.Session
-
 	if sessionInput := buildCLIStdinSessionInput(params, runtimeResult.Thread, os.Stdin); sessionInput != nil {
 		sessionInput.StartReadingInput()
 	}
@@ -753,10 +757,6 @@ func buildCLIStdinSessionInput(params *CLIParams, thread core.SessionThreadInput
 
 	if params.OutputFormat == "jsonl" {
 		return sessionio.NewJsonlSessionInput(input, thread)
-	}
-
-	if !params.Interactive {
-		return nil
 	}
 
 	return sessionio.NewTextSessionInput(input, thread)

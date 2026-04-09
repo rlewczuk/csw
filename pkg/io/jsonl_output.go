@@ -1,6 +1,7 @@
 package io
 
 import (
+	"encoding/json"
 	"fmt"
 	stdio "io"
 	"strings"
@@ -104,7 +105,20 @@ func (o *JsonlSessionOutput) RunFinished(err error) {
 
 // OnPermissionQuery handles permission query callback.
 func (o *JsonlSessionOutput) OnPermissionQuery(query *tool.ToolPermissionsQuery) {
-	_ = query
+	if query == nil {
+		return
+	}
+
+	payload := map[string]any{
+		"type":  "permission_query",
+		"query": query,
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+
+	o.write(string(data) + "\n")
 }
 
 // OnRateLimitError handles rate-limit callback.

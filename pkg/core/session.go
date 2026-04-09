@@ -1181,7 +1181,24 @@ func (s *SweSession) UpdatePermission(query *tool.ToolPermissionsQuery, response
 		)
 	}
 
-	allow := strings.ToLower(response) == "allow"
+	normalizedResponse := strings.TrimSpace(response)
+	if normalizedResponse == "" {
+		return fmt.Errorf("SweSession.UpdatePermission() [session.go]: empty permission response")
+	}
+
+	matchedOption := ""
+	for _, option := range query.Options {
+		if strings.EqualFold(strings.TrimSpace(option), normalizedResponse) {
+			matchedOption = option
+			break
+		}
+	}
+	if matchedOption == "" {
+		return fmt.Errorf("SweSession.UpdatePermission() [session.go]: invalid permission response %q for query %s", normalizedResponse, query.Id)
+	}
+
+	lowerOption := strings.ToLower(strings.TrimSpace(matchedOption))
+	allow := strings.HasPrefix(lowerOption, "allow")
 	flag := conf.AccessDeny
 	if allow {
 		flag = conf.AccessAllow

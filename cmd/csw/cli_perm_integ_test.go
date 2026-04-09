@@ -65,7 +65,7 @@ func (h *autoPermissionOutputHandler) OnPermissionQuery(query *tool.ToolPermissi
 	h.mu.Unlock()
 
 	if thread != nil {
-		_ = thread.PermissionResponse(response)
+		_ = thread.PermissionResponse("", response)
 	}
 }
 

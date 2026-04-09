@@ -21,6 +21,12 @@ func (d *cliSessionInputThreadDouble) Interrupt() error {
 	return nil
 }
 
+func (d *cliSessionInputThreadDouble) PermissionResponse(queryID string, response string) error {
+	_ = queryID
+	_ = response
+	return nil
+}
+
 var _ core.SessionThreadInput = (*cliSessionInputThreadDouble)(nil)
 
 func TestBuildCLIStdinSessionInput(t *testing.T) {
@@ -61,16 +67,18 @@ func TestBuildCLIStdinSessionInput(t *testing.T) {
 			expected:    &io.JsonlSessionInput{},
 		},
 		{
-			name:        "short mode does not attach stdin session input",
+			name:        "short mode attaches text session input",
 			params:      &CLIParams{Interactive: false, OutputFormat: "short"},
 			input:       strings.NewReader("hello\n"),
-			expectedNil: true,
+			expectedNil: false,
+			expected:    &io.TextSessionInput{},
 		},
 		{
-			name:        "full mode does not attach stdin session input",
+			name:        "full mode attaches text session input",
 			params:      &CLIParams{Interactive: false, OutputFormat: "full"},
 			input:       strings.NewReader("hello\n"),
-			expectedNil: true,
+			expectedNil: false,
+			expected:    &io.TextSessionInput{},
 		},
 	}
 

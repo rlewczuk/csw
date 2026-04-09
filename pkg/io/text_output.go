@@ -100,7 +100,10 @@ func (o *TextSessionOutput) RunFinished(err error) {
 
 // OnPermissionQuery handles permission query callback.
 func (o *TextSessionOutput) OnPermissionQuery(query *tool.ToolPermissionsQuery) {
-	_ = query
+	if query == nil {
+		return
+	}
+	o.writef("[PERMISSION] %s\n%s\nOptions: %s\n", query.Title, query.Details, strings.Join(query.Options, " | "))
 }
 
 // OnRateLimitError handles rate-limit callback.
