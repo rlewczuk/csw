@@ -16,12 +16,9 @@ import (
 	"github.com/rlewczuk/csw/pkg/core"
 	sessionio "github.com/rlewczuk/csw/pkg/io"
 	"github.com/rlewczuk/csw/pkg/logging"
-	"github.com/rlewczuk/csw/pkg/presenter"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/system"
-	"github.com/rlewczuk/csw/pkg/ui"
-	"github.com/rlewczuk/csw/pkg/ui/cli"
 	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/spf13/cobra"
 )
@@ -602,11 +599,6 @@ func runCLI(params *CLIParams) error {
 		return err
 	}
 
-	cliSlug := strings.TrimSpace(buildResult.WorktreeBranch)
-	if cliSlug == "" {
-		cliSlug = "main"
-	}
-
 	if params.ResumeTarget != "" {
 		resolvedResumeTarget, err := system.ResolveResumeTargetToSessionID(params.ResumeTarget, buildResult.WorkDirRoot, buildResult.LogsDir)
 		if err != nil {
@@ -626,6 +618,7 @@ func runCLI(params *CLIParams) error {
 		_, _ = fmt.Fprintln(os.Stdout, BuildContainerStartupInfoMessage(buildResult))
 	}
 
+	sessionOutput := buildCLISessionOutput(params, os.Stdout)
 	runtimeResult, err := sweSystem.StartCLISession(system.StartCLISessionParams{
 		ModelName:          params.ModelName,
 		RoleName:           params.RoleName,
@@ -639,22 +632,11 @@ func runCLI(params *CLIParams) error {
 		ContinueSession:    params.ContinueSession,
 		ForceResume:        params.ForceResume,
 		ForceCompact:       params.ForceCompact,
-		Interactive:        params.Interactive,
-		AllowAllPerms:      params.AllowAllPerms,
-		OutputFormat:       params.OutputFormat,
-		ChatOutput:         os.Stdout,
-		ChatInput:          os.Stdin,
-		ChatPresenterFactory: func(factory core.SessionFactory, thread *core.SessionThread) system.ChatPresenter {
-			return presenter.NewChatPresenter(factory, thread)
-		},
-		ChatViewFactory: func(chatPresenter ui.IChatPresenter, output stdio.Writer, input stdio.Reader, interactive bool, allowAllPerms bool, outputFormat string) system.ChatView {
-			return cli.NewCliChatView(chatPresenter, output, input, cliSlug, interactive, allowAllPerms, params.OutputFormat)
-		},
+		OutputHandler:      sessionOutput,
 	})
 	if err != nil {
 		return fmt.Errorf("runCLI() [cli.go]: failed to start CLI session runtime: %w", err)
 	}
-	chatView := runtimeResult.ChatView
 	session := runtimeResult.Session
 
 	if sessionInput := buildCLIStdinSessionInput(params, runtimeResult.Thread, os.Stdin); sessionInput != nil {
@@ -694,7 +676,7 @@ func runCLI(params *CLIParams) error {
 	}
 
 	var finalizeResult system.WorktreeFinalizeResult
-	finalizeResult, finalizeErr := system.FinalizeWorktreeSession(ctx, finalizeVCS, finalizeWorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, finalizeWorktreeDir, params.Prompt, hookEngine, chatView)
+	finalizeResult, finalizeErr := system.FinalizeWorktreeSession(ctx, finalizeVCS, finalizeWorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, finalizeWorktreeDir, params.Prompt, hookEngine, buildHookOutputView(sessionOutput))
 	if finalizeErr != nil {
 		sessionRunErr = finalizeErr
 	}
@@ -712,11 +694,52 @@ func runCLI(params *CLIParams) error {
 		WorkDir:        buildResult.WorkDir,
 		LSPServer:      buildResult.LSPServer,
 		ContainerImage: buildResult.ContainerImage,
-	}, chatView.ShowMessage, sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
+	}, buildSummaryMessageFunc(sessionOutput), sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func buildCLISessionOutput(params *CLIParams, output stdio.Writer) core.SessionThreadOutput {
+	if params == nil {
+		return sessionio.NewTextSessionOutput(output)
+	}
+
+	if strings.TrimSpace(params.OutputFormat) == "jsonl" {
+		return sessionio.NewJsonlSessionOutput(output)
+	}
+
+	return sessionio.NewTextSessionOutput(output)
+}
+
+type cliHookOutputView struct {
+	output core.SessionThreadOutput
+}
+
+func (v *cliHookOutputView) ShowMessage(message string, messageType shared.MessageType) {
+	if v == nil || v.output == nil {
+		return
+	}
+	v.output.ShowMessage(message, string(messageType))
+}
+
+func buildHookOutputView(output core.SessionThreadOutput) core.HookOutputView {
+	if output == nil {
+		return nil
+	}
+
+	return &cliHookOutputView{output: output}
+}
+
+func buildSummaryMessageFunc(output core.SessionThreadOutput) func(string, shared.MessageType) {
+	if output == nil {
+		return nil
+	}
+
+	return func(message string, messageType shared.MessageType) {
+		output.ShowMessage(message, string(messageType))
+	}
 }
 
 type cliSessionInput interface {

@@ -2,37 +2,11 @@ package system
 
 import (
 	"fmt"
-	"io"
-	"log/slog"
 	"strings"
 
 	"github.com/rlewczuk/csw/pkg/core"
-	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/ui"
 )
-
-// ChatPresenter is runtime presenter contract required by system runtime wiring.
-type ChatPresenter interface {
-	ui.IChatPresenter
-	core.SessionThreadOutput
-}
-
-// ChatView is runtime chat view contract required by system runtime wiring.
-type ChatView interface {
-	ui.IChatView
-	StartReadingInput()
-}
-
-type sessionLoggerChatView interface {
-	SetSessionLogger(logger *slog.Logger)
-}
-
-// ChatPresenterFactory builds presenter for session thread.
-type ChatPresenterFactory func(system core.SessionFactory, thread *core.SessionThread) ChatPresenter
-
-// ChatViewFactory builds chat view bound to presenter.
-type ChatViewFactory func(presenter ui.IChatPresenter, output io.Writer, input io.Reader, interactive bool, allowAllPerms bool, outputFormat string) ChatView
 
 // StartCLISessionParams defines parameters for creating and starting CLI session runtime.
 type StartCLISessionParams struct {
@@ -48,33 +22,19 @@ type StartCLISessionParams struct {
 	ContinueSession      bool
 	ForceResume          bool
 	ForceCompact         bool
-	Interactive          bool
-	AllowAllPerms        bool
-	OutputFormat         string
-	ChatOutput           io.Writer
-	ChatInput            io.Reader
-	ChatPresenterFactory ChatPresenterFactory
-	ChatViewFactory      ChatViewFactory
+	OutputHandler        core.SessionThreadOutput
 }
 
 // StartCLISessionResult contains initialized CLI runtime components.
 type StartCLISessionResult struct {
-	ChatView ui.IChatView
-	Thread   *core.SessionThread
-	Session  *core.SweSession
-	Done     <-chan error
+	Thread  *core.SessionThread
+	Session *core.SweSession
+	Done    <-chan error
 }
 
-// StartCLISession creates thread, presenter, chat view and starts requested flow.
+// StartCLISession creates thread, binds output handler and starts requested flow.
 func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessionResult, error) {
 	var result StartCLISessionResult
-
-	if params.ChatPresenterFactory == nil {
-		return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: chat presenter factory is nil")
-	}
-	if params.ChatViewFactory == nil {
-		return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: chat view factory is nil")
-	}
 
 	var (
 		thread  *core.SessionThread
@@ -151,28 +111,13 @@ func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessi
 
 	session.SetTaskInfo(params.TaskInfo)
 
-	chatPresenter := params.ChatPresenterFactory(s, thread)
-	chatView := params.ChatViewFactory(chatPresenter, params.ChatOutput, params.ChatInput, params.Interactive, params.AllowAllPerms, params.OutputFormat)
-	if loggerAwareView, ok := chatView.(sessionLoggerChatView); ok {
-		loggerAwareView.SetSessionLogger(logging.GetSessionLogger(session.ID(), logging.LogTypeSession))
-	}
-
-	if err := chatPresenter.SetView(chatView); err != nil {
-		return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to set view: %w", err)
-	}
-
-	if params.Interactive {
-		chatView.StartReadingInput()
-	}
-
 	done := make(chan error, 1)
-	wrappedHandler := &cliOutputHandler{delegate: chatPresenter, done: done}
+	wrappedHandler := &cliOutputHandler{delegate: params.OutputHandler, done: done}
 	thread.SetOutputHandler(wrappedHandler)
 
 	if params.ResumeTarget != "" {
 		if params.ContinueSession {
-			userMsg := &ui.ChatMessageUI{Role: ui.ChatRoleUser, Text: params.Prompt}
-			if err := chatPresenter.SendUserMessage(userMsg); err != nil {
+			if err := thread.UserPrompt(params.Prompt); err != nil {
 				return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to send continue message: %w", err)
 			}
 		} else {
@@ -184,13 +129,12 @@ func (s *SweSystem) StartCLISession(params StartCLISessionParams) (StartCLISessi
 			}
 		}
 	} else {
-		userMsg := &ui.ChatMessageUI{Role: ui.ChatRoleUser, Text: params.Prompt}
-		if err := chatPresenter.SendUserMessage(userMsg); err != nil {
+		if err := thread.UserPrompt(params.Prompt); err != nil {
 			return result, fmt.Errorf("SweSystem.StartCLISession() [runtime.go]: failed to send initial message: %w", err)
 		}
 	}
 
-	result = StartCLISessionResult{ChatView: chatView, Thread: thread, Session: session, Done: done}
+	result = StartCLISessionResult{Thread: thread, Session: session, Done: done}
 
 	return result, nil
 }
