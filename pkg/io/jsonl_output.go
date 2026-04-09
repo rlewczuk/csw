@@ -18,6 +18,15 @@ type JsonlSessionOutput struct {
 	renderedTools map[string]string
 }
 
+// AddUserMessage writes a full user message.
+func (o *JsonlSessionOutput) AddUserMessage(text string) {
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+
+	o.writef("\nUser: %s\n", text)
+}
+
 // NewJsonlSessionOutput creates a JSONL output adapter for session thread callbacks.
 func NewJsonlSessionOutput(output stdio.Writer) *JsonlSessionOutput {
 	return &JsonlSessionOutput{

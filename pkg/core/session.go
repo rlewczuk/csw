@@ -648,6 +648,7 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 		agentMessages = append(agentMessages, newAgentMessages...)
 
 		if s.outputHandler != nil {
+			s.decorateToolResponseForOutput(response)
 			s.outputHandler.AddToolCallResult(response)
 		}
 	}
@@ -674,6 +675,63 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 	s.persistSessionState()
 
 	return nil
+}
+
+func (s *SweSession) decorateToolResponseForOutput(response *tool.ToolResponse) {
+	if s == nil || s.Tools == nil || response == nil || response.Call == nil {
+		return
+	}
+
+	renderCall := copyToolCallWithResultForRender(response.Call, response)
+	summary, details, jsonl, meta := s.Tools.Render(renderCall)
+
+	if strings.TrimSpace(summary) != "" {
+		response.Result.Set("summary", summary)
+	}
+	if strings.TrimSpace(details) != "" {
+		response.Result.Set("details", details)
+	}
+	if strings.TrimSpace(jsonl) != "" {
+		response.Result.Set("jsonl", jsonl)
+	}
+	if len(meta) > 0 {
+		metaAny := make(map[string]any, len(meta))
+		for key, value := range meta {
+			metaAny[key] = value
+		}
+		response.Result.Set("meta", metaAny)
+	}
+}
+
+func copyToolCallWithResultForRender(call *tool.ToolCall, response *tool.ToolResponse) *tool.ToolCall {
+	if call == nil {
+		return nil
+	}
+
+	args := make(map[string]any)
+	if obj := call.Arguments.Object(); obj != nil {
+		for key, value := range obj {
+			args[key] = value.Raw()
+		}
+	}
+
+	if response != nil {
+		if obj := response.Result.Object(); obj != nil {
+			for key, value := range obj {
+				args[key] = value.Raw()
+			}
+		}
+		if response.Error != nil {
+			args["error"] = response.Error.Error()
+		}
+	}
+
+	return &tool.ToolCall{
+		ID:        call.ID,
+		Function:  call.Function,
+		Arguments: tool.NewToolValue(args),
+		Access:    call.Access,
+	}
 }
 
 func appendUniqueString(values []string, value string) []string {

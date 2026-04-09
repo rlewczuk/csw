@@ -28,6 +28,7 @@ type hookRunOutput struct {
 type noopSessionOutputHandler struct{}
 
 func (noopSessionOutputHandler) ShowMessage(string, string)                   {}
+func (noopSessionOutputHandler) AddUserMessage(string)                        {}
 func (noopSessionOutputHandler) AddAssistantMessage(string, string)           {}
 func (noopSessionOutputHandler) AddToolCall(*tool.ToolCall)                   {}
 func (noopSessionOutputHandler) AddToolCallResult(*tool.ToolResponse)         {}

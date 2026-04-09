@@ -83,6 +83,11 @@ func (h *MockSessionOutputHandler) ShowMessage(message string, messageType strin
 	_ = messageType
 }
 
+// AddUserMessage records user message (ignored in this mock).
+func (h *MockSessionOutputHandler) AddUserMessage(text string) {
+	_ = text
+}
+
 // ShouldRetryAfterFailure returns false in test mock unless explicitly handled by tests.
 func (h *MockSessionOutputHandler) ShouldRetryAfterFailure(message string) bool {
 	_ = message

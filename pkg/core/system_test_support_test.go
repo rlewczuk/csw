@@ -401,6 +401,13 @@ func (h *subAgentOutputHandler) AddAssistantMessage(text string, thinking string
 	h.delegate.AddAssistantMessage(prefixSubAgentMessage(h.slug, text), prefixSubAgentMessage(h.slug, thinking))
 }
 
+func (h *subAgentOutputHandler) AddUserMessage(text string) {
+	if h.delegate == nil {
+		return
+	}
+	h.delegate.AddUserMessage(prefixSubAgentMessage(h.slug, text))
+}
+
 func (h *subAgentOutputHandler) AddToolCall(call *tool.ToolCall) {
 	if h.delegate == nil {
 		return

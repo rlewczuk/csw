@@ -25,6 +25,15 @@ type TextSessionOutput struct {
 	renderedTools map[string]string
 }
 
+// AddUserMessage writes a full user message.
+func (o *TextSessionOutput) AddUserMessage(text string) {
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+
+	o.writef("\nUser: %s\n", text)
+}
+
 // NewTextSessionOutput creates a text output adapter for session thread callbacks.
 func NewTextSessionOutput(output stdio.Writer) *TextSessionOutput {
 	return &TextSessionOutput{

@@ -27,6 +27,8 @@ func (h *compactionOutputHandler) ShowMessage(message string, messageType string
 
 func (h *compactionOutputHandler) AddAssistantMessage(text string, thinking string) {}
 
+func (h *compactionOutputHandler) AddUserMessage(text string) {}
+
 func (h *compactionOutputHandler) AddToolCall(call *tool.ToolCall) {}
 
 func (h *compactionOutputHandler) AddToolCallResult(result *tool.ToolResponse) {}
@@ -55,6 +57,8 @@ func (h *retryOutputHandler) ShowMessage(message string, messageType string) {
 }
 
 func (h *retryOutputHandler) AddAssistantMessage(text string, thinking string) {}
+
+func (h *retryOutputHandler) AddUserMessage(text string) {}
 
 func (h *retryOutputHandler) AddToolCall(call *tool.ToolCall) {}
 

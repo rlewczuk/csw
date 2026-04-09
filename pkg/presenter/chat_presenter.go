@@ -159,6 +159,13 @@ func (p *ChatPresenter) AddAssistantMessage(text string, thinking string) {
 	}
 }
 
+// AddUserMessage is called when a full user message is queued by thread input adapters.
+// Presenter user-initiated flows already add user messages directly in SendUserMessage,
+// so this callback intentionally does nothing to avoid duplicate user messages in view.
+func (p *ChatPresenter) AddUserMessage(text string) {
+	_ = text
+}
+
 // AddToolCall is called when assistant requests a tool call.
 // Implements core.SessionThreadOutput.
 func (p *ChatPresenter) AddToolCall(call *tool.ToolCall) {

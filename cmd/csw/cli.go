@@ -751,12 +751,12 @@ func buildCLIStdinSessionInput(params *CLIParams, thread core.SessionThreadInput
 		return nil
 	}
 
-	if params.Interactive {
-		return nil
-	}
-
 	if params.OutputFormat == "jsonl" {
 		return sessionio.NewJsonlSessionInput(input, thread)
+	}
+
+	if !params.Interactive {
+		return nil
 	}
 
 	return sessionio.NewTextSessionInput(input, thread)

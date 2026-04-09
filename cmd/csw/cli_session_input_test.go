@@ -41,10 +41,11 @@ func TestBuildCLIStdinSessionInput(t *testing.T) {
 			expectedNil: true,
 		},
 		{
-			name:        "interactive mode returns nil",
+			name:        "interactive short mode uses text session input",
 			params:      &CLIParams{Interactive: true, OutputFormat: "short"},
 			input:       reader,
-			expectedNil: true,
+			expectedNil: false,
+			expected:    &io.TextSessionInput{},
 		},
 		{
 			name:        "nil input returns nil",
@@ -60,11 +61,16 @@ func TestBuildCLIStdinSessionInput(t *testing.T) {
 			expected:    &io.JsonlSessionInput{},
 		},
 		{
-			name:        "default mode uses text session input",
+			name:        "short mode does not attach stdin session input",
 			params:      &CLIParams{Interactive: false, OutputFormat: "short"},
 			input:       strings.NewReader("hello\n"),
-			expectedNil: false,
-			expected:    &io.TextSessionInput{},
+			expectedNil: true,
+		},
+		{
+			name:        "full mode does not attach stdin session input",
+			params:      &CLIParams{Interactive: false, OutputFormat: "full"},
+			input:       strings.NewReader("hello\n"),
+			expectedNil: true,
 		},
 	}
 

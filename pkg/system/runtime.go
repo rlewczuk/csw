@@ -157,6 +157,12 @@ func (h *cliOutputHandler) ShowMessage(message string, messageType string) {
 	}
 }
 
+func (h *cliOutputHandler) AddUserMessage(text string) {
+	if h.delegate != nil {
+		h.delegate.AddUserMessage(text)
+	}
+}
+
 func (h *cliOutputHandler) AddToolCall(call *tool.ToolCall) {
 	if h.delegate != nil {
 		h.delegate.AddToolCall(call)
