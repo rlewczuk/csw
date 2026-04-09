@@ -475,6 +475,10 @@ func (c *ResponsesClient) logRefreshDecision(
 	hasAccessToken bool,
 	hasRefreshToken bool,
 ) {
+	if decision == "skip" {
+		return
+	}
+
 	if now.IsZero() {
 		now = time.Now()
 	}

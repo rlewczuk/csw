@@ -1771,7 +1771,7 @@ func TestResponsesClient_OAuthTokenRenewal(t *testing.T) {
 		assert.Equal(t, int32(0), atomic.LoadInt32(&refreshCalls))
 	})
 
-	t.Run("RefreshTokenIfNeeded skips refresh when disable-refresh is enabled and prints debug details", func(t *testing.T) {
+	t.Run("RefreshTokenIfNeeded skips refresh when disable-refresh is enabled without debug output", func(t *testing.T) {
 		var refreshCalls int32
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1805,16 +1805,10 @@ func TestResponsesClient_OAuthTokenRenewal(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, int32(0), atomic.LoadInt32(&refreshCalls))
-		assert.Contains(t, stdout, `[oauth-refresh-debug]`)
-		assert.Contains(t, stdout, `stage="refresh-disabled"`)
-		assert.Contains(t, stdout, `decision="skip"`)
-		assert.Contains(t, stdout, `disable_refresh=true`)
-		assert.Contains(t, stdout, `token_expiration=`)
-		assert.Contains(t, stdout, `overlap=`)
-		assert.Contains(t, stdout, `min_overlap=`)
+		assert.Empty(t, stdout)
 	})
 
-	t.Run("RefreshTokenIfNeeded prints overlap-based decision details when token is still valid", func(t *testing.T) {
+	t.Run("RefreshTokenIfNeeded skips refresh for valid token without debug output", func(t *testing.T) {
 		client, err := NewResponsesClient(&conf.ModelProviderConfig{
 			Name:         "responses-test",
 			URL:          defaultResponsesTestURL,
@@ -1832,11 +1826,7 @@ func TestResponsesClient_OAuthTokenRenewal(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		assert.Contains(t, stdout, `stage="prelock-token-valid"`)
-		assert.Contains(t, stdout, `decision="skip"`)
-		assert.Contains(t, stdout, `token_expiration=`)
-		assert.Contains(t, stdout, `overlap=`)
-		assert.Contains(t, stdout, `min_overlap="5m0s"`)
+		assert.Empty(t, stdout)
 	})
 
 	t.Run("Chat retries on 401 expired token and refreshes once", func(t *testing.T) {
