@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	stdio "io"
 	"strings"
 	"testing"
@@ -131,4 +132,14 @@ func TestBuildCLISessionOutput(t *testing.T) {
 			assert.IsType(t, tt.expected, actual)
 		})
 	}
+}
+
+func TestBuildCLISessionOutput_UsesWorktreeBranchAsLabel(t *testing.T) {
+	buffer := &bytes.Buffer{}
+	output := buildCLISessionOutput(&CLIParams{OutputFormat: "short", WorktreeBranch: "feature/fix-branch-label"}, buffer)
+
+	output.AddUserMessage("Run full build")
+
+	assert.Contains(t, buffer.String(), "[feature/fix-branch-label]")
+	assert.NotContains(t, buffer.String(), "[main] User: Run full build")
 }

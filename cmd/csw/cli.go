@@ -714,7 +714,7 @@ func buildCLISessionOutput(params *CLIParams, output stdio.Writer) core.SessionT
 		return sessionio.NewJsonlSessionOutput(output)
 	}
 
-	return sessionio.NewTextSessionOutput(output)
+	return sessionio.NewTextSessionOutputWithSlug(output, params.WorktreeBranch)
 }
 
 type cliHookOutputView struct {

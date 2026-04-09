@@ -20,6 +20,7 @@ var textOutputSubAgentLinePrefixPattern = regexp.MustCompile(`^\*([a-z0-9]+(?:-[
 // TextSessionOutput writes session output in human-readable text format.
 type TextSessionOutput struct {
 	output stdio.Writer
+	slug   string
 
 	mu            sync.Mutex
 	renderedTools map[string]string
@@ -36,8 +37,14 @@ func (o *TextSessionOutput) AddUserMessage(text string) {
 
 // NewTextSessionOutput creates a text output adapter for session thread callbacks.
 func NewTextSessionOutput(output stdio.Writer) *TextSessionOutput {
+	return NewTextSessionOutputWithSlug(output, textOutputDefaultSlug)
+}
+
+// NewTextSessionOutputWithSlug creates a text output adapter using the provided prefix slug.
+func NewTextSessionOutputWithSlug(output stdio.Writer, slug string) *TextSessionOutput {
 	return &TextSessionOutput{
 		output:        output,
+		slug:          normalizeTextOutputSlug(slug),
 		renderedTools: make(map[string]string),
 	}
 }
@@ -149,7 +156,7 @@ func (o *TextSessionOutput) write(message string) {
 	if o == nil || o.output == nil {
 		return
 	}
-	_, _ = fmt.Fprint(o.output, addTextOutputSlugPrefix(textOutputDefaultSlug, message))
+	_, _ = fmt.Fprint(o.output, addTextOutputSlugPrefix(o.slug, message))
 }
 
 func addTextOutputSlugPrefix(slug string, message string) string {
