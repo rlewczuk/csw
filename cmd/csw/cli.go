@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
+	stdio "io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,6 +14,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/core"
+	sessionio "github.com/rlewczuk/csw/pkg/io"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/presenter"
 	"github.com/rlewczuk/csw/pkg/runner"
@@ -169,7 +170,7 @@ func CliCommand() *cobra.Command {
 				prompt = string(data)
 			} else if prompt == "-" {
 				// Read prompt from stdin
-				data, err := io.ReadAll(os.Stdin)
+				data, err := stdio.ReadAll(os.Stdin)
 				if err != nil {
 					return fmt.Errorf("CliCommand.RunE() [cli.go]: failed to read prompt from stdin: %w", err)
 				}
@@ -646,7 +647,7 @@ func runCLI(params *CLIParams) error {
 		ChatPresenterFactory: func(factory core.SessionFactory, thread *core.SessionThread) system.ChatPresenter {
 			return presenter.NewChatPresenter(factory, thread)
 		},
-		ChatViewFactory: func(chatPresenter ui.IChatPresenter, output io.Writer, input io.Reader, interactive bool, allowAllPerms bool, outputFormat string) system.ChatView {
+		ChatViewFactory: func(chatPresenter ui.IChatPresenter, output stdio.Writer, input stdio.Reader, interactive bool, allowAllPerms bool, outputFormat string) system.ChatView {
 			return cli.NewCliChatView(chatPresenter, output, input, cliSlug, interactive, allowAllPerms, params.OutputFormat)
 		},
 	})
@@ -655,6 +656,10 @@ func runCLI(params *CLIParams) error {
 	}
 	chatView := runtimeResult.ChatView
 	session := runtimeResult.Session
+
+	if sessionInput := buildCLIStdinSessionInput(params, runtimeResult.Thread, os.Stdin); sessionInput != nil {
+		sessionInput.StartReadingInput()
+	}
 
 	finalizeVCS := buildResult.VCS
 	finalizeWorktreeBranch := buildResult.WorktreeBranch
@@ -712,6 +717,26 @@ func runCLI(params *CLIParams) error {
 	}
 
 	return nil
+}
+
+type cliSessionInput interface {
+	StartReadingInput()
+}
+
+func buildCLIStdinSessionInput(params *CLIParams, thread core.SessionThreadInput, input stdio.Reader) cliSessionInput {
+	if params == nil || thread == nil || input == nil {
+		return nil
+	}
+
+	if params.Interactive {
+		return nil
+	}
+
+	if params.OutputFormat == "jsonl" {
+		return sessionio.NewJsonlSessionInput(input, thread)
+	}
+
+	return sessionio.NewTextSessionInput(input, thread)
 }
 
 func validateMergeCLIParams(params *CLIParams) error {
