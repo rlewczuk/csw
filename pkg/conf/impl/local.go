@@ -313,9 +313,6 @@ func (s *LocalConfigStore) loadAllConfig() error {
 	if err := s.loadGlobalConfig(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load global config: %w", err)
 	}
-	if err := s.loadModelTemplateConfig(); err != nil {
-		return fmt.Errorf("loadAllConfig(): failed to load model template config: %w", err)
-	}
 	if err := s.loadModelProviderConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load model provider configs: %w", err)
 	}
@@ -389,30 +386,6 @@ func (s *LocalConfigStore) loadGlobalConfig() error {
 
 	s.globalConfig = &config
 	s.globalConfigUpdate = time.Now()
-
-	return nil
-}
-
-func (s *LocalConfigStore) loadModelTemplateConfig() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	families, err := s.loadModelProviderConfigMapDir(filepath.Join(s.configDir, "models", "families"))
-	if err != nil {
-		return fmt.Errorf("loadModelTemplateConfig(): failed to load families: %w", err)
-	}
-	vendors, err := s.loadModelProviderConfigMapDir(filepath.Join(s.configDir, "models", "vendors"))
-	if err != nil {
-		return fmt.Errorf("loadModelTemplateConfig(): failed to load vendors: %w", err)
-	}
-	templates, err := s.loadModelTemplateGroupsDir(filepath.Join(s.configDir, "models", "templates"))
-	if err != nil {
-		return fmt.Errorf("loadModelTemplateConfig(): failed to load templates: %w", err)
-	}
-
-	s.globalConfig.ModelFamilies = families
-	s.globalConfig.ModelVendors = vendors
-	s.globalConfig.ModelTemplates = templates
 
 	return nil
 }
@@ -1334,9 +1307,6 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 	if filepath.Dir(event.Name) == modelFamiliesDir || filepath.Dir(event.Name) == modelVendorsDir || filepath.Dir(event.Name) == modelTemplatesDir {
 		ext := strings.ToLower(filepath.Ext(event.Name))
 		if ext == ".json" || ext == ".yml" || ext == ".yaml" {
-			if err := s.loadModelTemplateConfig(); err != nil {
-				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload model template config: %v\n", err)
-			}
 			return
 		}
 	}

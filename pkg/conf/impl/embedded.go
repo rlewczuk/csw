@@ -259,9 +259,6 @@ func (s *EmbeddedConfigStore) loadAllConfig() error {
 	if err := s.loadGlobalConfig(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load global config: %w", err)
 	}
-	if err := s.loadModelTemplateConfig(); err != nil {
-		return fmt.Errorf("loadAllConfig(): failed to load model template config: %w", err)
-	}
 	if err := s.loadModelProviderConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load model provider configs: %w", err)
 	}
@@ -661,27 +658,6 @@ func selectEmbeddedHookConfigFile(hookDir string, hookDirName string) (string, s
 	}
 
 	return fallbackPath, fallbackBase, data, fallbackYAML, additionalFiles, nil
-}
-
-func (s *EmbeddedConfigStore) loadModelTemplateConfig() error {
-	families, err := s.loadModelProviderConfigMapDir("conf/models/families")
-	if err != nil {
-		return fmt.Errorf("loadModelTemplateConfig(): failed to load families: %w", err)
-	}
-	vendors, err := s.loadModelProviderConfigMapDir("conf/models/vendors")
-	if err != nil {
-		return fmt.Errorf("loadModelTemplateConfig(): failed to load vendors: %w", err)
-	}
-	templates, err := s.loadModelTemplateGroupsDir("conf/models/templates")
-	if err != nil {
-		return fmt.Errorf("loadModelTemplateConfig(): failed to load templates: %w", err)
-	}
-
-	s.globalConfig.ModelFamilies = families
-	s.globalConfig.ModelVendors = vendors
-	s.globalConfig.ModelTemplates = templates
-
-	return nil
 }
 
 func (s *EmbeddedConfigStore) loadModelProviderConfigMapDir(dir string) (map[string]conf.ModelProviderConfig, error) {

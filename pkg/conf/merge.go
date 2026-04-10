@@ -159,10 +159,6 @@ func (c *GlobalConfig) Clone() *GlobalConfig {
 		LLMRetryMaxBackoffSeconds:  c.LLMRetryMaxBackoffSeconds,
 		Defaults:                   c.Defaults,
 		ShadowPaths:                append([]string(nil), c.ShadowPaths...),
-		ModelFamilies:              cloneModelProviderMapValue(c.ModelFamilies),
-		ModelVendors:               cloneModelProviderMapValue(c.ModelVendors),
-		ModelTemplates:             cloneModelTemplateGroups(c.ModelTemplates),
-		VendorFamilyOverrides:      cloneVendorFamilyOverrides(c.VendorFamilyOverrides),
 	}
 	if c.Defaults.Container != nil {
 		containerCopy := c.Defaults.Container.Clone()
@@ -200,59 +196,6 @@ func (c *GlobalConfig) Merge(override *GlobalConfig) {
 		c.ShadowPaths = append([]string(nil), override.ShadowPaths...)
 	}
 
-	if c.ModelFamilies == nil {
-		c.ModelFamilies = make(map[string]ModelProviderConfig)
-	}
-	for key, value := range override.ModelFamilies {
-		if existing, ok := c.ModelFamilies[key]; ok {
-			existing.Merge(&value)
-			c.ModelFamilies[key] = existing
-			continue
-		}
-		c.ModelFamilies[key] = *value.Clone()
-	}
-
-	if c.ModelVendors == nil {
-		c.ModelVendors = make(map[string]ModelProviderConfig)
-	}
-	for key, value := range override.ModelVendors {
-		if existing, ok := c.ModelVendors[key]; ok {
-			existing.Merge(&value)
-			c.ModelVendors[key] = existing
-			continue
-		}
-		c.ModelVendors[key] = *value.Clone()
-	}
-
-	if c.ModelTemplates == nil {
-		c.ModelTemplates = make(map[string]map[string]ModelProviderConfig)
-	}
-	for lab, templates := range override.ModelTemplates {
-		if c.ModelTemplates[lab] == nil {
-			c.ModelTemplates[lab] = make(map[string]ModelProviderConfig)
-		}
-		for modelName, template := range templates {
-			if existing, ok := c.ModelTemplates[lab][modelName]; ok {
-				existing.Merge(&template)
-				c.ModelTemplates[lab][modelName] = existing
-				continue
-			}
-			c.ModelTemplates[lab][modelName] = *template.Clone()
-		}
-	}
-
-	if c.VendorFamilyOverrides == nil {
-		c.VendorFamilyOverrides = make(map[string]ModelVendorFamilyTemplateOverride)
-	}
-	for key, overrideEntry := range override.VendorFamilyOverrides {
-		existing, ok := c.VendorFamilyOverrides[key]
-		if !ok {
-			c.VendorFamilyOverrides[key] = *overrideEntry.Clone()
-			continue
-		}
-		existing.Merge(&overrideEntry)
-		c.VendorFamilyOverrides[key] = existing
-	}
 }
 
 // Clone returns a deep copy of ModelProviderConfig.

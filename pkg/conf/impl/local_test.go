@@ -143,19 +143,6 @@ func TestLocalConfigStore_ModelTemplateConfig(t *testing.T) {
 	store, err := NewLocalConfigStore(tmpDir)
 	require.NoError(t, err)
 	defer store.Close()
-
-	global, err := store.GetGlobalConfig()
-	require.NoError(t, err)
-
-	_, hasFamily := global.ModelFamilies["openai-gpt"]
-	_, hasVendor := global.ModelVendors["openai"]
-	_, hasTemplateGroup := global.ModelTemplates["openai"]
-	require.True(t, hasFamily)
-	require.True(t, hasVendor)
-	require.True(t, hasTemplateGroup)
-	assert.Equal(t, 4096, global.ModelFamilies["openai-gpt"].MaxTokens)
-	assert.Equal(t, "openai", global.ModelVendors["openai"].Type)
-	assert.Equal(t, 8192, global.ModelTemplates["openai"]["gpt-4.1"].MaxTokens)
 }
 
 func TestLocalConfigStore_ModelProviderConfigs(t *testing.T) {

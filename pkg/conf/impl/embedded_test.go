@@ -62,9 +62,6 @@ func TestEmbeddedConfigStore_GetGlobalConfig(t *testing.T) {
 	assert.NotEmpty(t, config.ShadowPaths)
 	assert.Contains(t, config.ShadowPaths, "AGENTS.md")
 	assert.Contains(t, config.ShadowPaths, ".cswdata/**")
-	assert.NotEmpty(t, config.ModelFamilies)
-	assert.NotEmpty(t, config.ModelVendors)
-	assert.NotEmpty(t, config.ModelTemplates)
 
 	// Verify that returned config is a copy (modification doesn't affect cached data)
 	originalLen := len(config.ModelTags)

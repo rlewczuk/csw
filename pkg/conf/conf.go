@@ -696,14 +696,6 @@ type GlobalConfig struct {
 	Defaults CLIDefaultsConfig `json:"defaults,omitempty" yaml:"defaults,omitempty"`
 	// ShadowPaths defines glob patterns redirected to shadow directory when --shadow-dir is enabled.
 	ShadowPaths []string `json:"shadow-paths,omitempty" yaml:"shadow-paths,omitempty"`
-	// ModelFamilies contains model family templates.
-	ModelFamilies map[string]ModelProviderConfig `json:"model-families,omitempty" yaml:"model-families,omitempty"`
-	// ModelVendors contains inference vendor templates.
-	ModelVendors map[string]ModelProviderConfig `json:"model-vendors,omitempty" yaml:"model-vendors,omitempty"`
-	// ModelTemplates contains model templates grouped by training lab.
-	ModelTemplates map[string]map[string]ModelProviderConfig `json:"model-templates,omitempty" yaml:"model-templates,omitempty"`
-	// VendorFamilyOverrides contains per-provider vendor+family template overrides.
-	VendorFamilyOverrides map[string]ModelVendorFamilyTemplateOverride `json:"vendor-family-overrides,omitempty" yaml:"vendor-family-overrides,omitempty"`
 }
 
 // ConfigStore is an interface for accessing configuration data.
