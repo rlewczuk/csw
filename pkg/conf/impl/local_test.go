@@ -1547,3 +1547,68 @@ func TestLocalConfigStore_YAMLConfigFileWatching(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, newTime.After(initialTime))
 }
+
+func TestLocalConfigStore_GlobalConfigSupportsYAMLExtension(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	globalYAML := `defaults:
+  container:
+    enabled: true
+    image: "golang:1.25-trixie"
+`
+	err = os.WriteFile(filepath.Join(tmpDir, "global.yaml"), []byte(globalYAML), 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	config, err := store.GetGlobalConfig()
+	require.NoError(t, err)
+	require.NotNil(t, config.Defaults.Container)
+	assert.True(t, config.Defaults.Container.Enabled)
+	assert.Equal(t, "golang:1.25-trixie", config.Defaults.Container.Image)
+}
+
+func TestLocalConfigStore_YAMLLongExtensionConfigFileWatching(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-config-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	globalYAML := `model-tags:
+  - model: "^gpt-.*"
+    tag: "openai"
+`
+	err = os.WriteFile(filepath.Join(tmpDir, "global.yaml"), []byte(globalYAML), 0644)
+	require.NoError(t, err)
+
+	store, err := NewLocalConfigStore(tmpDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	initialTime, err := store.LastGlobalConfigUpdate()
+	require.NoError(t, err)
+
+	time.Sleep(10 * time.Millisecond)
+
+	globalYAML = `model-tags:
+  - model: "^claude-.*"
+    tag: "anthropic"
+  - model: "^gpt-.*"
+    tag: "openai"
+`
+	err = os.WriteFile(filepath.Join(tmpDir, "global.yaml"), []byte(globalYAML), 0644)
+	require.NoError(t, err)
+
+	time.Sleep(20 * time.Millisecond)
+
+	config, err := store.GetGlobalConfig()
+	require.NoError(t, err)
+	assert.Len(t, config.ModelTags, 2)
+
+	newTime, err := store.LastGlobalConfigUpdate()
+	require.NoError(t, err)
+	assert.True(t, newTime.After(initialTime))
+}
