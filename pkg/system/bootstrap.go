@@ -169,8 +169,8 @@ type ResolveWorktreeBranchNameParams struct {
 }
 
 // ResolveRunDefaults resolves run command defaults from effective global config.
-func ResolveRunDefaults(params ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
-	var defaults conf.CLIDefaultsConfig
+func ResolveRunDefaults(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+	var defaults conf.RunDefaultsConfig
 
 	resolvedWorkDir, err := ResolveWorkDir(params.WorkDir)
 	if err != nil {

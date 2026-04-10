@@ -66,7 +66,7 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 	// Create global.json
 	globalConfig := conf.GlobalConfig{
 		ContextCompactionThreshold: 0.8,
-		Defaults: conf.CLIDefaultsConfig{
+		Defaults: conf.RunDefaultsConfig{
 			Container: &conf.ContainerConfig{
 				Enabled: true,
 				Image:   "busybox:latest",

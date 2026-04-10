@@ -59,9 +59,9 @@ func TestCLIGitIdentityPropagation(t *testing.T) {
 				vcs.GitConfigValue = originalConfigValue
 			})
 
-			resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
+			resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 				_ = params
-				return conf.CLIDefaultsConfig{}, nil
+				return conf.RunDefaultsConfig{}, nil
 			}
 
 			vcs.GitLookPath = func(file string) (string, error) {

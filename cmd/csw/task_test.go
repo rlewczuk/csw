@@ -27,9 +27,9 @@ func TestResolveTaskDirPathUsesDefaultWhenUnset(t *testing.T) {
 		resolveTaskRunDefaultsFunc = originalResolver
 	})
 
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 		_ = params
-		return conf.CLIDefaultsConfig{}, nil
+		return conf.RunDefaultsConfig{}, nil
 	}
 
 	command := TaskCommand()
@@ -45,9 +45,9 @@ func TestResolveTaskDirPathUsesConfigDefaultWhenUnset(t *testing.T) {
 		resolveTaskRunDefaultsFunc = originalResolver
 	})
 
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 		_ = params
-		return conf.CLIDefaultsConfig{TaskDir: "custom/tasks"}, nil
+		return conf.RunDefaultsConfig{TaskDir: "custom/tasks"}, nil
 	}
 
 	command := TaskCommand()
@@ -63,9 +63,9 @@ func TestResolveTaskDirPathPrefersFlagOverConfigAndMakesRelativeAbsolute(t *test
 		resolveTaskRunDefaultsFunc = originalResolver
 	})
 
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 		_ = params
-		return conf.CLIDefaultsConfig{TaskDir: "from-config"}, nil
+		return conf.RunDefaultsConfig{TaskDir: "from-config"}, nil
 	}
 
 	command := TaskCommand()
@@ -145,20 +145,20 @@ func TestPrintTaskRunOutcome(t *testing.T) {
 
 func TestPrintTaskHuman(t *testing.T) {
 	taskData := &core.Task{
-		UUID:         "task-uuid",
-		Name:         "task-name",
-		Description:  "task-description",
-		Status:       core.TaskStatusOpen,
-		State:        core.TaskStateCompleted,
+		UUID:          "task-uuid",
+		Name:          "task-name",
+		Description:   "task-description",
+		Status:        core.TaskStatusOpen,
+		State:         core.TaskStateCompleted,
 		FeatureBranch: "feature/task",
-		ParentBranch: "main",
-		Role:         "developer",
-		ParentTaskID: "parent-uuid",
-		Deps:         []string{"dep-a", "dep-b"},
-		SessionIDs:   []string{"ses-1"},
-		SubtaskIDs:   []string{"sub-1"},
-		CreatedAt:    "2026-01-01T10:00:00Z",
-		UpdatedAt:    "2026-01-01T10:01:00Z",
+		ParentBranch:  "main",
+		Role:          "developer",
+		ParentTaskID:  "parent-uuid",
+		Deps:          []string{"dep-a", "dep-b"},
+		SessionIDs:    []string{"ses-1"},
+		SubtaskIDs:    []string{"sub-1"},
+		CreatedAt:     "2026-01-01T10:00:00Z",
+		UpdatedAt:     "2026-01-01T10:01:00Z",
 	}
 	meta := &core.TaskSessionSummary{SessionID: "ses-1", Status: core.TaskStateCompleted}
 

@@ -97,7 +97,7 @@ func TestContainerConfig_Merge(t *testing.T) {
 }
 
 func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
-	base := CLIDefaultsConfig{
+	base := RunDefaultsConfig{
 		DefaultProvider: "provider1",
 		DefaultRole:     "role1",
 		MaxToolThreads:  3,
@@ -115,7 +115,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		ShadowDir:       "shadow/base",
 		VFSAllow:        []string{"/base/allow"},
 	}
-	override := CLIDefaultsConfig{
+	override := RunDefaultsConfig{
 		DefaultProvider:     "provider2",
 		DefaultRole:         "role2",
 		MaxToolThreads:      12,
@@ -135,7 +135,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 
 	base.MergeFrom(override)
 
-	assert.Equal(t, CLIDefaultsConfig{
+	assert.Equal(t, RunDefaultsConfig{
 		DefaultProvider:     "provider2",
 		DefaultRole:         "role2",
 		MaxToolThreads:      12,
@@ -159,29 +159,29 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 func TestCLIDefaultsConfig_MergeFrom_GitIdentity(t *testing.T) {
 	tests := []struct {
 		name          string
-		base          CLIDefaultsConfig
-		override      CLIDefaultsConfig
+		base          RunDefaultsConfig
+		override      RunDefaultsConfig
 		expectedName  string
 		expectedEmail string
 	}{
 		{
 			name:          "override sets git identity",
-			base:          CLIDefaultsConfig{},
-			override:      CLIDefaultsConfig{GitUserName: "New User", GitUserEmail: "new@example.com"},
+			base:          RunDefaultsConfig{},
+			override:      RunDefaultsConfig{GitUserName: "New User", GitUserEmail: "new@example.com"},
 			expectedName:  "New User",
 			expectedEmail: "new@example.com",
 		},
 		{
 			name:          "empty override keeps base git identity",
-			base:          CLIDefaultsConfig{GitUserName: "Base User", GitUserEmail: "base@example.com"},
-			override:      CLIDefaultsConfig{},
+			base:          RunDefaultsConfig{GitUserName: "Base User", GitUserEmail: "base@example.com"},
+			override:      RunDefaultsConfig{},
 			expectedName:  "Base User",
 			expectedEmail: "base@example.com",
 		},
 		{
 			name:          "partial override only updates provided fields",
-			base:          CLIDefaultsConfig{GitUserName: "Base User", GitUserEmail: "base@example.com"},
-			override:      CLIDefaultsConfig{GitUserName: "New User"},
+			base:          RunDefaultsConfig{GitUserName: "Base User", GitUserEmail: "base@example.com"},
+			override:      RunDefaultsConfig{GitUserName: "New User"},
 			expectedName:  "New User",
 			expectedEmail: "base@example.com",
 		},
@@ -206,7 +206,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 		ContextCompactionThreshold: 0.7,
 		LLMRetryMaxAttempts:        5,
 		LLMRetryMaxBackoffSeconds:  30,
-		Defaults: CLIDefaultsConfig{
+		Defaults: RunDefaultsConfig{
 			DefaultProvider: "provider1",
 			DefaultRole:     "role1",
 			MaxToolThreads:  3,
@@ -230,7 +230,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 		ContextCompactionThreshold: 0.95,
 		LLMRetryMaxAttempts:        10,
 		LLMRetryMaxBackoffSeconds:  60,
-		Defaults: CLIDefaultsConfig{
+		Defaults: RunDefaultsConfig{
 			DefaultProvider:     "provider2",
 			DefaultRole:         "role2",
 			MaxToolThreads:      12,
@@ -261,7 +261,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 	assert.Equal(t, 12, base.Defaults.MaxToolThreads)
 	require.NotNil(t, base.Defaults.Container)
 	assert.Equal(t, ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, *base.Defaults.Container)
-	assert.Equal(t, CLIDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxToolThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks", ShadowDir: "shadow/override", AllowAllPermissions: true, VFSAllow: []string{"/override/allow"}}, base.Defaults)
+	assert.Equal(t, RunDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxToolThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks", ShadowDir: "shadow/override", AllowAllPermissions: true, VFSAllow: []string{"/override/allow"}}, base.Defaults)
 	assert.Equal(t, []string{".cswdata/**", ".agents/**"}, base.ShadowPaths)
 }
 
@@ -347,7 +347,7 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 				Default: map[string]bool{"runBash": true},
 				Tags:    map[string]map[string]bool{"safe": {"vfsRead": true}},
 			},
-			Defaults: CLIDefaultsConfig{Container: &ContainerConfig{Mounts: []string{"a"}, Env: []string{"A=1"}}, VFSAllow: []string{"/a", "/b"}},
+			Defaults: RunDefaultsConfig{Container: &ContainerConfig{Mounts: []string{"a"}, Env: []string{"A=1"}}, VFSAllow: []string{"/a", "/b"}},
 		}
 
 		clone := cfg.Clone()
@@ -485,7 +485,7 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 }
 
 func TestGlobalConfig_Merge_NilOverride(t *testing.T) {
-	base := &GlobalConfig{Defaults: CLIDefaultsConfig{DefaultProvider: "provider"}}
+	base := &GlobalConfig{Defaults: RunDefaultsConfig{DefaultProvider: "provider"}}
 	base.Merge(nil)
 	assert.Equal(t, "provider", base.Defaults.DefaultProvider)
 }

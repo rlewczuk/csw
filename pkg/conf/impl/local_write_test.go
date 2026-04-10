@@ -160,7 +160,7 @@ func TestLocalConfigStore_SaveGlobalConfig(t *testing.T) {
 
 	// Create global config
 	globalConfig := &conf.GlobalConfig{
-		Defaults:                   conf.CLIDefaultsConfig{DefaultProvider: "test-provider"},
+		Defaults:                   conf.RunDefaultsConfig{DefaultProvider: "test-provider"},
 		ContextCompactionThreshold: 0.9,
 		ModelTags: []conf.ModelTagMapping{
 			{Model: "gpt-4", Tag: "large"},
@@ -197,7 +197,7 @@ func TestLocalConfigStore_SaveGlobalConfig_Update(t *testing.T) {
 
 	// Create initial config
 	globalConfig := &conf.GlobalConfig{
-		Defaults: conf.CLIDefaultsConfig{DefaultProvider: "provider1"},
+		Defaults: conf.RunDefaultsConfig{DefaultProvider: "provider1"},
 	}
 	err = store.SaveGlobalConfig(globalConfig)
 	require.NoError(t, err)

@@ -128,9 +128,9 @@ func TestCLICommandInvocation(t *testing.T) {
 				resolveRunDefaultsFunc = originalDefaults
 			})
 
-			resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
+			resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 				_ = params
-				return conf.CLIDefaultsConfig{Model: "provider/default"}, nil
+				return conf.RunDefaultsConfig{Model: "provider/default"}, nil
 			}
 
 			captured := ""

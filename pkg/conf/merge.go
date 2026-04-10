@@ -79,8 +79,8 @@ func (c *ContainerConfig) Merge(override ContainerConfig) {
 	}
 }
 
-// MergeFrom merges overrides into CLIDefaultsConfig.
-func (c *CLIDefaultsConfig) MergeFrom(override CLIDefaultsConfig) {
+// MergeFrom merges overrides into RunDefaultsConfig.
+func (c *RunDefaultsConfig) MergeFrom(override RunDefaultsConfig) {
 	if override.DefaultProvider != "" {
 		c.DefaultProvider = override.DefaultProvider
 	}

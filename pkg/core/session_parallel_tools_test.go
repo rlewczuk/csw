@@ -334,7 +334,7 @@ func TestExecuteToolCalls_SpacesToolStartsByMinimumDelay(t *testing.T) {
 
 func TestMaxToolThreadsLimit_UsesOverrideThenConfigThenDefault(t *testing.T) {
 	configStore := impl.NewMockConfigStore()
-	configStore.SetGlobalConfig(&conf.GlobalConfig{Defaults: conf.CLIDefaultsConfig{MaxToolThreads: 11}})
+	configStore.SetGlobalConfig(&conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{MaxToolThreads: 11}})
 
 	session := &SweSession{configStore: configStore}
 	assert.Equal(t, 11, session.maxToolThreadsLimit())

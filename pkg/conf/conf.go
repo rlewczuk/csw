@@ -441,8 +441,8 @@ func (c *HookConfig) applyDefaults() {
 	}
 }
 
-// CLIDefaultsConfig defines default values for the cli command flags.
-type CLIDefaultsConfig struct {
+// RunDefaultsConfig defines default values for the cli command flags.
+type RunDefaultsConfig struct {
 	// DefaultProvider is the default model provider to use.
 	DefaultProvider string `json:"default-provider,omitempty" yaml:"default-provider,omitempty"`
 	// DefaultRole is the default agent role to use.
@@ -693,7 +693,7 @@ type GlobalConfig struct {
 	// Defaults to 60 when unset or invalid.
 	LLMRetryMaxBackoffSeconds int `json:"llm-retry-max-backoff-seconds,omitempty" yaml:"llm-retry-max-backoff-seconds,omitempty"`
 	// Defaults defines default values for cli command flags.
-	Defaults CLIDefaultsConfig `json:"defaults,omitempty" yaml:"defaults,omitempty"`
+	Defaults RunDefaultsConfig `json:"defaults,omitempty" yaml:"defaults,omitempty"`
 	// ShadowPaths defines glob patterns redirected to shadow directory when --shadow-dir is enabled.
 	ShadowPaths []string `json:"shadow-paths,omitempty" yaml:"shadow-paths,omitempty"`
 }

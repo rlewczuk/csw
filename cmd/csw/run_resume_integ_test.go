@@ -130,8 +130,8 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 				runFunc = originalRun
 				resolveRunDefaultsFunc = originalResolveDefaults
 			})
-			resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
-				return conf.CLIDefaultsConfig{}, nil
+			resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+				return conf.RunDefaultsConfig{}, nil
 			}
 
 			runFunc = func(params *RunParams) error {

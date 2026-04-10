@@ -12,7 +12,7 @@ import (
 )
 
 func TestCLIConfigDefaultsPropagation(t *testing.T) {
-	defaults := conf.CLIDefaultsConfig{
+	defaults := conf.RunDefaultsConfig{
 		Model:               "provider/default",
 		Worktree:            "feature/default",
 		Merge:               true,
@@ -35,7 +35,7 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 		resolveRunDefaultsFunc = originalDefaultsResolver
 	})
 
-	resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
+	resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 		_ = params
 		return defaults, nil
 	}
@@ -97,7 +97,7 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 }
 
 func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
-	defaults := conf.CLIDefaultsConfig{
+	defaults := conf.RunDefaultsConfig{
 		Model:               "provider/default",
 		Worktree:            "feature/default",
 		Merge:               true,
@@ -120,7 +120,7 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 		resolveRunDefaultsFunc = originalDefaultsResolver
 	})
 
-	resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
+	resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 		_ = params
 		return defaults, nil
 	}

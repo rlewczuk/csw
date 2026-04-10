@@ -172,7 +172,7 @@ func TestResolveContainerRuntimeConfig(t *testing.T) {
 		{name: "disabled by default", global: &conf.GlobalConfig{}, params: BuildSystemParams{}},
 		{
 			name: "enabled from global config",
-			global: &conf.GlobalConfig{Defaults: conf.CLIDefaultsConfig{Container: &conf.ContainerConfig{
+			global: &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{Container: &conf.ContainerConfig{
 				Enabled: true,
 				Image:   "busybox:latest",
 				Env:     []string{"TEST_ENV=global"},
@@ -185,27 +185,27 @@ func TestResolveContainerRuntimeConfig(t *testing.T) {
 		},
 		{
 			name:          "container enabled uses global image",
-			global:        &conf.GlobalConfig{Defaults: conf.CLIDefaultsConfig{Container: &conf.ContainerConfig{Image: "alpine:latest"}}},
+			global:        &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{Container: &conf.ContainerConfig{Image: "alpine:latest"}}},
 			params:        BuildSystemParams{ContainerEnabled: true},
 			expectEnabled: true,
 			expectImage:   "alpine:latest",
 		},
 		{
 			name:          "container disabled overrides global enabled",
-			global:        &conf.GlobalConfig{Defaults: conf.CLIDefaultsConfig{Container: &conf.ContainerConfig{Enabled: true, Image: "alpine:latest"}}},
+			global:        &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{Container: &conf.ContainerConfig{Enabled: true, Image: "alpine:latest"}}},
 			params:        BuildSystemParams{ContainerDisabled: true},
 			expectEnabled: false,
 		},
 		{
 			name:          "cli image overrides global image",
-			global:        &conf.GlobalConfig{Defaults: conf.CLIDefaultsConfig{Container: &conf.ContainerConfig{Enabled: true, Image: "alpine:latest"}}},
+			global:        &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{Container: &conf.ContainerConfig{Enabled: true, Image: "alpine:latest"}}},
 			params:        BuildSystemParams{ContainerImage: "busybox:1.36"},
 			expectEnabled: true,
 			expectImage:   "busybox:1.36",
 		},
 		{
 			name:          "additional mounts are included",
-			global:        &conf.GlobalConfig{Defaults: conf.CLIDefaultsConfig{Container: &conf.ContainerConfig{Enabled: true, Image: "busybox:latest"}}},
+			global:        &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{Container: &conf.ContainerConfig{Enabled: true, Image: "busybox:latest"}}},
 			params:        BuildSystemParams{ContainerMounts: []string{extraMountHost + ":/mnt/extra"}},
 			expectEnabled: true,
 			expectImage:   "busybox:latest",
@@ -213,7 +213,7 @@ func TestResolveContainerRuntimeConfig(t *testing.T) {
 		},
 		{
 			name:        "enabled without image returns error",
-			global:      &conf.GlobalConfig{Defaults: conf.CLIDefaultsConfig{Container: &conf.ContainerConfig{Enabled: true}}},
+			global:      &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{Container: &conf.ContainerConfig{Enabled: true}}},
 			params:      BuildSystemParams{},
 			expectError: true,
 		},
@@ -260,7 +260,7 @@ func TestResolveContainerRuntimeConfig_ShadowDirNotMountedWhenEmpty(t *testing.T
 	effectiveWorkDir := t.TempDir()
 
 	resolved, err := ResolveContainerRuntimeConfig(
-		&conf.GlobalConfig{Defaults: conf.CLIDefaultsConfig{Container: &conf.ContainerConfig{Enabled: true, Image: "busybox:latest"}}},
+		&conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{Container: &conf.ContainerConfig{Enabled: true, Image: "busybox:latest"}}},
 		BuildSystemParams{},
 		effectiveWorkDir,
 		"",
