@@ -13,16 +13,19 @@ import (
 
 func TestCLIConfigDefaultsPropagation(t *testing.T) {
 	defaults := conf.CLIDefaultsConfig{
-		Model:          "provider/default",
-		Worktree:       "feature/default",
-		Merge:          true,
-		LogLLMRequests: true,
-		Thinking:       "high",
-		LSPServer:      "gopls",
-		GitUserName:    "Config User",
-		GitUserEmail:   "config@example.com",
-		MaxThreads:     13,
-		TaskDir:        "default/tasks",
+		Model:               "provider/default",
+		Worktree:            "feature/default",
+		Merge:               true,
+		LogLLMRequests:      true,
+		Thinking:            "high",
+		LSPServer:           "gopls",
+		GitUserName:         "Config User",
+		GitUserEmail:        "config@example.com",
+		MaxThreads:          13,
+		TaskDir:             "default/tasks",
+		ShadowDir:           "shadow/default",
+		AllowAllPermissions: true,
+		VFSAllow:            []string{"/allowed/one", "/allowed/two"},
 	}
 
 	originalRun := runCLIFunc
@@ -43,12 +46,21 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 		if params.TaskInfo != nil {
 			taskDir = params.TaskInfo.TaskDir
 		}
+		vfsAllowJoined := ""
+		if len(params.VFSAllow) > 0 {
+			vfsAllowJoined = params.VFSAllow[0]
+			for _, value := range params.VFSAllow[1:] {
+				vfsAllowJoined += ";" + value
+			}
+		}
 		captured = fmt.Sprintf(
-			"model=%s,shadow=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s,maxThreads=%d,taskDir=%s",
+			"model=%s,shadow=%s,worktree=%s,merge=%t,allowAll=%t,vfsAllow=%s,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s,maxThreads=%d,taskDir=%s",
 			params.ModelName,
 			params.ShadowDir,
 			params.WorktreeBranch,
 			params.Merge,
+			params.AllowAllPerms,
+			vfsAllowJoined,
 			params.LogLLMRequests,
 			params.Thinking,
 			params.LSPServer,
@@ -70,9 +82,11 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 	assert.Contains(t, captured, "model=provider/default")
-	assert.Contains(t, captured, "shadow=")
+	assert.Contains(t, captured, "shadow=shadow/default")
 	assert.Contains(t, captured, "worktree=feature/default")
 	assert.Contains(t, captured, "merge=true")
+	assert.Contains(t, captured, "allowAll=true")
+	assert.Contains(t, captured, "vfsAllow=/allowed/one;/allowed/two")
 	assert.Contains(t, captured, "log=true")
 	assert.Contains(t, captured, "thinking=high")
 	assert.Contains(t, captured, "lsp=gopls")
@@ -84,16 +98,19 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 
 func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	defaults := conf.CLIDefaultsConfig{
-		Model:          "provider/default",
-		Worktree:       "feature/default",
-		Merge:          true,
-		LogLLMRequests: true,
-		Thinking:       "high",
-		LSPServer:      "gopls",
-		GitUserName:    "Config User",
-		GitUserEmail:   "config@example.com",
-		MaxThreads:     13,
-		TaskDir:        "default/tasks",
+		Model:               "provider/default",
+		Worktree:            "feature/default",
+		Merge:               true,
+		LogLLMRequests:      true,
+		Thinking:            "high",
+		LSPServer:           "gopls",
+		GitUserName:         "Config User",
+		GitUserEmail:        "config@example.com",
+		MaxThreads:          13,
+		TaskDir:             "default/tasks",
+		ShadowDir:           "shadow/default",
+		AllowAllPermissions: true,
+		VFSAllow:            []string{"/allowed/one", "/allowed/two"},
 	}
 
 	originalRun := runCLIFunc
@@ -114,12 +131,21 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 		if params.TaskInfo != nil {
 			taskDir = params.TaskInfo.TaskDir
 		}
+		vfsAllowJoined := ""
+		if len(params.VFSAllow) > 0 {
+			vfsAllowJoined = params.VFSAllow[0]
+			for _, value := range params.VFSAllow[1:] {
+				vfsAllowJoined += ";" + value
+			}
+		}
 		captured = fmt.Sprintf(
-			"model=%s,shadow=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s,maxThreads=%d,taskDir=%s",
+			"model=%s,shadow=%s,worktree=%s,merge=%t,allowAll=%t,vfsAllow=%s,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s,maxThreads=%d,taskDir=%s",
 			params.ModelName,
 			params.ShadowDir,
 			params.WorktreeBranch,
 			params.Merge,
+			params.AllowAllPerms,
+			vfsAllowJoined,
 			params.LogLLMRequests,
 			params.Thinking,
 			params.LSPServer,
@@ -138,8 +164,11 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	cmd.SetErr(stderr)
 	cmd.SetArgs([]string{
 		"--model=provider/override",
+		"--shadow-dir=shadow/override",
 		"--worktree=feature/override",
 		"--merge=false",
+		"--allow-all-permissions=false",
+		"--vfs-allow=/explicit/allow",
 		"--log-llm-requests=false",
 		"--log-llm-requests-raw",
 		"--thinking=medium",
@@ -153,8 +182,11 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 	assert.Contains(t, captured, "model=provider/override")
+	assert.Contains(t, captured, "shadow=shadow/override")
 	assert.Contains(t, captured, "worktree=feature/override")
 	assert.Contains(t, captured, "merge=false")
+	assert.Contains(t, captured, "allowAll=false")
+	assert.Contains(t, captured, "vfsAllow=/explicit/allow")
 	assert.Contains(t, captured, "log=true")
 	assert.Contains(t, captured, "thinking=medium")
 	assert.Contains(t, captured, "lsp=custom-lsp")

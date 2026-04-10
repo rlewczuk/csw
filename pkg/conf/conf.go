@@ -471,6 +471,12 @@ type CLIDefaultsConfig struct {
 	MaxThreads int `json:"max-threads,omitempty" yaml:"max-threads,omitempty"`
 	// TaskDir is the default task directory used by task commands.
 	TaskDir string `json:"task-dir,omitempty" yaml:"task-dir,omitempty"`
+	// ShadowDir is the default --shadow-dir value.
+	ShadowDir string `json:"shadow-dir,omitempty" yaml:"shadow-dir,omitempty"`
+	// AllowAllPermissions is the default --allow-all-permissions value.
+	AllowAllPermissions bool `json:"allow-all-permissions,omitempty" yaml:"allow-all-permissions,omitempty"`
+	// VFSAllow is the default --vfs-allow value.
+	VFSAllow []string `json:"vfs-allow,omitempty" yaml:"vfs-allow,omitempty"`
 }
 
 // ModelProviderConfig represents common configuration for model providers.

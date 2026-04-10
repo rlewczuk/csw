@@ -112,39 +112,47 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		GitUserEmail:    "base@example.com",
 		MaxThreads:      4,
 		TaskDir:         ".cswdata/tasks",
+		ShadowDir:       "shadow/base",
+		VFSAllow:        []string{"/base/allow"},
 	}
 	override := CLIDefaultsConfig{
-		DefaultProvider: "provider2",
-		DefaultRole:     "role2",
-		MaxToolThreads:  12,
-		Container:       &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
-		Model:           "provider2/model",
-		Merge:           true,
-		LogLLMRequests:  true,
-		LSPServer:       "second",
-		GitUserName:     "Override User",
-		GitUserEmail:    "override@example.com",
-		MaxThreads:      12,
-		TaskDir:         "custom/tasks",
+		DefaultProvider:     "provider2",
+		DefaultRole:         "role2",
+		MaxToolThreads:      12,
+		Container:           &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
+		Model:               "provider2/model",
+		Merge:               true,
+		LogLLMRequests:      true,
+		LSPServer:           "second",
+		GitUserName:         "Override User",
+		GitUserEmail:        "override@example.com",
+		MaxThreads:          12,
+		TaskDir:             "custom/tasks",
+		ShadowDir:           "shadow/override",
+		AllowAllPermissions: true,
+		VFSAllow:            []string{"/override/allow1", "/override/allow2"},
 	}
 
 	base.MergeFrom(override)
 
 	assert.Equal(t, CLIDefaultsConfig{
-		DefaultProvider: "provider2",
-		DefaultRole:     "role2",
-		MaxToolThreads:  12,
-		Container:       &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
-		Model:           "provider2/model",
-		Worktree:        "feature/one",
-		Merge:           true,
-		LogLLMRequests:  true,
-		Thinking:        "medium",
-		LSPServer:       "second",
-		GitUserName:     "Override User",
-		GitUserEmail:    "override@example.com",
-		MaxThreads:      12,
-		TaskDir:         "custom/tasks",
+		DefaultProvider:     "provider2",
+		DefaultRole:         "role2",
+		MaxToolThreads:      12,
+		Container:           &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
+		Model:               "provider2/model",
+		Worktree:            "feature/one",
+		Merge:               true,
+		LogLLMRequests:      true,
+		Thinking:            "medium",
+		LSPServer:           "second",
+		GitUserName:         "Override User",
+		GitUserEmail:        "override@example.com",
+		MaxThreads:          12,
+		TaskDir:             "custom/tasks",
+		ShadowDir:           "shadow/override",
+		AllowAllPermissions: true,
+		VFSAllow:            []string{"/override/allow1", "/override/allow2"},
 	}, base)
 }
 
@@ -207,6 +215,8 @@ func TestGlobalConfig_Merge(t *testing.T) {
 			Worktree:        "w1",
 			Thinking:        "low",
 			TaskDir:         ".cswdata/tasks",
+			ShadowDir:       "shadow/base",
+			VFSAllow:        []string{"/base/allow"},
 		},
 		ShadowPaths: []string{"AGENTS.md"},
 	}
@@ -221,16 +231,19 @@ func TestGlobalConfig_Merge(t *testing.T) {
 		LLMRetryMaxAttempts:        10,
 		LLMRetryMaxBackoffSeconds:  60,
 		Defaults: CLIDefaultsConfig{
-			DefaultProvider: "provider2",
-			DefaultRole:     "role2",
-			MaxToolThreads:  12,
-			Container:       &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
-			Model:           "m2",
-			Merge:           true,
-			LogLLMRequests:  true,
-			Thinking:        "high",
-			LSPServer:       "lsp2",
-			TaskDir:         "custom/tasks",
+			DefaultProvider:     "provider2",
+			DefaultRole:         "role2",
+			MaxToolThreads:      12,
+			Container:           &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
+			Model:               "m2",
+			Merge:               true,
+			LogLLMRequests:      true,
+			Thinking:            "high",
+			LSPServer:           "lsp2",
+			TaskDir:             "custom/tasks",
+			ShadowDir:           "shadow/override",
+			AllowAllPermissions: true,
+			VFSAllow:            []string{"/override/allow"},
 		},
 		ShadowPaths: []string{".cswdata/**", ".agents/**"},
 	}
@@ -248,7 +261,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 	assert.Equal(t, 12, base.Defaults.MaxToolThreads)
 	require.NotNil(t, base.Defaults.Container)
 	assert.Equal(t, ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, *base.Defaults.Container)
-	assert.Equal(t, CLIDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxToolThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks"}, base.Defaults)
+	assert.Equal(t, CLIDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxToolThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks", ShadowDir: "shadow/override", AllowAllPermissions: true, VFSAllow: []string{"/override/allow"}}, base.Defaults)
 	assert.Equal(t, []string{".cswdata/**", ".agents/**"}, base.ShadowPaths)
 }
 
@@ -334,7 +347,7 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 				Default: map[string]bool{"runBash": true},
 				Tags:    map[string]map[string]bool{"safe": {"vfsRead": true}},
 			},
-			Defaults: CLIDefaultsConfig{Container: &ContainerConfig{Mounts: []string{"a"}, Env: []string{"A=1"}}},
+			Defaults: CLIDefaultsConfig{Container: &ContainerConfig{Mounts: []string{"a"}, Env: []string{"A=1"}}, VFSAllow: []string{"/a", "/b"}},
 		}
 
 		clone := cfg.Clone()
@@ -346,11 +359,13 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 		require.NotNil(t, clone.Defaults.Container)
 		require.NotNil(t, cfg.Defaults.Container)
 		clone.Defaults.Container.Mounts[0] = "b"
+		clone.Defaults.VFSAllow[0] = "/changed"
 
 		assert.Equal(t, "all", cfg.ModelTags[0].Tag)
 		assert.True(t, cfg.ToolSelection.Default["runBash"])
 		assert.True(t, cfg.ToolSelection.Tags["safe"]["vfsRead"])
 		assert.Equal(t, "a", cfg.Defaults.Container.Mounts[0])
+		assert.Equal(t, "/a", cfg.Defaults.VFSAllow[0])
 	})
 
 	t.Run("provider clone is deep copy", func(t *testing.T) {

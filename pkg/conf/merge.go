@@ -134,6 +134,15 @@ mergeOtherFields:
 	if override.TaskDir != "" {
 		c.TaskDir = override.TaskDir
 	}
+	if override.ShadowDir != "" {
+		c.ShadowDir = override.ShadowDir
+	}
+	if override.AllowAllPermissions {
+		c.AllowAllPermissions = true
+	}
+	if len(override.VFSAllow) > 0 {
+		c.VFSAllow = append([]string(nil), override.VFSAllow...)
+	}
 }
 
 // Clone returns a deep copy of GlobalConfig.
@@ -158,6 +167,9 @@ func (c *GlobalConfig) Clone() *GlobalConfig {
 	if c.Defaults.Container != nil {
 		containerCopy := c.Defaults.Container.Clone()
 		cloned.Defaults.Container = &containerCopy
+	}
+	if len(c.Defaults.VFSAllow) > 0 {
+		cloned.Defaults.VFSAllow = append([]string(nil), c.Defaults.VFSAllow...)
 	}
 	copy(cloned.ModelTags, c.ModelTags)
 

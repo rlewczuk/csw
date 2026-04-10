@@ -250,7 +250,7 @@ func CliCommand() *cobra.Command {
 				return err
 			}
 
-			if err := applyCLIDefaults(cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads); err != nil {
+			if err := applyCLIDefaults(cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads, &cliShadowDir, &cliAllowAllPerms, &cliVFSAllow); err != nil {
 				return err
 			}
 			cliLogLLMRequests = cliLogLLMRequests || cliLogLLMRequestsRaw
@@ -449,6 +449,9 @@ func applyCLIDefaults(
 	gitUser *string,
 	gitEmail *string,
 	maxThreads *int,
+	shadowDirOut *string,
+	allowAllPerms *bool,
+	vfsAllow *[]string,
 ) error {
 	defaults, err := resolveCLIDefaultsFunc(system.ResolveCLIDefaultsParams{
 		WorkDir:       workDir,
@@ -486,6 +489,15 @@ func applyCLIDefaults(
 	}
 	if !cmd.Flags().Changed("max-threads") && defaults.MaxThreads > 0 {
 		*maxThreads = defaults.MaxThreads
+	}
+	if !cmd.Flags().Changed("shadow-dir") && defaults.ShadowDir != "" {
+		*shadowDirOut = defaults.ShadowDir
+	}
+	if !cmd.Flags().Changed("allow-all-permissions") && defaults.AllowAllPermissions {
+		*allowAllPerms = true
+	}
+	if !cmd.Flags().Changed("vfs-allow") && len(defaults.VFSAllow) > 0 {
+		*vfsAllow = append([]string(nil), defaults.VFSAllow...)
 	}
 
 	if *maxThreads < 0 {
@@ -624,20 +636,20 @@ func runCLI(params *CLIParams) error {
 		autoPermissionResponse = "Allow"
 	}
 	runtimeResult, err := sweSystem.StartCLISession(system.StartCLISessionParams{
-		ModelName:          params.ModelName,
-		RoleName:           params.RoleName,
-		TaskInfo:           params.TaskInfo,
+		ModelName:              params.ModelName,
+		RoleName:               params.RoleName,
+		TaskInfo:               params.TaskInfo,
 		AutoPermissionResponse: autoPermissionResponse,
-		Thinking:           params.Thinking,
-		ModelOverridden:    params.ModelOverridden,
-		RoleOverridden:     params.RoleOverridden,
-		ThinkingOverridden: params.ThinkingOverridden,
-		Prompt:             params.Prompt,
-		ResumeTarget:       params.ResumeTarget,
-		ContinueSession:    params.ContinueSession,
-		ForceResume:        params.ForceResume,
-		ForceCompact:       params.ForceCompact,
-		OutputHandler:      sessionOutput,
+		Thinking:               params.Thinking,
+		ModelOverridden:        params.ModelOverridden,
+		RoleOverridden:         params.RoleOverridden,
+		ThinkingOverridden:     params.ThinkingOverridden,
+		Prompt:                 params.Prompt,
+		ResumeTarget:           params.ResumeTarget,
+		ContinueSession:        params.ContinueSession,
+		ForceResume:            params.ForceResume,
+		ForceCompact:           params.ForceCompact,
+		OutputHandler:          sessionOutput,
 	})
 	if err != nil {
 		return fmt.Errorf("runCLI() [cli.go]: failed to start CLI session runtime: %w", err)
