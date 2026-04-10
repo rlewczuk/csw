@@ -15,7 +15,7 @@ import (
 func TestPreparePromptWithPreRunHook(t *testing.T) {
 	tests := []struct {
 		name           string
-		params         *CLIParams
+		params         *RunParams
 		withHook       bool
 		runnerSetup    func(*runner.MockRunner)
 		expectedPrompt string
@@ -24,7 +24,7 @@ func TestPreparePromptWithPreRunHook(t *testing.T) {
 	}{
 		{
 			name: "pre_run hook updates context before template rendering",
-			params: &CLIParams{
+			params: &RunParams{
 				Prompt:      "Hello {{.NAME}}",
 				ContextData: map[string]string{},
 			},
@@ -37,7 +37,7 @@ func TestPreparePromptWithPreRunHook(t *testing.T) {
 		},
 		{
 			name: "without hook engine prompt still renders from cli context",
-			params: &CLIParams{
+			params: &RunParams{
 				Prompt:      "Hello {{.NAME}}",
 				ContextData: map[string]string{"NAME": "FromCLI"},
 			},
@@ -47,7 +47,7 @@ func TestPreparePromptWithPreRunHook(t *testing.T) {
 		},
 		{
 			name: "pre_run hook failure is returned",
-			params: &CLIParams{
+			params: &RunParams{
 				Prompt: "Hello",
 			},
 			withHook: true,

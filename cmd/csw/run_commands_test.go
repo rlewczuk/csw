@@ -15,7 +15,7 @@ import (
 )
 
 func TestCliWorktreeAndCommitMessageFlagsDefinition(t *testing.T) {
-	cmd := CliCommand()
+	cmd := RunCommand()
 
 	worktreeFlag := cmd.Flags().Lookup("worktree")
 	require.NotNil(t, worktreeFlag)
@@ -121,20 +121,20 @@ func TestCLICommandInvocation(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(workDir, ".agents", "commands", "review.md"), []byte(tt.commandContent), 0644))
 			}
 
-			originalRun := runCLIFunc
-			originalDefaults := resolveCLIDefaultsFunc
+			originalRun := runFunc
+			originalDefaults := resolveRunDefaultsFunc
 			t.Cleanup(func() {
-				runCLIFunc = originalRun
-				resolveCLIDefaultsFunc = originalDefaults
+				runFunc = originalRun
+				resolveRunDefaultsFunc = originalDefaults
 			})
 
-			resolveCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+			resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
 				_ = params
 				return conf.CLIDefaultsConfig{Model: "provider/default"}, nil
 			}
 
 			captured := ""
-			runCLIFunc = func(params *CLIParams) error {
+			runFunc = func(params *RunParams) error {
 				mockRunner := runner.NewMockRunner()
 				hostRunner := runner.NewMockRunner()
 				for command, output := range tt.shellResponse {
@@ -148,7 +148,7 @@ func TestCLICommandInvocation(t *testing.T) {
 				return nil
 			}
 
-			cmd := CliCommand()
+			cmd := RunCommand()
 			stdout := &bytes.Buffer{}
 			stderr := &bytes.Buffer{}
 			cmd.SetOut(stdout)
@@ -176,7 +176,7 @@ func TestRenderCommandPromptFileReference(t *testing.T) {
 	workDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(workDir, "file.txt"), []byte("abc"), 0644))
 
-	params := &CLIParams{CommandName: "review", CommandTemplate: "Read @file.txt", CommandArgs: []string{}}
+	params := &RunParams{CommandName: "review", CommandTemplate: "Read @file.txt", CommandArgs: []string{}}
 	err := renderCommandPrompt(params, workDir, runner.NewMockRunner(), runner.NewMockRunner())
 	require.NoError(t, err)
 	assert.Equal(t, "Read abc", params.Prompt)

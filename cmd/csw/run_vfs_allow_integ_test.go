@@ -85,21 +85,21 @@ func TestCLIVFSAllowIntegration(t *testing.T) {
 
 	t.Run("VFSAllowPathsParsedAndPassedToRuntime", func(t *testing.T) {
 		// This test verifies that the VFSAllow paths are correctly parsed and
-		// passed through CLIParams to runtime code
+		// passed through RunParams to runtime code
 
-		// Create a mock runCLIFunc to capture the params
-		var capturedParams *CLIParams
-		originalRunCLIFunc := runCLIFunc
-		runCLIFunc = func(params *CLIParams) error {
+		// Create a mock runFunc to capture the params
+		var capturedParams *RunParams
+		originalRunCLIFunc := runFunc
+		runFunc = func(params *RunParams) error {
 			capturedParams = params
 			return nil
 		}
 		defer func() {
-			runCLIFunc = originalRunCLIFunc
+			runFunc = originalRunCLIFunc
 		}()
 
 		// Get the CLI command
-		cmd := CliCommand()
+		cmd := RunCommand()
 
 		// Execute with vfs-allow flags
 		cmd.SetArgs([]string{
@@ -121,17 +121,17 @@ func TestCLIVFSAllowIntegration(t *testing.T) {
 	t.Run("VFSAllowColonSeparated", func(t *testing.T) {
 		// This test verifies that colon-separated paths work correctly
 
-		var capturedParams *CLIParams
-		originalRunCLIFunc := runCLIFunc
-		runCLIFunc = func(params *CLIParams) error {
+		var capturedParams *RunParams
+		originalRunCLIFunc := runFunc
+		runFunc = func(params *RunParams) error {
 			capturedParams = params
 			return nil
 		}
 		defer func() {
-			runCLIFunc = originalRunCLIFunc
+			runFunc = originalRunCLIFunc
 		}()
 
-		cmd := CliCommand()
+		cmd := RunCommand()
 
 		// Execute with colon-separated vfs-allow flag
 		cmd.SetArgs([]string{
@@ -155,17 +155,17 @@ func TestCLIVFSAllowIntegration(t *testing.T) {
 		require.NoError(t, err)
 		defer os.RemoveAll(allowedDir3)
 
-		var capturedParams *CLIParams
-		originalRunCLIFunc := runCLIFunc
-		runCLIFunc = func(params *CLIParams) error {
+		var capturedParams *RunParams
+		originalRunCLIFunc := runFunc
+		runFunc = func(params *RunParams) error {
 			capturedParams = params
 			return nil
 		}
 		defer func() {
-			runCLIFunc = originalRunCLIFunc
+			runFunc = originalRunCLIFunc
 		}()
 
-		cmd := CliCommand()
+		cmd := RunCommand()
 
 		// Execute with mixed flags and colon-separated
 		cmd.SetArgs([]string{
@@ -187,7 +187,7 @@ func TestCLIVFSAllowIntegration(t *testing.T) {
 }
 
 func TestVFSAllowFlagInHelp(t *testing.T) {
-	cmd := CliCommand()
+	cmd := RunCommand()
 
 	// Capture help output
 	var buf strings.Builder

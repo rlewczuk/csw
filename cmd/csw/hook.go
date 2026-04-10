@@ -115,14 +115,14 @@ func hookRunCommand() *cobra.Command {
 				return fmt.Errorf("hookRunCommand() [hook.go]: hook name cannot be empty")
 			}
 
-			contextData, err := system.ParseCLIContextEntries(contextPairs)
+			contextData, err := system.ParseRunContextEntries(contextPairs)
 			if err != nil {
 				return fmt.Errorf("hookRunCommand() [hook.go]: failed to parse --context values: %w", err)
 			}
 			if contextData == nil {
 				contextData = map[string]string{}
 			}
-			contextFromData, err := system.ParseCLIContextFromEntries(contextFiles)
+			contextFromData, err := system.ParseRunContextFromEntries(contextFiles)
 			if err != nil {
 				return fmt.Errorf("hookRunCommand() [hook.go]: failed to parse --context-from values: %w", err)
 			}

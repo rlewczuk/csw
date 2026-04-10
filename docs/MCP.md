@@ -83,7 +83,7 @@ mcp-servers:
 
 When role `mcp-servers` is present and no CLI MCP flags are passed, only listed servers are enabled; others are disabled.
 
-3. **CLI runtime overrides** on `csw cli`:
+3. **CLI runtime overrides** on `csw run`:
    - `--mcp-enable <name>[,<name>...]` (repeatable)
    - `--mcp-disable <name>[,<name>...]` (repeatable)
 

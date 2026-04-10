@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseCLIContextEntries(t *testing.T) {
+func TestParseRunContextEntries(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       []string
@@ -71,7 +71,7 @@ func TestParseCLIContextEntries(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual, err := ParseCLIContextEntries(tt.input)
+			actual, err := ParseRunContextEntries(tt.input)
 			if tt.expectError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorText)

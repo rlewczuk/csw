@@ -1,6 +1,6 @@
 # Commands
 
-This document describes **custom slash commands** used with `csw cli`.
+This document describes **custom slash commands** used with `csw run`.
 
 Custom commands let you store reusable prompt templates as files and invoke them with:
 
@@ -29,13 +29,13 @@ When `--shadow-dir` is set, commands are loaded from:
 Invoke a command as the prompt:
 
 ```bash
-csw cli "/review api package"
+csw run "/review api package"
 ```
 
 or pass arguments as extra positional CLI args:
 
 ```bash
-csw cli /review api package
+csw run /review api package
 ```
 
 Both forms resolve to command name `review` with arguments `api`, `package`.
@@ -45,7 +45,7 @@ Both forms resolve to command name `review` with arguments `api`, `package`.
 Arguments are shell-like tokenized, including quoted values:
 
 ```bash
-csw cli '/review src/pkg "naming consistency"'
+csw run '/review src/pkg "naming consistency"'
 ```
 
 In this case, the second argument is `naming consistency`.
@@ -85,7 +85,7 @@ All args: $ARGUMENTS
 Invocation:
 
 ```bash
-csw cli '/review pkg/core "focus on error handling"'
+csw run '/review pkg/core "focus on error handling"'
 ```
 
 Rendered prompt:
@@ -181,7 +181,7 @@ Focus on correctness, clarity, and test coverage.
 Use it with:
 
 ```bash
-csw cli "/review pkg/core pkg/tool"
+csw run "/review pkg/core pkg/tool"
 ```
 
 ### Command with metadata example
@@ -226,7 +226,7 @@ Relevant file:
 Invocation:
 
 ```bash
-csw cli '/debug TestAgentCoreInitialization pkg/core/session.go'
+csw run '/debug TestAgentCoreInitialization pkg/core/session.go'
 ```
 
 ---

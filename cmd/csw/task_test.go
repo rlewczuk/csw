@@ -22,12 +22,12 @@ func TestTaskCommandHasTaskDirPersistentFlag(t *testing.T) {
 }
 
 func TestResolveTaskDirPathUsesDefaultWhenUnset(t *testing.T) {
-	originalResolver := resolveTaskCLIDefaultsFunc
+	originalResolver := resolveTaskRunDefaultsFunc
 	t.Cleanup(func() {
-		resolveTaskCLIDefaultsFunc = originalResolver
+		resolveTaskRunDefaultsFunc = originalResolver
 	})
 
-	resolveTaskCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
 		_ = params
 		return conf.CLIDefaultsConfig{}, nil
 	}
@@ -40,12 +40,12 @@ func TestResolveTaskDirPathUsesDefaultWhenUnset(t *testing.T) {
 }
 
 func TestResolveTaskDirPathUsesConfigDefaultWhenUnset(t *testing.T) {
-	originalResolver := resolveTaskCLIDefaultsFunc
+	originalResolver := resolveTaskRunDefaultsFunc
 	t.Cleanup(func() {
-		resolveTaskCLIDefaultsFunc = originalResolver
+		resolveTaskRunDefaultsFunc = originalResolver
 	})
 
-	resolveTaskCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
 		_ = params
 		return conf.CLIDefaultsConfig{TaskDir: "custom/tasks"}, nil
 	}
@@ -58,12 +58,12 @@ func TestResolveTaskDirPathUsesConfigDefaultWhenUnset(t *testing.T) {
 }
 
 func TestResolveTaskDirPathPrefersFlagOverConfigAndMakesRelativeAbsolute(t *testing.T) {
-	originalResolver := resolveTaskCLIDefaultsFunc
+	originalResolver := resolveTaskRunDefaultsFunc
 	t.Cleanup(func() {
-		resolveTaskCLIDefaultsFunc = originalResolver
+		resolveTaskRunDefaultsFunc = originalResolver
 	})
 
-	resolveTaskCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
 		_ = params
 		return conf.CLIDefaultsConfig{TaskDir: "from-config"}, nil
 	}

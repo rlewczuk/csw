@@ -78,7 +78,7 @@ Role aliases are alternative role names resolved to the canonical role.
 Example:
 
 - role `developer` with aliases `dev`, `build`
-- `csw cli --role dev ...` behaves like `--role developer`
+- `csw run --role dev ...` behaves like `--role developer`
 - command frontmatter `agent: build` behaves like `agent: developer`
 - subagent role fields (for example in hooks) accept aliases as well
 

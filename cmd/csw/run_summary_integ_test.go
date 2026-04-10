@@ -35,7 +35,7 @@ func TestCLISavesSummaryMarkdown(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := runCLI(&CLIParams{
+	err := runCommand(&RunParams{
 		Prompt:        "Do the task",
 		ModelName:     "ollama/test-model",
 		RoleName:      "developer",

@@ -23,8 +23,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// CLIParams holds all parameters for runCLI.
-type CLIParams struct {
+// RunParams holds all parameters for runCommand.
+type RunParams struct {
 	Prompt                string
 	CommandName           string
 	CommandArgs           []string
@@ -75,13 +75,13 @@ type CLIParams struct {
 
 const defaultBashRunTimeout = 120 * time.Second
 
-var runCLIFunc = runCLI
-var resolveCLIDefaultsFunc = system.ResolveCLIDefaults
+var runFunc = runCommand
+var resolveRunDefaultsFunc = system.ResolveRunDefaults
 var resolveWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
 var buildSystemFunc = system.BuildSystem
 
-// CliCommand creates the cli command.
-func CliCommand() *cobra.Command {
+// RunCommand creates the run command.
+func RunCommand() *cobra.Command {
 	var (
 		cliModel             string
 		cliRole              string
@@ -125,8 +125,8 @@ func CliCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "cli [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--continue <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last|branch|workdir>] [--force] [\"prompt\"] [command-args...]",
-		Short: "Start a CLI chat session with an agent",
+		Use:   "run [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--continue <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last|branch|workdir>] [--force] [\"prompt\"] [command-args...]",
+		Short: "Start a run chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -141,7 +141,7 @@ func CliCommand() *cobra.Command {
 
 			continueWorktreeBranch := strings.TrimSpace(cliContinue)
 			if continueWorktreeBranch != "" && resumeTarget != "" {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: --continue <branch> cannot be used with --resume")
+				return fmt.Errorf("RunCommand.RunE() [run.go]: --continue <branch> cannot be used with --resume")
 			}
 
 			positionalArgs := append([]string(nil), args...)
@@ -162,14 +162,14 @@ func CliCommand() *cobra.Command {
 				promptFile := strings.TrimPrefix(prompt, "@")
 				data, err := os.ReadFile(promptFile)
 				if err != nil {
-					return fmt.Errorf("CliCommand.RunE() [cli.go]: failed to read prompt file: %w", err)
+					return fmt.Errorf("RunCommand.RunE() [run.go]: failed to read prompt file: %w", err)
 				}
 				prompt = string(data)
 			} else if prompt == "-" {
 				// Read prompt from stdin
 				data, err := stdio.ReadAll(os.Stdin)
 				if err != nil {
-					return fmt.Errorf("CliCommand.RunE() [cli.go]: failed to read prompt from stdin: %w", err)
+					return fmt.Errorf("RunCommand.RunE() [run.go]: failed to read prompt from stdin: %w", err)
 				}
 				prompt = string(data)
 			}
@@ -180,10 +180,10 @@ func CliCommand() *cobra.Command {
 
 			invocation, isCommandInvocation, err := commands.ParseInvocation(prompt, extraPositionalArgs)
 			if err != nil {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: %w", err)
+				return fmt.Errorf("RunCommand.RunE() [run.go]: %w", err)
 			}
 			if !isCommandInvocation && len(extraPositionalArgs) > 0 {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt must be a single argument unless using /command invocation")
+				return fmt.Errorf("RunCommand.RunE() [run.go]: prompt must be a single argument unless using /command invocation")
 			}
 
 			commandTemplate := ""
@@ -199,7 +199,7 @@ func CliCommand() *cobra.Command {
 				}
 				loadedCommand, loadErr := commands.LoadFromDir(filepath.Join(commandsRoot, ".agents", "commands"), invocation.Name)
 				if loadErr != nil {
-					return fmt.Errorf("CliCommand.RunE() [cli.go]: %w", loadErr)
+					return fmt.Errorf("RunCommand.RunE() [run.go]: %w", loadErr)
 				}
 
 				commandTemplate = loadedCommand.Template
@@ -213,7 +213,7 @@ func CliCommand() *cobra.Command {
 				prompt = loadedCommand.Template
 			}
 
-			contextData, err := system.ParseCLIContextEntries(cliContext)
+			contextData, err := system.ParseRunContextEntries(cliContext)
 			if err != nil {
 				return err
 			}
@@ -222,27 +222,27 @@ func CliCommand() *cobra.Command {
 			if strings.TrimSpace(cliTaskJSON) != "" {
 				var task core.Task
 				if unmarshalErr := json.Unmarshal([]byte(cliTaskJSON), &task); unmarshalErr != nil {
-					return fmt.Errorf("CliCommand.RunE() [cli.go]: failed to parse --task-json: %w", unmarshalErr)
+					return fmt.Errorf("RunCommand.RunE() [run.go]: failed to parse --task-json: %w", unmarshalErr)
 				}
 				taskInfo = &core.TaskInfo{Task: &task, TaskDir: strings.TrimSpace(cliTaskDir)}
 			}
 
 			if resumeTarget == "" {
 				if prompt == "" {
-					return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
+					return fmt.Errorf("RunCommand.RunE() [run.go]: prompt cannot be empty")
 				}
 			}
 
 			if continueWorktreeBranch != "" && cmd.Flags().Changed("worktree") {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: --continue and --worktree cannot be used together")
+				return fmt.Errorf("RunCommand.RunE() [run.go]: --continue and --worktree cannot be used together")
 			}
 
 			if resumeTarget != "" && cmd.Flags().Changed("worktree") {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: --worktree cannot be used with --resume")
+				return fmt.Errorf("RunCommand.RunE() [run.go]: --worktree cannot be used with --resume")
 			}
 
 			if resumeTarget == "" && prompt == "" {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: prompt cannot be empty")
+				return fmt.Errorf("RunCommand.RunE() [run.go]: prompt cannot be empty")
 			}
 
 			bashRunTimeout, err := parseBashRunTimeout(cliBashRunTimeout)
@@ -250,7 +250,7 @@ func CliCommand() *cobra.Command {
 				return err
 			}
 
-			if err := applyCLIDefaults(cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads, &cliShadowDir, &cliAllowAllPerms, &cliVFSAllow); err != nil {
+			if err := applyRunDefaults(cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads, &cliShadowDir, &cliAllowAllPerms, &cliVFSAllow); err != nil {
 				return err
 			}
 			cliLogLLMRequests = cliLogLLMRequests || cliLogLLMRequestsRaw
@@ -270,7 +270,7 @@ func CliCommand() *cobra.Command {
 			containerEnabledChanged := cmd.Flags().Changed("container-enabled")
 			containerDisabledChanged := cmd.Flags().Changed("container-disabled")
 			if containerEnabledChanged && containerDisabledChanged {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: --container-enabled and --container-disabled cannot be used together")
+				return fmt.Errorf("RunCommand.RunE() [run.go]: --container-enabled and --container-disabled cannot be used together")
 			}
 
 			containerRequested := (containerEnabledChanged && cliContainerOn) || len(cliContainerMount) > 0 || len(cliContainerEnv) > 0
@@ -278,7 +278,7 @@ func CliCommand() *cobra.Command {
 				containerRequested = true
 			}
 			if containerRequested && resumeTarget != "" {
-				return fmt.Errorf("CliCommand.RunE() [cli.go]: container mode options are not supported with --resume")
+				return fmt.Errorf("RunCommand.RunE() [run.go]: container mode options are not supported with --resume")
 			}
 
 			// Parse vfs-allow paths, handling both repeated flags and colon-separated values
@@ -286,7 +286,7 @@ func CliCommand() *cobra.Command {
 			mcpEnableNames := parseMCPServerFlagValues(cliMCPEnable)
 			mcpDisableNames := parseMCPServerFlagValues(cliMCPDisable)
 
-			return runCLIFunc(&CLIParams{
+			return runFunc(&RunParams{
 				Prompt:                prompt,
 				CommandName:           commandName,
 				CommandArgs:           commandArgs,
@@ -434,7 +434,7 @@ func isLikelyResumeTargetToken(value string) bool {
 	return system.ResumeWorktreeNamePattern.MatchString(trimmedValue)
 }
 
-func applyCLIDefaults(
+func applyRunDefaults(
 	cmd *cobra.Command,
 	workDir string,
 	shadowDir string,
@@ -453,14 +453,14 @@ func applyCLIDefaults(
 	allowAllPerms *bool,
 	vfsAllow *[]string,
 ) error {
-	defaults, err := resolveCLIDefaultsFunc(system.ResolveCLIDefaultsParams{
+	defaults, err := resolveRunDefaultsFunc(system.ResolveRunDefaultsParams{
 		WorkDir:       workDir,
 		ShadowDir:     shadowDir,
 		ProjectConfig: projectConfig,
 		ConfigPath:    configPath,
 	})
 	if err != nil {
-		return fmt.Errorf("applyCLIDefaults() [cli.go]: failed to resolve CLI defaults: %w", err)
+		return fmt.Errorf("applyRunDefaults() [run.go]: failed to resolve run defaults: %w", err)
 	}
 
 	if !cmd.Flags().Changed("model") && defaults.Model != "" {
@@ -501,7 +501,7 @@ func applyCLIDefaults(
 	}
 
 	if *maxThreads < 0 {
-		return fmt.Errorf("applyCLIDefaults() [cli.go]: --max-threads must be >= 0")
+		return fmt.Errorf("applyRunDefaults() [run.go]: --max-threads must be >= 0")
 	}
 
 	return nil
@@ -515,7 +515,7 @@ func isThinkingFlagChanged(cmd *cobra.Command) bool {
 	return cmd.Flags().Changed("thinking") || cmd.Flags().Changed("thinking-mode")
 }
 
-func runCLI(params *CLIParams) error {
+func runCommand(params *RunParams) error {
 	startTime := time.Now()
 	ctx := context.Background()
 	if params.BashRunTimeout <= 0 {
@@ -525,10 +525,10 @@ func runCLI(params *CLIParams) error {
 		params.OutputFormat = "short"
 	}
 	if params.OutputFormat != "short" && params.OutputFormat != "full" && params.OutputFormat != "jsonl" {
-		return fmt.Errorf("runCLI() [cli.go]: invalid --output-format %q (allowed: short, full, jsonl)", params.OutputFormat)
+		return fmt.Errorf("runCommand() [run.go]: invalid --output-format %q (allowed: short, full, jsonl)", params.OutputFormat)
 	}
 
-	if err := validateMergeCLIParams(params); err != nil {
+	if err := validateMergeRunParams(params); err != nil {
 		return err
 	}
 
@@ -538,7 +538,7 @@ func runCLI(params *CLIParams) error {
 	}
 
 	if (params.ContainerEnabled || len(params.ContainerMounts) > 0 || len(params.ContainerEnv) > 0) && params.ResumeTarget != "" {
-		return fmt.Errorf("runCLI() [cli.go]: container mode options are not supported with --resume")
+		return fmt.Errorf("runCommand() [run.go]: container mode options are not supported with --resume")
 	}
 
 	resolvedWorktreeBranch, err := resolveWorktreeBranchNameFunc(ctx, system.ResolveWorktreeBranchNameParams{
@@ -551,7 +551,7 @@ func runCLI(params *CLIParams) error {
 		WorktreeBranch: params.WorktreeBranch,
 	})
 	if err != nil {
-		return fmt.Errorf("runCLI() [cli.go]: failed to resolve worktree branch: %w", err)
+		return fmt.Errorf("runCommand() [run.go]: failed to resolve worktree branch: %w", err)
 	}
 	params.WorktreeBranch = resolvedWorktreeBranch
 	if params.WorktreeBranch != "" {
@@ -630,12 +630,12 @@ func runCLI(params *CLIParams) error {
 		_, _ = fmt.Fprintln(os.Stdout, BuildContainerStartupInfoMessage(buildResult))
 	}
 
-	sessionOutput := buildCLISessionOutput(params, os.Stdout)
+	sessionOutput := buildRunSessionOutput(params, os.Stdout)
 	autoPermissionResponse := ""
 	if params.AllowAllPerms {
 		autoPermissionResponse = "Allow"
 	}
-	runtimeResult, err := sweSystem.StartCLISession(system.StartCLISessionParams{
+	runtimeResult, err := sweSystem.StartRunSession(system.StartRunSessionParams{
 		ModelName:              params.ModelName,
 		RoleName:               params.RoleName,
 		TaskInfo:               params.TaskInfo,
@@ -652,10 +652,10 @@ func runCLI(params *CLIParams) error {
 		OutputHandler:          sessionOutput,
 	})
 	if err != nil {
-		return fmt.Errorf("runCLI() [cli.go]: failed to start CLI session runtime: %w", err)
+		return fmt.Errorf("runCommand() [run.go]: failed to start run session runtime: %w", err)
 	}
 	session := runtimeResult.Session
-	if sessionInput := buildCLIStdinSessionInput(params, runtimeResult.Thread, os.Stdin); sessionInput != nil {
+	if sessionInput := buildRunStdinSessionInput(params, runtimeResult.Thread, os.Stdin); sessionInput != nil {
 		sessionInput.StartReadingInput()
 	}
 
@@ -685,7 +685,7 @@ func runCLI(params *CLIParams) error {
 	select {
 	case err := <-runtimeResult.Done:
 		if err != nil {
-			sessionRunErr = fmt.Errorf("runCLI() [cli.go]: session error: %w", err)
+			sessionRunErr = fmt.Errorf("runCommand() [run.go]: session error: %w", err)
 		}
 	case <-ctx.Done():
 		sessionRunErr = ctx.Err()
@@ -717,7 +717,7 @@ func runCLI(params *CLIParams) error {
 	return nil
 }
 
-func buildCLISessionOutput(params *CLIParams, output stdio.Writer) core.SessionThreadOutput {
+func buildRunSessionOutput(params *RunParams, output stdio.Writer) core.SessionThreadOutput {
 	if params == nil {
 		return sessionio.NewTextSessionOutput(output)
 	}
@@ -729,11 +729,11 @@ func buildCLISessionOutput(params *CLIParams, output stdio.Writer) core.SessionT
 	return sessionio.NewTextSessionOutputWithSlug(output, params.WorktreeBranch)
 }
 
-type cliHookOutputView struct {
+type runHookOutputView struct {
 	output core.SessionThreadOutput
 }
 
-func (v *cliHookOutputView) ShowMessage(message string, messageType shared.MessageType) {
+func (v *runHookOutputView) ShowMessage(message string, messageType shared.MessageType) {
 	if v == nil || v.output == nil {
 		return
 	}
@@ -745,7 +745,7 @@ func buildHookOutputView(output core.SessionThreadOutput) core.HookOutputView {
 		return nil
 	}
 
-	return &cliHookOutputView{output: output}
+	return &runHookOutputView{output: output}
 }
 
 func buildSummaryMessageFunc(output core.SessionThreadOutput) func(string, shared.MessageType) {
@@ -758,11 +758,11 @@ func buildSummaryMessageFunc(output core.SessionThreadOutput) func(string, share
 	}
 }
 
-type cliSessionInput interface {
+type runSessionInput interface {
 	StartReadingInput()
 }
 
-func buildCLIStdinSessionInput(params *CLIParams, thread core.SessionThreadInput, input stdio.Reader) cliSessionInput {
+func buildRunStdinSessionInput(params *RunParams, thread core.SessionThreadInput, input stdio.Reader) runSessionInput {
 	if params == nil || thread == nil || input == nil {
 		return nil
 	}
@@ -774,49 +774,49 @@ func buildCLIStdinSessionInput(params *CLIParams, thread core.SessionThreadInput
 	return sessionio.NewTextSessionInput(input, thread)
 }
 
-func validateMergeCLIParams(params *CLIParams) error {
+func validateMergeRunParams(params *RunParams) error {
 	if params == nil {
-		return fmt.Errorf("validateMergeCLIParams() [cli.go]: params cannot be nil")
+		return fmt.Errorf("validateMergeRunParams() [run.go]: params cannot be nil")
 	}
 
 	if params.Merge && strings.TrimSpace(params.WorktreeBranch) == "" && strings.TrimSpace(params.ResumeTarget) == "" {
-		return fmt.Errorf("runCLI() [cli.go]: --merge requires --worktree")
+		return fmt.Errorf("runCommand() [run.go]: --merge requires --worktree")
 	}
 
 	return nil
 }
 
-func resolveResumeMergeWorktreeContext(buildResult system.BuildSystemResult, params *CLIParams, session *core.SweSession) (apis.VCS, string, string, error) {
+func resolveResumeMergeWorktreeContext(buildResult system.BuildSystemResult, params *RunParams, session *core.SweSession) (apis.VCS, string, string, error) {
 	if params == nil {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: params cannot be nil")
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: params cannot be nil")
 	}
 	if session == nil {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: session is nil")
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: session is nil")
 	}
 
 	sessionWorkDir := strings.TrimSpace(session.GetState().Info.WorkDir)
 	if sessionWorkDir == "" {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: resumed session has empty workdir")
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: resumed session has empty workdir")
 	}
 
 	worktreeBranch, ok := inferResumeWorktreeBranch(buildResult.WorkDirRoot, buildResult.ShadowDir, sessionWorkDir)
 	if !ok {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: --merge with --resume requires resumed session to use a worktree")
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: --merge with --resume requires resumed session to use a worktree")
 	}
 
 	worktreesBaseDir := strings.TrimSpace(firstNonEmpty(buildResult.ShadowDir, buildResult.WorkDirRoot))
 	if worktreesBaseDir == "" {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: worktrees base directory is empty")
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: worktrees base directory is empty")
 	}
 	worktreesRoot := filepath.Join(worktreesBaseDir, ".cswdata", "work")
 
 	resumeVCS, err := vcs.NewGitRepo(buildResult.WorkDirRoot, worktreesRoot, nil, nil, params.GitUserName, params.GitUserEmail)
 	if err != nil {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: failed to create git vcs for resumed worktree: %w", err)
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: failed to create git vcs for resumed worktree: %w", err)
 	}
 
 	if _, err := resumeVCS.GetWorktree(worktreeBranch); err != nil {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [cli.go]: failed to load resumed worktree %q: %w", worktreeBranch, err)
+		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: failed to load resumed worktree %q: %w", worktreeBranch, err)
 	}
 
 	return resumeVCS, worktreeBranch, sessionWorkDir, nil
@@ -851,22 +851,22 @@ func resolveCommandsRootDir(workDir string, shadowDir string) (string, error) {
 	if strings.TrimSpace(shadowDir) != "" {
 		resolvedShadowDir, err := system.ResolveWorkDir(shadowDir)
 		if err != nil {
-			return "", fmt.Errorf("resolveCommandsRootDir() [cli.go]: failed to resolve shadow directory: %w", err)
+			return "", fmt.Errorf("resolveCommandsRootDir() [run.go]: failed to resolve shadow directory: %w", err)
 		}
 		return resolvedShadowDir, nil
 	}
 
 	resolvedWorkDir, err := system.ResolveWorkDir(workDir)
 	if err != nil {
-		return "", fmt.Errorf("resolveCommandsRootDir() [cli.go]: failed to resolve work directory: %w", err)
+		return "", fmt.Errorf("resolveCommandsRootDir() [run.go]: failed to resolve work directory: %w", err)
 	}
 
 	return resolvedWorkDir, nil
 }
 
-func renderCommandPrompt(params *CLIParams, workDir string, shellRunner runner.CommandRunner, hostShellRunner runner.CommandRunner) error {
+func renderCommandPrompt(params *RunParams, workDir string, shellRunner runner.CommandRunner, hostShellRunner runner.CommandRunner) error {
 	if params == nil {
-		return fmt.Errorf("renderCommandPrompt() [cli.go]: params is nil")
+		return fmt.Errorf("renderCommandPrompt() [run.go]: params is nil")
 	}
 	if strings.TrimSpace(params.CommandName) == "" {
 		return nil
@@ -880,12 +880,12 @@ func renderCommandPrompt(params *CLIParams, workDir string, shellRunner runner.C
 	withArguments := commands.ApplyArguments(template, params.CommandArgs)
 	expandedPrompt, err := commands.ExpandPrompt(withArguments, workDir, shellRunner, hostShellRunner)
 	if err != nil {
-		return fmt.Errorf("renderCommandPrompt() [cli.go]: failed to render command /%s: %w", params.CommandName, err)
+		return fmt.Errorf("renderCommandPrompt() [run.go]: failed to render command /%s: %w", params.CommandName, err)
 	}
 
 	params.Prompt = strings.TrimSpace(expandedPrompt)
 	if params.Prompt == "" {
-		return fmt.Errorf("renderCommandPrompt() [cli.go]: rendered command /%s prompt is empty", params.CommandName)
+		return fmt.Errorf("renderCommandPrompt() [run.go]: rendered command /%s prompt is empty", params.CommandName)
 	}
 
 	return nil
@@ -903,11 +903,11 @@ func parseBashRunTimeout(value string) (time.Duration, error) {
 
 	parsed, err := time.ParseDuration(trimmed)
 	if err != nil {
-		return 0, fmt.Errorf("parseBashRunTimeout() [cli.go]: invalid --bash-run-timeout value %q: %w", value, err)
+		return 0, fmt.Errorf("parseBashRunTimeout() [run.go]: invalid --bash-run-timeout value %q: %w", value, err)
 	}
 
 	if parsed <= 0 {
-		return 0, fmt.Errorf("parseBashRunTimeout() [cli.go]: --bash-run-timeout must be positive, got %q", value)
+		return 0, fmt.Errorf("parseBashRunTimeout() [run.go]: --bash-run-timeout must be positive, got %q", value)
 	}
 
 	return parsed, nil
@@ -957,9 +957,9 @@ func parseMCPServerFlagValues(values []string) []string {
 	return result
 }
 
-func PreparePromptWithPreRunHook(ctx context.Context, params *CLIParams, workDirRoot string, hookEngine *core.HookEngine) error {
+func PreparePromptWithPreRunHook(ctx context.Context, params *RunParams, workDirRoot string, hookEngine *core.HookEngine) error {
 	if params == nil {
-		return fmt.Errorf("PreparePromptWithPreRunHook() [cli.go]: params is nil")
+		return fmt.Errorf("PreparePromptWithPreRunHook() [run.go]: params is nil")
 	}
 	if hookEngine == nil {
 		if strings.TrimSpace(params.Prompt) == "" {
@@ -985,7 +985,7 @@ func PreparePromptWithPreRunHook(ctx context.Context, params *CLIParams, workDir
 	hookEngine.MergeContext(params.ContextData)
 
 	if _, err := hookEngine.Execute(ctx, core.HookExecutionRequest{Name: "pre_run"}); err != nil {
-		return fmt.Errorf("PreparePromptWithPreRunHook() [cli.go]: pre_run hook execution failed: %w", err)
+		return fmt.Errorf("PreparePromptWithPreRunHook() [run.go]: pre_run hook execution failed: %w", err)
 	}
 
 	if strings.TrimSpace(params.Prompt) == "" {

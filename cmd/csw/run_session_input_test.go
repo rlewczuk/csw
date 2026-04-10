@@ -30,13 +30,13 @@ func (d *cliSessionInputThreadDouble) PermissionResponse(queryID string, respons
 
 var _ core.SessionThreadInput = (*cliSessionInputThreadDouble)(nil)
 
-func TestBuildCLIStdinSessionInput(t *testing.T) {
+func TestBuildRunStdinSessionInput(t *testing.T) {
 	thread := &cliSessionInputThreadDouble{}
 	reader := strings.NewReader("hello\n")
 
 	tests := []struct {
 		name        string
-		params      *CLIParams
+		params      *RunParams
 		input       stdio.Reader
 		expectedNil bool
 		expected    any
@@ -49,34 +49,34 @@ func TestBuildCLIStdinSessionInput(t *testing.T) {
 		},
 		{
 			name:        "interactive short mode uses text session input",
-			params:      &CLIParams{Interactive: true, OutputFormat: "short"},
+			params:      &RunParams{Interactive: true, OutputFormat: "short"},
 			input:       reader,
 			expectedNil: false,
 			expected:    &io.TextSessionInput{},
 		},
 		{
 			name:        "nil input returns nil",
-			params:      &CLIParams{Interactive: false, OutputFormat: "short"},
+			params:      &RunParams{Interactive: false, OutputFormat: "short"},
 			input:       nil,
 			expectedNil: true,
 		},
 		{
 			name:        "jsonl mode uses jsonl session input",
-			params:      &CLIParams{Interactive: false, OutputFormat: "jsonl"},
+			params:      &RunParams{Interactive: false, OutputFormat: "jsonl"},
 			input:       strings.NewReader("{}\n"),
 			expectedNil: false,
 			expected:    &io.JsonlSessionInput{},
 		},
 		{
 			name:        "short mode attaches text session input",
-			params:      &CLIParams{Interactive: false, OutputFormat: "short"},
+			params:      &RunParams{Interactive: false, OutputFormat: "short"},
 			input:       strings.NewReader("hello\n"),
 			expectedNil: false,
 			expected:    &io.TextSessionInput{},
 		},
 		{
 			name:        "full mode attaches text session input",
-			params:      &CLIParams{Interactive: false, OutputFormat: "full"},
+			params:      &RunParams{Interactive: false, OutputFormat: "full"},
 			input:       strings.NewReader("hello\n"),
 			expectedNil: false,
 			expected:    &io.TextSessionInput{},
@@ -85,7 +85,7 @@ func TestBuildCLIStdinSessionInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := buildCLIStdinSessionInput(tt.params, thread, tt.input)
+			actual := buildRunStdinSessionInput(tt.params, thread, tt.input)
 			if tt.expectedNil {
 				assert.Nil(t, actual)
 				return
@@ -100,7 +100,7 @@ func TestBuildCLIStdinSessionInput(t *testing.T) {
 func TestBuildCLISessionOutput(t *testing.T) {
 	tests := []struct {
 		name     string
-		params   *CLIParams
+		params   *RunParams
 		expected any
 	}{
 		{
@@ -110,24 +110,24 @@ func TestBuildCLISessionOutput(t *testing.T) {
 		},
 		{
 			name:     "jsonl format uses jsonl output",
-			params:   &CLIParams{OutputFormat: "jsonl"},
+			params:   &RunParams{OutputFormat: "jsonl"},
 			expected: &io.JsonlSessionOutput{},
 		},
 		{
 			name:     "short format uses text output",
-			params:   &CLIParams{OutputFormat: "short"},
+			params:   &RunParams{OutputFormat: "short"},
 			expected: &io.TextSessionOutput{},
 		},
 		{
 			name:     "full format uses text output",
-			params:   &CLIParams{OutputFormat: "full"},
+			params:   &RunParams{OutputFormat: "full"},
 			expected: &io.TextSessionOutput{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := buildCLISessionOutput(tt.params, &strings.Builder{})
+			actual := buildRunSessionOutput(tt.params, &strings.Builder{})
 			assert.NotNil(t, actual)
 			assert.IsType(t, tt.expected, actual)
 		})
@@ -136,7 +136,7 @@ func TestBuildCLISessionOutput(t *testing.T) {
 
 func TestBuildCLISessionOutput_UsesWorktreeBranchAsLabel(t *testing.T) {
 	buffer := &bytes.Buffer{}
-	output := buildCLISessionOutput(&CLIParams{OutputFormat: "short", WorktreeBranch: "feature/fix-branch-label"}, buffer)
+	output := buildRunSessionOutput(&RunParams{OutputFormat: "short", WorktreeBranch: "feature/fix-branch-label"}, buffer)
 
 	output.AddUserMessage("Run full build")
 

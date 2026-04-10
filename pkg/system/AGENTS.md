@@ -6,10 +6,10 @@ Package `pkg/system` contains orchestration and runtime wiring for `pkg/system`.
 
 * `system.go` - SweSystem lifecycle and session registry
 * `bootstrap.go` - Build system dependencies and config
-* `runtime.go` - CLI runtime session startup flow
+* `runtime.go` - run runtime session startup flow
 * `hooks.go` - Hook override parsing and runtime store
 * `worktree.go` - Worktree finalize and resume helpers
-* `context.go` - CLI context parsing helpers
+* `context.go` - run context parsing helpers
 
 ## Important public API objects
 
@@ -17,10 +17,10 @@ Package `pkg/system` contains orchestration and runtime wiring for `pkg/system`.
 * `SessionLoggerFactory` - Creates per-session loggers
 * `BuildSystemParams` - Inputs for BuildSystem
 * `BuildSystemResult` - Outputs of BuildSystem
-* `ResolveCLIDefaultsParams` - Inputs for CLI defaults
+* `ResolveRunDefaultsParams` - Inputs for run defaults
 * `ResolveWorktreeBranchNameParams` - Inputs for branch resolver
-* `StartCLISessionParams` - Inputs for CLI session startup
-* `StartCLISessionResult` - CLI runtime startup outputs
+* `StartRunSessionParams` - Inputs for run session startup
+* `StartRunSessionResult` - run runtime startup outputs
 * `SessionLoggerAppView` - App view with logger binding
 * `ChatPresenter` - Runtime presenter contract
 * `ChatView` - Runtime chat view contract
@@ -39,8 +39,8 @@ Package `pkg/system` contains orchestration and runtime wiring for `pkg/system`.
 * `ListSessions()` - List active sessions
 * `DeleteSession()` - Delete session by id
 * `Shutdown()` - Stop sessions and close resources
-* `StartCLISession()` - Start CLI session runtime
-* `ResolveCLIDefaults()` - Load CLI default values
+* `StartRunSession()` - Start run session runtime
+* `ResolveRunDefaults()` - Load run default values
 * `ResolveWorktreeBranchName()` - Resolve dynamic worktree branch
 * `PrepareSessionVFS()` - Build session VCS and VFS
 * `BuildSystem()` - Build configured SweSystem
@@ -64,5 +64,5 @@ Package `pkg/system` contains orchestration and runtime wiring for `pkg/system`.
 * `BuildSessionSummaryJSON()` - Build session summary JSON
 * `SaveSessionSummaryJSON()` - Save session summary JSON
 * `EmitSessionSummary()` - Emit and save session summary
-* `ParseCLIContextEntries()` - Parse --context entries
-* `ParseCLIContextFromEntries()` - Parse --context-from entries
+* `ParseRunContextEntries()` - Parse --context entries
+* `ParseRunContextFromEntries()` - Parse --context-from entries

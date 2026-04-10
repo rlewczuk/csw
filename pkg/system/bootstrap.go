@@ -149,8 +149,8 @@ type BuildSystemResult struct {
 	Cleanup               func()
 }
 
-// ResolveCLIDefaultsParams contains inputs for resolving CLI defaults.
-type ResolveCLIDefaultsParams struct {
+// ResolveRunDefaultsParams contains inputs for resolving run command defaults.
+type ResolveRunDefaultsParams struct {
 	WorkDir       string
 	ShadowDir     string
 	ProjectConfig string
@@ -168,37 +168,37 @@ type ResolveWorktreeBranchNameParams struct {
 	WorktreeBranch string
 }
 
-// ResolveCLIDefaults resolves CLI defaults from effective global config.
-func ResolveCLIDefaults(params ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+// ResolveRunDefaults resolves run command defaults from effective global config.
+func ResolveRunDefaults(params ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
 	var defaults conf.CLIDefaultsConfig
 
 	resolvedWorkDir, err := ResolveWorkDir(params.WorkDir)
 	if err != nil {
-		return defaults, fmt.Errorf("ResolveCLIDefaults() [bootstrap.go]: failed to resolve work directory: %w", err)
+		return defaults, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to resolve work directory: %w", err)
 	}
 
 	configPathStr, err := BuildConfigPath(params.ProjectConfig, params.ConfigPath)
 	if err != nil {
-		return defaults, fmt.Errorf("ResolveCLIDefaults() [bootstrap.go]: failed to build config path: %w", err)
+		return defaults, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to build config path: %w", err)
 	}
 
 	configRoot := resolvedWorkDir
 	if strings.TrimSpace(params.ShadowDir) != "" {
 		resolvedShadowDir, shadowErr := ResolveWorkDir(params.ShadowDir)
 		if shadowErr != nil {
-			return defaults, fmt.Errorf("ResolveCLIDefaults() [bootstrap.go]: failed to resolve shadow directory: %w", shadowErr)
+			return defaults, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to resolve shadow directory: %w", shadowErr)
 		}
 		configRoot = resolvedShadowDir
 	}
 
 	configStore, err := newCompositeConfigStoreFunc(configRoot, configPathStr)
 	if err != nil {
-		return defaults, fmt.Errorf("ResolveCLIDefaults() [bootstrap.go]: failed to create config store: %w", err)
+		return defaults, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to create config store: %w", err)
 	}
 
 	globalConfig, err := configStore.GetGlobalConfig()
 	if err != nil {
-		return defaults, fmt.Errorf("ResolveCLIDefaults() [bootstrap.go]: failed to load global config: %w", err)
+		return defaults, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to load global config: %w", err)
 	}
 
 	if globalConfig == nil {

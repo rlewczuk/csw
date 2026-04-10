@@ -566,7 +566,7 @@ func mainRootCommandForTest() *cobra.Command {
 	cmd.AddCommand(ProviderCommand())
 	cmd.AddCommand(RoleCommand())
 	cmd.AddCommand(ToolCommand())
-	cmd.AddCommand(CliCommand())
+	cmd.AddCommand(RunCommand())
 	cmd.AddCommand(CleanCommand())
 	return cmd
 }

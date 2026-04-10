@@ -124,22 +124,22 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var capturedCall string
-			originalRun := runCLIFunc
-			originalResolveDefaults := resolveCLIDefaultsFunc
+			originalRun := runFunc
+			originalResolveDefaults := resolveRunDefaultsFunc
 			t.Cleanup(func() {
-				runCLIFunc = originalRun
-				resolveCLIDefaultsFunc = originalResolveDefaults
+				runFunc = originalRun
+				resolveRunDefaultsFunc = originalResolveDefaults
 			})
-			resolveCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+			resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
 				return conf.CLIDefaultsConfig{}, nil
 			}
 
-			runCLIFunc = func(params *CLIParams) error {
+			runFunc = func(params *RunParams) error {
 				capturedCall = fmt.Sprintf("prompt=%s,resume=%s,continue=%t,force=%t,forcecompact=%t,modeloverride=%t,roleoverride=%t,thinkingoverride=%t,thinking=%s,worktree=%s,continuewt=%t", params.Prompt, params.ResumeTarget, params.ContinueSession, params.ForceResume, params.ForceCompact, params.ModelOverridden, params.RoleOverridden, params.ThinkingOverridden, params.Thinking, params.WorktreeBranch, params.ContinueWorktree)
 				return nil
 			}
 
-			cmd := CliCommand()
+			cmd := RunCommand()
 			stdout := &bytes.Buffer{}
 			stderr := &bytes.Buffer{}
 			cmd.SetOut(stdout)

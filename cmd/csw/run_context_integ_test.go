@@ -34,7 +34,7 @@ func TestCLIContextPromptRenderingIntegration(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	cmd := CliCommand()
+	cmd := RunCommand()
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	cmd.SetOut(stdout)

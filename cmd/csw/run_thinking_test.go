@@ -12,7 +12,7 @@ import (
 
 // TestCliThinkingFlagDefinition tests that the --thinking flag is correctly defined
 func TestCliThinkingFlagDefinition(t *testing.T) {
-	cmd := CliCommand()
+	cmd := RunCommand()
 
 	// Check that the flag is defined
 	flag := cmd.Flags().Lookup("thinking")
@@ -89,7 +89,7 @@ func TestCliThinkingFlagParsing(t *testing.T) {
 
 // TestCliRuntimeErrorDoesNotPrintUsage tests that runtime command errors don't print usage text.
 func TestCliRuntimeErrorDoesNotPrintUsage(t *testing.T) {
-	cmd := CliCommand()
+	cmd := RunCommand()
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 

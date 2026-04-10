@@ -13,13 +13,13 @@ go build -o ./bin/csw ./cmd/csw
 ### 2) Run agent in normal project mode (no worktree)
 
 ```bash
-./bin/csw cli "Summarize this repository and suggest first improvements"
+./bin/csw run "Summarize this repository and suggest first improvements"
 ```
 
 Optional: set working directory explicitly.
 
 ```bash
-./bin/csw cli --workdir /path/to/project "Fix failing tests"
+./bin/csw run --workdir /path/to/project "Fix failing tests"
 ```
 
 ### 3) Run agent in worktree mode
@@ -27,26 +27,26 @@ Optional: set working directory explicitly.
 Create and use an isolated git worktree branch for the session:
 
 ```bash
-./bin/csw cli --worktree feature/docs-update "Update user docs"
+./bin/csw run --worktree feature/docs-update "Update user docs"
 ```
 
 If you also want branch merge at the end:
 
 ```bash
-./bin/csw cli --worktree feature/docs-update --merge "Update user docs"
+./bin/csw run --worktree feature/docs-update --merge "Update user docs"
 ```
 
 Continue work on an existing worktree branch (reuses extracted worktree if present,
 or extracts it if missing):
 
 ```bash
-./bin/csw cli --continue feature/docs-update "Apply requested review fixes"
+./bin/csw run --continue feature/docs-update "Apply requested review fixes"
 ```
 
 ### 4) Run with containerized command execution
 
 ```bash
-./bin/csw cli \
+./bin/csw run \
   --container-enabled \
   --container-image ghcr.io/codesnort/csw-runner:latest \
   "Run tests and fix failures"
@@ -55,7 +55,7 @@ or extracts it if missing):
 With additional mounts/env:
 
 ```bash
-./bin/csw cli \
+./bin/csw run \
   --container-enabled \
   --container-image ghcr.io/codesnort/csw-runner:latest \
   --container-mount /host/cache:/workspace/.cache \
@@ -66,7 +66,7 @@ With additional mounts/env:
 ### 5) Add LSP to the agent
 
 ```bash
-./bin/csw cli --lsp-server /usr/local/bin/gopls "Refactor this package safely"
+./bin/csw run --lsp-server /usr/local/bin/gopls "Refactor this package safely"
 ```
 
 If `--lsp-server` is empty, LSP is disabled.
@@ -94,7 +94,7 @@ Equivalent full cleanup shortcut:
 ### 7) Use verbose mode for debugging session behavior
 
 ```bash
-./bin/csw cli --verbose "Investigate why command output is truncated"
+./bin/csw run --verbose "Investigate why command output is truncated"
 ```
 
 ### 8) Logs: where to find them and how to increase detail
@@ -107,8 +107,8 @@ Logs are stored under your project:
 
 Useful flags:
 
-- `--verbose` (on `csw cli`) for fuller tool output in terminal
-- `--log-llm-requests` (on `csw cli`) to include detailed LLM request/response logs
+- `--verbose` (on `csw run`) for fuller tool output in terminal
+- `--log-llm-requests` (on `csw run`) to include detailed LLM request/response logs
 
 Provider diagnostics (outside session runtime):
 
@@ -255,19 +255,19 @@ Hook configuration, hook types (`shell`, `llm`, `subagent`), `--hook` runtime ov
 
 ## Full command reference
 
-### `csw cli` reference
+### `csw run` reference
 
 Usage:
 
 ```text
-csw cli [flags] ["prompt"]
+csw run [flags] ["prompt"]
 ```
 
 Prompt input modes:
 
-- inline argument: `csw cli "Fix lint errors"`
-- file input: `csw cli @prompt.txt`
-- stdin: `echo "Fix docs" | csw cli -`
+- inline argument: `csw run "Fix lint errors"`
+- file input: `csw run @prompt.txt`
+- stdin: `echo "Fix docs" | csw run -`
 
 Session and runtime options:
 
@@ -397,7 +397,7 @@ go build -o ./bin/csw ./cmd/csw
 ### Run from source
 
 ```bash
-go run ./cmd/csw cli "Explain this codebase structure"
+go run ./cmd/csw run "Explain this codebase structure"
 ```
 
 ### Run tests

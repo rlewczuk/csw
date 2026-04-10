@@ -48,18 +48,18 @@ func TestCLIGitIdentityPropagation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			originalRun := runCLIFunc
-			originalDefaultsResolver := resolveCLIDefaultsFunc
+			originalRun := runFunc
+			originalDefaultsResolver := resolveRunDefaultsFunc
 			originalLookPath := vcs.GitLookPath
 			originalConfigValue := vcs.GitConfigValue
 			t.Cleanup(func() {
-				runCLIFunc = originalRun
-				resolveCLIDefaultsFunc = originalDefaultsResolver
+				runFunc = originalRun
+				resolveRunDefaultsFunc = originalDefaultsResolver
 				vcs.GitLookPath = originalLookPath
 				vcs.GitConfigValue = originalConfigValue
 			})
 
-			resolveCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+			resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
 				_ = params
 				return conf.CLIDefaultsConfig{}, nil
 			}
@@ -83,13 +83,13 @@ func TestCLIGitIdentityPropagation(t *testing.T) {
 
 			capturedName := ""
 			capturedEmail := ""
-			runCLIFunc = func(params *CLIParams) error {
+			runFunc = func(params *RunParams) error {
 				capturedName = params.GitUserName
 				capturedEmail = params.GitUserEmail
 				return nil
 			}
 
-			cmd := CliCommand()
+			cmd := RunCommand()
 			stdout := &bytes.Buffer{}
 			stderr := &bytes.Buffer{}
 			cmd.SetOut(stdout)

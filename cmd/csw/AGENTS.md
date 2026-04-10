@@ -5,7 +5,7 @@ Package `cmd/csw` implements the CSW command-line application.
 ## Important files
 
 * `main.go` - Root command and global flags
-* `cli.go` - CLI session command implementation
+* `run.go` - run session command implementation
 * `provider.go` - Provider management subcommands
 * `role.go` - Role management subcommands
 * `tool.go` - Tool inspection subcommands
@@ -17,10 +17,10 @@ Package `cmd/csw` implements the CSW command-line application.
 
 ## Important public API objects
 
-* `CLIParams` - Parameters for CLI execution
+* `RunParams` - Parameters for run execution
 * `ConfigScope` - Configuration scope enum
 * `ConfigScope` values: `local`, `global`
-* `CliCommand()` - Creates `cli` command
+* `RunCommand()` - Creates `run` command
 * `CleanCommand()` - Creates `clean` command
 * `ProviderCommand()` - Creates `provider` command
 * `RoleCommand()` - Creates `role` command

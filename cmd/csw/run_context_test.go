@@ -46,18 +46,18 @@ func TestCLIContextFlagPropagation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			originalRun := runCLIFunc
+			originalRun := runFunc
 			t.Cleanup(func() {
-				runCLIFunc = originalRun
+				runFunc = originalRun
 			})
 
 			captured := ""
-			runCLIFunc = func(params *CLIParams) error {
+			runFunc = func(params *RunParams) error {
 				captured = fmt.Sprintf("prompt=%s,context=%v", params.Prompt, params.ContextData)
 				return nil
 			}
 
-			cmd := CliCommand()
+			cmd := RunCommand()
 			stdout := &bytes.Buffer{}
 			stderr := &bytes.Buffer{}
 			cmd.SetOut(stdout)
@@ -81,7 +81,7 @@ func TestCLIContextFlagPropagation(t *testing.T) {
 }
 
 func TestContextFlagInHelp(t *testing.T) {
-	cmd := CliCommand()
+	cmd := RunCommand()
 
 	var buf strings.Builder
 	cmd.SetOut(&buf)

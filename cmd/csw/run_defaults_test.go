@@ -28,20 +28,20 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 		VFSAllow:            []string{"/allowed/one", "/allowed/two"},
 	}
 
-	originalRun := runCLIFunc
-	originalDefaultsResolver := resolveCLIDefaultsFunc
+	originalRun := runFunc
+	originalDefaultsResolver := resolveRunDefaultsFunc
 	t.Cleanup(func() {
-		runCLIFunc = originalRun
-		resolveCLIDefaultsFunc = originalDefaultsResolver
+		runFunc = originalRun
+		resolveRunDefaultsFunc = originalDefaultsResolver
 	})
 
-	resolveCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+	resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
 		_ = params
 		return defaults, nil
 	}
 
 	captured := ""
-	runCLIFunc = func(params *CLIParams) error {
+	runFunc = func(params *RunParams) error {
 		taskDir := ""
 		if params.TaskInfo != nil {
 			taskDir = params.TaskInfo.TaskDir
@@ -72,7 +72,7 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 		return nil
 	}
 
-	cmd := CliCommand()
+	cmd := RunCommand()
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	cmd.SetOut(stdout)
@@ -113,20 +113,20 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 		VFSAllow:            []string{"/allowed/one", "/allowed/two"},
 	}
 
-	originalRun := runCLIFunc
-	originalDefaultsResolver := resolveCLIDefaultsFunc
+	originalRun := runFunc
+	originalDefaultsResolver := resolveRunDefaultsFunc
 	t.Cleanup(func() {
-		runCLIFunc = originalRun
-		resolveCLIDefaultsFunc = originalDefaultsResolver
+		runFunc = originalRun
+		resolveRunDefaultsFunc = originalDefaultsResolver
 	})
 
-	resolveCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+	resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.CLIDefaultsConfig, error) {
 		_ = params
 		return defaults, nil
 	}
 
 	captured := ""
-	runCLIFunc = func(params *CLIParams) error {
+	runFunc = func(params *RunParams) error {
 		taskDir := ""
 		if params.TaskInfo != nil {
 			taskDir = params.TaskInfo.TaskDir
@@ -157,7 +157,7 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 		return nil
 	}
 
-	cmd := CliCommand()
+	cmd := RunCommand()
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	cmd.SetOut(stdout)
@@ -197,18 +197,18 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 }
 
 func TestCLIShadowDirFlagPropagation(t *testing.T) {
-	originalRun := runCLIFunc
+	originalRun := runFunc
 	t.Cleanup(func() {
-		runCLIFunc = originalRun
+		runFunc = originalRun
 	})
 
 	captured := ""
-	runCLIFunc = func(params *CLIParams) error {
+	runFunc = func(params *RunParams) error {
 		captured = params.ShadowDir
 		return nil
 	}
 
-	cmd := CliCommand()
+	cmd := RunCommand()
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	cmd.SetOut(stdout)

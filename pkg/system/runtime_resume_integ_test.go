@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStartCLISessionResumeAppliesOverridesAndForceCompact(t *testing.T) {
+func TestStartRunSessionResumeAppliesOverridesAndForceCompact(t *testing.T) {
 	tmpDir := filepath.Join("../../tmp", "runtime_resume", t.Name())
 	require.NoError(t, os.MkdirAll(tmpDir, 0755))
 	defer os.RemoveAll(tmpDir)
@@ -54,7 +54,7 @@ func TestStartCLISessionResumeAppliesOverridesAndForceCompact(t *testing.T) {
 
 	sweSystem.Shutdown()
 
-	result, err := sweSystem.StartCLISession(system.StartCLISessionParams{
+	result, err := sweSystem.StartRunSession(system.StartRunSessionParams{
 		ModelName:          "ollama/override-model",
 		RoleName:           "reviewer",
 		Thinking:           "high",

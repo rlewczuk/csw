@@ -42,7 +42,7 @@ func main() {
 	rootCmd.AddCommand(ProviderCommand())
 	rootCmd.AddCommand(RoleCommand())
 	rootCmd.AddCommand(ToolCommand())
-	rootCmd.AddCommand(CliCommand())
+	rootCmd.AddCommand(RunCommand())
 	rootCmd.AddCommand(CleanCommand())
 	rootCmd.AddCommand(McpCommand())
 	rootCmd.AddCommand(HookCommand())

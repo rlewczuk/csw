@@ -14,7 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var resolveTaskCLIDefaultsFunc = system.ResolveCLIDefaults
+var resolveTaskRunDefaultsFunc = system.ResolveRunDefaults
 
 // TaskCommand creates task command with persistent hierarchical task management.
 func TaskCommand() *cobra.Command {
@@ -394,7 +394,7 @@ func resolveTaskDirPath(cmd *cobra.Command, workDir string) (string, error) {
 
 	resolvedTaskDir := strings.TrimSpace(flagTaskDir)
 	if resolvedTaskDir == "" {
-		defaults, defaultsErr := resolveTaskCLIDefaultsFunc(system.ResolveCLIDefaultsParams{
+		defaults, defaultsErr := resolveTaskRunDefaultsFunc(system.ResolveRunDefaultsParams{
 			WorkDir:       workDir,
 			ProjectConfig: projectConfig,
 			ConfigPath:    configPath,

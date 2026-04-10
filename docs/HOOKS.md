@@ -176,7 +176,7 @@ This supports returning different data shapes through feedback `args` fields.
 
 ## Runtime control with `--hook`
 
-`csw cli` accepts repeatable `--hook` overrides:
+`csw run` accepts repeatable `--hook` overrides:
 
 - enable existing hook:
   - `--hook commit`

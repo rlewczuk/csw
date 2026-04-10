@@ -12,13 +12,13 @@ import (
 func TestValidateMergeCLIParams(t *testing.T) {
 	tests := []struct {
 		name           string
-		params         *CLIParams
+		params         *RunParams
 		expectError    bool
 		errorSubstring string
 	}{
 		{
 			name: "merge without worktree or resume is rejected",
-			params: &CLIParams{
+			params: &RunParams{
 				Merge: true,
 			},
 			expectError:    true,
@@ -26,21 +26,21 @@ func TestValidateMergeCLIParams(t *testing.T) {
 		},
 		{
 			name: "merge with worktree is allowed",
-			params: &CLIParams{
+			params: &RunParams{
 				Merge:          true,
 				WorktreeBranch: "feature/test",
 			},
 		},
 		{
 			name: "merge with resume is allowed",
-			params: &CLIParams{
+			params: &RunParams{
 				Merge:        true,
 				ResumeTarget: "last",
 			},
 		},
 		{
 			name: "non merge without worktree is allowed",
-			params: &CLIParams{
+			params: &RunParams{
 				Merge: false,
 			},
 		},
@@ -54,7 +54,7 @@ func TestValidateMergeCLIParams(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateMergeCLIParams(tc.params)
+			err := validateMergeRunParams(tc.params)
 			if tc.expectError {
 				require.Error(t, err)
 				if tc.errorSubstring != "" {
