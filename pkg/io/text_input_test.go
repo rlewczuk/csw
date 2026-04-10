@@ -95,6 +95,20 @@ func TestTextSessionInput_StartReadingInputRoutesLines(t *testing.T) {
 	assert.Empty(t, responses)
 }
 
+func TestTextSessionInput_StartReadingInputRoutesMultipleInterrupts(t *testing.T) {
+	reader := strings.NewReader("\n\nresume\n")
+	thread := newInputThreadDouble()
+	input := NewTextSessionInput(reader, thread)
+
+	input.StartReadingInput()
+	thread.waitForEvents(t, 3)
+
+	prompts, interrupts, responses := thread.snapshot()
+	assert.Equal(t, []string{"resume"}, prompts)
+	assert.Equal(t, 2, interrupts)
+	assert.Empty(t, responses)
+}
+
 func TestTextSessionInput_StartReadingInputCanBeCalledOnce(t *testing.T) {
 	reader := strings.NewReader("hello\n")
 	thread := newInputThreadDouble()

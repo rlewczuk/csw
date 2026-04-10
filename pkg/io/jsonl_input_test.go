@@ -26,6 +26,24 @@ func TestJsonlSessionInput_StartReadingInputRoutesActions(t *testing.T) {
 	assert.Empty(t, responses)
 }
 
+func TestJsonlSessionInput_StartReadingInputRoutesMultipleInterrupts(t *testing.T) {
+	reader := strings.NewReader(strings.Join([]string{
+		`{"action":"interrupt"}`,
+		`{"action":"interrupt"}`,
+		`{"action":"prompt","input":"resume"}`,
+	}, "\n") + "\n")
+	thread := newInputThreadDouble()
+	input := NewJsonlSessionInput(reader, thread)
+
+	input.StartReadingInput()
+	thread.waitForEvents(t, 3)
+
+	prompts, interrupts, responses := thread.snapshot()
+	assert.Equal(t, []string{"resume"}, prompts)
+	assert.Equal(t, 2, interrupts)
+	assert.Empty(t, responses)
+}
+
 func TestJsonlSessionInput_StartReadingInputSkipsInvalidEntries(t *testing.T) {
 	reader := strings.NewReader(strings.Join([]string{
 		"",

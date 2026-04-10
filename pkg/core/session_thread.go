@@ -88,6 +88,7 @@ type SessionThread struct {
 	inputQueue             []string
 	interruptPending       bool
 	paused                 bool
+	suspended              bool
 	resumePending          bool
 	pendingPermissionQuery *tool.ToolPermissionsQuery
 	autoPermissionResponse string
@@ -133,6 +134,16 @@ func (c *SessionThread) UserPrompt(input string) error {
 		return fmt.Errorf("SessionThread.UserPrompt() [session_thread.go]: session not initialized, call StartSession first")
 	}
 
+	if c.suspended {
+		c.inputQueue = append(c.inputQueue, input)
+		if !c.sessionRunning {
+			c.suspended = false
+			c.paused = false
+			c.startSessionLocked()
+		}
+		return nil
+	}
+
 	// Add to input queue
 	c.inputQueue = append(c.inputQueue, input)
 
@@ -152,19 +163,49 @@ func (c *SessionThread) UserPrompt(input string) error {
 // This method is non-blocking and thread-safe.
 func (c *SessionThread) Interrupt() error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
+
+	if c.suspended {
+		c.suspended = false
+		c.paused = false
+		c.interruptPending = false
+		outputHandler := c.outputHandler
+		c.mu.Unlock()
+
+		if outputHandler != nil {
+			outputHandler.ShowMessage("Session terminated.", "info")
+			outputHandler.RunFinished(fmt.Errorf("SessionThread.Interrupt() [session_thread.go]: terminated by interrupt while suspended"))
+		}
+
+		return nil
+	}
 
 	if !c.sessionRunning {
+		c.mu.Unlock()
 		return fmt.Errorf("SessionThread.Interrupt() [session_thread.go]: no session running to interrupt")
 	}
 
-	if c.session.logger != nil {
+	if c.session != nil && c.session.logger != nil {
 		c.session.logger.Info("session_thread_interrupt")
 	}
 
-	c.interruptPending = true
-	if c.cancelFunc != nil {
-		c.cancelFunc()
+	removedPrompts := len(c.inputQueue)
+	c.inputQueue = c.inputQueue[:0]
+	c.interruptPending = false
+	c.paused = true
+	c.suspended = true
+	cancelFunc := c.cancelFunc
+	outputHandler := c.outputHandler
+	c.mu.Unlock()
+
+	if cancelFunc != nil {
+		cancelFunc()
+	}
+
+	if outputHandler != nil {
+		outputHandler.ShowMessage("Session suspended.", "info")
+		if removedPrompts > 0 {
+			outputHandler.ShowMessage(fmt.Sprintf("Removed %d queued user prompt(s).", removedPrompts), "warning")
+		}
 	}
 
 	return nil
@@ -376,6 +417,11 @@ func (c *SessionThread) runSessionLoop() {
 		c.sessionRunning = false
 		c.backgroundCtx = nil
 		c.cancelFunc = nil
+		if c.suspended && len(c.inputQueue) > 0 {
+			c.suspended = false
+			c.paused = false
+			c.startSessionLocked()
+		}
 		c.mu.Unlock()
 	}()
 
@@ -435,10 +481,13 @@ func (c *SessionThread) runSessionLoop() {
 				c.mu.Lock()
 				wasInterrupted := c.interruptPending
 				wasPaused := c.paused
+				wasSuspended := c.suspended
 				c.mu.Unlock()
 
 				if wasPaused {
-					c.outputHandler.RunFinished(nil)
+					if !wasSuspended {
+						c.outputHandler.RunFinished(nil)
+					}
 					return
 				}
 				if wasInterrupted {
@@ -522,11 +571,14 @@ func (c *SessionThread) runSessionLoop() {
 		c.mu.Lock()
 		wasInterrupted := c.interruptPending
 		wasPaused := c.paused
+		wasSuspended := c.suspended
 		c.mu.Unlock()
 
 		if wasPaused {
-			// Paused cleanly, no error
-			c.outputHandler.RunFinished(nil)
+			if !wasSuspended {
+				// Paused cleanly, no error
+				c.outputHandler.RunFinished(nil)
+			}
 			return
 		}
 
