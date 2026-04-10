@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -13,12 +14,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var resolveTaskCLIDefaultsFunc = system.ResolveCLIDefaults
+
 // TaskCommand creates task command with persistent hierarchical task management.
 func TaskCommand() *cobra.Command {
+	var taskDir string
+
 	command := &cobra.Command{
 		Use:   "task",
 		Short: "Manage persistent hierarchical tasks",
 	}
+
+	command.PersistentFlags().StringVar(&taskDir, "task-dir", "", "Task directory path (relative paths are resolved from project directory)")
 
 	command.AddCommand(taskNewCommand())
 	command.AddCommand(taskUpdateCommand())
@@ -338,6 +345,11 @@ func loadTaskBackend(cmd *cobra.Command) (*core.TaskManager, *core.TaskBackendAd
 		return nil, nil, err
 	}
 
+	resolvedTaskDir, err := resolveTaskDirPath(cmd, workDir)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	store, err := GetCompositeConfigStore()
 	if err != nil {
 		return nil, nil, err
@@ -353,7 +365,7 @@ func loadTaskBackend(cmd *cobra.Command) (*core.TaskManager, *core.TaskBackendAd
 		return nil, nil, err
 	}
 
-	manager, err := core.NewTaskManager(workDir, store, runner)
+	manager, err := core.NewTaskManagerWithTasksDir(workDir, resolvedTaskDir, store, runner)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -364,6 +376,43 @@ func loadTaskBackend(cmd *cobra.Command) (*core.TaskManager, *core.TaskBackendAd
 	}
 
 	return manager, backend, nil
+}
+
+func resolveTaskDirPath(cmd *cobra.Command, workDir string) (string, error) {
+	if cmd == nil {
+		return "", fmt.Errorf("resolveTaskDirPath() [task.go]: command cannot be nil")
+	}
+
+	flagTaskDir, err := cmd.Flags().GetString("task-dir")
+	if err != nil {
+		flag := cmd.PersistentFlags().Lookup("task-dir")
+		if flag == nil {
+			return "", fmt.Errorf("resolveTaskDirPath() [task.go]: failed to read --task-dir flag: %w", err)
+		}
+		flagTaskDir = flag.Value.String()
+	}
+
+	resolvedTaskDir := strings.TrimSpace(flagTaskDir)
+	if resolvedTaskDir == "" {
+		defaults, defaultsErr := resolveTaskCLIDefaultsFunc(system.ResolveCLIDefaultsParams{
+			WorkDir:       workDir,
+			ProjectConfig: projectConfig,
+			ConfigPath:    configPath,
+		})
+		if defaultsErr != nil {
+			return "", fmt.Errorf("resolveTaskDirPath() [task.go]: failed to resolve CLI defaults: %w", defaultsErr)
+		}
+		resolvedTaskDir = strings.TrimSpace(defaults.TaskDir)
+	}
+
+	if resolvedTaskDir == "" {
+		resolvedTaskDir = ".cswdata/tasks"
+	}
+	if !filepath.IsAbs(resolvedTaskDir) {
+		resolvedTaskDir = filepath.Join(workDir, resolvedTaskDir)
+	}
+
+	return filepath.Clean(resolvedTaskDir), nil
 }
 
 func printTaskRunOutcome(outcome tool.TaskRunOutcome) {

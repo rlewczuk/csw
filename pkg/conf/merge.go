@@ -131,6 +131,9 @@ mergeOtherFields:
 	if override.MaxThreads > 0 {
 		c.MaxThreads = override.MaxThreads
 	}
+	if override.TaskDir != "" {
+		c.TaskDir = override.TaskDir
+	}
 }
 
 // Clone returns a deep copy of GlobalConfig.

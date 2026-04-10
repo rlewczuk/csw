@@ -22,6 +22,7 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 		GitUserName:    "Config User",
 		GitUserEmail:   "config@example.com",
 		MaxThreads:     13,
+		TaskDir:        "default/tasks",
 	}
 
 	originalRun := runCLIFunc
@@ -38,8 +39,12 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 
 	captured := ""
 	runCLIFunc = func(params *CLIParams) error {
+		taskDir := ""
+		if params.TaskInfo != nil {
+			taskDir = params.TaskInfo.TaskDir
+		}
 		captured = fmt.Sprintf(
-			"model=%s,shadow=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s,maxThreads=%d",
+			"model=%s,shadow=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s,maxThreads=%d,taskDir=%s",
 			params.ModelName,
 			params.ShadowDir,
 			params.WorktreeBranch,
@@ -50,6 +55,7 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 			params.GitUserName,
 			params.GitUserEmail,
 			params.MaxThreads,
+			taskDir,
 		)
 		return nil
 	}
@@ -73,6 +79,7 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 	assert.Contains(t, captured, "gitUser=Config User")
 	assert.Contains(t, captured, "gitEmail=config@example.com")
 	assert.Contains(t, captured, "maxThreads=13")
+	assert.Contains(t, captured, "taskDir=")
 }
 
 func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
@@ -86,6 +93,7 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 		GitUserName:    "Config User",
 		GitUserEmail:   "config@example.com",
 		MaxThreads:     13,
+		TaskDir:        "default/tasks",
 	}
 
 	originalRun := runCLIFunc
@@ -102,8 +110,12 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 
 	captured := ""
 	runCLIFunc = func(params *CLIParams) error {
+		taskDir := ""
+		if params.TaskInfo != nil {
+			taskDir = params.TaskInfo.TaskDir
+		}
 		captured = fmt.Sprintf(
-			"model=%s,shadow=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s,maxThreads=%d",
+			"model=%s,shadow=%s,worktree=%s,merge=%t,log=%t,thinking=%s,lsp=%s,gitUser=%s,gitEmail=%s,maxThreads=%d,taskDir=%s",
 			params.ModelName,
 			params.ShadowDir,
 			params.WorktreeBranch,
@@ -114,6 +126,7 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 			params.GitUserName,
 			params.GitUserEmail,
 			params.MaxThreads,
+			taskDir,
 		)
 		return nil
 	}
@@ -148,6 +161,7 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	assert.Contains(t, captured, "gitUser=CLI User")
 	assert.Contains(t, captured, "gitEmail=cli@example.com")
 	assert.Contains(t, captured, "maxThreads=2")
+	assert.Contains(t, captured, "taskDir=")
 }
 
 func TestCLIShadowDirFlagPropagation(t *testing.T) {

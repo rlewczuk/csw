@@ -139,7 +139,7 @@ func TestTaskManagerCreateTaskAllowsEmptyPrompt(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, created)
 
-	taskPromptPath := filepath.Join(baseDir, ".csw", "tasks", created.UUID, "task.md")
+	taskPromptPath := filepath.Join(baseDir, ".cswdata", "tasks", created.UUID, "task.md")
 	contents, err := os.ReadFile(taskPromptPath)
 	require.NoError(t, err)
 	assert.Empty(t, string(contents))
@@ -156,7 +156,7 @@ func TestTaskManagerCreateTaskWithParentAddsSubtaskAndNestedPath(t *testing.T) {
 	child, err := manager.CreateTask(TaskCreateParams{Name: "child", ParentTaskID: parent.UUID, Prompt: "child prompt"})
 	require.NoError(t, err)
 
-	parentDir := filepath.Join(baseDir, ".csw", "tasks", parent.UUID)
+	parentDir := filepath.Join(baseDir, ".cswdata", "tasks", parent.UUID)
 	childTaskFile := filepath.Join(parentDir, child.UUID, "task.yml")
 	_, statErr := os.Stat(childTaskFile)
 	require.NoError(t, statErr)
@@ -218,7 +218,7 @@ func TestTaskManagerUpdateTaskUpdatesFieldsAndPrompt(t *testing.T) {
 	assert.Equal(t, "reviewer", updated.Role)
 	assert.Equal(t, []string{"dep-1", "dep-2"}, updated.Deps)
 
-	promptPath := filepath.Join(baseDir, ".csw", "tasks", created.UUID, "task.md")
+	promptPath := filepath.Join(baseDir, ".cswdata", "tasks", created.UUID, "task.md")
 	promptBytes, readErr := os.ReadFile(promptPath)
 	require.NoError(t, readErr)
 	assert.Equal(t, "new prompt\n", string(promptBytes))
@@ -315,7 +315,7 @@ func TestTaskManagerRunTaskSuccessWritesSummaryAndOutput(t *testing.T) {
 	require.NotNil(t, runner.lastRequest.Task)
 	assert.Equal(t, created.UUID, runner.lastRequest.Task.UUID)
 	assert.Equal(t, created.Name, runner.lastRequest.Task.Name)
-	assert.Equal(t, filepath.Join(baseDir, ".csw", "tasks", created.UUID), runner.lastRequest.TaskDir)
+	assert.Equal(t, filepath.Join(baseDir, ".cswdata", "tasks", created.UUID), runner.lastRequest.TaskDir)
 	assert.Equal(t, TaskStateCompleted, outcome.Task.State)
 	assert.Equal(t, TaskStatusOpen, outcome.Task.Status)
 	assert.Equal(t, "ses-123", outcome.SessionID)
@@ -325,7 +325,7 @@ func TestTaskManagerRunTaskSuccessWritesSummaryAndOutput(t *testing.T) {
 	assert.Equal(t, "feat/run", fake.mergeCalls[0][0])
 	assert.Equal(t, outcome.TaskBranchName, fake.mergeCalls[0][1])
 
-	taskDir := filepath.Join(baseDir, ".csw", "tasks", created.UUID)
+	taskDir := filepath.Join(baseDir, ".cswdata", "tasks", created.UUID)
 	summaryMetaBytes, readMetaErr := os.ReadFile(filepath.Join(taskDir, "ses-ses-123", "summary.yml"))
 	require.NoError(t, readMetaErr)
 	var meta TaskSessionSummary
@@ -455,7 +455,7 @@ func TestCLITaskSessionRunnerIncludesTaskFlags(t *testing.T) {
 		Role:       "developer",
 		Prompt:     "do work",
 		Task:       &Task{UUID: "task-uuid", Name: "task-name"},
-		TaskDir:    ".csw/tasks/task-uuid",
+		TaskDir:    ".cswdata/tasks/task-uuid",
 	}
 
 	args, err := runner.buildCLIArgs(request)
@@ -463,6 +463,6 @@ func TestCLITaskSessionRunnerIncludesTaskFlags(t *testing.T) {
 
 	assert.Contains(t, args, "--task-json")
 	assert.Contains(t, args, "--task-dir")
-	assert.Contains(t, args, ".csw/tasks/task-uuid")
+	assert.Contains(t, args, ".cswdata/tasks/task-uuid")
 	assert.Equal(t, "do work", args[len(args)-1])
 }

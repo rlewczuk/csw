@@ -551,7 +551,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create task runner: %w", err)
 	}
-	taskManager, err := core.NewTaskManager(workDir, configStore, taskRunner)
+	taskManager, err := core.NewTaskManagerWithTasksDir(workDir, ".cswdata/tasks", configStore, taskRunner)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create task manager: %w", err)

@@ -166,6 +166,7 @@ type CLITaskSessionRunner struct {
 // TaskManager manages persistent hierarchical tasks.
 type TaskManager struct {
 	baseDir     string
+	tasksDir    string
 	configStore conf.ConfigStore
 	runner      TaskSessionRunner
 	uuidFn      func() string
@@ -181,13 +182,27 @@ type TaskBackendAdapter struct {
 
 // NewTaskManager creates a new TaskManager.
 func NewTaskManager(baseDir string, configStore conf.ConfigStore, runner TaskSessionRunner) (*TaskManager, error) {
+	if strings.TrimSpace(baseDir) == "" {
+		return nil, fmt.Errorf("NewTaskManager() [task.go]: baseDir cannot be empty")
+	}
+
+	return NewTaskManagerWithTasksDir(baseDir, ".cswdata/tasks", configStore, runner)
+}
+
+// NewTaskManagerWithTasksDir creates a new TaskManager with custom tasks directory.
+func NewTaskManagerWithTasksDir(baseDir string, tasksDir string, configStore conf.ConfigStore, runner TaskSessionRunner) (*TaskManager, error) {
 	trimmedBaseDir := strings.TrimSpace(baseDir)
 	if trimmedBaseDir == "" {
-		return nil, fmt.Errorf("NewTaskManager() [task.go]: baseDir cannot be empty")
+		return nil, fmt.Errorf("NewTaskManagerWithTasksDir() [task.go]: baseDir cannot be empty")
+	}
+	trimmedTasksDir := strings.TrimSpace(tasksDir)
+	if trimmedTasksDir == "" {
+		return nil, fmt.Errorf("NewTaskManagerWithTasksDir() [task.go]: tasksDir cannot be empty")
 	}
 
 	return &TaskManager{
 		baseDir:     trimmedBaseDir,
+		tasksDir:    trimmedTasksDir,
 		configStore: configStore,
 		runner:      runner,
 		uuidFn:      shared.GenerateUUIDv7,
@@ -482,7 +497,7 @@ func toToolTaskRecord(taskData *Task) tool.TaskRecord {
 
 // TasksRoot returns root directory for task persistence.
 func (m *TaskManager) TasksRoot() string {
-	return filepath.Join(m.baseDir, ".csw", "tasks")
+	return filepath.Join(m.baseDir, m.tasksDir)
 }
 
 // CreateTask creates a new persistent task and prompt file.

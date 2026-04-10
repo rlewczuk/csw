@@ -3,14 +3,79 @@ package main
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestTaskCommandHasTaskDirPersistentFlag(t *testing.T) {
+	command := TaskCommand()
+	flag := command.PersistentFlags().Lookup("task-dir")
+	require.NotNil(t, flag)
+}
+
+func TestResolveTaskDirPathUsesDefaultWhenUnset(t *testing.T) {
+	originalResolver := resolveTaskCLIDefaultsFunc
+	t.Cleanup(func() {
+		resolveTaskCLIDefaultsFunc = originalResolver
+	})
+
+	resolveTaskCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+		_ = params
+		return conf.CLIDefaultsConfig{}, nil
+	}
+
+	command := TaskCommand()
+	rootDir := filepath.Join("/tmp", "project")
+	resolved, err := resolveTaskDirPath(command, rootDir)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(rootDir, ".cswdata", "tasks"), resolved)
+}
+
+func TestResolveTaskDirPathUsesConfigDefaultWhenUnset(t *testing.T) {
+	originalResolver := resolveTaskCLIDefaultsFunc
+	t.Cleanup(func() {
+		resolveTaskCLIDefaultsFunc = originalResolver
+	})
+
+	resolveTaskCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+		_ = params
+		return conf.CLIDefaultsConfig{TaskDir: "custom/tasks"}, nil
+	}
+
+	command := TaskCommand()
+	rootDir := filepath.Join("/tmp", "project")
+	resolved, err := resolveTaskDirPath(command, rootDir)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(rootDir, "custom", "tasks"), resolved)
+}
+
+func TestResolveTaskDirPathPrefersFlagOverConfigAndMakesRelativeAbsolute(t *testing.T) {
+	originalResolver := resolveTaskCLIDefaultsFunc
+	t.Cleanup(func() {
+		resolveTaskCLIDefaultsFunc = originalResolver
+	})
+
+	resolveTaskCLIDefaultsFunc = func(params system.ResolveCLIDefaultsParams) (conf.CLIDefaultsConfig, error) {
+		_ = params
+		return conf.CLIDefaultsConfig{TaskDir: "from-config"}, nil
+	}
+
+	command := TaskCommand()
+	require.NoError(t, command.ParseFlags([]string{"--task-dir", "from-flag"}))
+
+	rootDir := filepath.Join("/tmp", "project")
+	resolved, err := resolveTaskDirPath(command, rootDir)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(rootDir, "from-flag"), resolved)
+}
 
 func TestTaskNewCommandPromptFlagIsOptional(t *testing.T) {
 	command := taskNewCommand()

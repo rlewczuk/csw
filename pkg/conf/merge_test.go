@@ -111,6 +111,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		GitUserName:     "Base User",
 		GitUserEmail:    "base@example.com",
 		MaxThreads:      4,
+		TaskDir:         ".cswdata/tasks",
 	}
 	override := CLIDefaultsConfig{
 		DefaultProvider: "provider2",
@@ -124,6 +125,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		GitUserName:     "Override User",
 		GitUserEmail:    "override@example.com",
 		MaxThreads:      12,
+		TaskDir:         "custom/tasks",
 	}
 
 	base.MergeFrom(override)
@@ -142,6 +144,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		GitUserName:     "Override User",
 		GitUserEmail:    "override@example.com",
 		MaxThreads:      12,
+		TaskDir:         "custom/tasks",
 	}, base)
 }
 
@@ -203,6 +206,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 			Model:           "m1",
 			Worktree:        "w1",
 			Thinking:        "low",
+			TaskDir:         ".cswdata/tasks",
 		},
 		ShadowPaths: []string{"AGENTS.md"},
 	}
@@ -226,6 +230,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 			LogLLMRequests:  true,
 			Thinking:        "high",
 			LSPServer:       "lsp2",
+			TaskDir:         "custom/tasks",
 		},
 		ShadowPaths: []string{".cswdata/**", ".agents/**"},
 	}
@@ -243,7 +248,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 	assert.Equal(t, 12, base.Defaults.MaxToolThreads)
 	require.NotNil(t, base.Defaults.Container)
 	assert.Equal(t, ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, *base.Defaults.Container)
-	assert.Equal(t, CLIDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxToolThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2"}, base.Defaults)
+	assert.Equal(t, CLIDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxToolThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks"}, base.Defaults)
 	assert.Equal(t, []string{".cswdata/**", ".agents/**"}, base.ShadowPaths)
 }
 

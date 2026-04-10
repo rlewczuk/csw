@@ -469,6 +469,8 @@ type CLIDefaultsConfig struct {
 	GitUserEmail string `json:"git-email,omitempty" yaml:"git-email,omitempty"`
 	// MaxThreads is the default --max-threads value.
 	MaxThreads int `json:"max-threads,omitempty" yaml:"max-threads,omitempty"`
+	// TaskDir is the default task directory used by task commands.
+	TaskDir string `json:"task_dir,omitempty" yaml:"task_dir,omitempty"`
 }
 
 // ModelProviderConfig represents common configuration for model providers.

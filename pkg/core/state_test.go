@@ -13,7 +13,7 @@ func TestAgentStateCloneDeepCopiesRoleAndHookContext(t *testing.T) {
 		Role: &conf.AgentRoleConfig{Name: "developer", Aliases: []string{"dev"}},
 		TaskInfo: &TaskInfo{
 			Task:    &Task{UUID: "task-1", Name: "task-name", Deps: []string{"dep-a"}},
-			TaskDir: ".csw/tasks/task-1",
+			TaskDir: ".cswdata/tasks/task-1",
 		},
 		HookContext: HookContext{
 			"status": "running",
@@ -35,7 +35,7 @@ func TestAgentStateCloneDeepCopiesRoleAndHookContext(t *testing.T) {
 	assert.Equal(t, "developer", original.Role.Name)
 	assert.Equal(t, "task-name", original.TaskInfo.Task.Name)
 	assert.Equal(t, []string{"dep-a"}, original.TaskInfo.Task.Deps)
-	assert.Equal(t, ".csw/tasks/task-1", original.TaskInfo.TaskDir)
+	assert.Equal(t, ".cswdata/tasks/task-1", original.TaskInfo.TaskDir)
 	assert.Equal(t, "running", original.HookContext["status"])
 }
 
