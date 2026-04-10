@@ -7,9 +7,9 @@ defaults:
   log-llm-requests: true
   thinking: medium
   lsp-server: /home/rlew/go/bin/gopls
+  allow-all-permissions: true
+  vfs-allow:
+    - "/home/rlew/codesnort/src/csw/_local/files"
   container:
     image: "golang:1.25-trixie"
     enabled: true
-#  allow-all-permissions: true
-#  vfs-allow:
-#    - /home/rlew/codesnort/src/csw/_local/files
