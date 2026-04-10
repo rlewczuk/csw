@@ -1,6 +1,6 @@
 # Package `pkg/shared` Overview
 
-Package `pkg/shared` provides shared helpers used across package `pkg/shared` consumers.
+Package `pkg/shared` provides common utility helpers for file copying, string formatting, template rendering, and UUID generation, consumed by other packages across the project.
 
 ## Important files
 

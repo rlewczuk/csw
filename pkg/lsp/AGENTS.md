@@ -1,6 +1,6 @@
 # Package `pkg/lsp` Overview
 
-Package `pkg/lsp` provides LSP client, DTOs, and mocks for `pkg/lsp`.
+Package `pkg/lsp` provides a Language Server Protocol client, protocol DTOs, and an in-memory mock implementation for testing. It supports diagnostics, go-to-definition, find-references, hover, document/workspace symbols, and call hierarchy operations.
 
 ## Important files
 
@@ -18,7 +18,7 @@ Package `pkg/lsp` provides LSP client, DTOs, and mocks for `pkg/lsp`.
 * `NewMockLSP()` - Creates `MockLSP` instance.
 * `CursorLocation` - File path with line and column.
 * `Diagnostic` - Diagnostic message with range and severity.
-* `DiagnosticSeverity` - Enum: Error=1 Warning=2 Info=3 Hint=4.
+* `DiagnosticSeverity` - Enum: SeverityError=1 SeverityWarning=2 SeverityInformation=3 SeverityHint=4.
 * `Location` - URI and source range location.
 * `Position` - Zero-based line and character position.
 * `Range` - Start and end positions.
@@ -28,8 +28,8 @@ Package `pkg/lsp` provides LSP client, DTOs, and mocks for `pkg/lsp`.
 * `CallHierarchyIncomingCall` - Incoming caller with ranges.
 * `CallHierarchyOutgoingCall` - Outgoing callee with ranges.
 * `SymbolKind` - Enum: File..TypeParameter symbolic kinds.
-* `SymbolTag` - Enum: `SymbolTagDeprecated=1`.
-* `MarkupKind` - Enum: `PlainText`, `Markdown`.
+* `SymbolTag` - Enum: SymbolTagDeprecated=1.
+* `MarkupKind` - Enum: PlainText Markdown.
 * `Hover` - Hover response with content and range.
 * `MarkupContent` - Markup value with format kind.
 * `MarkedString` - Hover text or code block.

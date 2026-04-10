@@ -1,6 +1,6 @@
 # Package `pkg/tool` Overview
 
-Package `pkg/tool` defines tool contracts, registry, and built-ins in `pkg/tool`.
+Package `pkg/tool` defines tool contracts, registry, permission wrappers, and built-in agent tools including VFS, bash execution, tasks, subagents, web fetching, skills, and custom commands.
 
 ## Important files
 
@@ -21,6 +21,7 @@ Package `pkg/tool` defines tool contracts, registry, and built-ins in `pkg/tool`
 * `task_merge.go` - Task merge tool.
 * `task_get.go` - Task metadata query tool.
 * `task_list.go` - Task listing tool.
+* `task_helpers.go` - Task tool helper functions.
 * `vfs_read.go` - VFS file read tool.
 * `vfs_write.go` - VFS file write tool.
 * `vfs_edit.go` - VFS text edit tool.
@@ -30,6 +31,7 @@ Package `pkg/tool` defines tool contracts, registry, and built-ins in `pkg/tool`
 * `vfs_list.go` - VFS directory listing tool.
 * `vfs_find.go` - VFS glob search tool.
 * `vfs_grep.go` - VFS content grep tool.
+* `vfs_helpers.go` - VFS tool helper functions.
 
 ## Important public API objects
 
@@ -83,8 +85,9 @@ Package `pkg/tool` defines tool contracts, registry, and built-ins in `pkg/tool`
 * `TaskMergeTool` - Task merge tool.
 * `TaskGetTool` - Task lookup tool.
 * `TaskListTool` - Task listing tool.
+* `DiagnosticWithURI` - Diagnostic wrapper with file URI.
 * `NewToolRegistry()` - Creates empty tool registry.
-* `NewToolValue()` - Creates `ToolValue` from raw value.
+* `NewToolValue()` - Creates ToolValue from raw value.
 * `NewToolSchema()` - Creates empty tool schema.
 * `NewPermissionQuery()` - Creates permission query response.
 * `NewVFSPermissionQuery()` - Creates VFS permission query response.

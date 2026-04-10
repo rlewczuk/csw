@@ -1,15 +1,15 @@
 # Package `pkg/system` Overview
 
-Package `pkg/system` contains orchestration and runtime wiring for `pkg/system`.
+`pkg/system` provides core system orchestration for building, running, and managing agent sessions. It wires together configuration, models, tools, VFS/VCS, hooks, container runtime, and worktree handling to create a fully initialized `SweSystem` and drive session lifecycle.
 
 ## Important files
 
-* `system.go` - SweSystem lifecycle and session registry
-* `bootstrap.go` - Build system dependencies and config
-* `runtime.go` - run runtime session startup flow
-* `hooks.go` - Hook override parsing and runtime store
-* `worktree.go` - Worktree finalize and resume helpers
+* `bootstrap.go` - build system and configuration wiring
 * `context.go` - run context parsing helpers
+* `hooks.go` - hook parsing and runtime config
+* `runtime.go` - run session startup flow
+* `system.go` - SweSystem lifecycle and sessions
+* `worktree.go` - worktree finalize and resume helpers
 
 ## Important public API objects
 
@@ -19,50 +19,54 @@ Package `pkg/system` contains orchestration and runtime wiring for `pkg/system`.
 * `BuildSystemResult` - Outputs of BuildSystem
 * `ResolveRunDefaultsParams` - Inputs for run defaults
 * `ResolveWorktreeBranchNameParams` - Inputs for branch resolver
-* `StartRunSessionParams` - Inputs for run session startup
-* `StartRunSessionResult` - run runtime startup outputs
-* `SessionLoggerAppView` - App view with logger binding
-* `ChatPresenter` - Runtime presenter contract
-* `ChatView` - Runtime chat view contract
-* `AppViewFactory` - App view constructor
-* `ChatPresenterFactory` - Chat presenter constructor
-* `ChatViewFactory` - Chat view constructor
+* `ContainerUserIdentity` - Host user identity for containers
 * `RuntimeHookConfigStore` - Hook-overriding config store
 * `HookOverride` - Parsed hook override entry
+* `StartRunSessionParams` - Inputs for run session startup
+* `StartRunSessionResult` - Outputs from run session startup
 * `WorktreeFinalizeResult` - Worktree finalization output
-* `LoadSession()` - Load persisted session
-* `LoadLastSession()` - Load latest persisted session
-* `NewSession()` - Create new runtime session
-* `ExecuteSubAgentTask()` - Run delegated subagent task
-* `GetSession()` - Get session by id
-* `GetSessionThread()` - Get session thread by id
-* `ListSessions()` - List active sessions
-* `DeleteSession()` - Delete session by id
-* `Shutdown()` - Stop sessions and close resources
-* `StartRunSession()` - Start run session runtime
-* `ResolveRunDefaults()` - Load run default values
-* `ResolveWorktreeBranchName()` - Resolve dynamic worktree branch
-* `PrepareSessionVFS()` - Build session VCS and VFS
-* `BuildSystem()` - Build configured SweSystem
-* `ResolveContainerRuntimeConfig()` - Resolve container runtime settings
-* `ParseContainerMountSpec()` - Parse container mount entry
-* `ParseContainerEnvSpec()` - Parse container env entry
-* `ResolveContainerGitAuthorIdentity()` - Resolve git identity in container
-* `BuildConfigPath()` - Build effective config path
-* `ValidateConfigPaths()` - Validate config directories
-* `ResolveWorkDir()` - Resolve absolute working directory
-* `ResolveModelName()` - Resolve effective model name
-* `CreateProviderMap()` - Build provider lookup map
-* `CreateModelTagRegistry()` - Build model tag registry
-* `HandleCommitHookResponse()` - Process commit hook result
-* `ApplyHookDefaults()` - Apply default hook values
-* `BuildRuntimeHookConfigStore()` - Build overridden hook config store
-* `ParseHookOverride()` - Parse hook override string
-* `ParseHookTimeout()` - Parse hook timeout value
-* `FinalizeWorktreeSession()` - Finalize worktree and optional merge
-* `ResolveResumeTargetToSessionID()` - Resolve resume target to session id
-* `BuildSessionSummaryJSON()` - Build session summary JSON
-* `SaveSessionSummaryJSON()` - Save session summary JSON
-* `EmitSessionSummary()` - Emit and save session summary
-* `ParseRunContextEntries()` - Parse --context entries
-* `ParseRunContextFromEntries()` - Parse --context-from entries
+* `ResumeUUIDPattern` - UUID regex for resume targets
+* `ResumeWorktreeNamePattern` - Worktree name regex for resume
+* `NewRuntimeConfigStore()` - Creates runtime hook config store
+* `BuildSystem()` - Builds configured SweSystem
+* `PrepareSessionVFS()` - Creates session VCS and VFS
+* `ResolveRunDefaults()` - Resolves run command defaults
+* `ResolveWorktreeBranchName()` - Resolves dynamic worktree branch
+* `ResolveContainerRuntimeConfig()` - Resolves container runtime settings
+* `ParseContainerMountSpec()` - Parses container mount entry
+* `ParseContainerEnvSpec()` - Parses container env entry
+* `ResolveContainerGitAuthorIdentity()` - Resolves git identity in container
+* `BuildConfigPath()` - Builds effective config path
+* `ValidateConfigPaths()` - Validates config directories
+* `ResolveWorkDir()` - Resolves absolute working directory
+* `ResolveModelName()` - Resolves effective model name
+* `ResolveModelSpec()` - Resolves model alias or spec
+* `CreateProviderMap()` - Builds provider lookup map
+* `CreateModelTagRegistry()` - Builds model tag registry
+* `ParseRunContextEntries()` - Parses --context entries
+* `ParseRunContextFromEntries()` - Parses --context-from entries
+* `HandleCommitHookResponse()` - Processes commit hook result
+* `ApplyHookDefaults()` - Applies default hook values
+* `BuildRuntimeHookConfigStore()` - Builds overridden hook config store
+* `ApplyHookOverridesToConfigs()` - Applies hook overrides to configs
+* `ParseHookOverride()` - Parses hook override string
+* `BuildNewHookConfig()` - Builds new hook config
+* `ApplyHookSettings()` - Applies settings to hook config
+* `ParseHookTimeout()` - Parses hook timeout value
+* `NormalizeResumeTarget()` - Normalizes resume target value
+* `StartRunSession()` - Starts run session runtime
+* `LoadSession()` - Loads persisted session
+* `LoadLastSession()` - Loads latest persisted session
+* `NewSession()` - Creates new runtime session
+* `ExecuteSubAgentTask()` - Runs delegated subagent task
+* `GetSession()` - Gets session by id
+* `GetSessionThread()` - Gets session thread by id
+* `ListSessions()` - Lists active sessions
+* `DeleteSession()` - Deletes session by id
+* `Shutdown()` - Stops sessions and closes resources
+* `FinalizeWorktreeSession()` - Finalizes worktree and optional merge
+* `FindSessionIDByWorkDirName()` - Finds session by work dir name
+* `ResolveResumeTargetAsBranchOrWorktree()` - Resolves resume target as branch
+* `FindSessionIDByWorkDirPath()` - Finds session by work dir path
+* `ResolveResumeTargetToSessionID()` - Resolves resume target to session id
+* `ResolveResumeTargetAsPath()` - Resolves resume target as path

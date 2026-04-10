@@ -1,6 +1,6 @@
 # Package `pkg/logging` Overview
 
-Package `pkg/logging` provides structured runtime and session logging for `pkg/logging`.
+Package `pkg/logging` provides structured JSONL logging for global runtime and per-session events, including LLM request/response traces and test helpers.
 
 ## Important files
 
@@ -10,11 +10,11 @@ Package `pkg/logging` provides structured runtime and session logging for `pkg/l
 ## Important public API objects
 
 * `LogType` - Enum: `LogTypeSession`, `LogTypeLLM`.
-* `SetLogsDirectory` - Sets log directory and sync mode.
+* `SetLogsDirectory` - Configures log directory and sync mode.
 * `GetSessionLogDirectory` - Returns session log directory path.
 * `GetGlobalLogger` - Returns global slog logger.
 * `GetSessionLogger` - Returns session logger by type.
-* `CloseSessionLogger` - Closes one session's loggers.
+* `CloseSessionLogger` - Closes one session logger.
 * `CloseSessionLoggers` - Closes all session loggers.
 * `FlushLogs` - Flushes all logger writers.
 * `LogUserInput` - Logs user message event.

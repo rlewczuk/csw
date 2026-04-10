@@ -1,6 +1,6 @@
 # Package `pkg/core/testfixture` Overview
 
-Package `pkg/core/testfixture` provides fixtures for testing `pkg/core/testfixture` integrations.
+Package `pkg/core/testfixture` provides preconfigured test fixtures for building `system.SweSystem` instances used in `pkg/core` integration tests.
 
 ## Important files
 
@@ -8,23 +8,23 @@ Package `pkg/core/testfixture` provides fixtures for testing `pkg/core/testfixtu
 
 ## Important public API objects
 
-* `SweSystemFixture` - Holds system fixture dependencies
-* `SweSystemFixtureConfig` - Fixture configuration values
-* `SweSystemFixtureOption` - Functional fixture option
-* `StaticPromptGenerator` - Fixed prompt generator stub
-* `NewSweSystemFixture()` - Build fixture with defaults
-* `NewStaticPromptGenerator()` - Build fixed prompt generator
-* `WithPromptGenerator()` - Override prompt generator
-* `WithVFS()` - Override VFS implementation
-* `WithTools()` - Override tool registry
-* `WithModelProvider()` - Set default model provider
-* `WithModelProviders()` - Set provider map
-* `WithProviderName()` - Set provider key name
-* `WithWorkDir()` - Set fixture work directory
-* `WithSessionLoggerFactory()` - Set session logger factory
-* `WithRoles()` - Set role registry
-* `WithConfigStore()` - Set config store
-* `WithLSP()` - Set LSP implementation
-* `WithLogBaseDir()` - Set log base directory
-* `WithLogLLMRequests()` - Toggle LLM request logging
-* `WithoutVFSTools()` - Disable VFS tool registration
+* `SweSystemFixture` - Holds fixture system and dependencies
+* `SweSystemFixtureConfig` - Fixture creation configuration values
+* `SweSystemFixtureOption` - Functional fixture option type
+* `StaticPromptGenerator` - Fixed prompt generator for tests
+* `NewSweSystemFixture()` - Creates fixture with defaults
+* `NewStaticPromptGenerator()` - Creates fixed prompt generator
+* `WithPromptGenerator()` - Sets custom prompt generator
+* `WithVFS()` - Sets custom VFS implementation
+* `WithTools()` - Sets custom tool registry
+* `WithModelProvider()` - Sets default model provider
+* `WithModelProviders()` - Sets model provider map
+* `WithProviderName()` - Sets provider key name
+* `WithWorkDir()` - Sets system work directory
+* `WithSessionLoggerFactory()` - Sets session logger factory
+* `WithRoles()` - Sets role registry
+* `WithConfigStore()` - Sets config store
+* `WithLSP()` - Sets LSP implementation
+* `WithLogBaseDir()` - Sets log base directory
+* `WithLogLLMRequests()` - Toggles LLM request logging
+* `WithoutVFSTools()` - Disables VFS tool registration

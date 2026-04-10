@@ -1,28 +1,36 @@
 # Package `pkg/vcs` Overview
 
-Package `pkg/vcs` implements git and null VCS behavior in package `pkg/vcs`.
+Package `pkg/vcs` provides git-backed and no-op VCS implementations for repository operations, worktree management, branching, merging, and diff utilities.
 
 ## Important files
 
-* `git_vcs.go` - GitVCS repository and worktree operations.
-* `git_merge.go` - Git merge and diff helper functions.
-* `null_vcs.go` - NullVCS no-op implementation.
+* `git_vcs.go` - Git-backed repository and worktree operations.
+* `git_merge.go` - Git merge helpers and diff utilities.
+* `null_vcs.go` - No-op VCS implementation.
 
 ## Important public API objects
 
 * `GitVCS` - Git-backed VCS implementation.
 * `NullVCS` - No-op VCS implementation.
 * `NewGitRepo` - Creates GitVCS from repository path.
-* `NewNullVFS` - Creates NullVCS wrapper.
-* `ReadGitConfigValue` - Reads git config key value.
-* `GitWorktreeForBranch` - Finds worktree name for branch.
-* `HardResetWorktree` - Resets and cleans worktree.
-* `DetectMergeBaseBranch` - Detects current branch name.
-* `GitBranchExists` - Checks branch existence.
-* `CreateMergeWorktree` - Creates temporary merge worktree.
-* `ExtractConflictFilesFromOutput` - Extracts conflict file paths.
+* `NewNullVFS` - Creates NullVCS instance.
+* `RunGitCommand` - Variable pointing to git command runner.
+* `ListGitConflictFiles` - Variable pointing to conflict file lister.
+* `GitLookPath` - Variable wrapping exec LookPath for git.
+* `GitConfigValue` - Variable wrapping ReadGitConfigValue.
+* `ReadGitConfigValue` - Reads a single git configuration key.
+* `GitWorktreeForBranch` - Finds worktree name for a branch.
+* `HardResetWorktree` - Resets and cleans a worktree.
+* `DetectMergeBaseBranch` - Resolves the currently checked out branch.
+* `GitBranchExists` - Checks if a branch exists.
+* `CreateMergeWorktree` - Creates a temporary merge worktree.
+* `ExtractConflictFilesFromOutput` - Extracts conflict file paths from output.
 * `IsMergeConflictError` - Detects merge conflict output.
-* `ResolveGitCommitID` - Resolves revision to commit hash.
+* `ResolveGitCommitID` - Resolves a revision to a commit hash.
 * `ResolveHostGitConfigValue` - Reads host git config value.
 * `ResolveGitIdentity` - Resolves configured git identity.
-* `CollectEditedFiles` - Collects edited file paths.
+* `ChooseGitDiffDir` - Chooses the directory for git diff.
+* `GitDiffNameOnly` - Returns changed file names for a range.
+* `GitUntrackedFiles` - Returns untracked file paths.
+* `ParseGitFileList` - Parses git command output into file list.
+* `CollectEditedFiles` - Collects edited files across worktrees.

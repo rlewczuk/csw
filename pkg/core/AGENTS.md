@@ -1,11 +1,12 @@
 # Package `pkg/core` Overview
 
-Package `pkg/core` contains runtime orchestration for `pkg/core` agent sessions and tasks.
+Package `pkg/core` provides runtime orchestration for agent sessions and tasks. It manages the core session loop, async threading, prompt generation, role caching, lifecycle hooks, persistent tasks, state persistence, and session summarization.
 
 ## Important files
 
 * `session.go` - Main session loop and tool execution
 * `session_thread.go` - Thread-safe async session controller
+* `session_agents.go` - Injects AGENTS.md into context
 * `prompt.go` - Prompt fragments and tool info builder
 * `role.go` - Cached agent role registry
 * `hooks_engine.go` - Hook execution and feedback handling
@@ -25,6 +26,7 @@ Package `pkg/core` contains runtime orchestration for `pkg/core` agent sessions 
 * `SessionThreadInput` - Input operations for session threads
 * `SessionThreadOutput` - Output callbacks for session threads
 * `SessionFactory` - Creates sessions for threads
+* `SubAgentTaskRunner` - Runs delegated subagent tasks
 * `PromptGenerator` - Builds prompts and tool docs
 * `ConfPromptGenerator` - ConfigStore-backed prompt generator
 * `AgentRoleRegistry` - Cached role lookup service
@@ -32,6 +34,7 @@ Package `pkg/core` contains runtime orchestration for `pkg/core` agent sessions 
 * `AgentStateCommonInfo` - Shared runtime metadata fields
 * `TaskInfo` - Task metadata attached to sessions
 * `HookEngine` - Executes configured lifecycle hooks
+* `HookOutputView` - Hook output sink interface
 * `HookContext` - Hook context key-value map
 * `HookExecutionRequest` - Hook invocation request payload
 * `HookExecutionResult` - Hook execution output data
@@ -41,6 +44,8 @@ Package `pkg/core` contains runtime orchestration for `pkg/core` agent sessions 
 * `Task` - Persistent task metadata record
 * `TaskManager` - Persistent task lifecycle manager
 * `TaskBackendAdapter` - Tool backend adapter for tasks
+* `TaskSessionRunner` - Runs a single task session
+* `SessionSummaryBuildResult` - Runtime fields for summary build
 * `PersistedSessionState` - Serialized session state alias
 * `SessionSummaryJSON` - Persisted session summary schema
 * `SubAgentSummaryJSON` - Persisted subagent summary schema
@@ -51,6 +56,7 @@ Package `pkg/core` contains runtime orchestration for `pkg/core` agent sessions 
 * `NewAgentRoleRegistry()` - Create role registry
 * `NewHookEngine()` - Create hook engine
 * `NewTaskManager()` - Create task manager
+* `NewTaskManagerWithTasksDir()` - Create task manager with dir
 * `NewTaskBackendAdapter()` - Create task backend adapter
 * `NewCLITaskSessionRunner()` - Create CLI task runner
 * `CompactMessages()` - Compact chat history messages

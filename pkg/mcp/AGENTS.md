@@ -1,6 +1,6 @@
 # Package `pkg/mcp` Overview
 
-Package `pkg/mcp` implements MCP clients and tool bridging in `pkg/mcp`.
+Package `pkg/mcp` implements MCP clients and tool bridging. It provides stdio and HTTP transports, a manager for server lifecycle and tool routing, and a prompt generator wrapper that injects MCP tool metadata into prompts.
 
 ## Important files
 
@@ -23,27 +23,27 @@ Package `pkg/mcp` implements MCP clients and tool bridging in `pkg/mcp`.
 * `NewManager()` - Creates manager from config store.
 * `NewTool()` - Creates MCP forwarding tool.
 * `NewPromptGenerator()` - Wraps prompt generator for MCP.
-* `NewMockManager()` - Creates initialized `MockManager`.
+* `NewMockManager()` - Creates initialized mock manager.
 * `RegisterTools()` - Registers MCP tools in registry.
-* `BuildQualifiedToolName()` - Builds `mcp.server.tool` names.
+* `BuildQualifiedToolName()` - Builds qualified MCP tool names.
 * `WriteMessage()` - Writes framed JSON-RPC message.
 * `ReadMessage()` - Reads framed JSON-RPC body.
-* `LatestProtocolVersion` - Constant: `2025-11-25`.
-* `JSONRPCVersion` - Constant: `2.0`.
+* `LatestProtocolVersion` - Constant: 2025-11-25.
+* `JSONRPCVersion` - Constant: 2.0.
 * `JSONRPCRequest` - JSON-RPC request DTO.
 * `JSONRPCResponse` - JSON-RPC response DTO.
 * `JSONRPCNotification` - JSON-RPC notification DTO.
 * `JSONRPCError` - JSON-RPC error DTO.
 * `InitializeRequestParams` - Initialize request parameters.
 * `InitializeResult` - Initialize response payload.
-* `RemoteTool` - Tool metadata from `tools/list`.
-* `RemoteResource` - Resource metadata from `resources/list`.
-* `ListToolsResult` - `tools/list` response payload.
-* `ListResourcesResult` - `resources/list` response payload.
-* `ReadResourceRequestParams` - `resources/read` request parameters.
-* `ReadResourceResult` - `resources/read` response payload.
-* `CallToolRequestParams` - `tools/call` request parameters.
-* `CallToolResult` - `tools/call` response payload.
+* `RemoteTool` - Tool metadata from list response.
+* `RemoteResource` - Resource metadata from list response.
+* `ListToolsResult` - Tool list response payload.
+* `ListResourcesResult` - Resource list response payload.
+* `ReadResourceRequestParams` - Resource read request parameters.
+* `ReadResourceResult` - Resource read response payload.
+* `CallToolRequestParams` - Tool call request parameters.
+* `CallToolResult` - Tool call response payload.
 * `ResourceContent` - Resource content entry payload.
 * `MCPContentBlock` - Tool result content block.
 * `MCPImplementationInfo` - MCP implementation identity metadata.

@@ -1,6 +1,6 @@
 # Package `pkg/testutil` Overview
 
-Package `pkg/testutil` provides reusable testing helpers in package `pkg/testutil`.
+Package `pkg/testutil` provides reusable test utilities and helpers for integration tests, mock HTTP servers, and session output handling in `pkg/testutil`.
 
 ## Important files
 
@@ -12,9 +12,9 @@ Package `pkg/testutil` provides reusable testing helpers in package `pkg/testuti
 ## Important public API objects
 
 * `AssistantMessageRecord` - Captured assistant message payload.
-* `MockHTTPServer` - In-memory HTTP endpoint mock.
 * `CapturedRequest` - Recorded incoming HTTP request.
-* `NewMockHTTPServer` - Creates mock HTTP server.
+* `MockHTTPServer` - In-memory mock HTTP server.
+* `NewMockHTTPServer` - Creates new mock HTTP server.
 * `MockSessionOutputHandler` - Captures session output events.
 * `NewMockSessionOutputHandler` - Creates session output mock.
 * `IntegCfgDir` - Returns `_integ` directory path.

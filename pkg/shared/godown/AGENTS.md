@@ -1,6 +1,6 @@
 # Package `pkg/shared/godown` Overview
 
-Package `pkg/shared/godown` implements HTML-to-Markdown conversion in package `pkg/shared/godown`.
+Package `pkg/shared/godown` converts HTML into Markdown with customizable options and support for custom tag rules.
 
 ## Important files
 
@@ -12,5 +12,6 @@ Package `pkg/shared/godown` implements HTML-to-Markdown conversion in package `p
 * `WalkFunc` - HTML node walk function type.
 * `CustomRule` - Interface for custom tag conversion.
 * `Option` - Converter options for rendering behavior.
+* `Clone` - Copies options without modifying original.
 * `Convert` - Converts HTML reader to Markdown writer.
-* `CovertStr` - Converts HTML string to Markdown.
+* `CovertStr` - Converts HTML string to Markdown string.

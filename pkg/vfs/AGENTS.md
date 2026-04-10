@@ -1,18 +1,18 @@
 # Package `pkg/vfs` Overview
 
-Package `pkg/vfs` provides filesystem abstractions and helpers in package `pkg/vfs`.
+Package `pkg/vfs` provides filesystem abstractions, local and in-memory VFS implementations, access-control wrappers, glob/grep filtering, patch parsing, text patching, and shadow routing for the project.
 
 ## Important files
 
-* `local.go` - Local filesystem VFS implementation.
 * `access.go` - Access-control VFS wrapper.
+* `config.go` - Hide-pattern configuration helpers.
 * `glob.go` - Glob matching and filtering.
 * `grep.go` - Regex file content search.
-* `patcher.go` - Text patching and unified diff.
-* `patch.go` - Patch parsing for file operations.
-* `config.go` - Hide-pattern configuration helpers.
-* `shadow.go` - Shadow filesystem routing wrapper.
+* `local.go` - Local filesystem VFS implementation.
 * `mock.go` - In-memory VFS and VCS doubles.
+* `patch.go` - Patch parsing for file operations.
+* `patcher.go` - Text patching and unified diff.
+* `shadow.go` - Shadow filesystem routing wrapper.
 
 ## Important public API objects
 

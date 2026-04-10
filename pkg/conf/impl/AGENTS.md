@@ -1,6 +1,6 @@
 # Package `pkg/conf/impl` Overview
 
-Package `pkg/conf/impl` implements configuration store backends.
+Package `pkg/conf/impl` provides concrete configuration store implementations for `pkg/conf` interfaces. It includes composite merging across multiple sources, embedded read-only defaults, local filesystem-based stores with auto-reload, and a test mock.
 
 ## Important files
 
@@ -12,9 +12,9 @@ Package `pkg/conf/impl` implements configuration store backends.
 ## Important public API objects
 
 * `CompositeConfigStore` - Multi-source merged configuration store
-* `EmbeddedConfigStore` - Embedded configuration store
-* `LocalConfigStore` - Local configuration store
-* `MockConfigStore` - Mock configuration store
+* `EmbeddedConfigStore` - Embedded read-only configuration store
+* `LocalConfigStore` - Local filesystem configuration store
+* `MockConfigStore` - Mock configuration store for tests
 * `NewCompositeConfigStore()` - Creates composite config store
 * `NewEmbeddedConfigStore()` - Creates embedded config store
 * `NewLocalConfigStore()` - Creates local config store

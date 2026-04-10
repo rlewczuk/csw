@@ -52,58 +52,52 @@ Other rules:
 
 ## Packages Overview
 
-* `cmd/csw` - Main CLI application with Cobra commands and session execution
-* `pkg/apis` - Core VFS and VCS abstraction interfaces
-* `pkg/commands` - Slash command parsing and template expansion
-* `pkg/conf` - Configuration domain and config-store abstractions
-* `pkg/conf/impl` - Configuration store implementations (local, embedded, composite, mock)
-* `pkg/conf/impl/conf/tools` - Embedded tool directory names for bundled configuration
-* `pkg/core` - Runtime orchestration layer for agent sessions
-* `pkg/core/testfixture` - Core integration test fixtures for SweSystem
-* `pkg/logging` - Structured logging infrastructure for events and session logs
-* `pkg/lsp` - Language Server Protocol integration layer
-* `pkg/mcp` - MCP client for external MCP servers via stdio/HTTP
-* `pkg/models` - Model/provider abstraction layer for chat and embedding backends
-* `pkg/presenter` - Presenter layer connecting core to UI interfaces
-* `pkg/presenter/testfixture` - Presenter integration test fixtures
-* `pkg/runner` - Command execution abstractions for bash and containers
-* `pkg/shared` - Cross-cutting utilities (file copy, UUIDv7, HTML to Markdown)
-* `pkg/shared/godown` - HTML to Markdown converter with customizable options
-* `pkg/system` - Core system orchestration for sessions, models, tools
-* `pkg/testutil` - Reusable test doubles and fixtures for integration tests
-* `pkg/testutil/cfg` - Integration test configuration helpers
-* `pkg/testutil/fixture` - Project path utilities and temp directory helpers
-* `pkg/tool` - Agent tool execution layer with registry and concrete tools
-* `pkg/ui` - Frontend-agnostic UI contracts and view models
-* `pkg/ui/cli` - CLI implementations of UI interfaces for terminal interaction
-* `pkg/ui/cli/testfixture` - CLI integration test fixtures
-* `pkg/ui/mock` - Mock implementations of UI interfaces for testing
-* `pkg/vcs` - VCS interface implementations for git and null/no-op
-* `pkg/vfs` - Filesystem and VCS abstractions with local/git implementations
+* `cmd/csw` - CSW CLI with RunCommand, ProviderCommand, and config helpers
+* `pkg/apis` - VFS and VCS abstraction interfaces
+* `pkg/commands` - Slash command parsing with Command and Invocation
+* `pkg/conf` - Config models and ConfigStore/WritableConfigStore interfaces
+* `pkg/conf/impl` - Config store implementations: composite, embedded, local, mock
+* `pkg/conf/impl/conf/tools` - Embedded tool directory names constant
+* `pkg/core` - Session orchestration with SweSession, SessionThread, TaskManager
+* `pkg/core/testfixture` - SweSystem test fixtures with SweSystemFixture
+* `pkg/io` - Text and JSONL session input/output adapters
+* `pkg/logging` - Structured JSONL logging with session and LLM loggers
+* `pkg/lsp` - LSP client, protocol DTOs, and MockLSP
+* `pkg/mcp` - MCP clients, Manager, and tool bridge
+* `pkg/models` - Model/provider abstractions with ChatModel, ProviderRegistry
+* `pkg/runner` - BashRunner and ContainerRunner command executors
+* `pkg/shared` - File copy, formatting, template, UUIDv7 helpers
+* `pkg/shared/godown` - HTML to Markdown converter with custom rules
+* `pkg/system` - SweSystem orchestration and runtime bootstrapping
+* `pkg/testutil` - MockHTTPServer and MockSessionOutputHandler test utilities
+* `pkg/testutil/cfg` - Integration test config and feature flag helpers
+* `pkg/testutil/fixture` - Project root and temporary directory helpers
+* `pkg/tool` - Tool registry and built-in VFS, bash, task tools
+* `pkg/vcs` - GitVCS and NullVCS implementations
+* `pkg/vfs` - LocalVFS, access control, glob/grep, patch, shadow
 
 ## Code Organization
 
-- `cmd/csw` - Main CLI application with Cobra commands, CLI session execution, configuration management, and worktree cleanup functionality.
-- `pkg/conf` - Configuration domain and config-store abstractions for global settings, model providers, agent roles, tool and file access policies.
-- `pkg/conf/impl` - Configuration store implementations (local filesystem-based, embedded, composite, and mock config stores).
-- `pkg/core` - Runtime orchestration layer for agent sessions, managing session lifecycle, prompt/tool assembly, role/model switching, and async session threading.
-- `pkg/core/testfixture` - Core integration test fixtures for creating pre-configured SweSystem instances with mock dependencies.
-- `pkg/logging` - Structured logging infrastructure for global runtime events and per-session logs.
-- `pkg/lsp` - Language Server Protocol integration layer with JSON-RPC client, protocol DTOs, and in-memory mock.
-- `pkg/models` - Model/provider abstraction layer for chat and embedding backends with provider registry, concrete clients, OAuth helpers, and tagging logic.
-- `pkg/presenter` - Presenter layer connecting core session/system behavior to UI interfaces.
-- `pkg/presenter/testfixture` - Presenter integration test fixtures.
-- `pkg/runner` - Command execution abstractions for running shell commands with bash and containerized environments.
-- `pkg/shared` - Cross-cutting utility code including patch parsing, file copy helpers, and UUIDv7 generation.
-- `pkg/shared/godown` - HTML to Markdown converter with customizable options.
-- `pkg/system` - Core system orchestration for managing sessions, models, tools, and CLI runtime initialization.
+- `cmd/csw` - Main CLI application with Cobra commands, subcommands for run, provider, role, tool, hook, mcp, task, and worktree cleanup.
+- `pkg/apis` - Core VFS and VCS abstraction interfaces and common errors.
+- `pkg/commands` - Slash command parsing, template expansion, and prompt file loading.
+- `pkg/conf` - Configuration domain models, store interfaces, and merge helpers.
+- `pkg/conf/impl` - Concrete config store implementations: composite, embedded, local, and mock.
+- `pkg/conf/impl/conf/tools` - Embedded tool directory names for bundled configuration.
+- `pkg/core` - Runtime orchestration layer for agent sessions, threads, prompts, hooks, tasks, and summaries.
+- `pkg/core/testfixture` - Preconfigured SweSystem test fixtures for core integration tests.
+- `pkg/io` - Text and JSONL input/output adapters bridging external streams to session threads.
+- `pkg/logging` - Structured JSONL logging infrastructure for global runtime and per-session events.
+- `pkg/lsp` - Language Server Protocol integration with JSON-RPC client, DTOs, and in-memory mock.
+- `pkg/mcp` - MCP client for external MCP servers via stdio and HTTP transports.
+- `pkg/models` - Model/provider abstraction layer for chat and embedding backends.
+- `pkg/runner` - Command execution abstractions for bash and containerized environments.
+- `pkg/shared` - Cross-cutting utilities including file copy, UUIDv7, and HTML-to-Markdown conversion.
+- `pkg/shared/godown` - HTML to Markdown converter with customizable options and custom tag rules.
+- `pkg/system` - Core system orchestration for building, running, and managing agent sessions.
 - `pkg/testutil` - Reusable test doubles and fixtures for integration and package tests.
-- `pkg/testutil/cfg` - Integration test configuration helpers for managing test directories and feature flags.
-- `pkg/testutil/fixture` - Reusable test fixture helpers for locating project paths and managing temporary directories.
-- `pkg/tool` - Agent tool execution layer with tool interfaces, registry, permissions, and concrete tools for shell, todo, subagent, web fetch, and VFS operations.
-- `pkg/ui` - Frontend-agnostic UI contracts and view models for presenters and interfaces.
-- `pkg/ui/cli` - CLI implementations of UI interfaces for terminal-based interaction.
-- `pkg/ui/cli/testfixture` - CLI integration test fixtures for setting up test environments.
-- `pkg/ui/mock` - Mock implementations of UI interfaces for testing purposes.
+- `pkg/testutil/cfg` - Integration test configuration helpers for feature flags and temp directories.
+- `pkg/testutil/fixture` - Reusable test fixture helpers for locating project paths and managing temp dirs.
+- `pkg/tool` - Agent tool execution layer with registry, permissions, and concrete tools.
 - `pkg/vcs` - VCS interface implementations for git repositories and null/no-op version control.
-- `pkg/vfs` - Filesystem and VCS abstractions with local/git implementations, access control, search/filter, patching, and mocks.
+- `pkg/vfs` - Filesystem and VCS abstractions with local implementations, access control, search, and patching.

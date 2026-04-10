@@ -1,6 +1,6 @@
 # Package `pkg/testutil/fixture` Overview
 
-Package `pkg/testutil/fixture` provides path fixtures in package `pkg/testutil/fixture`.
+Package `pkg/testutil/fixture` provides reusable test fixture helpers for locating the project root and managing temporary directories within the repository.
 
 ## Important files
 
