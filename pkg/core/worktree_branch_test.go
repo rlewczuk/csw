@@ -30,8 +30,15 @@ func TestGenerateWorktreeBranchName(t *testing.T) {
 			name:             "limits generated branch suffix to twenty chars",
 			llmResponse:      "very long symbolic branch name for worktree cleanup",
 			inputPrompt:      "Fix worktree cleanup",
-			expectedBranch:   "very-long-symbolic-b",
+			expectedBranch:   "very-long-symbolic-branch",
 			expectedContains: "Fix worktree cleanup",
+		},
+		{
+			name:             "allows overflow up to twenty five chars to keep nearest word",
+			llmResponse:      "kebab case configuration keys",
+			inputPrompt:      "Normalize branch names",
+			expectedBranch:   "kebab-case-configuration",
+			expectedContains: "Normalize branch names",
 		},
 	}
 
@@ -169,7 +176,9 @@ func TestNormalizeWorktreeBranchSymbolicName(t *testing.T) {
 		{name: "keeps lowercase and dashes", input: "linear-merge", expected: "linear-merge"},
 		{name: "normalizes spaces and symbols", input: "Linear Merge Cleanup!!!", expected: "linear-merge-cleanup"},
 		{name: "collapses repeated separators", input: "worktree___cleanup---fix", expected: "worktree-cleanup-fix"},
-		{name: "trims to twenty chars", input: "this name is definitely too long", expected: "this-name-is-definit"},
+		{name: "trims to nearest word around twenty chars", input: "this name is definitely too long", expected: "this-name-is-definitely"},
+		{name: "allows overflow up to twenty five chars", input: "kebab-case-configuration-keys", expected: "kebab-case-configuration"},
+		{name: "falls back to twenty five chars when first word too long", input: "supercalifragilisticexpialidocious", expected: "supercalifragilisticexpia"},
 		{name: "empty when no alphanumeric characters", input: "!!!", expected: ""},
 	}
 

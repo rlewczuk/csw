@@ -382,6 +382,7 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 		{name: "returns unchanged branch when no placeholder suffix", prompt: "Implement feature", modelName: "mock/test-model", worktree: "feature/fixed", expected: "feature/fixed", generateCalls: 0},
 		{name: "returns error when placeholder used with empty prompt", prompt: "   ", modelName: "mock/test-model", worktree: "sp-1234-%", expectError: "requires non-empty prompt"},
 		{name: "generates and appends branch suffix", prompt: "Fix worktree cleanup issue", modelName: "mock/test-model", worktree: "sp-1234-%", expected: "sp-1234-worktree-cleanup", generateCalls: 1},
+		{name: "prefix length does not affect generated suffix length", prompt: "Fix worktree cleanup issue", modelName: "mock/test-model", worktree: "very-long-constant-prefix-%", expected: "very-long-constant-prefix-kebab-case-configuration", generateCalls: 1},
 		{name: "generates and appends branch suffix with model alias", prompt: "Fix worktree cleanup issue", modelName: "default", aliases: map[string]conf.ModelAliasValue{"default": {Values: []string{"mock/test-model"}}}, worktree: "sp-1234-%", expected: "sp-1234-worktree-cleanup", generateCalls: 1},
 		{name: "propagates generator error", prompt: "Fix worktree cleanup issue", modelName: "mock/test-model", worktree: "sp-1234-%", generatorError: errors.New("generation failed"), expectError: "generation failed", generateCalls: 1},
 	}
@@ -423,6 +424,9 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 				generateCalls++
 				if tt.generatorError != nil {
 					return "", tt.generatorError
+				}
+				if strings.Contains(tt.name, "prefix length") {
+					return "kebab-case-configuration", nil
 				}
 				return "worktree-cleanup", nil
 			}

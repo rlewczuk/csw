@@ -11,6 +11,11 @@ import (
 	"github.com/rlewczuk/csw/pkg/models"
 )
 
+const (
+	worktreeBranchTargetLength = 20
+	worktreeBranchMaxLength    = 25
+)
+
 // WorktreeBranchPromptData contains data for rendering worktree branch prompt templates.
 type WorktreeBranchPromptData struct {
 	Input string
@@ -138,9 +143,50 @@ func NormalizeWorktreeBranchSymbolicName(input string) string {
 	}
 
 	normalized := strings.Trim(builder.String(), "-")
-	if len(normalized) > 20 {
-		normalized = strings.Trim(normalized[:20], "-")
+	if len(normalized) > worktreeBranchTargetLength {
+		normalized = truncateWorktreeBranchByWords(normalized)
 	}
 
 	return normalized
+}
+
+// truncateWorktreeBranchByWords trims a normalized branch suffix at word boundaries.
+func truncateWorktreeBranchByWords(normalized string) string {
+	if len(normalized) <= worktreeBranchTargetLength {
+		return normalized
+	}
+
+	words := strings.Split(normalized, "-")
+	if len(words) == 0 {
+		return ""
+	}
+
+	current := ""
+	for _, word := range words {
+		if word == "" {
+			continue
+		}
+
+		candidate := word
+		if current != "" {
+			candidate = current + "-" + word
+		}
+
+		if len(candidate) <= worktreeBranchTargetLength {
+			current = candidate
+			continue
+		}
+
+		if len(candidate) <= worktreeBranchMaxLength {
+			return candidate
+		}
+
+		if current != "" {
+			return current
+		}
+
+		return strings.Trim(candidate[:worktreeBranchMaxLength], "-")
+	}
+
+	return current
 }
