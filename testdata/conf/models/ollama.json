@@ -3,7 +3,7 @@
   "name": "ollama",
   "description": "Local Ollama instance",
   "url": "http://localhost:11434",
-  "model_tags": [
+  "model-tags": [
     {
       "model": "^devstral.*",
       "tag": "devstral"

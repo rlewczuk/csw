@@ -42,7 +42,7 @@ func TestHookCommand_RunLLMWithRunIntegration(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, ".csw", "config", "models", "ollama.json"), []byte(providerConfig), 0o644))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(tmpDir, ".csw", "config", "hooks", "llm_real", "llm_real.yml"),
-		[]byte("name: llm_real\ndescription: real llm test\nhook: pre_run\ntype: llm\nmodel: ollama/test-model\nprompt: summarize {{.ticket}}\noutput_to: llm_out\n"),
+		[]byte("name: llm_real\ndescription: real llm test\nhook: pre_run\ntype: llm\nmodel: ollama/test-model\nprompt: summarize {{.ticket}}\noutput-to: llm_out\n"),
 		0o644,
 	))
 

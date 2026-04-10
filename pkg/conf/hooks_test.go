@@ -32,7 +32,7 @@ func TestHookConfigUnmarshalYAMLDescription(t *testing.T) {
 
 func TestHookConfigUnmarshalJSONLLMFields(t *testing.T) {
 	var cfg HookConfig
-	err := json.Unmarshal([]byte(`{"name":"h1","hook":"summary","type":"llm","prompt":"p","system_prompt":"s","model":"mock/test","thinking":"high","output_to":"out"}`), &cfg)
+	err := json.Unmarshal([]byte(`{"name":"h1","hook":"summary","type":"llm","prompt":"p","system-prompt":"s","model":"mock/test","thinking":"high","output-to":"out"}`), &cfg)
 	require.NoError(t, err)
 
 	assert.Equal(t, HookTypeLLM, cfg.Type)
@@ -70,7 +70,7 @@ func TestHookConfigUnmarshalYAMLUsesFilenameProvidedName(t *testing.T) {
 
 func TestHookConfigUnmarshalYAMLLLMFields(t *testing.T) {
 	var cfg HookConfig
-	err := yaml.Unmarshal([]byte("name: h1\nhook: summary\ntype: llm\nprompt: p\nsystem_prompt: s\nmodel: mock/test\nthinking: high\noutput_to: out\n"), &cfg)
+	err := yaml.Unmarshal([]byte("name: h1\nhook: summary\ntype: llm\nprompt: p\nsystem-prompt: s\nmodel: mock/test\nthinking: high\noutput-to: out\n"), &cfg)
 	require.NoError(t, err)
 
 	assert.Equal(t, HookTypeLLM, cfg.Type)
@@ -83,7 +83,7 @@ func TestHookConfigUnmarshalYAMLLLMFields(t *testing.T) {
 
 func TestHookConfigUnmarshalYAMLSubAgentFields(t *testing.T) {
 	var cfg HookConfig
-	err := yaml.Unmarshal([]byte("name: h1\nhook: summary\ntype: subagent\nprompt: p\nsystem_prompt: s\nmodel: mock/test\nthinking: high\nrole: reviewer\n"), &cfg)
+	err := yaml.Unmarshal([]byte("name: h1\nhook: summary\ntype: subagent\nprompt: p\nsystem-prompt: s\nmodel: mock/test\nthinking: high\nrole: reviewer\n"), &cfg)
 	require.NoError(t, err)
 
 	assert.Equal(t, HookTypeSubAgent, cfg.Type)
@@ -96,7 +96,7 @@ func TestHookConfigUnmarshalYAMLSubAgentFields(t *testing.T) {
 
 func TestHookConfigUnmarshalJSONSubAgentFields(t *testing.T) {
 	var cfg HookConfig
-	err := json.Unmarshal([]byte(`{"name":"h1","hook":"summary","type":"subagent","prompt":"p","system_prompt":"s","model":"mock/test","thinking":"high","role":"reviewer"}`), &cfg)
+	err := json.Unmarshal([]byte(`{"name":"h1","hook":"summary","type":"subagent","prompt":"p","system-prompt":"s","model":"mock/test","thinking":"high","role":"reviewer"}`), &cfg)
 	require.NoError(t, err)
 
 	assert.Equal(t, HookTypeSubAgent, cfg.Type)

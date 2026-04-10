@@ -174,7 +174,7 @@ func TestModelTagRegistry_LoadGlobalConfig(t *testing.T) {
 	// Write a test global config
 	configPath := filepath.Join(tmpDir, "global.json")
 	configContent := `{
-  "model_tags": [
+  "model-tags": [
     {"model": "^claude-.*", "tag": "anthropic"},
     {"model": "^gpt-.*", "tag": "openai"}
   ]
@@ -225,7 +225,7 @@ func TestModelTagRegistry_LoadGlobalConfig_InvalidRegexp(t *testing.T) {
 
 	// Invalid regexp pattern
 	configContent := `{
-  "model_tags": [
+  "model-tags": [
     {"model": "[invalid", "tag": "test"}
   ]
 }`

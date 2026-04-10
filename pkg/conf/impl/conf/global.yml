@@ -1,4 +1,4 @@
-model_tags:
+model-tags:
   - model: "^claude-.*"
     tag: "anthropic"
   - model: "^gpt-.*"
@@ -14,7 +14,7 @@ model_tags:
   - model: ".*:latest$"
     tag: "latest"
 
-tool_selection:
+tool-selection:
   default:
     vfsPatch: false
   tags:
@@ -24,11 +24,11 @@ tool_selection:
       vfsWrite: false
       vfsDelete: false
 
-llm_retry_max_attempts: 10
-llm_retry_max_backoff_seconds: 60
-context_compaction_threshold: 0.95
+llm-retry-max-attempts: 10
+llm-retry-max-backoff-seconds: 60
+context-compaction-threshold: 0.95
 
-shadow_paths:
+shadow-paths:
   - AGENTS.md
   - "**/AGENTS.md"
   - .agentsignore

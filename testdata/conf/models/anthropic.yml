@@ -2,7 +2,7 @@ type: anthropic
 name: anthropic
 description: Anthropic Claude API
 url: https://api.anthropic.com
-api_key: test-api-key
-model_tags:
+api-key: test-api-key
+model-tags:
   - model: "^claude-3-opus.*"
     tag: "opus"

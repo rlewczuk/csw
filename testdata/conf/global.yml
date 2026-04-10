@@ -1,4 +1,4 @@
-model_tags:
+model-tags:
   - model: "^claude-.*"
     tag: "anthropic"
   - model: "^gpt-.*"
@@ -8,4 +8,4 @@ model_tags:
   - model: ".*:latest$"
     tag: "latest"
 
-context_compaction_threshold: 0.95
+context-compaction-threshold: 0.95

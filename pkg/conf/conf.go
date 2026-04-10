@@ -72,9 +72,9 @@ type ModelProviderCost struct {
 	// Output is the cost per 1M output tokens.
 	Output float64 `json:"output,omitempty" yaml:"output,omitempty"`
 	// CacheRead is the cost per 1M cache read tokens.
-	CacheRead float64 `json:"cache_read,omitempty" yaml:"cache_read,omitempty"`
+	CacheRead float64 `json:"cache-read,omitempty" yaml:"cache-read,omitempty"`
 	// CacheWrite is the cost per 1M cache write tokens.
-	CacheWrite float64 `json:"cache_write,omitempty" yaml:"cache_write,omitempty"`
+	CacheWrite float64 `json:"cache-write,omitempty" yaml:"cache-write,omitempty"`
 	// Context is the lower context token threshold for this pricing tier.
 	Context int `json:"context,omitempty" yaml:"context,omitempty"`
 }
@@ -264,7 +264,7 @@ type MCPServerConfig struct {
 	// URL is MCP endpoint URL for HTTP(S) transports.
 	URL string `json:"url,omitempty" yaml:"url,omitempty"`
 	// APIKey is optional bearer token used for HTTP(S) transport requests.
-	APIKey string `json:"api_key,omitempty" yaml:"api_key,omitempty"`
+	APIKey string `json:"api-key,omitempty" yaml:"api-key,omitempty"`
 	// Cmd is the command to run MCP server (may include arguments).
 	Cmd string `json:"cmd,omitempty" yaml:"cmd,omitempty"`
 	// Enabled controls whether MCP server should be started.
@@ -296,7 +296,7 @@ type HookConfig struct {
 	// Prompt is LLM user prompt template rendered with hook context data.
 	Prompt string `json:"prompt,omitempty" yaml:"prompt,omitempty"`
 	// SystemPrompt is optional LLM system prompt template rendered with hook context data.
-	SystemPrompt string `json:"system_prompt,omitempty" yaml:"system_prompt,omitempty"`
+	SystemPrompt string `json:"system-prompt,omitempty" yaml:"system-prompt,omitempty"`
 	// Model is optional provider/model override for LLM hook execution.
 	Model string `json:"model,omitempty" yaml:"model,omitempty"`
 	// Thinking is optional --thinking-style override for LLM hook execution.
@@ -306,10 +306,10 @@ type HookConfig struct {
 	// OutputTo is optional output field name used by hooks for generated output.
 	// For LLM hooks it stores model response text in hook context. Defaults to "result".
 	// For shell hooks it is exposed in synthetic response feedback and maps to stdout.
-	OutputTo string `json:"output_to,omitempty" yaml:"output_to,omitempty"`
+	OutputTo string `json:"output-to,omitempty" yaml:"output-to,omitempty"`
 	// ErrorTo is optional output field name used by shell hooks in synthetic response
 	// feedback and maps to stderr.
-	ErrorTo string `json:"error_to,omitempty" yaml:"error_to,omitempty"`
+	ErrorTo string `json:"error-to,omitempty" yaml:"error-to,omitempty"`
 	// Timeout limits hook execution. Zero means no timeout.
 	Timeout time.Duration `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 	// RunOn defines shell execution target: host or sandbox.
@@ -335,12 +335,12 @@ func (c *HookConfig) UnmarshalJSON(data []byte) error {
 		Type        HookType  `json:"type,omitempty"`
 		Command     string    `json:"command,omitempty"`
 		Prompt      string    `json:"prompt,omitempty"`
-		System      string    `json:"system_prompt,omitempty"`
+		System      string    `json:"system-prompt,omitempty"`
 		Model       string    `json:"model,omitempty"`
 		Thinking    string    `json:"thinking,omitempty"`
 		Role        string    `json:"role,omitempty"`
-		OutputTo    string    `json:"output_to,omitempty"`
-		ErrorTo     string    `json:"error_to,omitempty"`
+		OutputTo    string    `json:"output-to,omitempty"`
+		ErrorTo     string    `json:"error-to,omitempty"`
 		Timeout     string    `json:"timeout,omitempty"`
 		RunOn       HookRunOn `json:"run-on,omitempty"`
 	}{}
@@ -387,12 +387,12 @@ func (c *HookConfig) UnmarshalYAML(node *yaml.Node) error {
 		Type        HookType  `yaml:"type,omitempty"`
 		Command     string    `yaml:"command,omitempty"`
 		Prompt      string    `yaml:"prompt,omitempty"`
-		System      string    `yaml:"system_prompt,omitempty"`
+		System      string    `yaml:"system-prompt,omitempty"`
 		Model       string    `yaml:"model,omitempty"`
 		Thinking    string    `yaml:"thinking,omitempty"`
 		Role        string    `yaml:"role,omitempty"`
-		OutputTo    string    `yaml:"output_to,omitempty"`
-		ErrorTo     string    `yaml:"error_to,omitempty"`
+		OutputTo    string    `yaml:"output-to,omitempty"`
+		ErrorTo     string    `yaml:"error-to,omitempty"`
 		Timeout     string    `yaml:"timeout,omitempty"`
 		RunOn       HookRunOn `yaml:"run-on,omitempty"`
 	}{}
@@ -444,11 +444,11 @@ func (c *HookConfig) applyDefaults() {
 // CLIDefaultsConfig defines default values for the cli command flags.
 type CLIDefaultsConfig struct {
 	// DefaultProvider is the default model provider to use.
-	DefaultProvider string `json:"default_provider,omitempty" yaml:"default_provider,omitempty"`
+	DefaultProvider string `json:"default-provider,omitempty" yaml:"default-provider,omitempty"`
 	// DefaultRole is the default agent role to use.
-	DefaultRole string `json:"default_role,omitempty" yaml:"default_role,omitempty"`
+	DefaultRole string `json:"default-role,omitempty" yaml:"default-role,omitempty"`
 	// MaxToolThreads is the default --max-threads value.
-	MaxToolThreads int `json:"max_tool_threads,omitempty" yaml:"max_tool_threads,omitempty"`
+	MaxToolThreads int `json:"max-tool-threads,omitempty" yaml:"max-tool-threads,omitempty"`
 	// Container defines default container execution settings.
 	Container *ContainerConfig `json:"container,omitempty" yaml:"container,omitempty"`
 	// Model is the default --model value.
@@ -470,7 +470,7 @@ type CLIDefaultsConfig struct {
 	// MaxThreads is the default --max-threads value.
 	MaxThreads int `json:"max-threads,omitempty" yaml:"max-threads,omitempty"`
 	// TaskDir is the default task directory used by task commands.
-	TaskDir string `json:"task_dir,omitempty" yaml:"task_dir,omitempty"`
+	TaskDir string `json:"task-dir,omitempty" yaml:"task-dir,omitempty"`
 }
 
 // ModelProviderConfig represents common configuration for model providers.
@@ -483,42 +483,42 @@ type ModelProviderConfig struct {
 	// Family is the model family identifier.
 	Family string `json:"family,omitempty" yaml:"family,omitempty"`
 	// ReleaseDate is the model/template release date in string form.
-	ReleaseDate string `json:"release_date,omitempty" yaml:"release_date,omitempty"`
+	ReleaseDate string `json:"release-date,omitempty" yaml:"release-date,omitempty"`
 	// Description is a user-friendly description for the provider instance
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 	// URL is the base URL for the provider's API
 	URL string `json:"url" yaml:"url"`
 	// APIKey is the API key for authentication (if required)
-	APIKey string `json:"api_key,omitempty" yaml:"api_key,omitempty"`
+	APIKey string `json:"api-key,omitempty" yaml:"api-key,omitempty"`
 	// ConnectTimeout is the timeout for establishing connections
-	ConnectTimeout time.Duration `json:"connect_timeout,omitempty" yaml:"connect_timeout,omitempty"`
+	ConnectTimeout time.Duration `json:"connect-timeout,omitempty" yaml:"connect-timeout,omitempty"`
 	// RequestTimeout is the timeout for complete requests
-	RequestTimeout time.Duration `json:"request_timeout,omitempty" yaml:"request_timeout,omitempty"`
+	RequestTimeout time.Duration `json:"request-timeout,omitempty" yaml:"request-timeout,omitempty"`
 	// DefaultTemperature is the default temperature for chat completions
-	DefaultTemperature float32 `json:"default_temperature,omitempty" yaml:"default_temperature,omitempty"`
+	DefaultTemperature float32 `json:"default-temperature,omitempty" yaml:"default-temperature,omitempty"`
 	// DefaultTopP is the default top_p for chat completions
-	DefaultTopP float32 `json:"default_top_p,omitempty" yaml:"default_top_p,omitempty"`
+	DefaultTopP float32 `json:"default-top-p,omitempty" yaml:"default-top-p,omitempty"`
 	// DefaultTopK is the default top_k for chat completions
-	DefaultTopK int `json:"default_top_k,omitempty" yaml:"default_top_k,omitempty"`
+	DefaultTopK int `json:"default-top-k,omitempty" yaml:"default-top-k,omitempty"`
 	// ContextLengthLimit is the maximum number of tokens to use for context
-	ContextLengthLimit int `json:"context_length_limit,omitempty" yaml:"context_length_limit,omitempty"`
+	ContextLengthLimit int `json:"context-length-limit,omitempty" yaml:"context-length-limit,omitempty"`
 	// MaxTokens is the maximum number of tokens to generate in the response
-	MaxTokens int `json:"max_tokens,omitempty" yaml:"max_tokens,omitempty"`
+	MaxTokens int `json:"max-tokens,omitempty" yaml:"max-tokens,omitempty"`
 	// MaxInputTokens is the maximum number of input tokens accepted by the model.
-	MaxInputTokens int `json:"max_input_tokens,omitempty" yaml:"max_input_tokens,omitempty"`
+	MaxInputTokens int `json:"max-input-tokens,omitempty" yaml:"max-input-tokens,omitempty"`
 	// MaxOutputTokens is the maximum number of output tokens generated by the model.
-	MaxOutputTokens int `json:"max_output_tokens,omitempty" yaml:"max_output_tokens,omitempty"`
+	MaxOutputTokens int `json:"max-output-tokens,omitempty" yaml:"max-output-tokens,omitempty"`
 	// ModelTags contains model-to-tag mappings specific to this provider.
 	// Each mapping has a regexp pattern for model names and a tag to assign.
-	ModelTags []ModelTagMapping `json:"model_tags,omitempty" yaml:"model_tags,omitempty"`
+	ModelTags []ModelTagMapping `json:"model-tags,omitempty" yaml:"model-tags,omitempty"`
 	// Reasoning maps effort levels (none, low, medium, high, xhigh) to provider-specific reasoning mode names.
 	Reasoning map[string]string `json:"reasoning,omitempty" yaml:"reasoning,omitempty"`
 	// ReasoningContent defines provider reasoning content field name.
-	ReasoningContent string `json:"reasoning_content,omitempty" yaml:"reasoning_content,omitempty"`
+	ReasoningContent string `json:"reasoning-content,omitempty" yaml:"reasoning-content,omitempty"`
 	// Temperature indicates whether model/template supports temperature control.
 	Temperature *bool `json:"temperature,omitempty" yaml:"temperature,omitempty"`
 	// ToolCall indicates whether model/template supports tool calling.
-	ToolCall *bool `json:"tool_call,omitempty" yaml:"tool_call,omitempty"`
+	ToolCall *bool `json:"tool-call,omitempty" yaml:"tool-call,omitempty"`
 	// Interleaved indicates optional interleaving mode configuration.
 	Interleaved string `json:"interleaved,omitempty" yaml:"interleaved,omitempty"`
 	// Cost contains pricing tiers for token costs.
@@ -539,26 +539,26 @@ type ModelProviderConfig struct {
 	// Headers contains optional headers to send with provider requests
 	Headers map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
 	// QueryParams contains optional query parameters to send with provider requests.
-	QueryParams map[string]string `json:"query_params,omitempty" yaml:"query_params,omitempty"`
+	QueryParams map[string]string `json:"query-params,omitempty" yaml:"query-params,omitempty"`
 	// MaxRetries is the maximum number of retries for rate limit (429) errors
 	// Defaults to 3 if not specified
-	MaxRetries int `json:"max_retries,omitempty" yaml:"max_retries,omitempty"`
+	MaxRetries int `json:"max-retries,omitempty" yaml:"max-retries,omitempty"`
 	// RateLimitBackoffScale is the base duration to scale rate limit backoff delays.
 	// Defaults to 1s when unset or invalid.
-	RateLimitBackoffScale time.Duration `json:"rate_limit_backoff_scale,omitempty" yaml:"rate_limit_backoff_scale,omitempty"`
+	RateLimitBackoffScale time.Duration `json:"rate-limit-backoff-scale,omitempty" yaml:"rate-limit-backoff-scale,omitempty"`
 	// AuthMode specifies the authentication mode for the provider.
 	// Possible values: "none", "api_key" (default), "oauth2".
-	AuthMode AuthMode `json:"auth_mode,omitempty" yaml:"auth_mode,omitempty"`
+	AuthMode AuthMode `json:"auth-mode,omitempty" yaml:"auth-mode,omitempty"`
 	// AuthURL is the OAuth2 authorization endpoint URL for browser-based authentication.
-	AuthURL string `json:"auth_url,omitempty" yaml:"auth_url,omitempty"`
+	AuthURL string `json:"auth-url,omitempty" yaml:"auth-url,omitempty"`
 	// TokenURL is the OAuth2 token endpoint URL for token renewal.
-	TokenURL string `json:"token_url,omitempty" yaml:"token_url,omitempty"`
+	TokenURL string `json:"token-url,omitempty" yaml:"token-url,omitempty"`
 	// ClientID is the OAuth2 client identifier.
-	ClientID string `json:"client_id,omitempty" yaml:"client_id,omitempty"`
+	ClientID string `json:"client-id,omitempty" yaml:"client-id,omitempty"`
 	// ClientSecret is the OAuth2 client secret (optional for some providers).
-	ClientSecret string `json:"client_secret,omitempty" yaml:"client_secret,omitempty"`
+	ClientSecret string `json:"client-secret,omitempty" yaml:"client-secret,omitempty"`
 	// RefreshToken is the OAuth2 refresh token used to obtain new access tokens.
-	RefreshToken string `json:"refresh_token,omitempty" yaml:"refresh_token,omitempty"`
+	RefreshToken string `json:"refresh-token,omitempty" yaml:"refresh-token,omitempty"`
 	// DisableRefresh disables OAuth access token refresh for this provider.
 	DisableRefresh bool `json:"disable-refresh,omitempty" yaml:"disable-refresh,omitempty"`
 }
@@ -568,9 +568,9 @@ type ModelProviderConfig struct {
 func (c ModelProviderConfig) MarshalJSON() ([]byte, error) {
 	type Alias ModelProviderConfig
 	aux := &struct {
-		ConnectTimeout        string `json:"connect_timeout,omitempty"`
-		RequestTimeout        string `json:"request_timeout,omitempty"`
-		RateLimitBackoffScale string `json:"rate_limit_backoff_scale,omitempty"`
+		ConnectTimeout        string `json:"connect-timeout,omitempty"`
+		RequestTimeout        string `json:"request-timeout,omitempty"`
+		RateLimitBackoffScale string `json:"rate-limit-backoff-scale,omitempty"`
 		*Alias
 	}{
 		Alias: (*Alias)(&c),
@@ -631,9 +631,9 @@ func (c *ModelProviderConfig) UnmarshalJSON(data []byte) error {
 	// Define a temporary struct with string fields for durations
 	type Alias ModelProviderConfig
 	aux := &struct {
-		ConnectTimeout        string `json:"connect_timeout,omitempty"`
-		RequestTimeout        string `json:"request_timeout,omitempty"`
-		RateLimitBackoffScale string `json:"rate_limit_backoff_scale,omitempty"`
+		ConnectTimeout        string `json:"connect-timeout,omitempty"`
+		RequestTimeout        string `json:"request-timeout,omitempty"`
+		RateLimitBackoffScale string `json:"rate-limit-backoff-scale,omitempty"`
 		*Alias
 	}{
 		Alias: (*Alias)(c),
@@ -674,30 +674,30 @@ func (c *ModelProviderConfig) UnmarshalJSON(data []byte) error {
 // GlobalConfig represents the global configuration file structure.
 type GlobalConfig struct {
 	// ModelTags contains global model-to-tag mappings
-	ModelTags []ModelTagMapping `json:"model_tags,omitempty" yaml:"model_tags,omitempty"`
+	ModelTags []ModelTagMapping `json:"model-tags,omitempty" yaml:"model-tags,omitempty"`
 	// ToolSelection defines model tag based tool selection rules.
-	ToolSelection ToolSelectionConfig `json:"tool_selection,omitempty" yaml:"tool_selection,omitempty"`
+	ToolSelection ToolSelectionConfig `json:"tool-selection,omitempty" yaml:"tool-selection,omitempty"`
 	// ContextCompactionThreshold defines the ratio of current context length to max context length
 	// at which message compaction is triggered. Defaults to 0.95 when unset or invalid.
-	ContextCompactionThreshold float64 `json:"context_compaction_threshold,omitempty" yaml:"context_compaction_threshold,omitempty"`
+	ContextCompactionThreshold float64 `json:"context-compaction-threshold,omitempty" yaml:"context-compaction-threshold,omitempty"`
 	// LLMRetryMaxAttempts is the maximum number of attempts for temporary LLM API failures.
 	// Defaults to 10 when unset or invalid.
-	LLMRetryMaxAttempts int `json:"llm_retry_max_attempts,omitempty" yaml:"llm_retry_max_attempts,omitempty"`
+	LLMRetryMaxAttempts int `json:"llm-retry-max-attempts,omitempty" yaml:"llm-retry-max-attempts,omitempty"`
 	// LLMRetryMaxBackoffSeconds caps exponential backoff delay in seconds.
 	// Defaults to 60 when unset or invalid.
-	LLMRetryMaxBackoffSeconds int `json:"llm_retry_max_backoff_seconds,omitempty" yaml:"llm_retry_max_backoff_seconds,omitempty"`
+	LLMRetryMaxBackoffSeconds int `json:"llm-retry-max-backoff-seconds,omitempty" yaml:"llm-retry-max-backoff-seconds,omitempty"`
 	// Defaults defines default values for cli command flags.
 	Defaults CLIDefaultsConfig `json:"defaults,omitempty" yaml:"defaults,omitempty"`
 	// ShadowPaths defines glob patterns redirected to shadow directory when --shadow-dir is enabled.
-	ShadowPaths []string `json:"shadow_paths,omitempty" yaml:"shadow_paths,omitempty"`
+	ShadowPaths []string `json:"shadow-paths,omitempty" yaml:"shadow-paths,omitempty"`
 	// ModelFamilies contains model family templates.
-	ModelFamilies map[string]ModelProviderConfig `json:"model_families,omitempty" yaml:"model_families,omitempty"`
+	ModelFamilies map[string]ModelProviderConfig `json:"model-families,omitempty" yaml:"model-families,omitempty"`
 	// ModelVendors contains inference vendor templates.
-	ModelVendors map[string]ModelProviderConfig `json:"model_vendors,omitempty" yaml:"model_vendors,omitempty"`
+	ModelVendors map[string]ModelProviderConfig `json:"model-vendors,omitempty" yaml:"model-vendors,omitempty"`
 	// ModelTemplates contains model templates grouped by training lab.
-	ModelTemplates map[string]map[string]ModelProviderConfig `json:"model_templates,omitempty" yaml:"model_templates,omitempty"`
+	ModelTemplates map[string]map[string]ModelProviderConfig `json:"model-templates,omitempty" yaml:"model-templates,omitempty"`
 	// VendorFamilyOverrides contains per-provider vendor+family template overrides.
-	VendorFamilyOverrides map[string]ModelVendorFamilyTemplateOverride `json:"vendor_family_overrides,omitempty" yaml:"vendor_family_overrides,omitempty"`
+	VendorFamilyOverrides map[string]ModelVendorFamilyTemplateOverride `json:"vendor-family-overrides,omitempty" yaml:"vendor-family-overrides,omitempty"`
 }
 
 // ConfigStore is an interface for accessing configuration data.

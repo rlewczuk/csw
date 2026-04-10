@@ -136,9 +136,9 @@ func TestLocalConfigStore_ModelTemplateConfig(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "models", "vendors"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "models", "templates"), 0755))
 
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "families", "openai-gpt.yaml"), []byte("max_tokens: 4096\nmodel_tags:\n  - model: '^gpt'\n    tag: 'openai'\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "families", "openai-gpt.yaml"), []byte("max-tokens: 4096\nmodel-tags:\n  - model: '^gpt'\n    tag: 'openai'\n"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "vendors", "openai.yaml"), []byte("type: openai\nurl: https://api.openai.com/v1\n"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "templates", "openai.yaml"), []byte("gpt-4.1:\n  family: openai-gpt\n  max_tokens: 8192\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "templates", "openai.yaml"), []byte("gpt-4.1:\n  family: openai-gpt\n  max-tokens: 8192\n"), 0644))
 
 	store, err := NewLocalConfigStore(tmpDir)
 	require.NoError(t, err)
@@ -352,8 +352,8 @@ func TestLocalConfigStore_MCPServerConfigs(t *testing.T) {
 	mcpDir := filepath.Join(tmpDir, "mcp")
 	require.NoError(t, os.MkdirAll(mcpDir, 0o755))
 
-	jsonConfig := `{"description":"JSON server","enabled":true,"transport":"http","url":"http://json.example/mcp","api_key":"json-key"}`
-	yamlConfig := "description: YAML server\nenabled: true\ntransport: https\nurl: https://yaml.example/mcp\napi_key: yaml-key\n"
+	jsonConfig := `{"description":"JSON server","enabled":true,"transport":"http","url":"http://json.example/mcp","api-key":"json-key"}`
+	yamlConfig := "description: YAML server\nenabled: true\ntransport: https\nurl: https://yaml.example/mcp\napi-key: yaml-key\n"
 
 	require.NoError(t, os.WriteFile(filepath.Join(mcpDir, "json-srv.json"), []byte(jsonConfig), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(mcpDir, "yaml-srv.yml"), []byte(yamlConfig), 0o644))
@@ -1209,12 +1209,12 @@ func TestLocalConfigStore_YAMLGlobalConfig(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create global.yml
-	globalYAML := `model_tags:
+	globalYAML := `model-tags:
   - model: "^claude-.*"
     tag: "anthropic"
 defaults:
-  default_provider: "test-provider"
-  default_role: "test-role"
+  default-provider: "test-provider"
+  default-role: "test-role"
 `
 	err = os.WriteFile(filepath.Join(tmpDir, "global.yml"), []byte(globalYAML), 0644)
 	require.NoError(t, err)
@@ -1239,18 +1239,18 @@ func TestLocalConfigStore_YAMLPrecedence_Global(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create both global.yml and global.json
-	globalYAML := `model_tags:
+	globalYAML := `model-tags:
   - model: "^gpt-.*"
     tag: "openai"
 defaults:
-  default_provider: "yaml-provider"
+  default-provider: "yaml-provider"
 `
 	globalJSON := `{
-  "model_tags": [
+  "model-tags": [
     {"model": "^claude-.*", "tag": "anthropic"}
   ],
   "defaults": {
-    "default_provider": "json-provider"
+    "default-provider": "json-provider"
   }
 }`
 
@@ -1285,7 +1285,7 @@ func TestLocalConfigStore_YAMLModelProvider(t *testing.T) {
 name: openai-yaml
 description: OpenAI via YAML
 url: https://api.openai.com/v1
-api_key: yaml-key
+api-key: yaml-key
 `
 	err = os.WriteFile(filepath.Join(modelsDir, "openai.yml"), []byte(providerYAML), 0644)
 	require.NoError(t, err)
@@ -1506,7 +1506,7 @@ func TestLocalConfigStore_YAMLConfigFileWatching(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create initial global.yml
-	globalYAML := `model_tags:
+	globalYAML := `model-tags:
   - model: "^gpt-.*"
     tag: "openai"
 `
@@ -1525,7 +1525,7 @@ func TestLocalConfigStore_YAMLConfigFileWatching(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Modify global.yml
-	globalYAML = `model_tags:
+	globalYAML = `model-tags:
   - model: "^claude-.*"
     tag: "anthropic"
   - model: "^gpt-.*"

@@ -302,9 +302,9 @@ func TestConfigUpdaterImpl_Update_PreservesDurationFieldsAfterReadBack(t *testin
  	originalRaw := []byte(`{
   "type": "openai",
   "url": "https://api.example.com/v1",
-  "api_key": "old-token",
-  "connect_timeout": "3600s",
-  "request_timeout": "120s"
+  "api-key": "old-token",
+  "connect-timeout": "3600s",
+  "request-timeout": "120s"
 }`)
 	require.NoError(t, os.WriteFile(providerPath, originalRaw, 0o644))
 
@@ -339,6 +339,6 @@ func TestConfigUpdaterImpl_Update_PreservesDurationFieldsAfterReadBack(t *testin
 
 	var persisted map[string]any
 	require.NoError(t, json.Unmarshal(updatedRaw, &persisted))
-	assert.Equal(t, "3600s", persisted["connect_timeout"])
-	assert.Equal(t, "120s", persisted["request_timeout"])
+	assert.Equal(t, "3600s", persisted["connect-timeout"])
+	assert.Equal(t, "120s", persisted["request-timeout"])
 }

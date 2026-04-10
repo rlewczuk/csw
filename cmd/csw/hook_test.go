@@ -102,7 +102,7 @@ func TestHookCommand_Run(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(hooksDir, "llm_preview"), 0o755))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(hooksDir, "llm_preview", "llm_preview.yml"),
-		[]byte("name: llm_preview\ndescription: LLM preview hook\nhook: pre_run\ntype: llm\nprompt: ticket={{.ticket}}\nsystem_prompt: sys={{.env}}\noutput_to: llm_out\n"),
+		[]byte("name: llm_preview\ndescription: LLM preview hook\nhook: pre_run\ntype: llm\nprompt: ticket={{.ticket}}\nsystem-prompt: sys={{.env}}\noutput-to: llm_out\n"),
 		0o644,
 	))
 	require.NoError(t, os.MkdirAll(filepath.Join(hooksDir, "shell_ctx"), 0o755))

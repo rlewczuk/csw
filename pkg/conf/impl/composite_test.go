@@ -285,10 +285,10 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 
 	// Create global config in source1
 	global1 := `{
-		"model_tags": [
+		"model-tags": [
 			{"model": "gpt-.*", "tag": "openai"}
 		],
-		"context_compaction_threshold": 0.7,
+		"context-compaction-threshold": 0.7,
 		"defaults": {
 			"model": "provider1/default",
 			"worktree": "feature/base",
@@ -303,7 +303,7 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 				"env": ["FOO=bar"]
 			}
 		},
-		"tool_selection": {
+		"tool-selection": {
 			"default": {
 				"runBash": false
 			},
@@ -318,10 +318,10 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 
 	// Create global config in source2
 	global2 := `{
-		"model_tags": [
+		"model-tags": [
 			{"model": "claude-.*", "tag": "anthropic"}
 		],
-		"context_compaction_threshold": 0.9,
+		"context-compaction-threshold": 0.9,
 		"defaults": {
 			"model": "provider2/default",
 			"worktree": "feature/override",
@@ -333,7 +333,7 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 				"env": ["BAR=baz"]
 			}
 		},
-		"tool_selection": {
+		"tool-selection": {
 			"default": {
 				"runBash": true,
 				"vfsEdit": false
@@ -1138,7 +1138,8 @@ func TestCompositeConfigStore_ContainerConfigFromGlobalSource(t *testing.T) {
 	// Global config with full container configuration
 	globalConfig := `{
 		"defaults": {
-			"default_role": "developer",
+			"default-provider": "openai",
+			"default-role": "developer",
 			"container": {
 			"image": "golang:1.25-trixie",
 			"enabled": true,
@@ -1152,7 +1153,8 @@ func TestCompositeConfigStore_ContainerConfigFromGlobalSource(t *testing.T) {
 	// Local config WITHOUT container section - only has default_role
 	localConfig := `{
 		"defaults": {
-			"default_role": "custom-role"
+			"default-provider": "openai",
+			"default-role": "custom-role"
 		}
 	}`
 	require.NoError(t, os.WriteFile(filepath.Join(localDir, "global.json"), []byte(localConfig), 0644))
