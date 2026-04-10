@@ -334,13 +334,14 @@ func (s *LocalConfigStore) loadAllConfig() error {
 	return nil
 }
 
-// loadGlobalConfig loads the global configuration from global.yml or global.json.
+// loadGlobalConfig loads the global configuration from global.yml/global.yaml or global.json.
 // YAML takes precedence over JSON if both exist.
 func (s *LocalConfigStore) loadGlobalConfig() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	yamlPath := filepath.Join(s.configDir, "global.yml")
+	ymlPath := filepath.Join(s.configDir, "global.yml")
+	yamlPath := filepath.Join(s.configDir, "global.yaml")
 	jsonPath := filepath.Join(s.configDir, "global.json")
 
 	var data []byte
@@ -348,24 +349,31 @@ func (s *LocalConfigStore) loadGlobalConfig() error {
 	var err error
 
 	// Try YAML first (takes precedence)
-	data, err = os.ReadFile(yamlPath)
+	data, err = os.ReadFile(ymlPath)
 	if err == nil {
-		configPath = yamlPath
+		configPath = ymlPath
 	} else if os.IsNotExist(err) {
-		// Try JSON if YAML doesn't exist
-		data, err = os.ReadFile(jsonPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				// Global config is optional, use empty config
-				s.globalConfig = &conf.GlobalConfig{}
-				s.globalConfigUpdate = time.Now()
-				return nil
+		data, err = os.ReadFile(yamlPath)
+		if err == nil {
+			configPath = yamlPath
+		} else if os.IsNotExist(err) {
+			// Try JSON if YAML doesn't exist
+			data, err = os.ReadFile(jsonPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					// Global config is optional, use empty config
+					s.globalConfig = &conf.GlobalConfig{}
+					s.globalConfigUpdate = time.Now()
+					return nil
+				}
+				return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", jsonPath, err)
 			}
-			return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", jsonPath, err)
+			configPath = jsonPath
+		} else {
+			return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", yamlPath, err)
 		}
-		configPath = jsonPath
 	} else {
-		return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", yamlPath, err)
+		return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", ymlPath, err)
 	}
 
 	var config conf.GlobalConfig
@@ -1103,12 +1111,18 @@ func (s *LocalConfigStore) loadToolFragments() (map[string]string, error) {
 
 // setupWatchers sets up file system watchers for all configuration directories.
 func (s *LocalConfigStore) setupWatchers() error {
-	// Watch global config files (YAML takes precedence but watch both)
-	yamlPath := filepath.Join(s.configDir, "global.yml")
+	// Watch global config files (YAML takes precedence but watch all supported names)
+	ymlPath := filepath.Join(s.configDir, "global.yml")
+	yamlPath := filepath.Join(s.configDir, "global.yaml")
 	jsonPath := filepath.Join(s.configDir, "global.json")
+	if _, err := os.Stat(ymlPath); err == nil {
+		if err := s.watcher.Add(ymlPath); err != nil {
+			return fmt.Errorf("setupWatchers(): failed to watch global.yml: %w", err)
+		}
+	}
 	if _, err := os.Stat(yamlPath); err == nil {
 		if err := s.watcher.Add(yamlPath); err != nil {
-			return fmt.Errorf("setupWatchers(): failed to watch global.yml: %w", err)
+			return fmt.Errorf("setupWatchers(): failed to watch global.yaml: %w", err)
 		}
 	}
 	if _, err := os.Stat(jsonPath); err == nil {
@@ -1248,7 +1262,8 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 		return
 	}
 
-	globalYAMLPath := filepath.Join(s.configDir, "global.yml")
+	globalYMLPath := filepath.Join(s.configDir, "global.yml")
+	globalYAMLPath := filepath.Join(s.configDir, "global.yaml")
 	globalJSONPath := filepath.Join(s.configDir, "global.json")
 	modelsDir := filepath.Join(s.configDir, "models")
 	modelAliasesYAMLPath := filepath.Join(s.configDir, "model_aliases.yaml")
@@ -1263,7 +1278,7 @@ func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
 	toolsDir := filepath.Join(s.configDir, "tools")
 
 	// Check if it's global config file (YAML or JSON)
-	if event.Name == globalYAMLPath || event.Name == globalJSONPath {
+	if event.Name == globalYMLPath || event.Name == globalYAMLPath || event.Name == globalJSONPath {
 		if err := s.loadGlobalConfig(); err != nil {
 			fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload global config: %v\n", err)
 		}
