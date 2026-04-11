@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -198,7 +199,12 @@ type CLITaskSessionRunner struct {
 	ConfigPath    string
 	ProjectConfig string
 	Thinking      string
+	stdin         io.Reader
+	stdout        io.Writer
+	stderr        io.Writer
 }
+
+var execTaskCommandContext = exec.CommandContext
 
 // TaskManager manages persistent hierarchical tasks.
 type TaskManager struct {
@@ -269,6 +275,9 @@ func NewCLITaskSessionRunner(baseDir string, modelName string, configPath string
 		ConfigPath:    strings.TrimSpace(configPath),
 		ProjectConfig: strings.TrimSpace(projectConfig),
 		Thinking:      strings.TrimSpace(thinking),
+		stdin:         os.Stdin,
+		stdout:        os.Stdout,
+		stderr:        os.Stderr,
 	}, nil
 }
 
@@ -284,13 +293,19 @@ func (r *CLITaskSessionRunner) RunTaskSession(ctx context.Context, request TaskS
 		return TaskSessionRunResult{}, err
 	}
 
-	command := exec.CommandContext(ctx, "go", args...)
+	command := execTaskCommandContext(ctx, "go", args...)
 	command.Dir = r.BaseDir
-	output, err := command.CombinedOutput()
+
+	var outputBuffer bytes.Buffer
+	command.Stdin = r.stdin
+	command.Stdout = io.MultiWriter(r.stdout, &outputBuffer)
+	command.Stderr = io.MultiWriter(r.stderr, &outputBuffer)
+	err = command.Run()
 
 	completedAt := time.Now().UTC()
-	sessionID := extractTaskSessionID(string(output))
-	summaryText := strings.TrimSpace(string(output))
+	runOutput := outputBuffer.String()
+	sessionID := extractTaskSessionID(runOutput)
+	summaryText := strings.TrimSpace(runOutput)
 	if strings.TrimSpace(sessionID) != "" {
 		if summary, readErr := readCLISessionSummary(r.BaseDir, sessionID); readErr == nil && strings.TrimSpace(summary) != "" {
 			summaryText = summary

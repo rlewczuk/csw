@@ -1,9 +1,12 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -542,4 +545,56 @@ func TestCLITaskSessionRunnerIncludesRunOptionsFlags(t *testing.T) {
 	assert.Contains(t, args, "3")
 	assert.Contains(t, args, "--output-format")
 	assert.Contains(t, args, "jsonl")
+}
+
+func TestCLITaskSessionRunnerRunTaskSessionStreamsConsoleIO(t *testing.T) {
+	originalExec := execTaskCommandContext
+	t.Cleanup(func() {
+		execTaskCommandContext = originalExec
+	})
+
+	execTaskCommandContext = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		_ = name
+		testArgs := []string{"-test.run=TestHelperProcessTaskRunner", "--"}
+		testArgs = append(testArgs, args...)
+		cmd := exec.CommandContext(ctx, os.Args[0], testArgs...)
+		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS_TASK_RUNNER=1")
+		return cmd
+	}
+
+	runner, err := NewCLITaskSessionRunner(t.TempDir(), "", "", "", "")
+	require.NoError(t, err)
+
+	stdinData := "input-from-user\n"
+	stdin := bytes.NewBufferString(stdinData)
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	runner.stdin = stdin
+	runner.stdout = stdout
+	runner.stderr = stderr
+
+	result, err := runner.RunTaskSession(context.Background(), TaskSessionRunRequest{TaskBranch: "feature/task", Prompt: "do work"})
+	require.NoError(t, err)
+	assert.Equal(t, "ses-helper", result.SessionID)
+	assert.Contains(t, result.SummaryText, "stdout:input-from-user")
+	assert.Contains(t, result.SummaryText, "Session ID: ses-helper")
+	assert.Contains(t, stdout.String(), "stdout:input-from-user")
+	assert.Contains(t, stderr.String(), "stderr:trace")
+}
+
+func TestHelperProcessTaskRunner(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS_TASK_RUNNER") != "1" {
+		return
+	}
+
+	input, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		_, _ = os.Stderr.WriteString("read error\n")
+		os.Exit(2)
+	}
+
+	_, _ = os.Stdout.WriteString("stdout:" + strings.TrimSpace(string(input)) + "\n")
+	_, _ = os.Stderr.WriteString("stderr:trace\n")
+	_, _ = os.Stdout.WriteString("Session ID: ses-helper\n")
+	os.Exit(0)
 }
