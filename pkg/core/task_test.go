@@ -456,13 +456,71 @@ func TestCLITaskSessionRunnerIncludesTaskFlags(t *testing.T) {
 		Prompt:     "do work",
 		Task:       &Task{UUID: "task-uuid", Name: "task-name"},
 		TaskDir:    ".cswdata/tasks/task-uuid",
+		RunOptions: TaskSessionRunOptions{
+			OutputFormat: "full",
+		},
 	}
 
 	args, err := runner.buildCLIArgs(request)
 	require.NoError(t, err)
 
+	assert.Contains(t, args, "run")
 	assert.Contains(t, args, "--task-json")
 	assert.Contains(t, args, "--task-dir")
 	assert.Contains(t, args, ".cswdata/tasks/task-uuid")
 	assert.Equal(t, "do work", args[len(args)-1])
+}
+
+func TestCLITaskSessionRunnerIncludesRunOptionsFlags(t *testing.T) {
+	runner, err := NewCLITaskSessionRunner("/tmp/project", "", "", "", "")
+	require.NoError(t, err)
+
+	request := TaskSessionRunRequest{
+		TaskBranch: "feature/task",
+		Prompt:     "do work",
+		RunOptions: TaskSessionRunOptions{
+			Model:             "provider/model",
+			Role:              "reviewer",
+			ShadowDir:         "/shadow",
+			ContainerEnabled:  true,
+			ContainerImage:    "img:latest",
+			ContainerMounts:   []string{"/host:/container"},
+			ContainerEnv:      []string{"A=B"},
+			AllowAllPerms:     true,
+			Interactive:       true,
+			ConfigPath:        "/cfg",
+			ProjectConfig:     "/project/.csw/config",
+			SaveSessionTo:     "/tmp/ses.md",
+			SaveSession:       true,
+			LogLLMRequests:    true,
+			LogLLMRequestsRaw: true,
+			NoRefresh:         true,
+			LSPServer:         "gopls",
+			Thinking:          "high",
+			ForceCompact:      true,
+			BashRunTimeout:    "45s",
+			MaxThreads:        3,
+			OutputFormat:      "jsonl",
+			VFSAllow:          []string{"/allow"},
+			MCPEnable:         []string{"m1,m2"},
+			MCPDisable:        []string{"m3"},
+			HookOverrides:     []string{"h:disable"},
+			ContextEntries:    []string{"k=v"},
+			GitUserName:       "John",
+			GitUserEmail:      "john@example.com",
+		},
+	}
+
+	args, err := runner.buildCLIArgs(request)
+	require.NoError(t, err)
+
+	assert.Contains(t, args, "--model")
+	assert.Contains(t, args, "provider/model")
+	assert.Contains(t, args, "--container-enabled")
+	assert.Contains(t, args, "--container-image")
+	assert.Contains(t, args, "img:latest")
+	assert.Contains(t, args, "--max-threads")
+	assert.Contains(t, args, "3")
+	assert.Contains(t, args, "--output-format")
+	assert.Contains(t, args, "jsonl")
 }

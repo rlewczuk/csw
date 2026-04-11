@@ -131,6 +131,52 @@ func TestTaskCommandArgValidators(t *testing.T) {
 	}
 }
 
+func TestTaskRunCommandIncludesRunSessionFlags(t *testing.T) {
+	command := taskRunCommand()
+
+	flagNames := []string{
+		"allow-all-permissions",
+		"bash-run-timeout",
+		"config-path",
+		"container-disabled",
+		"container-enabled",
+		"container-env",
+		"container-image",
+		"container-mount",
+		"context",
+		"force-compact",
+		"git-email",
+		"git-user",
+		"interactive",
+		"log-llm-requests",
+		"log-llm-requests-raw",
+		"lsp-server",
+		"max-threads",
+		"mcp-disable",
+		"mcp-enable",
+		"merge",
+		"model",
+		"no-refresh",
+		"output-format",
+		"project-config",
+		"role",
+		"save-session",
+		"save-session-to",
+		"shadow-dir",
+		"thinking",
+		"vfs-allow",
+		"workdir",
+		"worktree",
+		"hook",
+	}
+
+	for _, flagName := range flagNames {
+		t.Run(flagName, func(t *testing.T) {
+			assert.NotNil(t, command.Flags().Lookup(flagName))
+		})
+	}
+}
+
 func TestPrintTaskRunOutcome(t *testing.T) {
 	outcome := tool.TaskRunOutcome{SessionID: " ses-123 ", TaskBranchName: " feature/task ", SummaryText: "  summary text  "}
 

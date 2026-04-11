@@ -109,6 +109,42 @@ type TaskRunParams struct {
 	Merge      bool
 	Reset      bool
 	Continue   bool
+	RunOptions TaskSessionRunOptions
+}
+
+// TaskSessionRunOptions stores session run CLI options used for task execution.
+type TaskSessionRunOptions struct {
+	Model             string
+	Role              string
+	WorkDir           string
+	ShadowDir         string
+	ContainerImage    string
+	ContainerEnabled  bool
+	ContainerDisabled bool
+	ContainerMounts   []string
+	ContainerEnv      []string
+	AllowAllPerms     bool
+	Interactive       bool
+	ConfigPath        string
+	ProjectConfig     string
+	SaveSessionTo     string
+	SaveSession       bool
+	LogLLMRequests    bool
+	LogLLMRequestsRaw bool
+	NoRefresh         bool
+	LSPServer         string
+	Thinking          string
+	ForceCompact      bool
+	BashRunTimeout    string
+	MaxThreads        int
+	OutputFormat      string
+	VFSAllow          []string
+	MCPEnable         []string
+	MCPDisable        []string
+	HookOverrides     []string
+	ContextEntries    []string
+	GitUserName       string
+	GitUserEmail      string
 }
 
 // TaskRunResult stores run outcome information.
@@ -143,6 +179,7 @@ type TaskSessionRunRequest struct {
 	ParentBranch  string
 	Role          string
 	Prompt        string
+	RunOptions    TaskSessionRunOptions
 	VCS           apis.VCS
 }
 
@@ -269,18 +306,117 @@ func (r *CLITaskSessionRunner) RunTaskSession(ctx context.Context, request TaskS
 }
 
 func (r *CLITaskSessionRunner) buildCLIArgs(request TaskSessionRunRequest) ([]string, error) {
-	args := []string{"run", "./cmd/csw", "cli", "--workdir", r.BaseDir, "--worktree", strings.TrimSpace(request.TaskBranch), "--role", firstNonEmptyTask(request.Role, "developer")}
-	if strings.TrimSpace(r.ModelName) != "" {
-		args = append(args, "--model", r.ModelName)
+	effectiveWorkDir := firstNonEmptyTask(strings.TrimSpace(request.RunOptions.WorkDir), strings.TrimSpace(r.BaseDir))
+	args := []string{"run", "./cmd/csw", "run", "--workdir", effectiveWorkDir, "--worktree", strings.TrimSpace(request.TaskBranch), "--role", firstNonEmptyTask(strings.TrimSpace(request.RunOptions.Role), request.Role, "developer")}
+
+	modelName := firstNonEmptyTask(strings.TrimSpace(request.RunOptions.Model), strings.TrimSpace(r.ModelName))
+	if modelName != "" {
+		args = append(args, "--model", modelName)
 	}
-	if strings.TrimSpace(r.ConfigPath) != "" {
-		args = append(args, "--config-path", r.ConfigPath)
+
+	configPath := firstNonEmptyTask(strings.TrimSpace(request.RunOptions.ConfigPath), strings.TrimSpace(r.ConfigPath))
+	if configPath != "" {
+		args = append(args, "--config-path", configPath)
 	}
-	if strings.TrimSpace(r.ProjectConfig) != "" {
-		args = append(args, "--project-config", r.ProjectConfig)
+
+	projectConfig := firstNonEmptyTask(strings.TrimSpace(request.RunOptions.ProjectConfig), strings.TrimSpace(r.ProjectConfig))
+	if projectConfig != "" {
+		args = append(args, "--project-config", projectConfig)
 	}
-	if strings.TrimSpace(r.Thinking) != "" {
-		args = append(args, "--thinking", r.Thinking)
+
+	thinking := firstNonEmptyTask(strings.TrimSpace(request.RunOptions.Thinking), strings.TrimSpace(r.Thinking))
+	if thinking != "" {
+		args = append(args, "--thinking", thinking)
+	}
+
+	if strings.TrimSpace(request.RunOptions.ShadowDir) != "" {
+		args = append(args, "--shadow-dir", strings.TrimSpace(request.RunOptions.ShadowDir))
+	}
+	if strings.TrimSpace(request.RunOptions.ContainerImage) != "" {
+		args = append(args, "--container-image", strings.TrimSpace(request.RunOptions.ContainerImage))
+	}
+	if request.RunOptions.ContainerEnabled {
+		args = append(args, "--container-enabled")
+	}
+	if request.RunOptions.ContainerDisabled {
+		args = append(args, "--container-disabled")
+	}
+	for _, mount := range request.RunOptions.ContainerMounts {
+		if strings.TrimSpace(mount) != "" {
+			args = append(args, "--container-mount", strings.TrimSpace(mount))
+		}
+	}
+	for _, env := range request.RunOptions.ContainerEnv {
+		if strings.TrimSpace(env) != "" {
+			args = append(args, "--container-env", strings.TrimSpace(env))
+		}
+	}
+	if request.RunOptions.AllowAllPerms {
+		args = append(args, "--allow-all-permissions")
+	}
+	if request.RunOptions.Interactive {
+		args = append(args, "--interactive")
+	}
+	if strings.TrimSpace(request.RunOptions.SaveSessionTo) != "" {
+		args = append(args, "--save-session-to", strings.TrimSpace(request.RunOptions.SaveSessionTo))
+	}
+	if request.RunOptions.SaveSession {
+		args = append(args, "--save-session")
+	}
+	if request.RunOptions.LogLLMRequests {
+		args = append(args, "--log-llm-requests")
+	}
+	if request.RunOptions.LogLLMRequestsRaw {
+		args = append(args, "--log-llm-requests-raw")
+	}
+	if request.RunOptions.NoRefresh {
+		args = append(args, "--no-refresh")
+	}
+	if strings.TrimSpace(request.RunOptions.LSPServer) != "" {
+		args = append(args, "--lsp-server", strings.TrimSpace(request.RunOptions.LSPServer))
+	}
+	if request.RunOptions.ForceCompact {
+		args = append(args, "--force-compact")
+	}
+	if strings.TrimSpace(request.RunOptions.BashRunTimeout) != "" {
+		args = append(args, "--bash-run-timeout", strings.TrimSpace(request.RunOptions.BashRunTimeout))
+	}
+	if request.RunOptions.MaxThreads > 0 {
+		args = append(args, "--max-threads", fmt.Sprintf("%d", request.RunOptions.MaxThreads))
+	}
+	if strings.TrimSpace(request.RunOptions.OutputFormat) != "" {
+		args = append(args, "--output-format", strings.TrimSpace(request.RunOptions.OutputFormat))
+	}
+	for _, path := range request.RunOptions.VFSAllow {
+		if strings.TrimSpace(path) != "" {
+			args = append(args, "--vfs-allow", strings.TrimSpace(path))
+		}
+	}
+	for _, name := range request.RunOptions.MCPEnable {
+		if strings.TrimSpace(name) != "" {
+			args = append(args, "--mcp-enable", strings.TrimSpace(name))
+		}
+	}
+	for _, name := range request.RunOptions.MCPDisable {
+		if strings.TrimSpace(name) != "" {
+			args = append(args, "--mcp-disable", strings.TrimSpace(name))
+		}
+	}
+	for _, override := range request.RunOptions.HookOverrides {
+		if strings.TrimSpace(override) != "" {
+			args = append(args, "--hook", strings.TrimSpace(override))
+		}
+	}
+	for _, entry := range request.RunOptions.ContextEntries {
+		if strings.TrimSpace(entry) != "" {
+			args = append(args, "--context", strings.TrimSpace(entry))
+		}
+	}
+	if strings.TrimSpace(request.RunOptions.GitUserName) != "" {
+		args = append(args, "--git-user", strings.TrimSpace(request.RunOptions.GitUserName))
+	}
+	if strings.TrimSpace(request.RunOptions.GitUserEmail) != "" {
+		args = append(args, "--git-email", strings.TrimSpace(request.RunOptions.GitUserEmail))
 	}
 	if request.Task != nil {
 		taskJSON, err := json.Marshal(request.Task)
@@ -293,7 +429,10 @@ func (r *CLITaskSessionRunner) buildCLIArgs(request TaskSessionRunRequest) ([]st
 		args = append(args, "--task-dir", strings.TrimSpace(request.TaskDir))
 	}
 
-	args = append(args, "--output-format", "full", strings.TrimSpace(request.Prompt))
+	if strings.TrimSpace(request.RunOptions.OutputFormat) == "" {
+		args = append(args, "--output-format", "full")
+	}
+	args = append(args, strings.TrimSpace(request.Prompt))
 
 	return args, nil
 }
@@ -395,19 +534,25 @@ func (a *TaskBackendAdapter) GetTask(ctx context.Context, identifier string, fal
 
 // RunTask runs task through backend interface.
 func (a *TaskBackendAdapter) RunTask(ctx context.Context, identifier string, fallbackTaskID string, merge bool, reset bool) (tool.TaskRunOutcome, error) {
+	return a.RunTaskWithParams(ctx, identifier, fallbackTaskID, TaskRunParams{Merge: merge, Reset: reset})
+}
+
+// RunTaskWithParams runs task through backend interface with extended run parameters.
+func (a *TaskBackendAdapter) RunTaskWithParams(ctx context.Context, identifier string, fallbackTaskID string, params TaskRunParams) (tool.TaskRunOutcome, error) {
 	if a == nil || a.manager == nil {
-		return tool.TaskRunOutcome{}, fmt.Errorf("TaskBackendAdapter.RunTask() [task.go]: adapter is not configured")
+		return tool.TaskRunOutcome{}, fmt.Errorf("TaskBackendAdapter.RunTaskWithParams() [task.go]: adapter is not configured")
 	}
 	if a.vcsRepo == nil {
-		return tool.TaskRunOutcome{}, fmt.Errorf("TaskBackendAdapter.RunTask() [task.go]: vcs repository is not configured")
+		return tool.TaskRunOutcome{}, fmt.Errorf("TaskBackendAdapter.RunTaskWithParams() [task.go]: vcs repository is not configured")
 	}
 
-	outcome, err := a.manager.RunTask(ctx, TaskLookup{Identifier: strings.TrimSpace(identifier), FallbackTaskID: strings.TrimSpace(fallbackTaskID)}, TaskRunParams{Merge: merge, Reset: reset}, a.vcsRepo)
+	params.Identifier = strings.TrimSpace(identifier)
+	outcome, err := a.manager.RunTask(ctx, TaskLookup{Identifier: strings.TrimSpace(identifier), FallbackTaskID: strings.TrimSpace(fallbackTaskID)}, params, a.vcsRepo)
 	if outcome == nil {
 		if err != nil {
 			return tool.TaskRunOutcome{}, err
 		}
-		return tool.TaskRunOutcome{}, fmt.Errorf("TaskBackendAdapter.RunTask() [task.go]: empty run outcome")
+		return tool.TaskRunOutcome{}, fmt.Errorf("TaskBackendAdapter.RunTaskWithParams() [task.go]: empty run outcome")
 	}
 
 	result := tool.TaskRunOutcome{
@@ -751,6 +896,7 @@ func (m *TaskManager) RunTask(ctx context.Context, lookup TaskLookup, params Tas
 		ParentBranch:  task.ParentBranch,
 		Role:          firstNonEmptyTask(strings.TrimSpace(task.Role), "developer"),
 		Prompt:        prompt,
+		RunOptions:    params.RunOptions,
 		VCS:           vcsRepo,
 	})
 
