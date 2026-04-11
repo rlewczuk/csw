@@ -442,6 +442,97 @@ func TestTaskManagerMergeTaskUpdatesStatusAndState(t *testing.T) {
 	assert.Equal(t, TaskStateCompleted, merged.State)
 }
 
+func TestTaskManagerArchiveTaskMovesTaskDirectory(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})
+	require.NoError(t, err)
+
+	created, err := manager.CreateTask(TaskCreateParams{Name: "archive-me", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	archived, err := manager.ArchiveTask(TaskLookup{Identifier: created.UUID})
+	require.NoError(t, err)
+	require.NotNil(t, archived)
+	assert.Equal(t, created.UUID, archived.UUID)
+
+	_, _, resolveErr := manager.ResolveTask(TaskLookup{Identifier: created.UUID})
+	require.Error(t, resolveErr)
+	assert.Contains(t, resolveErr.Error(), "not found")
+
+	archivedTaskPath := filepath.Join(baseDir, ".cswdata", "tasks-archived", created.UUID, "task.yml")
+	_, statErr := os.Stat(archivedTaskPath)
+	require.NoError(t, statErr)
+}
+
+func TestTaskManagerArchiveTaskPreservesNestedPath(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})
+	require.NoError(t, err)
+
+	parent, err := manager.CreateTask(TaskCreateParams{Name: "parent", Prompt: "parent"})
+	require.NoError(t, err)
+	child, err := manager.CreateTask(TaskCreateParams{Name: "child", ParentTaskID: parent.UUID, Prompt: "child"})
+	require.NoError(t, err)
+
+	_, err = manager.ArchiveTask(TaskLookup{Identifier: child.Name})
+	require.NoError(t, err)
+
+	archivedChildPath := filepath.Join(baseDir, ".cswdata", "tasks-archived", parent.UUID, child.UUID, "task.yml")
+	_, statErr := os.Stat(archivedChildPath)
+	require.NoError(t, statErr)
+}
+
+func TestTaskManagerArchiveTasksByStatusArchivesMatchingTasks(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})
+	require.NoError(t, err)
+
+	mergedTask, err := manager.CreateTask(TaskCreateParams{Name: "merged-task", FeatureBranch: "feat/merged", ParentBranch: "main", Prompt: "prompt"})
+	require.NoError(t, err)
+	openTask, err := manager.CreateTask(TaskCreateParams{Name: "open-task", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	fake := &fakeVCS{branches: []string{"main", "feat/merged"}}
+	_, err = manager.MergeTask(TaskLookup{Identifier: mergedTask.UUID}, fake)
+	require.NoError(t, err)
+
+	archivedTasks, err := manager.ArchiveTasksByStatus(TaskStatusMerged)
+	require.NoError(t, err)
+	require.Len(t, archivedTasks, 1)
+	assert.Equal(t, mergedTask.UUID, archivedTasks[0].UUID)
+
+	mergedArchivedPath := filepath.Join(baseDir, ".cswdata", "tasks-archived", mergedTask.UUID, "task.yml")
+	_, mergedArchivedErr := os.Stat(mergedArchivedPath)
+	require.NoError(t, mergedArchivedErr)
+
+	openTaskPath := filepath.Join(baseDir, ".cswdata", "tasks", openTask.UUID, "task.yml")
+	_, openTaskErr := os.Stat(openTaskPath)
+	require.NoError(t, openTaskErr)
+}
+
+func TestTaskManagerArchiveTasksByStatusMatchesTaskState(t *testing.T) {
+	baseDir := t.TempDir()
+	runner := &taskTestRunner{err: errors.New("boom")}
+	manager, err := NewTaskManager(baseDir, nil, runner)
+	require.NoError(t, err)
+
+	failedTask, err := manager.CreateTask(TaskCreateParams{Name: "failed-task", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	fake := &fakeVCS{branches: []string{"main"}}
+	_, runErr := manager.RunTask(context.Background(), TaskLookup{Identifier: failedTask.UUID}, TaskRunParams{}, fake)
+	require.Error(t, runErr)
+
+	archivedTasks, err := manager.ArchiveTasksByStatus(TaskStateFailed)
+	require.NoError(t, err)
+	require.Len(t, archivedTasks, 1)
+	assert.Equal(t, failedTask.UUID, archivedTasks[0].UUID)
+
+	archivedPath := filepath.Join(baseDir, ".cswdata", "tasks-archived", failedTask.UUID, "task.yml")
+	_, statErr := os.Stat(archivedPath)
+	require.NoError(t, statErr)
+}
+
 func TestEnsureBranchFromCreatesMissingBranch(t *testing.T) {
 	fake := &fakeVCS{branches: []string{"main"}}
 	err := ensureBranchFrom(fake, "feature/task", "main")

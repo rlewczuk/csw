@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestResolveTaskEditorCommandPrefersFlagValue(t *testing.T) {
@@ -184,14 +185,14 @@ func TestTaskNewCommandPromptFlagIsOptional(t *testing.T) {
 func TestTaskCommandContainsExpectedSubcommands(t *testing.T) {
 	command := TaskCommand()
 	subcommands := command.Commands()
-	require.Len(t, subcommands, 6)
+	require.Len(t, subcommands, 7)
 
 	names := make([]string, 0, len(subcommands))
 	for _, subcommand := range subcommands {
 		names = append(names, subcommand.Name())
 	}
 
-	assert.ElementsMatch(t, []string{"new", "update", "get", "run", "list", "merge"}, names)
+	assert.ElementsMatch(t, []string{"new", "update", "get", "run", "list", "merge", "archive"}, names)
 }
 
 func TestTaskCommandArgValidators(t *testing.T) {
@@ -212,6 +213,9 @@ func TestTaskCommandArgValidators(t *testing.T) {
 		{name: "list rejects more than one argument", command: taskListCommand(), args: []string{"task-1", "task-2"}, expectError: true},
 		{name: "merge requires one argument", command: taskMergeCommand(), args: []string{}, expectError: true},
 		{name: "merge accepts one argument", command: taskMergeCommand(), args: []string{"task-1"}, expectError: false},
+		{name: "archive accepts no argument", command: taskArchiveCommand(), args: []string{}, expectError: false},
+		{name: "archive accepts one argument", command: taskArchiveCommand(), args: []string{"task-1"}, expectError: false},
+		{name: "archive rejects more than one argument", command: taskArchiveCommand(), args: []string{"task-1", "task-2"}, expectError: true},
 	}
 
 	for _, testCase := range tests {
@@ -225,6 +229,104 @@ func TestTaskCommandArgValidators(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestTaskArchiveCommandIncludesStatusFlag(t *testing.T) {
+	command := taskArchiveCommand()
+	assert.NotNil(t, command.Flags().Lookup("status"))
+}
+
+func TestRunTaskArchiveConflictingArguments(t *testing.T) {
+	manager, err := core.NewTaskManager(t.TempDir(), nil, nil)
+	require.NoError(t, err)
+
+	err = runTaskArchive(manager, []string{"task-id"}, "merged", &bytes.Buffer{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "task identifier and --status cannot be used together")
+}
+
+func TestRunTaskArchiveByIdentifier(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	require.NoError(t, err)
+
+	created, err := manager.CreateTask(core.TaskCreateParams{Name: "archive-me", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	buffer := &bytes.Buffer{}
+	err = runTaskArchive(manager, []string{created.UUID}, "", buffer)
+	require.NoError(t, err)
+	assert.Contains(t, buffer.String(), "Task archived: "+created.UUID)
+
+	archivedPath := filepath.Join(baseDir, ".cswdata", "tasks-archived", created.UUID, "task.yml")
+	_, statErr := os.Stat(archivedPath)
+	require.NoError(t, statErr)
+}
+
+func TestRunTaskArchiveDefaultStatusMerged(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	require.NoError(t, err)
+
+	mergedTask, err := manager.CreateTask(core.TaskCreateParams{Name: "merged", Prompt: "prompt"})
+	require.NoError(t, err)
+	openTask, err := manager.CreateTask(core.TaskCreateParams{Name: "open", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", mergedTask.UUID, "task.yml"), core.TaskStatusMerged, core.TaskStateCompleted)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", openTask.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCreated)
+
+	buffer := &bytes.Buffer{}
+	err = runTaskArchive(manager, nil, "", buffer)
+	require.NoError(t, err)
+	assert.Contains(t, buffer.String(), mergedTask.UUID)
+	assert.NotContains(t, buffer.String(), openTask.UUID)
+
+	_, mergedErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks-archived", mergedTask.UUID, "task.yml"))
+	require.NoError(t, mergedErr)
+	_, openErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks", openTask.UUID, "task.yml"))
+	require.NoError(t, openErr)
+}
+
+func TestRunTaskArchiveByStatusFailed(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	require.NoError(t, err)
+
+	failedTask, err := manager.CreateTask(core.TaskCreateParams{Name: "failed", Prompt: "prompt"})
+	require.NoError(t, err)
+	otherTask, err := manager.CreateTask(core.TaskCreateParams{Name: "other", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", failedTask.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateFailed)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", otherTask.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCompleted)
+
+	buffer := &bytes.Buffer{}
+	err = runTaskArchive(manager, nil, "failed", buffer)
+	require.NoError(t, err)
+	assert.Contains(t, buffer.String(), failedTask.UUID)
+	assert.NotContains(t, buffer.String(), otherTask.UUID)
+
+	_, failedErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks-archived", failedTask.UUID, "task.yml"))
+	require.NoError(t, failedErr)
+	_, otherErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks", otherTask.UUID, "task.yml"))
+	require.NoError(t, otherErr)
+}
+
+func setTaskStatusForTest(t *testing.T, taskPath string, status string, state string) {
+	t.Helper()
+
+	contents, err := os.ReadFile(taskPath)
+	require.NoError(t, err)
+
+	taskData := &core.Task{}
+	require.NoError(t, yaml.Unmarshal(contents, taskData))
+	taskData.Status = status
+	taskData.State = state
+
+	updatedContents, err := yaml.Marshal(taskData)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(taskPath, updatedContents, 0o644))
 }
 
 func TestTaskRunCommandIncludesRunSessionFlags(t *testing.T) {

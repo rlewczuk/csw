@@ -1006,6 +1006,99 @@ func (m *TaskManager) MergeTask(lookup TaskLookup, vcsRepo apis.VCS) (*Task, err
 	return task, nil
 }
 
+// ArchiveTask moves selected task directory to archive root and returns archived task metadata.
+func (m *TaskManager) ArchiveTask(lookup TaskLookup) (*Task, error) {
+	taskDir, task, err := m.ResolveTask(lookup)
+	if err != nil {
+		return nil, err
+	}
+
+	archivedRoot := m.ArchivedTasksRoot()
+	relativeDir, err := filepath.Rel(m.TasksRoot(), taskDir)
+	if err != nil {
+		return nil, fmt.Errorf("TaskManager.ArchiveTask() [task.go]: failed to calculate archive path: %w", err)
+	}
+	if strings.HasPrefix(relativeDir, "..") {
+		return nil, fmt.Errorf("TaskManager.ArchiveTask() [task.go]: task path %q is outside of tasks root %q", taskDir, m.TasksRoot())
+	}
+	destinationDir := filepath.Join(archivedRoot, relativeDir)
+	if err := os.MkdirAll(filepath.Dir(destinationDir), 0755); err != nil {
+		return nil, fmt.Errorf("TaskManager.ArchiveTask() [task.go]: failed to create archive parent directory: %w", err)
+	}
+	if err := os.Rename(taskDir, destinationDir); err != nil {
+		return nil, fmt.Errorf("TaskManager.ArchiveTask() [task.go]: failed to move task to archive: %w", err)
+	}
+
+	return cloneTask(task), nil
+}
+
+// ArchiveTasksByStatus moves all tasks with provided status or state to archive root.
+func (m *TaskManager) ArchiveTasksByStatus(status string) ([]*Task, error) {
+	trimmedStatus := strings.TrimSpace(status)
+	if trimmedStatus == "" {
+		return nil, fmt.Errorf("TaskManager.ArchiveTasksByStatus() [task.go]: status cannot be empty")
+	}
+
+	allTasks, err := m.loadAllTasks()
+	if err != nil {
+		return nil, err
+	}
+
+	candidates := make([]taskWithPath, 0, len(allTasks))
+	for _, item := range allTasks {
+		if item.task == nil {
+			continue
+		}
+		if strings.TrimSpace(item.task.Status) == trimmedStatus || strings.TrimSpace(item.task.State) == trimmedStatus {
+			candidates = append(candidates, item)
+		}
+	}
+
+	if len(candidates) == 0 {
+		return []*Task{}, nil
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		return len(candidates[i].dir) < len(candidates[j].dir)
+	})
+
+	archivedRoot := m.ArchivedTasksRoot()
+	archivedPaths := make([]string, 0, len(candidates))
+	archivedTasks := make([]*Task, 0, len(candidates))
+	for _, item := range candidates {
+		skip := false
+		for _, archivedPath := range archivedPaths {
+			if isTaskPathNestedUnder(item.dir, archivedPath) {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+
+		relativeDir, relErr := filepath.Rel(m.TasksRoot(), item.dir)
+		if relErr != nil {
+			return nil, fmt.Errorf("TaskManager.ArchiveTasksByStatus() [task.go]: failed to calculate archive path: %w", relErr)
+		}
+		if strings.HasPrefix(relativeDir, "..") {
+			return nil, fmt.Errorf("TaskManager.ArchiveTasksByStatus() [task.go]: task path %q is outside of tasks root %q", item.dir, m.TasksRoot())
+		}
+		destinationDir := filepath.Join(archivedRoot, relativeDir)
+		if err := os.MkdirAll(filepath.Dir(destinationDir), 0755); err != nil {
+			return nil, fmt.Errorf("TaskManager.ArchiveTasksByStatus() [task.go]: failed to create archive parent directory: %w", err)
+		}
+		if err := os.Rename(item.dir, destinationDir); err != nil {
+			return nil, fmt.Errorf("TaskManager.ArchiveTasksByStatus() [task.go]: failed to move task to archive: %w", err)
+		}
+
+		archivedPaths = append(archivedPaths, item.dir)
+		archivedTasks = append(archivedTasks, cloneTask(item.task))
+	}
+
+	return archivedTasks, nil
+}
+
 func (m *TaskManager) validateDependencies(task *Task) error {
 	for _, dep := range task.Deps {
 		_, depTask, err := m.findTaskByUUID(dep)
@@ -1017,6 +1110,16 @@ func (m *TaskManager) validateDependencies(task *Task) error {
 		}
 	}
 	return nil
+}
+
+// ArchivedTasksRoot returns archive directory for task persistence.
+func (m *TaskManager) ArchivedTasksRoot() string {
+	tasksRoot := m.TasksRoot()
+	if filepath.Base(tasksRoot) == "tasks" {
+		return filepath.Join(filepath.Dir(tasksRoot), "tasks-archived")
+	}
+
+	return tasksRoot + "-archived"
 }
 
 func (m *TaskManager) ensureBranches(task *Task, reset bool, vcsRepo apis.VCS) error {
@@ -1335,6 +1438,29 @@ func firstNonEmptyTask(values ...string) string {
 	}
 
 	return ""
+}
+
+func isTaskPathNestedUnder(path string, parent string) bool {
+	cleanPath := filepath.Clean(strings.TrimSpace(path))
+	cleanParent := filepath.Clean(strings.TrimSpace(parent))
+	if cleanPath == "." || cleanParent == "." {
+		return false
+	}
+	if cleanPath == cleanParent {
+		return true
+	}
+	relativePath, err := filepath.Rel(cleanParent, cleanPath)
+	if err != nil {
+		return false
+	}
+	if relativePath == "." {
+		return true
+	}
+	if strings.HasPrefix(relativePath, "..") {
+		return false
+	}
+
+	return true
 }
 
 func extractTaskSessionID(output string) string {
