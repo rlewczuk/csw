@@ -143,6 +143,9 @@ mergeOtherFields:
 	if len(override.VFSAllow) > 0 {
 		c.VFSAllow = append([]string(nil), override.VFSAllow...)
 	}
+	if len(override.Editors) > 0 {
+		c.Editors = append([]string(nil), override.Editors...)
+	}
 }
 
 // Clone returns a deep copy of GlobalConfig.
@@ -166,6 +169,9 @@ func (c *GlobalConfig) Clone() *GlobalConfig {
 	}
 	if len(c.Defaults.VFSAllow) > 0 {
 		cloned.Defaults.VFSAllow = append([]string(nil), c.Defaults.VFSAllow...)
+	}
+	if len(c.Defaults.Editors) > 0 {
+		cloned.Defaults.Editors = append([]string(nil), c.Defaults.Editors...)
 	}
 	copy(cloned.ModelTags, c.ModelTags)
 

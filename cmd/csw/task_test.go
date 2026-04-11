@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,6 +15,101 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestResolveTaskEditorCommandPrefersFlagValue(t *testing.T) {
+	command, err := resolveTaskEditorCommand(taskNewPromptParams{Editor: "custom-editor --flag"})
+	require.NoError(t, err)
+	assert.Equal(t, "custom-editor --flag", command)
+}
+
+func TestResolveTaskEditorCommandUsesEditorEnvironment(t *testing.T) {
+	t.Setenv("EDITOR", "env-editor")
+
+	command, err := resolveTaskEditorCommand(taskNewPromptParams{})
+	require.NoError(t, err)
+	assert.Equal(t, "env-editor", command)
+}
+
+func TestResolveTaskEditorCommandUsesConfiguredEditorsFallback(t *testing.T) {
+	originalResolver := resolveTaskRunDefaultsFunc
+	originalLookPath := taskEditorLookPathFunc
+	t.Cleanup(func() {
+		resolveTaskRunDefaultsFunc = originalResolver
+		taskEditorLookPathFunc = originalLookPath
+	})
+
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		_ = params
+		return conf.RunDefaultsConfig{Editors: []string{"missing-editor", "vim"}}, nil
+	}
+
+	taskEditorLookPathFunc = func(file string) (string, error) {
+		if file == "vim" {
+			return "/usr/bin/vim", nil
+		}
+		return "", os.ErrNotExist
+	}
+
+	command, err := resolveTaskEditorCommand(taskNewPromptParams{})
+	require.NoError(t, err)
+	assert.Equal(t, "vim", command)
+}
+
+func TestResolveTaskNewPromptSkipsTaskCreationWhenEditedPromptIsEmpty(t *testing.T) {
+	originalEditorRunner := runTaskEditorFunc
+	t.Cleanup(func() {
+		runTaskEditorFunc = originalEditorRunner
+	})
+
+	runTaskEditorFunc = func(ctx context.Context, editorCommand string, promptFilePath string) error {
+		_ = ctx
+		_ = editorCommand
+		return os.WriteFile(promptFilePath, []byte(" \n\t "), 0o644)
+	}
+
+	prompt, shouldCreate, err := resolveTaskNewPrompt(context.Background(), taskNewPromptParams{Editor: "editor"})
+	require.NoError(t, err)
+	assert.False(t, shouldCreate)
+	assert.Equal(t, "", prompt)
+}
+
+func TestResolveTaskCreateParamsGeneratesBranchAndDescription(t *testing.T) {
+	originalDefaults := resolveTaskRunDefaultsFunc
+	originalBranchResolver := resolveTaskWorktreeBranchNameFunc
+	originalDescriptionGenerator := generateTaskDescriptionFunc
+	t.Cleanup(func() {
+		resolveTaskRunDefaultsFunc = originalDefaults
+		resolveTaskWorktreeBranchNameFunc = originalBranchResolver
+		generateTaskDescriptionFunc = originalDescriptionGenerator
+	})
+
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		_ = params
+		return conf.RunDefaultsConfig{Model: "provider/model", Worktree: "feature/%"}, nil
+	}
+
+	resolveTaskWorktreeBranchNameFunc = func(ctx context.Context, params system.ResolveWorktreeBranchNameParams) (string, error) {
+		_ = ctx
+		assert.Equal(t, "do this task", params.Prompt)
+		assert.Equal(t, "provider/model", params.ModelName)
+		assert.Equal(t, "feature/%", params.WorktreeBranch)
+		return "feature/generated", nil
+	}
+
+	generateTaskDescriptionFunc = func(ctx context.Context, params taskCreateResolveParams) (string, error) {
+		_ = ctx
+		assert.Equal(t, "do this task", params.Prompt)
+		assert.Equal(t, "feature/generated", params.Branch)
+		return "generated description", nil
+	}
+
+	resolved, err := resolveTaskCreateParams(context.Background(), taskCreateResolveParams{Prompt: "do this task"})
+	require.NoError(t, err)
+	assert.Equal(t, "feature/generated", resolved.FeatureBranch)
+	assert.Equal(t, "feature/generated", resolved.Name)
+	assert.Equal(t, "generated description", resolved.Description)
+	assert.Equal(t, "do this task", resolved.Prompt)
+}
 
 func TestTaskCommandHasTaskDirPersistentFlag(t *testing.T) {
 	command := TaskCommand()

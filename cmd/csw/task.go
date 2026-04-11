@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/spf13/cobra"
@@ -15,6 +18,11 @@ import (
 )
 
 var resolveTaskRunDefaultsFunc = system.ResolveRunDefaults
+var resolveTaskWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
+var buildTaskSystemFunc = system.BuildSystem
+var taskEditorLookPathFunc = exec.LookPath
+var runTaskEditorFunc = runTaskEditor
+var generateTaskDescriptionFunc = generateTaskDescription
 
 // TaskCommand creates task command with persistent hierarchical task management.
 func TaskCommand() *cobra.Command {
@@ -46,27 +54,59 @@ func taskNewCommand() *cobra.Command {
 	var deps []string
 	var prompt string
 	var parent string
+	var cliModel string
+	var cliEditor string
+	var cliWorkDir string
+	var cliShadowDir string
+	var cliConfigPath string
+	var cliProjectConfig string
 	var run bool
 
 	command := &cobra.Command{
 		Use:   "new",
 		Short: "Create new persistent task",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			resolvedPrompt, shouldCreate, err := resolveTaskNewPrompt(cmd.Context(), taskNewPromptParams{
+				Prompt:        strings.TrimSpace(prompt),
+				Editor:        strings.TrimSpace(cliEditor),
+				WorkDir:       strings.TrimSpace(cliWorkDir),
+				ShadowDir:     strings.TrimSpace(cliShadowDir),
+				ProjectConfig: strings.TrimSpace(cliProjectConfig),
+				ConfigPath:    strings.TrimSpace(cliConfigPath),
+			})
+			if err != nil {
+				return err
+			}
+			if !shouldCreate {
+				fmt.Fprintln(os.Stdout, "Task not created: prompt is empty")
+				return nil
+			}
+
+			createParams, err := resolveTaskCreateParams(cmd.Context(), taskCreateResolveParams{
+				Prompt:        resolvedPrompt,
+				Name:          strings.TrimSpace(name),
+				Description:   strings.TrimSpace(description),
+				Branch:        strings.TrimSpace(branch),
+				ParentBranch:  strings.TrimSpace(parentBranch),
+				Role:          strings.TrimSpace(role),
+				ParentTaskID:  strings.TrimSpace(parent),
+				Deps:          append([]string(nil), deps...),
+				ModelName:     strings.TrimSpace(cliModel),
+				WorkDir:       strings.TrimSpace(cliWorkDir),
+				ShadowDir:     strings.TrimSpace(cliShadowDir),
+				ProjectConfig: strings.TrimSpace(cliProjectConfig),
+				ConfigPath:    strings.TrimSpace(cliConfigPath),
+			})
+			if err != nil {
+				return err
+			}
+
 			manager, backend, err := loadTaskBackend(cmd)
 			if err != nil {
 				return err
 			}
 
-			created, err := manager.CreateTask(core.TaskCreateParams{
-				ParentTaskID:  strings.TrimSpace(parent),
-				Name:          strings.TrimSpace(name),
-				Description:   strings.TrimSpace(description),
-				FeatureBranch: strings.TrimSpace(branch),
-				ParentBranch:  strings.TrimSpace(parentBranch),
-				Role:          strings.TrimSpace(role),
-				Deps:          append([]string(nil), deps...),
-				Prompt:        strings.TrimSpace(prompt),
-			})
+			created, err := manager.CreateTask(createParams)
 			if err != nil {
 				return err
 			}
@@ -89,6 +129,12 @@ func taskNewCommand() *cobra.Command {
 	command.Flags().StringVarP(&role, "role", "r", "", "Task role")
 	command.Flags().StringArrayVarP(&deps, "depends", "D", nil, "Dependency task UUID (repeatable)")
 	command.Flags().StringVarP(&prompt, "prompt", "p", "", "Task prompt")
+	command.Flags().StringVar(&cliModel, "model", "", "Model alias or model spec in provider/model format (single or comma-separated fallback list); if not set, uses defaults")
+	command.Flags().StringVar(&cliEditor, "editor", "", "Editor command used for interactive prompt creation")
+	command.Flags().StringVar(&cliWorkDir, "workdir", "", "Working directory (default: current directory)")
+	command.Flags().StringVar(&cliShadowDir, "shadow-dir", "", "Shadow directory for agent files overlay (AGENTS.md, .agents*, .csw*, .cswdata)")
+	command.Flags().StringVar(&cliConfigPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
+	command.Flags().StringVar(&cliProjectConfig, "project-config", "", "Custom project config directory (default: .csw/config)")
 	command.Flags().StringVar(&parent, "parent", "", "Parent task name or UUID")
 	command.Flags().BoolVar(&run, "run", false, "Run created task immediately")
 
@@ -530,6 +576,288 @@ func resolveTaskDirPath(cmd *cobra.Command, workDir string) (string, error) {
 	}
 
 	return filepath.Clean(resolvedTaskDir), nil
+}
+
+type taskNewPromptParams struct {
+	Prompt        string
+	Editor        string
+	WorkDir       string
+	ShadowDir     string
+	ProjectConfig string
+	ConfigPath    string
+}
+
+type taskCreateResolveParams struct {
+	Prompt        string
+	Name          string
+	Description   string
+	Branch        string
+	ParentBranch  string
+	Role          string
+	ParentTaskID  string
+	Deps          []string
+	ModelName     string
+	WorkDir       string
+	ShadowDir     string
+	ProjectConfig string
+	ConfigPath    string
+}
+
+func resolveTaskNewPrompt(ctx context.Context, params taskNewPromptParams) (string, bool, error) {
+	prompt := strings.TrimSpace(params.Prompt)
+	if prompt != "" {
+		return prompt, true, nil
+	}
+
+	workDir, err := system.ResolveWorkDir(strings.TrimSpace(params.WorkDir))
+	if err != nil {
+		return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to resolve work directory: %w", err)
+	}
+
+	editorCommand, err := resolveTaskEditorCommand(taskNewPromptParams{
+		Editor:        strings.TrimSpace(params.Editor),
+		WorkDir:       workDir,
+		ShadowDir:     strings.TrimSpace(params.ShadowDir),
+		ProjectConfig: strings.TrimSpace(params.ProjectConfig),
+		ConfigPath:    strings.TrimSpace(params.ConfigPath),
+	})
+	if err != nil {
+		return "", false, err
+	}
+
+	temporaryFile, err := os.CreateTemp("", "csw-task-new-*.md")
+	if err != nil {
+		return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to create temporary prompt file: %w", err)
+	}
+	temporaryFilePath := temporaryFile.Name()
+	if closeErr := temporaryFile.Close(); closeErr != nil {
+		_ = os.Remove(temporaryFilePath)
+		return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to close temporary prompt file: %w", closeErr)
+	}
+	defer func() {
+		_ = os.Remove(temporaryFilePath)
+	}()
+
+	if err := runTaskEditorFunc(ctx, editorCommand, temporaryFilePath); err != nil {
+		return "", false, err
+	}
+
+	promptBytes, err := os.ReadFile(temporaryFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to read temporary prompt file: %w", err)
+	}
+
+	resolvedPrompt := strings.TrimSpace(string(promptBytes))
+	if resolvedPrompt == "" {
+		return "", false, nil
+	}
+
+	return resolvedPrompt, true, nil
+}
+
+func resolveTaskEditorCommand(params taskNewPromptParams) (string, error) {
+	if trimmedEditor := strings.TrimSpace(params.Editor); trimmedEditor != "" {
+		return trimmedEditor, nil
+	}
+
+	if envEditor := strings.TrimSpace(os.Getenv("EDITOR")); envEditor != "" {
+		return envEditor, nil
+	}
+
+	defaults, err := resolveTaskRunDefaultsFunc(system.ResolveRunDefaultsParams{
+		WorkDir:       strings.TrimSpace(params.WorkDir),
+		ShadowDir:     strings.TrimSpace(params.ShadowDir),
+		ProjectConfig: strings.TrimSpace(params.ProjectConfig),
+		ConfigPath:    strings.TrimSpace(params.ConfigPath),
+	})
+	if err != nil {
+		return "", fmt.Errorf("resolveTaskEditorCommand() [task.go]: failed to resolve CLI defaults: %w", err)
+	}
+
+	for _, candidate := range defaults.Editors {
+		trimmedCandidate := strings.TrimSpace(candidate)
+		if trimmedCandidate == "" {
+			continue
+		}
+		if isTaskEditorAvailable(trimmedCandidate) {
+			return trimmedCandidate, nil
+		}
+	}
+
+	return "", fmt.Errorf("resolveTaskEditorCommand() [task.go]: no editor command found")
+}
+
+func isTaskEditorAvailable(command string) bool {
+	tokens := strings.Fields(strings.TrimSpace(command))
+	if len(tokens) == 0 {
+		return false
+	}
+	executable := strings.TrimSpace(tokens[0])
+	if executable == "" {
+		return false
+	}
+
+	if filepath.IsAbs(executable) {
+		info, err := os.Stat(executable)
+		if err != nil {
+			return false
+		}
+		return !info.IsDir()
+	}
+
+	_, err := taskEditorLookPathFunc(executable)
+	return err == nil
+}
+
+func runTaskEditor(ctx context.Context, editorCommand string, promptFilePath string) error {
+	editorTokens := strings.Fields(strings.TrimSpace(editorCommand))
+	if len(editorTokens) == 0 {
+		return fmt.Errorf("runTaskEditor() [task.go]: editor command cannot be empty")
+	}
+
+	commandArgs := append([]string(nil), editorTokens[1:]...)
+	commandArgs = append(commandArgs, promptFilePath)
+	editorProcess := exec.CommandContext(ctx, editorTokens[0], commandArgs...)
+	editorProcess.Stdin = os.Stdin
+	editorProcess.Stdout = os.Stdout
+	editorProcess.Stderr = os.Stderr
+
+	if err := editorProcess.Run(); err != nil {
+		return fmt.Errorf("runTaskEditor() [task.go]: failed to run editor: %w", err)
+	}
+
+	return nil
+}
+
+func resolveTaskCreateParams(ctx context.Context, params taskCreateResolveParams) (core.TaskCreateParams, error) {
+	resolvedPrompt := strings.TrimSpace(params.Prompt)
+	if resolvedPrompt == "" {
+		return core.TaskCreateParams{}, fmt.Errorf("resolveTaskCreateParams() [task.go]: prompt cannot be empty")
+	}
+
+	workDir, err := system.ResolveWorkDir(strings.TrimSpace(params.WorkDir))
+	if err != nil {
+		return core.TaskCreateParams{}, fmt.Errorf("resolveTaskCreateParams() [task.go]: failed to resolve work directory: %w", err)
+	}
+
+	defaults, err := resolveTaskRunDefaultsFunc(system.ResolveRunDefaultsParams{
+		WorkDir:       workDir,
+		ShadowDir:     strings.TrimSpace(params.ShadowDir),
+		ProjectConfig: strings.TrimSpace(params.ProjectConfig),
+		ConfigPath:    strings.TrimSpace(params.ConfigPath),
+	})
+	if err != nil {
+		return core.TaskCreateParams{}, fmt.Errorf("resolveTaskCreateParams() [task.go]: failed to resolve CLI defaults: %w", err)
+	}
+
+	modelName := strings.TrimSpace(params.ModelName)
+	if modelName == "" {
+		modelName = strings.TrimSpace(defaults.Model)
+	}
+
+	resolvedBranch := strings.TrimSpace(params.Branch)
+	if resolvedBranch == "" {
+		worktreeTemplate := strings.TrimSpace(defaults.Worktree)
+		if worktreeTemplate == "" {
+			worktreeTemplate = "%"
+		}
+		if !strings.HasSuffix(worktreeTemplate, "%") {
+			worktreeTemplate += "-%"
+		}
+
+		generatedBranch, err := resolveTaskWorktreeBranchNameFunc(ctx, system.ResolveWorktreeBranchNameParams{
+			Prompt:         resolvedPrompt,
+			ModelName:      modelName,
+			WorkDir:        workDir,
+			ShadowDir:      strings.TrimSpace(params.ShadowDir),
+			ProjectConfig:  strings.TrimSpace(params.ProjectConfig),
+			ConfigPath:     strings.TrimSpace(params.ConfigPath),
+			WorktreeBranch: worktreeTemplate,
+		})
+		if err != nil {
+			return core.TaskCreateParams{}, fmt.Errorf("resolveTaskCreateParams() [task.go]: failed to resolve task branch: %w", err)
+		}
+		resolvedBranch = strings.TrimSpace(generatedBranch)
+	}
+
+	if resolvedBranch == "" {
+		return core.TaskCreateParams{}, fmt.Errorf("resolveTaskCreateParams() [task.go]: resolved task branch cannot be empty")
+	}
+
+	resolvedName := strings.TrimSpace(params.Name)
+	if resolvedName == "" {
+		resolvedName = resolvedBranch
+	}
+
+	resolvedDescription := strings.TrimSpace(params.Description)
+	if resolvedDescription == "" {
+		generatedDescription, err := generateTaskDescriptionFunc(ctx, taskCreateResolveParams{
+			Prompt:        resolvedPrompt,
+			Branch:        resolvedBranch,
+			Role:          strings.TrimSpace(params.Role),
+			ModelName:     modelName,
+			WorkDir:       workDir,
+			ShadowDir:     strings.TrimSpace(params.ShadowDir),
+			ProjectConfig: strings.TrimSpace(params.ProjectConfig),
+			ConfigPath:    strings.TrimSpace(params.ConfigPath),
+		})
+		if err != nil {
+			return core.TaskCreateParams{}, err
+		}
+		resolvedDescription = strings.TrimSpace(generatedDescription)
+	}
+
+	return core.TaskCreateParams{
+		ParentTaskID:  strings.TrimSpace(params.ParentTaskID),
+		Name:          resolvedName,
+		Description:   resolvedDescription,
+		FeatureBranch: resolvedBranch,
+		ParentBranch:  strings.TrimSpace(params.ParentBranch),
+		Role:          strings.TrimSpace(params.Role),
+		Deps:          append([]string(nil), params.Deps...),
+		Prompt:        resolvedPrompt,
+	}, nil
+}
+
+func generateTaskDescription(ctx context.Context, params taskCreateResolveParams) (string, error) {
+	buildParams := system.BuildSystemParams{
+		WorkDir:       strings.TrimSpace(params.WorkDir),
+		ShadowDir:     strings.TrimSpace(params.ShadowDir),
+		ConfigPath:    strings.TrimSpace(params.ConfigPath),
+		ProjectConfig: strings.TrimSpace(params.ProjectConfig),
+		ModelName:     strings.TrimSpace(params.ModelName),
+		RoleName:      firstNonEmpty(strings.TrimSpace(params.Role), "developer"),
+	}
+
+	sweSystem, buildResult, err := buildTaskSystemFunc(buildParams)
+	if err != nil {
+		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to build system: %w", err)
+	}
+	defer buildResult.Cleanup()
+
+	modelRefs, err := models.ParseProviderModelChain(strings.TrimSpace(buildResult.ModelName))
+	if err != nil || len(modelRefs) == 0 {
+		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to parse resolved model name: %w", err)
+	}
+
+	seedSession := core.NewSweSession(&core.SweSessionParams{
+		ProviderName: modelRefs[0].Provider,
+		Model:        modelRefs[0].Model,
+		ModelSpec:    strings.TrimSpace(buildResult.ModelName),
+		Messages: []*models.ChatMessage{
+			models.NewTextMessage(models.ChatRoleUser, strings.TrimSpace(params.Prompt)),
+		},
+	})
+
+	generatedDescription, err := core.GenerateCommitMessage(ctx, sweSystem.ModelProviders, sweSystem.ConfigStore, seedSession, strings.TrimSpace(params.Branch), "")
+	if err != nil {
+		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to generate description: %w", err)
+	}
+
+	return strings.TrimSpace(generatedDescription), nil
 }
 
 func printTaskRunOutcome(outcome tool.TaskRunOutcome) {

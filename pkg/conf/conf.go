@@ -477,6 +477,8 @@ type RunDefaultsConfig struct {
 	AllowAllPermissions bool `json:"allow-all-permissions,omitempty" yaml:"allow-all-permissions,omitempty"`
 	// VFSAllow is the default --vfs-allow value.
 	VFSAllow []string `json:"vfs-allow,omitempty" yaml:"vfs-allow,omitempty"`
+	// Editors is the ordered fallback list of editor commands used for interactive prompt editing.
+	Editors []string `json:"editors,omitempty" yaml:"editors,omitempty"`
 }
 
 // ModelProviderConfig represents common configuration for model providers.

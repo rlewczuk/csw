@@ -28,6 +28,14 @@ llm-retry-max-attempts: 10
 llm-retry-max-backoff-seconds: 60
 context-compaction-threshold: 0.95
 
+defaults:
+  editors:
+    - /usr/bin/editor
+    - vim
+    - mcedit
+    - vi
+    - nano
+
 shadow-paths:
   - AGENTS.md
   - "**/AGENTS.md"
