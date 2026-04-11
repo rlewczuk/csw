@@ -92,7 +92,7 @@ func isThinkingFlagChanged(cmd *cobra.Command) bool {
 		return false
 	}
 
-	return cmd.Flags().Changed("thinking") || cmd.Flags().Changed("thinking-mode")
+	return cmd.Flags().Changed("thinking")
 }
 
 func parseBashRunTimeout(value string) (time.Duration, error) {

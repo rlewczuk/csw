@@ -68,8 +68,8 @@ func TestCLIResumeFlagsAndPromptRules(t *testing.T) {
 			expectedForceCompact: true,
 		},
 		{
-			name:                     "resume overrides model role and thinking mode",
-			args:                     []string{"--resume=last", "--model=ollama/custom", "--role=developer", "--thinking-mode=high", "next"},
+			name:                     "resume overrides model role and thinking",
+			args:                     []string{"--resume=last", "--model=ollama/custom", "--role=developer", "--thinking=high", "next"},
 			expectedResume:           "last",
 			expectedPrompt:           "next",
 			expectedCont:             true,
