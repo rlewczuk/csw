@@ -114,6 +114,25 @@ func TestNewTaskManagerFailsOnEmptyBaseDir(t *testing.T) {
 	assert.Contains(t, err.Error(), "baseDir cannot be empty")
 }
 
+func TestTaskManagerCreateTaskUsesAbsoluteTasksDirWithoutPrefixingBaseDir(t *testing.T) {
+	baseDir := t.TempDir()
+	tasksDir := filepath.Join(baseDir, ".cswdata", "tasks")
+
+	manager, err := NewTaskManagerWithTasksDir(baseDir, tasksDir, nil, &taskTestRunner{})
+	require.NoError(t, err)
+
+	created, err := manager.CreateTask(TaskCreateParams{Name: "task-name", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	expectedTaskPath := filepath.Join(tasksDir, created.UUID, "task.yml")
+	_, expectedTaskPathErr := os.Stat(expectedTaskPath)
+	require.NoError(t, expectedTaskPathErr)
+
+	incorrectTaskPath := filepath.Join(baseDir, tasksDir, created.UUID, "task.yml")
+	_, incorrectTaskPathErr := os.Stat(incorrectTaskPath)
+	assert.ErrorIs(t, incorrectTaskPathErr, os.ErrNotExist)
+}
+
 func TestTaskManagerCreateTaskDefaultsAndNormalizeDeps(t *testing.T) {
 	baseDir := t.TempDir()
 	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})

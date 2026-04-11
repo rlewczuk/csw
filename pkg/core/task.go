@@ -642,6 +642,10 @@ func toToolTaskRecord(taskData *Task) tool.TaskRecord {
 
 // TasksRoot returns root directory for task persistence.
 func (m *TaskManager) TasksRoot() string {
+	if filepath.IsAbs(m.tasksDir) {
+		return filepath.Clean(m.tasksDir)
+	}
+
 	return filepath.Join(m.baseDir, m.tasksDir)
 }
 
