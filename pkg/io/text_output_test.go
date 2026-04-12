@@ -113,6 +113,21 @@ func TestTextSessionOutput_AddToolCallResult(t *testing.T) {
 			},
 			expectedOutput: "✅ todoRead",
 		},
+		{
+			name: "appends notifications",
+			result: &tool.ToolResponse{
+				Call: &tool.ToolCall{ID: "c4", Function: "vfsRead"},
+				Result: tool.NewToolValue(map[string]any{
+					"summary": "read pkg/foo/test.go",
+				}),
+				Notifications: []tool.ToolNotification{{
+					Type:    "agents_auto_loaded",
+					Message: `AGENTS.md from "pkg/foo" was automatically loaded.`,
+				}},
+				Done: true,
+			},
+			expectedOutput: "ℹ️ AGENTS.md from \"pkg/foo\" was automatically loaded.",
+		},
 	}
 
 	for _, tt := range tests {
@@ -144,6 +159,24 @@ func TestTextSessionOutput_AddToolCallResultDeduplicates(t *testing.T) {
 
 	count := strings.Count(buffer.String(), "✅ read notes.txt")
 	assert.Equal(t, 1, count)
+}
+
+func TestTextSessionOutput_AddToolCallResultRendersNotificationWithoutSummary(t *testing.T) {
+	buffer := &bytes.Buffer{}
+	output := NewTextSessionOutput(buffer)
+
+	result := &tool.ToolResponse{
+		Call: &tool.ToolCall{ID: "call-2", Function: "vfsRead"},
+		Notifications: []tool.ToolNotification{{
+			Type:    "agents_auto_loaded",
+			Message: `AGENTS.md from "pkg" was automatically loaded.`,
+		}},
+		Done: true,
+	}
+
+	output.AddToolCallResult(result)
+
+	assert.Contains(t, buffer.String(), "AGENTS.md from \"pkg\" was automatically loaded.")
 }
 
 func TestTextSessionOutput_NoPanicsOnNilInputs(t *testing.T) {

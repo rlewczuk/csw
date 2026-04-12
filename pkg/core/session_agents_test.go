@@ -99,9 +99,10 @@ func TestBuildAdditionalAgentMessageForDir(t *testing.T) {
 	}
 
 	t.Run("loads messages for directory and parents excluding root", func(t *testing.T) {
-		msgs, err := session.buildAdditionalAgentMessageForDir("pkg/foo/bar")
+		msgs, loadedPaths, err := session.buildAdditionalAgentMessageForDir("pkg/foo/bar")
 		require.NoError(t, err)
 		require.Len(t, msgs, 3)
+		require.Len(t, loadedPaths, 3)
 
 		joined := strings.Builder{}
 		for _, msg := range msgs {
@@ -117,9 +118,10 @@ func TestBuildAdditionalAgentMessageForDir(t *testing.T) {
 		assert.Contains(t, joinedText, "pkg instructions")
 		assert.NotContains(t, joinedText, "root instructions")
 
-		nextMsgs, err := session.buildAdditionalAgentMessageForDir("pkg/foo/bar")
+		nextMsgs, nextLoadedPaths, err := session.buildAdditionalAgentMessageForDir("pkg/foo/bar")
 		require.NoError(t, err)
 		assert.Nil(t, nextMsgs)
+		assert.Nil(t, nextLoadedPaths)
 	})
 
 	t.Run("deduplicates parent files across subsequent directory reads", func(t *testing.T) {
@@ -129,20 +131,24 @@ func TestBuildAdditionalAgentMessageForDir(t *testing.T) {
 			workDir:         ".",
 		}
 
-		firstMsgs, err := freshSession.buildAdditionalAgentMessageForDir("pkg/foo/bar")
+		firstMsgs, firstLoadedPaths, err := freshSession.buildAdditionalAgentMessageForDir("pkg/foo/bar")
 		require.NoError(t, err)
 		require.Len(t, firstMsgs, 3)
+		require.Len(t, firstLoadedPaths, 3)
 
-		secondMsgs, err := freshSession.buildAdditionalAgentMessageForDir("pkg/foo/baz")
+		secondMsgs, secondLoadedPaths, err := freshSession.buildAdditionalAgentMessageForDir("pkg/foo/baz")
 		require.NoError(t, err)
 		require.Len(t, secondMsgs, 1)
+		require.Len(t, secondLoadedPaths, 1)
 		assert.Contains(t, secondMsgs[0].GetText(), "baz instructions")
+		assert.Equal(t, "pkg/foo/baz/AGENTS.md", secondLoadedPaths[0])
 	})
 
 	t.Run("ignores root directory", func(t *testing.T) {
-		msgs, err := session.buildAdditionalAgentMessageForDir(".")
+		msgs, loadedPaths, err := session.buildAdditionalAgentMessageForDir(".")
 		require.NoError(t, err)
 		assert.Nil(t, msgs)
+		assert.Nil(t, loadedPaths)
 	})
 }
 
@@ -179,6 +185,9 @@ func TestExecuteToolCalls_AppendsAgentInstructionsAfterToolResponse(t *testing.T
 	require.Len(t, toolResponseMessage.Parts, 1)
 	require.NotNil(t, toolResponseMessage.Parts[0].ToolResponse)
 	assert.Contains(t, toolResponseMessage.Parts[0].ToolResponse.Result.Get("content").AsString(), "package foo")
+	require.Len(t, toolResponseMessage.Parts[0].ToolResponse.Notifications, 1)
+	assert.Equal(t, "agents_auto_loaded", toolResponseMessage.Parts[0].ToolResponse.Notifications[0].Type)
+	assert.Equal(t, "pkg/foo/AGENTS.md", toolResponseMessage.Parts[0].ToolResponse.Notifications[0].Path)
 
 	agentInstructionMessage := session.messages[2]
 	require.Equal(t, models.ChatRoleUser, agentInstructionMessage.Role)

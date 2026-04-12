@@ -12,9 +12,9 @@ import (
 )
 
 // buildAdditionalAgentMessages builds user messages with extra AGENTS.md instructions for vfsRead/vfsGrep tool calls.
-func (s *SweSession) buildAdditionalAgentMessages(toolCall *tool.ToolCall, response *tool.ToolResponse) ([]*models.ChatMessage, error) {
+func (s *SweSession) buildAdditionalAgentMessages(toolCall *tool.ToolCall, response *tool.ToolResponse) ([]*models.ChatMessage, []string, error) {
 	if s == nil || s.promptGenerator == nil || toolCall == nil || response == nil || response.Error != nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	var dirs []string
@@ -22,32 +22,36 @@ func (s *SweSession) buildAdditionalAgentMessages(toolCall *tool.ToolCall, respo
 	case "vfsRead":
 		path, ok := toolCall.Arguments.StringOK("path")
 		if !ok || strings.TrimSpace(path) == "" {
-			return nil, nil
+			return nil, nil, nil
 		}
 		dirs = append(dirs, filepath.Dir(path))
 	case "vfsGrep":
 		dirs = append(dirs, parseDirsFromGrepResult(response.Result.Get("content").AsString())...)
 	default:
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	messages := make([]*models.ChatMessage, 0)
+	loadedPaths := make([]string, 0)
 	for _, dir := range uniqueStrings(dirs) {
-		dirMessages, err := s.buildAdditionalAgentMessageForDir(dir)
+		dirMessages, dirLoadedPaths, err := s.buildAdditionalAgentMessageForDir(dir)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if len(dirMessages) > 0 {
 			messages = append(messages, dirMessages...)
 		}
+		if len(dirLoadedPaths) > 0 {
+			loadedPaths = append(loadedPaths, dirLoadedPaths...)
+		}
 	}
 
-	return messages, nil
+	return messages, loadedPaths, nil
 }
 
 // buildAdditionalAgentMessageForDir creates user messages from AGENTS.md files in the
 // provided directory and its parent directories if not loaded yet.
-func (s *SweSession) buildAdditionalAgentMessageForDir(dir string) ([]*models.ChatMessage, error) {
+func (s *SweSession) buildAdditionalAgentMessageForDir(dir string) ([]*models.ChatMessage, []string, error) {
 	rootPath := ""
 	if s.VFS != nil {
 		rootPath = s.VFS.WorktreePath()
@@ -57,7 +61,7 @@ func (s *SweSession) buildAdditionalAgentMessageForDir(dir string) ([]*models.Ch
 	}
 	workDirAbs, err := filepath.Abs(rootPath)
 	if err != nil {
-		return nil, fmt.Errorf("SweSession.buildAdditionalAgentMessageForDir() [session_agents.go]: failed to resolve root path %q: %w", rootPath, err)
+		return nil, nil, fmt.Errorf("SweSession.buildAdditionalAgentMessageForDir() [session_agents.go]: failed to resolve root path %q: %w", rootPath, err)
 	}
 
 	resolvedDir := dir
@@ -69,15 +73,15 @@ func (s *SweSession) buildAdditionalAgentMessageForDir(dir string) ([]*models.Ch
 	}
 	resolvedDir, err = filepath.Abs(resolvedDir)
 	if err != nil {
-		return nil, fmt.Errorf("SweSession.buildAdditionalAgentMessageForDir() [session_agents.go]: failed to resolve dir %q: %w", dir, err)
+		return nil, nil, fmt.Errorf("SweSession.buildAdditionalAgentMessageForDir() [session_agents.go]: failed to resolve dir %q: %w", dir, err)
 	}
 
 	relDir, err := filepath.Rel(workDirAbs, resolvedDir)
 	if err != nil {
-		return nil, fmt.Errorf("SweSession.buildAdditionalAgentMessageForDir() [session_agents.go]: failed to get relative dir for %q: %w", resolvedDir, err)
+		return nil, nil, fmt.Errorf("SweSession.buildAdditionalAgentMessageForDir() [session_agents.go]: failed to get relative dir for %q: %w", resolvedDir, err)
 	}
 	if relDir == "." || relDir == "" || strings.HasPrefix(relDir, "..") || filepath.IsAbs(relDir) {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	if s.loadedAgentFiles == nil {
@@ -86,10 +90,10 @@ func (s *SweSession) buildAdditionalAgentMessageForDir(dir string) ([]*models.Ch
 
 	files, err := s.promptGenerator.GetAgentFiles(relDir)
 	if err != nil {
-		return nil, fmt.Errorf("SweSession.buildAdditionalAgentMessageForDir() [session_agents.go]: failed to get agent files for %q: %w", relDir, err)
+		return nil, nil, fmt.Errorf("SweSession.buildAdditionalAgentMessageForDir() [session_agents.go]: failed to get agent files for %q: %w", relDir, err)
 	}
 	if len(files) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	paths := make([]string, 0, len(files))
@@ -106,20 +110,22 @@ func (s *SweSession) buildAdditionalAgentMessageForDir(dir string) ([]*models.Ch
 	})
 
 	messages := make([]*models.ChatMessage, 0, len(paths))
+	loadedPaths := make([]string, 0, len(paths))
 	for _, agentsPath := range paths {
 		if _, loaded := s.loadedAgentFiles[agentsPath]; loaded {
 			continue
 		}
 		s.loadedAgentFiles[agentsPath] = struct{}{}
+		loadedPaths = append(loadedPaths, agentsPath)
 		wrapped := "<system>\n" + files[agentsPath] + "\n</system>"
 		messages = append(messages, models.NewTextMessage(models.ChatRoleUser, wrapped))
 	}
 
 	if len(messages) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	return messages, nil
+	return messages, loadedPaths, nil
 }
 
 // parseDirsFromGrepResult extracts directories from vfsGrep result content.
@@ -153,4 +159,31 @@ func uniqueStrings(values []string) []string {
 		result = append(result, value)
 	}
 	return result
+}
+
+// buildAgentFileLoadNotifications creates notifications for newly loaded AGENTS.md files.
+func buildAgentFileLoadNotifications(agentsPaths []string) []tool.ToolNotification {
+	if len(agentsPaths) == 0 {
+		return nil
+	}
+
+	notifications := make([]tool.ToolNotification, 0, len(agentsPaths))
+	for _, agentsPath := range uniqueStrings(agentsPaths) {
+		trimmedPath := strings.TrimSpace(agentsPath)
+		if trimmedPath == "" {
+			continue
+		}
+
+		notifications = append(notifications, tool.ToolNotification{
+			Type:    "agents_auto_loaded",
+			Path:    trimmedPath,
+			Message: fmt.Sprintf("AGENTS.md from %q was automatically loaded.", filepath.Dir(trimmedPath)),
+		})
+	}
+
+	if len(notifications) == 0 {
+		return nil
+	}
+
+	return notifications
 }

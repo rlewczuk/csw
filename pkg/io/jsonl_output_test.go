@@ -97,6 +97,22 @@ func TestJsonlSessionOutput_AddToolCallResult(t *testing.T) {
 			},
 			expectedContain: "taskList",
 		},
+		{
+			name: "appends notification json",
+			result: &tool.ToolResponse{
+				Call: &tool.ToolCall{ID: "c5", Function: "vfsRead"},
+				Result: tool.NewToolValue(map[string]any{
+					"jsonl": `{"tool":"vfsRead","status":"success"}`,
+				}),
+				Notifications: []tool.ToolNotification{{
+					Type:    "agents_auto_loaded",
+					Path:    "pkg/foo/AGENTS.md",
+					Message: `AGENTS.md from "pkg/foo" was automatically loaded.`,
+				}},
+				Done: true,
+			},
+			expectedContain: `"type":"notification"`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -128,6 +144,34 @@ func TestJsonlSessionOutput_AddToolCallResultDeduplicates(t *testing.T) {
 
 	count := strings.Count(buffer.String(), `{"tool":"vfsRead","status":"success"}`)
 	assert.Equal(t, 1, count)
+}
+
+func TestJsonlSessionOutput_AddToolCallResultNotificationOnly(t *testing.T) {
+	buffer := &bytes.Buffer{}
+	output := NewJsonlSessionOutput(buffer)
+
+	result := &tool.ToolResponse{
+		Call: &tool.ToolCall{ID: "call-2", Function: "vfsRead"},
+		Notifications: []tool.ToolNotification{{
+			Type:    "agents_auto_loaded",
+			Path:    "pkg/AGENTS.md",
+			Message: `AGENTS.md from "pkg" was automatically loaded.`,
+		}},
+		Done: true,
+	}
+
+	output.AddToolCallResult(result)
+
+	lines := strings.Split(strings.TrimSpace(buffer.String()), "\n")
+	require.NotEmpty(t, lines)
+	line := lines[len(lines)-1]
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal([]byte(line), &payload))
+	assert.Equal(t, "notification", payload["type"])
+	notificationObj, ok := payload["notification"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "agents_auto_loaded", notificationObj["Type"])
+	assert.Equal(t, "pkg/AGENTS.md", notificationObj["Path"])
 }
 
 func TestJsonlSessionOutput_NoPanicsOnNilInputs(t *testing.T) {

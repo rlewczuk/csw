@@ -85,9 +85,11 @@ func (o *TextSessionOutput) AddToolCallResult(result *tool.ToolResponse) {
 	}
 
 	outputLine, ok := buildTextToolOutputLine(result)
-	if !ok {
+	notificationLines := buildTextToolNotificationLines(result.Notifications)
+	if !ok && notificationLines == "" {
 		return
 	}
+	outputLine += notificationLines
 
 	o.mu.Lock()
 	if lastOutput, exists := o.renderedTools[result.Call.ID]; exists && lastOutput == outputLine {
@@ -146,6 +148,25 @@ func buildTextToolOutputLine(result *tool.ToolResponse) (string, bool) {
 	}
 
 	return fmt.Sprintf("%s %s\n", icon, display), true
+}
+
+func buildTextToolNotificationLines(notifications []tool.ToolNotification) string {
+	if len(notifications) == 0 {
+		return ""
+	}
+
+	builder := strings.Builder{}
+	for _, notification := range notifications {
+		message := strings.TrimSpace(notification.Message)
+		if message == "" {
+			continue
+		}
+		builder.WriteString("ℹ️ ")
+		builder.WriteString(message)
+		builder.WriteByte('\n')
+	}
+
+	return builder.String()
 }
 
 func (o *TextSessionOutput) writef(format string, args ...any) {

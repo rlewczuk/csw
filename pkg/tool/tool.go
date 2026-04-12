@@ -441,6 +441,21 @@ type ToolResponse struct {
 
 	// Done indicates whether the tool execution is complete.
 	Done bool
+
+	// Notifications contains non-error informational notifications produced while handling tool call.
+	Notifications []ToolNotification
+}
+
+// ToolNotification represents an informational event related to tool execution.
+type ToolNotification struct {
+	// Type identifies notification category.
+	Type string
+
+	// Message is user-facing notification text.
+	Message string
+
+	// Path is optional path related to notification.
+	Path string
 }
 
 // SchemaType represents the type of a property in JSON Schema.

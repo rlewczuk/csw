@@ -641,11 +641,12 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 		toolResponses = append(toolResponses, response)
 		logging.LogToolResult(s.logger, response)
 
-		newAgentMessages, err := s.buildAdditionalAgentMessages(result.toolCall, response)
+		newAgentMessages, loadedAgentPaths, err := s.buildAdditionalAgentMessages(result.toolCall, response)
 		if err != nil {
 			return fmt.Errorf("SweSession.executeToolCalls() [session.go]: failed to load additional AGENTS.md instructions: %w", err)
 		}
 		agentMessages = append(agentMessages, newAgentMessages...)
+		response.Notifications = append(response.Notifications, buildAgentFileLoadNotifications(loadedAgentPaths)...)
 
 		if s.outputHandler != nil {
 			s.decorateToolResponseForOutput(response)

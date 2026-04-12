@@ -81,6 +81,12 @@ func (o *JsonlSessionOutput) AddToolCallResult(result *tool.ToolResponse) {
 	if display == "" {
 		display = strings.TrimSpace(result.Call.Function)
 	}
+	notificationLines := buildJSONLToolNotificationLines(result.Notifications)
+	if display == "" {
+		display = notificationLines
+	} else if notificationLines != "" {
+		display = strings.TrimSuffix(display, "\n") + "\n" + strings.TrimSuffix(notificationLines, "\n")
+	}
 	if display == "" {
 		return
 	}
@@ -96,6 +102,33 @@ func (o *JsonlSessionOutput) AddToolCallResult(result *tool.ToolResponse) {
 	o.mu.Unlock()
 
 	o.write(outputLine)
+}
+
+func buildJSONLToolNotificationLines(notifications []tool.ToolNotification) string {
+	if len(notifications) == 0 {
+		return ""
+	}
+
+	builder := strings.Builder{}
+	for _, notification := range notifications {
+		message := strings.TrimSpace(notification.Message)
+		if message == "" {
+			continue
+		}
+
+		payload := map[string]any{
+			"type":         "notification",
+			"notification": notification,
+		}
+		data, err := json.Marshal(payload)
+		if err != nil {
+			continue
+		}
+		builder.Write(data)
+		builder.WriteByte('\n')
+	}
+
+	return builder.String()
 }
 
 // RunFinished handles end-of-run callback.
