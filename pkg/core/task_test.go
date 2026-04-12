@@ -476,6 +476,46 @@ func TestTaskManagerRunTaskContinueRendersTemplate(t *testing.T) {
 	assert.Contains(t, runner.lastRequest.Prompt, "Prompt=base prompt")
 }
 
+func TestTaskManagerRunTaskPromptOverrideTemplateCanUseTaskPrompt(t *testing.T) {
+	baseDir := t.TempDir()
+	runner := &taskTestRunner{result: TaskSessionRunResult{SessionID: "ses-template", SummaryText: "ok"}}
+	manager, err := NewTaskManager(baseDir, nil, runner)
+	require.NoError(t, err)
+
+	created, err := manager.CreateTask(TaskCreateParams{Name: "templated", FeatureBranch: "feat/templated", Prompt: "prompt from task file"})
+	require.NoError(t, err)
+
+	fake := &fakeVCS{branches: []string{"main"}}
+	_, runErr := manager.RunTask(context.Background(), TaskLookup{Identifier: created.UUID}, TaskRunParams{
+		PromptOverride: "Rewrite this task: {{.Task.Prompt}}",
+	}, fake)
+	require.NoError(t, runErr)
+	assert.Equal(t, "Rewrite this task: prompt from task file", runner.lastRequest.Prompt)
+}
+
+func TestTaskManagerRunTaskCommandPromptTemplateCanUseTaskPrompt(t *testing.T) {
+	baseDir := t.TempDir()
+	runner := &taskTestRunner{result: TaskSessionRunResult{SessionID: "ses-command-template", SummaryText: "ok"}}
+	store := confimpl.NewMockConfigStore()
+	manager, err := NewTaskManager(baseDir, store, runner)
+	require.NoError(t, err)
+
+	commandsDir := filepath.Join(baseDir, ".agents", "commands")
+	require.NoError(t, os.MkdirAll(commandsDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(commandsDir, "my-command.md"), []byte("TaskPrompt={{.Task.Prompt}} Args=$ARGUMENTS"), 0o644))
+
+	created, err := manager.CreateTask(TaskCreateParams{Name: "templated-cmd", FeatureBranch: "feat/templated-cmd", Prompt: "prompt from task file"})
+	require.NoError(t, err)
+
+	fake := &fakeVCS{branches: []string{"main"}}
+	_, runErr := manager.RunTask(context.Background(), TaskLookup{Identifier: created.UUID}, TaskRunParams{
+		PromptOverride: "/my-command",
+		PromptArgs:     []string{"foo", "bar"},
+	}, fake)
+	require.NoError(t, runErr)
+	assert.Equal(t, "TaskPrompt=prompt from task file Args=foo bar", runner.lastRequest.Prompt)
+}
+
 func TestTaskManagerMergeTaskUpdatesStatusAndState(t *testing.T) {
 	baseDir := t.TempDir()
 	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})

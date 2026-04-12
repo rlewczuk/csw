@@ -255,7 +255,9 @@ func TestTaskCommandArgValidators(t *testing.T) {
 		{name: "run accepts no positional argument when task flag is set", command: taskRunCommand(), args: []string{}, expectError: false, prepare: func(t *testing.T, command *cobra.Command) {
 			require.NoError(t, command.Flags().Set("task", "task-1"))
 		}},
-		{name: "run rejects positional argument", command: taskRunCommand(), args: []string{"task-1"}, expectError: true},
+		{name: "run accepts positional prompt when task flag is set", command: taskRunCommand(), args: []string{"task prompt"}, expectError: false, prepare: func(t *testing.T, command *cobra.Command) {
+			require.NoError(t, command.Flags().Set("task", "task-1"))
+		}},
 		{name: "list accepts no argument", command: taskListCommand(), args: []string{}, expectError: false},
 		{name: "list accepts one argument", command: taskListCommand(), args: []string{"task-1"}, expectError: false},
 		{name: "list rejects more than one argument", command: taskListCommand(), args: []string{"task-1", "task-2"}, expectError: true},
@@ -760,9 +762,8 @@ func TestTaskRunCommandArgsValidationWithLastFlag(t *testing.T) {
 	require.Error(t, conflictErr)
 	assert.Contains(t, conflictErr.Error(), "cannot be used with --last or --next")
 
-	positionalErr := command.Args(command, []string{"task-1"})
-	require.Error(t, positionalErr)
-	assert.Contains(t, positionalErr.Error(), "positional task identifier is not supported")
+	require.NoError(t, command.Flags().Set("last", "false"))
+	assert.NoError(t, command.Args(command, []string{"task prompt"}))
 }
 
 func TestPrintTaskRunOutcome(t *testing.T) {

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/apis"
+	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
@@ -108,11 +109,13 @@ type TaskUpdateParams struct {
 
 // TaskRunParams defines parameters for running a task.
 type TaskRunParams struct {
-	Identifier string
-	Merge      bool
-	Reset      bool
-	Continue   bool
-	RunOptions TaskSessionRunOptions
+	Identifier     string
+	Merge          bool
+	Reset          bool
+	Continue       bool
+	PromptOverride string
+	PromptArgs     []string
+	RunOptions     TaskSessionRunOptions
 }
 
 // TaskSessionRunOptions stores session run CLI options used for task execution.
@@ -921,6 +924,13 @@ func (m *TaskManager) RunTask(ctx context.Context, lookup TaskLookup, params Tas
 	if prompt == "" {
 		return nil, fmt.Errorf("TaskManager.RunTask() [task.go]: task is empty: task.md has no prompt")
 	}
+	if strings.TrimSpace(params.PromptOverride) != "" {
+		resolvedPrompt, resolveErr := m.resolveTaskPromptOverride(task, params, prompt)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		prompt = resolvedPrompt
+	}
 	if params.Continue {
 		prompt, err = m.renderContinuePrompt(task, prompt)
 		if err != nil {
@@ -1480,6 +1490,93 @@ func firstNonEmptyTask(values ...string) string {
 	}
 
 	return ""
+}
+
+func (m *TaskManager) resolveTaskPromptOverride(task *Task, params TaskRunParams, taskPrompt string) (string, error) {
+	if task == nil {
+		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: task cannot be nil")
+	}
+	basePrompt := strings.TrimSpace(params.PromptOverride)
+	if basePrompt == "" {
+		return strings.TrimSpace(taskPrompt), nil
+	}
+	taskPromptValue := strings.TrimSpace(taskPrompt)
+
+	contextData := map[string]any{
+		"Task": map[string]any{
+			"UUID":          strings.TrimSpace(task.UUID),
+			"Name":          strings.TrimSpace(task.Name),
+			"Description":   strings.TrimSpace(task.Description),
+			"FeatureBranch": strings.TrimSpace(task.FeatureBranch),
+			"ParentBranch":  strings.TrimSpace(task.ParentBranch),
+			"Role":          strings.TrimSpace(task.Role),
+			"Prompt":        taskPromptValue,
+		},
+	}
+
+	renderedPrompt, err := renderTaskPromptTemplate(basePrompt, contextData)
+	if err != nil {
+		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: failed to render prompt override template: %w", err)
+	}
+	renderedPrompt = strings.TrimSpace(renderedPrompt)
+
+	invocation, isCommandInvocation, parseErr := commands.ParseInvocation(renderedPrompt, append([]string(nil), params.PromptArgs...))
+	if parseErr != nil {
+		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: %w", parseErr)
+	}
+	if !isCommandInvocation {
+		if len(params.PromptArgs) > 0 {
+			return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: prompt override must be a single argument unless using /command invocation")
+		}
+		if strings.TrimSpace(renderedPrompt) == "" {
+			return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: resolved prompt override is empty")
+		}
+		return renderedPrompt, nil
+	}
+
+	if m.configStore == nil {
+		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: config store is not available for command invocation")
+	}
+	commandsRoot := filepath.Join(strings.TrimSpace(m.baseDir), ".agents", "commands")
+	loadedCommand, loadErr := commands.LoadFromDir(commandsRoot, invocation.Name)
+	if loadErr != nil {
+		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: %w", loadErr)
+	}
+
+	commandTemplate, templateErr := renderTaskPromptTemplate(strings.TrimSpace(loadedCommand.Template), contextData)
+	if templateErr != nil {
+		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: failed to render command template: %w", templateErr)
+	}
+
+	resolvedCommandPrompt := commands.ApplyArguments(commandTemplate, invocation.Arguments)
+	resolvedCommandPrompt, expandErr := commands.ExpandPrompt(resolvedCommandPrompt, strings.TrimSpace(m.baseDir), nil, nil)
+	if expandErr != nil {
+		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: failed to render command /%s: %w", strings.TrimSpace(loadedCommand.Name), expandErr)
+	}
+	resolvedCommandPrompt = strings.TrimSpace(resolvedCommandPrompt)
+	if resolvedCommandPrompt == "" {
+		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: rendered command /%s prompt is empty", strings.TrimSpace(loadedCommand.Name))
+	}
+
+	return resolvedCommandPrompt, nil
+}
+
+func renderTaskPromptTemplate(input string, contextData map[string]any) (string, error) {
+	templateText := strings.TrimSpace(input)
+	if templateText == "" {
+		return "", nil
+	}
+	tpl, err := template.New("task-prompt").Option("missingkey=error").Parse(templateText)
+	if err != nil {
+		return "", fmt.Errorf("renderTaskPromptTemplate() [task.go]: failed to parse prompt template: %w", err)
+	}
+
+	var rendered bytes.Buffer
+	if err := tpl.Execute(&rendered, contextData); err != nil {
+		return "", fmt.Errorf("renderTaskPromptTemplate() [task.go]: failed to render prompt template: %w", err)
+	}
+
+	return rendered.String(), nil
 }
 
 func isTaskPathNestedUnder(path string, parent string) bool {

@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/system"
@@ -499,12 +500,9 @@ func taskRunCommand() *cobra.Command {
 	var cliContext []string
 
 	command := &cobra.Command{
-		Use:   "run",
+		Use:   "run [\"prompt\"] [command-args...]",
 		Short: "Run task session",
 		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				return fmt.Errorf("taskRunCommand.Args() [task.go]: positional task identifier is not supported; use --task")
-			}
 			if last && next {
 				return fmt.Errorf("taskRunCommand.Args() [task.go]: --last and --next cannot be used together")
 			}
@@ -521,6 +519,40 @@ func taskRunCommand() *cobra.Command {
 				return err
 			}
 			cliLogLLMRequests = cliLogLLMRequests || cliLogLLMRequestsRaw
+
+			promptOverride := ""
+			extraPromptArgs := []string(nil)
+			if len(args) >= 1 {
+				promptOverride = strings.TrimSpace(args[0])
+				extraPromptArgs = append([]string(nil), args[1:]...)
+			}
+
+			if promptOverride != "" && strings.HasPrefix(promptOverride, "@") {
+				promptFile := strings.TrimPrefix(promptOverride, "@")
+				data, readErr := os.ReadFile(promptFile)
+				if readErr != nil {
+					return fmt.Errorf("taskRunCommand.RunE() [task.go]: failed to read prompt file: %w", readErr)
+				}
+				promptOverride = strings.TrimSpace(string(data))
+			} else if promptOverride == "-" {
+				data, readErr := io.ReadAll(os.Stdin)
+				if readErr != nil {
+					return fmt.Errorf("taskRunCommand.RunE() [task.go]: failed to read prompt from stdin: %w", readErr)
+				}
+				promptOverride = strings.TrimSpace(string(data))
+			}
+
+			invocation, isCommandInvocation, parseErr := commands.ParseInvocation(promptOverride, extraPromptArgs)
+			if parseErr != nil {
+				return fmt.Errorf("taskRunCommand.RunE() [task.go]: %w", parseErr)
+			}
+			if !isCommandInvocation && len(extraPromptArgs) > 0 {
+				return fmt.Errorf("taskRunCommand.RunE() [task.go]: prompt must be a single argument unless using /command invocation")
+			}
+			if invocation != nil {
+				promptOverride = "/" + strings.TrimSpace(invocation.Name)
+				extraPromptArgs = append([]string(nil), invocation.Arguments...)
+			}
 
 			containerEnabledChanged := cmd.Flags().Changed("container-enabled")
 			containerDisabledChanged := cmd.Flags().Changed("container-disabled")
@@ -544,8 +576,10 @@ func taskRunCommand() *cobra.Command {
 			}
 
 			outcome, runErr := backend.RunTaskWithParams(cmd.Context(), identifier, "", core.TaskRunParams{
-				Merge: merge,
-				Reset: reset,
+				Merge:          merge,
+				Reset:          reset,
+				PromptOverride: strings.TrimSpace(promptOverride),
+				PromptArgs:     append([]string(nil), extraPromptArgs...),
 				RunOptions: core.TaskSessionRunOptions{
 					Model:             cliModel,
 					Role:              cliRole,
