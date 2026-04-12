@@ -447,8 +447,6 @@ type RunDefaultsConfig struct {
 	DefaultProvider string `json:"default-provider,omitempty" yaml:"default-provider,omitempty"`
 	// DefaultRole is the default agent role to use.
 	DefaultRole string `json:"default-role,omitempty" yaml:"default-role,omitempty"`
-	// MaxToolThreads is the default --max-threads value.
-	MaxToolThreads int `json:"max-tool-threads,omitempty" yaml:"max-tool-threads,omitempty"`
 	// Container defines default container execution settings.
 	Container *ContainerConfig `json:"container,omitempty" yaml:"container,omitempty"`
 	// Model is the default --model value.

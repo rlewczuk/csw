@@ -87,9 +87,6 @@ func (c *RunDefaultsConfig) MergeFrom(override RunDefaultsConfig) {
 	if override.DefaultRole != "" {
 		c.DefaultRole = override.DefaultRole
 	}
-	if override.MaxToolThreads > 0 {
-		c.MaxToolThreads = override.MaxToolThreads
-	}
 	if override.Container != nil {
 		overrideHasValue := override.Container.Enabled || override.Container.Image != "" || len(override.Container.Mounts) > 0 || len(override.Container.Env) > 0
 		if c.Container == nil {

@@ -697,7 +697,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 			if params.MaxToolThreads > 0 {
 				return params.MaxToolThreads
 			}
-			return globalConfig.Defaults.MaxToolThreads
+			return globalConfig.Defaults.MaxThreads
 		}(),
 	}
 

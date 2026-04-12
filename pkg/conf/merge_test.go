@@ -100,7 +100,6 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 	base := RunDefaultsConfig{
 		DefaultProvider: "provider1",
 		DefaultRole:     "role1",
-		MaxToolThreads:  3,
 		Container:       &ContainerConfig{Image: "image1", Mounts: []string{"/a:/b"}, Env: []string{"A=1"}},
 		Model:           "provider1/model",
 		Worktree:        "feature/one",
@@ -118,7 +117,6 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 	override := RunDefaultsConfig{
 		DefaultProvider:     "provider2",
 		DefaultRole:         "role2",
-		MaxToolThreads:      12,
 		Container:           &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
 		Model:               "provider2/model",
 		Merge:               true,
@@ -138,7 +136,6 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 	assert.Equal(t, RunDefaultsConfig{
 		DefaultProvider:     "provider2",
 		DefaultRole:         "role2",
-		MaxToolThreads:      12,
 		Container:           &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
 		Model:               "provider2/model",
 		Worktree:            "feature/one",
@@ -209,7 +206,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 		Defaults: RunDefaultsConfig{
 			DefaultProvider: "provider1",
 			DefaultRole:     "role1",
-			MaxToolThreads:  3,
+			MaxThreads:      3,
 			Container:       &ContainerConfig{Image: "image1", Mounts: []string{"/a:/b"}, Env: []string{"A=1"}},
 			Model:           "m1",
 			Worktree:        "w1",
@@ -233,7 +230,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 		Defaults: RunDefaultsConfig{
 			DefaultProvider:     "provider2",
 			DefaultRole:         "role2",
-			MaxToolThreads:      12,
+			MaxThreads:          12,
 			Container:           &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
 			Model:               "m2",
 			Merge:               true,
@@ -258,10 +255,10 @@ func TestGlobalConfig_Merge(t *testing.T) {
 	assert.Equal(t, "role2", base.Defaults.DefaultRole)
 	assert.Equal(t, 10, base.LLMRetryMaxAttempts)
 	assert.Equal(t, 60, base.LLMRetryMaxBackoffSeconds)
-	assert.Equal(t, 12, base.Defaults.MaxToolThreads)
+	assert.Equal(t, 12, base.Defaults.MaxThreads)
 	require.NotNil(t, base.Defaults.Container)
 	assert.Equal(t, ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, *base.Defaults.Container)
-	assert.Equal(t, RunDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxToolThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks", ShadowDir: "shadow/override", AllowAllPermissions: true, VFSAllow: []string{"/override/allow"}}, base.Defaults)
+	assert.Equal(t, RunDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks", ShadowDir: "shadow/override", AllowAllPermissions: true, VFSAllow: []string{"/override/allow"}}, base.Defaults)
 	assert.Equal(t, []string{".cswdata/**", ".agents/**"}, base.ShadowPaths)
 }
 
