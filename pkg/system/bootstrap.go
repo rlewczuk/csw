@@ -1188,7 +1188,8 @@ func ResolveWorkDir(dirPath string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("ResolveWorkDir() [bootstrap.go]: failed to get current working directory: %w", err)
 		}
-		return wd, nil
+		projectDir := findNearestProjectDir(wd)
+		return projectDir, nil
 	}
 
 	absPath, err := filepath.Abs(dirPath)
@@ -1203,6 +1204,40 @@ func ResolveWorkDir(dirPath string) (string, error) {
 		return "", fmt.Errorf("ResolveWorkDir() [bootstrap.go]: path is not a directory: %s", dirPath)
 	}
 	return absPath, nil
+}
+
+// findNearestProjectDir searches upwards from startDir for a directory containing .csw or .cswdata.
+func findNearestProjectDir(startDir string) string {
+	currentDir := startDir
+	for {
+		if hasProjectMarker(currentDir) {
+			return currentDir
+		}
+
+		parentDir := filepath.Dir(currentDir)
+		if parentDir == currentDir {
+			return startDir
+		}
+
+		currentDir = parentDir
+	}
+}
+
+// hasProjectMarker returns true when dirPath contains .csw or .cswdata directory.
+func hasProjectMarker(dirPath string) bool {
+	projectMarkers := []string{".csw", ".cswdata"}
+	for _, marker := range projectMarkers {
+		markerPath := filepath.Join(dirPath, marker)
+		markerInfo, err := os.Stat(markerPath)
+		if err != nil {
+			continue
+		}
+		if markerInfo.IsDir() {
+			return true
+		}
+	}
+
+	return false
 }
 
 // ResolveModelName determines the model name to use.
