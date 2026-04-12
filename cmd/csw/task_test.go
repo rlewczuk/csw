@@ -491,6 +491,63 @@ func TestTaskRunCommandIncludesRunSessionFlags(t *testing.T) {
 	}
 }
 
+func TestResolveTaskRunIdentifierReturnsProvidedIdentifierWhenNotLast(t *testing.T) {
+	resolved, err := resolveTaskRunIdentifier(nil, " task-123 ")
+	require.NoError(t, err)
+	assert.Equal(t, "task-123", resolved)
+}
+
+func TestResolveTaskRunIdentifierResolvesLastUnfinishedTaskByMostRecentModTime(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	require.NoError(t, err)
+
+	oldCompleted, err := manager.CreateTask(core.TaskCreateParams{Name: "completed", Prompt: "prompt"})
+	require.NoError(t, err)
+	runnableOlder, err := manager.CreateTask(core.TaskCreateParams{Name: "runnable-older", Prompt: "prompt"})
+	require.NoError(t, err)
+	runnableNewest, err := manager.CreateTask(core.TaskCreateParams{Name: "runnable-newest", Prompt: "prompt"})
+	require.NoError(t, err)
+	runningTask, err := manager.CreateTask(core.TaskCreateParams{Name: "running", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", oldCompleted.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCompleted)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableOlder.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCreated)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), core.TaskStatusCreated, core.TaskStateFailed)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), core.TaskStatusRunning, core.TaskStateRunning)
+
+	baseTime := time.Date(2026, time.February, 1, 10, 0, 0, 0, time.UTC)
+	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", oldCompleted.UUID, "task.yml"), baseTime.Add(1*time.Minute))
+	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableOlder.UUID, "task.yml"), baseTime.Add(2*time.Minute))
+	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), baseTime.Add(3*time.Minute))
+	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), baseTime.Add(4*time.Minute))
+
+	resolved, err := resolveTaskRunIdentifier(manager, "last")
+	require.NoError(t, err)
+	assert.Equal(t, runnableNewest.UUID, resolved)
+}
+
+func TestResolveTaskRunIdentifierReturnsErrorWhenNoUnfinishedTaskExists(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	require.NoError(t, err)
+
+	completedTask, err := manager.CreateTask(core.TaskCreateParams{Name: "completed", Prompt: "prompt"})
+	require.NoError(t, err)
+	mergedTask, err := manager.CreateTask(core.TaskCreateParams{Name: "merged", Prompt: "prompt"})
+	require.NoError(t, err)
+	runningTask, err := manager.CreateTask(core.TaskCreateParams{Name: "running", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", completedTask.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCompleted)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", mergedTask.UUID, "task.yml"), core.TaskStatusMerged, core.TaskStateCompleted)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), core.TaskStatusRunning, core.TaskStateRunning)
+
+	_, err = resolveTaskRunIdentifier(manager, "last")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no unfinished task found")
+}
+
 func TestPrintTaskRunOutcome(t *testing.T) {
 	outcome := tool.TaskRunOutcome{SessionID: " ses-123 ", TaskBranchName: " feature/task ", SummaryText: "  summary text  "}
 

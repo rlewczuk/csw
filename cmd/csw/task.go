@@ -322,7 +322,7 @@ func taskRunCommand() *cobra.Command {
 	var cliContext []string
 
 	command := &cobra.Command{
-		Use:   "run {name|uuid}",
+		Use:   "run {name|uuid|last}",
 		Short: "Run task session",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -342,12 +342,17 @@ func taskRunCommand() *cobra.Command {
 				return err
 			}
 
-			_, backend, err := loadTaskBackend(cmd)
+			manager, backend, err := loadTaskBackend(cmd)
 			if err != nil {
 				return err
 			}
 
-			outcome, runErr := backend.RunTaskWithParams(cmd.Context(), strings.TrimSpace(args[0]), "", core.TaskRunParams{
+			identifier, err := resolveTaskRunIdentifier(manager, strings.TrimSpace(args[0]))
+			if err != nil {
+				return err
+			}
+
+			outcome, runErr := backend.RunTaskWithParams(cmd.Context(), identifier, "", core.TaskRunParams{
 				Merge: merge,
 				Reset: reset,
 				RunOptions: core.TaskSessionRunOptions{
@@ -426,6 +431,106 @@ func taskRunCommand() *cobra.Command {
 	command.Flags().StringArrayVarP(&cliContext, "context", "c", nil, "Template context value in KEY=VAL format (repeatable)")
 
 	return command
+}
+
+func resolveTaskRunIdentifier(manager *core.TaskManager, identifier string) (string, error) {
+	trimmedIdentifier := strings.TrimSpace(identifier)
+	if trimmedIdentifier == "" {
+		return "", fmt.Errorf("resolveTaskRunIdentifier() [task.go]: task identifier cannot be empty")
+	}
+	if trimmedIdentifier != "last" {
+		return trimmedIdentifier, nil
+	}
+	if manager == nil {
+		return "", fmt.Errorf("resolveTaskRunIdentifier() [task.go]: manager cannot be nil")
+	}
+
+	taskData, err := findLastUnfinishedTask(manager)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(taskData.UUID), nil
+}
+
+func findLastUnfinishedTask(manager *core.TaskManager) (*core.Task, error) {
+	tasks, err := listAllCurrentTasks(manager)
+	if err != nil {
+		return nil, err
+	}
+
+	modTimes, err := collectTaskYMLModTimes(manager.TasksRoot())
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		modTimes = map[string]int64{}
+	}
+
+	var selected *core.Task
+	selectedModTime := int64(0)
+	for _, taskData := range tasks {
+		if !isUnfinishedTaskForRun(taskData) {
+			continue
+		}
+
+		taskID := strings.TrimSpace(taskData.UUID)
+		currentModTime := modTimes[taskID]
+		if selected == nil || currentModTime > selectedModTime || (currentModTime == selectedModTime && taskID > strings.TrimSpace(selected.UUID)) {
+			selected = taskData
+			selectedModTime = currentModTime
+		}
+	}
+
+	if selected == nil {
+		return nil, fmt.Errorf("findLastUnfinishedTask() [task.go]: no unfinished task found")
+	}
+
+	return selected, nil
+}
+
+func listAllCurrentTasks(manager *core.TaskManager) ([]*core.Task, error) {
+	if manager == nil {
+		return nil, fmt.Errorf("listAllCurrentTasks() [task.go]: manager cannot be nil")
+	}
+
+	topLevelTasks, err := manager.ListTasks(core.TaskLookup{}, false)
+	if err != nil {
+		return nil, err
+	}
+
+	allTasks := make([]*core.Task, 0, len(topLevelTasks))
+	for _, topLevelTask := range topLevelTasks {
+		if topLevelTask == nil {
+			continue
+		}
+		allTasks = append(allTasks, topLevelTask)
+
+		children, childErr := manager.ListTasks(core.TaskLookup{Identifier: strings.TrimSpace(topLevelTask.UUID)}, true)
+		if childErr != nil {
+			return nil, childErr
+		}
+		allTasks = append(allTasks, children...)
+	}
+
+	return allTasks, nil
+}
+
+func isUnfinishedTaskForRun(taskData *core.Task) bool {
+	if taskData == nil {
+		return false
+	}
+
+	status := strings.TrimSpace(taskData.Status)
+	state := strings.TrimSpace(taskData.State)
+	if status == core.TaskStatusMerged || status == core.TaskStatusRunning {
+		return false
+	}
+	if state == core.TaskStateCompleted || state == core.TaskStateRunning {
+		return false
+	}
+
+	return true
 }
 
 func taskListCommand() *cobra.Command {
