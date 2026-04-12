@@ -117,7 +117,7 @@ func taskNewCommand() *cobra.Command {
 			}
 
 			if !run {
-				fmt.Fprintf(os.Stdout, "Task created: %s\n", created.UUID)
+				printTaskCreated(created)
 				return nil
 			}
 
@@ -1384,6 +1384,15 @@ func printTaskRunOutcome(outcome tool.TaskRunOutcome) {
 		fmt.Fprintln(os.Stdout, "")
 		fmt.Fprintln(os.Stdout, strings.TrimSpace(outcome.SummaryText))
 	}
+}
+
+func printTaskCreated(taskData *core.Task) {
+	if taskData == nil {
+		return
+	}
+
+	fmt.Fprintf(os.Stdout, "Task created: %s\n", strings.TrimSpace(taskData.UUID))
+	fmt.Fprintf(os.Stdout, "Description: %s\n", strings.TrimSpace(taskData.Description))
 }
 
 func printTaskHuman(taskData *core.Task, summaryMeta *core.TaskSessionSummary, summaryText string) {

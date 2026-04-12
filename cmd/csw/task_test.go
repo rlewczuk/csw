@@ -76,6 +76,24 @@ func TestResolveTaskNewPromptSkipsTaskCreationWhenEditedPromptIsEmpty(t *testing
 	assert.Equal(t, "", prompt)
 }
 
+func TestResolveTaskNewPromptReturnsEditedPrompt(t *testing.T) {
+	originalEditorRunner := runTaskEditorFunc
+	t.Cleanup(func() {
+		runTaskEditorFunc = originalEditorRunner
+	})
+
+	runTaskEditorFunc = func(ctx context.Context, editorCommand string, promptFilePath string) error {
+		_ = ctx
+		_ = editorCommand
+		return os.WriteFile(promptFilePath, []byte("implement feature from editor\n"), 0o644)
+	}
+
+	prompt, shouldCreate, err := resolveTaskNewPrompt(context.Background(), taskNewPromptParams{Editor: "editor"})
+	require.NoError(t, err)
+	assert.True(t, shouldCreate)
+	assert.Equal(t, "implement feature from editor", prompt)
+}
+
 func TestResolveTaskCreateParamsGeneratesBranchAndDescription(t *testing.T) {
 	originalDefaults := resolveTaskRunDefaultsFunc
 	originalBranchResolver := resolveTaskWorktreeBranchNameFunc
@@ -701,6 +719,17 @@ func TestPrintTaskRunOutcome(t *testing.T) {
 	assert.Contains(t, output, "Task run session: ses-123")
 	assert.Contains(t, output, "Task branch: feature/task")
 	assert.Contains(t, output, "summary text")
+}
+
+func TestPrintTaskCreated(t *testing.T) {
+	taskData := &core.Task{UUID: " task-uuid ", Description: " generated description "}
+
+	output := captureStdout(t, func() {
+		printTaskCreated(taskData)
+	})
+
+	assert.Contains(t, output, "Task created: task-uuid")
+	assert.Contains(t, output, "Description: generated description")
 }
 
 func TestPrintTaskHuman(t *testing.T) {
