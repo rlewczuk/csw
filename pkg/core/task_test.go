@@ -374,7 +374,7 @@ func TestTaskManagerRunTaskSuccessWritesSummaryAndOutput(t *testing.T) {
 	assert.Equal(t, TaskStateCompleted, outcome.Task.State)
 	assert.Equal(t, TaskStatusOpen, outcome.Task.Status)
 	assert.Equal(t, "ses-123", outcome.SessionID)
-	assert.Contains(t, outcome.TaskBranchName, "feat/run-task-")
+	assert.Contains(t, outcome.TaskBranchName, "feat/run-")
 
 	require.GreaterOrEqual(t, len(fake.mergeCalls), 1)
 	assert.Equal(t, "feat/run", fake.mergeCalls[0][0])

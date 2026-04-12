@@ -939,7 +939,7 @@ func (m *TaskManager) RunTask(ctx context.Context, lookup TaskLookup, params Tas
 	}
 
 	sessionID := m.uuidFn()
-	taskBranchName := fmt.Sprintf("%s-task-%s", task.FeatureBranch, strings.ReplaceAll(sessionID[:8], "-", ""))
+	taskBranchName := fmt.Sprintf("%s-%s", task.FeatureBranch, strings.ReplaceAll(sessionID[:8], "-", ""))
 	if params.Reset {
 		_ = vcsRepo.DropWorktree(taskBranchName)
 		_ = vcsRepo.DeleteBranch(taskBranchName)
