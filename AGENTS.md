@@ -14,7 +14,7 @@ When you need to generate and run a test script, or generate and use some tempor
 - Module: `github.com/codesnort/codesnort-swe`
 - Go version: 1.25.5
 - Imports: Standard library first, then blank line, then external packages, then local packages
-- Package structure: `cmd/` for binaries, `internal/` for private code, `pkg/` for public APIs, `test/` for tests
+- Package structure: `cmd/` for binaries, `pkg/` for core implementation
 - Naming: Interface names end with interface purpose (e.g., `ChatModel`, `SweSystem`), not generic `I` prefix
 - Error handling: Return errors explicitly, use `error` as last return value
 - Comments: Document all exported types and functions with comments starting with the name
@@ -32,6 +32,8 @@ When you need to generate and run a test script, or generate and use some tempor
   - even in such case try to keep logic of given functionality in one file, by designing it in such way, that other files will be limited to contain plumbing code for this functionality
 - Avoid adding code to very big files (more than 1000 lines)
   - If given wile would exceed size threshold, consider finding consistent piece of functionality inside this file that can be split to a new file
+- When implementing new functionality or changing existing one, ALWAYS start with implementing or adapting tests for it; 
+- When implementing bug fix, ALWAYS start with implementing a test that reproduces the bug;
 
 Rules regarding implementing tests:
 - Testing: Use table-driven tests with `t.Run()` for subtests
@@ -45,6 +47,7 @@ Rules regarding implementing tests:
   - but when running integration tests, extend duration to 300 seconds;
 - prefer writing test exposing issue being solved before fixing it;
 - when asked to make integration test conditional based on `_integ/xxx.enabled` file, always use `TestEnabled` function from `pkg/testutil/cfg/integ.go`, never implement it manually;
+- at the end of task ALWAYS run all tests and full build to make sure there are no regressions;
 
 Other rules:
 - When generating summary after performing a task, DO NOT save it to file, just put it in chat.
