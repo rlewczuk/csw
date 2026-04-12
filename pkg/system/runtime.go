@@ -10,20 +10,20 @@ import (
 
 // StartRunSessionParams defines parameters for creating and starting run session runtime.
 type StartRunSessionParams struct {
-	ModelName            string
-	RoleName             string
-	TaskInfo             *core.TaskInfo
+	ModelName              string
+	RoleName               string
+	Task                   *core.Task
 	AutoPermissionResponse string
-	Thinking             string
-	ModelOverridden      bool
-	RoleOverridden       bool
-	ThinkingOverridden   bool
-	Prompt               string
-	ResumeTarget         string
-	ContinueSession      bool
-	ForceResume          bool
-	ForceCompact         bool
-	OutputHandler        core.SessionThreadOutput
+	Thinking               string
+	ModelOverridden        bool
+	RoleOverridden         bool
+	ThinkingOverridden     bool
+	Prompt                 string
+	ResumeTarget           string
+	ContinueSession        bool
+	ForceResume            bool
+	ForceCompact           bool
+	OutputHandler          core.SessionThreadOutput
 }
 
 // StartRunSessionResult contains initialized run runtime components.
@@ -110,7 +110,7 @@ func (s *SweSystem) StartRunSession(params StartRunSessionParams) (StartRunSessi
 		session.SetWorkDir(s.WorkDir)
 	}
 
-	session.SetTaskInfo(params.TaskInfo)
+	session.SetTask(params.Task)
 
 	done := make(chan error, 1)
 	wrappedHandler := &runOutputHandler{delegate: params.OutputHandler, done: done}

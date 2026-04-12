@@ -43,8 +43,8 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 	captured := ""
 	runFunc = func(params *RunParams) error {
 		taskDir := ""
-		if params.TaskInfo != nil {
-			taskDir = params.TaskInfo.TaskDir
+		if params.Task != nil {
+			taskDir = params.Task.TaskDir
 		}
 		vfsAllowJoined := ""
 		if len(params.VFSAllow) > 0 {
@@ -128,8 +128,8 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	captured := ""
 	runFunc = func(params *RunParams) error {
 		taskDir := ""
-		if params.TaskInfo != nil {
-			taskDir = params.TaskInfo.TaskDir
+		if params.Task != nil {
+			taskDir = params.Task.TaskDir
 		}
 		vfsAllowJoined := ""
 		if len(params.VFSAllow) > 0 {

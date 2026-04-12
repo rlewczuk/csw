@@ -369,6 +369,7 @@ func TestTaskManagerRunTaskSuccessWritesSummaryAndOutput(t *testing.T) {
 	require.NotNil(t, runner.lastRequest.Task)
 	assert.Equal(t, created.UUID, runner.lastRequest.Task.UUID)
 	assert.Equal(t, created.Name, runner.lastRequest.Task.Name)
+	assert.Equal(t, filepath.Join(baseDir, ".cswdata", "tasks", created.UUID), runner.lastRequest.Task.TaskDir)
 	assert.Equal(t, filepath.Join(baseDir, ".cswdata", "tasks", created.UUID), runner.lastRequest.TaskDir)
 	assert.Equal(t, TaskStateCompleted, outcome.Task.State)
 	assert.Equal(t, TaskStatusOpen, outcome.Task.Status)
@@ -394,6 +395,26 @@ func TestTaskManagerRunTaskSuccessWritesSummaryAndOutput(t *testing.T) {
 	require.NoError(t, readOutputErr)
 	assert.Contains(t, string(outputBytes), "task_id: "+created.UUID)
 	assert.Contains(t, string(outputBytes), "Task completed")
+}
+
+func TestTaskManagerResolveTaskSetsTaskDirFromFilesystemPath(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})
+	require.NoError(t, err)
+
+	created, err := manager.CreateTask(TaskCreateParams{Name: "task-with-dir", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	taskDir, resolved, err := manager.ResolveTask(TaskLookup{Identifier: created.UUID})
+	require.NoError(t, err)
+	require.NotNil(t, resolved)
+	assert.Equal(t, taskDir, resolved.TaskDir)
+	assert.Equal(t, filepath.Join(baseDir, ".cswdata", "tasks", created.UUID), resolved.TaskDir)
+
+	taskFilePath := filepath.Join(taskDir, "task.yml")
+	taskFileBytes, readErr := os.ReadFile(taskFilePath)
+	require.NoError(t, readErr)
+	assert.NotContains(t, string(taskFileBytes), "task_dir")
 }
 
 func TestTaskManagerRunTaskFailurePersistsFailedSummary(t *testing.T) {
@@ -617,7 +638,7 @@ func TestCLITaskSessionRunnerIncludesTaskFlags(t *testing.T) {
 		TaskBranch: "feature/task",
 		Role:       "developer",
 		Prompt:     "do work",
-		Task:       &Task{UUID: "task-uuid", Name: "task-name"},
+		Task:       &Task{UUID: "task-uuid", Name: "task-name", TaskDir: ".cswdata/tasks/task-uuid"},
 		TaskDir:    ".cswdata/tasks/task-uuid",
 		RunOptions: TaskSessionRunOptions{
 			OutputFormat: "full",

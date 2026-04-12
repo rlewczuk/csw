@@ -31,7 +31,7 @@ type RunParams struct {
 	ContextData           map[string]string
 	ModelName             string
 	RoleName              string
-	TaskInfo              *core.TaskInfo
+	Task                  *core.Task
 	WorkDir               string
 	ShadowDir             string
 	WorktreeBranch        string
@@ -217,13 +217,14 @@ func RunCommand() *cobra.Command {
 				return err
 			}
 
-			var taskInfo *core.TaskInfo
+			var taskData *core.Task
 			if strings.TrimSpace(cliTaskJSON) != "" {
 				var task core.Task
 				if unmarshalErr := json.Unmarshal([]byte(cliTaskJSON), &task); unmarshalErr != nil {
 					return fmt.Errorf("RunCommand.RunE() [run.go]: failed to parse --task-json: %w", unmarshalErr)
 				}
-				taskInfo = &core.TaskInfo{Task: &task, TaskDir: strings.TrimSpace(cliTaskDir)}
+				task.TaskDir = strings.TrimSpace(cliTaskDir)
+				taskData = &task
 			}
 
 			if resumeTarget == "" {
@@ -293,7 +294,7 @@ func RunCommand() *cobra.Command {
 				ContextData:           contextData,
 				ModelName:             cliModel,
 				RoleName:              cliRole,
-				TaskInfo:              taskInfo,
+				Task:                  taskData,
 				WorkDir:               cliWorkDir,
 				ShadowDir:             cliShadowDir,
 				WorktreeBranch:        firstNonEmpty(continueWorktreeBranch, cliWorktree),
@@ -555,7 +556,7 @@ func runCommand(params *RunParams) error {
 	runtimeResult, err := sweSystem.StartRunSession(system.StartRunSessionParams{
 		ModelName:              params.ModelName,
 		RoleName:               params.RoleName,
-		TaskInfo:               params.TaskInfo,
+		Task:                   params.Task,
 		AutoPermissionResponse: autoPermissionResponse,
 		Thinking:               params.Thinking,
 		ModelOverridden:        params.ModelOverridden,

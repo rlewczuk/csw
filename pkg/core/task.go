@@ -49,6 +49,7 @@ type Task struct {
 	UUID          string   `json:"uuid" yaml:"uuid"`
 	Name          string   `json:"name,omitempty" yaml:"name,omitempty"`
 	Description   string   `json:"description,omitempty" yaml:"description,omitempty"`
+	TaskDir       string   `json:"-" yaml:"-"`
 	Status        string   `json:"status" yaml:"status"`
 	FeatureBranch string   `json:"feature_branch" yaml:"feature_branch"`
 	ParentBranch  string   `json:"parent_branch" yaml:"parent_branch"`
@@ -682,11 +683,21 @@ func (m *TaskManager) CreateTask(params TaskCreateParams) (*Task, error) {
 	if parentBranch == "" {
 		parentBranch = "main"
 	}
+	taskDir := filepath.Join(m.TasksRoot(), taskID)
+ 	parentTaskID := strings.TrimSpace(params.ParentTaskID)
+ 	if parentTaskID != "" {
+		parentDir, _, err := m.findTaskByUUID(parentTaskID)
+		if err != nil {
+			return nil, fmt.Errorf("TaskManager.CreateTask() [task.go]: failed to resolve parent task: %w", err)
+		}
+		taskDir = filepath.Join(parentDir, taskID)
+	}
 
 	task := &Task{
 		UUID:          taskID,
 		Name:          name,
 		Description:   strings.TrimSpace(params.Description),
+		TaskDir:       taskDir,
 		Status:        TaskStatusCreated,
 		FeatureBranch: featureBranch,
 		ParentBranch:  parentBranch,
@@ -695,18 +706,9 @@ func (m *TaskManager) CreateTask(params TaskCreateParams) (*Task, error) {
 		Deps:          normalizeTaskDeps(params.Deps),
 		SessionIDs:    []string{},
 		SubtaskIDs:    []string{},
-		ParentTaskID:  strings.TrimSpace(params.ParentTaskID),
+		ParentTaskID:  parentTaskID,
 		CreatedAt:     now,
 		UpdatedAt:     now,
-	}
-
-	taskDir := filepath.Join(m.TasksRoot(), task.UUID)
-	if strings.TrimSpace(task.ParentTaskID) != "" {
-		parentDir, _, err := m.findTaskByUUID(task.ParentTaskID)
-		if err != nil {
-			return nil, fmt.Errorf("TaskManager.CreateTask() [task.go]: failed to resolve parent task: %w", err)
-		}
-		taskDir = filepath.Join(parentDir, task.UUID)
 	}
 
 	if err := os.MkdirAll(taskDir, 0755); err != nil {
@@ -1422,6 +1424,7 @@ func readTaskFile(path string) (*Task, error) {
 	if err := yaml.Unmarshal(data, &task); err != nil {
 		return nil, fmt.Errorf("readTaskFile() [task.go]: failed to unmarshal task metadata: %w", err)
 	}
+	task.TaskDir = filepath.Dir(path)
 	return &task, nil
 }
 

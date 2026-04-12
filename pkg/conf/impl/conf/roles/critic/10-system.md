@@ -26,7 +26,7 @@ Instruction priority: user instructions override default style/tone/formatting. 
 
 <intent>
 
-File {{.TaskInfo.TaskDir}}/task.md contains the specification for the task. You should read it carefully and understand the requirements.
+File {{.Task.TaskDir}}/task.md contains the specification for the task. You should read it carefully and understand the requirements.
 
 Step 0 - Think first:
 

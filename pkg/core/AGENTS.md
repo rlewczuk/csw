@@ -32,7 +32,6 @@ Package `pkg/core` provides runtime orchestration for agent sessions and tasks. 
 * `AgentRoleRegistry` - Cached role lookup service
 * `AgentState` - Runtime prompt template state
 * `AgentStateCommonInfo` - Shared runtime metadata fields
-* `TaskInfo` - Task metadata attached to sessions
 * `HookEngine` - Executes configured lifecycle hooks
 * `HookOutputView` - Hook output sink interface
 * `HookContext` - Hook context key-value map

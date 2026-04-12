@@ -43,7 +43,7 @@ type SweSession struct {
 	id            string
 	parentID      string
 	taskID        string
-	taskInfo      *TaskInfo
+	task          *Task
 	slug          string
 	provider      models.ModelProvider
 	providerName  string
@@ -100,7 +100,7 @@ type SweSessionParams struct {
 	ID           string
 	ParentID     string
 	TaskID       string
-	TaskInfo     *TaskInfo
+	Task         *Task
 	Slug         string
 	Provider     models.ModelProvider
 	ProviderName string
@@ -158,7 +158,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		id:              params.ID,
 		parentID:        strings.TrimSpace(params.ParentID),
 		taskID:          strings.TrimSpace(params.TaskID),
-		taskInfo:        cloneTaskInfo(params.TaskInfo),
+		task:            cloneTask(params.Task),
 		slug:            strings.TrimSpace(params.Slug),
 		provider:        params.Provider,
 		providerName:    params.ProviderName,
@@ -778,13 +778,13 @@ func (s *SweSession) SetTaskID(taskID string) {
 	s.persistSessionState()
 }
 
-// SetTaskInfo sets task context associated with this session.
-func (s *SweSession) SetTaskInfo(taskInfo *TaskInfo) {
+// SetTask sets task context associated with this session.
+func (s *SweSession) SetTask(task *Task) {
 	if s == nil {
 		return
 	}
 
-	s.taskInfo = cloneTaskInfo(taskInfo)
+	s.task = cloneTask(task)
 	s.persistSessionState()
 }
 
@@ -944,19 +944,8 @@ func (s *SweSession) GetState() AgentState {
 			TokenUsage:          s.tokenUsage,
 			ContextLengthTokens: s.contextLength,
 		},
-		Role:     s.role.Clone(),
-		TaskInfo: cloneTaskInfo(s.taskInfo),
-	}
-}
-
-func cloneTaskInfo(info *TaskInfo) *TaskInfo {
-	if info == nil {
-		return nil
-	}
-
-	return &TaskInfo{
-		Task:    cloneTask(info.Task),
-		TaskDir: strings.TrimSpace(info.TaskDir),
+		Role: s.role.Clone(),
+		Task: cloneTask(s.task),
 	}
 }
 

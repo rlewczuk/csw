@@ -257,6 +257,7 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 			ID:       state.SessionID,
 			ParentID: state.ParentSessionID,
 			TaskID:   state.TaskID,
+			Task:     nil,
 			Slug:     state.Slug,
 			ModelSpec: func() string {
 				if strings.TrimSpace(state.ModelSpec) != "" {
