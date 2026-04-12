@@ -36,6 +36,7 @@ func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranc
 	}
 
 	baseBranch := vcs.DetectMergeBaseBranch(repoDir)
+	stashedLocalChanges := false
 	commitMessage := ""
 	commitHandledByHook := false
 
@@ -73,6 +74,25 @@ func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranc
 	}
 
 	if merge {
+		shouldHandleLocalStash := strings.TrimSpace(repoDir) != ""
+
+		var stashErr error
+		if shouldHandleLocalStash {
+			stashedLocalChanges, stashErr = stashLocalChangesBeforeMerge(repoDir)
+			if stashErr != nil {
+				_, _ = fmt.Fprintf(stderr, "automatic merge failed: %v\n", stashErr)
+				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
+				return result, nil
+			}
+
+			defer func() {
+				restoreErr := restoreStashedLocalChangesAfterMerge(repoDir, stashedLocalChanges, stderr)
+				if restoreErr != nil {
+					_, _ = fmt.Fprintf(stderr, "failed to restore stashed local changes after merge: %v\n", restoreErr)
+				}
+			}()
+		}
+
 		mergeHookExecuted := false
 		if hookEngine != nil {
 			hookEngine.MergeContext(map[string]string{
@@ -131,6 +151,76 @@ func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranc
 	}
 
 	return result, nil
+}
+
+// stashLocalChangesBeforeMerge stashes local repository changes before automatic merge.
+func stashLocalChangesBeforeMerge(repoDir string) (bool, error) {
+	trimmedRepoDir := strings.TrimSpace(repoDir)
+	if trimmedRepoDir == "" {
+		return false, nil
+	}
+
+	repoInfo, statErr := os.Stat(trimmedRepoDir)
+	if statErr != nil {
+		if os.IsNotExist(statErr) {
+			return false, nil
+		}
+		return false, fmt.Errorf("stashLocalChangesBeforeMerge() [cli.go]: failed to stat repository directory: %w", statErr)
+	}
+	if !repoInfo.IsDir() {
+		return false, nil
+	}
+
+	statusOutput, err := vcs.RunGitCommand(trimmedRepoDir, "status", "--porcelain")
+	if err != nil {
+		return false, fmt.Errorf("stashLocalChangesBeforeMerge() [cli.go]: failed to read repository status: %w", err)
+	}
+
+	if strings.TrimSpace(statusOutput) == "" {
+		return false, nil
+	}
+
+	if _, err := vcs.RunGitCommand(trimmedRepoDir, "stash", "push", "--include-untracked", "-m", "csw: automatic stash before merge"); err != nil {
+		return false, fmt.Errorf("stashLocalChangesBeforeMerge() [cli.go]: failed to stash local changes: %w", err)
+	}
+
+	return true, nil
+}
+
+// restoreStashedLocalChangesAfterMerge restores stashed local changes after automatic merge.
+func restoreStashedLocalChangesAfterMerge(repoDir string, stashed bool, stderr io.Writer) error {
+	if !stashed {
+		return nil
+	}
+
+	trimmedRepoDir := strings.TrimSpace(repoDir)
+	if trimmedRepoDir == "" {
+		return nil
+	}
+
+	if _, err := vcs.RunGitCommand(trimmedRepoDir, "stash", "apply", "--index", "stash@{0}"); err != nil {
+		if vcs.IsMergeConflictError(err.Error()) {
+			if _, resetErr := vcs.RunGitCommand(trimmedRepoDir, "reset", "--hard", "HEAD"); resetErr != nil {
+				return fmt.Errorf("restoreStashedLocalChangesAfterMerge() [cli.go]: failed to reset repository after unstash conflict: %w", resetErr)
+			}
+
+			if _, cleanErr := vcs.RunGitCommand(trimmedRepoDir, "clean", "-fd"); cleanErr != nil {
+				return fmt.Errorf("restoreStashedLocalChangesAfterMerge() [cli.go]: failed to clean repository after unstash conflict: %w", cleanErr)
+			}
+
+			_, _ = fmt.Fprintln(stderr, "automatic unstash failed due to conflicts; local changes remain stashed and repository was restored to a clean state.")
+			_, _ = fmt.Fprintln(stderr, "please unstash manually when ready (for example: git stash pop stash@{0}).")
+			return nil
+		}
+
+		return fmt.Errorf("restoreStashedLocalChangesAfterMerge() [cli.go]: failed to apply stashed local changes: %w", err)
+	}
+
+	if _, err := vcs.RunGitCommand(trimmedRepoDir, "stash", "drop", "stash@{0}"); err != nil {
+		return fmt.Errorf("restoreStashedLocalChangesAfterMerge() [cli.go]: failed to drop temporary stash: %w", err)
+	}
+
+	return nil
 }
 
 func mergeWorktreeWithConflictResolution(ctx context.Context, repoDir string, worktreeDir string, worktreeBranch string, baseBranch string, originalPrompt string, sweSystem *SweSystem, session *core.SweSession, stderr io.Writer) (string, error) {

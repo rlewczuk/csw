@@ -230,6 +230,94 @@ func TestFinalizeWorktreeSessionUsesDetectedBaseBranch(t *testing.T) {
 	assert.Equal(t, "feature/detect-base", mergeCalls[0].From)
 }
 
+func TestFinalizeWorktreeSessionMergeStashesAndRestoresLocalChanges(t *testing.T) {
+	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge with local changes", true)
+	repoDir := t.TempDir()
+
+	originalRunGit := vcs.RunGitCommand
+	defer func() {
+		vcs.RunGitCommand = originalRunGit
+	}()
+
+	commands := make([]string, 0)
+	vcs.RunGitCommand = func(workDir string, args ...string) (string, error) {
+		command := strings.Join(args, " ")
+		commands = append(commands, fmt.Sprintf("%s::%s", workDir, command))
+		switch command {
+		case "rev-parse --abbrev-ref HEAD":
+			return "main", nil
+		case "status --porcelain":
+			return " M README.md", nil
+		case "stash push --include-untracked -m csw: automatic stash before merge":
+			return "Saved working directory and index state", nil
+		case "stash apply --index stash@{0}":
+			return "", nil
+		case "stash drop stash@{0}":
+			return "Dropped stash@{0}", nil
+		default:
+			return "", nil
+		}
+	}
+
+	var stderr bytes.Buffer
+	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/stash-ok", true, "", sweSystem, session, &stderr, repoDir, "", "", nil, nil)
+	require.NoError(t, err)
+
+	assert.Contains(t, commands, fmt.Sprintf("%s::status --porcelain", repoDir))
+	assert.Contains(t, commands, fmt.Sprintf("%s::stash push --include-untracked -m csw: automatic stash before merge", repoDir))
+	assert.Contains(t, commands, fmt.Sprintf("%s::stash apply --index stash@{0}", repoDir))
+	assert.Contains(t, commands, fmt.Sprintf("%s::stash drop stash@{0}", repoDir))
+	assert.NotContains(t, stderr.String(), "failed to restore stashed local changes")
+}
+
+func TestFinalizeWorktreeSessionMergeUnstashConflictRestoresCleanStateAndKeepsStash(t *testing.T) {
+	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge with local changes", true)
+	repoDir := t.TempDir()
+
+	originalRunGit := vcs.RunGitCommand
+	defer func() {
+		vcs.RunGitCommand = originalRunGit
+	}()
+
+	commands := make([]string, 0)
+	vcs.RunGitCommand = func(workDir string, args ...string) (string, error) {
+		command := strings.Join(args, " ")
+		commands = append(commands, fmt.Sprintf("%s::%s", workDir, command))
+		switch command {
+		case "rev-parse --abbrev-ref HEAD":
+			return "main", nil
+		case "status --porcelain":
+			return " M README.md", nil
+		case "stash push --include-untracked -m csw: automatic stash before merge":
+			return "Saved working directory and index state", nil
+		case "stash apply --index stash@{0}":
+			return "", fmt.Errorf("runGitCommand() [cli.go]: git stash apply --index stash@{0} failed: CONFLICT (content): Merge conflict in README.md")
+		case "reset --hard HEAD":
+			return "HEAD is now at abc123", nil
+		case "clean -fd":
+			return "", nil
+		case "stash drop stash@{0}":
+			return "Dropped stash@{0}", nil
+		default:
+			return "", nil
+		}
+	}
+
+	var stderr bytes.Buffer
+	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/stash-conflict", true, "", sweSystem, session, &stderr, repoDir, "", "", nil, nil)
+	require.NoError(t, err)
+
+	assert.Contains(t, commands, fmt.Sprintf("%s::status --porcelain", repoDir))
+	assert.Contains(t, commands, fmt.Sprintf("%s::stash push --include-untracked -m csw: automatic stash before merge", repoDir))
+	assert.Contains(t, commands, fmt.Sprintf("%s::stash apply --index stash@{0}", repoDir))
+	assert.Contains(t, commands, fmt.Sprintf("%s::reset --hard HEAD", repoDir))
+	assert.Contains(t, commands, fmt.Sprintf("%s::clean -fd", repoDir))
+	assert.NotContains(t, commands, fmt.Sprintf("%s::stash drop stash@{0}", repoDir))
+	assert.Contains(t, stderr.String(), "automatic unstash failed due to conflicts")
+	assert.Contains(t, stderr.String(), "local changes remain stashed")
+	assert.Contains(t, stderr.String(), "please unstash manually when ready")
+}
+
 func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
 	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge via hook", true)
 	configStore, ok := sweSystem.ConfigStore.(*confimpl.MockConfigStore)
