@@ -159,6 +159,7 @@ func taskEditCommand() *cobra.Command {
 func taskUpdateCommandWithDefaults(use string, short string, defaultEdit bool) *cobra.Command {
 	var name string
 	var description string
+	var status string
 	var branch string
 	var parentBranch string
 	var role string
@@ -226,6 +227,10 @@ func taskUpdateCommandWithDefaults(use string, short string, defaultEdit bool) *
 			if cmd.Flags().Changed("description") {
 				value := strings.TrimSpace(description)
 				params.Description = &value
+			}
+			if cmd.Flags().Changed("status") {
+				value := strings.TrimSpace(status)
+				params.Status = &value
 			}
 			if cmd.Flags().Changed("branch") {
 				value := strings.TrimSpace(branch)
@@ -322,6 +327,7 @@ func taskUpdateCommandWithDefaults(use string, short string, defaultEdit bool) *
 
 	command.Flags().StringVarP(&name, "name", "n", "", "Task name/slug")
 	command.Flags().StringVarP(&description, "description", "d", "", "Task description")
+	command.Flags().StringVar(&status, "status", "", "Task status (draft, created, open, running, merged)")
 	command.Flags().StringVarP(&branch, "branch", "b", "", "Feature branch name")
 	command.Flags().StringVarP(&parentBranch, "parent-branch", "B", "", "Parent branch name")
 	command.Flags().StringVarP(&role, "role", "r", "", "Task role")
@@ -770,7 +776,7 @@ func isUnfinishedTaskForRun(taskData *core.Task) bool {
 
 	status := strings.TrimSpace(taskData.Status)
 	state := strings.TrimSpace(taskData.State)
-	if status == core.TaskStatusMerged || status == core.TaskStatusRunning {
+	if status == core.TaskStatusMerged || status == core.TaskStatusRunning || status == core.TaskStatusDraft {
 		return false
 	}
 	if state == core.TaskStateCompleted || state == core.TaskStateRunning {
@@ -841,7 +847,7 @@ func runTaskList(manager *core.TaskManager, args []string, recursive bool, inclu
 		for key, value := range currentTimes {
 			modTimes[key] = value
 		}
-}
+	}
 
 	if includeArchived {
 		archivedManager, createErr := core.NewTaskManagerWithTasksDir(manager.TasksRoot(), manager.ArchivedTasksRoot(), nil, nil)

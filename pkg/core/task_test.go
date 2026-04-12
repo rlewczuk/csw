@@ -215,6 +215,7 @@ func TestTaskManagerUpdateTaskUpdatesFieldsAndPrompt(t *testing.T) {
 
 	name := "new-name"
 	description := "new description"
+	status := TaskStatusDraft
 	feature := "feature/new"
 	parentBranch := "develop"
 	role := "reviewer"
@@ -225,6 +226,7 @@ func TestTaskManagerUpdateTaskUpdatesFieldsAndPrompt(t *testing.T) {
 		Identifier:    created.UUID,
 		Name:          &name,
 		Description:   &description,
+		Status:        &status,
 		FeatureBranch: &feature,
 		ParentBranch:  &parentBranch,
 		Role:          &role,
@@ -235,6 +237,7 @@ func TestTaskManagerUpdateTaskUpdatesFieldsAndPrompt(t *testing.T) {
 
 	assert.Equal(t, "new-name", updated.Name)
 	assert.Equal(t, "new description", updated.Description)
+	assert.Equal(t, TaskStatusDraft, updated.Status)
 	assert.Equal(t, "feature/new", updated.FeatureBranch)
 	assert.Equal(t, "develop", updated.ParentBranch)
 	assert.Equal(t, "reviewer", updated.Role)
@@ -259,6 +262,36 @@ func TestTaskManagerUpdateTaskRejectsEmptyPrompt(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, updated)
 	assert.Contains(t, err.Error(), "prompt cannot be empty")
+}
+
+func TestTaskManagerUpdateTaskRejectsEmptyStatus(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})
+	require.NoError(t, err)
+
+	created, err := manager.CreateTask(TaskCreateParams{Name: "task", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	empty := "  "
+	updated, err := manager.UpdateTask(TaskUpdateParams{Identifier: created.UUID, Status: &empty})
+	require.Error(t, err)
+	assert.Nil(t, updated)
+	assert.Contains(t, err.Error(), "status cannot be empty")
+}
+
+func TestTaskManagerUpdateTaskRejectsUnsupportedStatus(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})
+	require.NoError(t, err)
+
+	created, err := manager.CreateTask(TaskCreateParams{Name: "task", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	unsupported := "archived"
+	updated, err := manager.UpdateTask(TaskUpdateParams{Identifier: created.UUID, Status: &unsupported})
+	require.Error(t, err)
+	assert.Nil(t, updated)
+	assert.Contains(t, err.Error(), "unsupported task status")
 }
 
 func TestTaskManagerUpdateTaskKeepsUpdatedAtWhenNothingChanges(t *testing.T) {

@@ -26,6 +26,8 @@ import (
 )
 
 const (
+	// TaskStatusDraft indicates task is prepared but not selectable for execution.
+	TaskStatusDraft = "draft"
 	// TaskStatusCreated indicates task is created and not yet started.
 	TaskStatusCreated = "created"
 	// TaskStatusOpen indicates task can be worked on.
@@ -100,6 +102,7 @@ type TaskUpdateParams struct {
 	Identifier    string
 	Name          *string
 	Description   *string
+	Status        *string
 	FeatureBranch *string
 	ParentBranch  *string
 	Role          *string
@@ -498,6 +501,10 @@ func (a *TaskBackendAdapter) UpdateTask(ctx context.Context, identifier string, 
 		value := strings.TrimSpace(params.Description)
 		update.Description = &value
 	}
+	if params.Status != "" {
+		value := strings.TrimSpace(params.Status)
+		update.Status = &value
+	}
 	if strings.TrimSpace(params.FeatureBranch) != "" {
 		value := strings.TrimSpace(params.FeatureBranch)
 		update.FeatureBranch = &value
@@ -687,8 +694,8 @@ func (m *TaskManager) CreateTask(params TaskCreateParams) (*Task, error) {
 		parentBranch = "main"
 	}
 	taskDir := filepath.Join(m.TasksRoot(), taskID)
- 	parentTaskID := strings.TrimSpace(params.ParentTaskID)
- 	if parentTaskID != "" {
+	parentTaskID := strings.TrimSpace(params.ParentTaskID)
+	if parentTaskID != "" {
 		parentDir, _, err := m.findTaskByUUID(parentTaskID)
 		if err != nil {
 			return nil, fmt.Errorf("TaskManager.CreateTask() [task.go]: failed to resolve parent task: %w", err)
@@ -759,6 +766,19 @@ func (m *TaskManager) UpdateTask(params TaskUpdateParams) (*Task, error) {
 		trimmed := strings.TrimSpace(*params.Description)
 		if trimmed != strings.TrimSpace(task.Description) {
 			task.Description = trimmed
+			taskChanged = true
+		}
+	}
+	if params.Status != nil {
+		trimmed := strings.TrimSpace(*params.Status)
+		if trimmed == "" {
+			return nil, fmt.Errorf("TaskManager.UpdateTask() [task.go]: status cannot be empty")
+		}
+		if !isTaskStatusSupported(trimmed) {
+			return nil, fmt.Errorf("TaskManager.UpdateTask() [task.go]: unsupported task status %q", trimmed)
+		}
+		if trimmed != strings.TrimSpace(task.Status) {
+			task.Status = trimmed
 			taskChanged = true
 		}
 	}
@@ -1194,6 +1214,16 @@ func ensureBranchFrom(vcsRepo apis.VCS, branch string, from string) error {
 		return fmt.Errorf("ensureBranchFrom() [task.go]: failed to create branch %q from %q: %w", branch, from, err)
 	}
 	return nil
+}
+
+func isTaskStatusSupported(status string) bool {
+	trimmed := strings.TrimSpace(status)
+	switch trimmed {
+	case TaskStatusDraft, TaskStatusCreated, TaskStatusOpen, TaskStatusRunning, TaskStatusMerged:
+		return true
+	default:
+		return false
+	}
 }
 
 func (m *TaskManager) appendSubtask(parentTaskID string, subtaskID string) error {

@@ -238,13 +238,13 @@ func TestTaskCommandContainsExpectedSubcommands(t *testing.T) {
 }
 
 func TestTaskCommandArgValidators(t *testing.T) {
-		tests := []struct {
-			name        string
-			command     *cobra.Command
-			args        []string
-			expectError bool
-			prepare     func(t *testing.T, command *cobra.Command)
-		}{
+	tests := []struct {
+		name        string
+		command     *cobra.Command
+		args        []string
+		expectError bool
+		prepare     func(t *testing.T, command *cobra.Command)
+	}{
 		{name: "update requires one argument", command: taskUpdateCommand(), args: []string{}, expectError: true},
 		{name: "update accepts one argument", command: taskUpdateCommand(), args: []string{"task-1"}, expectError: false},
 		{name: "edit requires one argument", command: taskEditCommand(), args: []string{}, expectError: true},
@@ -288,6 +288,7 @@ func TestTaskUpdateCommandIncludesExpectedFlags(t *testing.T) {
 	command := taskUpdateCommand()
 	assert.NotNil(t, command.Flags().Lookup("last"))
 	assert.NotNil(t, command.Flags().Lookup("next"))
+	assert.NotNil(t, command.Flags().Lookup("status"))
 	assert.NotNil(t, command.Flags().Lookup("edit"))
 	assert.NotNil(t, command.Flags().Lookup("editor"))
 	assert.NotNil(t, command.Flags().Lookup("regen"))
@@ -523,20 +524,26 @@ func TestRunTaskArchiveDefaultStatusMerged(t *testing.T) {
 	require.NoError(t, err)
 	openTask, err := manager.CreateTask(core.TaskCreateParams{Name: "open", Prompt: "prompt"})
 	require.NoError(t, err)
+	draftTask, err := manager.CreateTask(core.TaskCreateParams{Name: "draft", Prompt: "prompt"})
+	require.NoError(t, err)
 
 	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", mergedTask.UUID, "task.yml"), core.TaskStatusMerged, core.TaskStateCompleted)
 	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", openTask.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCreated)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", draftTask.UUID, "task.yml"), core.TaskStatusDraft, core.TaskStateCreated)
 
 	buffer := &bytes.Buffer{}
 	err = runTaskArchive(manager, nil, "", buffer)
 	require.NoError(t, err)
 	assert.Contains(t, buffer.String(), mergedTask.UUID)
 	assert.NotContains(t, buffer.String(), openTask.UUID)
+	assert.NotContains(t, buffer.String(), draftTask.UUID)
 
 	_, mergedErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks", "archive", mergedTask.UUID, "task.yml"))
 	require.NoError(t, mergedErr)
 	_, openErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks", openTask.UUID, "task.yml"))
 	require.NoError(t, openErr)
+	_, draftErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks", draftTask.UUID, "task.yml"))
+	require.NoError(t, draftErr)
 }
 
 func TestRunTaskArchiveByStatusFailed(t *testing.T) {
@@ -669,18 +676,22 @@ func TestResolveTaskRunIdentifierResolvesLastUnfinishedTaskByMostRecentModTime(t
 	require.NoError(t, err)
 	runnableNewest, err := manager.CreateTask(core.TaskCreateParams{Name: "runnable-newest", Prompt: "prompt"})
 	require.NoError(t, err)
+	draftNewest, err := manager.CreateTask(core.TaskCreateParams{Name: "draft-newest", Prompt: "prompt"})
+	require.NoError(t, err)
 	runningTask, err := manager.CreateTask(core.TaskCreateParams{Name: "running", Prompt: "prompt"})
 	require.NoError(t, err)
 
 	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", oldCompleted.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCompleted)
 	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableOlder.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCreated)
 	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), core.TaskStatusCreated, core.TaskStateFailed)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", draftNewest.UUID, "task.yml"), core.TaskStatusDraft, core.TaskStateCreated)
 	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), core.TaskStatusRunning, core.TaskStateRunning)
 
 	baseTime := time.Date(2026, time.February, 1, 10, 0, 0, 0, time.UTC)
 	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", oldCompleted.UUID, "task.yml"), baseTime.Add(1*time.Minute))
 	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableOlder.UUID, "task.yml"), baseTime.Add(2*time.Minute))
 	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), baseTime.Add(3*time.Minute))
+	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", draftNewest.UUID, "task.yml"), baseTime.Add(5*time.Minute))
 	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), baseTime.Add(4*time.Minute))
 
 	resolved, err := resolveTaskRunIdentifier(manager, "", true, false)
@@ -697,16 +708,20 @@ func TestResolveTaskRunIdentifierResolvesNextUnfinishedTaskByOldestModTime(t *te
 	require.NoError(t, err)
 	runnableOldest, err := manager.CreateTask(core.TaskCreateParams{Name: "runnable-oldest", Prompt: "prompt"})
 	require.NoError(t, err)
+	draftOldest, err := manager.CreateTask(core.TaskCreateParams{Name: "draft-oldest", Prompt: "prompt"})
+	require.NoError(t, err)
 	runningTask, err := manager.CreateTask(core.TaskCreateParams{Name: "running", Prompt: "prompt"})
 	require.NoError(t, err)
 
 	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCreated)
 	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableOldest.UUID, "task.yml"), core.TaskStatusCreated, core.TaskStateFailed)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", draftOldest.UUID, "task.yml"), core.TaskStatusDraft, core.TaskStateCreated)
 	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), core.TaskStatusRunning, core.TaskStateRunning)
 
 	baseTime := time.Date(2026, time.February, 1, 10, 0, 0, 0, time.UTC)
 	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), baseTime.Add(3*time.Minute))
 	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableOldest.UUID, "task.yml"), baseTime.Add(1*time.Minute))
+	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", draftOldest.UUID, "task.yml"), baseTime.Add(0*time.Minute))
 	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), baseTime.Add(4*time.Minute))
 
 	resolved, err := resolveTaskRunIdentifier(manager, "", false, true)

@@ -11,14 +11,18 @@
       "type": "string",
       "description": "Task name/slug. Used as identifier when uuid is omitted, or new name when uuid is provided."
     },
-    "description": {
-      "type": "string",
-      "description": "Updated task description."
-    },
-    "branch": {
-      "type": "string",
-      "description": "Updated task feature branch name."
-    },
+      "description": {
+        "type": "string",
+        "description": "Updated task description."
+      },
+      "status": {
+        "type": "string",
+        "description": "Updated task status. Supported values: draft, created, open, running, merged."
+      },
+      "branch": {
+        "type": "string",
+        "description": "Updated task feature branch name."
+      },
     "parent-branch": {
       "type": "string",
       "description": "Updated parent branch name."

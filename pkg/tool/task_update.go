@@ -45,6 +45,7 @@ func (t *TaskUpdateTool) Execute(args *ToolCall) *ToolResponse {
 	updated, err := t.backend.UpdateTask(context.Background(), firstNonEmptyTool(identifier, fallback), TaskRecord{
 		Name:          strings.TrimSpace(args.Arguments.String("name")),
 		Description:   strings.TrimSpace(args.Arguments.String("description")),
+		Status:        strings.TrimSpace(args.Arguments.String("status")),
 		FeatureBranch: strings.TrimSpace(args.Arguments.String("branch")),
 		ParentBranch:  strings.TrimSpace(args.Arguments.String("parent-branch")),
 		Role:          strings.TrimSpace(args.Arguments.String("role")),
