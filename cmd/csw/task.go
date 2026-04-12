@@ -155,6 +155,7 @@ func taskUpdateCommand() *cobra.Command {
 	var deps []string
 	var prompt string
 	var last bool
+	var next bool
 	var edit bool
 	var cliEditor string
 	var regen bool
@@ -167,11 +168,14 @@ func taskUpdateCommand() *cobra.Command {
 		Use:   "update [name|uuid]",
 		Short: "Update existing task",
 		Args: func(cmd *cobra.Command, args []string) error {
-			if !last {
+			if last && next {
+				return fmt.Errorf("taskUpdateCommand.Args() [task.go]: --last and --next cannot be used together")
+			}
+			if !last && !next {
 				return cobra.ExactArgs(1)(cmd, args)
 			}
 			if len(args) > 0 {
-				return fmt.Errorf("taskUpdateCommand.Args() [task.go]: task identifier cannot be used with --last")
+				return fmt.Errorf("taskUpdateCommand.Args() [task.go]: task identifier cannot be used with --last or --next")
 			}
 			return nil
 		},
@@ -189,7 +193,7 @@ func taskUpdateCommand() *cobra.Command {
 			if len(args) > 0 {
 				argIdentifier = strings.TrimSpace(args[0])
 			}
-			identifier, err := resolveTaskRunIdentifier(manager, argIdentifier, last)
+			identifier, err := resolveTaskRunIdentifier(manager, argIdentifier, last, next)
 			if err != nil {
 				return err
 			}
@@ -314,6 +318,7 @@ func taskUpdateCommand() *cobra.Command {
 	command.Flags().StringArrayVarP(&deps, "depends", "D", nil, "Dependency task UUID (repeatable)")
 	command.Flags().StringVarP(&prompt, "prompt", "p", "", "Task prompt")
 	command.Flags().BoolVar(&last, "last", false, "Update latest unfinished task")
+	command.Flags().BoolVar(&next, "next", false, "Update oldest unfinished task")
 	command.Flags().BoolVar(&edit, "edit", false, "Edit task prompt in editor")
 	command.Flags().StringVar(&cliEditor, "editor", "", "Editor command used for interactive prompt editing")
 	command.Flags().BoolVar(&regen, "regen", false, "Regenerate task name, branch and description")
@@ -449,6 +454,7 @@ func taskRunCommand() *cobra.Command {
 	var merge bool
 	var reset bool
 	var last bool
+	var next bool
 	var taskIdentifier string
 	var cliModel string
 	var cliRole string
@@ -490,11 +496,14 @@ func taskRunCommand() *cobra.Command {
 			if len(args) > 0 {
 				return fmt.Errorf("taskRunCommand.Args() [task.go]: positional task identifier is not supported; use --task")
 			}
-			if last && strings.TrimSpace(taskIdentifier) != "" {
-				return fmt.Errorf("taskRunCommand.Args() [task.go]: task identifier cannot be used with --last")
+			if last && next {
+				return fmt.Errorf("taskRunCommand.Args() [task.go]: --last and --next cannot be used together")
 			}
-			if !last && strings.TrimSpace(taskIdentifier) == "" {
-				return fmt.Errorf("taskRunCommand.Args() [task.go]: either --task or --last must be provided")
+			if (last || next) && strings.TrimSpace(taskIdentifier) != "" {
+				return fmt.Errorf("taskRunCommand.Args() [task.go]: task identifier cannot be used with --last or --next")
+			}
+			if !last && !next && strings.TrimSpace(taskIdentifier) == "" {
+				return fmt.Errorf("taskRunCommand.Args() [task.go]: either --task, --last or --next must be provided")
 			}
 			return nil
 		},
@@ -520,7 +529,7 @@ func taskRunCommand() *cobra.Command {
 				return err
 			}
 
-			identifier, err := resolveTaskRunIdentifier(manager, taskIdentifier, last)
+			identifier, err := resolveTaskRunIdentifier(manager, taskIdentifier, last, next)
 			if err != nil {
 				return err
 			}
@@ -571,6 +580,7 @@ func taskRunCommand() *cobra.Command {
 	command.Flags().BoolVar(&reset, "reset", false, "Reset task branch before run")
 	command.Flags().StringVar(&taskIdentifier, "task", "", "Task name or UUID")
 	command.Flags().BoolVar(&last, "last", false, "Run latest unfinished task")
+	command.Flags().BoolVar(&next, "next", false, "Run oldest unfinished task")
 	command.Flags().StringVar(&cliModel, "model", "", "Model alias or model spec in provider/model format (single or comma-separated fallback list); if not set, uses defaults")
 	command.Flags().StringVar(&cliRole, "role", "developer", "Agent role name")
 	command.Flags().StringVar(&cliWorkDir, "workdir", "", "Working directory (default: current directory)")
@@ -608,13 +618,17 @@ func taskRunCommand() *cobra.Command {
 	return command
 }
 
-func resolveTaskRunIdentifier(manager *core.TaskManager, identifier string, useLast bool) (string, error) {
-	if useLast {
+func resolveTaskRunIdentifier(manager *core.TaskManager, identifier string, useLast bool, useNext bool) (string, error) {
+	if useLast && useNext {
+		return "", fmt.Errorf("resolveTaskRunIdentifier() [task.go]: --last and --next cannot be used together")
+	}
+
+	if useLast || useNext {
 		if manager == nil {
 			return "", fmt.Errorf("resolveTaskRunIdentifier() [task.go]: manager cannot be nil")
 		}
 
-		taskData, err := findLastUnfinishedTask(manager)
+		taskData, err := findRunnableTaskByModTime(manager, useLast)
 		if err != nil {
 			return "", err
 		}
@@ -630,7 +644,7 @@ func resolveTaskRunIdentifier(manager *core.TaskManager, identifier string, useL
 	return trimmedIdentifier, nil
 }
 
-func findLastUnfinishedTask(manager *core.TaskManager) (*core.Task, error) {
+func findRunnableTaskByModTime(manager *core.TaskManager, newest bool) (*core.Task, error) {
 	tasks, err := listAllCurrentTasks(manager)
 	if err != nil {
 		return nil, err
@@ -653,14 +667,27 @@ func findLastUnfinishedTask(manager *core.TaskManager) (*core.Task, error) {
 
 		taskID := strings.TrimSpace(taskData.UUID)
 		currentModTime := modTimes[taskID]
-		if selected == nil || currentModTime > selectedModTime || (currentModTime == selectedModTime && taskID > strings.TrimSpace(selected.UUID)) {
+		if selected == nil {
+			selected = taskData
+			selectedModTime = currentModTime
+			continue
+		}
+
+		isBetter := false
+		if newest {
+			isBetter = currentModTime > selectedModTime || (currentModTime == selectedModTime && taskID > strings.TrimSpace(selected.UUID))
+		} else {
+			isBetter = currentModTime < selectedModTime || (currentModTime == selectedModTime && taskID < strings.TrimSpace(selected.UUID))
+		}
+
+		if isBetter {
 			selected = taskData
 			selectedModTime = currentModTime
 		}
 	}
 
 	if selected == nil {
-		return nil, fmt.Errorf("findLastUnfinishedTask() [task.go]: no unfinished task found")
+		return nil, fmt.Errorf("findRunnableTaskByModTime() [task.go]: no unfinished task found")
 	}
 
 	return selected, nil

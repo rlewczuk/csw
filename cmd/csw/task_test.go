@@ -283,6 +283,7 @@ func TestTaskCommandArgValidators(t *testing.T) {
 func TestTaskUpdateCommandIncludesExpectedFlags(t *testing.T) {
 	command := taskUpdateCommand()
 	assert.NotNil(t, command.Flags().Lookup("last"))
+	assert.NotNil(t, command.Flags().Lookup("next"))
 	assert.NotNil(t, command.Flags().Lookup("edit"))
 	assert.NotNil(t, command.Flags().Lookup("editor"))
 	assert.NotNil(t, command.Flags().Lookup("regen"))
@@ -301,9 +302,15 @@ func TestTaskUpdateCommandArgsValidationWithLastFlag(t *testing.T) {
 
 	assert.NoError(t, command.Args(command, []string{}))
 
+	require.NoError(t, command.Flags().Set("next", "true"))
+	lastNextConflictErr := command.Args(command, []string{})
+	require.Error(t, lastNextConflictErr)
+	assert.Contains(t, lastNextConflictErr.Error(), "--last and --next cannot be used together")
+
+	require.NoError(t, command.Flags().Set("next", "false"))
 	conflictErr := command.Args(command, []string{"task-1"})
 	require.Error(t, conflictErr)
-	assert.Contains(t, conflictErr.Error(), "cannot be used with --last")
+	assert.Contains(t, conflictErr.Error(), "cannot be used with --last or --next")
 }
 
 func TestReadTaskPromptFileReturnsEmptyWhenFileIsMissing(t *testing.T) {
@@ -600,6 +607,7 @@ func TestTaskRunCommandIncludesRunSessionFlags(t *testing.T) {
 		"lsp-server",
 		"task",
 		"last",
+		"next",
 		"max-threads",
 		"mcp-disable",
 		"mcp-enable",
@@ -627,13 +635,13 @@ func TestTaskRunCommandIncludesRunSessionFlags(t *testing.T) {
 }
 
 func TestResolveTaskRunIdentifierReturnsProvidedIdentifierWhenNotUsingLastFlag(t *testing.T) {
-	resolved, err := resolveTaskRunIdentifier(nil, " task-123 ", false)
+	resolved, err := resolveTaskRunIdentifier(nil, " task-123 ", false, false)
 	require.NoError(t, err)
 	assert.Equal(t, "task-123", resolved)
 }
 
 func TestResolveTaskRunIdentifierReturnsNameLastWhenLastFlagIsNotUsed(t *testing.T) {
-	resolved, err := resolveTaskRunIdentifier(nil, " last ", false)
+	resolved, err := resolveTaskRunIdentifier(nil, " last ", false, false)
 	require.NoError(t, err)
 	assert.Equal(t, "last", resolved)
 }
@@ -663,9 +671,41 @@ func TestResolveTaskRunIdentifierResolvesLastUnfinishedTaskByMostRecentModTime(t
 	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), baseTime.Add(3*time.Minute))
 	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), baseTime.Add(4*time.Minute))
 
-	resolved, err := resolveTaskRunIdentifier(manager, "", true)
+	resolved, err := resolveTaskRunIdentifier(manager, "", true, false)
 	require.NoError(t, err)
 	assert.Equal(t, runnableNewest.UUID, resolved)
+}
+
+func TestResolveTaskRunIdentifierResolvesNextUnfinishedTaskByOldestModTime(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	require.NoError(t, err)
+
+	runnableNewest, err := manager.CreateTask(core.TaskCreateParams{Name: "runnable-newest", Prompt: "prompt"})
+	require.NoError(t, err)
+	runnableOldest, err := manager.CreateTask(core.TaskCreateParams{Name: "runnable-oldest", Prompt: "prompt"})
+	require.NoError(t, err)
+	runningTask, err := manager.CreateTask(core.TaskCreateParams{Name: "running", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCreated)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableOldest.UUID, "task.yml"), core.TaskStatusCreated, core.TaskStateFailed)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), core.TaskStatusRunning, core.TaskStateRunning)
+
+	baseTime := time.Date(2026, time.February, 1, 10, 0, 0, 0, time.UTC)
+	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), baseTime.Add(3*time.Minute))
+	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableOldest.UUID, "task.yml"), baseTime.Add(1*time.Minute))
+	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), baseTime.Add(4*time.Minute))
+
+	resolved, err := resolveTaskRunIdentifier(manager, "", false, true)
+	require.NoError(t, err)
+	assert.Equal(t, runnableOldest.UUID, resolved)
+}
+
+func TestResolveTaskRunIdentifierReturnsErrorWhenLastAndNextAreBothUsed(t *testing.T) {
+	_, err := resolveTaskRunIdentifier(nil, "", true, true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--last and --next cannot be used together")
 }
 
 func TestResolveTaskRunIdentifierReturnsErrorWhenNoUnfinishedTaskExists(t *testing.T) {
@@ -684,7 +724,7 @@ func TestResolveTaskRunIdentifierReturnsErrorWhenNoUnfinishedTaskExists(t *testi
 	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", mergedTask.UUID, "task.yml"), core.TaskStatusMerged, core.TaskStateCompleted)
 	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), core.TaskStatusRunning, core.TaskStateRunning)
 
-	_, err = resolveTaskRunIdentifier(manager, "", true)
+	_, err = resolveTaskRunIdentifier(manager, "", true, false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no unfinished task found")
 }
@@ -699,10 +739,16 @@ func TestTaskRunCommandArgsValidationWithLastFlag(t *testing.T) {
 
 	assert.NoError(t, command.Args(command, []string{}))
 
+	require.NoError(t, command.Flags().Set("next", "true"))
+	lastNextConflictErr := command.Args(command, []string{})
+	require.Error(t, lastNextConflictErr)
+	assert.Contains(t, lastNextConflictErr.Error(), "--last and --next cannot be used together")
+
+	require.NoError(t, command.Flags().Set("next", "false"))
 	require.NoError(t, command.Flags().Set("task", "task-1"))
 	conflictErr := command.Args(command, []string{})
 	require.Error(t, conflictErr)
-	assert.Contains(t, conflictErr.Error(), "cannot be used with --last")
+	assert.Contains(t, conflictErr.Error(), "cannot be used with --last or --next")
 
 	positionalErr := command.Args(command, []string{"task-1"})
 	require.Error(t, positionalErr)
