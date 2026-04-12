@@ -449,6 +449,7 @@ func taskRunCommand() *cobra.Command {
 	var merge bool
 	var reset bool
 	var last bool
+	var taskIdentifier string
 	var cliModel string
 	var cliRole string
 	var cliWorkDir string
@@ -483,14 +484,17 @@ func taskRunCommand() *cobra.Command {
 	var cliContext []string
 
 	command := &cobra.Command{
-		Use:   "run [name|uuid]",
+		Use:   "run",
 		Short: "Run task session",
 		Args: func(cmd *cobra.Command, args []string) error {
-			if !last {
-				return cobra.ExactArgs(1)(cmd, args)
-			}
 			if len(args) > 0 {
+				return fmt.Errorf("taskRunCommand.Args() [task.go]: positional task identifier is not supported; use --task")
+			}
+			if last && strings.TrimSpace(taskIdentifier) != "" {
 				return fmt.Errorf("taskRunCommand.Args() [task.go]: task identifier cannot be used with --last")
+			}
+			if !last && strings.TrimSpace(taskIdentifier) == "" {
+				return fmt.Errorf("taskRunCommand.Args() [task.go]: either --task or --last must be provided")
 			}
 			return nil
 		},
@@ -516,12 +520,7 @@ func taskRunCommand() *cobra.Command {
 				return err
 			}
 
-			var argIdentifier string
-			if len(args) > 0 {
-				argIdentifier = strings.TrimSpace(args[0])
-			}
-
-			identifier, err := resolveTaskRunIdentifier(manager, argIdentifier, last)
+			identifier, err := resolveTaskRunIdentifier(manager, taskIdentifier, last)
 			if err != nil {
 				return err
 			}
@@ -570,6 +569,7 @@ func taskRunCommand() *cobra.Command {
 
 	command.Flags().BoolVar(&merge, "merge", false, "Merge task into parent branch after successful run")
 	command.Flags().BoolVar(&reset, "reset", false, "Reset task branch before run")
+	command.Flags().StringVar(&taskIdentifier, "task", "", "Task name or UUID")
 	command.Flags().BoolVar(&last, "last", false, "Run latest unfinished task")
 	command.Flags().StringVar(&cliModel, "model", "", "Model alias or model spec in provider/model format (single or comma-separated fallback list); if not set, uses defaults")
 	command.Flags().StringVar(&cliRole, "role", "developer", "Agent role name")

@@ -220,19 +220,22 @@ func TestTaskCommandContainsExpectedSubcommands(t *testing.T) {
 }
 
 func TestTaskCommandArgValidators(t *testing.T) {
-	tests := []struct {
-		name        string
-		command     *cobra.Command
-		args        []string
-		expectError bool
-	}{
+		tests := []struct {
+			name        string
+			command     *cobra.Command
+			args        []string
+			expectError bool
+			prepare     func(t *testing.T, command *cobra.Command)
+		}{
 		{name: "update requires one argument", command: taskUpdateCommand(), args: []string{}, expectError: true},
 		{name: "update accepts one argument", command: taskUpdateCommand(), args: []string{"task-1"}, expectError: false},
 		{name: "get requires one argument", command: taskGetCommand(), args: []string{}, expectError: true},
 		{name: "get accepts one argument", command: taskGetCommand(), args: []string{"task-1"}, expectError: false},
-		{name: "run requires one argument", command: taskRunCommand(), args: []string{}, expectError: true},
-		{name: "run accepts one argument", command: taskRunCommand(), args: []string{"task-1"}, expectError: false},
-		{name: "run rejects two arguments", command: taskRunCommand(), args: []string{"task-1", "task-2"}, expectError: true},
+		{name: "run requires task flag or last", command: taskRunCommand(), args: []string{}, expectError: true},
+		{name: "run accepts no positional argument when task flag is set", command: taskRunCommand(), args: []string{}, expectError: false, prepare: func(t *testing.T, command *cobra.Command) {
+			require.NoError(t, command.Flags().Set("task", "task-1"))
+		}},
+		{name: "run rejects positional argument", command: taskRunCommand(), args: []string{"task-1"}, expectError: true},
 		{name: "list accepts no argument", command: taskListCommand(), args: []string{}, expectError: false},
 		{name: "list accepts one argument", command: taskListCommand(), args: []string{"task-1"}, expectError: false},
 		{name: "list rejects more than one argument", command: taskListCommand(), args: []string{"task-1", "task-2"}, expectError: true},
@@ -245,6 +248,9 @@ func TestTaskCommandArgValidators(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
+			if testCase.prepare != nil {
+				testCase.prepare(t, testCase.command)
+			}
 			err := testCase.command.Args(testCase.command, testCase.args)
 			if testCase.expectError {
 				assert.Error(t, err)
@@ -574,6 +580,7 @@ func TestTaskRunCommandIncludesRunSessionFlags(t *testing.T) {
 		"log-llm-requests",
 		"log-llm-requests-raw",
 		"lsp-server",
+		"task",
 		"last",
 		"max-threads",
 		"mcp-disable",
@@ -674,9 +681,14 @@ func TestTaskRunCommandArgsValidationWithLastFlag(t *testing.T) {
 
 	assert.NoError(t, command.Args(command, []string{}))
 
-	conflictErr := command.Args(command, []string{"task-1"})
+	require.NoError(t, command.Flags().Set("task", "task-1"))
+	conflictErr := command.Args(command, []string{})
 	require.Error(t, conflictErr)
 	assert.Contains(t, conflictErr.Error(), "cannot be used with --last")
+
+	positionalErr := command.Args(command, []string{"task-1"})
+	require.Error(t, positionalErr)
+	assert.Contains(t, positionalErr.Error(), "positional task identifier is not supported")
 }
 
 func TestPrintTaskRunOutcome(t *testing.T) {
