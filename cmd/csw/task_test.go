@@ -234,6 +234,75 @@ func TestTaskCommandArgValidators(t *testing.T) {
 	}
 }
 
+func TestTaskUpdateCommandIncludesExpectedFlags(t *testing.T) {
+	command := taskUpdateCommand()
+	assert.NotNil(t, command.Flags().Lookup("last"))
+	assert.NotNil(t, command.Flags().Lookup("edit"))
+	assert.NotNil(t, command.Flags().Lookup("editor"))
+	assert.NotNil(t, command.Flags().Lookup("regen"))
+	assert.NotNil(t, command.Flags().Lookup("regen-branch"))
+	assert.NotNil(t, command.Flags().Lookup("regen-name"))
+	assert.NotNil(t, command.Flags().Lookup("regen-description"))
+}
+
+func TestTaskUpdateCommandArgsValidationWithLastFlag(t *testing.T) {
+	command := taskUpdateCommand()
+
+	argsErr := command.Args(command, []string{})
+	assert.Error(t, argsErr)
+
+	require.NoError(t, command.Flags().Set("last", "true"))
+
+	assert.NoError(t, command.Args(command, []string{}))
+
+	conflictErr := command.Args(command, []string{"task-1"})
+	require.Error(t, conflictErr)
+	assert.Contains(t, conflictErr.Error(), "cannot be used with --last")
+}
+
+func TestReadTaskPromptFileReturnsEmptyWhenFileIsMissing(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt, err := readTaskPromptFile(taskDir)
+	require.NoError(t, err)
+	assert.Equal(t, "", prompt)
+}
+
+func TestEditTaskPromptDetectsPromptChange(t *testing.T) {
+	originalEditorRunner := runTaskEditorFunc
+	t.Cleanup(func() {
+		runTaskEditorFunc = originalEditorRunner
+	})
+
+	runTaskEditorFunc = func(ctx context.Context, editorCommand string, promptFilePath string) error {
+		_ = ctx
+		_ = editorCommand
+		return os.WriteFile(promptFilePath, []byte("new prompt\n"), 0o644)
+	}
+
+	prompt, changed, err := editTaskPrompt(context.Background(), "editor", "old prompt")
+	require.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, "new prompt", prompt)
+}
+
+func TestEditTaskPromptDetectsNoPromptChange(t *testing.T) {
+	originalEditorRunner := runTaskEditorFunc
+	t.Cleanup(func() {
+		runTaskEditorFunc = originalEditorRunner
+	})
+
+	runTaskEditorFunc = func(ctx context.Context, editorCommand string, promptFilePath string) error {
+		_ = ctx
+		_ = editorCommand
+		return nil
+	}
+
+	prompt, changed, err := editTaskPrompt(context.Background(), "editor", "same prompt")
+	require.NoError(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, "same prompt", prompt)
+}
+
 func TestTaskListCommandIncludesExpectedFlags(t *testing.T) {
 	command := taskListCommand()
 	assert.NotNil(t, command.Flags().Lookup("recursive"))

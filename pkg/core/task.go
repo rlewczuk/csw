@@ -739,40 +739,76 @@ func (m *TaskManager) UpdateTask(params TaskUpdateParams) (*Task, error) {
 		return nil, err
 	}
 
+	taskChanged := false
+
 	if params.Name != nil {
 		trimmed := strings.TrimSpace(*params.Name)
-		if trimmed != "" {
+		if trimmed != "" && trimmed != strings.TrimSpace(task.Name) {
 			task.Name = trimmed
+			taskChanged = true
 		}
 	}
 	if params.Description != nil {
-		task.Description = strings.TrimSpace(*params.Description)
+		trimmed := strings.TrimSpace(*params.Description)
+		if trimmed != strings.TrimSpace(task.Description) {
+			task.Description = trimmed
+			taskChanged = true
+		}
 	}
 	if params.FeatureBranch != nil {
 		trimmed := strings.TrimSpace(*params.FeatureBranch)
-		if trimmed != "" {
+		if trimmed != "" && trimmed != strings.TrimSpace(task.FeatureBranch) {
 			task.FeatureBranch = trimmed
+			taskChanged = true
 		}
 	}
 	if params.ParentBranch != nil {
 		trimmed := strings.TrimSpace(*params.ParentBranch)
-		if trimmed != "" {
+		if trimmed != "" && trimmed != strings.TrimSpace(task.ParentBranch) {
 			task.ParentBranch = trimmed
+			taskChanged = true
 		}
 	}
 	if params.Role != nil {
-		task.Role = strings.TrimSpace(*params.Role)
+		trimmed := strings.TrimSpace(*params.Role)
+		if trimmed != strings.TrimSpace(task.Role) {
+			task.Role = trimmed
+			taskChanged = true
+		}
 	}
 	if params.Deps != nil {
-		task.Deps = normalizeTaskDeps(*params.Deps)
+		normalizedDeps := normalizeTaskDeps(*params.Deps)
+		if strings.Join(normalizedDeps, "\x00") != strings.Join(task.Deps, "\x00") {
+			task.Deps = normalizedDeps
+			taskChanged = true
+		}
 	}
 	if params.Prompt != nil {
-		if strings.TrimSpace(*params.Prompt) == "" {
+		resolvedPrompt := strings.TrimSpace(*params.Prompt)
+		if resolvedPrompt == "" {
 			return nil, fmt.Errorf("TaskManager.UpdateTask() [task.go]: prompt cannot be empty")
 		}
-		if err := os.WriteFile(filepath.Join(taskDir, "task.md"), []byte(strings.TrimSpace(*params.Prompt)+"\n"), 0644); err != nil {
-			return nil, fmt.Errorf("TaskManager.UpdateTask() [task.go]: failed to update task prompt: %w", err)
+		promptPath := filepath.Join(taskDir, "task.md")
+		existingPrompt := ""
+		existingPromptBytes, readErr := os.ReadFile(promptPath)
+		if readErr != nil {
+			if !errors.Is(readErr, os.ErrNotExist) {
+				return nil, fmt.Errorf("TaskManager.UpdateTask() [task.go]: failed to read existing task prompt: %w", readErr)
+			}
+		} else {
+			existingPrompt = strings.TrimSpace(string(existingPromptBytes))
 		}
+
+		if resolvedPrompt != existingPrompt {
+			if err := os.WriteFile(promptPath, []byte(resolvedPrompt+"\n"), 0644); err != nil {
+				return nil, fmt.Errorf("TaskManager.UpdateTask() [task.go]: failed to update task prompt: %w", err)
+			}
+			taskChanged = true
+		}
+	}
+
+	if !taskChanged {
+		return task, nil
 	}
 
 	task.UpdatedAt = m.nowFn().UTC().Format(time.RFC3339Nano)

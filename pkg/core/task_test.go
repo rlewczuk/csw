@@ -261,6 +261,38 @@ func TestTaskManagerUpdateTaskRejectsEmptyPrompt(t *testing.T) {
 	assert.Contains(t, err.Error(), "prompt cannot be empty")
 }
 
+func TestTaskManagerUpdateTaskKeepsUpdatedAtWhenNothingChanges(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})
+	require.NoError(t, err)
+
+	created, err := manager.CreateTask(TaskCreateParams{Name: "task", Prompt: "same prompt"})
+	require.NoError(t, err)
+
+	name := "task"
+	prompt := "same prompt"
+	updated, err := manager.UpdateTask(TaskUpdateParams{Identifier: created.UUID, Name: &name, Prompt: &prompt})
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	assert.Equal(t, created.UpdatedAt, updated.UpdatedAt)
+}
+
+func TestTaskManagerUpdateTaskChangesUpdatedAtWhenPromptChanges(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})
+	require.NoError(t, err)
+
+	created, err := manager.CreateTask(TaskCreateParams{Name: "task", Prompt: "old prompt"})
+	require.NoError(t, err)
+
+	time.Sleep(2 * time.Millisecond)
+	prompt := "new prompt"
+	updated, err := manager.UpdateTask(TaskUpdateParams{Identifier: created.UUID, Prompt: &prompt})
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	assert.NotEqual(t, created.UpdatedAt, updated.UpdatedAt)
+}
+
 func TestTaskManagerListTasksTopLevelAndRecursiveChildren(t *testing.T) {
 	baseDir := t.TempDir()
 	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})
