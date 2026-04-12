@@ -115,7 +115,6 @@ type TaskRunParams struct {
 	Identifier     string
 	Merge          bool
 	Reset          bool
-	Continue       bool
 	PromptOverride string
 	PromptArgs     []string
 	RunOptions     TaskSessionRunOptions
@@ -143,7 +142,6 @@ type TaskSessionRunOptions struct {
 	NoRefresh         bool
 	LSPServer         string
 	Thinking          string
-	ForceCompact      bool
 	BashRunTimeout    string
 	MaxThreads        int
 	OutputFormat      string
@@ -398,9 +396,6 @@ func (r *CLITaskSessionRunner) buildCLIArgs(request TaskSessionRunRequest) ([]st
 	}
 	if strings.TrimSpace(request.RunOptions.LSPServer) != "" {
 		args = append(args, "--lsp-server", strings.TrimSpace(request.RunOptions.LSPServer))
-	}
-	if request.RunOptions.ForceCompact {
-		args = append(args, "--force-compact")
 	}
 	if strings.TrimSpace(request.RunOptions.BashRunTimeout) != "" {
 		args = append(args, "--bash-run-timeout", strings.TrimSpace(request.RunOptions.BashRunTimeout))
@@ -951,13 +946,6 @@ func (m *TaskManager) RunTask(ctx context.Context, lookup TaskLookup, params Tas
 		}
 		prompt = resolvedPrompt
 	}
-	if params.Continue {
-		prompt, err = m.renderContinuePrompt(task, prompt)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	sessionID := m.uuidFn()
 	taskBranchName := fmt.Sprintf("%s-%s", task.FeatureBranch, strings.ReplaceAll(sessionID[:8], "-", ""))
 	if params.Reset {
@@ -1234,36 +1222,6 @@ func (m *TaskManager) appendSubtask(parentTaskID string, subtaskID string) error
 	parentTask.SubtaskIDs = appendUniqueString(parentTask.SubtaskIDs, subtaskID)
 	parentTask.UpdatedAt = m.nowFn().UTC().Format(time.RFC3339Nano)
 	return m.writeTaskFile(parentDir, parentTask)
-}
-
-func (m *TaskManager) renderContinuePrompt(task *Task, prompt string) (string, error) {
-	if m.configStore == nil {
-		return "", fmt.Errorf("TaskManager.renderContinuePrompt() [task.go]: config store is not available")
-	}
-	tplBytes, err := m.configStore.GetAgentConfigFile("continue", "prompt.md")
-	if err != nil {
-		return "", fmt.Errorf("TaskManager.renderContinuePrompt() [task.go]: failed to load continue prompt template: %w", err)
-	}
-	tpl, err := template.New("task-continue-prompt").Parse(string(tplBytes))
-	if err != nil {
-		return "", fmt.Errorf("TaskManager.renderContinuePrompt() [task.go]: failed to parse continue prompt template: %w", err)
-	}
-
-	data := map[string]any{
-		"TaskID":          task.UUID,
-		"TaskName":        task.Name,
-		"TaskDescription": task.Description,
-		"FeatureBranch":   task.FeatureBranch,
-		"ParentBranch":    task.ParentBranch,
-		"TaskRole":        task.Role,
-		"Prompt":          prompt,
-	}
-
-	var buffer bytes.Buffer
-	if err := tpl.Execute(&buffer, data); err != nil {
-		return "", fmt.Errorf("TaskManager.renderContinuePrompt() [task.go]: failed to render continue prompt template: %w", err)
-	}
-	return buffer.String(), nil
 }
 
 func (m *TaskManager) writeSessionSummary(taskDir string, meta *TaskSessionSummary, summaryText string) error {

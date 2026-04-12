@@ -392,20 +392,3 @@ func ParseHookTimeout(value string) (time.Duration, error) {
 
 	return parsed, nil
 }
-
-func NormalizeResumeTarget(raw string) (string, error) {
-	value := strings.TrimSpace(raw)
-	if value == "" {
-		return "", nil
-	}
-
-	if strings.EqualFold(value, "last") {
-		return "last", nil
-	}
-
-	if ResumeUUIDPattern.MatchString(value) {
-		return strings.ToLower(value), nil
-	}
-
-	return value, nil
-}

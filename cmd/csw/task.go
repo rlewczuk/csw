@@ -495,7 +495,6 @@ func taskRunCommand() *cobra.Command {
 	var cliContainerOff bool
 	var cliContainerMount []string
 	var cliContainerEnv []string
-	var cliForceCompact bool
 	var cliBashRunTimeout string
 	var cliMaxThreads int
 	var cliOutputFormat string
@@ -607,7 +606,6 @@ func taskRunCommand() *cobra.Command {
 					NoRefresh:         cliNoRefresh,
 					LSPServer:         cliLSPServer,
 					Thinking:          cliThinking,
-					ForceCompact:      cliForceCompact,
 					BashRunTimeout:    bashRunTimeout.String(),
 					MaxThreads:        cliMaxThreads,
 					OutputFormat:      cliOutputFormat,
@@ -651,8 +649,7 @@ func taskRunCommand() *cobra.Command {
 	command.Flags().BoolVar(&cliNoRefresh, "no-refresh", false, "Disable OAuth access-token refresh for this run")
 	command.Flags().StringVar(&cliLSPServer, "lsp-server", "", "Path to LSP server binary (empty to disable LSP)")
 	command.Flags().StringVar(&cliThinking, "thinking", "", "Thinking/reasoning mode: low, medium, high, xhigh (effort-based) or true/false (boolean)")
-	command.Flags().StringVar(&cliThinking, "thinking-mode", "", "Thinking/reasoning mode override when starting or resuming a session")
-	command.Flags().BoolVar(&cliForceCompact, "force-compact", false, "Force context compaction after loading a resumed session")
+	command.Flags().StringVar(&cliThinking, "thinking-mode", "", "Thinking/reasoning mode override")
 	command.Flags().StringVar(&cliGitUser, "git-user", "", "Git user name for git operations (default: from git config)")
 	command.Flags().StringVar(&cliGitEmail, "git-email", "", "Git user email for git operations (default: from git config)")
 	command.Flags().StringVar(&cliBashRunTimeout, "bash-run-timeout", "120", "Default runBash command timeout (duration; plain number means seconds)")
@@ -1114,7 +1111,7 @@ func loadTaskBackend(cmd *cobra.Command) (*core.TaskManager, *core.TaskBackendAd
 		return nil, nil, err
 	}
 
-	vcsRepo, _, err := system.PrepareSessionVFS(workDir, workDir, "", false, nil, "", "", nil)
+	vcsRepo, _, err := system.PrepareSessionVFS(workDir, workDir, "", nil, "", "", nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("loadTaskBackend() [task.go]: failed to prepare vcs: %w", err)
 	}
@@ -1448,7 +1445,7 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 		ConfigPath:    strings.TrimSpace(params.ConfigPath),
 		ProjectConfig: strings.TrimSpace(params.ProjectConfig),
 		ModelName:     strings.TrimSpace(params.ModelName),
-		RoleName:      firstNonEmpty(strings.TrimSpace(params.Role), "developer"),
+		RoleName:      strings.TrimSpace(pickTaskRoleName(params.Role)),
 	}
 
 	sweSystem, buildResult, err := buildTaskSystemFunc(buildParams)
@@ -1477,6 +1474,15 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 	}
 
 	return strings.TrimSpace(generatedDescription), nil
+}
+
+func pickTaskRoleName(roleName string) string {
+	trimmedRoleName := strings.TrimSpace(roleName)
+	if trimmedRoleName == "" {
+		return "developer"
+	}
+
+	return trimmedRoleName
 }
 
 func printTaskRunOutcome(outcome tool.TaskRunOutcome) {

@@ -159,31 +159,3 @@ func TestBuildRuntimeHookConfigStoreOverridesAreEphemeral(t *testing.T) {
 	assert.Equal(t, "old", baseHooks["summary"].Prompt)
 	assert.Equal(t, "result", baseHooks["summary"].OutputTo)
 }
-
-func TestNormalizeResumeTarget(t *testing.T) {
-	tests := []struct {
-		name        string
-		input       string
-		expected    string
-		expectError bool
-	}{
-		{name: "empty", input: "", expected: ""},
-		{name: "last", input: "last", expected: "last"},
-		{name: "last uppercase", input: "LAST", expected: "last"},
-		{name: "valid uuid", input: "018F6E30-3ACB-7F24-BEDE-8D96CD157152", expected: "018f6e30-3acb-7f24-bede-8d96cd157152"},
-		{name: "branch name", input: "feature/existing", expected: "feature/existing"},
-		{name: "workdir name", input: "0145-resume-by-branch-dir", expected: "0145-resume-by-branch-dir"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			actual, err := NormalizeResumeTarget(tc.input)
-			if tc.expectError {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, tc.expected, actual)
-		})
-	}
-}

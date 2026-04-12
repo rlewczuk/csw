@@ -47,18 +47,6 @@ func TestCLIContainerFlagsPropagation(t *testing.T) {
 			expectedEnv:     []string{"KEY=value"},
 		},
 		{
-			name:                   "container enabled rejected with resume",
-			args:                   []string{"--container-enabled", "--resume=last", "prompt"},
-			expectError:            true,
-			expectedErrorSubstring: "container mode options are not supported with --resume",
-		},
-		{
-			name:                   "container mount rejected with resume",
-			args:                   []string{"--container-mount=/host:/container", "--resume=last", "prompt"},
-			expectError:            true,
-			expectedErrorSubstring: "container mode options are not supported with --resume",
-		},
-		{
 			name:                   "container flags are mutually exclusive",
 			args:                   []string{"--container-enabled", "--container-disabled", "prompt"},
 			expectError:            true,

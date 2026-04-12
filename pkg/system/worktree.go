@@ -3,14 +3,11 @@ package system
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
-	"sort"
 	"strings"
 	"text/template"
 
@@ -19,9 +16,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vcs"
 )
-
-var ResumeUUIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
-var ResumeWorktreeNamePattern = regexp.MustCompile(`^[0-9]{4}-[a-z0-9][a-z0-9-]*$`)
 
 var executeConflictSubAgentFunc = executeConflictSubAgentTask
 
@@ -398,147 +392,4 @@ func executeConflictSubAgentTask(session *core.SweSession, request tool.SubAgent
 	}
 
 	return session.ExecuteSubAgentTask(request)
-}
-
-func FindSessionIDByWorkDirName(workDirName string, logsDir string, sessionEntries []os.DirEntry) (string, bool) {
-	trimmedName := strings.TrimSpace(workDirName)
-	if trimmedName == "" {
-		return "", false
-	}
-
-	for _, entry := range sessionEntries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		statePath := filepath.Join(logsDir, "sessions", entry.Name(), "session.json")
-		stateBytes, err := os.ReadFile(statePath)
-		if err != nil {
-			continue
-		}
-
-		var state core.PersistedSessionState
-		if err := json.Unmarshal(stateBytes, &state); err != nil {
-			continue
-		}
-
-		sessionWorkDir := strings.TrimSpace(state.WorkDir)
-		if sessionWorkDir == "" {
-			continue
-		}
-
-		if filepath.Base(filepath.Clean(sessionWorkDir)) == trimmedName {
-			return entry.Name(), true
-		}
-	}
-
-	return "", false
-}
-
-func ResolveResumeTargetAsBranchOrWorktree(target string, workDir string, logsDir string, sessionEntries []os.DirEntry) (string, bool) {
-	resolvedWorkDir, err := ResolveWorkDir(workDir)
-	if err != nil {
-		return "", false
-	}
-
-	branchExists, err := vcs.GitBranchExists(resolvedWorkDir, target)
-	if err == nil && branchExists {
-		worktreeExists, worktreeName := vcs.GitWorktreeForBranch(resolvedWorkDir, target)
-		if worktreeExists && strings.TrimSpace(worktreeName) != "" {
-			if sessionID, ok := FindSessionIDByWorkDirName(worktreeName, logsDir, sessionEntries); ok {
-				return sessionID, true
-			}
-		}
-	}
-
-	return FindSessionIDByWorkDirName(target, logsDir, sessionEntries)
-}
-
-func FindSessionIDByWorkDirPath(workDirPath string, logsDir string, sessionEntries []os.DirEntry) (string, bool) {
-	expectedPath := filepath.Clean(strings.TrimSpace(workDirPath))
-	if expectedPath == "" {
-		return "", false
-	}
-
-	for _, entry := range sessionEntries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		statePath := filepath.Join(logsDir, "sessions", entry.Name(), "session.json")
-		stateBytes, err := os.ReadFile(statePath)
-		if err != nil {
-			continue
-		}
-
-		var state core.PersistedSessionState
-		if err := json.Unmarshal(stateBytes, &state); err != nil {
-			continue
-		}
-
-		sessionWorkDir := filepath.Clean(strings.TrimSpace(state.WorkDir))
-		if sessionWorkDir == expectedPath {
-			return entry.Name(), true
-		}
-	}
-
-	return "", false
-}
-
-func ResolveResumeTargetToSessionID(resumeTarget string, workDir string, logsDir string) (string, error) {
-	trimmedTarget := strings.TrimSpace(resumeTarget)
-	if trimmedTarget == "" {
-		return "", nil
-	}
-
-	if strings.EqualFold(trimmedTarget, "last") {
-		return "last", nil
-	}
-
-	if strings.TrimSpace(logsDir) == "" {
-		return "", fmt.Errorf("ResolveResumeTargetToSessionID() [cli.go]: logs directory is empty")
-	}
-
-	if ResumeUUIDPattern.MatchString(trimmedTarget) {
-		return strings.ToLower(trimmedTarget), nil
-	}
-
-	entries, err := os.ReadDir(filepath.Join(logsDir, "sessions"))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", fmt.Errorf("ResolveResumeTargetToSessionID() [cli.go]: no persisted sessions found")
-		}
-		return "", fmt.Errorf("ResolveResumeTargetToSessionID() [cli.go]: failed to read sessions directory: %w", err)
-	}
-
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Name() > entries[j].Name()
-	})
-
-	if candidateID, ok := ResolveResumeTargetAsPath(trimmedTarget, logsDir, entries); ok {
-		return candidateID, nil
-	}
-
-	if candidateID, ok := ResolveResumeTargetAsBranchOrWorktree(trimmedTarget, workDir, logsDir, entries); ok {
-		return candidateID, nil
-	}
-
-	return "", fmt.Errorf("ResolveResumeTargetToSessionID() [cli.go]: no session found for --resume value %q", resumeTarget)
-}
-
-func ResolveResumeTargetAsPath(target string, logsDir string, sessionEntries []os.DirEntry) (string, bool) {
-	if !filepath.IsAbs(target) {
-		return "", false
-	}
-
-	info, err := os.Stat(target)
-	if err != nil || !info.IsDir() {
-		return "", false
-	}
-
-	if sessionID, ok := FindSessionIDByWorkDirPath(target, logsDir, sessionEntries); ok {
-		return sessionID, true
-	}
-
-	return "", false
 }

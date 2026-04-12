@@ -396,7 +396,7 @@ func TestResolveContainerGitAuthorIdentity(t *testing.T) {
 func TestPrepareSessionVFSWithoutWorktree(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	repo, selectedVFS, err := PrepareSessionVFS(tmpDir, tmpDir, "", false, nil, "", "", nil)
+	repo, selectedVFS, err := PrepareSessionVFS(tmpDir, tmpDir, "", nil, "", "", nil)
 	require.NoError(t, err)
 	require.NotNil(t, repo)
 	require.NotNil(t, selectedVFS)
@@ -409,7 +409,7 @@ func TestPrepareSessionVFSWithoutWorktree(t *testing.T) {
 func TestPrepareSessionVFSWithWorktreeCreatesBranchAndWorktree(t *testing.T) {
 	repoDir := initTestGitRepository(t)
 
-	repo, selectedVFS, err := PrepareSessionVFS(repoDir, repoDir, "feature/worktree", false, nil, "", "", nil)
+	repo, selectedVFS, err := PrepareSessionVFS(repoDir, repoDir, "feature/worktree", nil, "", "", nil)
 	require.NoError(t, err)
 	require.NotNil(t, repo)
 	require.NotNil(t, selectedVFS)
@@ -427,12 +427,14 @@ func TestPrepareSessionVFSWithWorktreeCreatesBranchAndWorktree(t *testing.T) {
 	require.NoError(t, branchCheck.Run())
 }
 
-func TestPrepareSessionVFSContinueModeFailsWhenBranchDoesNotExist(t *testing.T) {
+func TestPrepareSessionVFSWithMissingBranchCreatesBranchAndWorktree(t *testing.T) {
 	repoDir := initTestGitRepository(t)
 
-	_, _, err := PrepareSessionVFS(repoDir, repoDir, "feature/missing", true, nil, "", "", nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "worktree branch \"feature/missing\" not found")
+	repo, selectedVFS, err := PrepareSessionVFS(repoDir, repoDir, "feature/missing", nil, "", "", nil)
+	require.NoError(t, err)
+	require.NotNil(t, repo)
+	require.NotNil(t, selectedVFS)
+	assert.Equal(t, filepath.Join(repoDir, ".cswdata", "work", "feature", "missing"), selectedVFS.WorktreePath())
 }
 
 func TestResolveWorktreeBranchName(t *testing.T) {

@@ -16,13 +16,7 @@ type StartRunSessionParams struct {
 	AutoPermissionResponse string
 	Thinking               string
 	ModelOverridden        bool
-	RoleOverridden         bool
-	ThinkingOverridden     bool
 	Prompt                 string
-	ResumeTarget           string
-	ContinueSession        bool
-	ForceResume            bool
-	ForceCompact           bool
 	OutputHandler          core.SessionThreadOutput
 }
 
@@ -37,78 +31,28 @@ type StartRunSessionResult struct {
 func (s *SweSystem) StartRunSession(params StartRunSessionParams) (StartRunSessionResult, error) {
 	var result StartRunSessionResult
 
-	var (
-		thread  *core.SessionThread
-		session *core.SweSession
-		err     error
-	)
-
-	if params.ResumeTarget != "" {
-		if params.ResumeTarget == "last" {
-			session, err = s.LoadLastSession(nil)
-			if err != nil {
-				return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to load last session: %w", err)
-			}
-		} else {
-			session, err = s.LoadSession(params.ResumeTarget, nil)
-			if err != nil {
-				return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to load session: %w", err)
-			}
-		}
-		thread = core.NewSessionThreadWithSession(s, session, nil)
-	} else {
-		thread = core.NewSessionThread(s, nil)
-		if err := thread.StartSession(params.ModelName); err != nil {
-			return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to start session: %w", err)
-		}
-		session = thread.GetSession()
+	thread := core.NewSessionThread(s, nil)
+	if err := thread.StartSession(params.ModelName); err != nil {
+		return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to start session: %w", err)
 	}
+	session := thread.GetSession()
 
 	if session == nil {
 		return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: session is not available")
 	}
 
-	if params.ResumeTarget != "" {
-		if params.ModelOverridden {
-			if err := session.SetModel(params.ModelName); err != nil {
-				return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to override model: %w", err)
-			}
-		}
-		if params.RoleOverridden {
-			if err := session.SetRole(params.RoleName); err != nil {
-				return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to override role: %w", err)
-			}
-			if !params.ModelOverridden {
-				if roleConfig := session.Role(); roleConfig != nil && strings.TrimSpace(roleConfig.Model) != "" {
-					if err := session.SetModel(roleConfig.Model); err != nil {
-						return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to apply role model override: %w", err)
-					}
-				}
-			}
-		}
-		if params.ThinkingOverridden {
-			session.SetThinkingLevel(params.Thinking)
-		}
-		if params.ForceCompact {
-			if err := session.ForceCompactContext(); err != nil {
-				return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to compact resumed session: %w", err)
+	if err := session.SetRole(params.RoleName); err != nil {
+		return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to set role: %w", err)
+	}
+	if !params.ModelOverridden {
+		if roleConfig := session.Role(); roleConfig != nil && strings.TrimSpace(roleConfig.Model) != "" {
+			if err := session.SetModel(roleConfig.Model); err != nil {
+				return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to apply role model: %w", err)
 			}
 		}
 	}
-
-	if params.ResumeTarget == "" {
-		if err := session.SetRole(params.RoleName); err != nil {
-			return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to set role: %w", err)
-		}
-		if !params.ModelOverridden {
-			if roleConfig := session.Role(); roleConfig != nil && strings.TrimSpace(roleConfig.Model) != "" {
-				if err := session.SetModel(roleConfig.Model); err != nil {
-					return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to apply role model: %w", err)
-				}
-			}
-		}
-		session.SetWorkDir(s.WorkDir)
-	}
+	session.SetThinkingLevel(params.Thinking)
+	session.SetWorkDir(s.WorkDir)
 
 	session.SetTask(params.Task)
 
@@ -117,23 +61,8 @@ func (s *SweSystem) StartRunSession(params StartRunSessionParams) (StartRunSessi
 	thread.SetOutputHandler(wrappedHandler)
 	thread.SetAutoPermissionResponse(params.AutoPermissionResponse)
 
-	if params.ResumeTarget != "" {
-		if params.ContinueSession {
-			if err := thread.UserPrompt(params.Prompt); err != nil {
-				return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to send continue message: %w", err)
-			}
-		} else {
-			if !params.ForceResume && !session.HasPendingWork() {
-				return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: resumed session has no pending work (provide prompt with --resume to continue or use --force to run anyway)")
-			}
-			if err := thread.ResumePending(); err != nil {
-				return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to resume pending work: %w", err)
-			}
-		}
-	} else {
-		if err := thread.UserPrompt(params.Prompt); err != nil {
-			return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to send initial message: %w", err)
-		}
+	if err := thread.UserPrompt(params.Prompt); err != nil {
+		return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to send initial message: %w", err)
 	}
 
 	result = StartRunSessionResult{Thread: thread, Session: session, Done: done}

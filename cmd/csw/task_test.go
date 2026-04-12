@@ -652,7 +652,6 @@ func TestTaskRunCommandIncludesRunSessionFlags(t *testing.T) {
 		"container-image",
 		"container-mount",
 		"context",
-		"force-compact",
 		"git-email",
 		"git-user",
 		"interactive",

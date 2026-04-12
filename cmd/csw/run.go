@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/core"
 	sessionio "github.com/rlewczuk/csw/pkg/io"
@@ -39,7 +38,6 @@ type RunParams struct {
 	WorkDir               string
 	ShadowDir             string
 	WorktreeBranch        string
-	ContinueWorktree      bool
 	GitUserName           string
 	GitUserEmail          string
 	Merge                 bool
@@ -61,12 +59,6 @@ type RunParams struct {
 	LSPServer             string
 	Thinking              string
 	ModelOverridden       bool
-	RoleOverridden        bool
-	ThinkingOverridden    bool
-	ResumeTarget          string
-	ContinueSession       bool
-	ForceResume           bool
-	ForceCompact          bool
 	BashRunTimeout        time.Duration
 	MaxThreads            int
 	OutputFormat          string
@@ -111,10 +103,6 @@ func RunCommand() *cobra.Command {
 		cliContainerOff      bool
 		cliContainerMount    []string
 		cliContainerEnv      []string
-		cliResume            string
-		cliContinue          string
-		cliForce             bool
-		cliForceCompact      bool
 		cliBashRunTimeout    string
 		cliMaxThreads        int
 		cliOutputFormat      string
@@ -128,7 +116,7 @@ func RunCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "run [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--continue <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [--resume <session-id|last|branch|workdir>] [--force] [\"prompt\"] [command-args...]",
+		Use:   "run [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [\"prompt\"] [command-args...]",
 		Short: "Start a run chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.ArbitraryArgs,
@@ -137,21 +125,7 @@ func RunCommand() *cobra.Command {
 			// Argument/flag parsing errors happen before RunE and still show usage.
 			cmd.SilenceUsage = true
 
-			resumeTarget, err := system.NormalizeResumeTarget(cliResume)
-			if err != nil {
-				return err
-			}
-
-			continueWorktreeBranch := strings.TrimSpace(cliContinue)
-			if continueWorktreeBranch != "" && resumeTarget != "" {
-				return fmt.Errorf("RunCommand.RunE() [run.go]: --continue <branch> cannot be used with --resume")
-			}
-
 			positionalArgs := append([]string(nil), args...)
-			if shouldConsumeFirstPositionalAsResumeTarget(cmd, resumeTarget, positionalArgs) {
-				resumeTarget = strings.ToLower(strings.TrimSpace(positionalArgs[0]))
-				positionalArgs = positionalArgs[1:]
-			}
 
 			prompt := ""
 			extraPositionalArgs := []string(nil)
@@ -239,21 +213,7 @@ func RunCommand() *cobra.Command {
 				initialTaskData = cloneRunTask(taskData)
 			}
 
-			if resumeTarget == "" {
-				if prompt == "" {
-					return fmt.Errorf("RunCommand.RunE() [run.go]: prompt cannot be empty")
-				}
-			}
-
-			if continueWorktreeBranch != "" && cmd.Flags().Changed("worktree") {
-				return fmt.Errorf("RunCommand.RunE() [run.go]: --continue and --worktree cannot be used together")
-			}
-
-			if resumeTarget != "" && cmd.Flags().Changed("worktree") {
-				return fmt.Errorf("RunCommand.RunE() [run.go]: --worktree cannot be used with --resume")
-			}
-
-			if resumeTarget == "" && prompt == "" {
+			if prompt == "" {
 				return fmt.Errorf("RunCommand.RunE() [run.go]: prompt cannot be empty")
 			}
 
@@ -271,8 +231,6 @@ func RunCommand() *cobra.Command {
 			}
 			cliLogLLMRequests = cliLogLLMRequests || cliLogLLMRequestsRaw
 			modelOverridden := cmd.Flags().Changed("model")
-			roleOverridden := cmd.Flags().Changed("role")
-			thinkingOverridden := isThinkingFlagChanged(cmd)
 
 			if invocation != nil {
 				if !cmd.Flags().Changed("model") && commandModelOverride != "" {
@@ -296,10 +254,6 @@ func RunCommand() *cobra.Command {
 			if !containerDisabledChanged && invocation != nil && commandNeedsShell {
 				containerRequested = true
 			}
-			if containerRequested && resumeTarget != "" {
-				return fmt.Errorf("RunCommand.RunE() [run.go]: container mode options are not supported with --resume")
-			}
-
 			// Parse vfs-allow paths, handling both repeated flags and colon-separated values
 			vfsAllowPaths := parseVFSAllowPaths(cliVFSAllow)
 			mcpEnableNames := parseMCPServerFlagValues(cliMCPEnable)
@@ -318,8 +272,7 @@ func RunCommand() *cobra.Command {
 				InitialTask:           initialTaskData,
 				WorkDir:               cliWorkDir,
 				ShadowDir:             cliShadowDir,
-				WorktreeBranch:        firstNonEmpty(continueWorktreeBranch, cliWorktree),
-				ContinueWorktree:      continueWorktreeBranch != "",
+				WorktreeBranch:        cliWorktree,
 				GitUserName:           vcs.ResolveGitIdentity(cliGitUser, "user.name"),
 				GitUserEmail:          vcs.ResolveGitIdentity(cliGitEmail, "user.email"),
 				Merge:                 cliMerge,
@@ -341,12 +294,6 @@ func RunCommand() *cobra.Command {
 				LSPServer:             cliLSPServer,
 				Thinking:              cliThinking,
 				ModelOverridden:       modelOverridden,
-				RoleOverridden:        roleOverridden,
-				ThinkingOverridden:    thinkingOverridden,
-				ResumeTarget:          resumeTarget,
-				ContinueSession:       resumeTarget != "" && prompt != "",
-				ForceResume:           cliForce,
-				ForceCompact:          cliForceCompact,
 				BashRunTimeout:        bashRunTimeout,
 				MaxThreads:            cliMaxThreads,
 				OutputFormat:          cliOutputFormat,
@@ -381,13 +328,9 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliLogLLMRequestsRaw, "log-llm-requests-raw", false, "Log raw line-based LLM requests and responses")
 	cmd.Flags().BoolVar(&cliNoRefresh, "no-refresh", false, "Disable OAuth access-token refresh for this run")
 	cmd.Flags().StringVar(&cliLSPServer, "lsp-server", "", "Path to LSP server binary (empty to disable LSP)")
-	cmd.Flags().StringVar(&cliThinking, "thinking", "", "Thinking/reasoning mode override for new and resumed sessions: low, medium, high, xhigh (effort-based) or true/false (boolean)")
+	cmd.Flags().StringVar(&cliThinking, "thinking", "", "Thinking/reasoning mode override: low, medium, high, xhigh (effort-based) or true/false (boolean)")
 	cmd.Flags().StringVar(&cliGitUser, "git-user", "", "Git user name for git operations (default: from git config)")
 	cmd.Flags().StringVar(&cliGitEmail, "git-email", "", "Git user email for git operations (default: from git config)")
-	cmd.Flags().StringVar(&cliResume, "resume", "", "Resume session by id (UUID), 'last', branch name, workdir name, or workdir path. If value is omitted, resumes last session")
-	cmd.Flags().StringVar(&cliContinue, "continue", "", "Continue work in an existing git worktree branch")
-	cmd.Flags().BoolVar(&cliForce, "force", false, "Force resume even when there is no pending work")
-	cmd.Flags().BoolVar(&cliForceCompact, "force-compact", false, "Force context compaction after loading a resumed session")
 	cmd.Flags().StringVar(&cliBashRunTimeout, "bash-run-timeout", "120", "Default runBash command timeout (duration; plain number means seconds)")
 	cmd.Flags().IntVar(&cliMaxThreads, "max-threads", 0, "Maximum number of tool calls executed in parallel")
 	cmd.Flags().StringVar(&cliOutputFormat, "output-format", "short", "Console output format: short, full, jsonl")
@@ -400,58 +343,7 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliTaskDir, "task-dir", "", "Task directory path used for task session state")
 	_ = cmd.Flags().MarkHidden("task-json")
 	_ = cmd.Flags().MarkHidden("task-dir")
-	resumeFlag := cmd.Flags().Lookup("resume")
-	if resumeFlag != nil {
-		resumeFlag.NoOptDefVal = "last"
-	}
 	return cmd
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-
-	return ""
-}
-
-func shouldConsumeFirstPositionalAsResumeTarget(cmd *cobra.Command, resumeTarget string, args []string) bool {
-	if cmd == nil {
-		return false
-	}
-	if !cmd.Flags().Changed("resume") {
-		return false
-	}
-	if strings.TrimSpace(resumeTarget) != "last" {
-		return false
-	}
-	if len(args) == 0 {
-		return false
-	}
-	return isLikelyResumeTargetToken(strings.TrimSpace(args[0]))
-}
-
-func isLikelyResumeTargetToken(value string) bool {
-	trimmedValue := strings.TrimSpace(value)
-	if trimmedValue == "" {
-		return false
-	}
-	if strings.EqualFold(trimmedValue, "last") {
-		return true
-	}
-	if system.ResumeUUIDPattern.MatchString(trimmedValue) {
-		return true
-	}
-	if filepath.IsAbs(trimmedValue) {
-		return true
-	}
-	if strings.Contains(trimmedValue, "/") {
-		return true
-	}
-
-	return system.ResumeWorktreeNamePattern.MatchString(trimmedValue)
 }
 
 func runCommand(params *RunParams) error {
@@ -471,15 +363,6 @@ func runCommand(params *RunParams) error {
 		return err
 	}
 
-	if params.ResumeTarget != "" {
-		params.WorktreeBranch = ""
-		params.ContinueWorktree = false
-	}
-
-	if (params.ContainerEnabled || len(params.ContainerMounts) > 0 || len(params.ContainerEnv) > 0) && params.ResumeTarget != "" {
-		return fmt.Errorf("runCommand() [run.go]: container mode options are not supported with --resume")
-	}
-
 	resolvedWorktreeBranch, err := resolveWorktreeBranchNameFunc(ctx, system.ResolveWorktreeBranchNameParams{
 		Prompt:         params.Prompt,
 		ModelName:      params.ModelName,
@@ -497,7 +380,7 @@ func runCommand(params *RunParams) error {
 		_, _ = fmt.Fprintf(os.Stdout, "[INFO] Worktree branch: %s\n", params.WorktreeBranch)
 	}
 
-	sweSystem, buildResult, err := buildSystemFunc(system.BuildSystemParams{
+		sweSystem, buildResult, err := buildSystemFunc(system.BuildSystemParams{
 		WorkDir:           params.WorkDir,
 		ShadowDir:         params.ShadowDir,
 		ConfigPath:        params.ConfigPath,
@@ -505,7 +388,6 @@ func runCommand(params *RunParams) error {
 		ModelName:         params.ModelName,
 		RoleName:          params.RoleName,
 		WorktreeBranch:    params.WorktreeBranch,
-		ContinueWorktree:  params.ContinueWorktree,
 		GitUserName:       params.GitUserName,
 		GitUserEmail:      params.GitUserEmail,
 		ContainerEnabled:  params.ContainerEnabled,
@@ -550,14 +432,6 @@ func runCommand(params *RunParams) error {
 		return err
 	}
 
-	if params.ResumeTarget != "" {
-		resolvedResumeTarget, err := system.ResolveResumeTargetToSessionID(params.ResumeTarget, buildResult.WorkDirRoot, buildResult.LogsDir)
-		if err != nil {
-			return err
-		}
-		params.ResumeTarget = resolvedResumeTarget
-	}
-
 	if params.LSPServer != "" {
 		lspStatus := "disabled"
 		if buildResult.LSPStarted {
@@ -581,13 +455,7 @@ func runCommand(params *RunParams) error {
 		AutoPermissionResponse: autoPermissionResponse,
 		Thinking:               params.Thinking,
 		ModelOverridden:        params.ModelOverridden,
-		RoleOverridden:         params.RoleOverridden,
-		ThinkingOverridden:     params.ThinkingOverridden,
 		Prompt:                 params.Prompt,
-		ResumeTarget:           params.ResumeTarget,
-		ContinueSession:        params.ContinueSession,
-		ForceResume:            params.ForceResume,
-		ForceCompact:           params.ForceCompact,
 		OutputHandler:          sessionOutput,
 	})
 	if err != nil {
@@ -601,15 +469,6 @@ func runCommand(params *RunParams) error {
 	finalizeVCS := buildResult.VCS
 	finalizeWorktreeBranch := buildResult.WorktreeBranch
 	finalizeWorktreeDir := buildResult.WorkDir
-	if params.Merge && params.ResumeTarget != "" && strings.TrimSpace(finalizeWorktreeBranch) == "" {
-		resumeVCS, resumeWorktreeBranch, resumeWorktreeDir, err := resolveResumeMergeWorktreeContext(buildResult, params, session)
-		if err != nil {
-			return err
-		}
-		finalizeVCS = resumeVCS
-		finalizeWorktreeBranch = resumeWorktreeBranch
-		finalizeWorktreeDir = resumeWorktreeDir
-	}
 
 	sessionID := session.ID()
 	defer func() {
@@ -824,72 +683,11 @@ func validateMergeRunParams(params *RunParams) error {
 		return fmt.Errorf("validateMergeRunParams() [run.go]: params cannot be nil")
 	}
 
-	if params.Merge && strings.TrimSpace(params.WorktreeBranch) == "" && strings.TrimSpace(params.ResumeTarget) == "" {
+	if params.Merge && strings.TrimSpace(params.WorktreeBranch) == "" {
 		return fmt.Errorf("runCommand() [run.go]: --merge requires --worktree")
 	}
 
 	return nil
-}
-
-func resolveResumeMergeWorktreeContext(buildResult system.BuildSystemResult, params *RunParams, session *core.SweSession) (apis.VCS, string, string, error) {
-	if params == nil {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: params cannot be nil")
-	}
-	if session == nil {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: session is nil")
-	}
-
-	sessionWorkDir := strings.TrimSpace(session.GetState().Info.WorkDir)
-	if sessionWorkDir == "" {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: resumed session has empty workdir")
-	}
-
-	worktreeBranch, ok := inferResumeWorktreeBranch(buildResult.WorkDirRoot, buildResult.ShadowDir, sessionWorkDir)
-	if !ok {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: --merge with --resume requires resumed session to use a worktree")
-	}
-
-	worktreesBaseDir := strings.TrimSpace(firstNonEmpty(buildResult.ShadowDir, buildResult.WorkDirRoot))
-	if worktreesBaseDir == "" {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: worktrees base directory is empty")
-	}
-	worktreesRoot := filepath.Join(worktreesBaseDir, ".cswdata", "work")
-
-	resumeVCS, err := vcs.NewGitRepo(buildResult.WorkDirRoot, worktreesRoot, nil, nil, params.GitUserName, params.GitUserEmail)
-	if err != nil {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: failed to create git vcs for resumed worktree: %w", err)
-	}
-
-	if _, err := resumeVCS.GetWorktree(worktreeBranch); err != nil {
-		return nil, "", "", fmt.Errorf("resolveResumeMergeWorktreeContext() [run.go]: failed to load resumed worktree %q: %w", worktreeBranch, err)
-	}
-
-	return resumeVCS, worktreeBranch, sessionWorkDir, nil
-}
-
-func inferResumeWorktreeBranch(workDirRoot string, shadowDir string, sessionWorkDir string) (string, bool) {
-	trimmedSessionWorkDir := strings.TrimSpace(sessionWorkDir)
-	if trimmedSessionWorkDir == "" {
-		return "", false
-	}
-
-	worktreesBaseDir := strings.TrimSpace(firstNonEmpty(shadowDir, workDirRoot))
-	if worktreesBaseDir == "" {
-		return "", false
-	}
-
-	worktreesRoot := filepath.Join(worktreesBaseDir, ".cswdata", "work")
-	relPath, err := filepath.Rel(worktreesRoot, trimmedSessionWorkDir)
-	if err != nil {
-		return "", false
-	}
-
-	normalizedRelPath := filepath.Clean(relPath)
-	if normalizedRelPath == "." || normalizedRelPath == ".." || strings.HasPrefix(normalizedRelPath, ".."+string(filepath.Separator)) {
-		return "", false
-	}
-
-	return filepath.ToSlash(normalizedRelPath), true
 }
 
 func resolveCommandsRootDir(workDir string, shadowDir string) (string, error) {

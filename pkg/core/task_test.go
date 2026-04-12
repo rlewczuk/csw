@@ -490,25 +490,6 @@ func TestTaskManagerRunTaskBlocksWhenDependencyNotCompleted(t *testing.T) {
 	assert.Contains(t, runErr.Error(), "is not completed")
 }
 
-func TestTaskManagerRunTaskContinueRendersTemplate(t *testing.T) {
-	baseDir := t.TempDir()
-	runner := &taskTestRunner{result: TaskSessionRunResult{SessionID: "ses-continue", SummaryText: "ok"}}
-	store := confimpl.NewMockConfigStore()
-	store.SetAgentConfigFile("continue", "prompt.md", []byte("Task={{.TaskName}} Prompt={{.Prompt}}"))
-
-	manager, err := NewTaskManager(baseDir, store, runner)
-	require.NoError(t, err)
-
-	created, err := manager.CreateTask(TaskCreateParams{Name: "cont", Prompt: "base prompt"})
-	require.NoError(t, err)
-
-	fake := &fakeVCS{branches: []string{"main"}}
-	_, runErr := manager.RunTask(context.Background(), TaskLookup{Identifier: created.UUID}, TaskRunParams{Continue: true}, fake)
-	require.NoError(t, runErr)
-	assert.Contains(t, runner.lastRequest.Prompt, "Task=cont")
-	assert.Contains(t, runner.lastRequest.Prompt, "Prompt=base prompt")
-}
-
 func TestTaskManagerRunTaskPromptOverrideTemplateCanUseTaskPrompt(t *testing.T) {
 	baseDir := t.TempDir()
 	runner := &taskTestRunner{result: TaskSessionRunResult{SessionID: "ses-template", SummaryText: "ok"}}
@@ -754,7 +735,6 @@ func TestCLITaskSessionRunnerIncludesRunOptionsFlags(t *testing.T) {
 			NoRefresh:         true,
 			LSPServer:         "gopls",
 			Thinking:          "high",
-			ForceCompact:      true,
 			BashRunTimeout:    "45s",
 			MaxThreads:        3,
 			OutputFormat:      "jsonl",

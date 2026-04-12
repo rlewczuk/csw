@@ -94,7 +94,6 @@ type BuildSystemParams struct {
 	ModelName         string
 	RoleName          string
 	WorktreeBranch    string
-	ContinueWorktree  bool
 	GitUserName       string
 	GitUserEmail      string
 	ContainerEnabled  bool
@@ -314,7 +313,7 @@ func resolveWorktreeBranchNameFromHook(ctx context.Context, configStore conf.Con
 }
 
 // PrepareSessionVFS creates session VCS/VFS with optional worktree handling.
-func PrepareSessionVFS(workDir string, worktreesBaseDir string, worktreeBranch string, continueWorktree bool, hidePatterns []string, gitUserName string, gitUserEmail string, allowedPaths []string) (apis.VCS, apis.VFS, error) {
+func PrepareSessionVFS(workDir string, worktreesBaseDir string, worktreeBranch string, hidePatterns []string, gitUserName string, gitUserEmail string, allowedPaths []string) (apis.VCS, apis.VFS, error) {
 	localVFS, err := vfs.NewLocalVFS(workDir, hidePatterns, allowedPaths)
 	if err != nil {
 		return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create local VFS: %w", err)
@@ -334,39 +333,20 @@ func PrepareSessionVFS(workDir string, worktreesBaseDir string, worktreeBranch s
 			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create GitVCS: %w", err)
 		}
 
-		if continueWorktree {
-			branches, listErr := gitRepo.ListBranches("")
-			if listErr != nil {
-				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to list branches for continue mode: %w", listErr)
-			}
+		if err := os.RemoveAll(filepath.Join(worktreesRoot, worktreeBranch)); err != nil {
+			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to remove existing worktree path: %w", err)
+		}
 
-			branchExists := false
-			for _, branch := range branches {
-				if branch == worktreeBranch {
-					branchExists = true
-					break
-				}
-			}
+		if err := gitRepo.DropWorktree(worktreeBranch); err != nil && !errors.Is(err, apis.ErrFileNotFound) {
+			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to drop existing worktree: %w", err)
+		}
 
-			if !branchExists {
-				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: worktree branch %q not found: %w", worktreeBranch, apis.ErrFileNotFound)
-			}
-		} else {
-			if err := os.RemoveAll(filepath.Join(worktreesRoot, worktreeBranch)); err != nil {
-				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to remove existing worktree path: %w", err)
-			}
+		if err := gitRepo.DeleteBranch(worktreeBranch); err != nil && !errors.Is(err, apis.ErrFileNotFound) {
+			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to delete existing worktree branch: %w", err)
+		}
 
-			if err := gitRepo.DropWorktree(worktreeBranch); err != nil && !errors.Is(err, apis.ErrFileNotFound) {
-				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to drop existing worktree: %w", err)
-			}
-
-			if err := gitRepo.DeleteBranch(worktreeBranch); err != nil && !errors.Is(err, apis.ErrFileNotFound) {
-				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to delete existing worktree branch: %w", err)
-			}
-
-			if err := gitRepo.NewBranch(worktreeBranch, "HEAD"); err != nil {
-				return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create worktree branch: %w", err)
-			}
+		if err := gitRepo.NewBranch(worktreeBranch, "HEAD"); err != nil {
+			return nil, nil, fmt.Errorf("prepareSessionVFS() [bootstrap.go]: failed to create worktree branch: %w", err)
 		}
 
 		selectedVCS = gitRepo
@@ -501,7 +481,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		allowedPaths = append(allowedPaths, shadowDir)
 	}
 
-	selectedVCS, selectedVFS, err := PrepareSessionVFS(workDir, configRoot, params.WorktreeBranch, params.ContinueWorktree, hidePatterns, params.GitUserName, params.GitUserEmail, allowedPaths)
+	selectedVCS, selectedVFS, err := PrepareSessionVFS(workDir, configRoot, params.WorktreeBranch, hidePatterns, params.GitUserName, params.GitUserEmail, allowedPaths)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)

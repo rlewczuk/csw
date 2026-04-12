@@ -1440,15 +1440,6 @@ func (s *SweSession) compactContext(statusMessage string) error {
 	return nil
 }
 
-// ForceCompactContext compacts session context regardless of current threshold.
-func (s *SweSession) ForceCompactContext() error {
-	if s == nil {
-		return fmt.Errorf("SweSession.ForceCompactContext() [session.go]: session is nil")
-	}
-
-	return s.compactContext("Compacting resumed session context...")
-}
-
 func (s *SweSession) contextCompactionThreshold() float64 {
 	if s.configStore != nil {
 		globalConfig, err := s.configStore.GetGlobalConfig()

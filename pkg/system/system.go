@@ -2,7 +2,6 @@ package system
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -53,107 +52,6 @@ type SweSystem struct {
 	LogLLMRequestsRaw    bool
 	Thinking             string
 	MaxToolThreads       int
-}
-
-// LoadSession loads a persisted session from disk and registers it in memory.
-func (s *SweSystem) LoadSession(id string, outputHandler core.SessionThreadOutput) (*core.SweSession, error) {
-	s.sessionsMu.Lock()
-	defer s.sessionsMu.Unlock()
-
-	if existing, ok := s.sessions[id]; ok {
-		existing.SetOutputHandler(outputHandler)
-		return existing, nil
-	}
-
-	if strings.TrimSpace(id) == "" {
-		return nil, fmt.Errorf("SweSystem.LoadSession() [system.go]: session id cannot be empty")
-	}
-
-	statePath := filepath.Join(s.LogBaseDir, "sessions", id, "session.json")
-	stateBytes, err := os.ReadFile(statePath)
-	if err != nil {
-		return nil, fmt.Errorf("SweSystem.LoadSession() [system.go]: failed to read session state file: %w", err)
-	}
-
-	var state core.PersistedSessionState
-	if err := json.Unmarshal(stateBytes, &state); err != nil {
-		return nil, fmt.Errorf("SweSystem.LoadSession() [system.go]: failed to unmarshal session state: %w", err)
-	}
-
-	params := s.buildSessionParams()
-	params.Logger = logging.GetSessionLogger(state.SessionID, logging.LogTypeSession)
-	if s.LogLLMRequests {
-		params.LLMLogger = logging.GetSessionLogger(state.SessionID, logging.LogTypeLLM)
-	}
-	if s.LogLLMRequestsRaw && strings.TrimSpace(s.LogBaseDir) != "" {
-		if provider, ok := s.ModelProviders[state.ProviderName]; ok {
-			rawPath := filepath.Join(s.LogBaseDir, "sessions", state.SessionID, "llm_requests_raw.log")
-			if err := attachProviderRawLLMLogger(provider, state.ProviderName, state.Model, rawPath); err != nil && params.Logger != nil {
-				params.Logger.Warn("failed to setup raw llm logger", "error", err)
-			}
-		}
-	}
-
-	session, err := core.RestoreSessionFromPersistedState(params, state, outputHandler)
-	if err != nil {
-		return nil, fmt.Errorf("SweSystem.LoadSession() [system.go]: failed to restore session: %w", err)
-	}
-
-	if s.sessions == nil {
-		s.sessions = make(map[string]*core.SweSession)
-	}
-	s.sessions[session.ID()] = session
-
-	return session, nil
-}
-
-// LoadLastSession loads the most recently updated persisted session.
-func (s *SweSystem) LoadLastSession(outputHandler core.SessionThreadOutput) (*core.SweSession, error) {
-	if strings.TrimSpace(s.LogBaseDir) == "" {
-		return nil, fmt.Errorf("SweSystem.LoadLastSession() [system.go]: LogBaseDir is empty")
-	}
-
-	sessionsRoot := filepath.Join(s.LogBaseDir, "sessions")
-	entries, err := os.ReadDir(sessionsRoot)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("SweSystem.LoadLastSession() [system.go]: no persisted sessions found")
-		}
-		return nil, fmt.Errorf("SweSystem.LoadLastSession() [system.go]: failed to read sessions directory: %w", err)
-	}
-
-	type persistedSessionFile struct {
-		id      string
-		modTime int64
-	}
-
-	latest := persistedSessionFile{}
-	found := false
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		sessionID := entry.Name()
-		statePath := filepath.Join(sessionsRoot, sessionID, "session.json")
-		info, statErr := os.Stat(statePath)
-		if statErr != nil {
-			continue
-		}
-
-		modTime := info.ModTime().UnixNano()
-		if !found || modTime > latest.modTime {
-			latest = persistedSessionFile{id: sessionID, modTime: modTime}
-			found = true
-		}
-	}
-
-	if !found {
-		return nil, fmt.Errorf("SweSystem.LoadLastSession() [system.go]: no persisted sessions found")
-	}
-
-	return s.LoadSession(latest.id, outputHandler)
 }
 
 // NewSession creates a new session for selected model.
