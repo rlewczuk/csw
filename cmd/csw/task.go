@@ -1218,7 +1218,15 @@ func resolveTaskNewPrompt(ctx context.Context, params taskNewPromptParams) (stri
 		return "", false, err
 	}
 
-	temporaryFile, err := os.CreateTemp("", "csw-task-new-*.md")
+	temporaryDir, err := resolveTaskTempDir(workDir, strings.TrimSpace(params.ShadowDir))
+	if err != nil {
+		return "", false, err
+	}
+	if err := os.MkdirAll(temporaryDir, 0o755); err != nil {
+		return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to create temporary directory: %w", err)
+	}
+
+	temporaryFile, err := os.CreateTemp(temporaryDir, "csw-task-new-*.md")
 	if err != nil {
 		return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to create temporary prompt file: %w", err)
 	}
@@ -1249,6 +1257,24 @@ func resolveTaskNewPrompt(ctx context.Context, params taskNewPromptParams) (stri
 	}
 
 	return resolvedPrompt, true, nil
+}
+
+func resolveTaskTempDir(workDir string, shadowDir string) (string, error) {
+	resolvedWorkDir, err := system.ResolveWorkDir(strings.TrimSpace(workDir))
+	if err != nil {
+		return "", fmt.Errorf("resolveTaskTempDir() [task.go]: failed to resolve work directory: %w", err)
+	}
+
+	configRoot := resolvedWorkDir
+	if strings.TrimSpace(shadowDir) != "" {
+		resolvedShadowDir, shadowErr := system.ResolveWorkDir(strings.TrimSpace(shadowDir))
+		if shadowErr != nil {
+			return "", fmt.Errorf("resolveTaskTempDir() [task.go]: failed to resolve shadow directory: %w", shadowErr)
+		}
+		configRoot = resolvedShadowDir
+	}
+
+	return filepath.Join(configRoot, ".cswdata", "tmp"), nil
 }
 
 func resolveTaskEditorCommand(params taskNewPromptParams) (string, error) {
