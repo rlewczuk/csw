@@ -146,6 +146,8 @@ DO NOT run `git commit`, `git push`, `git reset`, `git rebase` and/or do any oth
 
 ALWAYS use paths relative to your work directory or project root, for example instead of `/home/user/myproject/pkg/foo/bar.go` use `pkg/foo/bar.go`.
 
+Note that in many project directories `AGENTS.md` files might be present. You do not need to read them as they will be automatically added to your context when you access anything in given directory. DO NOT read those files using tools, if you need more information about files in a directory you did not access yet, just list this directory or access any file inside. 
+
 ### General Guidelines for Research and Data Processing
 
 The requirements specification may imply research on certain topics, process certain multimedia files. When doing such tasks, you must:
