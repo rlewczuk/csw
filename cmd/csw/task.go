@@ -41,6 +41,7 @@ func TaskCommand() *cobra.Command {
 
 	command.AddCommand(taskNewCommand())
 	command.AddCommand(taskUpdateCommand())
+	command.AddCommand(taskEditCommand())
 	command.AddCommand(taskGetCommand())
 	command.AddCommand(taskRunCommand())
 	command.AddCommand(taskListCommand())
@@ -147,6 +148,14 @@ func taskNewCommand() *cobra.Command {
 }
 
 func taskUpdateCommand() *cobra.Command {
+	return taskUpdateCommandWithDefaults("update [name|uuid]", "Update existing task", false)
+}
+
+func taskEditCommand() *cobra.Command {
+	return taskUpdateCommandWithDefaults("edit [name|uuid]", "Edit existing task prompt (shortcut for update --edit)", true)
+}
+
+func taskUpdateCommandWithDefaults(use string, short string, defaultEdit bool) *cobra.Command {
 	var name string
 	var description string
 	var branch string
@@ -156,7 +165,7 @@ func taskUpdateCommand() *cobra.Command {
 	var prompt string
 	var last bool
 	var next bool
-	var edit bool
+	edit := defaultEdit
 	var cliEditor string
 	var regen bool
 	var regenBranch bool
@@ -165,8 +174,8 @@ func taskUpdateCommand() *cobra.Command {
 	var run bool
 
 	command := &cobra.Command{
-		Use:   "update [name|uuid]",
-		Short: "Update existing task",
+		Use:   strings.TrimSpace(use),
+		Short: strings.TrimSpace(short),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if last && next {
 				return fmt.Errorf("taskUpdateCommand.Args() [task.go]: --last and --next cannot be used together")
@@ -319,7 +328,7 @@ func taskUpdateCommand() *cobra.Command {
 	command.Flags().StringVarP(&prompt, "prompt", "p", "", "Task prompt")
 	command.Flags().BoolVar(&last, "last", false, "Update latest unfinished task")
 	command.Flags().BoolVar(&next, "next", false, "Update oldest unfinished task")
-	command.Flags().BoolVar(&edit, "edit", false, "Edit task prompt in editor")
+	command.Flags().BoolVar(&edit, "edit", defaultEdit, "Edit task prompt in editor")
 	command.Flags().StringVar(&cliEditor, "editor", "", "Editor command used for interactive prompt editing")
 	command.Flags().BoolVar(&regen, "regen", false, "Regenerate task name, branch and description")
 	command.Flags().BoolVar(&regenBranch, "regen-branch", false, "Regenerate feature branch")

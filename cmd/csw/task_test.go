@@ -227,14 +227,14 @@ func TestTaskNewCommandPromptFlagIsOptional(t *testing.T) {
 func TestTaskCommandContainsExpectedSubcommands(t *testing.T) {
 	command := TaskCommand()
 	subcommands := command.Commands()
-	require.Len(t, subcommands, 7)
+	require.Len(t, subcommands, 8)
 
 	names := make([]string, 0, len(subcommands))
 	for _, subcommand := range subcommands {
 		names = append(names, subcommand.Name())
 	}
 
-	assert.ElementsMatch(t, []string{"new", "update", "get", "run", "list", "merge", "archive"}, names)
+	assert.ElementsMatch(t, []string{"new", "update", "edit", "get", "run", "list", "merge", "archive"}, names)
 }
 
 func TestTaskCommandArgValidators(t *testing.T) {
@@ -247,6 +247,8 @@ func TestTaskCommandArgValidators(t *testing.T) {
 		}{
 		{name: "update requires one argument", command: taskUpdateCommand(), args: []string{}, expectError: true},
 		{name: "update accepts one argument", command: taskUpdateCommand(), args: []string{"task-1"}, expectError: false},
+		{name: "edit requires one argument", command: taskEditCommand(), args: []string{}, expectError: true},
+		{name: "edit accepts one argument", command: taskEditCommand(), args: []string{"task-1"}, expectError: false},
 		{name: "get requires one argument", command: taskGetCommand(), args: []string{}, expectError: true},
 		{name: "get accepts one argument", command: taskGetCommand(), args: []string{"task-1"}, expectError: false},
 		{name: "run requires task flag or last", command: taskRunCommand(), args: []string{}, expectError: true},
@@ -290,6 +292,14 @@ func TestTaskUpdateCommandIncludesExpectedFlags(t *testing.T) {
 	assert.NotNil(t, command.Flags().Lookup("regen-branch"))
 	assert.NotNil(t, command.Flags().Lookup("regen-name"))
 	assert.NotNil(t, command.Flags().Lookup("regen-description"))
+}
+
+func TestTaskEditCommandDefaultsToEditMode(t *testing.T) {
+	command := taskEditCommand()
+	assert.Equal(t, "edit", command.Name())
+	editFlag := command.Flags().Lookup("edit")
+	require.NotNil(t, editFlag)
+	assert.Equal(t, "true", editFlag.DefValue)
 }
 
 func TestTaskUpdateCommandArgsValidationWithLastFlag(t *testing.T) {
