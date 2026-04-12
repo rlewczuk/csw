@@ -210,6 +210,7 @@ func TestTaskCommandArgValidators(t *testing.T) {
 		{name: "get accepts one argument", command: taskGetCommand(), args: []string{"task-1"}, expectError: false},
 		{name: "run requires one argument", command: taskRunCommand(), args: []string{}, expectError: true},
 		{name: "run accepts one argument", command: taskRunCommand(), args: []string{"task-1"}, expectError: false},
+		{name: "run rejects two arguments", command: taskRunCommand(), args: []string{"task-1", "task-2"}, expectError: true},
 		{name: "list accepts no argument", command: taskListCommand(), args: []string{}, expectError: false},
 		{name: "list accepts one argument", command: taskListCommand(), args: []string{"task-1"}, expectError: false},
 		{name: "list rejects more than one argument", command: taskListCommand(), args: []string{"task-1", "task-2"}, expectError: true},
@@ -463,6 +464,7 @@ func TestTaskRunCommandIncludesRunSessionFlags(t *testing.T) {
 		"log-llm-requests",
 		"log-llm-requests-raw",
 		"lsp-server",
+		"last",
 		"max-threads",
 		"mcp-disable",
 		"mcp-enable",
@@ -489,10 +491,16 @@ func TestTaskRunCommandIncludesRunSessionFlags(t *testing.T) {
 	}
 }
 
-func TestResolveTaskRunIdentifierReturnsProvidedIdentifierWhenNotLast(t *testing.T) {
-	resolved, err := resolveTaskRunIdentifier(nil, " task-123 ")
+func TestResolveTaskRunIdentifierReturnsProvidedIdentifierWhenNotUsingLastFlag(t *testing.T) {
+	resolved, err := resolveTaskRunIdentifier(nil, " task-123 ", false)
 	require.NoError(t, err)
 	assert.Equal(t, "task-123", resolved)
+}
+
+func TestResolveTaskRunIdentifierReturnsNameLastWhenLastFlagIsNotUsed(t *testing.T) {
+	resolved, err := resolveTaskRunIdentifier(nil, " last ", false)
+	require.NoError(t, err)
+	assert.Equal(t, "last", resolved)
 }
 
 func TestResolveTaskRunIdentifierResolvesLastUnfinishedTaskByMostRecentModTime(t *testing.T) {
@@ -520,7 +528,7 @@ func TestResolveTaskRunIdentifierResolvesLastUnfinishedTaskByMostRecentModTime(t
 	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), baseTime.Add(3*time.Minute))
 	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), baseTime.Add(4*time.Minute))
 
-	resolved, err := resolveTaskRunIdentifier(manager, "last")
+	resolved, err := resolveTaskRunIdentifier(manager, "", true)
 	require.NoError(t, err)
 	assert.Equal(t, runnableNewest.UUID, resolved)
 }
@@ -541,9 +549,24 @@ func TestResolveTaskRunIdentifierReturnsErrorWhenNoUnfinishedTaskExists(t *testi
 	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", mergedTask.UUID, "task.yml"), core.TaskStatusMerged, core.TaskStateCompleted)
 	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), core.TaskStatusRunning, core.TaskStateRunning)
 
-	_, err = resolveTaskRunIdentifier(manager, "last")
+	_, err = resolveTaskRunIdentifier(manager, "", true)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no unfinished task found")
+}
+
+func TestTaskRunCommandArgsValidationWithLastFlag(t *testing.T) {
+	command := taskRunCommand()
+
+	argsErr := command.Args(command, []string{})
+	assert.Error(t, argsErr)
+
+	require.NoError(t, command.Flags().Set("last", "true"))
+
+	assert.NoError(t, command.Args(command, []string{}))
+
+	conflictErr := command.Args(command, []string{"task-1"})
+	require.Error(t, conflictErr)
+	assert.Contains(t, conflictErr.Error(), "cannot be used with --last")
 }
 
 func TestPrintTaskRunOutcome(t *testing.T) {

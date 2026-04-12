@@ -288,6 +288,7 @@ func taskGetCommand() *cobra.Command {
 func taskRunCommand() *cobra.Command {
 	var merge bool
 	var reset bool
+	var last bool
 	var cliModel string
 	var cliRole string
 	var cliWorkDir string
@@ -322,9 +323,17 @@ func taskRunCommand() *cobra.Command {
 	var cliContext []string
 
 	command := &cobra.Command{
-		Use:   "run {name|uuid|last}",
+		Use:   "run [name|uuid]",
 		Short: "Run task session",
-		Args:  cobra.ExactArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if !last {
+				return cobra.ExactArgs(1)(cmd, args)
+			}
+			if len(args) > 0 {
+				return fmt.Errorf("taskRunCommand.Args() [task.go]: task identifier cannot be used with --last")
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := applyRunDefaults(resolveTaskRunDefaultsFunc, cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &merge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads, &cliShadowDir, &cliAllowAllPerms, &cliVFSAllow); err != nil {
 				return err
@@ -347,7 +356,12 @@ func taskRunCommand() *cobra.Command {
 				return err
 			}
 
-			identifier, err := resolveTaskRunIdentifier(manager, strings.TrimSpace(args[0]))
+			var argIdentifier string
+			if len(args) > 0 {
+				argIdentifier = strings.TrimSpace(args[0])
+			}
+
+			identifier, err := resolveTaskRunIdentifier(manager, argIdentifier, last)
 			if err != nil {
 				return err
 			}
@@ -396,6 +410,7 @@ func taskRunCommand() *cobra.Command {
 
 	command.Flags().BoolVar(&merge, "merge", false, "Merge task into parent branch after successful run")
 	command.Flags().BoolVar(&reset, "reset", false, "Reset task branch before run")
+	command.Flags().BoolVar(&last, "last", false, "Run latest unfinished task")
 	command.Flags().StringVar(&cliModel, "model", "", "Model alias or model spec in provider/model format (single or comma-separated fallback list); if not set, uses defaults")
 	command.Flags().StringVar(&cliRole, "role", "developer", "Agent role name")
 	command.Flags().StringVar(&cliWorkDir, "workdir", "", "Working directory (default: current directory)")
@@ -433,24 +448,26 @@ func taskRunCommand() *cobra.Command {
 	return command
 }
 
-func resolveTaskRunIdentifier(manager *core.TaskManager, identifier string) (string, error) {
+func resolveTaskRunIdentifier(manager *core.TaskManager, identifier string, useLast bool) (string, error) {
+	if useLast {
+		if manager == nil {
+			return "", fmt.Errorf("resolveTaskRunIdentifier() [task.go]: manager cannot be nil")
+		}
+
+		taskData, err := findLastUnfinishedTask(manager)
+		if err != nil {
+			return "", err
+		}
+
+		return strings.TrimSpace(taskData.UUID), nil
+	}
+
 	trimmedIdentifier := strings.TrimSpace(identifier)
 	if trimmedIdentifier == "" {
 		return "", fmt.Errorf("resolveTaskRunIdentifier() [task.go]: task identifier cannot be empty")
 	}
-	if trimmedIdentifier != "last" {
-		return trimmedIdentifier, nil
-	}
-	if manager == nil {
-		return "", fmt.Errorf("resolveTaskRunIdentifier() [task.go]: manager cannot be nil")
-	}
 
-	taskData, err := findLastUnfinishedTask(manager)
-	if err != nil {
-		return "", err
-	}
-
-	return strings.TrimSpace(taskData.UUID), nil
+	return trimmedIdentifier, nil
 }
 
 func findLastUnfinishedTask(manager *core.TaskManager) (*core.Task, error) {
