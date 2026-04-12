@@ -600,7 +600,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 			containerEnv["GIT_AUTHOR_EMAIL"] = gitAuthorEmail
 		}
 
-		containerRunner, err := runner.NewContainerRunner(runner.ContainerConfig{
+		containerRunner, err := runner.NewLazyContainerRunner(runner.ContainerConfig{
 			ImageName:      containerRuntimeConfig.Image,
 			Workdir:        effectiveWorkDir,
 			MountDirs:      containerRuntimeConfig.Mounts,
@@ -614,7 +614,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		})
 		if err != nil {
 			logging.FlushLogs()
-			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create container runner: %w", err)
+			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create lazy container runner: %w", err)
 		}
 		containerImageInfo := containerRunner.ImageInfo()
 		containerIdentity := containerRunner.Identity()
