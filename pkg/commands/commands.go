@@ -29,9 +29,63 @@ var embeddedCommandsFS embed.FS
 
 // Metadata describes supported command frontmatter fields.
 type Metadata struct {
-	Description string `yaml:"description"`
-	Agent       string `yaml:"agent"`
-	Model       string `yaml:"model"`
+	Description string       `yaml:"description"`
+	Agent       string       `yaml:"agent"`
+	Model       string       `yaml:"model"`
+	CSW         *CSWMetadata `yaml:"csw"`
+}
+
+// CSWMetadata describes csw-specific command frontmatter fields.
+type CSWMetadata struct {
+	Defaults *RunDefaultsMetadata `yaml:"defaults"`
+	Task     *TaskMetadata        `yaml:"task"`
+}
+
+// RunDefaultsMetadata mirrors conf.RunDefaultsConfig with pointer fields.
+type RunDefaultsMetadata struct {
+	DefaultProvider     *string            `yaml:"default-provider"`
+	DefaultRole         *string            `yaml:"default-role"`
+	Container           *ContainerMetadata `yaml:"container"`
+	Model               *string            `yaml:"model"`
+	Worktree            *string            `yaml:"worktree"`
+	Merge               *bool              `yaml:"merge"`
+	LogLLMRequests      *bool              `yaml:"log-llm-requests"`
+	Thinking            *string            `yaml:"thinking"`
+	LSPServer           *string            `yaml:"lsp-server"`
+	GitUserName         *string            `yaml:"git-user"`
+	GitUserEmail        *string            `yaml:"git-email"`
+	MaxThreads          *int               `yaml:"max-threads"`
+	TaskDir             *string            `yaml:"task-dir"`
+	ShadowDir           *string            `yaml:"shadow-dir"`
+	AllowAllPermissions *bool              `yaml:"allow-all-permissions"`
+	VFSAllow            *[]string          `yaml:"vfs-allow"`
+	Editors             *[]string          `yaml:"editors"`
+}
+
+// ContainerMetadata mirrors conf.ContainerConfig with pointer fields.
+type ContainerMetadata struct {
+	Mounts  *[]string `yaml:"mounts"`
+	Env     *[]string `yaml:"env"`
+	Image   *string   `yaml:"image"`
+	Enabled *bool     `yaml:"enabled"`
+}
+
+// TaskMetadata mirrors core.Task with pointer fields.
+type TaskMetadata struct {
+	UUID          *string   `yaml:"uuid"`
+	Name          *string   `yaml:"name"`
+	Description   *string   `yaml:"description"`
+	Status        *string   `yaml:"status"`
+	FeatureBranch *string   `yaml:"feature_branch"`
+	ParentBranch  *string   `yaml:"parent_branch"`
+	Role          *string   `yaml:"role"`
+	State         *string   `yaml:"state"`
+	Deps          *[]string `yaml:"deps"`
+	SessionIDs    *[]string `yaml:"session_ids"`
+	SubtaskIDs    *[]string `yaml:"subtask_ids"`
+	ParentTaskID  *string   `yaml:"parent_task_id"`
+	CreatedAt     *string   `yaml:"created_at"`
+	UpdatedAt     *string   `yaml:"updated_at"`
 }
 
 // Command stores loaded command definition.

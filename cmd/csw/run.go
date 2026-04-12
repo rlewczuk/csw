@@ -7,6 +7,7 @@ import (
 	stdio "io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 // RunParams holds all parameters for runCommand.
@@ -28,10 +30,12 @@ type RunParams struct {
 	CommandName           string
 	CommandArgs           []string
 	CommandTemplate       string
+	CommandTaskMetadata   *commands.TaskMetadata
 	ContextData           map[string]string
 	ModelName             string
 	RoleName              string
 	Task                  *core.Task
+	InitialTask           *core.Task
 	WorkDir               string
 	ShadowDir             string
 	WorktreeBranch        string
@@ -190,6 +194,8 @@ func RunCommand() *cobra.Command {
 			commandArgs := []string(nil)
 			commandModelOverride := ""
 			commandRoleOverride := ""
+			var commandRunDefaults *commands.RunDefaultsMetadata
+			var commandTaskMetadata *commands.TaskMetadata
 			commandNeedsShell := false
 			if invocation != nil {
 				commandsRoot, rootErr := resolveCommandsRootDir(cliWorkDir, cliShadowDir)
@@ -207,6 +213,10 @@ func RunCommand() *cobra.Command {
 
 				commandModelOverride = strings.TrimSpace(loadedCommand.Metadata.Model)
 				commandRoleOverride = strings.TrimSpace(loadedCommand.Metadata.Agent)
+				if loadedCommand.Metadata.CSW != nil {
+					commandRunDefaults = loadedCommand.Metadata.CSW.Defaults
+					commandTaskMetadata = loadedCommand.Metadata.CSW.Task
+				}
 				commandNeedsShell = commands.HasDefaultRuntimeShellExpansion(loadedCommand.Template)
 
 				prompt = loadedCommand.Template
@@ -218,6 +228,7 @@ func RunCommand() *cobra.Command {
 			}
 
 			var taskData *core.Task
+			var initialTaskData *core.Task
 			if strings.TrimSpace(cliTaskJSON) != "" {
 				var task core.Task
 				if unmarshalErr := json.Unmarshal([]byte(cliTaskJSON), &task); unmarshalErr != nil {
@@ -225,6 +236,7 @@ func RunCommand() *cobra.Command {
 				}
 				task.TaskDir = strings.TrimSpace(cliTaskDir)
 				taskData = &task
+				initialTaskData = cloneRunTask(taskData)
 			}
 
 			if resumeTarget == "" {
@@ -253,6 +265,10 @@ func RunCommand() *cobra.Command {
 			if err := applyRunDefaults(resolveRunDefaultsFunc, cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads, &cliShadowDir, &cliAllowAllPerms, &cliVFSAllow); err != nil {
 				return err
 			}
+			commandContainerEnabled, err := applyCommandRunDefaults(cmd, commandRunDefaults, &cliModel, &cliRole, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads, &cliShadowDir, &cliAllowAllPerms, &cliVFSAllow, &cliContainerOn, &cliContainerOff, &cliContainerImage, &cliContainerMount, &cliContainerEnv)
+			if err != nil {
+				return err
+			}
 			cliLogLLMRequests = cliLogLLMRequests || cliLogLLMRequestsRaw
 			modelOverridden := cmd.Flags().Changed("model")
 			roleOverridden := cmd.Flags().Changed("role")
@@ -274,6 +290,9 @@ func RunCommand() *cobra.Command {
 			}
 
 			containerRequested := (containerEnabledChanged && cliContainerOn) || len(cliContainerMount) > 0 || len(cliContainerEnv) > 0
+			if !containerEnabledChanged && !containerDisabledChanged && commandContainerEnabled != nil {
+				containerRequested = *commandContainerEnabled
+			}
 			if !containerDisabledChanged && invocation != nil && commandNeedsShell {
 				containerRequested = true
 			}
@@ -291,10 +310,12 @@ func RunCommand() *cobra.Command {
 				CommandName:           commandName,
 				CommandArgs:           commandArgs,
 				CommandTemplate:       commandTemplate,
+				CommandTaskMetadata:   commandTaskMetadata,
 				ContextData:           contextData,
 				ModelName:             cliModel,
 				RoleName:              cliRole,
 				Task:                  taskData,
+				InitialTask:           initialTaskData,
 				WorkDir:               cliWorkDir,
 				ShadowDir:             cliShadowDir,
 				WorktreeBranch:        firstNonEmpty(continueWorktreeBranch, cliWorktree),
@@ -632,7 +653,113 @@ func runCommand(params *RunParams) error {
 		return err
 	}
 
+	if err := applyCommandTaskMetadata(params); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func applyCommandTaskMetadata(params *RunParams) error {
+	if params == nil || params.Task == nil || params.CommandTaskMetadata == nil {
+		return nil
+	}
+	taskDir := strings.TrimSpace(params.Task.TaskDir)
+	if taskDir == "" {
+		return nil
+	}
+
+	taskFilePath := filepath.Join(taskDir, "task.yml")
+	taskBytes, err := os.ReadFile(taskFilePath)
+	if err != nil {
+		return fmt.Errorf("applyCommandTaskMetadata() [run.go]: failed to read task metadata: %w", err)
+	}
+
+	var persistedTask core.Task
+	if err := yaml.Unmarshal(taskBytes, &persistedTask); err != nil {
+		return fmt.Errorf("applyCommandTaskMetadata() [run.go]: failed to parse task metadata: %w", err)
+	}
+
+	applyIfUnchanged := func(fieldName string, apply func()) {
+		if params.InitialTask == nil {
+			apply()
+			return
+		}
+		currentField := reflect.ValueOf(persistedTask).FieldByName(fieldName)
+		initialField := reflect.ValueOf(*params.InitialTask).FieldByName(fieldName)
+		if !currentField.IsValid() || !initialField.IsValid() {
+			return
+		}
+		if reflect.DeepEqual(currentField.Interface(), initialField.Interface()) {
+			apply()
+		}
+	}
+
+	metadata := params.CommandTaskMetadata
+	if metadata.UUID != nil {
+		applyIfUnchanged("UUID", func() { persistedTask.UUID = strings.TrimSpace(*metadata.UUID) })
+	}
+	if metadata.Name != nil {
+		applyIfUnchanged("Name", func() { persistedTask.Name = strings.TrimSpace(*metadata.Name) })
+	}
+	if metadata.Description != nil {
+		applyIfUnchanged("Description", func() { persistedTask.Description = strings.TrimSpace(*metadata.Description) })
+	}
+	if metadata.Status != nil {
+		applyIfUnchanged("Status", func() { persistedTask.Status = strings.TrimSpace(*metadata.Status) })
+	}
+	if metadata.FeatureBranch != nil {
+		applyIfUnchanged("FeatureBranch", func() { persistedTask.FeatureBranch = strings.TrimSpace(*metadata.FeatureBranch) })
+	}
+	if metadata.ParentBranch != nil {
+		applyIfUnchanged("ParentBranch", func() { persistedTask.ParentBranch = strings.TrimSpace(*metadata.ParentBranch) })
+	}
+	if metadata.Role != nil {
+		applyIfUnchanged("Role", func() { persistedTask.Role = strings.TrimSpace(*metadata.Role) })
+	}
+	if metadata.State != nil {
+		applyIfUnchanged("State", func() { persistedTask.State = strings.TrimSpace(*metadata.State) })
+	}
+	if metadata.Deps != nil {
+		applyIfUnchanged("Deps", func() { persistedTask.Deps = append([]string(nil), (*metadata.Deps)...) })
+	}
+	if metadata.SessionIDs != nil {
+		applyIfUnchanged("SessionIDs", func() { persistedTask.SessionIDs = append([]string(nil), (*metadata.SessionIDs)...) })
+	}
+	if metadata.SubtaskIDs != nil {
+		applyIfUnchanged("SubtaskIDs", func() { persistedTask.SubtaskIDs = append([]string(nil), (*metadata.SubtaskIDs)...) })
+	}
+	if metadata.ParentTaskID != nil {
+		applyIfUnchanged("ParentTaskID", func() { persistedTask.ParentTaskID = strings.TrimSpace(*metadata.ParentTaskID) })
+	}
+	if metadata.CreatedAt != nil {
+		applyIfUnchanged("CreatedAt", func() { persistedTask.CreatedAt = strings.TrimSpace(*metadata.CreatedAt) })
+	}
+	if metadata.UpdatedAt != nil {
+		applyIfUnchanged("UpdatedAt", func() { persistedTask.UpdatedAt = strings.TrimSpace(*metadata.UpdatedAt) })
+	}
+
+	updatedBytes, err := yaml.Marshal(&persistedTask)
+	if err != nil {
+		return fmt.Errorf("applyCommandTaskMetadata() [run.go]: failed to serialize task metadata: %w", err)
+	}
+	if err := os.WriteFile(taskFilePath, updatedBytes, 0644); err != nil {
+		return fmt.Errorf("applyCommandTaskMetadata() [run.go]: failed to persist task metadata: %w", err)
+	}
+
+	return nil
+}
+
+func cloneRunTask(task *core.Task) *core.Task {
+	if task == nil {
+		return nil
+	}
+	cloned := *task
+	cloned.Deps = append([]string(nil), task.Deps...)
+	cloned.SessionIDs = append([]string(nil), task.SessionIDs...)
+	cloned.SubtaskIDs = append([]string(nil), task.SubtaskIDs...)
+
+	return &cloned
 }
 
 func buildRunSessionOutput(params *RunParams, output stdio.Writer) core.SessionThreadOutput {

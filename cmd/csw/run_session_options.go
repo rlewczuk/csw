@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/spf13/cobra"
@@ -85,6 +86,98 @@ func applyRunDefaults(
 	}
 
 	return nil
+}
+
+func applyCommandRunDefaults(
+	cmd *cobra.Command,
+	defaults *commands.RunDefaultsMetadata,
+	model *string,
+	role *string,
+	worktree *string,
+	merge *bool,
+	logLLMRequests *bool,
+	thinking *string,
+	lspServer *string,
+	gitUser *string,
+	gitEmail *string,
+	maxThreads *int,
+	shadowDirOut *string,
+	allowAllPerms *bool,
+	vfsAllow *[]string,
+	containerOn *bool,
+	containerOff *bool,
+	containerImage *string,
+	containerMounts *[]string,
+	containerEnv *[]string,
+) (*bool, error) {
+	if defaults == nil {
+		return nil, nil
+	}
+
+	if !cmd.Flags().Changed("model") && defaults.Model != nil {
+		*model = strings.TrimSpace(*defaults.Model)
+	}
+	if !cmd.Flags().Changed("role") && defaults.DefaultRole != nil {
+		*role = strings.TrimSpace(*defaults.DefaultRole)
+	}
+	if !cmd.Flags().Changed("worktree") && defaults.Worktree != nil {
+		*worktree = strings.TrimSpace(*defaults.Worktree)
+	}
+	if !cmd.Flags().Changed("merge") && defaults.Merge != nil {
+		*merge = *defaults.Merge
+	}
+	if !cmd.Flags().Changed("log-llm-requests") && defaults.LogLLMRequests != nil {
+		*logLLMRequests = *defaults.LogLLMRequests
+	}
+	if !isThinkingFlagChanged(cmd) && defaults.Thinking != nil {
+		*thinking = strings.TrimSpace(*defaults.Thinking)
+	}
+	if !cmd.Flags().Changed("lsp-server") && defaults.LSPServer != nil {
+		*lspServer = strings.TrimSpace(*defaults.LSPServer)
+	}
+	if !cmd.Flags().Changed("git-user") && defaults.GitUserName != nil {
+		*gitUser = strings.TrimSpace(*defaults.GitUserName)
+	}
+	if !cmd.Flags().Changed("git-email") && defaults.GitUserEmail != nil {
+		*gitEmail = strings.TrimSpace(*defaults.GitUserEmail)
+	}
+	if !cmd.Flags().Changed("max-threads") && defaults.MaxThreads != nil {
+		*maxThreads = *defaults.MaxThreads
+	}
+	if !cmd.Flags().Changed("shadow-dir") && defaults.ShadowDir != nil {
+		*shadowDirOut = strings.TrimSpace(*defaults.ShadowDir)
+	}
+	if !cmd.Flags().Changed("allow-all-permissions") && defaults.AllowAllPermissions != nil {
+		*allowAllPerms = *defaults.AllowAllPermissions
+	}
+	if !cmd.Flags().Changed("vfs-allow") && defaults.VFSAllow != nil {
+		*vfsAllow = append([]string(nil), *defaults.VFSAllow...)
+	}
+
+	var commandContainerEnabled *bool
+	if defaults.Container != nil {
+		if !cmd.Flags().Changed("container-image") && defaults.Container.Image != nil {
+			*containerImage = strings.TrimSpace(*defaults.Container.Image)
+		}
+		if !cmd.Flags().Changed("container-mount") && defaults.Container.Mounts != nil {
+			*containerMounts = append([]string(nil), *defaults.Container.Mounts...)
+		}
+		if !cmd.Flags().Changed("container-env") && defaults.Container.Env != nil {
+			*containerEnv = append([]string(nil), *defaults.Container.Env...)
+		}
+		if defaults.Container.Enabled != nil && !cmd.Flags().Changed("container-enabled") && !cmd.Flags().Changed("container-disabled") {
+			enabledValue := *defaults.Container.Enabled
+			commandContainerEnabled = &enabledValue
+			*containerOn = enabledValue
+			*containerOff = !enabledValue
+		}
+	}
+
+	if *maxThreads < 0 {
+		return commandContainerEnabled, fmt.Errorf("applyCommandRunDefaults() [run_session_options.go]: --max-threads must be >= 0")
+	}
+
+	return commandContainerEnabled, nil
 }
 
 func isThinkingFlagChanged(cmd *cobra.Command) bool {

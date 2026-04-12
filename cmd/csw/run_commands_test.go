@@ -70,6 +70,15 @@ func TestCLICommandInvocation(t *testing.T) {
 			expectedModel:  "provider/cli",
 		},
 		{
+			name:           "command csw defaults apply false and zero values",
+			args:           []string{"--allow-all-permissions", "--max-threads=8", "--container-enabled", "/review"},
+			commandContent: "---\ncsw:\n  defaults:\n    model: provider/review\n    merge: false\n    allow-all-permissions: false\n    max-threads: 0\n    container:\n      enabled: false\n---\nTask",
+			expectedPrompt: "Task",
+			expectedRole:   "developer",
+			expectedModel:  "provider/review",
+			expectedContainerEnable: true,
+		},
+		{
 			name:           "shell command enables container by default",
 			args:           []string{"/review"},
 			commandContent: "---\n---\nBefore !`echo hi`",
@@ -151,7 +160,7 @@ func TestCLICommandInvocation(t *testing.T) {
 				if err := renderCommandPrompt(params, workDir, mockRunner, hostRunner); err != nil {
 					return err
 				}
-				captured = fmt.Sprintf("prompt=%s,role=%s,model=%s,container=%t", params.Prompt, params.RoleName, params.ModelName, params.ContainerEnabled)
+				captured = fmt.Sprintf("prompt=%s,role=%s,model=%s,container=%t,allowAll=%t,maxThreads=%d,merge=%t", params.Prompt, params.RoleName, params.ModelName, params.ContainerEnabled, params.AllowAllPerms, params.MaxThreads, params.Merge)
 				return nil
 			}
 
@@ -175,6 +184,11 @@ func TestCLICommandInvocation(t *testing.T) {
 			assert.Contains(t, captured, "role="+tt.expectedRole)
 			assert.Contains(t, captured, "model="+tt.expectedModel)
 			assert.Contains(t, captured, fmt.Sprintf("container=%t", tt.expectedContainerEnable))
+			if tt.name == "command csw defaults apply false and zero values" {
+				assert.Contains(t, captured, "allowAll=true")
+				assert.Contains(t, captured, "maxThreads=8")
+				assert.Contains(t, captured, "merge=false")
+			}
 		})
 	}
 }

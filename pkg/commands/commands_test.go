@@ -63,6 +63,29 @@ func TestLoadFromDir(t *testing.T) {
 	assert.Equal(t, "run $ARGUMENTS", command.Template)
 }
 
+func TestLoadFromDirParsesCSWMetadata(t *testing.T) {
+	root := t.TempDir()
+	commandsDir := filepath.Join(root, ".agents", "commands")
+	require.NoError(t, os.MkdirAll(commandsDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(commandsDir, "test.md"), []byte("---\ncsw:\n  defaults:\n    merge: false\n    max-threads: 0\n    model: \"\"\n  task:\n    status: merged\n    role: \"\"\n---\nrun"), 0644))
+
+	command, err := LoadFromDir(commandsDir, "test")
+	require.NoError(t, err)
+	require.NotNil(t, command.Metadata.CSW)
+	require.NotNil(t, command.Metadata.CSW.Defaults)
+	require.NotNil(t, command.Metadata.CSW.Defaults.Merge)
+	assert.False(t, *command.Metadata.CSW.Defaults.Merge)
+	require.NotNil(t, command.Metadata.CSW.Defaults.MaxThreads)
+	assert.Equal(t, 0, *command.Metadata.CSW.Defaults.MaxThreads)
+	require.NotNil(t, command.Metadata.CSW.Defaults.Model)
+	assert.Equal(t, "", *command.Metadata.CSW.Defaults.Model)
+	require.NotNil(t, command.Metadata.CSW.Task)
+	require.NotNil(t, command.Metadata.CSW.Task.Status)
+	assert.Equal(t, "merged", *command.Metadata.CSW.Task.Status)
+	require.NotNil(t, command.Metadata.CSW.Task.Role)
+	assert.Equal(t, "", *command.Metadata.CSW.Task.Role)
+}
+
 func TestLoadFromDirHierarchical(t *testing.T) {
 	root := t.TempDir()
 	commandsDir := filepath.Join(root, ".agents", "commands")
