@@ -106,6 +106,13 @@ func TestCLICommandInvocation(t *testing.T) {
 			expectedContainerEnable: false,
 		},
 		{
+			name:           "embedded command is resolved when local file is missing",
+			args:           []string{"/csw/run-critic", "inspect", "this"},
+			expectedPrompt: "inspect this",
+			expectedRole:   "critic",
+			expectedModel:  "provider/default",
+		},
+		{
 			name:          "not command with extra args fails",
 			args:          []string{"plain", "extra"},
 			expectError:   true,

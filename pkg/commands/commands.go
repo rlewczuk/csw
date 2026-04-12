@@ -1,8 +1,12 @@
 package commands
 
 import (
+	"embed"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -17,6 +21,11 @@ var shellPattern = regexp.MustCompile("!`([^`]+)`")
 var defaultScriptPattern = regexp.MustCompile("(^|\\s)!([^\\s!`][^\\s`]*)")
 var hostScriptPattern = regexp.MustCompile("(^|\\s)!!([^\\s`]*)")
 var filePattern = regexp.MustCompile(`(^|\s)@([^\s]+)`)
+
+const embeddedCommandsDir = "data"
+
+//go:embed all:data
+var embeddedCommandsFS embed.FS
 
 // Metadata describes supported command frontmatter fields.
 type Metadata struct {
@@ -73,31 +82,65 @@ func ParseInvocation(prompt string, extraArgs []string) (*Invocation, bool, erro
 
 // LoadFromDir loads command definition from commands directory.
 func LoadFromDir(commandsDir string, name string) (*Command, error) {
-	trimmedName := strings.TrimSpace(name)
-	if trimmedName == "" {
-		return nil, fmt.Errorf("LoadFromDir() [commands.go]: command name cannot be empty")
-	}
-	if strings.Contains(trimmedName, "/") || strings.Contains(trimmedName, string(os.PathSeparator)) {
-		return nil, fmt.Errorf("LoadFromDir() [commands.go]: command name %q is invalid", name)
+	trimmedName, err := normalizeCommandName(name)
+	if err != nil {
+		return nil, err
 	}
 
-	path := filepath.Join(commandsDir, trimmedName+".md")
-	content, err := os.ReadFile(path)
+	localPath := filepath.Join(commandsDir, filepath.FromSlash(trimmedName)+".md")
+	content, err := os.ReadFile(localPath)
+	resolvedPath := localPath
 	if err != nil {
-		return nil, fmt.Errorf("LoadFromDir() [commands.go]: failed to read command file %q: %w", path, err)
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("LoadFromDir() [commands.go]: failed to read command file %q: %w", localPath, err)
+		}
+
+		embeddedPath := path.Join(embeddedCommandsDir, trimmedName+".md")
+		content, err = fs.ReadFile(embeddedCommandsFS, embeddedPath)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil, fmt.Errorf("LoadFromDir() [commands.go]: command %q not found in %q and embedded %q", trimmedName, commandsDir, embeddedCommandsDir)
+			}
+
+			return nil, fmt.Errorf("LoadFromDir() [commands.go]: failed to read embedded command file %q: %w", embeddedPath, err)
+		}
+		resolvedPath = "embedded:" + embeddedPath
 	}
 
 	metadata, template := parseFrontmatter(string(content))
 	if strings.TrimSpace(template) == "" {
-		return nil, fmt.Errorf("LoadFromDir() [commands.go]: command %q template is empty", name)
+		return nil, fmt.Errorf("LoadFromDir() [commands.go]: command %q template is empty", trimmedName)
 	}
 
 	return &Command{
 		Name:     trimmedName,
-		Path:     path,
+		Path:     resolvedPath,
 		Metadata: metadata,
 		Template: template,
 	}, nil
+}
+
+func normalizeCommandName(name string) (string, error) {
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return "", fmt.Errorf("LoadFromDir() [commands.go]: command name cannot be empty")
+	}
+
+	normalized := strings.ReplaceAll(trimmedName, "\\", "/")
+	normalized = strings.TrimPrefix(normalized, "/")
+	normalized = path.Clean(normalized)
+	if normalized == "." || normalized == "" {
+		return "", fmt.Errorf("LoadFromDir() [commands.go]: command name cannot be empty")
+	}
+
+	segments := strings.Split(normalized, "/")
+	for _, segment := range segments {
+		if segment == "" || segment == "." || segment == ".." {
+			return "", fmt.Errorf("LoadFromDir() [commands.go]: command name %q is invalid", name)
+		}
+	}
+
+	return normalized, nil
 }
 
 // ApplyArguments replaces $ARGUMENTS and positional placeholders in template.

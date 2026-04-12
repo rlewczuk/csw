@@ -3,6 +3,7 @@ package commands
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/runner"
@@ -60,6 +61,30 @@ func TestLoadFromDir(t *testing.T) {
 	assert.Equal(t, "reviewer", command.Metadata.Agent)
 	assert.Equal(t, "provider/model", command.Metadata.Model)
 	assert.Equal(t, "run $ARGUMENTS", command.Template)
+}
+
+func TestLoadFromDirHierarchical(t *testing.T) {
+	root := t.TempDir()
+	commandsDir := filepath.Join(root, ".agents", "commands")
+	require.NoError(t, os.MkdirAll(filepath.Join(commandsDir, "foo"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(commandsDir, "foo", "bar.md"), []byte("nested command"), 0644))
+
+	command, err := LoadFromDir(commandsDir, "foo/bar")
+	require.NoError(t, err)
+	assert.Equal(t, "foo/bar", command.Name)
+	assert.Equal(t, "nested command", command.Template)
+}
+
+func TestLoadFromDirFallsBackToEmbeddedCommand(t *testing.T) {
+	root := t.TempDir()
+	commandsDir := filepath.Join(root, ".agents", "commands")
+	require.NoError(t, os.MkdirAll(commandsDir, 0755))
+
+	command, err := LoadFromDir(commandsDir, "csw/run-critic")
+	require.NoError(t, err)
+	assert.Equal(t, "csw/run-critic", command.Name)
+	assert.Equal(t, "embedded:data/csw/run-critic.md", command.Path)
+	assert.NotEmpty(t, strings.TrimSpace(command.Template))
 }
 
 func TestApplyArguments(t *testing.T) {
