@@ -653,7 +653,7 @@ func runTaskList(manager *core.TaskManager, args []string, recursive bool, inclu
 		if item == nil {
 			continue
 		}
-		_, _ = fmt.Fprintf(output, "%s\t%s\t%s\t%s\t%s\n", item.UUID, item.Status, item.Name, item.FeatureBranch, item.Description)
+		_, _ = fmt.Fprintf(output, "%s\t%s\t%s\n", item.UUID, item.Status, item.Description)
 	}
 
 	return nil

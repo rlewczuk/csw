@@ -266,12 +266,10 @@ func TestRunTaskListListsCurrentTasksSortedByTaskYMLModTime(t *testing.T) {
 	assert.True(t, strings.HasPrefix(lines[1], first.UUID+"\t"))
 
 	columns := strings.Split(lines[0], "\t")
-	require.Len(t, columns, 5)
+	require.Len(t, columns, 3)
 	assert.Equal(t, second.UUID, columns[0])
 	assert.Equal(t, second.Status, columns[1])
-	assert.Equal(t, second.Name, columns[2])
-	assert.Equal(t, second.FeatureBranch, columns[3])
-	assert.Equal(t, second.Description, columns[4])
+	assert.Equal(t, second.Description, columns[2])
 }
 
 func TestRunTaskListIncludesArchivedWhenRequested(t *testing.T) {
