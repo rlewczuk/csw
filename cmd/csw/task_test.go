@@ -176,6 +176,28 @@ func TestResolveTaskDirPathPrefersFlagOverConfigAndMakesRelativeAbsolute(t *test
 	assert.Equal(t, filepath.Join(rootDir, "from-flag"), resolved)
 }
 
+func TestResolveTaskDirPathReadsTaskDirFromSubcommandPersistentFlag(t *testing.T) {
+	originalResolver := resolveTaskRunDefaultsFunc
+	t.Cleanup(func() {
+		resolveTaskRunDefaultsFunc = originalResolver
+	})
+
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		_ = params
+		return conf.RunDefaultsConfig{TaskDir: "from-config"}, nil
+	}
+
+	command := TaskCommand()
+	newCommand, _, err := command.Find([]string{"new"})
+	require.NoError(t, err)
+	require.NoError(t, newCommand.ParseFlags([]string{"--task-dir", "from-subcommand"}))
+
+	rootDir := filepath.Join("/tmp", "project")
+	resolved, err := resolveTaskDirPath(newCommand, rootDir)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(rootDir, "from-subcommand"), resolved)
+}
+
 func TestTaskNewCommandPromptFlagIsOptional(t *testing.T) {
 	command := taskNewCommand()
 	promptFlag := command.Flags().Lookup("prompt")
@@ -367,6 +389,25 @@ func TestRunTaskListIncludesArchivedWhenRequested(t *testing.T) {
 	assert.Contains(t, withArchived.String(), archivedTask.UUID)
 }
 
+func TestRunTaskListIgnoresArchiveContainerDirectory(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	require.NoError(t, err)
+
+	activeTask, err := manager.CreateTask(core.TaskCreateParams{Name: "active", Prompt: "prompt"})
+	require.NoError(t, err)
+	archivedTask, err := manager.CreateTask(core.TaskCreateParams{Name: "archived", Prompt: "prompt"})
+	require.NoError(t, err)
+	_, err = manager.ArchiveTask(core.TaskLookup{Identifier: archivedTask.UUID})
+	require.NoError(t, err)
+
+	buffer := &bytes.Buffer{}
+	err = runTaskList(manager, nil, false, false, "", buffer)
+	require.NoError(t, err)
+	assert.Contains(t, buffer.String(), activeTask.UUID)
+	assert.NotContains(t, buffer.String(), archivedTask.UUID)
+}
+
 func TestRunTaskListStatusFiltering(t *testing.T) {
 	baseDir := t.TempDir()
 	manager, err := core.NewTaskManager(baseDir, nil, nil)
@@ -425,7 +466,7 @@ func TestRunTaskArchiveByIdentifier(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, buffer.String(), "Task archived: "+created.UUID)
 
-	archivedPath := filepath.Join(baseDir, ".cswdata", "tasks-archived", created.UUID, "task.yml")
+	archivedPath := filepath.Join(baseDir, ".cswdata", "tasks", "archive", created.UUID, "task.yml")
 	_, statErr := os.Stat(archivedPath)
 	require.NoError(t, statErr)
 }
@@ -449,7 +490,7 @@ func TestRunTaskArchiveDefaultStatusMerged(t *testing.T) {
 	assert.Contains(t, buffer.String(), mergedTask.UUID)
 	assert.NotContains(t, buffer.String(), openTask.UUID)
 
-	_, mergedErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks-archived", mergedTask.UUID, "task.yml"))
+	_, mergedErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks", "archive", mergedTask.UUID, "task.yml"))
 	require.NoError(t, mergedErr)
 	_, openErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks", openTask.UUID, "task.yml"))
 	require.NoError(t, openErr)
@@ -474,7 +515,7 @@ func TestRunTaskArchiveByStatusFailed(t *testing.T) {
 	assert.Contains(t, buffer.String(), failedTask.UUID)
 	assert.NotContains(t, buffer.String(), otherTask.UUID)
 
-	_, failedErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks-archived", failedTask.UUID, "task.yml"))
+	_, failedErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks", "archive", failedTask.UUID, "task.yml"))
 	require.NoError(t, failedErr)
 	_, otherErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks", otherTask.UUID, "task.yml"))
 	require.NoError(t, otherErr)

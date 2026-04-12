@@ -491,7 +491,7 @@ func TestTaskManagerArchiveTaskMovesTaskDirectory(t *testing.T) {
 	require.Error(t, resolveErr)
 	assert.Contains(t, resolveErr.Error(), "not found")
 
-	archivedTaskPath := filepath.Join(baseDir, ".cswdata", "tasks-archived", created.UUID, "task.yml")
+	archivedTaskPath := filepath.Join(baseDir, ".cswdata", "tasks", "archive", created.UUID, "task.yml")
 	_, statErr := os.Stat(archivedTaskPath)
 	require.NoError(t, statErr)
 }
@@ -509,9 +509,27 @@ func TestTaskManagerArchiveTaskPreservesNestedPath(t *testing.T) {
 	_, err = manager.ArchiveTask(TaskLookup{Identifier: child.Name})
 	require.NoError(t, err)
 
-	archivedChildPath := filepath.Join(baseDir, ".cswdata", "tasks-archived", parent.UUID, child.UUID, "task.yml")
+	archivedChildPath := filepath.Join(baseDir, ".cswdata", "tasks", "archive", parent.UUID, child.UUID, "task.yml")
 	_, statErr := os.Stat(archivedChildPath)
 	require.NoError(t, statErr)
+}
+
+func TestTaskManagerListTasksSkipsArchiveContainerDirectory(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})
+	require.NoError(t, err)
+
+	activeTask, err := manager.CreateTask(TaskCreateParams{Name: "active", Prompt: "prompt"})
+	require.NoError(t, err)
+	archivedTask, err := manager.CreateTask(TaskCreateParams{Name: "archived", Prompt: "prompt"})
+	require.NoError(t, err)
+	_, err = manager.ArchiveTask(TaskLookup{Identifier: archivedTask.UUID})
+	require.NoError(t, err)
+
+	tasks, err := manager.ListTasks(TaskLookup{}, false)
+	require.NoError(t, err)
+	require.Len(t, tasks, 1)
+	assert.Equal(t, activeTask.UUID, tasks[0].UUID)
 }
 
 func TestTaskManagerArchiveTasksByStatusArchivesMatchingTasks(t *testing.T) {
@@ -533,7 +551,7 @@ func TestTaskManagerArchiveTasksByStatusArchivesMatchingTasks(t *testing.T) {
 	require.Len(t, archivedTasks, 1)
 	assert.Equal(t, mergedTask.UUID, archivedTasks[0].UUID)
 
-	mergedArchivedPath := filepath.Join(baseDir, ".cswdata", "tasks-archived", mergedTask.UUID, "task.yml")
+	mergedArchivedPath := filepath.Join(baseDir, ".cswdata", "tasks", "archive", mergedTask.UUID, "task.yml")
 	_, mergedArchivedErr := os.Stat(mergedArchivedPath)
 	require.NoError(t, mergedArchivedErr)
 
@@ -560,7 +578,7 @@ func TestTaskManagerArchiveTasksByStatusMatchesTaskState(t *testing.T) {
 	require.Len(t, archivedTasks, 1)
 	assert.Equal(t, failedTask.UUID, archivedTasks[0].UUID)
 
-	archivedPath := filepath.Join(baseDir, ".cswdata", "tasks-archived", failedTask.UUID, "task.yml")
+	archivedPath := filepath.Join(baseDir, ".cswdata", "tasks", "archive", failedTask.UUID, "task.yml")
 	_, statErr := os.Stat(archivedPath)
 	require.NoError(t, statErr)
 }

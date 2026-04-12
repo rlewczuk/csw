@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"text/template"
@@ -205,6 +206,7 @@ type CLITaskSessionRunner struct {
 }
 
 var execTaskCommandContext = exec.CommandContext
+var taskDirUUIDPattern = regexp.MustCompile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 // TaskManager manages persistent hierarchical tasks.
 type TaskManager struct {
@@ -1150,12 +1152,7 @@ func (m *TaskManager) validateDependencies(task *Task) error {
 
 // ArchivedTasksRoot returns archive directory for task persistence.
 func (m *TaskManager) ArchivedTasksRoot() string {
-	tasksRoot := m.TasksRoot()
-	if filepath.Base(tasksRoot) == "tasks" {
-		return filepath.Join(filepath.Dir(tasksRoot), "tasks-archived")
-	}
-
-	return tasksRoot + "-archived"
+	return filepath.Join(m.TasksRoot(), "archive")
 }
 
 func (m *TaskManager) ensureBranches(task *Task, reset bool, vcsRepo apis.VCS) error {
@@ -1328,10 +1325,13 @@ func (m *TaskManager) loadAllTasks() ([]taskWithPath, error) {
 		if walkErr != nil {
 			return walkErr
 		}
-		if d.IsDir() {
+		if d != nil && d.IsDir() {
+			if path != root && !taskDirUUIDPattern.MatchString(strings.TrimSpace(d.Name())) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
-		if filepath.Base(path) != "task.yml" {
+		if d == nil || filepath.Base(path) != "task.yml" {
 			return nil
 		}
 		task, err := readTaskFile(path)
@@ -1373,6 +1373,9 @@ func (m *TaskManager) listChildTasks(taskDir string, recursive bool) ([]*Task, e
 	items := []*Task{}
 	for _, entry := range entries {
 		if !entry.IsDir() {
+			continue
+		}
+		if !taskDirUUIDPattern.MatchString(strings.TrimSpace(entry.Name())) {
 			continue
 		}
 		childDir := filepath.Join(taskDir, entry.Name())

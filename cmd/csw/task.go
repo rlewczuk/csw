@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -25,6 +26,7 @@ var buildTaskSystemFunc = system.BuildSystem
 var taskEditorLookPathFunc = exec.LookPath
 var runTaskEditorFunc = runTaskEditor
 var generateTaskDescriptionFunc = generateTaskDescription
+var taskDirUUIDPattern = regexp.MustCompile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 // TaskCommand creates task command with persistent hierarchical task management.
 func TaskCommand() *cobra.Command {
@@ -849,6 +851,12 @@ func collectTaskYMLModTimes(tasksRoot string) (map[string]int64, error) {
 		if err != nil {
 			return err
 		}
+		if entry != nil && entry.IsDir() {
+			if path != trimmedRoot && !taskDirUUIDPattern.MatchString(strings.TrimSpace(entry.Name())) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 		if entry == nil || entry.IsDir() || strings.TrimSpace(entry.Name()) != "task.yml" {
 			return nil
 		}
@@ -1058,13 +1066,10 @@ func resolveTaskDirPath(cmd *cobra.Command, workDir string) (string, error) {
 		return "", fmt.Errorf("resolveTaskDirPath() [task.go]: command cannot be nil")
 	}
 
-	flagTaskDir, err := cmd.Flags().GetString("task-dir")
-	if err != nil {
-		flag := cmd.PersistentFlags().Lookup("task-dir")
-		if flag == nil {
-			return "", fmt.Errorf("resolveTaskDirPath() [task.go]: failed to read --task-dir flag: %w", err)
-		}
-		flagTaskDir = flag.Value.String()
+	flagTaskDir := ""
+	flag := cmd.Flag("task-dir")
+	if flag != nil {
+		flagTaskDir = strings.TrimSpace(flag.Value.String())
 	}
 
 	resolvedTaskDir := strings.TrimSpace(flagTaskDir)
