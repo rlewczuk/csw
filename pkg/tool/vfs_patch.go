@@ -98,16 +98,10 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 			body, readErr := t.vfs.ReadFile(hunk.Path)
 			if readErr != nil {
 				if readErr == apis.ErrAskPermission {
-					return NewVFSPermissionQuery(args, hunk.Path, "reading file", "read")
+					return NewVFSPermissionDeniedResponse(args, hunk.Path, "read")
 				}
 				if perr, ok := readErr.(*vfs.PermissionError); ok {
-					action := vfsActionFromOperation(perr.Operation)
-					op := perr.Operation
-					if op == "" {
-						op = "read"
-						action = "reading file"
-					}
-					return NewVFSPermissionQuery(args, perr.Path, action, op)
+					return NewVFSPermissionDeniedResponse(args, perr.Path, perr.Operation)
 				}
 				return &ToolResponse{
 					Call:  args,
@@ -136,16 +130,10 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 			body, readErr := t.vfs.ReadFile(hunk.Path)
 			if readErr != nil {
 				if readErr == apis.ErrAskPermission {
-					return NewVFSPermissionQuery(args, hunk.Path, "reading file", "read")
+					return NewVFSPermissionDeniedResponse(args, hunk.Path, "read")
 				}
 				if perr, ok := readErr.(*vfs.PermissionError); ok {
-					action := vfsActionFromOperation(perr.Operation)
-					op := perr.Operation
-					if op == "" {
-						op = "read"
-						action = "reading file"
-					}
-					return NewVFSPermissionQuery(args, perr.Path, action, op)
+					return NewVFSPermissionDeniedResponse(args, perr.Path, perr.Operation)
 				}
 				return &ToolResponse{
 					Call:  args,
@@ -167,16 +155,10 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 		case "add", "update":
 			if writeErr := t.vfs.WriteFile(change.path, []byte(change.newBody)); writeErr != nil {
 				if writeErr == apis.ErrAskPermission {
-					return NewVFSPermissionQuery(args, change.path, "writing to file", "write")
+					return NewVFSPermissionDeniedResponse(args, change.path, "write")
 				}
 				if perr, ok := writeErr.(*vfs.PermissionError); ok {
-					action := vfsActionFromOperation(perr.Operation)
-					op := perr.Operation
-					if op == "" {
-						op = "write"
-						action = "writing to file"
-					}
-					return NewVFSPermissionQuery(args, perr.Path, action, op)
+					return NewVFSPermissionDeniedResponse(args, perr.Path, perr.Operation)
 				}
 				return &ToolResponse{Call: args, Error: writeErr, Done: true}
 			}
@@ -184,47 +166,29 @@ func (t *VFSPatchTool) Execute(args *ToolCall) *ToolResponse {
 			target := change.movePath
 			if writeErr := t.vfs.WriteFile(target, []byte(change.newBody)); writeErr != nil {
 				if writeErr == apis.ErrAskPermission {
-					return NewVFSPermissionQuery(args, target, "writing to file", "write")
+					return NewVFSPermissionDeniedResponse(args, target, "write")
 				}
 				if perr, ok := writeErr.(*vfs.PermissionError); ok {
-					action := vfsActionFromOperation(perr.Operation)
-					op := perr.Operation
-					if op == "" {
-						op = "write"
-						action = "writing to file"
-					}
-					return NewVFSPermissionQuery(args, perr.Path, action, op)
+					return NewVFSPermissionDeniedResponse(args, perr.Path, perr.Operation)
 				}
 				return &ToolResponse{Call: args, Error: writeErr, Done: true}
 			}
 			if delErr := t.vfs.DeleteFile(change.path, false, false); delErr != nil {
 				if delErr == apis.ErrAskPermission {
-					return NewVFSPermissionQuery(args, change.path, "deleting file", "delete")
+					return NewVFSPermissionDeniedResponse(args, change.path, "delete")
 				}
 				if perr, ok := delErr.(*vfs.PermissionError); ok {
-					action := vfsActionFromOperation(perr.Operation)
-					op := perr.Operation
-					if op == "" {
-						op = "delete"
-						action = "deleting file"
-					}
-					return NewVFSPermissionQuery(args, perr.Path, action, op)
+					return NewVFSPermissionDeniedResponse(args, perr.Path, perr.Operation)
 				}
 				return &ToolResponse{Call: args, Error: delErr, Done: true}
 			}
 		case "delete":
 			if delErr := t.vfs.DeleteFile(change.path, false, false); delErr != nil {
 				if delErr == apis.ErrAskPermission {
-					return NewVFSPermissionQuery(args, change.path, "deleting file", "delete")
+					return NewVFSPermissionDeniedResponse(args, change.path, "delete")
 				}
 				if perr, ok := delErr.(*vfs.PermissionError); ok {
-					action := vfsActionFromOperation(perr.Operation)
-					op := perr.Operation
-					if op == "" {
-						op = "delete"
-						action = "deleting file"
-					}
-					return NewVFSPermissionQuery(args, perr.Path, action, op)
+					return NewVFSPermissionDeniedResponse(args, perr.Path, perr.Operation)
 				}
 				return &ToolResponse{Call: args, Error: delErr, Done: true}
 			}

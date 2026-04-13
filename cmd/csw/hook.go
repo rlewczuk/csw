@@ -33,7 +33,6 @@ func (noopSessionOutputHandler) AddAssistantMessage(string, string)           {}
 func (noopSessionOutputHandler) AddToolCall(*tool.ToolCall)                   {}
 func (noopSessionOutputHandler) AddToolCallResult(*tool.ToolResponse)         {}
 func (noopSessionOutputHandler) RunFinished(error)                            {}
-func (noopSessionOutputHandler) OnPermissionQuery(*tool.ToolPermissionsQuery) {}
 func (noopSessionOutputHandler) OnRateLimitError(int)                         {}
 func (noopSessionOutputHandler) ShouldRetryAfterFailure(string) bool          { return false }
 

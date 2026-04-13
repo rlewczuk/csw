@@ -52,10 +52,10 @@ func (t *VFSReadTool) Execute(args *ToolCall) *ToolResponse {
 
 	content, err := t.vfs.ReadFile(path)
 	if err == apis.ErrAskPermission {
-		return NewVFSPermissionQuery(args, path, "reading file", "read")
+		return NewVFSPermissionDeniedResponse(args, path, "read")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		return NewVFSPermissionQuery(args, perr.Path, "reading file", "read")
+		return NewVFSPermissionDeniedResponse(args, perr.Path, perr.Operation)
 	}
 	if err != nil {
 		return &ToolResponse{

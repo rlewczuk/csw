@@ -47,16 +47,10 @@ func (t *VFSMoveTool) Execute(args *ToolCall) *ToolResponse {
 
 	err := t.vfs.MoveFile(path, destination)
 	if err == apis.ErrAskPermission {
-		return NewVFSPermissionQuery(args, path, "moving file", "move")
+		return NewVFSPermissionDeniedResponse(args, path, "move")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		operation := perr.Operation
-		action := vfsActionFromOperation(operation)
-		if operation == "" {
-			operation = "move"
-			action = "moving file"
-		}
-		return NewVFSPermissionQuery(args, perr.Path, action, operation)
+		return NewVFSPermissionDeniedResponse(args, perr.Path, perr.Operation)
 	}
 	if err != nil {
 		return &ToolResponse{

@@ -51,17 +51,17 @@ func (t *VFSFindTool) Execute(args *ToolCall) *ToolResponse {
 	if filepath.IsAbs(path) {
 		files, err = t.findFilesInPath(path, query, recursive)
 		if err == apis.ErrAskPermission {
-			return NewVFSPermissionQuery(args, path, "finding files", "find")
+			return NewVFSPermissionDeniedResponse(args, path, "find")
 		}
 	} else {
 		files, err = t.vfs.FindFiles(query, recursive)
 		if err == apis.ErrAskPermission {
-			return NewVFSPermissionQuery(args, query, "finding files", "find")
+			return NewVFSPermissionDeniedResponse(args, query, "find")
 		}
 	}
 
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		return NewVFSPermissionQuery(args, perr.Path, "finding files", "find")
+		return NewVFSPermissionDeniedResponse(args, perr.Path, perr.Operation)
 	}
 	if err != nil {
 		return &ToolResponse{

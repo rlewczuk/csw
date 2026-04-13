@@ -444,19 +444,14 @@ func runCommand(params *RunParams) error {
 	}
 
 	sessionOutput := buildRunSessionOutput(params, os.Stdout)
-	autoPermissionResponse := ""
-	if params.AllowAllPerms {
-		autoPermissionResponse = "Allow"
-	}
 	runtimeResult, err := sweSystem.StartRunSession(system.StartRunSessionParams{
-		ModelName:              params.ModelName,
-		RoleName:               params.RoleName,
-		Task:                   params.Task,
-		AutoPermissionResponse: autoPermissionResponse,
-		Thinking:               params.Thinking,
-		ModelOverridden:        params.ModelOverridden,
-		Prompt:                 params.Prompt,
-		OutputHandler:          sessionOutput,
+		ModelName:       params.ModelName,
+		RoleName:        params.RoleName,
+		Task:            params.Task,
+		Thinking:        params.Thinking,
+		ModelOverridden: params.ModelOverridden,
+		Prompt:          params.Prompt,
+		OutputHandler:   sessionOutput,
 	})
 	if err != nil {
 		return fmt.Errorf("runCommand() [run.go]: failed to start run session runtime: %w", err)

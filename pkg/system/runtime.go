@@ -13,7 +13,6 @@ type StartRunSessionParams struct {
 	ModelName              string
 	RoleName               string
 	Task                   *core.Task
-	AutoPermissionResponse string
 	Thinking               string
 	ModelOverridden        bool
 	Prompt                 string
@@ -59,7 +58,6 @@ func (s *SweSystem) StartRunSession(params StartRunSessionParams) (StartRunSessi
 	done := make(chan error, 1)
 	wrappedHandler := &runOutputHandler{delegate: params.OutputHandler, done: done}
 	thread.SetOutputHandler(wrappedHandler)
-	thread.SetAutoPermissionResponse(params.AutoPermissionResponse)
 
 	if err := thread.UserPrompt(params.Prompt); err != nil {
 		return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to send initial message: %w", err)
@@ -103,12 +101,6 @@ func (h *runOutputHandler) AddToolCall(call *tool.ToolCall) {
 func (h *runOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
 	if h.delegate != nil {
 		h.delegate.AddToolCallResult(result)
-	}
-}
-
-func (h *runOutputHandler) OnPermissionQuery(query *tool.ToolPermissionsQuery) {
-	if h.delegate != nil {
-		h.delegate.OnPermissionQuery(query)
 	}
 }
 

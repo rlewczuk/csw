@@ -394,38 +394,6 @@ type ToolCall struct {
 	Access conf.AccessFlag
 }
 
-// ToolPermissionsQuery represents a query for user permissions to use a tool.
-type ToolPermissionsQuery struct {
-	// ID is a unique identifier for the query (typically UUIDv7 represented as string).
-	Id string
-
-	// Tool is the tool that the user is trying to use.
-	Tool *ToolCall
-
-	// Title is a short message to display to the user.
-	Title string
-
-	// Details is a message to display to the user.
-	Details string
-
-	// Options is a list of options to display to the user.
-	Options []string
-
-	// AllowCustomResponse indicates whether the user can enter a custom response.
-	AllowCustomResponse bool
-
-	// Meta contains additional information about the query (e.g. file path, operation).
-	Meta map[string]string
-}
-
-// Error returns the error message containing tool name and query ID.
-func (q *ToolPermissionsQuery) Error() string {
-	if q.Tool != nil {
-		return "permission query for tool: " + q.Tool.Function + " (query ID: " + q.Id + ")"
-	}
-	return "permission query (query ID: " + q.Id + ")"
-}
-
 // ToolResponse represents the response from a tool execution.
 type ToolResponse struct {
 	// Call is a reference to the original tool call that this response is for.

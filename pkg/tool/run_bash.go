@@ -149,15 +149,8 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 				Done: true,
 			}
 		} else {
-			details := fmt.Sprintf("Allow running command with absolute path:\nCommand: %s\nWorkdir: %s", command, resolvedWorkdir)
-			if timeout > 0 {
-				details += fmt.Sprintf("\nTimeout: %v", timeout)
-			}
-			return NewPermissionQuery(args, PermissionTitleAbsolutePath, details, PermissionOptions(), map[string]string{
-				"type":    "run_absolute_workdir",
-				"command": command,
-				"workdir": resolvedWorkdir,
-			})
+			details := fmt.Sprintf("running command with absolute path denied: command=%s workdir=%s", command, resolvedWorkdir)
+			return NewPermissionDeniedResponse(args, details)
 		}
 	}
 
@@ -180,43 +173,19 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 			Done: true,
 		}
 	case conf.AccessAsk:
-		details := fmt.Sprintf("Allow running command: %s", command)
-		if resolvedWorkdir != "" {
-			details += fmt.Sprintf("\nWorkdir: %s", resolvedWorkdir)
-		}
-		if timeout > 0 {
-			details += fmt.Sprintf("\nTimeout: %v", timeout)
-		}
-		return NewPermissionQuery(args, PermissionTitleRequired, details, PermissionOptions(PermissionOptionAllowRemember), map[string]string{
-			"type":    "run",
-			"command": command,
-		})
+		return NewPermissionDeniedResponse(args, fmt.Sprintf("running command denied: %s", command))
 	case conf.AccessAllow:
 		// Execute the command
 		return t.executeCommand(args, command, resolvedWorkdir, timeout, limit)
 	default:
-		// Default to Ask if not specified
-		details := fmt.Sprintf("Allow running command: %s", command)
-		if resolvedWorkdir != "" {
-			details += fmt.Sprintf("\nWorkdir: %s", resolvedWorkdir)
-		}
-		if timeout > 0 {
-			details += fmt.Sprintf("\nTimeout: %v", timeout)
-		}
-		if limit != 500 {
-			details += fmt.Sprintf("\nLimit: %d", limit)
-		}
-		return NewPermissionQuery(args, PermissionTitleRequired, details, PermissionOptions(PermissionOptionAllowRemember), map[string]string{
-			"type":    "run",
-			"command": command,
-		})
+		return NewPermissionDeniedResponse(args, fmt.Sprintf("running command denied: %s", command))
 	}
 }
 
 // checkPermission checks if the command is allowed based on the privileges.
 func (t *RunBashTool) checkPermission(command string) conf.AccessFlag {
 	if t.privileges == nil {
-		return conf.AccessAsk
+		return conf.AccessDeny
 	}
 
 	// Try to match against all patterns
@@ -249,8 +218,8 @@ func (t *RunBashTool) checkPermission(command string) conf.AccessFlag {
 		return bestAccess
 	}
 
-	// No match found, return Ask
-	return conf.AccessAsk
+	// No match found, return deny
+	return conf.AccessDeny
 }
 
 // countWildcards counts the number of wildcard characters in a pattern.
