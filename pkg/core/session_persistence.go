@@ -50,7 +50,6 @@ type persistedSessionState struct {
 	WorkDir                    string                  `json:"workdir"`
 	TodoList                   []tool.TodoItem         `json:"todo_list"`
 	Messages                   []persistedChatMessage  `json:"messages"`
-	PendingPermissionToolCalls []tool.ToolCall         `json:"pending_permission_tool_calls"`
 	PendingToolResponses       []persistedToolResponse `json:"pending_tool_responses"`
 	LoadedAgentFiles           []string                `json:"loaded_agent_files"`
 	TokenUsage                 models.TokenUsage       `json:"token_usage"`
@@ -115,7 +114,6 @@ func (s *SweSession) buildPersistedSessionState() persistedSessionState {
 		WorkDir:                    s.workDir,
 		TodoList:                   s.GetTodoList(),
 		Messages:                   make([]persistedChatMessage, 0, len(s.messages)),
-		PendingPermissionToolCalls: make([]tool.ToolCall, 0, len(s.pendingPermissionToolCalls)),
 		PendingToolResponses:       make([]persistedToolResponse, 0, len(s.pendingToolResponses)),
 		LoadedAgentFiles:           make([]string, 0, len(s.loadedAgentFiles)),
 		UsedSubAgentSlugs:          make([]string, 0, len(s.subAgentSlugs)),
@@ -131,13 +129,6 @@ func (s *SweSession) buildPersistedSessionState() persistedSessionState {
 
 	for _, message := range s.messages {
 		state.Messages = append(state.Messages, serializeChatMessage(message))
-	}
-
-	for _, toolCall := range s.pendingPermissionToolCalls {
-		if toolCall == nil {
-			continue
-		}
-		state.PendingPermissionToolCalls = append(state.PendingPermissionToolCalls, *toolCall)
 	}
 
 	for _, toolResponse := range s.pendingToolResponses {
@@ -344,12 +335,6 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 			return nil, fmt.Errorf("RestoreSessionFromPersistedState() [session_persistence.go]: failed to deserialize message: %w", err)
 		}
 		session.messages = append(session.messages, message)
-	}
-
-	session.pendingPermissionToolCalls = make([]*tool.ToolCall, 0, len(state.PendingPermissionToolCalls))
-	for _, pendingCall := range state.PendingPermissionToolCalls {
-		copiedCall := pendingCall
-		session.pendingPermissionToolCalls = append(session.pendingPermissionToolCalls, &copiedCall)
 	}
 
 	session.pendingToolResponses = make([]*tool.ToolResponse, 0, len(state.PendingToolResponses))

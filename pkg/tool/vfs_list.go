@@ -55,10 +55,10 @@ func (t *VFSListTool) Execute(args *ToolCall) *ToolResponse {
 
 	files, err := t.vfs.ListFiles(path, recursive)
 	if err == apis.ErrAskPermission {
-		return NewVFSPermissionQuery(args, path, "listing files", "list")
+		return NewVFSPermissionDeniedResponse(args, path, "list")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		return NewVFSPermissionQuery(args, perr.Path, "listing files", "list")
+		return NewVFSPermissionDeniedResponse(args, perr.Path, perr.Operation)
 	}
 	if err != nil {
 		return &ToolResponse{

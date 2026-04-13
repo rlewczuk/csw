@@ -76,13 +76,13 @@ func (t *VFSEditTool) Execute(args *ToolCall) *ToolResponse {
 		if t.logger != nil {
 			t.logger.Info("vfsEdit_permission_required", "path", path)
 		}
-		return NewVFSPermissionQuery(args, path, "editing file", "write")
+		return NewVFSPermissionDeniedResponse(args, path, "write")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
 		if t.logger != nil {
 			t.logger.Info("vfsEdit_permission_required", "path", perr.Path)
 		}
-		return NewVFSPermissionQuery(args, perr.Path, "editing file", "write")
+		return NewVFSPermissionDeniedResponse(args, perr.Path, perr.Operation)
 	}
 	if err != nil {
 		if t.logger != nil {

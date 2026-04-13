@@ -136,24 +136,6 @@ func (o *JsonlSessionOutput) RunFinished(err error) {
 	_ = err
 }
 
-// OnPermissionQuery handles permission query callback.
-func (o *JsonlSessionOutput) OnPermissionQuery(query *tool.ToolPermissionsQuery) {
-	if query == nil {
-		return
-	}
-
-	payload := map[string]any{
-		"type":  "permission_query",
-		"query": query,
-	}
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return
-	}
-
-	o.write(string(data) + "\n")
-}
-
 // OnRateLimitError handles rate-limit callback.
 func (o *JsonlSessionOutput) OnRateLimitError(retryAfterSeconds int) {
 	_ = retryAfterSeconds

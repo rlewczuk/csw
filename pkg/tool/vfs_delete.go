@@ -34,10 +34,10 @@ func (t *VFSDeleteTool) Execute(args *ToolCall) *ToolResponse {
 
 	err := t.vfs.DeleteFile(path, false, false)
 	if err == apis.ErrAskPermission {
-		return NewVFSPermissionQuery(args, path, "deleting file", "delete")
+		return NewVFSPermissionDeniedResponse(args, path, "delete")
 	}
 	if perr, ok := err.(*vfs.PermissionError); ok {
-		return NewVFSPermissionQuery(args, perr.Path, "deleting file", "delete")
+		return NewVFSPermissionDeniedResponse(args, perr.Path, "delete")
 	}
 	if err != nil {
 		return &ToolResponse{

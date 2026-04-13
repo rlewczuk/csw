@@ -77,9 +77,6 @@ type SweSession struct {
 	thinking        string
 	maxToolThreads  int
 
-	// pendingPermissionToolCall stores the tool call that was blocked by a permission query
-	// This is used to re-execute the tool after permission is granted
-	pendingPermissionToolCalls []*tool.ToolCall
 	// pendingToolResponses stores tool responses that were executed before a permission query
 	// so they can be sent together after permissions are granted
 	pendingToolResponses []*tool.ToolResponse
@@ -137,7 +134,6 @@ type SweSessionParams struct {
 	ToolsUsed        []string
 	LoadedAgentFiles map[string]struct{}
 
-	PendingPermissionToolCalls []*tool.ToolCall
 	PendingToolResponses       []*tool.ToolResponse
 	TokenUsage                 models.TokenUsage
 	ContextLength              int
@@ -190,7 +186,6 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		thinking:        params.Thinking,
 		maxToolThreads:  params.MaxToolThreads,
 
-		pendingPermissionToolCalls: make([]*tool.ToolCall, 0, len(params.PendingPermissionToolCalls)),
 		pendingToolResponses:       make([]*tool.ToolResponse, 0, len(params.PendingToolResponses)),
 		loadedAgentFiles:           make(map[string]struct{}, len(params.LoadedAgentFiles)),
 		tokenUsage:                 params.TokenUsage,
@@ -212,7 +207,6 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 
 	copy(session.todoList, params.TodoList)
 	session.messages = append(session.messages, params.Messages...)
-	session.pendingPermissionToolCalls = append(session.pendingPermissionToolCalls, params.PendingPermissionToolCalls...)
 	session.pendingToolResponses = append(session.pendingToolResponses, params.PendingToolResponses...)
 	for path := range params.LoadedAgentFiles {
 		session.loadedAgentFiles[path] = struct{}{}
@@ -319,27 +313,13 @@ func (s *SweSession) Run(ctx context.Context) error {
 
 	// Keep processing until the assistant doesn't make any tool calls
 	for {
-		// Check if there's a pending tool call from a previous permission query
-		// This happens when permission was granted and we need to re-execute the blocked tool
-		if len(s.pendingPermissionToolCalls) > 0 {
-			// Execute pending tool calls with updated permissions
-			if err := s.executeToolCalls(s.pendingPermissionToolCalls); err != nil {
-				return err
-			}
-			// After executing the pending tool call, continue to get the next LLM response
-			// Don't check for more tool calls in the assistant message since we just executed the pending one
-		} else {
-			// Check for pending tool calls from previous run (e.g. after permission grant)
-			// Only do this if we didn't just execute a pending tool call
-			if len(s.messages) > 0 {
-				lastMsg := s.messages[len(s.messages)-1]
-				if lastMsg.Role == models.ChatRoleAssistant {
-					toolCalls := lastMsg.GetToolCalls()
-					if len(toolCalls) > 0 {
-						// Execute pending tools
-						if err := s.executeToolCalls(toolCalls); err != nil {
-							return err
-						}
+		if len(s.messages) > 0 {
+			lastMsg := s.messages[len(s.messages)-1]
+			if lastMsg.Role == models.ChatRoleAssistant {
+				toolCalls := lastMsg.GetToolCalls()
+				if len(toolCalls) > 0 {
+					if err := s.executeToolCalls(toolCalls); err != nil {
+						return err
 					}
 				}
 			}
@@ -609,32 +589,9 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 
 	wg.Wait()
 
-	pendingPermissionToolCalls := make([]*tool.ToolCall, 0)
-	var firstPermissionQuery error
 	for _, result := range results {
 		response := result.response
 		if response == nil {
-			continue
-		}
-
-		if permQuery, ok := response.Error.(*tool.ToolPermissionsQuery); ok {
-			if s.logger != nil {
-				toolFunc := ""
-				if permQuery.Tool != nil {
-					toolFunc = permQuery.Tool.Function
-				}
-				s.logger.Info("permission_query",
-					"query_id", permQuery.Id,
-					"tool", toolFunc,
-					"title", permQuery.Title,
-					"details", permQuery.Details,
-				)
-			}
-
-			pendingPermissionToolCalls = append(pendingPermissionToolCalls, result.toolCall)
-			if firstPermissionQuery == nil {
-				firstPermissionQuery = response.Error
-			}
 			continue
 		}
 
@@ -654,13 +611,6 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 		}
 	}
 
-	if len(pendingPermissionToolCalls) > 0 {
-		s.pendingToolResponses = toolResponses
-		s.pendingPermissionToolCalls = pendingPermissionToolCalls
-		s.persistSessionState()
-		return firstPermissionQuery
-	}
-
 	// Add tool responses to the conversation
 	s.appendConversationMessage(models.NewToolResponseMessage(toolResponses...), "incoming", "tool_response")
 
@@ -670,8 +620,6 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 		}
 	}
 
-	// Clear pending state since all tools executed successfully
-	s.pendingPermissionToolCalls = nil
 	s.pendingToolResponses = nil
 	s.persistSessionState()
 
@@ -1162,81 +1110,6 @@ func (s *SweSession) SetRole(roleName string) error {
 	return nil
 }
 
-// UpdatePermission updates the permission for a tool or VFS operation based on user response.
-func (s *SweSession) UpdatePermission(query *tool.ToolPermissionsQuery, response string) error {
-	if s.logger != nil {
-		s.logger.Info("permission_response",
-			"tool", query.Tool.Function,
-			"response", response,
-		)
-	}
-
-	normalizedResponse := strings.TrimSpace(response)
-	if normalizedResponse == "" {
-		return fmt.Errorf("SweSession.UpdatePermission() [session.go]: empty permission response")
-	}
-
-	matchedOption := ""
-	for _, option := range query.Options {
-		if strings.EqualFold(strings.TrimSpace(option), normalizedResponse) {
-			matchedOption = option
-			break
-		}
-	}
-	if matchedOption == "" {
-		return fmt.Errorf("SweSession.UpdatePermission() [session.go]: invalid permission response %q for query %s", normalizedResponse, query.Id)
-	}
-
-	lowerOption := strings.ToLower(strings.TrimSpace(matchedOption))
-	allow := strings.HasPrefix(lowerOption, "allow")
-	flag := conf.AccessDeny
-	if allow {
-		flag = conf.AccessAllow
-	}
-
-	if query.Meta != nil && query.Meta["type"] == "vfs" {
-		path := query.Meta["path"]
-		op := query.Meta["operation"]
-		if op == "find" && path == "**" {
-			path = "*"
-		}
-
-		ac, ok := s.VFS.(*vfs.AccessControlVFS)
-		if ok {
-			ac.SetPermission(path, op, flag)
-		}
-	} else {
-		// Tool permission
-		toolName := query.Tool.Function
-
-		// We need to find the AccessControlTool for this tool
-		t, err := s.Tools.Get(toolName)
-		if err != nil {
-			return err
-		}
-
-		ac, ok := t.(*tool.AccessControlTool)
-		if ok {
-			// We set permission for this specific tool name
-			ac.SetPermission(toolName, flag)
-		}
-	}
-
-	// Update the pending tool call's access flag so it will be re-executed with the new permission
-	if len(s.pendingPermissionToolCalls) > 0 {
-		for _, pending := range s.pendingPermissionToolCalls {
-			if pending.ID == query.Tool.ID {
-				pending.Access = flag
-				break
-			}
-		}
-	}
-
-	s.persistSessionState()
-
-	return nil
-}
-
 // wrapToolsWithAccessControl creates a new tool registry with all tools wrapped in access control.
 func wrapToolsWithAccessControl(registry *tool.ToolRegistry, privileges map[string]conf.AccessFlag) *tool.ToolRegistry {
 	newRegistry := tool.NewToolRegistry()
@@ -1571,7 +1444,7 @@ func (s *SweSession) HasPendingWork() bool {
 		return false
 	}
 
-	if len(s.pendingPermissionToolCalls) > 0 || len(s.pendingToolResponses) > 0 {
+	if len(s.pendingToolResponses) > 0 {
 		return true
 	}
 

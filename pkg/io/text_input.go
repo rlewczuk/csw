@@ -2,7 +2,6 @@ package io
 
 import (
 	"bufio"
-	"errors"
 	stdio "io"
 	"strings"
 	"sync"
@@ -40,12 +39,6 @@ func (i *TextSessionInput) readLoop() {
 		trimmed := strings.TrimSpace(scanner.Text())
 		if trimmed == "" {
 			_ = i.thread.Interrupt()
-			continue
-		}
-
-		if err := i.thread.PermissionResponse("", trimmed); err == nil {
-			continue
-		} else if !errors.Is(err, core.ErrNoPendingPermissionQuery) {
 			continue
 		}
 

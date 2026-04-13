@@ -58,8 +58,7 @@ func (a *AccessControlTool) Execute(call *ToolCall) *ToolResponse {
 		resp := a.tool.Execute(call)
 		if resp.Error != nil {
 			if perr, ok := resp.Error.(*vfs.PermissionError); ok {
-				action := vfsActionFromOperation(perr.Operation)
-				return NewVFSPermissionQuery(call, perr.Path, action, perr.Operation)
+				return NewVFSPermissionDeniedResponse(call, perr.Path, perr.Operation)
 			}
 		}
 		return resp
@@ -70,11 +69,7 @@ func (a *AccessControlTool) Execute(call *ToolCall) *ToolResponse {
 			Done:  true,
 		}
 	case conf.AccessAsk:
-		// Return ToolPermissionsQuery as error
-		return NewPermissionQuery(call, PermissionTitleRequired, fmt.Sprintf("Tool %s requires permission", toolName), PermissionOptions(), map[string]string{
-			"type": "tool",
-			"tool": toolName,
-		})
+		return NewPermissionDeniedResponse(call, fmt.Sprintf("access denied for tool: %s", toolName))
 	default:
 		return &ToolResponse{
 			Call:  call,
