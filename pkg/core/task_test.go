@@ -417,7 +417,7 @@ func TestTaskManagerRunTaskSuccessWritesSummaryAndOutput(t *testing.T) {
 	require.NoError(t, readMetaErr)
 	var meta TaskSessionSummary
 	require.NoError(t, yaml.Unmarshal(summaryMetaBytes, &meta))
-	assert.Equal(t, TaskStateCompleted, meta.Status)
+	assert.Equal(t, TaskStatusCompleted, meta.Status)
 
 	summaryTextBytes, readSummaryErr := os.ReadFile(filepath.Join(taskDir, "ses-ses-123", "summary.md"))
 	require.NoError(t, readSummaryErr)
@@ -467,7 +467,7 @@ func TestTaskManagerRunTaskFailurePersistsFailedSummary(t *testing.T) {
 	require.NotNil(t, outcome)
 	assert.Contains(t, runErr.Error(), "task run failed")
 	assert.Equal(t, TaskStatusOpen, outcome.Task.Status)
-	assert.Equal(t, TaskStateFailed, outcome.SummaryMeta.Status)
+	assert.Equal(t, TaskStatusFailed, outcome.SummaryMeta.Status)
 	assert.Empty(t, fake.mergeCalls)
 }
 

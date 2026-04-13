@@ -853,7 +853,7 @@ func TestPrintTaskHuman(t *testing.T) {
 		CreatedAt:     "2026-01-01T10:00:00Z",
 		UpdatedAt:     "2026-01-01T10:01:00Z",
 	}
-	meta := &core.TaskSessionSummary{SessionID: "ses-1", Status: core.TaskStateCompleted}
+	meta := &core.TaskSessionSummary{SessionID: "ses-1", Status: core.TaskStatusCompleted}
 
 	output := captureStdout(t, func() {
 		printTaskHuman(taskData, meta, " latest summary ")

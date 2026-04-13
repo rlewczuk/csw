@@ -34,15 +34,14 @@ const (
 	TaskStatusOpen = "open"
 	// TaskStatusRunning indicates task is currently being executed.
 	TaskStatusRunning = "running"
+	// TaskStatusSubtasks indicates task has subtasks and is waiting for them to complete.
+	TaskStatusSubtasks = "subtasks"
 	// TaskStatusMerged indicates task result was merged to parent branch.
 	TaskStatusMerged = "merged"
-
-	// TaskStateRunning indicates task run is in progress.
-	TaskStateRunning = "running"
-	// TaskStateCompleted indicates task completed successfully.
-	TaskStateCompleted = "completed"
-	// TaskStateFailed indicates task execution failed.
-	TaskStateFailed = "failed"
+	// TaskStatusCompleted indicates task completed successfully.
+	TaskStatusCompleted = "completed"
+	// TaskStatusFailed indicates task execution failed.
+	TaskStatusFailed = "failed"
 )
 
 // Task stores persistent task metadata.
@@ -968,7 +967,7 @@ func (m *TaskManager) RunTask(ctx context.Context, lookup TaskLookup, params Tas
 
 	meta := &TaskSessionSummary{
 		SessionID:   firstNonEmptyTask(strings.TrimSpace(runResult.SessionID), sessionID),
-		Status:      TaskStateCompleted,
+		Status:      TaskStatusCompleted,
 		TaskID:      task.UUID,
 		StartedAt:   runResult.StartedAt.UTC().Format(time.RFC3339Nano),
 		CompletedAt: runResult.CompletedAt.UTC().Format(time.RFC3339Nano),
@@ -983,11 +982,11 @@ func (m *TaskManager) RunTask(ctx context.Context, lookup TaskLookup, params Tas
 	task.SessionIDs = appendUniqueString(task.SessionIDs, meta.SessionID)
 
 	if runErr != nil {
-		meta.Status = TaskStateFailed
+		meta.Status = TaskStatusFailed
 		task.Status = TaskStatusOpen
 	} else {
 		if err := vcsRepo.MergeBranches(task.FeatureBranch, taskBranchName); err != nil {
-			meta.Status = TaskStateFailed
+			meta.Status = TaskStatusFailed
 			task.Status = TaskStatusOpen
 			runErr = fmt.Errorf("TaskManager.RunTask() [task.go]: failed to merge task branch %q into feature branch %q: %w", taskBranchName, task.FeatureBranch, err)
 		} else {
