@@ -772,11 +772,7 @@ func isUnfinishedTaskForRun(taskData *core.Task) bool {
 	}
 
 	status := strings.TrimSpace(taskData.Status)
-	state := strings.TrimSpace(taskData.State)
 	if status == core.TaskStatusMerged || status == core.TaskStatusRunning || status == core.TaskStatusDraft {
-		return false
-	}
-	if state == core.TaskStateCompleted || state == core.TaskStateRunning {
 		return false
 	}
 
@@ -1041,7 +1037,7 @@ func taskArchiveCommand() *cobra.Command {
 		},
 	}
 
-	command.Flags().StringVar(&status, "status", "", "Archive all tasks by status or state")
+	command.Flags().StringVar(&status, "status", "", "Archive all tasks by status")
 
 	return command
 }
@@ -1511,7 +1507,6 @@ func printTaskHuman(taskData *core.Task, summaryMeta *core.TaskSessionSummary, s
 	fmt.Fprintf(os.Stdout, "Name: %s\n", taskData.Name)
 	fmt.Fprintf(os.Stdout, "Description: %s\n", taskData.Description)
 	fmt.Fprintf(os.Stdout, "Status: %s\n", taskData.Status)
-	fmt.Fprintf(os.Stdout, "State: %s\n", taskData.State)
 	fmt.Fprintf(os.Stdout, "Feature branch: %s\n", taskData.FeatureBranch)
 	fmt.Fprintf(os.Stdout, "Parent branch: %s\n", taskData.ParentBranch)
 	fmt.Fprintf(os.Stdout, "Role: %s\n", taskData.Role)

@@ -576,9 +576,6 @@ func applyCommandTaskMetadata(params *RunParams) error {
 	if metadata.Role != nil {
 		applyIfUnchanged("Role", func() { persistedTask.Role = strings.TrimSpace(*metadata.Role) })
 	}
-	if metadata.State != nil {
-		applyIfUnchanged("State", func() { persistedTask.State = strings.TrimSpace(*metadata.State) })
-	}
 	if metadata.Deps != nil {
 		applyIfUnchanged("Deps", func() { persistedTask.Deps = append([]string(nil), (*metadata.Deps)...) })
 	}

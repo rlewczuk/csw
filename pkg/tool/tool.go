@@ -563,7 +563,6 @@ type TaskRecord struct {
 	FeatureBranch string
 	ParentBranch  string
 	Role          string
-	State         string
 	Deps          []string
 	SessionIDs    []string
 	SubtaskIDs    []string

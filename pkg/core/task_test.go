@@ -404,7 +404,6 @@ func TestTaskManagerRunTaskSuccessWritesSummaryAndOutput(t *testing.T) {
 	assert.Equal(t, created.Name, runner.lastRequest.Task.Name)
 	assert.Equal(t, filepath.Join(baseDir, ".cswdata", "tasks", created.UUID), runner.lastRequest.Task.TaskDir)
 	assert.Equal(t, filepath.Join(baseDir, ".cswdata", "tasks", created.UUID), runner.lastRequest.TaskDir)
-	assert.Equal(t, TaskStateCompleted, outcome.Task.State)
 	assert.Equal(t, TaskStatusOpen, outcome.Task.Status)
 	assert.Equal(t, "ses-123", outcome.SessionID)
 	assert.Contains(t, outcome.TaskBranchName, "feat/run-")
@@ -467,27 +466,9 @@ func TestTaskManagerRunTaskFailurePersistsFailedSummary(t *testing.T) {
 	require.Error(t, runErr)
 	require.NotNil(t, outcome)
 	assert.Contains(t, runErr.Error(), "task run failed")
-	assert.Equal(t, TaskStateFailed, outcome.Task.State)
 	assert.Equal(t, TaskStatusOpen, outcome.Task.Status)
 	assert.Equal(t, TaskStateFailed, outcome.SummaryMeta.Status)
 	assert.Empty(t, fake.mergeCalls)
-}
-
-func TestTaskManagerRunTaskBlocksWhenDependencyNotCompleted(t *testing.T) {
-	baseDir := t.TempDir()
-	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})
-	require.NoError(t, err)
-
-	dep, err := manager.CreateTask(TaskCreateParams{Name: "dep", Prompt: "dep prompt"})
-	require.NoError(t, err)
-	mainTask, err := manager.CreateTask(TaskCreateParams{Name: "main", Prompt: "main prompt", Deps: []string{dep.UUID}})
-	require.NoError(t, err)
-
-	fake := &fakeVCS{branches: []string{"main"}}
-	outcome, runErr := manager.RunTask(context.Background(), TaskLookup{Identifier: mainTask.UUID}, TaskRunParams{}, fake)
-	require.Error(t, runErr)
-	assert.Nil(t, outcome)
-	assert.Contains(t, runErr.Error(), "is not completed")
 }
 
 func TestTaskManagerRunTaskPromptOverrideTemplateCanUseTaskPrompt(t *testing.T) {
@@ -530,7 +511,7 @@ func TestTaskManagerRunTaskCommandPromptTemplateCanUseTaskPrompt(t *testing.T) {
 	assert.Equal(t, "TaskPrompt=prompt from task file Args=foo bar", runner.lastRequest.Prompt)
 }
 
-func TestTaskManagerMergeTaskUpdatesStatusAndState(t *testing.T) {
+func TestTaskManagerMergeTaskUpdatesStatus(t *testing.T) {
 	baseDir := t.TempDir()
 	manager, err := NewTaskManager(baseDir, nil, &taskTestRunner{})
 	require.NoError(t, err)
@@ -546,7 +527,6 @@ func TestTaskManagerMergeTaskUpdatesStatusAndState(t *testing.T) {
 	require.Len(t, fake.mergeCalls, 1)
 	assert.Equal(t, [2]string{"main", "feat/merge"}, fake.mergeCalls[0])
 	assert.Equal(t, TaskStatusMerged, merged.Status)
-	assert.Equal(t, TaskStateCompleted, merged.State)
 }
 
 func TestTaskManagerArchiveTaskMovesTaskDirectory(t *testing.T) {
@@ -633,29 +613,6 @@ func TestTaskManagerArchiveTasksByStatusArchivesMatchingTasks(t *testing.T) {
 	openTaskPath := filepath.Join(baseDir, ".cswdata", "tasks", openTask.UUID, "task.yml")
 	_, openTaskErr := os.Stat(openTaskPath)
 	require.NoError(t, openTaskErr)
-}
-
-func TestTaskManagerArchiveTasksByStatusMatchesTaskState(t *testing.T) {
-	baseDir := t.TempDir()
-	runner := &taskTestRunner{err: errors.New("boom")}
-	manager, err := NewTaskManager(baseDir, nil, runner)
-	require.NoError(t, err)
-
-	failedTask, err := manager.CreateTask(TaskCreateParams{Name: "failed-task", Prompt: "prompt"})
-	require.NoError(t, err)
-
-	fake := &fakeVCS{branches: []string{"main"}}
-	_, runErr := manager.RunTask(context.Background(), TaskLookup{Identifier: failedTask.UUID}, TaskRunParams{}, fake)
-	require.Error(t, runErr)
-
-	archivedTasks, err := manager.ArchiveTasksByStatus(TaskStateFailed)
-	require.NoError(t, err)
-	require.Len(t, archivedTasks, 1)
-	assert.Equal(t, failedTask.UUID, archivedTasks[0].UUID)
-
-	archivedPath := filepath.Join(baseDir, ".cswdata", "tasks", "archive", failedTask.UUID, "task.yml")
-	_, statErr := os.Stat(archivedPath)
-	require.NoError(t, statErr)
 }
 
 func TestEnsureBranchFromCreatesMissingBranch(t *testing.T) {

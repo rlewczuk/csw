@@ -59,7 +59,6 @@ func taskRecordToToolValue(task TaskRecord) ToolValue {
 	value.Set("branch", task.FeatureBranch)
 	value.Set("parent_branch", task.ParentBranch)
 	value.Set("role", task.Role)
-	value.Set("state", task.State)
 	value.Set("deps", task.Deps)
 	value.Set("session_ids", task.SessionIDs)
 	value.Set("subtask_ids", task.SubtaskIDs)

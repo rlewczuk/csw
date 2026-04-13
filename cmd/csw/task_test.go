@@ -499,9 +499,9 @@ func TestRunTaskListStatusFiltering(t *testing.T) {
 	createdTask, err := manager.CreateTask(core.TaskCreateParams{Name: "created", Prompt: "prompt"})
 	require.NoError(t, err)
 
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", openTask.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCreated)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", mergedTask.UUID, "task.yml"), core.TaskStatusMerged, core.TaskStateCompleted)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", createdTask.UUID, "task.yml"), core.TaskStatusCreated, core.TaskStateCreated)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", openTask.UUID, "task.yml"), core.TaskStatusOpen)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", mergedTask.UUID, "task.yml"), core.TaskStatusMerged)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", createdTask.UUID, "task.yml"), core.TaskStatusCreated)
 
 	included := &bytes.Buffer{}
 	err = runTaskList(manager, nil, false, false, "open,merged", included)
@@ -562,9 +562,9 @@ func TestRunTaskArchiveDefaultStatusMerged(t *testing.T) {
 	draftTask, err := manager.CreateTask(core.TaskCreateParams{Name: "draft", Prompt: "prompt"})
 	require.NoError(t, err)
 
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", mergedTask.UUID, "task.yml"), core.TaskStatusMerged, core.TaskStateCompleted)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", openTask.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCreated)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", draftTask.UUID, "task.yml"), core.TaskStatusDraft, core.TaskStateCreated)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", mergedTask.UUID, "task.yml"), core.TaskStatusMerged)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", openTask.UUID, "task.yml"), core.TaskStatusOpen)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", draftTask.UUID, "task.yml"), core.TaskStatusDraft)
 
 	buffer := &bytes.Buffer{}
 	err = runTaskArchive(manager, nil, "", buffer)
@@ -591,8 +591,8 @@ func TestRunTaskArchiveByStatusFailed(t *testing.T) {
 	otherTask, err := manager.CreateTask(core.TaskCreateParams{Name: "other", Prompt: "prompt"})
 	require.NoError(t, err)
 
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", failedTask.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateFailed)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", otherTask.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCompleted)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", failedTask.UUID, "task.yml"), "failed")
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", otherTask.UUID, "task.yml"), core.TaskStatusOpen)
 
 	buffer := &bytes.Buffer{}
 	err = runTaskArchive(manager, nil, "failed", buffer)
@@ -606,7 +606,7 @@ func TestRunTaskArchiveByStatusFailed(t *testing.T) {
 	require.NoError(t, otherErr)
 }
 
-func setTaskStatusForTest(t *testing.T, taskPath string, status string, state string) {
+func setTaskStatusForTest(t *testing.T, taskPath string, status string) {
 	t.Helper()
 
 	contents, err := os.ReadFile(taskPath)
@@ -615,7 +615,6 @@ func setTaskStatusForTest(t *testing.T, taskPath string, status string, state st
 	taskData := &core.Task{}
 	require.NoError(t, yaml.Unmarshal(contents, taskData))
 	taskData.Status = status
-	taskData.State = state
 
 	updatedContents, err := yaml.Marshal(taskData)
 	require.NoError(t, err)
@@ -715,11 +714,11 @@ func TestResolveTaskRunIdentifierResolvesLastUnfinishedTaskByMostRecentModTime(t
 	runningTask, err := manager.CreateTask(core.TaskCreateParams{Name: "running", Prompt: "prompt"})
 	require.NoError(t, err)
 
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", oldCompleted.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCompleted)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableOlder.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCreated)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), core.TaskStatusCreated, core.TaskStateFailed)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", draftNewest.UUID, "task.yml"), core.TaskStatusDraft, core.TaskStateCreated)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), core.TaskStatusRunning, core.TaskStateRunning)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", oldCompleted.UUID, "task.yml"), core.TaskStatusMerged)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableOlder.UUID, "task.yml"), core.TaskStatusOpen)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), core.TaskStatusCreated)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", draftNewest.UUID, "task.yml"), core.TaskStatusDraft)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), core.TaskStatusRunning)
 
 	baseTime := time.Date(2026, time.February, 1, 10, 0, 0, 0, time.UTC)
 	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", oldCompleted.UUID, "task.yml"), baseTime.Add(1*time.Minute))
@@ -747,10 +746,10 @@ func TestResolveTaskRunIdentifierResolvesNextUnfinishedTaskByOldestModTime(t *te
 	runningTask, err := manager.CreateTask(core.TaskCreateParams{Name: "running", Prompt: "prompt"})
 	require.NoError(t, err)
 
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCreated)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableOldest.UUID, "task.yml"), core.TaskStatusCreated, core.TaskStateFailed)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", draftOldest.UUID, "task.yml"), core.TaskStatusDraft, core.TaskStateCreated)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), core.TaskStatusRunning, core.TaskStateRunning)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), core.TaskStatusOpen)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableOldest.UUID, "task.yml"), core.TaskStatusCreated)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", draftOldest.UUID, "task.yml"), core.TaskStatusDraft)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), core.TaskStatusRunning)
 
 	baseTime := time.Date(2026, time.February, 1, 10, 0, 0, 0, time.UTC)
 	setTaskYMLModTimeForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runnableNewest.UUID, "task.yml"), baseTime.Add(3*time.Minute))
@@ -781,9 +780,9 @@ func TestResolveTaskRunIdentifierReturnsErrorWhenNoUnfinishedTaskExists(t *testi
 	runningTask, err := manager.CreateTask(core.TaskCreateParams{Name: "running", Prompt: "prompt"})
 	require.NoError(t, err)
 
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", completedTask.UUID, "task.yml"), core.TaskStatusOpen, core.TaskStateCompleted)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", mergedTask.UUID, "task.yml"), core.TaskStatusMerged, core.TaskStateCompleted)
-	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), core.TaskStatusRunning, core.TaskStateRunning)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", completedTask.UUID, "task.yml"), core.TaskStatusMerged)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", mergedTask.UUID, "task.yml"), core.TaskStatusMerged)
+	setTaskStatusForTest(t, filepath.Join(baseDir, ".cswdata", "tasks", runningTask.UUID, "task.yml"), core.TaskStatusRunning)
 
 	_, err = resolveTaskRunIdentifier(manager, "", true, false)
 	require.Error(t, err)
@@ -844,7 +843,6 @@ func TestPrintTaskHuman(t *testing.T) {
 		Name:          "task-name",
 		Description:   "task-description",
 		Status:        core.TaskStatusOpen,
-		State:         core.TaskStateCompleted,
 		FeatureBranch: "feature/task",
 		ParentBranch:  "main",
 		Role:          "developer",
