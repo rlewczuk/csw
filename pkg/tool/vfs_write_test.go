@@ -82,7 +82,7 @@ func TestVFSWriteTool(t *testing.T) {
 	})
 }
 
-func TestVFSWriteToolPermissionQuery(t *testing.T) {
+func TestVFSWriteToolPermissions(t *testing.T) {
 	t.Run("should fail when access is ask", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()

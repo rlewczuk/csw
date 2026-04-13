@@ -3,6 +3,8 @@ package tool
 import (
 	"fmt"
 	"strings"
+
+	"github.com/rlewczuk/csw/pkg/apis"
 )
 
 const (
@@ -12,13 +14,13 @@ const (
 
 // NewPermissionDeniedResponse builds a standardized permission denied response.
 func NewPermissionDeniedResponse(call *ToolCall, details string) *ToolResponse {
-	errMsg := "permission denied"
+	err := error(apis.ErrPermissionDenied)
 	if strings.TrimSpace(details) != "" {
-		errMsg = fmt.Sprintf("permission denied: %s", strings.TrimSpace(details))
+		err = fmt.Errorf("%w: %s", apis.ErrPermissionDenied, strings.TrimSpace(details))
 	}
 	return &ToolResponse{
 		Call:  call,
-		Error: fmt.Errorf("NewPermissionDeniedResponse() [permissions.go]: %s", errMsg),
+		Error: fmt.Errorf("NewPermissionDeniedResponse() [permissions.go]: %w", err),
 		Done:  true,
 	}
 }

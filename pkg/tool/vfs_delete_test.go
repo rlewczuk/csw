@@ -80,7 +80,7 @@ func TestVFSDeleteTool(t *testing.T) {
 	})
 }
 
-func TestVFSDeleteToolPermissionQuery(t *testing.T) {
+func TestVFSDeleteToolPermissions(t *testing.T) {
 	t.Run("should fail when access is ask", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()

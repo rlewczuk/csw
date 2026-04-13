@@ -111,7 +111,7 @@ func TestVFSMoveTool(t *testing.T) {
 	})
 }
 
-func TestVFSMoveToolPermissionQuery(t *testing.T) {
+func TestVFSMoveToolPermissions(t *testing.T) {
 	t.Run("should fail when move access is ask", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()

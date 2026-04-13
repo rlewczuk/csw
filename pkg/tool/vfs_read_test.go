@@ -361,7 +361,7 @@ func TestVFSReadTool(t *testing.T) {
 	})
 }
 
-func TestVFSReadToolPermissionQuery(t *testing.T) {
+func TestVFSReadToolPermissions(t *testing.T) {
 	t.Run("should fail when access is ask", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()

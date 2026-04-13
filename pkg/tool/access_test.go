@@ -465,8 +465,8 @@ func TestAccessControlTool_Execute_Ask(t *testing.T) {
 	response := ac.Execute(call)
 
 	assert.False(t, mock.executed, "underlying tool should not be executed for ask")
-	assert.Error(t, response.Error, "should return error for ask (not yet implemented)")
-	assert.Contains(t, response.Error.Error(), "permission query")
+	assert.Error(t, response.Error, "should return error for ask")
+	assert.Contains(t, response.Error.Error(), "access denied")
 	assert.True(t, response.Done)
 }
 

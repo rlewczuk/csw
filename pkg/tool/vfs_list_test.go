@@ -210,7 +210,7 @@ func TestVFSListToolAbsolutePathDenied(t *testing.T) {
 	assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 }
 
-func TestVFSListToolPermissionQuery(t *testing.T) {
+func TestVFSListToolPermissions(t *testing.T) {
 	t.Run("should fail when list access is ask", func(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		require.NoError(t, mockVFS.WriteFile("a.txt", []byte("a")))

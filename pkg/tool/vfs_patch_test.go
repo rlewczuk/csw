@@ -334,7 +334,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 	})
 }
 
-func TestVFSPatchToolPermissionQuery(t *testing.T) {
+func TestVFSPatchToolPermissions(t *testing.T) {
 	t.Run("should fail when read access is ask", func(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		require.NoError(t, mockVFS.WriteFile("test.txt", []byte("hello\n")))
