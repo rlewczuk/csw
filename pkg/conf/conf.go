@@ -457,6 +457,8 @@ type RunDefaultsConfig struct {
 	Merge bool `json:"merge,omitempty" yaml:"merge,omitempty"`
 	// LogLLMRequests is the default --log-llm-requests value.
 	LogLLMRequests bool `json:"log-llm-requests,omitempty" yaml:"log-llm-requests,omitempty"`
+	// LogLLMRequestsRaw is the default --log-llm-requests-raw value.
+	LogLLMRequestsRaw bool `json:"log-llm-requests-raw,omitempty" yaml:"log-llm-requests-raw,omitempty"`
 	// Thinking is the default --thinking value.
 	Thinking string `json:"thinking,omitempty" yaml:"thinking,omitempty"`
 	// LSPServer is the default --lsp-server value.

@@ -25,6 +25,7 @@ func applyRunDefaults(
 	worktree *string,
 	merge *bool,
 	logLLMRequests *bool,
+	logLLMRequestsRaw *bool,
 	thinking *string,
 	lspServer *string,
 	gitUser *string,
@@ -55,6 +56,9 @@ func applyRunDefaults(
 	}
 	if !cmd.Flags().Changed("log-llm-requests") && defaults.LogLLMRequests {
 		*logLLMRequests = true
+	}
+	if !cmd.Flags().Changed("log-llm-requests-raw") && defaults.LogLLMRequestsRaw {
+		*logLLMRequestsRaw = true
 	}
 	if !isThinkingFlagChanged(cmd) && defaults.Thinking != "" {
 		*thinking = defaults.Thinking

@@ -17,6 +17,7 @@ func TestApplyRunDefaultsUsesResolverAndDefaults(t *testing.T) {
 	cmd.Flags().String("worktree", "", "")
 	cmd.Flags().Bool("merge", false, "")
 	cmd.Flags().Bool("log-llm-requests", false, "")
+	cmd.Flags().Bool("log-llm-requests-raw", false, "")
 	cmd.Flags().String("thinking", "", "")
 	cmd.Flags().String("lsp-server", "", "")
 	cmd.Flags().String("git-user", "", "")
@@ -30,6 +31,7 @@ func TestApplyRunDefaultsUsesResolverAndDefaults(t *testing.T) {
 	worktree := ""
 	merge := false
 	logRequests := false
+	logRequestsRaw := false
 	thinking := ""
 	lspServer := ""
 	gitUser := ""
@@ -49,6 +51,7 @@ func TestApplyRunDefaultsUsesResolverAndDefaults(t *testing.T) {
 			Worktree:            "feature/default",
 			Merge:               true,
 			LogLLMRequests:      true,
+			LogLLMRequestsRaw:   true,
 			Thinking:            "high",
 			LSPServer:           "gopls",
 			GitUserName:         "Config User",
@@ -58,13 +61,14 @@ func TestApplyRunDefaultsUsesResolverAndDefaults(t *testing.T) {
 			AllowAllPermissions: true,
 			VFSAllow:            []string{"/allow/one", "/allow/two"},
 		}, nil
-	}, cmd, "wd", "shadow", "project", "cfg", &model, &worktree, &merge, &logRequests, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAll, &vfsAllow)
+	}, cmd, "wd", "shadow", "project", "cfg", &model, &worktree, &merge, &logRequests, &logRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAll, &vfsAllow)
 
 	require.NoError(t, err)
 	assert.Equal(t, "provider/model", model)
 	assert.Equal(t, "feature/default", worktree)
 	assert.True(t, merge)
 	assert.True(t, logRequests)
+	assert.True(t, logRequestsRaw)
 	assert.Equal(t, "high", thinking)
 	assert.Equal(t, "gopls", lspServer)
 	assert.Equal(t, "Config User", gitUser)
@@ -81,6 +85,7 @@ func TestApplyRunDefaultsValidatesMaxThreads(t *testing.T) {
 	cmd.Flags().String("worktree", "", "")
 	cmd.Flags().Bool("merge", false, "")
 	cmd.Flags().Bool("log-llm-requests", false, "")
+	cmd.Flags().Bool("log-llm-requests-raw", false, "")
 	cmd.Flags().String("thinking", "", "")
 	cmd.Flags().String("lsp-server", "", "")
 	cmd.Flags().String("git-user", "", "")
@@ -94,6 +99,7 @@ func TestApplyRunDefaultsValidatesMaxThreads(t *testing.T) {
 	worktree := ""
 	merge := false
 	logRequests := false
+	logRequestsRaw := false
 	thinking := ""
 	lspServer := ""
 	gitUser := ""
@@ -106,7 +112,7 @@ func TestApplyRunDefaultsValidatesMaxThreads(t *testing.T) {
 	err := applyRunDefaults(func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 		_ = params
 		return conf.RunDefaultsConfig{}, nil
-	}, cmd, "wd", "", "", "", &model, &worktree, &merge, &logRequests, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAll, &vfsAllow)
+	}, cmd, "wd", "", "", "", &model, &worktree, &merge, &logRequests, &logRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAll, &vfsAllow)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--max-threads must be >= 0")

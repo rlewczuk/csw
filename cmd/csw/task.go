@@ -520,7 +520,7 @@ func taskRunCommand() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := applyRunDefaults(resolveTaskRunDefaultsFunc, cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &merge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads, &cliShadowDir, &cliAllowAllPerms, &cliVFSAllow); err != nil {
+			if err := applyRunDefaults(resolveTaskRunDefaultsFunc, cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &merge, &cliLogLLMRequests, &cliLogLLMRequestsRaw, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads, &cliShadowDir, &cliAllowAllPerms, &cliVFSAllow); err != nil {
 				return err
 			}
 			cliLogLLMRequests = cliLogLLMRequests || cliLogLLMRequestsRaw

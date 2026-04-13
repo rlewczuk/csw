@@ -294,6 +294,7 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 			"worktree": "feature/base",
 			"merge": true,
 			"log-llm-requests": true,
+			"log-llm-requests-raw": false,
 			"thinking": "medium",
 			"lsp-server": "source1-lsp",
 			"container": {
@@ -325,6 +326,7 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 		"defaults": {
 			"model": "provider2/default",
 			"worktree": "feature/override",
+			"log-llm-requests-raw": true,
 			"thinking": "high",
 			"lsp-server": "source2-lsp",
 			"container": {
@@ -372,6 +374,7 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 	assert.Equal(t, "feature/override", globalConfig.Defaults.Worktree)
 	assert.True(t, globalConfig.Defaults.Merge)
 	assert.True(t, globalConfig.Defaults.LogLLMRequests)
+	assert.True(t, globalConfig.Defaults.LogLLMRequestsRaw)
 	assert.Equal(t, "high", globalConfig.Defaults.Thinking)
 	assert.Equal(t, "source2-lsp", globalConfig.Defaults.LSPServer)
 	require.NotNil(t, globalConfig.Defaults.Container)

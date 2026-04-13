@@ -113,6 +113,9 @@ mergeOtherFields:
 	if override.LogLLMRequests {
 		c.LogLLMRequests = true
 	}
+	if override.LogLLMRequestsRaw {
+		c.LogLLMRequestsRaw = true
+	}
 	if override.Thinking != "" {
 		c.Thinking = override.Thinking
 	}

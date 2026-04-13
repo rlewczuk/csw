@@ -105,6 +105,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		Worktree:        "feature/one",
 		Merge:           false,
 		LogLLMRequests:  false,
+		LogLLMRequestsRaw: false,
 		Thinking:        "medium",
 		LSPServer:       "first",
 		GitUserName:     "Base User",
@@ -114,13 +115,14 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		ShadowDir:       "shadow/base",
 		VFSAllow:        []string{"/base/allow"},
 	}
-	override := RunDefaultsConfig{
+		override := RunDefaultsConfig{
 		DefaultProvider:     "provider2",
 		DefaultRole:         "role2",
 		Container:           &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
 		Model:               "provider2/model",
 		Merge:               true,
 		LogLLMRequests:      true,
+		LogLLMRequestsRaw:   true,
 		LSPServer:           "second",
 		GitUserName:         "Override User",
 		GitUserEmail:        "override@example.com",
@@ -141,6 +143,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		Worktree:            "feature/one",
 		Merge:               true,
 		LogLLMRequests:      true,
+		LogLLMRequestsRaw:   true,
 		Thinking:            "medium",
 		LSPServer:           "second",
 		GitUserName:         "Override User",
@@ -235,6 +238,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 			Model:               "m2",
 			Merge:               true,
 			LogLLMRequests:      true,
+			LogLLMRequestsRaw:   true,
 			Thinking:            "high",
 			LSPServer:           "lsp2",
 			TaskDir:             "custom/tasks",
@@ -258,7 +262,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 	assert.Equal(t, 12, base.Defaults.MaxThreads)
 	require.NotNil(t, base.Defaults.Container)
 	assert.Equal(t, ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, *base.Defaults.Container)
-	assert.Equal(t, RunDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks", ShadowDir: "shadow/override", AllowAllPermissions: true, VFSAllow: []string{"/override/allow"}}, base.Defaults)
+	assert.Equal(t, RunDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, LogLLMRequestsRaw: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks", ShadowDir: "shadow/override", AllowAllPermissions: true, VFSAllow: []string{"/override/allow"}}, base.Defaults)
 	assert.Equal(t, []string{".cswdata/**", ".agents/**"}, base.ShadowPaths)
 }
 

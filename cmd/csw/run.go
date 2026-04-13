@@ -222,7 +222,7 @@ func RunCommand() *cobra.Command {
 				return err
 			}
 
-			if err := applyRunDefaults(resolveRunDefaultsFunc, cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads, &cliShadowDir, &cliAllowAllPerms, &cliVFSAllow); err != nil {
+			if err := applyRunDefaults(resolveRunDefaultsFunc, cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliLogLLMRequestsRaw, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads, &cliShadowDir, &cliAllowAllPerms, &cliVFSAllow); err != nil {
 				return err
 			}
 			commandContainerEnabled, err := applyCommandRunDefaults(cmd, commandRunDefaults, &cliModel, &cliRole, &cliWorktree, &cliMerge, &cliLogLLMRequests, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads, &cliShadowDir, &cliAllowAllPerms, &cliVFSAllow, &cliContainerOn, &cliContainerOff, &cliContainerImage, &cliContainerMount, &cliContainerEnv)
