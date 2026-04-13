@@ -336,13 +336,6 @@ func (h *subAgentOutputHandler) RunFinished(err error) {
 	h.delegate.RunFinished(err)
 }
 
-func (h *subAgentOutputHandler) OnPermissionQuery(query *tool.ToolPermissionsQuery) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.OnPermissionQuery(query)
-}
-
 func (h *subAgentOutputHandler) OnRateLimitError(retryAfterSeconds int) {
 	if h.delegate == nil {
 		return

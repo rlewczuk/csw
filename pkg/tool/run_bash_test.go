@@ -84,59 +84,6 @@ func TestRunBashTool_Execute_DeniedCommand(t *testing.T) {
 	assert.Equal(t, 0, mockRunner.ExecutionCount())
 }
 
-func TestRunBashTool_Execute_AskPermission(t *testing.T) {
-	mockRunner := runner.NewMockRunner()
-
-	// No privileges means Ask by default
-	tool := NewRunBashTool(mockRunner, nil)
-
-	args := ToolCall{
-		ID:       "test-id",
-		Function: "runBash",
-		Arguments: NewToolValue(map[string]any{
-			"command": "ls -la",
-		}),
-	}
-
-	response := tool.Execute(&args)
-
-	assert.Error(t, response.Error)
-	query, ok := response.Error.(*ToolPermissionsQuery)
-	assert.True(t, ok, "Error should be ToolPermissionsQuery")
-	assert.Equal(t, "Permission Required", query.Title)
-	assert.Contains(t, query.Details, "ls -la")
-	assert.Contains(t, query.Options, "Allow")
-	assert.Contains(t, query.Options, "Deny")
-	assert.True(t, response.Done)
-	assert.Equal(t, 0, mockRunner.ExecutionCount())
-}
-
-func TestRunBashTool_Execute_ExplicitAskPermission(t *testing.T) {
-	mockRunner := runner.NewMockRunner()
-
-	privileges := map[string]conf.AccessFlag{
-		".*": conf.AccessAsk,
-	}
-	tool := NewRunBashTool(mockRunner, privileges)
-
-	args := ToolCall{
-		ID:       "test-id",
-		Function: "runBash",
-		Arguments: NewToolValue(map[string]any{
-			"command": "cat file.txt",
-		}),
-	}
-
-	response := tool.Execute(&args)
-
-	assert.Error(t, response.Error)
-	query, ok := response.Error.(*ToolPermissionsQuery)
-	assert.True(t, ok, "Error should be ToolPermissionsQuery")
-	assert.Equal(t, "run", query.Meta["type"])
-	assert.Equal(t, "cat file.txt", query.Meta["command"])
-	assert.True(t, response.Done)
-	assert.Equal(t, 0, mockRunner.ExecutionCount())
-}
 
 func TestRunBashTool_Execute_CommandWithNonZeroExitCode(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
@@ -267,36 +214,9 @@ func TestRunBashTool_CheckPermission_NoPrivileges(t *testing.T) {
 
 	response := tool.Execute(&args)
 
-	// Should ask for permission when no privileges are defined
-	_, ok := response.Error.(*ToolPermissionsQuery)
-	assert.True(t, ok, "Should return permission query")
-}
-
-func TestRunBashTool_PermissionQuery_Options(t *testing.T) {
-	mockRunner := runner.NewMockRunner()
-	tool := NewRunBashTool(mockRunner, nil)
-
-	args := ToolCall{
-		ID:       "test-id",
-		Function: "runBash",
-		Arguments: NewToolValue(map[string]any{
-			"command": "test command",
-		}),
-	}
-
-	response := tool.Execute(&args)
-
-	query, ok := response.Error.(*ToolPermissionsQuery)
-	require.True(t, ok)
-
-	assert.Equal(t, "Permission Required", query.Title)
-	assert.Contains(t, query.Details, "test command")
-	assert.Contains(t, query.Options, "Allow")
-	assert.Contains(t, query.Options, "Deny")
-	assert.Contains(t, query.Options, "Allow and remember (add to privileges)")
-	assert.True(t, query.AllowCustomResponse)
-	assert.Equal(t, "run", query.Meta["type"])
-	assert.Equal(t, "test command", query.Meta["command"])
+	assert.Error(t, response.Error)
+	assert.True(t, response.Done)
+	assert.Equal(t, 0, mockRunner.ExecutionCount())
 }
 
 func TestRunBashTool_Execute_WithRelativeWorkdir(t *testing.T) {
@@ -348,15 +268,8 @@ func TestRunBashTool_Execute_WithAbsoluteWorkdir(t *testing.T) {
 
 	response := tool.Execute(&args)
 
-	// Should ask for permission due to absolute path
 	assert.Error(t, response.Error)
-	query, ok := response.Error.(*ToolPermissionsQuery)
-	assert.True(t, ok, "Error should be ToolPermissionsQuery")
-	assert.Equal(t, "Permission Required for Absolute Path", query.Title)
-	assert.Contains(t, query.Details, "/absolute/path")
-	assert.Contains(t, query.Details, "ls")
-	assert.Equal(t, "run_absolute_workdir", query.Meta["type"])
-	assert.Equal(t, "/absolute/path", query.Meta["workdir"])
+	assert.Contains(t, response.Error.Error(), "permission denied")
 	assert.True(t, response.Done)
 	assert.Equal(t, 0, mockRunner.ExecutionCount())
 }

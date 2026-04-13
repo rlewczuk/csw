@@ -3,7 +3,6 @@ package logging
 import (
 	"testing"
 
-	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,27 +57,6 @@ func TestTestLoggerLLMResponse(t *testing.T) {
 	assert.Contains(t, llmBuf.String(), "llm_response")
 	assert.Contains(t, llmBuf.String(), "test-provider")
 	assert.Contains(t, llmBuf.String(), "test-model")
-}
-
-func TestTestLoggerPermissionQuery(t *testing.T) {
-	sessionID := "test-session-123"
-	sessionLog, _ := NewTestLogger(t, sessionID)
-
-	query := &tool.ToolPermissionsQuery{
-		Id: "query-123",
-		Tool: &tool.ToolCall{
-			Function: "test_tool",
-		},
-		Title:   "Permission Required",
-		Details: "This tool needs permission",
-	}
-	LogPermissionQuery(sessionLog, query)
-
-	// Verify it was logged
-	sessionBuf := GetTestSessionBuffer(sessionID)
-	require.NotNil(t, sessionBuf)
-	assert.Contains(t, sessionBuf.String(), "permission_query")
-	assert.Contains(t, sessionBuf.String(), "query-123")
 }
 
 func TestFlushTestLogger(t *testing.T) {

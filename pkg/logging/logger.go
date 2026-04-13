@@ -599,29 +599,6 @@ func LogLLMStreamChunk(llmLog *slog.Logger, provider string, model string, chunk
 	)
 }
 
-// LogPermissionQuery logs a permission query.
-func LogPermissionQuery(sessionLog *slog.Logger, query *tool.ToolPermissionsQuery) {
-	toolFunc := ""
-	if query.Tool != nil {
-		toolFunc = query.Tool.Function
-	}
-
-	sessionLog.Info("permission_query",
-		"query_id", query.Id,
-		"tool", toolFunc,
-		"title", query.Title,
-		"details", query.Details,
-	)
-}
-
-// LogPermissionResponse logs a permission response.
-func LogPermissionResponse(sessionLog *slog.Logger, query *tool.ToolPermissionsQuery, response string) {
-	sessionLog.Info("permission_response",
-		"tool", query.Tool.Function,
-		"response", response,
-	)
-}
-
 // LogChatMessages logs chat messages in internal format.
 func LogChatMessages(chatLog *slog.Logger, messages []*models.ChatMessage) {
 	for _, msg := range messages {

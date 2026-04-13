@@ -198,44 +198,6 @@ func TestSessionLoggerAppendMode(t *testing.T) {
 	assert.GreaterOrEqual(t, lines, 2, "should have at least 2 log lines")
 }
 
-func TestSessionLoggerPermissionQuery(t *testing.T) {
-	tmpDir := filepath.Join("../../tmp", "test_logs", t.Name())
-	defer os.RemoveAll(tmpDir)
-
-	err := SetLogsDirectory(tmpDir, false)
-	require.NoError(t, err)
-
-	sessionID := "test-session-123"
-	sessionLog := GetSessionLogger(sessionID, LogTypeSession)
-	defer CloseSessionLogger(sessionID)
-
-	// Log permission query
-	query := &tool.ToolPermissionsQuery{
-		Id: "query-123",
-		Tool: &tool.ToolCall{
-			Function: "test_tool",
-		},
-		Title:   "Permission Required",
-		Details: "This tool needs permission",
-	}
-	LogPermissionQuery(sessionLog, query)
-
-	// Log permission response
-	LogPermissionResponse(sessionLog, query, "allow")
-
-	// Flush to ensure writes complete
-	FlushLogs()
-
-	// Read session log
-	sessionLogPath := filepath.Join(tmpDir, "sessions", sessionID, "logs.json")
-	content, err := os.ReadFile(sessionLogPath)
-	require.NoError(t, err)
-	assert.Contains(t, string(content), "permission_query")
-	assert.Contains(t, string(content), "permission_response")
-	assert.Contains(t, string(content), "query-123")
-	assert.Contains(t, string(content), "allow")
-}
-
 func TestLogFormatIsValidJSON(t *testing.T) {
 	tmpDir := filepath.Join("../../tmp", "test_logs", t.Name())
 	defer os.RemoveAll(tmpDir)

@@ -112,7 +112,7 @@ func TestVFSMoveTool(t *testing.T) {
 }
 
 func TestVFSMoveToolPermissionQuery(t *testing.T) {
-	t.Run("should return permission query when access is ask", func(t *testing.T) {
+	t.Run("should fail when move access is ask", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
 		err := mockVFS.WriteFile("source.txt", []byte("hello"))
@@ -140,19 +140,10 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 
-		// Check that error is ToolPermissionsQuery
-		query, ok := response.Error.(*ToolPermissionsQuery)
-		require.True(t, ok, "Error should be ToolPermissionsQuery")
-		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfsMove", query.Tool.Function)
-		assert.Equal(t, "Permission Required", query.Title)
-		assert.Contains(t, query.Details, "source.txt")
-		assert.True(t, query.AllowCustomResponse)
-		assert.Contains(t, query.Options, "Allow")
-		assert.Contains(t, query.Options, "Deny")
+		assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 	})
 
-	t.Run("should request write permission for destination", func(t *testing.T) {
+	t.Run("should fail when write permission for destination is ask", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
 		err := mockVFS.WriteFile("source.txt", []byte("hello"))
@@ -181,12 +172,7 @@ func TestVFSMoveToolPermissionQuery(t *testing.T) {
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 
-		query, ok := response.Error.(*ToolPermissionsQuery)
-		require.True(t, ok, "Error should be ToolPermissionsQuery")
-		assert.Equal(t, "dest.txt", query.Meta["path"])
-		assert.Equal(t, "write", query.Meta["operation"])
-		assert.Contains(t, query.Details, "writing to file")
-		assert.Contains(t, query.Details, "dest.txt")
+		assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 	})
 
 	t.Run("should succeed when access is allow", func(t *testing.T) {

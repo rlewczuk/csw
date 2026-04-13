@@ -20,10 +20,9 @@ func TestJsonlSessionInput_StartReadingInputRoutesActions(t *testing.T) {
 	input.StartReadingInput()
 	thread.waitForEvents(t, 3)
 
-	prompts, interrupts, responses := thread.snapshot()
+	prompts, interrupts := thread.snapshot()
 	assert.Equal(t, []string{"hello", "world"}, prompts)
 	assert.Equal(t, 1, interrupts)
-	assert.Empty(t, responses)
 }
 
 func TestJsonlSessionInput_StartReadingInputRoutesMultipleInterrupts(t *testing.T) {
@@ -38,10 +37,9 @@ func TestJsonlSessionInput_StartReadingInputRoutesMultipleInterrupts(t *testing.
 	input.StartReadingInput()
 	thread.waitForEvents(t, 3)
 
-	prompts, interrupts, responses := thread.snapshot()
+	prompts, interrupts := thread.snapshot()
 	assert.Equal(t, []string{"resume"}, prompts)
 	assert.Equal(t, 2, interrupts)
-	assert.Empty(t, responses)
 }
 
 func TestJsonlSessionInput_StartReadingInputSkipsInvalidEntries(t *testing.T) {
@@ -57,10 +55,9 @@ func TestJsonlSessionInput_StartReadingInputSkipsInvalidEntries(t *testing.T) {
 	input.StartReadingInput()
 	thread.waitForEvents(t, 1)
 
-	prompts, interrupts, responses := thread.snapshot()
+	prompts, interrupts := thread.snapshot()
 	assert.Equal(t, []string{"ok"}, prompts)
 	assert.Equal(t, 0, interrupts)
-	assert.Empty(t, responses)
 }
 
 func TestJsonlSessionInput_StartReadingInputCanBeCalledOnce(t *testing.T) {
@@ -72,29 +69,9 @@ func TestJsonlSessionInput_StartReadingInputCanBeCalledOnce(t *testing.T) {
 	input.StartReadingInput()
 	thread.waitForEvents(t, 1)
 
-	prompts, interrupts, responses := thread.snapshot()
+	prompts, interrupts := thread.snapshot()
 	assert.Empty(t, prompts)
 	assert.Equal(t, 1, interrupts)
-	assert.Empty(t, responses)
-}
-
-func TestJsonlSessionInput_StartReadingInputRoutesPermissionResponse(t *testing.T) {
-	reader := strings.NewReader(strings.Join([]string{
-		`{"type":"query_response","query_id":"019d7138-dbf1-7fc6-bdfd-7e8bece29727","response":"deny"}`,
-	}, "\n") + "\n")
-	thread := newInputThreadDouble()
-	thread.acceptPermissionResponses = true
-	input := NewJsonlSessionInput(reader, thread)
-
-	input.StartReadingInput()
-	thread.waitForEvents(t, 1)
-
-	prompts, interrupts, responses := thread.snapshot()
-	assert.Empty(t, prompts)
-	assert.Equal(t, 0, interrupts)
-	require.Len(t, responses, 1)
-	assert.Equal(t, "019d7138-dbf1-7fc6-bdfd-7e8bece29727", responses[0].queryID)
-	assert.Equal(t, "deny", responses[0].response)
 }
 
 func TestJsonlSessionInput_StartReadingInputNoopForNilDependencies(t *testing.T) {

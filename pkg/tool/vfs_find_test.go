@@ -286,7 +286,7 @@ func TestVFSFindTool(t *testing.T) {
 }
 
 func TestVFSFindToolPermissionQuery(t *testing.T) {
-	t.Run("should return permission query when access is ask", func(t *testing.T) {
+	t.Run("should fail when access is ask", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
 		err := mockVFS.WriteFile("test.txt", []byte("hello"))
@@ -314,16 +314,7 @@ func TestVFSFindToolPermissionQuery(t *testing.T) {
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 
-		// Check that error is ToolPermissionsQuery
-		query, ok := response.Error.(*ToolPermissionsQuery)
-		require.True(t, ok, "Error should be ToolPermissionsQuery")
-		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfsFind", query.Tool.Function)
-		assert.Equal(t, "Permission Required", query.Title)
-		assert.Contains(t, query.Details, "*.txt")
-		assert.True(t, query.AllowCustomResponse)
-		assert.Contains(t, query.Options, "Allow")
-		assert.Contains(t, query.Options, "Deny")
+		assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 	})
 
 	t.Run("should succeed when access is allow", func(t *testing.T) {

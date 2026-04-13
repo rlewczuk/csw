@@ -48,21 +48,20 @@ func TestSessionPersistenceStateJSON(t *testing.T) {
 		}}
 		session.SetTodoList(todos)
 		session.loadedAgentFiles = map[string]struct{}{"AGENTS.md": {}}
-		session.pendingPermissionToolCalls = []*tool.ToolCall{{
+	session.pendingToolResponses = []*tool.ToolResponse{{
+		Call: &tool.ToolCall{
 			ID:       "call-1",
 			Function: "runBash",
 			Arguments: tool.NewToolValue(map[string]any{
 				"command": "pwd",
 			}),
-		}}
-		session.pendingToolResponses = []*tool.ToolResponse{{
-			Call:  session.pendingPermissionToolCalls[0],
-			Error: fmt.Errorf("permission required"),
-			Result: tool.NewToolValue(map[string]any{
-				"output": "ok",
-			}),
-			Done: true,
-		}}
+		},
+		Error: fmt.Errorf("permission required"),
+		Result: tool.NewToolValue(map[string]any{
+			"output": "ok",
+		}),
+		Done: true,
+	}}
 		session.messages = append(session.messages,
 			models.NewTextMessage(models.ChatRoleUser, "resume me"),
 			models.NewTextMessage(models.ChatRoleAssistant, "ready"),
@@ -88,9 +87,7 @@ func TestSessionPersistenceStateJSON(t *testing.T) {
 		require.Len(t, state.TodoList, 1)
 		assert.Equal(t, "todo-1", state.TodoList[0].ID)
 		assert.GreaterOrEqual(t, len(state.Messages), 3)
-		require.Len(t, state.PendingPermissionToolCalls, 1)
-		assert.Equal(t, "call-1", state.PendingPermissionToolCalls[0].ID)
-		require.Len(t, state.PendingToolResponses, 1)
+	require.Len(t, state.PendingToolResponses, 1)
 		assert.Equal(t, "call-1", state.PendingToolResponses[0].Call.ID)
 		assert.Equal(t, "ok", state.PendingToolResponses[0].Result.Get("output").AsString())
 		assert.True(t, strings.Contains(state.PendingToolResponses[0].Error, "permission required"))

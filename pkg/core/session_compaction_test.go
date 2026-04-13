@@ -35,8 +35,6 @@ func (h *compactionOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
 
 func (h *compactionOutputHandler) RunFinished(err error) {}
 
-func (h *compactionOutputHandler) OnPermissionQuery(query *tool.ToolPermissionsQuery) {}
-
 func (h *compactionOutputHandler) OnRateLimitError(retryAfterSeconds int) {}
 
 func (h *compactionOutputHandler) ShouldRetryAfterFailure(message string) bool {
@@ -65,8 +63,6 @@ func (h *retryOutputHandler) AddToolCall(call *tool.ToolCall) {}
 func (h *retryOutputHandler) AddToolCallResult(result *tool.ToolResponse) {}
 
 func (h *retryOutputHandler) RunFinished(err error) {}
-
-func (h *retryOutputHandler) OnPermissionQuery(query *tool.ToolPermissionsQuery) {}
 
 func (h *retryOutputHandler) OnRateLimitError(retryAfterSeconds int) {}
 

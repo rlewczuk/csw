@@ -24,10 +24,6 @@ type MockSessionOutputHandler struct {
 	// ToolCallResults stores all tool responses received via AddToolCallResult.
 	ToolCallResults []*tool.ToolResponse
 
-	// PermissionQueries stores all permission queries received via OnPermissionQuery.
-	PermissionQueries     []*tool.ToolPermissionsQuery
-	permissionQueryCalled chan struct{}
-
 	// RateLimitErrors stores all rate limit errors received via OnRateLimitError.
 	RateLimitErrors      []int
 	rateLimitErrorCalled chan struct{}
@@ -45,26 +41,10 @@ func NewMockSessionOutputHandler() *MockSessionOutputHandler {
 		AssistantMessages:     make([]AssistantMessageRecord, 0),
 		ToolCalls:             make([]*tool.ToolCall, 0),
 		ToolCallResults:       make([]*tool.ToolResponse, 0),
-		PermissionQueries:     make([]*tool.ToolPermissionsQuery, 0),
-		permissionQueryCalled: make(chan struct{}, 10),
 		rateLimitErrorCalled:  make(chan struct{}, 10),
 		runFinishedCalled:     make(chan struct{}),
 	}
 }
-
-// OnPermissionQuery records a permission query.
-func (h *MockSessionOutputHandler) OnPermissionQuery(query *tool.ToolPermissionsQuery) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.PermissionQueries = append(h.PermissionQueries, query)
-	select {
-	case h.permissionQueryCalled <- struct{}{}:
-	default:
-	}
-}
-
-// WaitForPermissionQuery blocks until OnPermissionQuery is called.
-func (h *MockSessionOutputHandler) WaitForPermissionQuery() { <-h.permissionQueryCalled }
 
 // OnRateLimitError records a rate limit error.
 func (h *MockSessionOutputHandler) OnRateLimitError(retryAfterSeconds int) {

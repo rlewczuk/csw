@@ -335,7 +335,7 @@ func TestVFSPatchToolRender(t *testing.T) {
 }
 
 func TestVFSPatchToolPermissionQuery(t *testing.T) {
-	t.Run("should return permission query when read access is ask", func(t *testing.T) {
+	t.Run("should fail when read access is ask", func(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		require.NoError(t, mockVFS.WriteFile("test.txt", []byte("hello\n")))
 
@@ -353,13 +353,10 @@ func TestVFSPatchToolPermissionQuery(t *testing.T) {
 		})
 
 		assert.Error(t, response.Error)
-		query, ok := response.Error.(*ToolPermissionsQuery)
-		require.True(t, ok)
-		assert.Equal(t, "read", query.Meta["operation"])
-		assert.Equal(t, "test.txt", query.Meta["path"])
+		assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 	})
 
-	t.Run("should return permission query when write access is ask", func(t *testing.T) {
+	t.Run("should fail when write access is ask", func(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 
 		accessVFS := vfs.NewAccessControlVFS(mockVFS, map[string]conf.FileAccess{
@@ -376,13 +373,10 @@ func TestVFSPatchToolPermissionQuery(t *testing.T) {
 		})
 
 		assert.Error(t, response.Error)
-		query, ok := response.Error.(*ToolPermissionsQuery)
-		require.True(t, ok)
-		assert.Equal(t, "write", query.Meta["operation"])
-		assert.Equal(t, "created.txt", query.Meta["path"])
+		assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 	})
 
-	t.Run("should return permission query when delete access is ask", func(t *testing.T) {
+	t.Run("should fail when delete access is ask", func(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		require.NoError(t, mockVFS.WriteFile("delete.txt", []byte("x\n")))
 
@@ -400,9 +394,6 @@ func TestVFSPatchToolPermissionQuery(t *testing.T) {
 		})
 
 		assert.Error(t, response.Error)
-		query, ok := response.Error.(*ToolPermissionsQuery)
-		require.True(t, ok)
-		assert.Equal(t, "delete", query.Meta["operation"])
-		assert.Equal(t, "delete.txt", query.Meta["path"])
+		assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 	})
 }

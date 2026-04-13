@@ -211,7 +211,7 @@ func TestVFSListToolAbsolutePathDenied(t *testing.T) {
 }
 
 func TestVFSListToolPermissionQuery(t *testing.T) {
-	t.Run("should return permission query when list access is ask", func(t *testing.T) {
+	t.Run("should fail when list access is ask", func(t *testing.T) {
 		mockVFS := vfs.NewMockVFS()
 		require.NoError(t, mockVFS.WriteFile("a.txt", []byte("a")))
 
@@ -229,9 +229,7 @@ func TestVFSListToolPermissionQuery(t *testing.T) {
 		})
 
 		require.Error(t, response.Error)
-		query, ok := response.Error.(*ToolPermissionsQuery)
-		require.True(t, ok)
-		assert.Equal(t, "vfsList", query.Tool.Function)
+		assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 	})
 
 	t.Run("should fail when list access is deny", func(t *testing.T) {

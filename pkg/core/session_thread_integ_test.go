@@ -57,10 +57,6 @@ func (d *interruptOutputDouble) RunFinished(err error) {
 	d.runFinishedErr = err
 }
 
-func (d *interruptOutputDouble) OnPermissionQuery(query *tool.ToolPermissionsQuery) {
-	_ = query
-}
-
 func (d *interruptOutputDouble) OnRateLimitError(retryAfterSeconds int) {
 	_ = retryAfterSeconds
 }

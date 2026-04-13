@@ -260,7 +260,7 @@ func TestVFSEditTool(t *testing.T) {
 }
 
 func TestVFSEditToolPermissionQuery(t *testing.T) {
-	t.Run("should return permission query when read access is ask", func(t *testing.T) {
+	t.Run("should fail when read access is ask", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
 		err := mockVFS.WriteFile("test.txt", []byte("hello"))
@@ -289,19 +289,10 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 
-		// Check that error is ToolPermissionsQuery
-		query, ok := response.Error.(*ToolPermissionsQuery)
-		require.True(t, ok, "Error should be ToolPermissionsQuery")
-		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfsEdit", query.Tool.Function)
-		assert.Equal(t, "Permission Required", query.Title)
-		assert.Contains(t, query.Details, "test.txt")
-		assert.True(t, query.AllowCustomResponse)
-		assert.Contains(t, query.Options, "Allow")
-		assert.Contains(t, query.Options, "Deny")
+		assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 	})
 
-	t.Run("should return permission query when write access is ask", func(t *testing.T) {
+	t.Run("should fail when write access is ask", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
 		err := mockVFS.WriteFile("test.txt", []byte("hello"))
@@ -330,16 +321,7 @@ func TestVFSEditToolPermissionQuery(t *testing.T) {
 		assert.Error(t, response.Error)
 		assert.True(t, response.Done)
 
-		// Check that error is ToolPermissionsQuery
-		query, ok := response.Error.(*ToolPermissionsQuery)
-		require.True(t, ok, "Error should be ToolPermissionsQuery")
-		assert.NotEmpty(t, query.Id)
-		assert.Equal(t, "vfsEdit", query.Tool.Function)
-		assert.Equal(t, "Permission Required", query.Title)
-		assert.Contains(t, query.Details, "test.txt")
-		assert.True(t, query.AllowCustomResponse)
-		assert.Contains(t, query.Options, "Allow")
-		assert.Contains(t, query.Options, "Deny")
+		assert.ErrorIs(t, response.Error, apis.ErrPermissionDenied)
 	})
 
 	t.Run("should succeed when read and write access are allow", func(t *testing.T) {

@@ -186,28 +186,8 @@ func TestTextSessionOutput_NoPanicsOnNilInputs(t *testing.T) {
 	require.NotPanics(t, func() {
 		output.AddToolCall(nil)
 		output.AddToolCallResult(nil)
-		output.OnPermissionQuery(nil)
 		output.OnRateLimitError(3)
 		output.RunFinished(nil)
 	})
 	assert.False(t, output.ShouldRetryAfterFailure("failed"))
-}
-
-func TestTextSessionOutput_OnPermissionQueryRendersDetailsAndOptions(t *testing.T) {
-	buffer := &bytes.Buffer{}
-	output := NewTextSessionOutput(buffer)
-	query := &tool.ToolPermissionsQuery{
-		Id:      "019d7138-dbf1-7fc6-bdfd-7e8bece29727",
-		Title:   "Permission Required for Absolute Path",
-		Details: "Allow running command with absolute path:\nCommand: ./tmpclean.sh",
-		Options: []string{"Allow", "Deny"},
-	}
-
-	output.OnPermissionQuery(query)
-
-	actual := buffer.String()
-	assert.Contains(t, actual, "[PERMISSION] Permission Required for Absolute Path")
-	assert.Contains(t, actual, "Allow running command with absolute path")
-	assert.Contains(t, actual, "Options: Allow | Deny")
-
 }
