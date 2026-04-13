@@ -57,7 +57,6 @@ type Task struct {
 	FeatureBranch string   `json:"feature_branch" yaml:"feature_branch"`
 	ParentBranch  string   `json:"parent_branch" yaml:"parent_branch"`
 	Role          string   `json:"role,omitempty" yaml:"role,omitempty"`
-	State         string   `json:"state" yaml:"state"`
 	Deps          []string `json:"deps,omitempty" yaml:"deps,omitempty"`
 	SessionIDs    []string `json:"session_ids,omitempty" yaml:"session_ids,omitempty"`
 	SubtaskIDs    []string `json:"subtask_ids,omitempty" yaml:"subtask_ids,omitempty"`
@@ -79,7 +78,6 @@ type TaskSessionSummary struct {
 type TaskOutputMetadata struct {
 	TaskID        string `json:"task_id" yaml:"task_id"`
 	TaskName      string `json:"task_name,omitempty" yaml:"task_name,omitempty"`
-	State         string `json:"state" yaml:"state"`
 	Status        string `json:"status" yaml:"status"`
 	UpdatedAt     string `json:"updated_at" yaml:"updated_at"`
 	LastSessionID string `json:"last_session_id,omitempty" yaml:"last_session_id,omitempty"`
@@ -653,7 +651,6 @@ func toToolTaskRecord(taskData *Task) tool.TaskRecord {
 		FeatureBranch: taskData.FeatureBranch,
 		ParentBranch:  taskData.ParentBranch,
 		Role:          taskData.Role,
-		State:         taskData.State,
 		Deps:          append([]string(nil), taskData.Deps...),
 		SessionIDs:    append([]string(nil), taskData.SessionIDs...),
 		SubtaskIDs:    append([]string(nil), taskData.SubtaskIDs...),
@@ -698,7 +695,7 @@ func (m *TaskManager) CreateTask(params TaskCreateParams) (*Task, error) {
 		taskDir = filepath.Join(parentDir, taskID)
 	}
 
-	task := &Task{
+		task := &Task{
 		UUID:          taskID,
 		Name:          name,
 		Description:   strings.TrimSpace(params.Description),
@@ -707,7 +704,6 @@ func (m *TaskManager) CreateTask(params TaskCreateParams) (*Task, error) {
 		FeatureBranch: featureBranch,
 		ParentBranch:  parentBranch,
 		Role:          strings.TrimSpace(params.Role),
-		State:         TaskStateCreated,
 		Deps:          normalizeTaskDeps(params.Deps),
 		SessionIDs:    []string{},
 		SubtaskIDs:    []string{},
@@ -923,10 +919,6 @@ func (m *TaskManager) RunTask(ctx context.Context, lookup TaskLookup, params Tas
 		return nil, err
 	}
 
-	if err := m.validateDependencies(task); err != nil {
-		return nil, err
-	}
-
 	if err := m.ensureBranches(task, params.Reset, vcsRepo); err != nil {
 		return nil, err
 	}
@@ -957,7 +949,6 @@ func (m *TaskManager) RunTask(ctx context.Context, lookup TaskLookup, params Tas
 	}
 
 	task.Status = TaskStatusRunning
-	task.State = TaskStateRunning
 	task.UpdatedAt = m.nowFn().UTC().Format(time.RFC3339Nano)
 	if err := m.writeTaskFile(taskDir, task); err != nil {
 		return nil, err
@@ -996,20 +987,15 @@ func (m *TaskManager) RunTask(ctx context.Context, lookup TaskLookup, params Tas
 	if runErr != nil {
 		meta.Status = TaskStateFailed
 		task.Status = TaskStatusOpen
-		task.State = TaskStateFailed
 	} else {
 		if err := vcsRepo.MergeBranches(task.FeatureBranch, taskBranchName); err != nil {
 			meta.Status = TaskStateFailed
 			task.Status = TaskStatusOpen
-			task.State = TaskStateFailed
 			runErr = fmt.Errorf("TaskManager.RunTask() [task.go]: failed to merge task branch %q into feature branch %q: %w", taskBranchName, task.FeatureBranch, err)
 		} else {
 			_ = vcsRepo.DeleteBranch(taskBranchName)
 		}
 		task.Status = TaskStatusOpen
-		if runErr == nil {
-			task.State = TaskStateCompleted
-		}
 	}
 	task.UpdatedAt = m.nowFn().UTC().Format(time.RFC3339Nano)
 	if err := m.writeTaskFile(taskDir, task); err != nil {
@@ -1055,7 +1041,6 @@ func (m *TaskManager) MergeTask(lookup TaskLookup, vcsRepo apis.VCS) (*Task, err
 	}
 
 	task.Status = TaskStatusMerged
-	task.State = TaskStateCompleted
 	task.UpdatedAt = m.nowFn().UTC().Format(time.RFC3339Nano)
 	if err := m.writeTaskFile(taskDir, task); err != nil {
 		return nil, err
@@ -1090,7 +1075,7 @@ func (m *TaskManager) ArchiveTask(lookup TaskLookup) (*Task, error) {
 	return cloneTask(task), nil
 }
 
-// ArchiveTasksByStatus moves all tasks with provided status or state to archive root.
+// ArchiveTasksByStatus moves all tasks with provided status to archive root.
 func (m *TaskManager) ArchiveTasksByStatus(status string) ([]*Task, error) {
 	trimmedStatus := strings.TrimSpace(status)
 	if trimmedStatus == "" {
@@ -1107,7 +1092,7 @@ func (m *TaskManager) ArchiveTasksByStatus(status string) ([]*Task, error) {
 		if item.task == nil {
 			continue
 		}
-		if strings.TrimSpace(item.task.Status) == trimmedStatus || strings.TrimSpace(item.task.State) == trimmedStatus {
+		if strings.TrimSpace(item.task.Status) == trimmedStatus {
 			candidates = append(candidates, item)
 		}
 	}
@@ -1155,19 +1140,6 @@ func (m *TaskManager) ArchiveTasksByStatus(status string) ([]*Task, error) {
 	}
 
 	return archivedTasks, nil
-}
-
-func (m *TaskManager) validateDependencies(task *Task) error {
-	for _, dep := range task.Deps {
-		_, depTask, err := m.findTaskByUUID(dep)
-		if err != nil {
-			return fmt.Errorf("TaskManager.validateDependencies() [task.go]: dependency %q not found: %w", dep, err)
-		}
-		if depTask.State != TaskStateCompleted {
-			return fmt.Errorf("TaskManager.validateDependencies() [task.go]: dependency %q is not completed (state=%s)", dep, depTask.State)
-		}
-	}
-	return nil
 }
 
 // ArchivedTasksRoot returns archive directory for task persistence.
@@ -1255,7 +1227,6 @@ func (m *TaskManager) writeTaskOutput(taskDir string, task *Task, sessionID stri
 	meta := TaskOutputMetadata{
 		TaskID:        task.UUID,
 		TaskName:      task.Name,
-		State:         task.State,
 		Status:        task.Status,
 		UpdatedAt:     m.nowFn().UTC().Format(time.RFC3339Nano),
 		LastSessionID: strings.TrimSpace(sessionID),
