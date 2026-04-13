@@ -754,6 +754,40 @@ func TestCLITaskSessionRunnerRunTaskSessionStreamsConsoleIO(t *testing.T) {
 	assert.Contains(t, stderr.String(), "stderr:trace")
 }
 
+func TestCLITaskSessionRunnerRunTaskSessionExecutesCurrentBinary(t *testing.T) {
+	originalExec := execTaskCommandContext
+	t.Cleanup(func() {
+		execTaskCommandContext = originalExec
+	})
+
+	executedCommand := ""
+	executedArgs := []string(nil)
+	execTaskCommandContext = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		executedCommand = name
+		executedArgs = append([]string(nil), args...)
+		testArgs := []string{"-test.run=TestHelperProcessTaskRunner", "--"}
+		testArgs = append(testArgs, args...)
+		cmd := exec.CommandContext(ctx, os.Args[0], testArgs...)
+		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS_TASK_RUNNER=1")
+		return cmd
+	}
+
+	runner, err := NewCLITaskSessionRunner(t.TempDir(), "", "", "", "")
+	require.NoError(t, err)
+
+	runner.stdin = bytes.NewBufferString("input-from-user\n")
+	runner.stdout = &bytes.Buffer{}
+	runner.stderr = &bytes.Buffer{}
+
+	_, err = runner.RunTaskSession(context.Background(), TaskSessionRunRequest{TaskBranch: "feature/task", Prompt: "do work"})
+	require.NoError(t, err)
+	require.NotEmpty(t, executedCommand)
+	assert.NotEqual(t, "go", executedCommand)
+	require.NotEmpty(t, executedArgs)
+	assert.Equal(t, "run", strings.TrimSpace(executedArgs[0]))
+	assert.NotContains(t, executedArgs, "./cmd/csw")
+}
+
 func TestHelperProcessTaskRunner(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS_TASK_RUNNER") != "1" {
 		return

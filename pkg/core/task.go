@@ -294,8 +294,12 @@ func (r *CLITaskSessionRunner) RunTaskSession(ctx context.Context, request TaskS
 	if err != nil {
 		return TaskSessionRunResult{}, err
 	}
+	executablePath, err := os.Executable()
+	if err != nil {
+		return TaskSessionRunResult{}, fmt.Errorf("CLITaskSessionRunner.RunTaskSession() [task.go]: failed to resolve current executable path: %w", err)
+	}
 
-	command := execTaskCommandContext(ctx, "go", args...)
+	command := execTaskCommandContext(ctx, executablePath, args...)
 	command.Dir = r.BaseDir
 
 	var outputBuffer bytes.Buffer
@@ -324,7 +328,7 @@ func (r *CLITaskSessionRunner) RunTaskSession(ctx context.Context, request TaskS
 
 func (r *CLITaskSessionRunner) buildCLIArgs(request TaskSessionRunRequest) ([]string, error) {
 	effectiveWorkDir := firstNonEmptyTask(strings.TrimSpace(request.RunOptions.WorkDir), strings.TrimSpace(r.BaseDir))
-	args := []string{"run", "./cmd/csw", "run", "--workdir", effectiveWorkDir, "--worktree", strings.TrimSpace(request.TaskBranch), "--role", firstNonEmptyTask(strings.TrimSpace(request.RunOptions.Role), request.Role, "developer")}
+	args := []string{"run", "--workdir", effectiveWorkDir, "--worktree", strings.TrimSpace(request.TaskBranch), "--role", firstNonEmptyTask(strings.TrimSpace(request.RunOptions.Role), request.Role, "developer")}
 
 	modelName := firstNonEmptyTask(strings.TrimSpace(request.RunOptions.Model), strings.TrimSpace(r.ModelName))
 	if modelName != "" {
