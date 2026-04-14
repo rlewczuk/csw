@@ -1798,6 +1798,13 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 			return true
 		}
 
+		if event.Type == "response.incomplete" {
+			streamEventErr = mapResponsesIncompleteEventError(event.Response)
+			if streamEventErr != nil {
+				return true
+			}
+		}
+
 		switch event.Type {
 		case "response.output_text.delta":
 			if event.Delta != "" {
@@ -1930,6 +1937,43 @@ func mapResponsesStreamError(apiErr *OpenaiAPIError) error {
 		Param:     fmt.Sprint(apiErr.Param),
 		Message:   apiErr.Message,
 	}
+}
+
+// mapResponsesIncompleteEventError maps response.incomplete stream events to retriable errors.
+func mapResponsesIncompleteEventError(response *ResponsesResponse) error {
+	if response == nil {
+		return nil
+	}
+
+	reason := responsesIncompleteReason(response.IncompleteDetails)
+	if reason != "max_output_tokens" {
+		return nil
+	}
+
+	return &NetworkError{
+		Message:     "response incomplete: max_output_tokens",
+		IsRetryable: true,
+	}
+}
+
+// responsesIncompleteReason extracts incomplete reason from response.incomplete_details.
+func responsesIncompleteReason(incompleteDetails any) string {
+	detailsMap, ok := incompleteDetails.(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	reasonValue, ok := detailsMap["reason"]
+	if !ok {
+		return ""
+	}
+
+	reason := strings.ToLower(strings.TrimSpace(fmt.Sprint(reasonValue)))
+	if reason == "<nil>" {
+		return ""
+	}
+
+	return reason
 }
 
 func convertFromResponsesOutput(items []ResponsesItem) (*ChatMessage, error) {

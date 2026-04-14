@@ -918,6 +918,23 @@ func TestConvertFromResponsesStreamBody_HandlesStreamErrorEvent(t *testing.T) {
 		assert.Equal(t, "An error occurred while processing your request. You can retry your request.", networkErr.Message)
 		assert.ErrorIs(t, err, ErrNetworkError)
 	})
+
+	t.Run("returns retryable NetworkError for response.incomplete with max_output_tokens", func(t *testing.T) {
+		body := strings.Join([]string{
+			"event: response.incomplete",
+			"data: {\"type\":\"response.incomplete\",\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"max_output_tokens\"}},\"sequence_number\":4}",
+			"",
+		}, "\n")
+
+		_, err := convertFromResponsesStreamBody([]byte(body))
+		require.Error(t, err)
+
+		var networkErr *NetworkError
+		require.ErrorAs(t, err, &networkErr)
+		assert.True(t, networkErr.IsRetryable)
+		assert.Equal(t, "response incomplete: max_output_tokens", networkErr.Message)
+		assert.ErrorIs(t, err, ErrNetworkError)
+	})
 }
 
 func TestFormatRawHTTPResponse(t *testing.T) {
