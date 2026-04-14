@@ -81,6 +81,7 @@ type RunCommandResult struct {
 const defaultBashRunTimeout = 120 * time.Second
 
 var runFunc = runCommand
+var runCommandWithResultFunc = runCommandWithResult
 var resolveRunDefaultsFunc = system.ResolveRunDefaults
 var resolveWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
 var buildSystemFunc = system.BuildSystem
@@ -359,6 +360,112 @@ func RunCommand() *cobra.Command {
 func runCommand(params *RunParams) error {
 	_, err := runCommandWithResult(params)
 	return err
+}
+
+// RunInProcessTaskSession executes task run flow directly in current process.
+func RunInProcessTaskSession(ctx context.Context, request core.TaskSessionRunRequest, defaults TaskRunDefaults, streams RunStreams) (core.TaskSessionRunResult, error) {
+	_ = ctx
+	startTime := time.Now().UTC()
+
+	bashRunTimeout, err := parseBashRunTimeout(strings.TrimSpace(request.RunOptions.BashRunTimeout))
+	if err != nil {
+		return core.TaskSessionRunResult{}, err
+	}
+	contextData, err := system.ParseRunContextEntries(append([]string(nil), request.RunOptions.ContextEntries...))
+	if err != nil {
+		return core.TaskSessionRunResult{}, err
+	}
+
+	runTask := cloneRunTask(request.Task)
+	if runTask != nil && strings.TrimSpace(runTask.TaskDir) == "" {
+		runTask.TaskDir = strings.TrimSpace(request.TaskDir)
+	}
+
+	outputFormat := strings.TrimSpace(request.RunOptions.OutputFormat)
+	if outputFormat == "" {
+		outputFormat = "full"
+	}
+
+	runResult, runErr := runCommandWithResultFunc(&RunParams{
+		Prompt:            strings.TrimSpace(request.Prompt),
+		ContextData:       contextData,
+		ModelName:         firstNonEmptyValue(strings.TrimSpace(request.RunOptions.Model), strings.TrimSpace(defaults.ModelName)),
+		RoleName:          firstNonEmptyValue(strings.TrimSpace(request.RunOptions.Role), strings.TrimSpace(request.Role), "developer"),
+		Task:              runTask,
+		InitialTask:       cloneRunTask(runTask),
+		WorkDir:           firstNonEmptyValue(strings.TrimSpace(request.RunOptions.WorkDir), strings.TrimSpace(defaults.WorkDir)),
+		ShadowDir:         strings.TrimSpace(request.RunOptions.ShadowDir),
+		WorktreeBranch:    strings.TrimSpace(request.TaskBranch),
+		GitUserName:       vcs.ResolveGitIdentity(strings.TrimSpace(request.RunOptions.GitUserName), "user.name"),
+		GitUserEmail:      vcs.ResolveGitIdentity(strings.TrimSpace(request.RunOptions.GitUserEmail), "user.email"),
+		ContainerEnabled:  request.RunOptions.ContainerEnabled,
+		ContainerDisabled: request.RunOptions.ContainerDisabled,
+		ContainerImage:    strings.TrimSpace(request.RunOptions.ContainerImage),
+		ContainerMounts:   append([]string(nil), request.RunOptions.ContainerMounts...),
+		ContainerEnv:      append([]string(nil), request.RunOptions.ContainerEnv...),
+		ConfigPath:        firstNonEmptyValue(strings.TrimSpace(request.RunOptions.ConfigPath), strings.TrimSpace(defaults.ConfigPath)),
+		ProjectConfig:     firstNonEmptyValue(strings.TrimSpace(request.RunOptions.ProjectConfig), strings.TrimSpace(defaults.ProjectConfig)),
+		AllowAllPerms:     request.RunOptions.AllowAllPerms,
+		Interactive:       request.RunOptions.Interactive,
+		SaveSessionTo:     strings.TrimSpace(request.RunOptions.SaveSessionTo),
+		SaveSession:       request.RunOptions.SaveSession,
+		LogLLMRequests:    request.RunOptions.LogLLMRequests,
+		LogLLMRequestsRaw: request.RunOptions.LogLLMRequestsRaw,
+		NoRefresh:         request.RunOptions.NoRefresh,
+		LSPServer:         strings.TrimSpace(request.RunOptions.LSPServer),
+		Thinking:          firstNonEmptyValue(strings.TrimSpace(request.RunOptions.Thinking), strings.TrimSpace(defaults.Thinking)),
+		ModelOverridden:   strings.TrimSpace(request.RunOptions.Model) != "",
+		BashRunTimeout:    bashRunTimeout,
+		MaxThreads:        request.RunOptions.MaxThreads,
+		OutputFormat:      outputFormat,
+		VFSAllow:          append([]string(nil), request.RunOptions.VFSAllow...),
+		MCPEnable:         append([]string(nil), request.RunOptions.MCPEnable...),
+		MCPDisable:        append([]string(nil), request.RunOptions.MCPDisable...),
+		HookOverrides:     append([]string(nil), request.RunOptions.HookOverrides...),
+		Stdin:             streams.Stdin,
+		Stdout:            streams.Stdout,
+		Stderr:            streams.Stderr,
+	})
+
+	completedAt := time.Now().UTC()
+	result := core.TaskSessionRunResult{
+		SessionID:   strings.TrimSpace(runResult.SessionID),
+		SummaryText: strings.TrimSpace(runResult.SummaryText),
+		StartedAt:   startTime,
+		CompletedAt: completedAt,
+	}
+	if runErr != nil {
+		return result, fmt.Errorf("RunInProcessTaskSession() [run.go]: in-process task run failed: %w", runErr)
+	}
+
+	return result, nil
+}
+
+// TaskRunDefaults stores fallback values used by in-process task runs.
+type TaskRunDefaults struct {
+	WorkDir       string
+	ModelName     string
+	ConfigPath    string
+	ProjectConfig string
+	Thinking      string
+}
+
+// RunStreams stores optional I/O streams for in-process runs.
+type RunStreams struct {
+	Stdin  stdio.Reader
+	Stdout stdio.Writer
+	Stderr stdio.Writer
+}
+
+func firstNonEmptyValue(values ...string) string {
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+
+	return ""
 }
 
 func runCommandWithResult(params *RunParams) (RunCommandResult, error) {

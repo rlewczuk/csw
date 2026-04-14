@@ -528,12 +528,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	toolRegistry := tool.NewToolRegistry()
 	tool.RegisterVFSTools(toolRegistry, toolVFS, lspClient, nil)
 
-	taskRunner, err := core.NewCLITaskSessionRunner(workDir, modelName, params.ConfigPath, params.ProjectConfig, params.Thinking)
-	if err != nil {
-		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create task runner: %w", err)
-	}
-	taskManager, err := core.NewTaskManagerWithTasksDir(workDir, ".cswdata/tasks", configStore, taskRunner)
+	taskManager, err := core.NewTaskManagerWithTasksDir(workDir, ".cswdata/tasks", configStore, nil)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create task manager: %w", err)

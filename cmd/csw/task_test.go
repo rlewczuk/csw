@@ -237,13 +237,13 @@ func TestNewTaskDirectSessionRunnerRejectsEmptyBaseDir(t *testing.T) {
 }
 
 func TestTaskDirectSessionRunnerRunTaskSessionCallsRunFunctionDirectly(t *testing.T) {
-	originalRun := runTaskSessionRunFunc
+	originalRun := runCommandWithResultFunc
 	t.Cleanup(func() {
-		runTaskSessionRunFunc = originalRun
+		runCommandWithResultFunc = originalRun
 	})
 
 	var captured *RunParams
-	runTaskSessionRunFunc = func(params *RunParams) (RunCommandResult, error) {
+	runCommandWithResultFunc = func(params *RunParams) (RunCommandResult, error) {
 		captured = params
 		return RunCommandResult{SessionID: "session-123", SummaryText: "summary text"}, nil
 	}
@@ -290,12 +290,12 @@ func TestTaskDirectSessionRunnerRunTaskSessionCallsRunFunctionDirectly(t *testin
 }
 
 func TestTaskDirectSessionRunnerRunTaskSessionWrapsRunError(t *testing.T) {
-	originalRun := runTaskSessionRunFunc
+	originalRun := runCommandWithResultFunc
 	t.Cleanup(func() {
-		runTaskSessionRunFunc = originalRun
+		runCommandWithResultFunc = originalRun
 	})
 
-	runTaskSessionRunFunc = func(params *RunParams) (RunCommandResult, error) {
+	runCommandWithResultFunc = func(params *RunParams) (RunCommandResult, error) {
 		_ = params
 		return RunCommandResult{SessionID: "session-err", SummaryText: "partial"}, assert.AnError
 	}

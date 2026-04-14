@@ -11,14 +11,12 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -29,7 +27,6 @@ var buildTaskSystemFunc = system.BuildSystem
 var taskEditorLookPathFunc = exec.LookPath
 var runTaskEditorFunc = runTaskEditor
 var generateTaskDescriptionFunc = generateTaskDescription
-var runTaskSessionRunFunc = runCommandWithResult
 var taskDirUUIDPattern = regexp.MustCompile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 type taskDirectSessionRunner struct {
@@ -63,95 +60,25 @@ func newTaskDirectSessionRunner(baseDir string, modelName string, configPath str
 
 // RunTaskSession runs task session directly without spawning another process.
 func (r *taskDirectSessionRunner) RunTaskSession(ctx context.Context, request core.TaskSessionRunRequest) (core.TaskSessionRunResult, error) {
-	_ = ctx
 	if r == nil {
 		return core.TaskSessionRunResult{}, fmt.Errorf("taskDirectSessionRunner.RunTaskSession() [task.go]: runner is nil")
 	}
-
-	startTime := time.Now().UTC()
-	bashRunTimeout, err := parseBashRunTimeout(strings.TrimSpace(request.RunOptions.BashRunTimeout))
-	if err != nil {
-		return core.TaskSessionRunResult{}, err
-	}
-	contextData, err := system.ParseRunContextEntries(append([]string(nil), request.RunOptions.ContextEntries...))
-	if err != nil {
-		return core.TaskSessionRunResult{}, err
-	}
-
-	runTask := cloneRunTask(request.Task)
-	if runTask != nil && strings.TrimSpace(runTask.TaskDir) == "" {
-		runTask.TaskDir = strings.TrimSpace(request.TaskDir)
-	}
-
-	outputFormat := strings.TrimSpace(request.RunOptions.OutputFormat)
-	if outputFormat == "" {
-		outputFormat = "full"
-	}
-
-	runResult, runErr := runTaskSessionRunFunc(&RunParams{
-		Prompt:            strings.TrimSpace(request.Prompt),
-		ContextData:       contextData,
-		ModelName:         firstNonEmptyTaskValue(strings.TrimSpace(request.RunOptions.Model), strings.TrimSpace(r.modelName)),
-		RoleName:          firstNonEmptyTaskValue(strings.TrimSpace(request.RunOptions.Role), strings.TrimSpace(request.Role), "developer"),
-		Task:              runTask,
-		InitialTask:       cloneRunTask(runTask),
-		WorkDir:           firstNonEmptyTaskValue(strings.TrimSpace(request.RunOptions.WorkDir), strings.TrimSpace(r.baseDir)),
-		ShadowDir:         strings.TrimSpace(request.RunOptions.ShadowDir),
-		WorktreeBranch:    strings.TrimSpace(request.TaskBranch),
-		GitUserName:       vcs.ResolveGitIdentity(strings.TrimSpace(request.RunOptions.GitUserName), "user.name"),
-		GitUserEmail:      vcs.ResolveGitIdentity(strings.TrimSpace(request.RunOptions.GitUserEmail), "user.email"),
-		ContainerEnabled:  request.RunOptions.ContainerEnabled,
-		ContainerDisabled: request.RunOptions.ContainerDisabled,
-		ContainerImage:    strings.TrimSpace(request.RunOptions.ContainerImage),
-		ContainerMounts:   append([]string(nil), request.RunOptions.ContainerMounts...),
-		ContainerEnv:      append([]string(nil), request.RunOptions.ContainerEnv...),
-		ConfigPath:        firstNonEmptyTaskValue(strings.TrimSpace(request.RunOptions.ConfigPath), strings.TrimSpace(r.configPath)),
-		ProjectConfig:     firstNonEmptyTaskValue(strings.TrimSpace(request.RunOptions.ProjectConfig), strings.TrimSpace(r.projectConfig)),
-		AllowAllPerms:     request.RunOptions.AllowAllPerms,
-		Interactive:       request.RunOptions.Interactive,
-		SaveSessionTo:     strings.TrimSpace(request.RunOptions.SaveSessionTo),
-		SaveSession:       request.RunOptions.SaveSession,
-		LogLLMRequests:    request.RunOptions.LogLLMRequests,
-		LogLLMRequestsRaw: request.RunOptions.LogLLMRequestsRaw,
-		NoRefresh:         request.RunOptions.NoRefresh,
-		LSPServer:         strings.TrimSpace(request.RunOptions.LSPServer),
-		Thinking:          firstNonEmptyTaskValue(strings.TrimSpace(request.RunOptions.Thinking), strings.TrimSpace(r.thinking)),
-		ModelOverridden:   strings.TrimSpace(request.RunOptions.Model) != "",
-		BashRunTimeout:    bashRunTimeout,
-		MaxThreads:        request.RunOptions.MaxThreads,
-		OutputFormat:      outputFormat,
-		VFSAllow:          append([]string(nil), request.RunOptions.VFSAllow...),
-		MCPEnable:         append([]string(nil), request.RunOptions.MCPEnable...),
-		MCPDisable:        append([]string(nil), request.RunOptions.MCPDisable...),
-		HookOverrides:     append([]string(nil), request.RunOptions.HookOverrides...),
-		Stdin:             r.stdin,
-		Stdout:            r.stdout,
-		Stderr:            r.stderr,
+	result, err := RunInProcessTaskSession(ctx, request, TaskRunDefaults{
+		WorkDir:       strings.TrimSpace(r.baseDir),
+		ModelName:     strings.TrimSpace(r.modelName),
+		ConfigPath:    strings.TrimSpace(r.configPath),
+		ProjectConfig: strings.TrimSpace(r.projectConfig),
+		Thinking:      strings.TrimSpace(r.thinking),
+	}, RunStreams{
+		Stdin:  r.stdin,
+		Stdout: r.stdout,
+		Stderr: r.stderr,
 	})
-	completedAt := time.Now().UTC()
-
-	result := core.TaskSessionRunResult{
-		SessionID:   strings.TrimSpace(runResult.SessionID),
-		SummaryText: strings.TrimSpace(runResult.SummaryText),
-		StartedAt:   startTime,
-		CompletedAt: completedAt,
-	}
-	if runErr != nil {
-		return result, fmt.Errorf("taskDirectSessionRunner.RunTaskSession() [task.go]: direct task run failed: %w", runErr)
+	if err != nil {
+		return result, fmt.Errorf("taskDirectSessionRunner.RunTaskSession() [task.go]: direct task run failed: %w", err)
 	}
 
 	return result, nil
-}
-
-func firstNonEmptyTaskValue(values ...string) string {
-	for _, value := range values {
-		trimmed := strings.TrimSpace(value)
-		if trimmed != "" {
-			return trimmed
-		}
-	}
-
-	return ""
 }
 
 // TaskCommand creates task command with persistent hierarchical task management.

@@ -3,13 +3,10 @@ package core
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -193,19 +190,6 @@ type TaskSessionRunResult struct {
 	CompletedAt time.Time
 }
 
-// CLITaskSessionRunner executes task sessions by spawning CLI process.
-type CLITaskSessionRunner struct {
-	BaseDir       string
-	ModelName     string
-	ConfigPath    string
-	ProjectConfig string
-	Thinking      string
-	stdin         io.Reader
-	stdout        io.Writer
-	stderr        io.Writer
-}
-
-var execTaskCommandContext = exec.CommandContext
 var taskDirUUIDPattern = regexp.MustCompile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 // TaskManager manages persistent hierarchical tasks.
@@ -264,196 +248,6 @@ func NewTaskBackendAdapter(manager *TaskManager, vcsRepo apis.VCS, logger *slog.
 	return &TaskBackendAdapter{manager: manager, vcsRepo: vcsRepo, logger: logger}, nil
 }
 
-// NewCLITaskSessionRunner creates a CLI-based task session runner.
-func NewCLITaskSessionRunner(baseDir string, modelName string, configPath string, projectConfig string, thinking string) (*CLITaskSessionRunner, error) {
-	trimmedBaseDir := strings.TrimSpace(baseDir)
-	if trimmedBaseDir == "" {
-		return nil, fmt.Errorf("NewCLITaskSessionRunner() [task.go]: baseDir cannot be empty")
-	}
-
-	return &CLITaskSessionRunner{
-		BaseDir:       trimmedBaseDir,
-		ModelName:     strings.TrimSpace(modelName),
-		ConfigPath:    strings.TrimSpace(configPath),
-		ProjectConfig: strings.TrimSpace(projectConfig),
-		Thinking:      strings.TrimSpace(thinking),
-		stdin:         os.Stdin,
-		stdout:        os.Stdout,
-		stderr:        os.Stderr,
-	}, nil
-}
-
-// RunTaskSession executes one task session in dedicated worktree branch.
-func (r *CLITaskSessionRunner) RunTaskSession(ctx context.Context, request TaskSessionRunRequest) (TaskSessionRunResult, error) {
-	if r == nil {
-		return TaskSessionRunResult{}, fmt.Errorf("CLITaskSessionRunner.RunTaskSession() [task.go]: runner is nil")
-	}
-
-	startTime := time.Now().UTC()
-	args, err := r.buildCLIArgs(request)
-	if err != nil {
-		return TaskSessionRunResult{}, err
-	}
-	executablePath, err := os.Executable()
-	if err != nil {
-		return TaskSessionRunResult{}, fmt.Errorf("CLITaskSessionRunner.RunTaskSession() [task.go]: failed to resolve current executable path: %w", err)
-	}
-
-	command := execTaskCommandContext(ctx, executablePath, args...)
-	command.Dir = r.BaseDir
-
-	var outputBuffer bytes.Buffer
-	command.Stdin = r.stdin
-	command.Stdout = io.MultiWriter(r.stdout, &outputBuffer)
-	command.Stderr = io.MultiWriter(r.stderr, &outputBuffer)
-	err = command.Run()
-
-	completedAt := time.Now().UTC()
-	runOutput := outputBuffer.String()
-	sessionID := extractTaskSessionID(runOutput)
-	summaryText := strings.TrimSpace(runOutput)
-	if strings.TrimSpace(sessionID) != "" {
-		if summary, readErr := readCLISessionSummary(r.BaseDir, sessionID); readErr == nil && strings.TrimSpace(summary) != "" {
-			summaryText = summary
-		}
-	}
-
-	result := TaskSessionRunResult{SessionID: sessionID, SummaryText: summaryText, StartedAt: startTime, CompletedAt: completedAt}
-	if err != nil {
-		return result, fmt.Errorf("CLITaskSessionRunner.RunTaskSession() [task.go]: cli task run failed: %w", err)
-	}
-
-	return result, nil
-}
-
-func (r *CLITaskSessionRunner) buildCLIArgs(request TaskSessionRunRequest) ([]string, error) {
-	effectiveWorkDir := firstNonEmptyTask(strings.TrimSpace(request.RunOptions.WorkDir), strings.TrimSpace(r.BaseDir))
-	args := []string{"run", "--workdir", effectiveWorkDir, "--worktree", strings.TrimSpace(request.TaskBranch), "--role", firstNonEmptyTask(strings.TrimSpace(request.RunOptions.Role), request.Role, "developer")}
-
-	modelName := firstNonEmptyTask(strings.TrimSpace(request.RunOptions.Model), strings.TrimSpace(r.ModelName))
-	if modelName != "" {
-		args = append(args, "--model", modelName)
-	}
-
-	configPath := firstNonEmptyTask(strings.TrimSpace(request.RunOptions.ConfigPath), strings.TrimSpace(r.ConfigPath))
-	if configPath != "" {
-		args = append(args, "--config-path", configPath)
-	}
-
-	projectConfig := firstNonEmptyTask(strings.TrimSpace(request.RunOptions.ProjectConfig), strings.TrimSpace(r.ProjectConfig))
-	if projectConfig != "" {
-		args = append(args, "--project-config", projectConfig)
-	}
-
-	thinking := firstNonEmptyTask(strings.TrimSpace(request.RunOptions.Thinking), strings.TrimSpace(r.Thinking))
-	if thinking != "" {
-		args = append(args, "--thinking", thinking)
-	}
-
-	if strings.TrimSpace(request.RunOptions.ShadowDir) != "" {
-		args = append(args, "--shadow-dir", strings.TrimSpace(request.RunOptions.ShadowDir))
-	}
-	if strings.TrimSpace(request.RunOptions.ContainerImage) != "" {
-		args = append(args, "--container-image", strings.TrimSpace(request.RunOptions.ContainerImage))
-	}
-	if request.RunOptions.ContainerEnabled {
-		args = append(args, "--container-enabled")
-	}
-	if request.RunOptions.ContainerDisabled {
-		args = append(args, "--container-disabled")
-	}
-	for _, mount := range request.RunOptions.ContainerMounts {
-		if strings.TrimSpace(mount) != "" {
-			args = append(args, "--container-mount", strings.TrimSpace(mount))
-		}
-	}
-	for _, env := range request.RunOptions.ContainerEnv {
-		if strings.TrimSpace(env) != "" {
-			args = append(args, "--container-env", strings.TrimSpace(env))
-		}
-	}
-	if request.RunOptions.AllowAllPerms {
-		args = append(args, "--allow-all-permissions")
-	}
-	if request.RunOptions.Interactive {
-		args = append(args, "--interactive")
-	}
-	if strings.TrimSpace(request.RunOptions.SaveSessionTo) != "" {
-		args = append(args, "--save-session-to", strings.TrimSpace(request.RunOptions.SaveSessionTo))
-	}
-	if request.RunOptions.SaveSession {
-		args = append(args, "--save-session")
-	}
-	if request.RunOptions.LogLLMRequests {
-		args = append(args, "--log-llm-requests")
-	}
-	if request.RunOptions.LogLLMRequestsRaw {
-		args = append(args, "--log-llm-requests-raw")
-	}
-	if request.RunOptions.NoRefresh {
-		args = append(args, "--no-refresh")
-	}
-	if strings.TrimSpace(request.RunOptions.LSPServer) != "" {
-		args = append(args, "--lsp-server", strings.TrimSpace(request.RunOptions.LSPServer))
-	}
-	if strings.TrimSpace(request.RunOptions.BashRunTimeout) != "" {
-		args = append(args, "--bash-run-timeout", strings.TrimSpace(request.RunOptions.BashRunTimeout))
-	}
-	if request.RunOptions.MaxThreads > 0 {
-		args = append(args, "--max-threads", fmt.Sprintf("%d", request.RunOptions.MaxThreads))
-	}
-	if strings.TrimSpace(request.RunOptions.OutputFormat) != "" {
-		args = append(args, "--output-format", strings.TrimSpace(request.RunOptions.OutputFormat))
-	}
-	for _, path := range request.RunOptions.VFSAllow {
-		if strings.TrimSpace(path) != "" {
-			args = append(args, "--vfs-allow", strings.TrimSpace(path))
-		}
-	}
-	for _, name := range request.RunOptions.MCPEnable {
-		if strings.TrimSpace(name) != "" {
-			args = append(args, "--mcp-enable", strings.TrimSpace(name))
-		}
-	}
-	for _, name := range request.RunOptions.MCPDisable {
-		if strings.TrimSpace(name) != "" {
-			args = append(args, "--mcp-disable", strings.TrimSpace(name))
-		}
-	}
-	for _, override := range request.RunOptions.HookOverrides {
-		if strings.TrimSpace(override) != "" {
-			args = append(args, "--hook", strings.TrimSpace(override))
-		}
-	}
-	for _, entry := range request.RunOptions.ContextEntries {
-		if strings.TrimSpace(entry) != "" {
-			args = append(args, "--context", strings.TrimSpace(entry))
-		}
-	}
-	if strings.TrimSpace(request.RunOptions.GitUserName) != "" {
-		args = append(args, "--git-user", strings.TrimSpace(request.RunOptions.GitUserName))
-	}
-	if strings.TrimSpace(request.RunOptions.GitUserEmail) != "" {
-		args = append(args, "--git-email", strings.TrimSpace(request.RunOptions.GitUserEmail))
-	}
-	if request.Task != nil {
-		taskJSON, err := json.Marshal(request.Task)
-		if err != nil {
-			return nil, fmt.Errorf("CLITaskSessionRunner.buildCLIArgs() [task.go]: failed to marshal task metadata: %w", err)
-		}
-		args = append(args, "--task-json", string(taskJSON))
-	}
-	if strings.TrimSpace(request.TaskDir) != "" {
-		args = append(args, "--task-dir", strings.TrimSpace(request.TaskDir))
-	}
-
-	if strings.TrimSpace(request.RunOptions.OutputFormat) == "" {
-		args = append(args, "--output-format", "full")
-	}
-	args = append(args, strings.TrimSpace(request.Prompt))
-
-	return args, nil
-}
 
 // CreateTask creates task through backend interface.
 func (a *TaskBackendAdapter) CreateTask(ctx context.Context, params tool.TaskRecord, prompt string, parentTaskID string) (tool.TaskRecord, error) {
@@ -1560,34 +1354,4 @@ func isTaskPathNestedUnder(path string, parent string) bool {
 	}
 
 	return true
-}
-
-func extractTaskSessionID(output string) string {
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "Session ID:") {
-			continue
-		}
-		return strings.TrimSpace(strings.TrimPrefix(trimmed, "Session ID:"))
-	}
-
-	return ""
-}
-
-func readCLISessionSummary(baseDir string, sessionID string) (string, error) {
-	if strings.TrimSpace(baseDir) == "" {
-		return "", fmt.Errorf("readCLISessionSummary() [task.go]: baseDir is empty")
-	}
-	if strings.TrimSpace(sessionID) == "" {
-		return "", fmt.Errorf("readCLISessionSummary() [task.go]: sessionID is empty")
-	}
-
-	path := filepath.Join(baseDir, ".cswdata", "logs", "sessions", strings.TrimSpace(sessionID), "summary.md")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("readCLISessionSummary() [task.go]: failed to read summary file: %w", err)
-	}
-
-	return strings.TrimSpace(string(data)), nil
 }
