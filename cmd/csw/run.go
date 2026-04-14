@@ -280,8 +280,10 @@ func RunCommand() *cobra.Command {
 					return err
 				}
 
+				taskRunMerge := resolveTaskRunMerge(cmd.Flags().Changed("merge"), cliMerge, cliWorktree, resolveRunDefaultsFunc, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath)
+
 				outcome, runErr := backend.RunTaskWithParams(cmd.Context(), identifier, "", core.TaskRunParams{
-					Merge:          cliMerge,
+					Merge:          taskRunMerge,
 					Reset:          cliTaskReset,
 					PromptOverride: strings.TrimSpace(prompt),
 					PromptArgs:     append([]string(nil), extraPositionalArgs...),
@@ -888,6 +890,36 @@ func validateMergeRunParams(params *RunParams) error {
 	}
 
 	return nil
+}
+
+func resolveTaskRunMerge(mergeFlagChanged bool, cliMerge bool, cliWorktree string, resolver runDefaultsResolver, workDir string, shadowDir string, projectConfig string, configPath string) bool {
+	if mergeFlagChanged {
+		return cliMerge
+	}
+
+	if strings.TrimSpace(cliWorktree) != "" {
+		return cliMerge
+	}
+
+	if resolver == nil {
+		return cliMerge
+	}
+
+	defaults, err := resolver(system.ResolveRunDefaultsParams{
+		WorkDir:       workDir,
+		ShadowDir:     shadowDir,
+		ProjectConfig: projectConfig,
+		ConfigPath:    configPath,
+	})
+	if err != nil {
+		return cliMerge
+	}
+
+	if defaults.Merge {
+		return true
+	}
+
+	return cliMerge
 }
 
 func resolveCommandsRootDir(workDir string, shadowDir string) (string, error) {
