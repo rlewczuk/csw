@@ -346,14 +346,14 @@ func TestTaskNewCommandPromptFlagIsOptional(t *testing.T) {
 func TestTaskCommandContainsExpectedSubcommands(t *testing.T) {
 	command := TaskCommand()
 	subcommands := command.Commands()
-	require.Len(t, subcommands, 8)
+	require.Len(t, subcommands, 7)
 
 	names := make([]string, 0, len(subcommands))
 	for _, subcommand := range subcommands {
 		names = append(names, subcommand.Name())
 	}
 
-	assert.ElementsMatch(t, []string{"new", "update", "edit", "get", "run", "list", "merge", "archive"}, names)
+	assert.ElementsMatch(t, []string{"new", "update", "edit", "get", "list", "merge", "archive"}, names)
 }
 
 func TestTaskCommandArgValidators(t *testing.T) {
@@ -370,13 +370,6 @@ func TestTaskCommandArgValidators(t *testing.T) {
 		{name: "edit accepts one argument", command: taskEditCommand(), args: []string{"task-1"}, expectError: false},
 		{name: "get requires one argument", command: taskGetCommand(), args: []string{}, expectError: true},
 		{name: "get accepts one argument", command: taskGetCommand(), args: []string{"task-1"}, expectError: false},
-		{name: "run requires task flag or last", command: taskRunCommand(), args: []string{}, expectError: true},
-		{name: "run accepts no positional argument when task flag is set", command: taskRunCommand(), args: []string{}, expectError: false, prepare: func(t *testing.T, command *cobra.Command) {
-			require.NoError(t, command.Flags().Set("task", "task-1"))
-		}},
-		{name: "run accepts positional prompt when task flag is set", command: taskRunCommand(), args: []string{"task prompt"}, expectError: false, prepare: func(t *testing.T, command *cobra.Command) {
-			require.NoError(t, command.Flags().Set("task", "task-1"))
-		}},
 		{name: "list accepts no argument", command: taskListCommand(), args: []string{}, expectError: false},
 		{name: "list accepts one argument", command: taskListCommand(), args: []string{"task-1"}, expectError: false},
 		{name: "list rejects more than one argument", command: taskListCommand(), args: []string{"task-1", "task-2"}, expectError: true},
@@ -722,54 +715,6 @@ func nonEmptyLines(input string) []string {
 	return result
 }
 
-func TestTaskRunCommandIncludesRunSessionFlags(t *testing.T) {
-	command := taskRunCommand()
-
-	flagNames := []string{
-		"allow-all-permissions",
-		"bash-run-timeout",
-		"config-path",
-		"container-disabled",
-		"container-enabled",
-		"container-env",
-		"container-image",
-		"container-mount",
-		"context",
-		"git-email",
-		"git-user",
-		"interactive",
-		"log-llm-requests",
-		"log-llm-requests-raw",
-		"lsp-server",
-		"task",
-		"last",
-		"next",
-		"max-threads",
-		"mcp-disable",
-		"mcp-enable",
-		"merge",
-		"model",
-		"no-refresh",
-		"output-format",
-		"project-config",
-		"role",
-		"save-session",
-		"save-session-to",
-		"shadow-dir",
-		"thinking",
-		"vfs-allow",
-		"workdir",
-		"worktree",
-		"hook",
-	}
-
-	for _, flagName := range flagNames {
-		t.Run(flagName, func(t *testing.T) {
-			assert.NotNil(t, command.Flags().Lookup(flagName))
-		})
-	}
-}
-
 func TestResolveTaskRunIdentifierReturnsProvidedIdentifierWhenNotUsingLastFlag(t *testing.T) {
 	resolved, err := resolveTaskRunIdentifier(nil, " task-123 ", false, false)
 	require.NoError(t, err)
@@ -871,31 +816,6 @@ func TestResolveTaskRunIdentifierReturnsErrorWhenNoUnfinishedTaskExists(t *testi
 	_, err = resolveTaskRunIdentifier(manager, "", true, false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no unfinished task found")
-}
-
-func TestTaskRunCommandArgsValidationWithLastFlag(t *testing.T) {
-	command := taskRunCommand()
-
-	argsErr := command.Args(command, []string{})
-	assert.Error(t, argsErr)
-
-	require.NoError(t, command.Flags().Set("last", "true"))
-
-	assert.NoError(t, command.Args(command, []string{}))
-
-	require.NoError(t, command.Flags().Set("next", "true"))
-	lastNextConflictErr := command.Args(command, []string{})
-	require.Error(t, lastNextConflictErr)
-	assert.Contains(t, lastNextConflictErr.Error(), "--last and --next cannot be used together")
-
-	require.NoError(t, command.Flags().Set("next", "false"))
-	require.NoError(t, command.Flags().Set("task", "task-1"))
-	conflictErr := command.Args(command, []string{})
-	require.Error(t, conflictErr)
-	assert.Contains(t, conflictErr.Error(), "cannot be used with --last or --next")
-
-	require.NoError(t, command.Flags().Set("last", "false"))
-	assert.NoError(t, command.Args(command, []string{"task prompt"}))
 }
 
 func TestPrintTaskRunOutcome(t *testing.T) {
