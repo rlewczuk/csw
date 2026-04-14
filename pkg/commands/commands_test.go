@@ -103,10 +103,10 @@ func TestLoadFromDirFallsBackToEmbeddedCommand(t *testing.T) {
 	commandsDir := filepath.Join(root, ".agents", "commands")
 	require.NoError(t, os.MkdirAll(commandsDir, 0755))
 
-	command, err := LoadFromDir(commandsDir, "csw/run-critic")
+	command, err := LoadFromDir(commandsDir, "csw/task-critic")
 	require.NoError(t, err)
-	assert.Equal(t, "csw/run-critic", command.Name)
-	assert.Equal(t, "embedded:data/csw/run-critic.md", command.Path)
+	assert.Equal(t, "csw/task-critic", command.Name)
+	assert.Equal(t, "embedded:data/csw/task-critic.md", command.Path)
 	assert.NotEmpty(t, strings.TrimSpace(command.Template))
 }
 
