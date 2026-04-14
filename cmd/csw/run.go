@@ -57,14 +57,15 @@ type RunParams struct {
 	LogLLMRequestsRaw     bool
 	NoRefresh             bool
 	LSPServer             string
-	Thinking              string
-	ModelOverridden       bool
-	BashRunTimeout        time.Duration
-	MaxThreads            int
-	OutputFormat          string
-	VFSAllow              []string
-	MCPEnable             []string
-	MCPDisable            []string
+		Thinking              string
+		ModelOverridden       bool
+		BashRunTimeout        time.Duration
+		MaxThreads            int
+		AllowAllPermissions   bool
+		OutputFormat          string
+		VFSAllow              []string
+		MCPEnable             []string
+		MCPDisable            []string
 	HookOverrides         []string
 }
 
@@ -400,12 +401,13 @@ func runCommand(params *RunParams) error {
 		LogLLMRequestsRaw: params.LogLLMRequestsRaw,
 		NoRefresh:         params.NoRefresh,
 		Thinking:          params.Thinking,
-		BashRunTimeout:    params.BashRunTimeout,
-		AllowedPaths:      params.VFSAllow,
-		MaxToolThreads:    params.MaxThreads,
-		MCPEnable:         params.MCPEnable,
-		MCPDisable:        params.MCPDisable,
-	})
+			BashRunTimeout:    params.BashRunTimeout,
+			AllowedPaths:      params.VFSAllow,
+			MaxToolThreads:    params.MaxThreads,
+			AllowAllPermissions: params.AllowAllPerms,
+			MCPEnable:         params.MCPEnable,
+			MCPDisable:        params.MCPDisable,
+		})
 	if err != nil {
 		return err
 	}

@@ -117,6 +117,8 @@ type BuildSystemParams struct {
 	AllowedPaths []string
 	// MaxToolThreads overrides max parallel tool executions. When <=0, value from config is used.
 	MaxToolThreads int
+	// AllowAllPermissions forces all tool permission checks to allow mode for this run.
+	AllowAllPermissions bool
 	// MCPEnable lists MCP server names to force-enable for this run.
 	MCPEnable []string
 	// MCPDisable lists MCP server names to force-disable for this run.
@@ -618,7 +620,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		})
 	}
 
-	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, effectiveWorkDir, params.BashRunTimeout)
+	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, effectiveWorkDir, params.BashRunTimeout, params.AllowAllPermissions)
 	tool.RegisterWebFetchTool(toolRegistry, nil)
 	tool.RegisterSkillTool(toolRegistry, configRoot)
 
@@ -673,6 +675,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		LogLLMRequests:    params.LogLLMRequests,
 		LogLLMRequestsRaw: params.LogLLMRequestsRaw,
 		Thinking:          params.Thinking,
+		AllowAllPermissions: params.AllowAllPermissions,
 		MaxToolThreads: func() int {
 			if params.MaxToolThreads > 0 {
 				return params.MaxToolThreads
