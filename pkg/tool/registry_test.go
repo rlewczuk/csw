@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
@@ -235,6 +236,58 @@ func TestRegisterWebFetchTool(t *testing.T) {
 	registeredTool, err := registry.Get("webFetch")
 	require.NoError(t, err)
 	assert.IsType(t, &WebFetchTool{}, registeredTool)
+}
+
+func TestRegisterRunBashTool_AllowAllPermissionsFalse_UsesProvidedPrivileges(t *testing.T) {
+	registry := NewToolRegistry()
+	mockRunner := runner.NewMockRunner()
+
+	RegisterRunBashTool(
+		registry,
+		mockRunner,
+		map[string]conf.AccessFlag{"rm.*": conf.AccessDeny},
+		"/project",
+		0,
+		false,
+	)
+
+	response := registry.Execute(&ToolCall{
+		ID:       "bash-1",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "echo hello",
+		}),
+	})
+
+	assert.Error(t, response.Error)
+	assert.Equal(t, 0, mockRunner.ExecutionCount())
+}
+
+func TestRegisterRunBashTool_AllowAllPermissionsTrue_AllowsAllCommands(t *testing.T) {
+	registry := NewToolRegistry()
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetResponse("echo hello", "hello\n", 0, nil)
+
+	RegisterRunBashTool(
+		registry,
+		mockRunner,
+		map[string]conf.AccessFlag{"rm.*": conf.AccessDeny},
+		"/project",
+		0,
+		true,
+	)
+
+	response := registry.Execute(&ToolCall{
+		ID:       "bash-2",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "echo hello",
+		}),
+	})
+
+	require.NoError(t, response.Error)
+	assert.Equal(t, 1, mockRunner.ExecutionCount())
+	assert.Equal(t, "hello\n", response.Result.String("output"))
 }
 
 func TestRegisterSkillTool(t *testing.T) {

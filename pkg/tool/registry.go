@@ -164,8 +164,22 @@ func RegisterVFSTools(registry *ToolRegistry, vfsImpl apis.VFS, lspClient lsp.LS
 }
 
 // RegisterRunBashTool registers the runBash tool with the given CommandRunner and privileges.
-func RegisterRunBashTool(registry *ToolRegistry, r runner.CommandRunner, privileges map[string]conf.AccessFlag, sessionWorkdir string, defaultTimeout time.Duration) {
-	registry.Register("runBash", NewRunBashToolWithSessionWorkdir(r, privileges, sessionWorkdir, defaultTimeout))
+func RegisterRunBashTool(
+	registry *ToolRegistry,
+	r runner.CommandRunner,
+	privileges map[string]conf.AccessFlag,
+	sessionWorkdir string,
+	defaultTimeout time.Duration,
+	allowAllPermissions bool,
+) {
+	effectivePrivileges := privileges
+	if allowAllPermissions {
+		effectivePrivileges = map[string]conf.AccessFlag{
+			".*": conf.AccessAllow,
+		}
+	}
+
+	registry.Register("runBash", NewRunBashToolWithSessionWorkdir(r, effectivePrivileges, sessionWorkdir, defaultTimeout))
 }
 
 // RegisterWebFetchTool registers the webFetch tool with optional custom HTTP client.

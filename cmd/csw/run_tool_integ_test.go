@@ -37,7 +37,7 @@ func TestRunBashToolIntegration(t *testing.T) {
 
 	tool.RegisterRunBashTool(tools, mockRunner, map[string]conf.AccessFlag{
 		"echo .*": conf.AccessAllow,
-	}, tmpDir, 120*time.Second)
+	}, tmpDir, 120*time.Second, false)
 
 	logsDir := filepath.Join(tmpDir, "logs")
 	err = os.MkdirAll(logsDir, 0755)
