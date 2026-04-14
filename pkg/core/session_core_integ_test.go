@@ -592,7 +592,7 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 		mockProvider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
 
 		rateLimitErr := &models.RateLimitError{
-			RetryAfterSeconds: 1,
+			RetryAfterSeconds: 0,
 			Message:           "rate limit exceeded",
 		}
 

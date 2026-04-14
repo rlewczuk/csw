@@ -106,6 +106,7 @@ func TestExecuteToolCalls_ExecutesCallsInParallelAndAggregatesResponses(t *testi
 	session := &SweSession{
 		Tools:  registry,
 		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		toolStartDelay: time.Millisecond,
 	}
 
 	calls := []*tool.ToolCall{
@@ -160,6 +161,7 @@ func TestExecuteToolCalls_RespectsConfiguredMaxThreadsAndQueuesRemainingCalls(t 
 		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 		configStore:    configStore,
 		maxToolThreads: 2,
+		toolStartDelay: time.Millisecond,
 	}
 
 	calls := []*tool.ToolCall{
@@ -184,7 +186,7 @@ func TestExecuteToolCalls_RespectsConfiguredMaxThreadsAndQueuesRemainingCalls(t 
 	select {
 	case id := <-started:
 		t.Fatalf("unexpected third tool started before queue release: %s", id)
-	case <-time.After(400 * time.Millisecond):
+	case <-time.After(5 * time.Millisecond):
 	}
 
 	close(release)
@@ -207,6 +209,7 @@ func TestExecuteToolCalls_SpacesToolStartsByMinimumDelay(t *testing.T) {
 		Tools:          registry,
 		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 		maxToolThreads: 8,
+		toolStartDelay: time.Millisecond,
 	}
 
 	calls := []*tool.ToolCall{
@@ -222,7 +225,7 @@ func TestExecuteToolCalls_SpacesToolStartsByMinimumDelay(t *testing.T) {
 
 	for i := 1; i < len(startTimes); i++ {
 		delta := startTimes[i].Sub(startTimes[i-1])
-		assert.GreaterOrEqual(t, delta, 240*time.Millisecond)
+		assert.GreaterOrEqual(t, delta, 500*time.Microsecond)
 	}
 }
 

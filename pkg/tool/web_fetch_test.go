@@ -1,15 +1,22 @@
 package tool
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
+}
 
 func TestWebFetchTool_Execute(t *testing.T) {
 	t.Run("returns error when url is missing", func(t *testing.T) {
@@ -204,28 +211,29 @@ func TestWebFetchTool_Execute(t *testing.T) {
 	})
 
 	t.Run("uses timeout argument", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(2 * time.Second)
-			_, _ = w.Write([]byte("slow"))
-		}))
-		defer server.Close()
+		httpClient := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+			deadline, ok := request.Context().Deadline()
+			require.True(t, ok)
+			assert.WithinDuration(t, time.Now().Add(time.Second), deadline, 100*time.Millisecond)
 
-		tool := NewWebFetchTool(nil)
+			return nil, context.DeadlineExceeded
+		})}
+
+		tool := NewWebFetchTool(httpClient)
 
 		response := tool.Execute(&ToolCall{
 			ID:       "test-id",
 			Function: "webFetch",
 			Arguments: NewToolValue(map[string]any{
-				"url":     server.URL,
+				"url":     "https://example.com",
 				"format":  "raw",
 				"timeout": 1,
 			}),
 		})
 
 		require.Error(t, response.Error)
-		assert.True(t,
-			strings.Contains(response.Error.Error(), "Client.Timeout") || strings.Contains(response.Error.Error(), "context deadline exceeded"),
-		)
+		assert.True(t, errors.Is(response.Error, context.DeadlineExceeded))
+		assert.Contains(t, response.Error.Error(), "context deadline exceeded")
 	})
 
 	t.Run("defaults to markdown for html content when format not provided", func(t *testing.T) {

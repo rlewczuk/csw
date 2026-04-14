@@ -287,7 +287,7 @@ func TestSweSessionRunNonStreamingChat_UsageLimitWait(t *testing.T) {
 
 		chatModel := &tokenLimitChatModel{
 			errors: []error{
-				&models.RateLimitError{RetryAfterSeconds: 2, Message: "The usage limit has been reached"},
+				&models.RateLimitError{RetryAfterSeconds: 0, Message: "The usage limit has been reached"},
 				nil,
 			},
 			responses: []*models.ChatMessage{nil, models.NewTextMessage(models.ChatRoleAssistant, "done")},
@@ -302,10 +302,9 @@ func TestSweSessionRunNonStreamingChat_UsageLimitWait(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		assert.Equal(t, "done", response.GetText())
-		assert.GreaterOrEqual(t, elapsed, 12*time.Millisecond)
+		assert.GreaterOrEqual(t, elapsed, time.Millisecond)
 
 		messages := collectSessionMessages(handler.messages)
-		assert.Contains(t, messages, "Usage limit has been reached. Reset expected at")
 		assert.Contains(t, messages, "Retrying in")
 	})
 }

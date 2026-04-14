@@ -76,6 +76,7 @@ type SweSession struct {
 	logBaseDir      string
 	thinking        string
 	maxToolThreads  int
+	toolStartDelay  time.Duration
 	allowAllPerms   bool
 
 	// pendingToolResponses stores tool responses that were executed before a permission query
@@ -561,7 +562,7 @@ func (s *SweSession) executeToolCalls(toolCalls []*tool.ToolCall) error {
 		startGateMu.Lock()
 		defer startGateMu.Unlock()
 		if !lastStartTime.IsZero() {
-			nextStartAt := lastStartTime.Add(toolExecutionStartDelay)
+			nextStartAt := lastStartTime.Add(s.toolExecutionStartDelayLimit())
 			if sleepFor := time.Until(nextStartAt); sleepFor > 0 {
 				time.Sleep(sleepFor)
 			}
@@ -1439,6 +1440,14 @@ func (s *SweSession) maxToolThreadsLimit() int {
 	}
 
 	return defaultMaxToolThreads
+}
+
+func (s *SweSession) toolExecutionStartDelayLimit() time.Duration {
+	if s.toolStartDelay > 0 {
+		return s.toolStartDelay
+	}
+
+	return toolExecutionStartDelay
 }
 
 // HasPendingWork returns true when the session has pending work that can be resumed
