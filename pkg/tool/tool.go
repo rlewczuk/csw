@@ -426,6 +426,45 @@ type ToolNotification struct {
 	Path string
 }
 
+// HookFeedbackRequest describes one feedback command invocation.
+type HookFeedbackRequest struct {
+	Fn   string         `json:"fn"`
+	Args map[string]any `json:"args,omitempty"`
+	ID   string         `json:"id,omitempty"`
+}
+
+// HookFeedbackResponse stores one processed hook feedback result.
+type HookFeedbackResponse struct {
+	ID     string `json:"id,omitempty"`
+	Fn     string `json:"fn"`
+	OK     bool   `json:"ok"`
+	Result any    `json:"result,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+// HookFeedbackExecutor executes hook feedback requests emitted by delegated sessions.
+type HookFeedbackExecutor interface {
+	ExecuteHookFeedback(request HookFeedbackRequest) HookFeedbackResponse
+}
+
+// SubAgentTaskRequest represents delegated child-session task request.
+type SubAgentTaskRequest struct {
+	Slug                 string
+	Title                string
+	Prompt               string
+	Role                 string
+	Model                string
+	Thinking             string
+	HookFeedbackExecutor HookFeedbackExecutor
+}
+
+// SubAgentTaskResult represents delegated task result.
+type SubAgentTaskResult struct {
+	Status  string
+	Summary string
+	Error   string
+}
+
 // SchemaType represents the type of a property in JSON Schema.
 // Supported types are compatible with JSON Schema used by LLM APIs (Anthropic, OpenAI, Ollama).
 type SchemaType string

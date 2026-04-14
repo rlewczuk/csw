@@ -300,25 +300,6 @@ func TestRegisterSkillTool(t *testing.T) {
 	assert.IsType(t, &SkillTool{}, registeredTool)
 }
 
-func TestToolRegistry_SubAgentRunnerIntegration(t *testing.T) {
-	registry := NewToolRegistry()
-	tool := NewSubAgentTool(&subAgentExecutorMock{result: SubAgentTaskResult{Status: "completed", Summary: "ok"}})
-	registry.Register("subAgent", tool)
-
-	response := registry.Execute(&ToolCall{
-		ID:       "sub-1",
-		Function: "subAgent",
-		Arguments: NewToolValue(map[string]any{
-			"slug":   "child",
-			"title":  "Delegated task",
-			"prompt": "Do delegated task",
-		}),
-	})
-
-	require.NoError(t, response.Error)
-	assert.Equal(t, "completed", response.Result.String("status"))
-}
-
 func TestToolRegistry_VFSIntegration(t *testing.T) {
 	registry := NewToolRegistry()
 	mockVFS := vfs.NewMockVFS()
