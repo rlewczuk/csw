@@ -348,6 +348,40 @@ func TestAgentRoleIntegration(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("SetRole keeps base VFS when allow all permissions enabled", func(t *testing.T) {
+		mockStore := impl.NewMockConfigStore()
+		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+			"readonly": readOnlyRole,
+		})
+		registry := NewAgentRoleRegistry(mockStore)
+
+		session := NewSweSession(&SweSessionParams{
+			Provider:            mockProvider,
+			ProviderName:        "mock",
+			Model:               "test-model",
+			VFS:                 mockVFS,
+			BaseVFS:             mockVFS,
+			SystemTools:         tools,
+			ModelProviders:      map[string]models.ModelProvider{"mock": mockProvider},
+			ModelTags:           models.NewModelTagRegistry(),
+			Roles:               registry,
+			AllowAllPermissions: true,
+		})
+
+		var err error
+		require.NoError(t, err)
+
+		err = session.SetRole("readonly")
+		require.NoError(t, err)
+
+		assert.Equal(t, mockVFS, session.VFS)
+		_, ok := session.VFS.(*vfs.AccessControlVFS)
+		assert.False(t, ok)
+
+		err = session.VFS.WriteFile("test.txt", []byte("content"))
+		assert.NoError(t, err)
+	})
+
 	t.Run("SetRole wraps tools with access control", func(t *testing.T) {
 		mockStore := impl.NewMockConfigStore()
 		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{

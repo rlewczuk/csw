@@ -76,6 +76,7 @@ type SweSession struct {
 	logBaseDir      string
 	thinking        string
 	maxToolThreads  int
+	allowAllPerms   bool
 
 	// pendingToolResponses stores tool responses that were executed before a permission query
 	// so they can be sent together after permissions are granted
@@ -123,6 +124,8 @@ type SweSessionParams struct {
 	LogBaseDir     string
 	Thinking       string
 	MaxToolThreads int
+	// AllowAllPermissions disables VFS role-based access control wrapping.
+	AllowAllPermissions bool
 
 	Logger    *slog.Logger
 	LLMLogger *slog.Logger
@@ -185,6 +188,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		logBaseDir:      params.LogBaseDir,
 		thinking:        params.Thinking,
 		maxToolThreads:  params.MaxToolThreads,
+		allowAllPerms:   params.AllowAllPermissions,
 
 		pendingToolResponses:       make([]*tool.ToolResponse, 0, len(params.PendingToolResponses)),
 		loadedAgentFiles:           make(map[string]struct{}, len(params.LoadedAgentFiles)),
@@ -1060,7 +1064,7 @@ func (s *SweSession) SetRole(roleName string) error {
 	s.rolesUsed = appendUniqueString(s.rolesUsed, role.Name)
 
 	// Wrap VFS with access control based on role privileges
-	if role.VFSPrivileges != nil {
+	if !s.allowAllPerms && role.VFSPrivileges != nil {
 		s.VFS = vfs.NewAccessControlVFS(s.baseVFS, role.VFSPrivileges)
 	} else {
 		s.VFS = s.baseVFS

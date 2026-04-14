@@ -314,7 +314,7 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 
 		session.role = &role
 
-		if role.VFSPrivileges != nil {
+		if !session.allowAllPerms && role.VFSPrivileges != nil {
 			session.VFS = vfs.NewAccessControlVFS(params.VFS, role.VFSPrivileges)
 		} else {
 			session.VFS = params.VFS

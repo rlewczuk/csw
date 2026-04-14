@@ -52,6 +52,7 @@ type SweSystem struct {
 	LogLLMRequestsRaw    bool
 	Thinking             string
 	MaxToolThreads       int
+	AllowAllPermissions  bool
 }
 
 // NewSession creates a new session for selected model.
@@ -114,9 +115,10 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 		LogBaseDir:           s.LogBaseDir,
 		Thinking:             firstNonEmpty(strings.TrimSpace(thinking), strings.TrimSpace(s.Thinking)),
 		MaxToolThreads:       s.MaxToolThreads,
-			HookFeedbackExecutor: hookFeedbackExecutor,
-			TaskBackend:          s.TaskBackend,
-			Logger:               sessionLogger,
+		AllowAllPermissions:  s.AllowAllPermissions,
+		HookFeedbackExecutor: hookFeedbackExecutor,
+		TaskBackend:          s.TaskBackend,
+		Logger:               sessionLogger,
 		LLMLogger:            llmLogger,
 		Messages:             []*models.ChatMessage{},
 		TodoList:             []tool.TodoItem{},
@@ -515,6 +517,7 @@ func (s *SweSystem) buildSessionParams() *core.SweSessionParams {
 		ShadowDir:       s.ShadowDir,
 		Thinking:        s.Thinking,
 		MaxToolThreads:  s.MaxToolThreads,
+		AllowAllPermissions: s.AllowAllPermissions,
 		SubAgentRunner:  s,
 		TaskBackend:     s.TaskBackend,
 	}

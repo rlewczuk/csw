@@ -62,6 +62,13 @@ func TestBuildSystemParamsMaxToolThreads(t *testing.T) {
 	assert.Equal(t, 9, params.MaxToolThreads)
 }
 
+func TestBuildSystemParamsAllowAllPermissions(t *testing.T) {
+	params := BuildSystemParams{
+		AllowAllPermissions: true,
+	}
+	assert.True(t, params.AllowAllPermissions)
+}
+
 func TestBuildSystemParamsNoRefresh(t *testing.T) {
 	params := BuildSystemParams{
 		NoRefresh: true,

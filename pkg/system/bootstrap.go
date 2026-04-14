@@ -675,6 +675,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		LogLLMRequests:    params.LogLLMRequests,
 		LogLLMRequestsRaw: params.LogLLMRequestsRaw,
 		Thinking:          params.Thinking,
+		AllowAllPermissions: params.AllowAllPermissions,
 		MaxToolThreads: func() int {
 			if params.MaxToolThreads > 0 {
 				return params.MaxToolThreads
