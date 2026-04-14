@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/system"
@@ -96,7 +95,6 @@ func TaskCommand() *cobra.Command {
 	command.AddCommand(taskUpdateCommand())
 	command.AddCommand(taskEditCommand())
 	command.AddCommand(taskGetCommand())
-	command.AddCommand(taskRunCommand())
 	command.AddCommand(taskListCommand())
 	command.AddCommand(taskMergeCommand())
 	command.AddCommand(taskArchiveCommand())
@@ -518,207 +516,12 @@ func taskGetCommand() *cobra.Command {
 	return command
 }
 
-func taskRunCommand() *cobra.Command {
-	var merge bool
-	var reset bool
-	var last bool
-	var next bool
-	var taskIdentifier string
-	var cliModel string
-	var cliRole string
-	var cliWorkDir string
-	var cliWorktree string
-	var cliShadowDir string
-	var cliAllowAllPerms bool
-	var cliInteractive bool
-	var cliConfigPath string
-	var cliProjectConfig string
-	var cliSaveSessionTo string
-	var cliSaveSession bool
-	var cliLogLLMRequests bool
-	var cliLogLLMRequestsRaw bool
-	var cliNoRefresh bool
-	var cliLSPServer string
-	var cliThinking string
-	var cliGitUser string
-	var cliGitEmail string
-	var cliContainerImage string
-	var cliContainerOn bool
-	var cliContainerOff bool
-	var cliContainerMount []string
-	var cliContainerEnv []string
-	var cliBashRunTimeout string
-	var cliMaxThreads int
-	var cliOutputFormat string
-	var cliVFSAllow []string
-	var cliMCPEnable []string
-	var cliMCPDisable []string
-	var cliHooks []string
-	var cliContext []string
-
-	command := &cobra.Command{
-		Use:   "run [\"prompt\"] [command-args...]",
-		Short: "Run task session",
-		Args: func(cmd *cobra.Command, args []string) error {
-			if last && next {
-				return fmt.Errorf("taskRunCommand.Args() [task.go]: --last and --next cannot be used together")
-			}
-			if (last || next) && strings.TrimSpace(taskIdentifier) != "" {
-				return fmt.Errorf("taskRunCommand.Args() [task.go]: task identifier cannot be used with --last or --next")
-			}
-			if !last && !next && strings.TrimSpace(taskIdentifier) == "" {
-				return fmt.Errorf("taskRunCommand.Args() [task.go]: either --task, --last or --next must be provided")
-			}
-			return nil
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := applyRunDefaults(resolveTaskRunDefaultsFunc, cmd, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath, &cliModel, &cliWorktree, &merge, &cliLogLLMRequests, &cliLogLLMRequestsRaw, &cliThinking, &cliLSPServer, &cliGitUser, &cliGitEmail, &cliMaxThreads, &cliShadowDir, &cliAllowAllPerms, &cliVFSAllow); err != nil {
-				return err
-			}
-			cliLogLLMRequests = cliLogLLMRequests || cliLogLLMRequestsRaw
-
-			promptOverride := ""
-			extraPromptArgs := []string(nil)
-			if len(args) >= 1 {
-				promptOverride = strings.TrimSpace(args[0])
-				extraPromptArgs = append([]string(nil), args[1:]...)
-			}
-
-			if promptOverride != "" && strings.HasPrefix(promptOverride, "@") {
-				promptFile := strings.TrimPrefix(promptOverride, "@")
-				data, readErr := os.ReadFile(promptFile)
-				if readErr != nil {
-					return fmt.Errorf("taskRunCommand.RunE() [task.go]: failed to read prompt file: %w", readErr)
-				}
-				promptOverride = strings.TrimSpace(string(data))
-			} else if promptOverride == "-" {
-				data, readErr := io.ReadAll(os.Stdin)
-				if readErr != nil {
-					return fmt.Errorf("taskRunCommand.RunE() [task.go]: failed to read prompt from stdin: %w", readErr)
-				}
-				promptOverride = strings.TrimSpace(string(data))
-			}
-
-			invocation, isCommandInvocation, parseErr := commands.ParseInvocation(promptOverride, extraPromptArgs)
-			if parseErr != nil {
-				return fmt.Errorf("taskRunCommand.RunE() [task.go]: %w", parseErr)
-			}
-			if !isCommandInvocation && len(extraPromptArgs) > 0 {
-				return fmt.Errorf("taskRunCommand.RunE() [task.go]: prompt must be a single argument unless using /command invocation")
-			}
-			if invocation != nil {
-				promptOverride = "/" + strings.TrimSpace(invocation.Name)
-				extraPromptArgs = append([]string(nil), invocation.Arguments...)
-			}
-
-			containerEnabledChanged := cmd.Flags().Changed("container-enabled")
-			containerDisabledChanged := cmd.Flags().Changed("container-disabled")
-			if containerEnabledChanged && containerDisabledChanged {
-				return fmt.Errorf("taskRunCommand.RunE() [task.go]: --container-enabled and --container-disabled cannot be used together")
-			}
-
-			bashRunTimeout, err := parseBashRunTimeout(cliBashRunTimeout)
-			if err != nil {
-				return err
-			}
-
-			manager, backend, err := loadTaskBackend(cmd)
-			if err != nil {
-				return err
-			}
-
-			identifier, err := resolveTaskRunIdentifier(manager, taskIdentifier, last, next)
-			if err != nil {
-				return err
-			}
-
-			outcome, runErr := backend.RunTaskWithParams(cmd.Context(), identifier, "", core.TaskRunParams{
-				Merge:          merge,
-				Reset:          reset,
-				PromptOverride: strings.TrimSpace(promptOverride),
-				PromptArgs:     append([]string(nil), extraPromptArgs...),
-				RunOptions: core.TaskSessionRunOptions{
-					Model:             cliModel,
-					Role:              cliRole,
-					WorkDir:           cliWorkDir,
-					ShadowDir:         cliShadowDir,
-					ContainerImage:    cliContainerImage,
-					ContainerEnabled:  containerEnabledChanged && cliContainerOn,
-					ContainerDisabled: containerDisabledChanged && cliContainerOff,
-					ContainerMounts:   append([]string(nil), cliContainerMount...),
-					ContainerEnv:      append([]string(nil), cliContainerEnv...),
-					AllowAllPerms:     cliAllowAllPerms,
-					Interactive:       cliInteractive,
-					ConfigPath:        cliConfigPath,
-					ProjectConfig:     cliProjectConfig,
-					SaveSessionTo:     cliSaveSessionTo,
-					SaveSession:       cliSaveSession,
-					LogLLMRequests:    cliLogLLMRequests,
-					LogLLMRequestsRaw: cliLogLLMRequestsRaw,
-					NoRefresh:         cliNoRefresh,
-					LSPServer:         cliLSPServer,
-					Thinking:          cliThinking,
-					BashRunTimeout:    bashRunTimeout.String(),
-					MaxThreads:        cliMaxThreads,
-					OutputFormat:      cliOutputFormat,
-					VFSAllow:          parseVFSAllowPaths(cliVFSAllow),
-					MCPEnable:         parseMCPServerFlagValues(cliMCPEnable),
-					MCPDisable:        parseMCPServerFlagValues(cliMCPDisable),
-					HookOverrides:     append([]string(nil), cliHooks...),
-					ContextEntries:    append([]string(nil), cliContext...),
-					GitUserName:       strings.TrimSpace(cliGitUser),
-					GitUserEmail:      strings.TrimSpace(cliGitEmail),
-				},
-			})
-			printTaskRunOutcome(outcome)
-			return runErr
-		},
-	}
-
-	command.Flags().BoolVar(&merge, "merge", false, "Merge task into parent branch after successful run")
-	command.Flags().BoolVar(&reset, "reset", false, "Reset task branch before run")
-	command.Flags().StringVar(&taskIdentifier, "task", "", "Task name or UUID")
-	command.Flags().BoolVar(&last, "last", false, "Run latest unfinished task")
-	command.Flags().BoolVar(&next, "next", false, "Run oldest unfinished task")
-	command.Flags().StringVar(&cliModel, "model", "", "Model alias or model spec in provider/model format (single or comma-separated fallback list); if not set, uses defaults")
-	command.Flags().StringVar(&cliRole, "role", "developer", "Agent role name")
-	command.Flags().StringVar(&cliWorkDir, "workdir", "", "Working directory (default: current directory)")
-	command.Flags().StringVar(&cliShadowDir, "shadow-dir", "", "Shadow directory for agent files overlay (AGENTS.md, .agents*, .csw*, .cswdata)")
-	command.Flags().StringVar(&cliWorktree, "worktree", "", "Create and use a git worktree for this session on a feature branch")
-	command.Flags().StringVar(&cliContainerImage, "container-image", "", "Container image for running bash commands in container mode")
-	command.Flags().BoolVar(&cliContainerOn, "container-enabled", false, "Enable running bash commands in container mode")
-	command.Flags().BoolVar(&cliContainerOff, "container-disabled", false, "Disable running bash commands in container mode")
-	command.Flags().StringArrayVar(&cliContainerMount, "container-mount", nil, "Additional container mount in host_path:container_path format (repeatable)")
-	command.Flags().StringArrayVar(&cliContainerEnv, "container-env", nil, "Additional container env var in KEY=VALUE format (repeatable)")
-	command.Flags().BoolVar(&cliAllowAllPerms, "allow-all-permissions", false, "Allow all permissions without asking")
-	command.Flags().BoolVar(&cliInteractive, "interactive", false, "Enable interactive mode (allows user to respond to agent questions)")
-	command.Flags().StringVar(&cliConfigPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
-	command.Flags().StringVar(&cliProjectConfig, "project-config", "", "Custom project config directory (default: .csw/config)")
-	command.Flags().StringVar(&cliSaveSessionTo, "save-session-to", "", "Save session conversation to specified markdown file")
-	command.Flags().BoolVar(&cliSaveSession, "save-session", false, "Save session conversation")
-	command.Flags().BoolVar(&cliLogLLMRequests, "log-llm-requests", false, "Log LLM requests and responses")
-	command.Flags().BoolVar(&cliLogLLMRequestsRaw, "log-llm-requests-raw", false, "Log raw line-based LLM requests and responses")
-	command.Flags().BoolVar(&cliNoRefresh, "no-refresh", false, "Disable OAuth access-token refresh for this run")
-	command.Flags().StringVar(&cliLSPServer, "lsp-server", "", "Path to LSP server binary (empty to disable LSP)")
-	command.Flags().StringVar(&cliThinking, "thinking", "", "Thinking/reasoning mode: low, medium, high, xhigh (effort-based) or true/false (boolean)")
-	command.Flags().StringVar(&cliThinking, "thinking-mode", "", "Thinking/reasoning mode override")
-	command.Flags().StringVar(&cliGitUser, "git-user", "", "Git user name for git operations (default: from git config)")
-	command.Flags().StringVar(&cliGitEmail, "git-email", "", "Git user email for git operations (default: from git config)")
-	command.Flags().StringVar(&cliBashRunTimeout, "bash-run-timeout", "120", "Default runBash command timeout (duration; plain number means seconds)")
-	command.Flags().IntVar(&cliMaxThreads, "max-threads", 0, "Maximum number of tool calls executed in parallel")
-	command.Flags().StringVar(&cliOutputFormat, "output-format", "short", "Console output format: short, full, jsonl")
-	command.Flags().StringArrayVar(&cliVFSAllow, "vfs-allow", nil, "Additional path to allow VFS access outside of worktree (repeatable, or use ':' separated list)")
-	command.Flags().StringArrayVar(&cliMCPEnable, "mcp-enable", nil, "Enable MCP server by name (repeatable, accepts comma-separated list)")
-	command.Flags().StringArrayVar(&cliMCPDisable, "mcp-disable", nil, "Disable MCP server by name (repeatable, accepts comma-separated list)")
-	command.Flags().StringArrayVar(&cliHooks, "hook", nil, "Ephemeral hook override: --hook name | --hook name:disable | --hook name:key=value,key2=value2")
-	command.Flags().StringArrayVarP(&cliContext, "context", "c", nil, "Template context value in KEY=VAL format (repeatable)")
-
-	return command
-}
-
 func resolveTaskRunIdentifier(manager *core.TaskManager, identifier string, useLast bool, useNext bool) (string, error) {
 	if useLast && useNext {
 		return "", fmt.Errorf("resolveTaskRunIdentifier() [task.go]: --last and --next cannot be used together")
+	}
+	if (useLast || useNext) && strings.TrimSpace(identifier) != "" {
+		return "", fmt.Errorf("resolveTaskRunIdentifier() [task.go]: task identifier cannot be used with --last or --next")
 	}
 
 	if useLast || useNext {

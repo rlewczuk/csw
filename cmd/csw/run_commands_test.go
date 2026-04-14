@@ -30,6 +30,15 @@ func TestCliWorktreeAndCommitMessageFlagsDefinition(t *testing.T) {
 	require.NotNil(t, mergeFlag)
 	assert.Equal(t, "false", mergeFlag.DefValue)
 	assert.Equal(t, "bool", mergeFlag.Value.Type())
+
+	taskFlag := cmd.Flags().Lookup("task")
+	require.NotNil(t, taskFlag)
+	lastFlag := cmd.Flags().Lookup("last")
+	require.NotNil(t, lastFlag)
+	nextFlag := cmd.Flags().Lookup("next")
+	require.NotNil(t, nextFlag)
+	resetFlag := cmd.Flags().Lookup("reset")
+	require.NotNil(t, resetFlag)
 }
 
 func TestCLICommandInvocation(t *testing.T) {

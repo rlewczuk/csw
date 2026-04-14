@@ -122,12 +122,16 @@ func RunCommand() *cobra.Command {
 		cliMCPDisable        []string
 		cliHooks             []string
 		cliContext           []string
+		cliTaskIdentifier    string
+		cliTaskNext          bool
+		cliTaskLast          bool
+		cliTaskReset         bool
 		cliTaskJSON          string
 		cliTaskDir           string
 	)
 
 	cmd := &cobra.Command{
-		Use:   "run [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [\"prompt\"] [command-args...]",
+		Use:   "run [--task <name|uuid>|--last|--next] [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [\"prompt\"] [command-args...]",
 		Short: "Start a run chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.ArbitraryArgs,
@@ -166,6 +170,8 @@ func RunCommand() *cobra.Command {
 				prompt = strings.TrimSpace(prompt)
 			}
 
+			runInTaskMode := strings.TrimSpace(cliTaskIdentifier) != "" || cliTaskLast || cliTaskNext
+
 			invocation, isCommandInvocation, err := commands.ParseInvocation(prompt, extraPositionalArgs)
 			if err != nil {
 				return fmt.Errorf("RunCommand.RunE() [run.go]: %w", err)
@@ -182,7 +188,7 @@ func RunCommand() *cobra.Command {
 			var commandRunDefaults *commands.RunDefaultsMetadata
 			var commandTaskMetadata *commands.TaskMetadata
 			commandNeedsShell := false
-			if invocation != nil {
+			if invocation != nil && !runInTaskMode {
 				commandsRoot, rootErr := resolveCommandsRootDir(cliWorkDir, cliShadowDir)
 				if rootErr != nil {
 					return rootErr
@@ -224,7 +230,7 @@ func RunCommand() *cobra.Command {
 				initialTaskData = cloneRunTask(taskData)
 			}
 
-			if prompt == "" {
+			if prompt == "" && !runInTaskMode {
 				return fmt.Errorf("RunCommand.RunE() [run.go]: prompt cannot be empty")
 			}
 
@@ -256,6 +262,64 @@ func RunCommand() *cobra.Command {
 			containerDisabledChanged := cmd.Flags().Changed("container-disabled")
 			if containerEnabledChanged && containerDisabledChanged {
 				return fmt.Errorf("RunCommand.RunE() [run.go]: --container-enabled and --container-disabled cannot be used together")
+			}
+
+			if runInTaskMode {
+				if invocation != nil {
+					prompt = "/" + strings.TrimSpace(invocation.Name)
+					extraPositionalArgs = append([]string(nil), invocation.Arguments...)
+				}
+
+				manager, backend, err := loadTaskBackend(cmd)
+				if err != nil {
+					return err
+				}
+
+				identifier, err := resolveTaskRunIdentifier(manager, cliTaskIdentifier, cliTaskLast, cliTaskNext)
+				if err != nil {
+					return err
+				}
+
+				outcome, runErr := backend.RunTaskWithParams(cmd.Context(), identifier, "", core.TaskRunParams{
+					Merge:          cliMerge,
+					Reset:          cliTaskReset,
+					PromptOverride: strings.TrimSpace(prompt),
+					PromptArgs:     append([]string(nil), extraPositionalArgs...),
+					RunOptions: core.TaskSessionRunOptions{
+						Model:             cliModel,
+						Role:              cliRole,
+						WorkDir:           cliWorkDir,
+						ShadowDir:         cliShadowDir,
+						ContainerImage:    cliContainerImage,
+						ContainerEnabled:  containerEnabledChanged && cliContainerOn,
+						ContainerDisabled: containerDisabledChanged && cliContainerOff,
+						ContainerMounts:   append([]string(nil), cliContainerMount...),
+						ContainerEnv:      append([]string(nil), cliContainerEnv...),
+						AllowAllPerms:     cliAllowAllPerms,
+						Interactive:       cliInteractive,
+						ConfigPath:        cliConfigPath,
+						ProjectConfig:     cliProjectConfig,
+						SaveSessionTo:     cliSaveSessionTo,
+						SaveSession:       cliSaveSession,
+						LogLLMRequests:    cliLogLLMRequests,
+						LogLLMRequestsRaw: cliLogLLMRequestsRaw,
+						NoRefresh:         cliNoRefresh,
+						LSPServer:         cliLSPServer,
+						Thinking:          cliThinking,
+						BashRunTimeout:    bashRunTimeout.String(),
+						MaxThreads:        cliMaxThreads,
+						OutputFormat:      cliOutputFormat,
+						VFSAllow:          parseVFSAllowPaths(cliVFSAllow),
+						MCPEnable:         parseMCPServerFlagValues(cliMCPEnable),
+						MCPDisable:        parseMCPServerFlagValues(cliMCPDisable),
+						HookOverrides:     append([]string(nil), cliHooks...),
+						ContextEntries:    append([]string(nil), cliContext...),
+						GitUserName:       strings.TrimSpace(cliGitUser),
+						GitUserEmail:      strings.TrimSpace(cliGitEmail),
+					},
+				})
+				printTaskRunOutcome(outcome)
+				return runErr
 			}
 
 			containerRequested := (containerEnabledChanged && cliContainerOn) || len(cliContainerMount) > 0 || len(cliContainerEnv) > 0
@@ -350,6 +414,10 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().StringArrayVar(&cliMCPDisable, "mcp-disable", nil, "Disable MCP server by name (repeatable, accepts comma-separated list)")
 	cmd.Flags().StringArrayVar(&cliHooks, "hook", nil, "Ephemeral hook override: --hook name | --hook name:disable | --hook name:key=value,key2=value2")
 	cmd.Flags().StringArrayVarP(&cliContext, "context", "c", nil, "Template context value in KEY=VAL format (repeatable)")
+	cmd.Flags().StringVar(&cliTaskIdentifier, "task", "", "Run in task context for specified task name or UUID")
+	cmd.Flags().BoolVar(&cliTaskLast, "last", false, "Run latest unfinished task in task context")
+	cmd.Flags().BoolVar(&cliTaskNext, "next", false, "Run oldest unfinished task in task context")
+	cmd.Flags().BoolVar(&cliTaskReset, "reset", false, "Reset task branch before run in task context")
 	cmd.Flags().StringVar(&cliTaskJSON, "task-json", "", "Task metadata payload used for task session state")
 	cmd.Flags().StringVar(&cliTaskDir, "task-dir", "", "Task directory path used for task session state")
 	_ = cmd.Flags().MarkHidden("task-json")
