@@ -34,11 +34,6 @@ const (
 	sessionMessageTypeError           = "error"
 )
 
-// SubAgentTaskRunner executes delegated subagent tasks for a parent session.
-type SubAgentTaskRunner interface {
-	ExecuteSubAgentTask(parent *SweSession, request tool.SubAgentTaskRequest) (tool.SubAgentTaskResult, error)
-}
-
 type SweSession struct {
 	id            string
 	parentID      string
@@ -86,12 +81,8 @@ type SweSession struct {
 	loadedAgentFiles map[string]struct{}
 	tokenUsage       models.TokenUsage
 	contextLength    int
-	compactionCount  int
-	subAgentSlugs    map[string]struct{}
-	subAgentSlugsMu  sync.Mutex
-	subAgentRunner   SubAgentTaskRunner
-	hookFeedbackExec tool.HookFeedbackExecutor
-	taskBackend      tool.TaskBackend
+	compactionCount int
+	taskBackend     tool.TaskBackend
 }
 
 // SweSessionParams stores dependencies and initial values used to create a SweSession.
@@ -138,14 +129,11 @@ type SweSessionParams struct {
 	ToolsUsed        []string
 	LoadedAgentFiles map[string]struct{}
 
-	PendingToolResponses       []*tool.ToolResponse
-	TokenUsage                 models.TokenUsage
-	ContextLength              int
-	CompactionCount            int
-	UsedSubAgentSlugs          map[string]struct{}
-	SubAgentRunner             SubAgentTaskRunner
-	HookFeedbackExecutor       tool.HookFeedbackExecutor
-	TaskBackend                tool.TaskBackend
+	PendingToolResponses []*tool.ToolResponse
+	TokenUsage           models.TokenUsage
+	ContextLength        int
+	CompactionCount      int
+	TaskBackend          tool.TaskBackend
 }
 
 // NewSweSession creates a new SweSession from provided parameters.
@@ -191,15 +179,12 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		maxToolThreads:  params.MaxToolThreads,
 		allowAllPerms:   params.AllowAllPermissions,
 
-		pendingToolResponses:       make([]*tool.ToolResponse, 0, len(params.PendingToolResponses)),
-		loadedAgentFiles:           make(map[string]struct{}, len(params.LoadedAgentFiles)),
-		tokenUsage:                 params.TokenUsage,
-		contextLength:              params.ContextLength,
-		compactionCount:            params.CompactionCount,
-		subAgentSlugs:              make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
-		subAgentRunner:             params.SubAgentRunner,
-		hookFeedbackExec:           params.HookFeedbackExecutor,
-		taskBackend:                params.TaskBackend,
+			pendingToolResponses: make([]*tool.ToolResponse, 0, len(params.PendingToolResponses)),
+			loadedAgentFiles:     make(map[string]struct{}, len(params.LoadedAgentFiles)),
+			tokenUsage:           params.TokenUsage,
+			contextLength:        params.ContextLength,
+			compactionCount:      params.CompactionCount,
+			taskBackend:          params.TaskBackend,
 	}
 
 	if session.modelSpec == "" {
@@ -216,14 +201,6 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 	for path := range params.LoadedAgentFiles {
 		session.loadedAgentFiles[path] = struct{}{}
 	}
-	for slug := range params.UsedSubAgentSlugs {
-		trimmedSlug := strings.TrimSpace(slug)
-		if trimmedSlug == "" {
-			continue
-		}
-		session.subAgentSlugs[trimmedSlug] = struct{}{}
-	}
-
 	session.applyModelTagToolSelection()
 	if session.role != nil && session.role.ToolsAccess != nil {
 		session.Tools = wrapToolsWithAccessControl(session.Tools, session.role.ToolsAccess)
@@ -1197,7 +1174,6 @@ func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 	// Register todo tools
 	registry.Register("todoRead", tool.NewTodoReadTool(s))
 	registry.Register("todoWrite", tool.NewTodoWriteTool(s))
-	registry.Register("subAgent", tool.NewSubAgentTool(s))
 	if s.taskBackend != nil {
 		registry.Register("taskNew", tool.NewTaskNewTool(s.taskBackend, s))
 		registry.Register("taskUpdate", tool.NewTaskUpdateTool(s.taskBackend, s))
@@ -1206,22 +1182,6 @@ func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 		registry.Register("taskList", tool.NewTaskListTool(s.taskBackend, s))
 		registry.Register("taskMerge", tool.NewTaskMergeTool(s.taskBackend, s))
 	}
-	if s.hookFeedbackExec != nil {
-		registry.Register("hookFeedback", tool.NewHookFeedbackTool(s.hookFeedbackExec, s.ModelWithProvider, s.ThinkingLevel))
-	}
-}
-
-// ExecuteSubAgentTask executes delegated subagent task for this parent session.
-func (s *SweSession) ExecuteSubAgentTask(request tool.SubAgentTaskRequest) (tool.SubAgentTaskResult, error) {
-	if s == nil {
-		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSession.ExecuteSubAgentTask() [session.go]: session is nil")
-	}
-
-	if s.subAgentRunner == nil {
-		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSession.ExecuteSubAgentTask() [session.go]: subagent runner is nil")
-	}
-
-	return s.subAgentRunner.ExecuteSubAgentTask(s, request)
 }
 
 func buildSessionToolRegistry(systemTools *tool.ToolRegistry, vfsImpl apis.VFS, lspClient lsp.LSP, session *SweSession) *tool.ToolRegistry {
