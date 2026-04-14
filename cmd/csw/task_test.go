@@ -229,6 +229,90 @@ func TestResolveTaskDirPathPrefersFlagOverConfigAndMakesRelativeAbsolute(t *test
 	assert.Equal(t, filepath.Join(rootDir, "from-flag"), resolved)
 }
 
+func TestNewTaskDirectSessionRunnerRejectsEmptyBaseDir(t *testing.T) {
+	runner, err := newTaskDirectSessionRunner("", "", "", "", "")
+	require.Error(t, err)
+	assert.Nil(t, runner)
+	assert.Contains(t, err.Error(), "baseDir cannot be empty")
+}
+
+func TestTaskDirectSessionRunnerRunTaskSessionCallsRunFunctionDirectly(t *testing.T) {
+	originalRun := runTaskSessionRunFunc
+	t.Cleanup(func() {
+		runTaskSessionRunFunc = originalRun
+	})
+
+	var captured *RunParams
+	runTaskSessionRunFunc = func(params *RunParams) (RunCommandResult, error) {
+		captured = params
+		return RunCommandResult{SessionID: "session-123", SummaryText: "summary text"}, nil
+	}
+
+	runner, err := newTaskDirectSessionRunner("/tmp/project", "provider/default", "/cfg", "/project/.csw/config", "high")
+	require.NoError(t, err)
+
+	stdin := strings.NewReader("stdin")
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	runner.stdin = stdin
+	runner.stdout = stdout
+	runner.stderr = stderr
+
+	result, err := runner.RunTaskSession(context.Background(), core.TaskSessionRunRequest{
+		TaskBranch: "feature/task",
+		Role:       "developer",
+		Prompt:     "run prompt",
+		TaskDir:    ".cswdata/tasks/task-id",
+		Task: &core.Task{
+			UUID: "task-id",
+		},
+		RunOptions: core.TaskSessionRunOptions{
+			Model:          "provider/override",
+			BashRunTimeout: "45",
+			OutputFormat:   "jsonl",
+			ContextEntries: []string{"k=v"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "session-123", result.SessionID)
+	assert.Equal(t, "summary text", result.SummaryText)
+
+	require.NotNil(t, captured)
+	assert.Equal(t, "provider/override", captured.ModelName)
+	assert.Equal(t, "feature/task", captured.WorktreeBranch)
+	assert.Equal(t, "jsonl", captured.OutputFormat)
+	assert.Equal(t, "v", captured.ContextData["k"])
+	assert.Equal(t, stdin, captured.Stdin)
+	assert.Equal(t, stdout, captured.Stdout)
+	assert.Equal(t, stderr, captured.Stderr)
+	require.NotNil(t, captured.Task)
+	assert.Equal(t, ".cswdata/tasks/task-id", captured.Task.TaskDir)
+}
+
+func TestTaskDirectSessionRunnerRunTaskSessionWrapsRunError(t *testing.T) {
+	originalRun := runTaskSessionRunFunc
+	t.Cleanup(func() {
+		runTaskSessionRunFunc = originalRun
+	})
+
+	runTaskSessionRunFunc = func(params *RunParams) (RunCommandResult, error) {
+		_ = params
+		return RunCommandResult{SessionID: "session-err", SummaryText: "partial"}, assert.AnError
+	}
+
+	runner, err := newTaskDirectSessionRunner("/tmp/project", "", "", "", "")
+	require.NoError(t, err)
+
+	result, runErr := runner.RunTaskSession(context.Background(), core.TaskSessionRunRequest{
+		TaskBranch: "feature/task",
+		Prompt:     "run prompt",
+	})
+	require.Error(t, runErr)
+	assert.Contains(t, runErr.Error(), "direct task run failed")
+	assert.Equal(t, "session-err", result.SessionID)
+	assert.Equal(t, "partial", result.SummaryText)
+}
+
 func TestResolveTaskDirPathReadsTaskDirFromSubcommandPersistentFlag(t *testing.T) {
 	originalResolver := resolveTaskRunDefaultsFunc
 	t.Cleanup(func() {

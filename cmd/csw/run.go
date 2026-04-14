@@ -57,16 +57,25 @@ type RunParams struct {
 	LogLLMRequestsRaw     bool
 	NoRefresh             bool
 	LSPServer             string
-		Thinking              string
-		ModelOverridden       bool
-		BashRunTimeout        time.Duration
-		MaxThreads            int
-		AllowAllPermissions   bool
-		OutputFormat          string
-		VFSAllow              []string
-		MCPEnable             []string
-		MCPDisable            []string
+	Thinking              string
+	ModelOverridden       bool
+	BashRunTimeout        time.Duration
+	MaxThreads            int
+	AllowAllPermissions   bool
+	OutputFormat          string
+	VFSAllow              []string
+	MCPEnable             []string
+	MCPDisable            []string
 	HookOverrides         []string
+	Stdin                 stdio.Reader
+	Stdout                stdio.Writer
+	Stderr                stdio.Writer
+}
+
+// RunCommandResult stores run command execution result values.
+type RunCommandResult struct {
+	SessionID   string
+	SummaryText string
 }
 
 const defaultBashRunTimeout = 120 * time.Second
@@ -348,8 +357,28 @@ func RunCommand() *cobra.Command {
 }
 
 func runCommand(params *RunParams) error {
+	_, err := runCommandWithResult(params)
+	return err
+}
+
+func runCommandWithResult(params *RunParams) (RunCommandResult, error) {
+	result := RunCommandResult{}
 	startTime := time.Now()
 	ctx := context.Background()
+	var stdin stdio.Reader = os.Stdin
+	var stdout stdio.Writer = os.Stdout
+	var stderr stdio.Writer = os.Stderr
+	if params != nil {
+		if params.Stdin != nil {
+			stdin = params.Stdin
+		}
+		if params.Stdout != nil {
+			stdout = params.Stdout
+		}
+		if params.Stderr != nil {
+			stderr = params.Stderr
+		}
+	}
 	if params.BashRunTimeout <= 0 {
 		params.BashRunTimeout = defaultBashRunTimeout
 	}
@@ -357,11 +386,11 @@ func runCommand(params *RunParams) error {
 		params.OutputFormat = "short"
 	}
 	if params.OutputFormat != "short" && params.OutputFormat != "full" && params.OutputFormat != "jsonl" {
-		return fmt.Errorf("runCommand() [run.go]: invalid --output-format %q (allowed: short, full, jsonl)", params.OutputFormat)
+		return result, fmt.Errorf("runCommand() [run.go]: invalid --output-format %q (allowed: short, full, jsonl)", params.OutputFormat)
 	}
 
 	if err := validateMergeRunParams(params); err != nil {
-		return err
+		return result, err
 	}
 
 	resolvedWorktreeBranch, err := resolveWorktreeBranchNameFunc(ctx, system.ResolveWorktreeBranchNameParams{
@@ -374,42 +403,42 @@ func runCommand(params *RunParams) error {
 		WorktreeBranch: params.WorktreeBranch,
 	})
 	if err != nil {
-		return fmt.Errorf("runCommand() [run.go]: failed to resolve worktree branch: %w", err)
+		return result, fmt.Errorf("runCommand() [run.go]: failed to resolve worktree branch: %w", err)
 	}
 	params.WorktreeBranch = resolvedWorktreeBranch
 	if params.WorktreeBranch != "" {
-		_, _ = fmt.Fprintf(os.Stdout, "[INFO] Worktree branch: %s\n", params.WorktreeBranch)
+		_, _ = fmt.Fprintf(stdout, "[INFO] Worktree branch: %s\n", params.WorktreeBranch)
 	}
 
-		sweSystem, buildResult, err := buildSystemFunc(system.BuildSystemParams{
-		WorkDir:           params.WorkDir,
-		ShadowDir:         params.ShadowDir,
-		ConfigPath:        params.ConfigPath,
-		ProjectConfig:     params.ProjectConfig,
-		ModelName:         params.ModelName,
-		RoleName:          params.RoleName,
-		WorktreeBranch:    params.WorktreeBranch,
-		GitUserName:       params.GitUserName,
-		GitUserEmail:      params.GitUserEmail,
-		ContainerEnabled:  params.ContainerEnabled,
-		ContainerDisabled: params.ContainerDisabled,
-		ContainerImage:    params.ContainerImage,
-		ContainerMounts:   params.ContainerMounts,
-		ContainerEnv:      params.ContainerEnv,
-		LSPServer:         params.LSPServer,
-		LogLLMRequests:    params.LogLLMRequests,
-		LogLLMRequestsRaw: params.LogLLMRequestsRaw,
-		NoRefresh:         params.NoRefresh,
-		Thinking:          params.Thinking,
-			BashRunTimeout:    params.BashRunTimeout,
-			AllowedPaths:      params.VFSAllow,
-			MaxToolThreads:    params.MaxThreads,
-			AllowAllPermissions: params.AllowAllPerms,
-			MCPEnable:         params.MCPEnable,
-			MCPDisable:        params.MCPDisable,
-		})
+	sweSystem, buildResult, err := buildSystemFunc(system.BuildSystemParams{
+		WorkDir:             params.WorkDir,
+		ShadowDir:           params.ShadowDir,
+		ConfigPath:          params.ConfigPath,
+		ProjectConfig:       params.ProjectConfig,
+		ModelName:           params.ModelName,
+		RoleName:            params.RoleName,
+		WorktreeBranch:      params.WorktreeBranch,
+		GitUserName:         params.GitUserName,
+		GitUserEmail:        params.GitUserEmail,
+		ContainerEnabled:    params.ContainerEnabled,
+		ContainerDisabled:   params.ContainerDisabled,
+		ContainerImage:      params.ContainerImage,
+		ContainerMounts:     params.ContainerMounts,
+		ContainerEnv:        params.ContainerEnv,
+		LSPServer:           params.LSPServer,
+		LogLLMRequests:      params.LogLLMRequests,
+		LogLLMRequestsRaw:   params.LogLLMRequestsRaw,
+		NoRefresh:           params.NoRefresh,
+		Thinking:            params.Thinking,
+		BashRunTimeout:      params.BashRunTimeout,
+		AllowedPaths:        params.VFSAllow,
+		MaxToolThreads:      params.MaxThreads,
+		AllowAllPermissions: params.AllowAllPerms,
+		MCPEnable:           params.MCPEnable,
+		MCPDisable:          params.MCPDisable,
+	})
 	if err != nil {
-		return err
+		return result, err
 	}
 	defer buildResult.Cleanup()
 	defer logging.FlushLogs()
@@ -418,11 +447,11 @@ func runCommand(params *RunParams) error {
 	params.ShadowDir = buildResult.ShadowDir
 	params.ModelName = buildResult.ModelName
 	if err := renderCommandPrompt(params, buildResult.WorkDir, buildResult.ShellRunner, buildResult.HostShellRunner); err != nil {
-		return err
+		return result, err
 	}
 	hookConfigStore, err := system.BuildRuntimeHookConfigStore(sweSystem.ConfigStore, params.HookOverrides)
 	if err != nil {
-		return err
+		return result, err
 	}
 	hookEngine := core.NewHookEngine(
 		hookConfigStore,
@@ -431,7 +460,7 @@ func runCommand(params *RunParams) error {
 		sweSystem.ModelProviders,
 	)
 	if err := PreparePromptWithPreRunHook(ctx, params, buildResult.WorkDirRoot, hookEngine); err != nil {
-		return err
+		return result, err
 	}
 
 	if params.LSPServer != "" {
@@ -439,13 +468,13 @@ func runCommand(params *RunParams) error {
 		if buildResult.LSPStarted {
 			lspStatus = "started"
 		}
-		_, _ = fmt.Fprintf(os.Stdout, "[INFO] LSP %s (workdir: %s)\n", lspStatus, buildResult.LSPWorkDir)
+		_, _ = fmt.Fprintf(stdout, "[INFO] LSP %s (workdir: %s)\n", lspStatus, buildResult.LSPWorkDir)
 	}
 	if strings.TrimSpace(buildResult.ContainerImage) != "" {
-		_, _ = fmt.Fprintln(os.Stdout, BuildContainerStartupInfoMessage(buildResult))
+		_, _ = fmt.Fprintln(stdout, BuildContainerStartupInfoMessage(buildResult))
 	}
 
-	sessionOutput := buildRunSessionOutput(params, os.Stdout)
+	sessionOutput := buildRunSessionOutput(params, stdout)
 	runtimeResult, err := sweSystem.StartRunSession(system.StartRunSessionParams{
 		ModelName:       params.ModelName,
 		RoleName:        params.RoleName,
@@ -456,10 +485,10 @@ func runCommand(params *RunParams) error {
 		OutputHandler:   sessionOutput,
 	})
 	if err != nil {
-		return fmt.Errorf("runCommand() [run.go]: failed to start run session runtime: %w", err)
+		return result, fmt.Errorf("runCommand() [run.go]: failed to start run session runtime: %w", err)
 	}
 	session := runtimeResult.Session
-	if sessionInput := buildRunStdinSessionInput(params, runtimeResult.Thread, os.Stdin); sessionInput != nil {
+	if sessionInput := buildRunStdinSessionInput(params, runtimeResult.Thread, stdin); sessionInput != nil {
 		sessionInput.StartReadingInput()
 	}
 
@@ -468,8 +497,9 @@ func runCommand(params *RunParams) error {
 	finalizeWorktreeDir := buildResult.WorkDir
 
 	sessionID := session.ID()
+	result.SessionID = sessionID
 	defer func() {
-		_, _ = fmt.Fprintf(os.Stdout, "Session ID: %s\n", sessionID)
+		_, _ = fmt.Fprintf(stdout, "Session ID: %s\n", sessionID)
 	}()
 
 	baseCommitID := vcs.ResolveGitCommitID(vcs.ChooseGitDiffDir(buildResult.WorkDirRoot, buildResult.WorkDir), "HEAD")
@@ -487,7 +517,7 @@ func runCommand(params *RunParams) error {
 	}
 
 	var finalizeResult system.WorktreeFinalizeResult
-	finalizeResult, finalizeErr := system.FinalizeWorktreeSession(ctx, finalizeVCS, finalizeWorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, os.Stderr, buildResult.WorkDirRoot, finalizeWorktreeDir, params.Prompt, hookEngine, buildHookOutputView(sessionOutput))
+	finalizeResult, finalizeErr := system.FinalizeWorktreeSession(ctx, finalizeVCS, finalizeWorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, stderr, buildResult.WorkDirRoot, finalizeWorktreeDir, params.Prompt, hookEngine, buildHookOutputView(sessionOutput))
 	if finalizeErr != nil {
 		sessionRunErr = finalizeErr
 	}
@@ -506,14 +536,15 @@ func runCommand(params *RunParams) error {
 		LSPServer:      buildResult.LSPServer,
 		ContainerImage: buildResult.ContainerImage,
 	}, buildSummaryMessageFunc(sessionOutput), sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
-		return err
+		return result, err
 	}
 
 	if err := applyCommandTaskMetadata(params); err != nil {
-		return err
+		return result, err
 	}
+	result.SummaryText = strings.TrimSpace(core.LastAssistantMessageText(session))
 
-	return nil
+	return result, nil
 }
 
 func applyCommandTaskMetadata(params *RunParams) error {
