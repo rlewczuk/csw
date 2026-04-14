@@ -901,6 +901,23 @@ func TestConvertFromResponsesStreamBody_HandlesStreamErrorEvent(t *testing.T) {
 		assert.Equal(t, "Our servers are currently overloaded. Please try again later.", rateLimitErr.Message)
 		assert.ErrorIs(t, err, ErrRateExceeded)
 	})
+
+	t.Run("returns retryable NetworkError for transient server error", func(t *testing.T) {
+		body := strings.Join([]string{
+			"event: error",
+			"data: {\"type\":\"error\",\"error\":{\"type\":\"server_error\",\"code\":\"server_error\",\"message\":\"An error occurred while processing your request. You can retry your request.\",\"param\":null},\"sequence_number\":2}",
+			"",
+		}, "\n")
+
+		_, err := convertFromResponsesStreamBody([]byte(body))
+		require.Error(t, err)
+
+		var networkErr *NetworkError
+		require.ErrorAs(t, err, &networkErr)
+		assert.True(t, networkErr.IsRetryable)
+		assert.Equal(t, "An error occurred while processing your request. You can retry your request.", networkErr.Message)
+		assert.ErrorIs(t, err, ErrNetworkError)
+	})
 }
 
 func TestFormatRawHTTPResponse(t *testing.T) {

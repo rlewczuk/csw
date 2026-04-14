@@ -1904,14 +1904,23 @@ func mapResponsesStreamError(apiErr *OpenaiAPIError) error {
 	}
 
 	errorCode := fmt.Sprint(apiErr.Code)
+	errorTypeLower := strings.ToLower(strings.TrimSpace(apiErr.Type))
+	errorCodeLower := strings.ToLower(strings.TrimSpace(errorCode))
 	if errorCode == "context_length_exceeded" {
 		return fmt.Errorf("%w: %s", ErrTooManyInputTokens, apiErr.Message)
 	}
 
-	if strings.EqualFold(apiErr.Type, "service_unavailable_error") && errorCode == "server_is_overloaded" {
+	if errorTypeLower == "service_unavailable_error" && errorCodeLower == "server_is_overloaded" {
 		return &RateLimitError{
 			RetryAfterSeconds: responsesOverloadedRetryAfterSeconds,
 			Message:           apiErr.Message,
+		}
+	}
+
+	if errorTypeLower == "server_error" && errorCodeLower == "server_error" {
+		return &NetworkError{
+			Message:     apiErr.Message,
+			IsRetryable: true,
 		}
 	}
 
