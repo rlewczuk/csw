@@ -79,7 +79,6 @@ type RunCommandResult struct {
 const defaultBashRunTimeout = 120 * time.Second
 
 var runFunc = runCommand
-var runCommandWithResultFunc = runCommandWithResult
 var resolveRunDefaultsFunc = system.ResolveRunDefaults
 var resolveWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
 var buildSystemFunc = system.BuildSystem
@@ -422,12 +421,6 @@ func RunCommand() *cobra.Command {
 }
 
 func runCommand(params *RunParams) error {
-	_, err := runCommandWithResult(params)
-	return err
-}
-
-func runCommandWithResult(params *RunParams) (RunCommandResult, error) {
-	result := RunCommandResult{}
 	startTime := time.Now()
 	ctx := context.Background()
 	var stdin stdio.Reader = os.Stdin
@@ -451,11 +444,11 @@ func runCommandWithResult(params *RunParams) (RunCommandResult, error) {
 		params.OutputFormat = "short"
 	}
 	if params.OutputFormat != "short" && params.OutputFormat != "full" && params.OutputFormat != "jsonl" {
-		return result, fmt.Errorf("runCommand() [run.go]: invalid --output-format %q (allowed: short, full, jsonl)", params.OutputFormat)
+		return fmt.Errorf("runCommand() [run.go]: invalid --output-format %q (allowed: short, full, jsonl)", params.OutputFormat)
 	}
 
 	if err := validateMergeRunParams(params); err != nil {
-		return result, err
+		return err
 	}
 
 	resolvedWorktreeBranch, err := resolveWorktreeBranchNameFunc(ctx, system.ResolveWorktreeBranchNameParams{
@@ -468,7 +461,7 @@ func runCommandWithResult(params *RunParams) (RunCommandResult, error) {
 		WorktreeBranch: params.WorktreeBranch,
 	})
 	if err != nil {
-		return result, fmt.Errorf("runCommand() [run.go]: failed to resolve worktree branch: %w", err)
+		return fmt.Errorf("runCommand() [run.go]: failed to resolve worktree branch: %w", err)
 	}
 	params.WorktreeBranch = resolvedWorktreeBranch
 	if params.WorktreeBranch != "" {
@@ -503,7 +496,7 @@ func runCommandWithResult(params *RunParams) (RunCommandResult, error) {
 		MCPDisable:          params.MCPDisable,
 	})
 	if err != nil {
-		return result, err
+		return err
 	}
 	defer buildResult.Cleanup()
 	defer logging.FlushLogs()
@@ -512,10 +505,10 @@ func runCommandWithResult(params *RunParams) (RunCommandResult, error) {
 	params.ShadowDir = buildResult.ShadowDir
 	params.ModelName = buildResult.ModelName
 	if err := renderCommandPrompt(params, buildResult.WorkDir, buildResult.ShellRunner, buildResult.HostShellRunner); err != nil {
-		return result, err
+		return err
 	}
 	if err := PreparePromptWithContext(params); err != nil {
-		return result, err
+		return err
 	}
 
 	if params.LSPServer != "" {
@@ -540,7 +533,7 @@ func runCommandWithResult(params *RunParams) (RunCommandResult, error) {
 		OutputHandler:   sessionOutput,
 	})
 	if err != nil {
-		return result, fmt.Errorf("runCommand() [run.go]: failed to start run session runtime: %w", err)
+		return fmt.Errorf("runCommand() [run.go]: failed to start run session runtime: %w", err)
 	}
 	session := runtimeResult.Session
 	if sessionInput := buildRunStdinSessionInput(params, runtimeResult.Thread, stdin); sessionInput != nil {
@@ -552,7 +545,6 @@ func runCommandWithResult(params *RunParams) (RunCommandResult, error) {
 	finalizeWorktreeDir := buildResult.WorkDir
 
 	sessionID := session.ID()
-	result.SessionID = sessionID
 	defer func() {
 		_, _ = fmt.Fprintf(stdout, "Session ID: %s\n", sessionID)
 	}()
@@ -585,15 +577,14 @@ func runCommandWithResult(params *RunParams) (RunCommandResult, error) {
 		LSPServer:      buildResult.LSPServer,
 		ContainerImage: buildResult.ContainerImage,
 	}, buildSummaryMessageFunc(sessionOutput), sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
-		return result, err
+		return err
 	}
 
 	if err := applyCommandTaskMetadata(params); err != nil {
-		return result, err
+		return err
 	}
-	result.SummaryText = strings.TrimSpace(core.LastAssistantMessageText(session))
 
-	return result, nil
+	return nil
 }
 
 func applyCommandTaskMetadata(params *RunParams) error {
