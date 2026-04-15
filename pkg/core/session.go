@@ -1204,7 +1204,6 @@ func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 		registry.Register("taskNew", tool.NewTaskNewTool(s.taskBackend, s))
 		registry.Register("taskUpdate", tool.NewTaskUpdateTool(s.taskBackend, s))
 		registry.Register("taskGet", tool.NewTaskGetTool(s.taskBackend, s))
-		registry.Register("taskRun", tool.NewTaskRunTool(s.taskBackend, s))
 		registry.Register("taskList", tool.NewTaskListTool(s.taskBackend, s))
 		registry.Register("taskMerge", tool.NewTaskMergeTool(s.taskBackend, s))
 	}

@@ -17,7 +17,6 @@ Package `pkg/tool` defines tool contracts, registry, permission wrappers, and bu
 * `custom.go` - Config-driven custom command tools.
 * `task_new.go` - Task creation tool.
 * `task_update.go` - Task update tool.
-* `task_run.go` - Task run tool.
 * `task_merge.go` - Task merge tool.
 * `task_get.go` - Task metadata query tool.
 * `task_list.go` - Task listing tool.
@@ -81,7 +80,6 @@ Package `pkg/tool` defines tool contracts, registry, permission wrappers, and bu
 * `TaskRunOutcome` - Task run result payload.
 * `TaskNewTool` - Task creation tool.
 * `TaskUpdateTool` - Task update tool.
-* `TaskRunTool` - Task run tool.
 * `TaskMergeTool` - Task merge tool.
 * `TaskGetTool` - Task lookup tool.
 * `TaskListTool` - Task listing tool.
@@ -111,7 +109,6 @@ Package `pkg/tool` defines tool contracts, registry, permission wrappers, and bu
 * `NewVFSGrepTool()` - Creates VFS-grep tool.
 * `NewTaskNewTool()` - Creates task-new tool.
 * `NewTaskUpdateTool()` - Creates task-update tool.
-* `NewTaskRunTool()` - Creates task-run tool.
 * `NewTaskMergeTool()` - Creates task-merge tool.
 * `NewTaskGetTool()` - Creates task-get tool.
 * `NewTaskListTool()` - Creates task-list tool.

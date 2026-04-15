@@ -8,7 +8,6 @@ var Names = []string{
 	"taskList",
 	"taskMerge",
 	"taskNew",
-	"taskRun",
 	"taskUpdate",
 	"todoRead",
 	"todoWrite",
