@@ -602,7 +602,6 @@ type TaskBackend interface {
 	CreateTask(ctx context.Context, params TaskRecord, prompt string, parentTaskID string) (TaskRecord, error)
 	UpdateTask(ctx context.Context, identifier string, params TaskRecord, prompt *string) (TaskRecord, error)
 	GetTask(ctx context.Context, identifier string, fallbackTaskID string, includeSummary bool) (TaskRecord, *TaskSessionSummary, string, error)
-	RunTask(ctx context.Context, identifier string, fallbackTaskID string, merge bool, reset bool) (TaskRunOutcome, error)
 	ListTasks(ctx context.Context, identifier string, fallbackTaskID string, recursive bool) ([]TaskRecord, error)
 	MergeTask(ctx context.Context, identifier string, fallbackTaskID string) (TaskRecord, error)
 }

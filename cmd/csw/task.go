@@ -28,58 +28,6 @@ var runTaskEditorFunc = runTaskEditor
 var generateTaskDescriptionFunc = generateTaskDescription
 var taskDirUUIDPattern = regexp.MustCompile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
-type taskDirectSessionRunner struct {
-	baseDir       string
-	modelName     string
-	configPath    string
-	projectConfig string
-	thinking      string
-	stdin         io.Reader
-	stdout        io.Writer
-	stderr        io.Writer
-}
-
-func newTaskDirectSessionRunner(baseDir string, modelName string, configPath string, projectConfig string, thinking string) (*taskDirectSessionRunner, error) {
-	trimmedBaseDir := strings.TrimSpace(baseDir)
-	if trimmedBaseDir == "" {
-		return nil, fmt.Errorf("newTaskDirectSessionRunner() [task.go]: baseDir cannot be empty")
-	}
-
-	return &taskDirectSessionRunner{
-		baseDir:       trimmedBaseDir,
-		modelName:     strings.TrimSpace(modelName),
-		configPath:    strings.TrimSpace(configPath),
-		projectConfig: strings.TrimSpace(projectConfig),
-		thinking:      strings.TrimSpace(thinking),
-		stdin:         os.Stdin,
-		stdout:        os.Stdout,
-		stderr:        os.Stderr,
-	}, nil
-}
-
-// RunTaskSession runs task session directly without spawning another process.
-func (r *taskDirectSessionRunner) RunTaskSession(ctx context.Context, request core.TaskSessionRunRequest) (core.TaskSessionRunResult, error) {
-	if r == nil {
-		return core.TaskSessionRunResult{}, fmt.Errorf("taskDirectSessionRunner.RunTaskSession() [task.go]: runner is nil")
-	}
-	result, err := RunInProcessTaskSession(ctx, request, TaskRunDefaults{
-		WorkDir:       strings.TrimSpace(r.baseDir),
-		ModelName:     strings.TrimSpace(r.modelName),
-		ConfigPath:    strings.TrimSpace(r.configPath),
-		ProjectConfig: strings.TrimSpace(r.projectConfig),
-		Thinking:      strings.TrimSpace(r.thinking),
-	}, RunStreams{
-		Stdin:  r.stdin,
-		Stdout: r.stdout,
-		Stderr: r.stderr,
-	})
-	if err != nil {
-		return result, fmt.Errorf("taskDirectSessionRunner.RunTaskSession() [task.go]: direct task run failed: %w", err)
-	}
-
-	return result, nil
-}
-
 // TaskCommand creates task command with persistent hierarchical task management.
 func TaskCommand() *cobra.Command {
 	var taskDir string
@@ -682,7 +630,7 @@ func runTaskList(manager *core.TaskManager, args []string, recursive bool, inclu
 	}
 
 	if includeArchived {
-		archivedManager, createErr := core.NewTaskManagerWithTasksDir(manager.TasksRoot(), manager.ArchivedTasksRoot(), nil, nil)
+		archivedManager, createErr := core.NewTaskManagerWithTasksDir(manager.TasksRoot(), manager.ArchivedTasksRoot(), nil)
 		if createErr != nil {
 			return fmt.Errorf("runTaskList() [task.go]: failed to prepare archived task manager: %w", createErr)
 		}
@@ -951,12 +899,7 @@ func loadTaskBackend(cmd *cobra.Command) (*core.TaskManager, *core.TaskBackendAd
 		return nil, nil, fmt.Errorf("loadTaskBackend() [task.go]: failed to prepare vcs: %w", err)
 	}
 
-	runner, err := newTaskDirectSessionRunner(workDir, modelName, configPath, projectConfig, "")
-	if err != nil {
-		return nil, nil, err
-	}
-
-	manager, err := core.NewTaskManagerWithTasksDir(workDir, resolvedTaskDir, store, runner)
+	manager, err := core.NewTaskManagerWithTasksDir(workDir, resolvedTaskDir, store)
 	if err != nil {
 		return nil, nil, err
 	}

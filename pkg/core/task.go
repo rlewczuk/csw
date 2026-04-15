@@ -162,11 +162,6 @@ type TaskLookup struct {
 	FallbackTaskID string
 }
 
-// TaskSessionRunner runs a single task session.
-type TaskSessionRunner interface {
-	RunTaskSession(ctx context.Context, request TaskSessionRunRequest) (TaskSessionRunResult, error)
-}
-
 // TaskSessionRunRequest defines task session execution input.
 type TaskSessionRunRequest struct {
 	TaskID        string
@@ -197,7 +192,6 @@ type TaskManager struct {
 	baseDir     string
 	tasksDir    string
 	configStore conf.ConfigStore
-	runner      TaskSessionRunner
 	uuidFn      func() string
 	nowFn       func() time.Time
 }
@@ -210,16 +204,16 @@ type TaskBackendAdapter struct {
 }
 
 // NewTaskManager creates a new TaskManager.
-func NewTaskManager(baseDir string, configStore conf.ConfigStore, runner TaskSessionRunner) (*TaskManager, error) {
+func NewTaskManager(baseDir string, configStore conf.ConfigStore) (*TaskManager, error) {
 	if strings.TrimSpace(baseDir) == "" {
 		return nil, fmt.Errorf("NewTaskManager() [task.go]: baseDir cannot be empty")
 	}
 
-	return NewTaskManagerWithTasksDir(baseDir, ".cswdata/tasks", configStore, runner)
+	return NewTaskManagerWithTasksDir(baseDir, ".cswdata/tasks", configStore)
 }
 
 // NewTaskManagerWithTasksDir creates a new TaskManager with custom tasks directory.
-func NewTaskManagerWithTasksDir(baseDir string, tasksDir string, configStore conf.ConfigStore, runner TaskSessionRunner) (*TaskManager, error) {
+func NewTaskManagerWithTasksDir(baseDir string, tasksDir string, configStore conf.ConfigStore) (*TaskManager, error) {
 	trimmedBaseDir := strings.TrimSpace(baseDir)
 	if trimmedBaseDir == "" {
 		return nil, fmt.Errorf("NewTaskManagerWithTasksDir() [task.go]: baseDir cannot be empty")
@@ -233,7 +227,6 @@ func NewTaskManagerWithTasksDir(baseDir string, tasksDir string, configStore con
 		baseDir:     trimmedBaseDir,
 		tasksDir:    trimmedTasksDir,
 		configStore: configStore,
-		runner:      runner,
 		uuidFn:      shared.GenerateUUIDv7,
 		nowFn:       time.Now,
 	}, nil
@@ -247,7 +240,6 @@ func NewTaskBackendAdapter(manager *TaskManager, vcsRepo apis.VCS, logger *slog.
 
 	return &TaskBackendAdapter{manager: manager, vcsRepo: vcsRepo, logger: logger}, nil
 }
-
 
 // CreateTask creates task through backend interface.
 func (a *TaskBackendAdapter) CreateTask(ctx context.Context, params tool.TaskRecord, prompt string, parentTaskID string) (tool.TaskRecord, error) {
@@ -346,53 +338,6 @@ func (a *TaskBackendAdapter) GetTask(ctx context.Context, identifier string, fal
 	}
 
 	return toToolTaskRecord(taskData), summary, summaryText, nil
-}
-
-// RunTask runs task through backend interface.
-func (a *TaskBackendAdapter) RunTask(ctx context.Context, identifier string, fallbackTaskID string, merge bool, reset bool) (tool.TaskRunOutcome, error) {
-	return a.RunTaskWithParams(ctx, identifier, fallbackTaskID, TaskRunParams{Merge: merge, Reset: reset})
-}
-
-// RunTaskWithParams runs task through backend interface with extended run parameters.
-func (a *TaskBackendAdapter) RunTaskWithParams(ctx context.Context, identifier string, fallbackTaskID string, params TaskRunParams) (tool.TaskRunOutcome, error) {
-	if a == nil || a.manager == nil {
-		return tool.TaskRunOutcome{}, fmt.Errorf("TaskBackendAdapter.RunTaskWithParams() [task.go]: adapter is not configured")
-	}
-	if a.vcsRepo == nil {
-		return tool.TaskRunOutcome{}, fmt.Errorf("TaskBackendAdapter.RunTaskWithParams() [task.go]: vcs repository is not configured")
-	}
-
-	params.Identifier = strings.TrimSpace(identifier)
-	outcome, err := a.manager.RunTask(ctx, TaskLookup{Identifier: strings.TrimSpace(identifier), FallbackTaskID: strings.TrimSpace(fallbackTaskID)}, params, a.vcsRepo)
-	if outcome == nil {
-		if err != nil {
-			return tool.TaskRunOutcome{}, err
-		}
-		return tool.TaskRunOutcome{}, fmt.Errorf("TaskBackendAdapter.RunTaskWithParams() [task.go]: empty run outcome")
-	}
-
-	result := tool.TaskRunOutcome{
-		Task:           toToolTaskRecord(outcome.Task),
-		SessionID:      outcome.SessionID,
-		SummaryText:    outcome.SummaryText,
-		Merged:         outcome.Merged,
-		TaskBranchName: outcome.TaskBranchName,
-	}
-	if outcome.SummaryMeta != nil {
-		result.SummaryMeta = &tool.TaskSessionSummary{
-			SessionID:   outcome.SummaryMeta.SessionID,
-			Status:      outcome.SummaryMeta.Status,
-			StartedAt:   outcome.SummaryMeta.StartedAt,
-			CompletedAt: outcome.SummaryMeta.CompletedAt,
-			TaskID:      outcome.SummaryMeta.TaskID,
-		}
-	}
-
-	if err != nil {
-		return result, err
-	}
-
-	return result, nil
 }
 
 // ListTasks lists tasks through backend interface.
@@ -699,126 +644,6 @@ func (m *TaskManager) ListTasks(lookup TaskLookup, recursive bool) ([]*Task, err
 	}
 	sortTasks(items)
 	return items, nil
-}
-
-// RunTask runs one task session and persists summary/output.
-func (m *TaskManager) RunTask(ctx context.Context, lookup TaskLookup, params TaskRunParams, vcsRepo apis.VCS) (*TaskRunResult, error) {
-	if m.runner == nil {
-		return nil, fmt.Errorf("TaskManager.RunTask() [task.go]: task session runner is not configured")
-	}
-	if vcsRepo == nil {
-		return nil, fmt.Errorf("TaskManager.RunTask() [task.go]: vcs repository is required")
-	}
-	taskDir, task, err := m.ResolveTask(lookup)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := m.ensureBranches(task, params.Reset, vcsRepo); err != nil {
-		return nil, err
-	}
-
-	promptBytes, err := os.ReadFile(filepath.Join(taskDir, "task.md"))
-	if err != nil {
-		return nil, fmt.Errorf("TaskManager.RunTask() [task.go]: failed to read task prompt: %w", err)
-	}
-	prompt := strings.TrimSpace(string(promptBytes))
-	if prompt == "" {
-		return nil, fmt.Errorf("TaskManager.RunTask() [task.go]: task is empty: task.md has no prompt")
-	}
-	if strings.TrimSpace(params.PromptOverride) != "" {
-		resolvedPrompt, resolveErr := m.resolveTaskPromptOverride(task, params, prompt)
-		if resolveErr != nil {
-			return nil, resolveErr
-		}
-		prompt = resolvedPrompt
-	}
-	sessionID := m.uuidFn()
-	taskBranchName := fmt.Sprintf("%s-%s", task.FeatureBranch, strings.ReplaceAll(sessionID[:8], "-", ""))
-	if params.Reset {
-		_ = vcsRepo.DropWorktree(taskBranchName)
-		_ = vcsRepo.DeleteBranch(taskBranchName)
-	}
-	if err := ensureBranchFrom(vcsRepo, taskBranchName, task.FeatureBranch); err != nil {
-		return nil, fmt.Errorf("TaskManager.RunTask() [task.go]: failed to prepare task branch: %w", err)
-	}
-
-	task.Status = TaskStatusRunning
-	task.UpdatedAt = m.nowFn().UTC().Format(time.RFC3339Nano)
-	if err := m.writeTaskFile(taskDir, task); err != nil {
-		return nil, err
-	}
-
-	runResult, runErr := m.runner.RunTaskSession(ctx, TaskSessionRunRequest{
-		TaskID:        task.UUID,
-		TaskName:      task.Name,
-		Task:          cloneTask(task),
-		TaskDir:       taskDir,
-		TaskBranch:    taskBranchName,
-		FeatureBranch: task.FeatureBranch,
-		ParentBranch:  task.ParentBranch,
-		Role:          firstNonEmptyTask(strings.TrimSpace(task.Role), "developer"),
-		Prompt:        prompt,
-		RunOptions:    params.RunOptions,
-		VCS:           vcsRepo,
-	})
-
-	meta := &TaskSessionSummary{
-		SessionID:   firstNonEmptyTask(strings.TrimSpace(runResult.SessionID), sessionID),
-		Status:      TaskStatusCompleted,
-		TaskID:      task.UUID,
-		StartedAt:   runResult.StartedAt.UTC().Format(time.RFC3339Nano),
-		CompletedAt: runResult.CompletedAt.UTC().Format(time.RFC3339Nano),
-	}
-	if runResult.StartedAt.IsZero() {
-		meta.StartedAt = m.nowFn().UTC().Format(time.RFC3339Nano)
-	}
-	if runResult.CompletedAt.IsZero() {
-		meta.CompletedAt = m.nowFn().UTC().Format(time.RFC3339Nano)
-	}
-
-	task.SessionIDs = appendUniqueString(task.SessionIDs, meta.SessionID)
-
-	if runErr != nil {
-		meta.Status = TaskStatusFailed
-		task.Status = TaskStatusOpen
-	} else {
-		if err := vcsRepo.MergeBranches(task.FeatureBranch, taskBranchName); err != nil {
-			meta.Status = TaskStatusFailed
-			task.Status = TaskStatusOpen
-			runErr = fmt.Errorf("TaskManager.RunTask() [task.go]: failed to merge task branch %q into feature branch %q: %w", taskBranchName, task.FeatureBranch, err)
-		} else {
-			_ = vcsRepo.DeleteBranch(taskBranchName)
-		}
-		task.Status = TaskStatusOpen
-	}
-	task.UpdatedAt = m.nowFn().UTC().Format(time.RFC3339Nano)
-	if err := m.writeTaskFile(taskDir, task); err != nil {
-		return nil, err
-	}
-
-	if writeErr := m.writeSessionSummary(taskDir, meta, runResult.SummaryText); writeErr != nil {
-		return nil, writeErr
-	}
-	if writeErr := m.writeTaskOutput(taskDir, task, meta.SessionID, runResult.SummaryText); writeErr != nil {
-		return nil, writeErr
-	}
-
-	merged := false
-	if runErr == nil && params.Merge {
-		if _, mergeErr := m.MergeTask(TaskLookup{Identifier: task.UUID}, vcsRepo); mergeErr != nil {
-			return nil, mergeErr
-		}
-		merged = true
-		taskDir, task, _ = m.ResolveTask(TaskLookup{Identifier: task.UUID})
-		_ = taskDir
-	}
-
-	if runErr != nil {
-		return &TaskRunResult{Task: cloneTask(task), SessionID: meta.SessionID, SummaryMeta: meta, SummaryText: runResult.SummaryText, Merged: merged, TaskBranchName: taskBranchName}, fmt.Errorf("TaskManager.RunTask() [task.go]: task run failed: %w", runErr)
-	}
-
-	return &TaskRunResult{Task: cloneTask(task), SessionID: meta.SessionID, SummaryMeta: meta, SummaryText: runResult.SummaryText, Merged: merged, TaskBranchName: taskBranchName}, nil
 }
 
 // MergeTask merges feature branch into parent branch and marks task merged.

@@ -13,7 +13,7 @@ import (
 
 func TestRunCommandTaskModeUsesUnifiedRunFlowAndTaskPrompt(t *testing.T) {
 	baseDir := t.TempDir()
-	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	manager, err := core.NewTaskManager(baseDir, nil)
 	require.NoError(t, err)
 	createdTask, err := manager.CreateTask(core.TaskCreateParams{
 		Name:          "task-a",
@@ -68,7 +68,7 @@ func TestRunCommandTaskModeUsesUnifiedRunFlowAndTaskPrompt(t *testing.T) {
 
 func TestRunCommandTaskModeSetsMergedStatusWhenMergeRequested(t *testing.T) {
 	baseDir := t.TempDir()
-	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	manager, err := core.NewTaskManager(baseDir, nil)
 	require.NoError(t, err)
 	createdTask, err := manager.CreateTask(core.TaskCreateParams{
 		Name:          "task-merge",

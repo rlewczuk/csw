@@ -528,7 +528,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	toolRegistry := tool.NewToolRegistry()
 	tool.RegisterVFSTools(toolRegistry, toolVFS, lspClient, nil)
 
-	taskManager, err := core.NewTaskManagerWithTasksDir(workDir, ".cswdata/tasks", configStore, nil)
+	taskManager, err := core.NewTaskManagerWithTasksDir(workDir, ".cswdata/tasks", configStore)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create task manager: %w", err)
@@ -651,25 +651,25 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	}
 
 	sweSystem := &SweSystem{
-		ModelProviders:    modelProviders,
-		ModelAliases:      modelAliases,
-		ModelTags:         modelTagRegistry,
-		ToolSelection:     globalConfig.ToolSelection,
-		PromptGenerator:   promptGenerator,
-		Tools:             toolRegistry,
-		VFS:               toolVFS,
-		VCS:               selectedVCS,
-		Roles:             roleRegistry,
-		LSP:               lspClient,
-		ConfigStore:       configStore,
-		TaskBackend:       taskBackend,
-		mcpManager:        mcpManager,
-		LogBaseDir:        logsDir,
-		WorkDir:           effectiveWorkDir,
-		ShadowDir:         shadowDir,
-		LogLLMRequests:    params.LogLLMRequests,
-		LogLLMRequestsRaw: params.LogLLMRequestsRaw,
-		Thinking:          params.Thinking,
+		ModelProviders:      modelProviders,
+		ModelAliases:        modelAliases,
+		ModelTags:           modelTagRegistry,
+		ToolSelection:       globalConfig.ToolSelection,
+		PromptGenerator:     promptGenerator,
+		Tools:               toolRegistry,
+		VFS:                 toolVFS,
+		VCS:                 selectedVCS,
+		Roles:               roleRegistry,
+		LSP:                 lspClient,
+		ConfigStore:         configStore,
+		TaskBackend:         taskBackend,
+		mcpManager:          mcpManager,
+		LogBaseDir:          logsDir,
+		WorkDir:             effectiveWorkDir,
+		ShadowDir:           shadowDir,
+		LogLLMRequests:      params.LogLLMRequests,
+		LogLLMRequestsRaw:   params.LogLLMRequestsRaw,
+		Thinking:            params.Thinking,
 		AllowAllPermissions: params.AllowAllPermissions,
 		MaxToolThreads: func() int {
 			if params.MaxToolThreads > 0 {

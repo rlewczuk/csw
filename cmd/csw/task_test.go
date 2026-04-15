@@ -229,90 +229,6 @@ func TestResolveTaskDirPathPrefersFlagOverConfigAndMakesRelativeAbsolute(t *test
 	assert.Equal(t, filepath.Join(rootDir, "from-flag"), resolved)
 }
 
-func TestNewTaskDirectSessionRunnerRejectsEmptyBaseDir(t *testing.T) {
-	runner, err := newTaskDirectSessionRunner("", "", "", "", "")
-	require.Error(t, err)
-	assert.Nil(t, runner)
-	assert.Contains(t, err.Error(), "baseDir cannot be empty")
-}
-
-func TestTaskDirectSessionRunnerRunTaskSessionCallsRunFunctionDirectly(t *testing.T) {
-	originalRun := runCommandWithResultFunc
-	t.Cleanup(func() {
-		runCommandWithResultFunc = originalRun
-	})
-
-	var captured *RunParams
-	runCommandWithResultFunc = func(params *RunParams) (RunCommandResult, error) {
-		captured = params
-		return RunCommandResult{SessionID: "session-123", SummaryText: "summary text"}, nil
-	}
-
-	runner, err := newTaskDirectSessionRunner("/tmp/project", "provider/default", "/cfg", "/project/.csw/config", "high")
-	require.NoError(t, err)
-
-	stdin := strings.NewReader("stdin")
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	runner.stdin = stdin
-	runner.stdout = stdout
-	runner.stderr = stderr
-
-	result, err := runner.RunTaskSession(context.Background(), core.TaskSessionRunRequest{
-		TaskBranch: "feature/task",
-		Role:       "developer",
-		Prompt:     "run prompt",
-		TaskDir:    ".cswdata/tasks/task-id",
-		Task: &core.Task{
-			UUID: "task-id",
-		},
-		RunOptions: core.TaskSessionRunOptions{
-			Model:          "provider/override",
-			BashRunTimeout: "45",
-			OutputFormat:   "jsonl",
-			ContextEntries: []string{"k=v"},
-		},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "session-123", result.SessionID)
-	assert.Equal(t, "summary text", result.SummaryText)
-
-	require.NotNil(t, captured)
-	assert.Equal(t, "provider/override", captured.ModelName)
-	assert.Equal(t, "feature/task", captured.WorktreeBranch)
-	assert.Equal(t, "jsonl", captured.OutputFormat)
-	assert.Equal(t, "v", captured.ContextData["k"])
-	assert.Equal(t, stdin, captured.Stdin)
-	assert.Equal(t, stdout, captured.Stdout)
-	assert.Equal(t, stderr, captured.Stderr)
-	require.NotNil(t, captured.Task)
-	assert.Equal(t, ".cswdata/tasks/task-id", captured.Task.TaskDir)
-}
-
-func TestTaskDirectSessionRunnerRunTaskSessionWrapsRunError(t *testing.T) {
-	originalRun := runCommandWithResultFunc
-	t.Cleanup(func() {
-		runCommandWithResultFunc = originalRun
-	})
-
-	runCommandWithResultFunc = func(params *RunParams) (RunCommandResult, error) {
-		_ = params
-		return RunCommandResult{SessionID: "session-err", SummaryText: "partial"}, assert.AnError
-	}
-
-	runner, err := newTaskDirectSessionRunner("/tmp/project", "", "", "", "")
-	require.NoError(t, err)
-
-	result, runErr := runner.RunTaskSession(context.Background(), core.TaskSessionRunRequest{
-		TaskBranch: "feature/task",
-		Prompt:     "run prompt",
-	})
-	require.Error(t, runErr)
-	assert.Contains(t, runErr.Error(), "direct task run failed")
-	assert.Equal(t, "session-err", result.SessionID)
-	assert.Equal(t, "partial", result.SummaryText)
-}
-
 func TestResolveTaskDirPathReadsTaskDirFromSubcommandPersistentFlag(t *testing.T) {
 	originalResolver := resolveTaskRunDefaultsFunc
 	t.Cleanup(func() {
@@ -493,7 +409,7 @@ func TestTaskListCommandIncludesExpectedFlags(t *testing.T) {
 
 func TestRunTaskListListsCurrentTasksSortedByTaskYMLModTime(t *testing.T) {
 	baseDir := t.TempDir()
-	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	manager, err := core.NewTaskManager(baseDir, nil)
 	require.NoError(t, err)
 
 	first, err := manager.CreateTask(core.TaskCreateParams{Name: "first", Prompt: "prompt", Description: "first desc", FeatureBranch: "feature/first"})
@@ -524,7 +440,7 @@ func TestRunTaskListListsCurrentTasksSortedByTaskYMLModTime(t *testing.T) {
 
 func TestRunTaskListIncludesArchivedWhenRequested(t *testing.T) {
 	baseDir := t.TempDir()
-	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	manager, err := core.NewTaskManager(baseDir, nil)
 	require.NoError(t, err)
 
 	activeTask, err := manager.CreateTask(core.TaskCreateParams{Name: "active", Prompt: "prompt"})
@@ -549,7 +465,7 @@ func TestRunTaskListIncludesArchivedWhenRequested(t *testing.T) {
 
 func TestRunTaskListIgnoresArchiveContainerDirectory(t *testing.T) {
 	baseDir := t.TempDir()
-	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	manager, err := core.NewTaskManager(baseDir, nil)
 	require.NoError(t, err)
 
 	activeTask, err := manager.CreateTask(core.TaskCreateParams{Name: "active", Prompt: "prompt"})
@@ -568,7 +484,7 @@ func TestRunTaskListIgnoresArchiveContainerDirectory(t *testing.T) {
 
 func TestRunTaskListStatusFiltering(t *testing.T) {
 	baseDir := t.TempDir()
-	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	manager, err := core.NewTaskManager(baseDir, nil)
 	require.NoError(t, err)
 
 	openTask, err := manager.CreateTask(core.TaskCreateParams{Name: "open", Prompt: "prompt"})
@@ -603,7 +519,7 @@ func TestTaskArchiveCommandIncludesStatusFlag(t *testing.T) {
 }
 
 func TestRunTaskArchiveConflictingArguments(t *testing.T) {
-	manager, err := core.NewTaskManager(t.TempDir(), nil, nil)
+	manager, err := core.NewTaskManager(t.TempDir(), nil)
 	require.NoError(t, err)
 
 	err = runTaskArchive(manager, []string{"task-id"}, "merged", &bytes.Buffer{})
@@ -613,7 +529,7 @@ func TestRunTaskArchiveConflictingArguments(t *testing.T) {
 
 func TestRunTaskArchiveByIdentifier(t *testing.T) {
 	baseDir := t.TempDir()
-	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	manager, err := core.NewTaskManager(baseDir, nil)
 	require.NoError(t, err)
 
 	created, err := manager.CreateTask(core.TaskCreateParams{Name: "archive-me", Prompt: "prompt"})
@@ -631,7 +547,7 @@ func TestRunTaskArchiveByIdentifier(t *testing.T) {
 
 func TestRunTaskArchiveDefaultStatusMerged(t *testing.T) {
 	baseDir := t.TempDir()
-	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	manager, err := core.NewTaskManager(baseDir, nil)
 	require.NoError(t, err)
 
 	mergedTask, err := manager.CreateTask(core.TaskCreateParams{Name: "merged", Prompt: "prompt"})
@@ -662,7 +578,7 @@ func TestRunTaskArchiveDefaultStatusMerged(t *testing.T) {
 
 func TestRunTaskArchiveByStatusFailed(t *testing.T) {
 	baseDir := t.TempDir()
-	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	manager, err := core.NewTaskManager(baseDir, nil)
 	require.NoError(t, err)
 
 	failedTask, err := manager.CreateTask(core.TaskCreateParams{Name: "failed", Prompt: "prompt"})
@@ -731,7 +647,7 @@ func TestResolveTaskRunIdentifierReturnsNameLastWhenLastFlagIsNotUsed(t *testing
 
 func TestResolveTaskRunIdentifierResolvesLastUnfinishedTaskByMostRecentModTime(t *testing.T) {
 	baseDir := t.TempDir()
-	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	manager, err := core.NewTaskManager(baseDir, nil)
 	require.NoError(t, err)
 
 	oldCompleted, err := manager.CreateTask(core.TaskCreateParams{Name: "completed", Prompt: "prompt"})
@@ -765,7 +681,7 @@ func TestResolveTaskRunIdentifierResolvesLastUnfinishedTaskByMostRecentModTime(t
 
 func TestResolveTaskRunIdentifierResolvesNextUnfinishedTaskByOldestModTime(t *testing.T) {
 	baseDir := t.TempDir()
-	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	manager, err := core.NewTaskManager(baseDir, nil)
 	require.NoError(t, err)
 
 	runnableNewest, err := manager.CreateTask(core.TaskCreateParams{Name: "runnable-newest", Prompt: "prompt"})
@@ -801,7 +717,7 @@ func TestResolveTaskRunIdentifierReturnsErrorWhenLastAndNextAreBothUsed(t *testi
 
 func TestResolveTaskRunIdentifierReturnsErrorWhenNoUnfinishedTaskExists(t *testing.T) {
 	baseDir := t.TempDir()
-	manager, err := core.NewTaskManager(baseDir, nil, nil)
+	manager, err := core.NewTaskManager(baseDir, nil)
 	require.NoError(t, err)
 
 	completedTask, err := manager.CreateTask(core.TaskCreateParams{Name: "completed", Prompt: "prompt"})
