@@ -117,7 +117,6 @@ func taskNewCommand() *cobra.Command {
 	var cliShadowDir string
 	var cliConfigPath string
 	var cliProjectConfig string
-	var run bool
 
 	command := &cobra.Command{
 		Use:   "new",
@@ -158,7 +157,7 @@ func taskNewCommand() *cobra.Command {
 				return err
 			}
 
-			manager, backend, err := loadTaskBackend(cmd)
+			manager, _, err := loadTaskBackend(cmd)
 			if err != nil {
 				return err
 			}
@@ -168,14 +167,8 @@ func taskNewCommand() *cobra.Command {
 				return err
 			}
 
-			if !run {
-				printTaskCreated(created)
-				return nil
-			}
-
-			outcome, runErr := backend.RunTask(cmd.Context(), strings.TrimSpace(created.UUID), "", false, false)
-			printTaskRunOutcome(outcome)
-			return runErr
+			printTaskCreated(created)
+			return nil
 		},
 	}
 
@@ -193,7 +186,6 @@ func taskNewCommand() *cobra.Command {
 	command.Flags().StringVar(&cliConfigPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
 	command.Flags().StringVar(&cliProjectConfig, "project-config", "", "Custom project config directory (default: .csw/config)")
 	command.Flags().StringVar(&parent, "parent", "", "Parent task name or UUID")
-	command.Flags().BoolVar(&run, "run", false, "Run created task immediately")
 
 	return command
 }
@@ -223,7 +215,6 @@ func taskUpdateCommandWithDefaults(use string, short string, defaultEdit bool) *
 	var regenBranch bool
 	var regenName bool
 	var regenDescription bool
-	var run bool
 
 	command := &cobra.Command{
 		Use:   strings.TrimSpace(use),
@@ -245,7 +236,7 @@ func taskUpdateCommandWithDefaults(use string, short string, defaultEdit bool) *
 				return fmt.Errorf("taskUpdateCommand.RunE() [task.go]: --edit and --prompt cannot be used together")
 			}
 
-			manager, backend, err := loadTaskBackend(cmd)
+			manager, _, err := loadTaskBackend(cmd)
 			if err != nil {
 				return err
 			}
@@ -364,14 +355,8 @@ func taskUpdateCommandWithDefaults(use string, short string, defaultEdit bool) *
 				return err
 			}
 
-			if !run {
-				fmt.Fprintf(os.Stdout, "Task updated: %s\n", updated.UUID)
-				return nil
-			}
-
-			outcome, runErr := backend.RunTask(cmd.Context(), strings.TrimSpace(updated.UUID), "", false, false)
-			printTaskRunOutcome(outcome)
-			return runErr
+			fmt.Fprintf(os.Stdout, "Task updated: %s\n", updated.UUID)
+			return nil
 		},
 	}
 
@@ -391,7 +376,6 @@ func taskUpdateCommandWithDefaults(use string, short string, defaultEdit bool) *
 	command.Flags().BoolVar(&regenBranch, "regen-branch", false, "Regenerate feature branch")
 	command.Flags().BoolVar(&regenName, "regen-name", false, "Regenerate task name")
 	command.Flags().BoolVar(&regenDescription, "regen-description", false, "Regenerate task description")
-	command.Flags().BoolVar(&run, "run", false, "Run task immediately after update")
 
 	return command
 }

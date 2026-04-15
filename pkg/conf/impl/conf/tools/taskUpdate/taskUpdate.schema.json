@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Updates task metadata/prompt and optionally runs task immediately.",
+  "description": "Updates task metadata/prompt.",
   "type": "object",
   "properties": {
     "uuid": {
@@ -41,10 +41,6 @@
     "prompt": {
       "type": "string",
       "description": "Updated task prompt content."
-    },
-    "run": {
-      "type": "boolean",
-      "description": "If true, run task immediately after update and return run summary."
     }
   },
   "required": [],

@@ -341,6 +341,7 @@ func TestTaskNewCommandPromptFlagIsOptional(t *testing.T) {
 	require.NotNil(t, promptFlag)
 	_, required := promptFlag.Annotations[cobra.BashCompOneRequiredFlag]
 	assert.False(t, required)
+	assert.Nil(t, command.Flags().Lookup("run"))
 }
 
 func TestTaskCommandContainsExpectedSubcommands(t *testing.T) {
@@ -407,6 +408,7 @@ func TestTaskUpdateCommandIncludesExpectedFlags(t *testing.T) {
 	assert.NotNil(t, command.Flags().Lookup("regen-branch"))
 	assert.NotNil(t, command.Flags().Lookup("regen-name"))
 	assert.NotNil(t, command.Flags().Lookup("regen-description"))
+	assert.Nil(t, command.Flags().Lookup("run"))
 }
 
 func TestTaskEditCommandDefaultsToEditMode(t *testing.T) {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Creates a persistent task and optionally runs it immediately.",
+  "description": "Creates a persistent task.",
   "type": "object",
   "properties": {
     "name": {
@@ -37,10 +37,6 @@
     "parent": {
       "type": "string",
       "description": "Optional parent task name or UUID. When set, the task is created as a subtask."
-    },
-    "run": {
-      "type": "boolean",
-      "description": "If true, run task immediately after creation and return run summary."
     }
   },
   "required": [

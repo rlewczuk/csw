@@ -55,14 +55,6 @@ func (t *TaskNewTool) Execute(args *ToolCall) *ToolResponse {
 	}
 
 	result := NewToolValue(map[string]any{"task": taskRecordToToolValue(record).Raw(), "uuid": record.UUID})
-	if args.Arguments.Bool("run") {
-		runOutcome, runErr := t.backend.RunTask(context.Background(), strings.TrimSpace(record.UUID), "", false, false)
-		if runErr != nil {
-			result.Set("run", NewToolValue(map[string]any{"task": taskRecordToToolValue(runOutcome.Task).Raw(), "session_id": runOutcome.SessionID, "summary": runOutcome.SummaryText, "merged": runOutcome.Merged, "task_branch": runOutcome.TaskBranchName}).Raw())
-			return &ToolResponse{Call: args, Result: result, Error: runErr, Done: true}
-		}
-		result.Set("run", NewToolValue(map[string]any{"task": taskRecordToToolValue(runOutcome.Task).Raw(), "session_id": runOutcome.SessionID, "summary": runOutcome.SummaryText, "merged": runOutcome.Merged, "task_branch": runOutcome.TaskBranchName}).Raw())
-	}
 
 	return &ToolResponse{Call: args, Result: result, Done: true}
 }
