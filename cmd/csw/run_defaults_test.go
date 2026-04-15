@@ -202,6 +202,42 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	assert.Contains(t, captured, "taskDir=")
 }
 
+func TestCLINoMergeOverridesConfigDefaults(t *testing.T) {
+	defaults := conf.RunDefaultsConfig{
+		Worktree: "feature/default",
+		Merge:    true,
+	}
+
+	originalRun := runFunc
+	originalDefaultsResolver := resolveRunDefaultsFunc
+	t.Cleanup(func() {
+		runFunc = originalRun
+		resolveRunDefaultsFunc = originalDefaultsResolver
+	})
+
+	resolveRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		_ = params
+		return defaults, nil
+	}
+
+	capturedMerge := true
+	runFunc = func(params *RunParams) error {
+		capturedMerge = params.Merge
+		return nil
+	}
+
+	cmd := RunCommand()
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	cmd.SetArgs([]string{"--no-merge", "prompt"})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.False(t, capturedMerge)
+}
+
 func TestCLIShadowDirFlagPropagation(t *testing.T) {
 	originalRun := runFunc
 	t.Cleanup(func() {

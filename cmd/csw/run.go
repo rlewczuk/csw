@@ -109,6 +109,7 @@ func RunCommand() *cobra.Command {
 		cliGitEmail          string
 		cliCommitMessage     string
 		cliMerge             bool
+		cliNoMerge           bool
 		cliContainerImage    string
 		cliContainerOn       bool
 		cliContainerOff      bool
@@ -131,7 +132,7 @@ func RunCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "run [--task <name|uuid>|--last|--next] [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [\"prompt\"] [command-args...]",
+		Use:   "run [--task <name|uuid>|--last|--next] [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--merge|--no-merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [\"prompt\"] [command-args...]",
 		Short: "Start a run chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.ArbitraryArgs,
@@ -246,6 +247,9 @@ func RunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if cliNoMerge {
+				cliMerge = false
+			}
 			cliLogLLMRequests = cliLogLLMRequests || cliLogLLMRequestsRaw
 			modelOverridden := cmd.Flags().Changed("model")
 
@@ -280,7 +284,7 @@ func RunCommand() *cobra.Command {
 					return err
 				}
 
-				taskRunMerge := resolveTaskRunMerge(cmd.Flags().Changed("merge"), cliMerge, cliWorktree, resolveRunDefaultsFunc, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath)
+				taskRunMerge := resolveTaskRunMerge(cmd.Flags().Changed("merge") || cliNoMerge, cliMerge, cliWorktree, resolveRunDefaultsFunc, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath)
 
 				outcome, runErr := backend.RunTaskWithParams(cmd.Context(), identifier, "", core.TaskRunParams{
 					Merge:          taskRunMerge,
@@ -389,6 +393,7 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliShadowDir, "shadow-dir", "", "Shadow directory for agent files overlay (AGENTS.md, .agents*, .csw*, .cswdata)")
 	cmd.Flags().StringVar(&cliWorktree, "worktree", "", "Create and use a git worktree for this session on a feature branch")
 	cmd.Flags().BoolVar(&cliMerge, "merge", false, "Merge the feature worktree branch into main after commit")
+	cmd.Flags().BoolVar(&cliNoMerge, "no-merge", false, "Disable merging after commit, overriding configured defaults")
 	cmd.Flags().StringVar(&cliContainerImage, "container-image", "", "Container image for running bash commands in container mode")
 	cmd.Flags().BoolVar(&cliContainerOn, "container-enabled", false, "Enable running bash commands in container mode")
 	cmd.Flags().BoolVar(&cliContainerOff, "container-disabled", false, "Disable running bash commands in container mode")
