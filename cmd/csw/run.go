@@ -65,7 +65,6 @@ type RunParams struct {
 	VFSAllow              []string
 	MCPEnable             []string
 	MCPDisable            []string
-	HookOverrides         []string
 	Stdin                 stdio.Reader
 	Stdout                stdio.Writer
 	Stderr                stdio.Writer
@@ -121,7 +120,6 @@ func RunCommand() *cobra.Command {
 		cliVFSAllow          []string
 		cliMCPEnable         []string
 		cliMCPDisable        []string
-		cliHooks             []string
 		cliContext           []string
 		cliTaskIdentifier    string
 		cliTaskNext          bool
@@ -363,7 +361,6 @@ func RunCommand() *cobra.Command {
 				VFSAllow:              vfsAllowPaths,
 				MCPEnable:             mcpEnableNames,
 				MCPDisable:            mcpDisableNames,
-				HookOverrides:         cliHooks,
 			})
 			if runErr != nil {
 				return runErr
@@ -416,7 +413,6 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().StringArrayVar(&cliVFSAllow, "vfs-allow", nil, "Additional path to allow VFS access outside of worktree (repeatable, or use ':' separated list)")
 	cmd.Flags().StringArrayVar(&cliMCPEnable, "mcp-enable", nil, "Enable MCP server by name (repeatable, accepts comma-separated list)")
 	cmd.Flags().StringArrayVar(&cliMCPDisable, "mcp-disable", nil, "Disable MCP server by name (repeatable, accepts comma-separated list)")
-	cmd.Flags().StringArrayVar(&cliHooks, "hook", nil, "Ephemeral hook override: --hook name | --hook name:disable | --hook name:key=value,key2=value2")
 	cmd.Flags().StringArrayVarP(&cliContext, "context", "c", nil, "Template context value in KEY=VAL format (repeatable)")
 	cmd.Flags().StringVar(&cliTaskIdentifier, "task", "", "Run in task context for specified task name or UUID")
 	cmd.Flags().BoolVar(&cliTaskLast, "last", false, "Run latest unfinished task in task context")
@@ -518,17 +514,7 @@ func runCommandWithResult(params *RunParams) (RunCommandResult, error) {
 	if err := renderCommandPrompt(params, buildResult.WorkDir, buildResult.ShellRunner, buildResult.HostShellRunner); err != nil {
 		return result, err
 	}
-	hookConfigStore, err := system.BuildRuntimeHookConfigStore(sweSystem.ConfigStore, params.HookOverrides)
-	if err != nil {
-		return result, err
-	}
-	hookEngine := core.NewHookEngine(
-		hookConfigStore,
-		core.NewDefaultHookRunner(vcs.ChooseGitDiffDir(buildResult.WorkDirRoot, buildResult.WorkDir)),
-		buildResult.ShellRunner,
-		sweSystem.ModelProviders,
-	)
-	if err := PreparePromptWithPreRunHook(ctx, params, buildResult.WorkDirRoot, hookEngine); err != nil {
+	if err := PreparePromptWithContext(params); err != nil {
 		return result, err
 	}
 
@@ -586,17 +572,11 @@ func runCommandWithResult(params *RunParams) (RunCommandResult, error) {
 	}
 
 	var finalizeResult system.WorktreeFinalizeResult
-	finalizeResult, finalizeErr := system.FinalizeWorktreeSession(ctx, finalizeVCS, finalizeWorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, stderr, buildResult.WorkDirRoot, finalizeWorktreeDir, params.Prompt, hookEngine, buildHookOutputView(sessionOutput))
+	finalizeResult, finalizeErr := system.FinalizeWorktreeSession(ctx, finalizeVCS, finalizeWorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, stderr, buildResult.WorkDirRoot, finalizeWorktreeDir, params.Prompt)
 	if finalizeErr != nil {
 		sessionRunErr = finalizeErr
 	}
 	endTime := time.Now()
-	hookEngine.SetContextValue("summary", strings.TrimSpace(core.LastAssistantMessageText(session)))
-	if sessionRunErr != nil {
-		hookEngine.SetSessionStatus(core.HookSessionStatusFailed)
-	} else {
-		hookEngine.SetSessionStatus(core.HookSessionStatusSuccess)
-	}
 
 	if err := core.EmitSessionSummary(startTime, endTime, session, core.SessionSummaryBuildResult{
 		LogsDir:        buildResult.LogsDir,
@@ -727,25 +707,6 @@ func buildRunSessionOutput(params *RunParams, output stdio.Writer) core.SessionT
 	return sessionio.NewTextSessionOutputWithSlug(output, params.WorktreeBranch)
 }
 
-type runHookOutputView struct {
-	output core.SessionThreadOutput
-}
-
-func (v *runHookOutputView) ShowMessage(message string, messageType shared.MessageType) {
-	if v == nil || v.output == nil {
-		return
-	}
-	v.output.ShowMessage(message, string(messageType))
-}
-
-func buildHookOutputView(output core.SessionThreadOutput) core.HookOutputView {
-	if output == nil {
-		return nil
-	}
-
-	return &runHookOutputView{output: output}
-}
-
 func buildSummaryMessageFunc(output core.SessionThreadOutput) func(string, shared.MessageType) {
 	if output == nil {
 		return nil
@@ -858,47 +819,20 @@ func renderCommandPrompt(params *RunParams, workDir string, shellRunner runner.C
 	return nil
 }
 
-func PreparePromptWithPreRunHook(ctx context.Context, params *RunParams, workDirRoot string, hookEngine *core.HookEngine) error {
+func PreparePromptWithContext(params *RunParams) error {
 	if params == nil {
-		return fmt.Errorf("PreparePromptWithPreRunHook() [run.go]: params is nil")
-	}
-	if hookEngine == nil {
-		if strings.TrimSpace(params.Prompt) == "" {
-			return nil
-		}
-
-		renderedPrompt, err := shared.RenderTextWithContext(params.Prompt, params.ContextData)
-		if err != nil {
-			return err
-		}
-		params.Prompt = strings.TrimSpace(renderedPrompt)
-
-		return nil
-	}
-
-	hookEngine.MergeContext(map[string]string{
-		"branch":      strings.TrimSpace(params.WorktreeBranch),
-		"workdir":     strings.TrimSpace(params.WorkDir),
-		"rootdir":     strings.TrimSpace(workDirRoot),
-		"status":      string(core.HookSessionStatusRunning),
-		"user_prompt": strings.TrimSpace(params.Prompt),
-	})
-	hookEngine.MergeContext(params.ContextData)
-
-	if _, err := hookEngine.Execute(ctx, core.HookExecutionRequest{Name: "pre_run"}); err != nil {
-		return fmt.Errorf("PreparePromptWithPreRunHook() [run.go]: pre_run hook execution failed: %w", err)
+		return fmt.Errorf("PreparePromptWithContext() [run.go]: params is nil")
 	}
 
 	if strings.TrimSpace(params.Prompt) == "" {
 		return nil
 	}
 
-	renderedPrompt, err := shared.RenderTextWithContext(params.Prompt, hookEngine.ContextData())
+	renderedPrompt, err := shared.RenderTextWithContext(params.Prompt, params.ContextData)
 	if err != nil {
 		return err
 	}
 	params.Prompt = strings.TrimSpace(renderedPrompt)
-	hookEngine.SetContextValue("user_prompt", params.Prompt)
 
 	return nil
 }

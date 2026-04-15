@@ -89,7 +89,6 @@ type SweSession struct {
 	compactionCount int
 	taskBackend     tool.TaskBackend
 
-	hookFeedbackExecutor tool.HookFeedbackExecutor
 	subAgentRunner       SubAgentTaskRunner
 	subAgentSlugs        map[string]struct{}
 	subAgentSlugsMu      sync.Mutex
@@ -144,7 +143,6 @@ type SweSessionParams struct {
 	ContextLength        int
 	CompactionCount      int
 	TaskBackend          tool.TaskBackend
-	HookFeedbackExecutor tool.HookFeedbackExecutor
 	SubAgentRunner       SubAgentTaskRunner
 	UsedSubAgentSlugs    map[string]struct{}
 }
@@ -198,7 +196,6 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 			contextLength:        params.ContextLength,
 			compactionCount:      params.CompactionCount,
 			taskBackend:          params.TaskBackend,
-			hookFeedbackExecutor: params.HookFeedbackExecutor,
 			subAgentRunner:       params.SubAgentRunner,
 			subAgentSlugs:        make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
 	}
@@ -1197,9 +1194,6 @@ func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 	// Register todo tools
 	registry.Register("todoRead", tool.NewTodoReadTool(s))
 	registry.Register("todoWrite", tool.NewTodoWriteTool(s))
-	if s.hookFeedbackExecutor != nil {
-		registry.Register("hookFeedback", tool.NewHookFeedbackTool(s.hookFeedbackExecutor))
-	}
 	if s.taskBackend != nil {
 		registry.Register("taskNew", tool.NewTaskNewTool(s.taskBackend, s))
 		registry.Register("taskUpdate", tool.NewTaskUpdateTool(s.taskBackend, s))

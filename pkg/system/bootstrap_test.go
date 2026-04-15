@@ -530,7 +530,7 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 	}
 }
 
-func TestResolveWorktreeBranchNameUsesEnabledBranchNameHook(t *testing.T) {
+func TestResolveWorktreeBranchNameIgnoresBranchNameHook(t *testing.T) {
 	store := confimpl.NewMockConfigStore()
 	store.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{
 		"mock": {Name: "mock", Type: "openai", URL: "http://example.com", ModelTags: []conf.ModelTagMapping{}},
@@ -589,11 +589,9 @@ func TestResolveWorktreeBranchNameUsesEnabledBranchNameHook(t *testing.T) {
 		WorktreeBranch: "sp-%",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "sp-hook-generated", branch)
-	assert.Equal(t, 0, generateCalls)
-	require.Len(t, provider.RecordedMessages, 1)
-	require.Len(t, provider.RecordedMessages[0], 1)
-	assert.Contains(t, provider.RecordedMessages[0][0].GetText(), "Add branch hook support")
+	assert.Equal(t, "sp-fallback-generated", branch)
+	assert.Equal(t, 1, generateCalls)
+	assert.Empty(t, provider.RecordedMessages)
 }
 
 func TestCreateProviderMapConfigUpdaterWiring(t *testing.T) {

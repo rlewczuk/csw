@@ -9,31 +9,15 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/apis"
-	"github.com/rlewczuk/csw/pkg/conf"
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
-	"github.com/rlewczuk/csw/pkg/runner"
-	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type worktreeTestMessageCall struct {
-	Message string
-	Type    shared.MessageType
-}
-
-type worktreeTestOutputView struct {
-	ShowMessageCalls []worktreeTestMessageCall
-}
-
-func (v *worktreeTestOutputView) ShowMessage(message string, messageType shared.MessageType) {
-	v.ShowMessageCalls = append(v.ShowMessageCalls, worktreeTestMessageCall{Message: message, Type: messageType})
-}
 
 func TestFinalizeWorktreeSession(t *testing.T) {
 	tests := []struct {
@@ -164,7 +148,7 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 			}
 
 			var stderr bytes.Buffer
-			_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.merge, tt.customTemplate, system, session, &stderr, "", "", "", nil, nil)
+			_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.merge, tt.customTemplate, system, session, &stderr, "", "", "")
 
 			commitCalls := mockVCS.GetCommitCalls()
 			if tt.expectCommit {
@@ -222,7 +206,7 @@ func TestFinalizeWorktreeSessionUsesDetectedBaseBranch(t *testing.T) {
 		return "", nil
 	}
 
-	_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, "feature/detect-base", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "", "", nil, nil)
+	_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, "feature/detect-base", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "", "")
 
 	mergeCalls := mockVCS.GetMergeCalls()
 	require.Len(t, mergeCalls, 1)
@@ -260,7 +244,7 @@ func TestFinalizeWorktreeSessionMergeStashesAndRestoresLocalChanges(t *testing.T
 	}
 
 	var stderr bytes.Buffer
-	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/stash-ok", true, "", sweSystem, session, &stderr, repoDir, "", "", nil, nil)
+	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/stash-ok", true, "", sweSystem, session, &stderr, repoDir, "", "")
 	require.NoError(t, err)
 
 	assert.Contains(t, commands, fmt.Sprintf("%s::status --porcelain", repoDir))
@@ -304,7 +288,7 @@ func TestFinalizeWorktreeSessionMergeUnstashConflictRestoresCleanStateAndKeepsSt
 	}
 
 	var stderr bytes.Buffer
-	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/stash-conflict", true, "", sweSystem, session, &stderr, repoDir, "", "", nil, nil)
+	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/stash-conflict", true, "", sweSystem, session, &stderr, repoDir, "", "")
 	require.NoError(t, err)
 
 	assert.Contains(t, commands, fmt.Sprintf("%s::status --porcelain", repoDir))
@@ -316,239 +300,6 @@ func TestFinalizeWorktreeSessionMergeUnstashConflictRestoresCleanStateAndKeepsSt
 	assert.Contains(t, stderr.String(), "automatic unstash failed due to conflicts")
 	assert.Contains(t, stderr.String(), "local changes remain stashed")
 	assert.Contains(t, stderr.String(), "please unstash manually when ready")
-}
-
-func TestFinalizeWorktreeSessionUsesMergeHook(t *testing.T) {
-	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge via hook", true)
-	configStore, ok := sweSystem.ConfigStore.(*confimpl.MockConfigStore)
-	require.True(t, ok)
-	configStore.SetHookConfigs(map[string]*conf.HookConfig{
-		"merge-custom": {
-			Name:    "merge-custom",
-			Hook:    "merge",
-			Enabled: true,
-			Type:    conf.HookTypeShell,
-			Command: "echo merge-hook {{.hook_dir}}",
-			RunOn:   conf.HookRunOnSandbox,
-			HookDir: "/repo/.csw/conf/hooks/merge-custom",
-		},
-	})
-
-	hostRunner := runner.NewMockRunner()
-	sandboxRunner := runner.NewMockRunner()
-	sandboxRunner.SetResponseDetailed("echo merge-hook /repo/.csw/conf/hooks/merge-custom", "merge ok\n", "", 0, nil)
-	hookEngine := core.NewHookEngine(configStore, hostRunner, sandboxRunner, sweSystem.ModelProviders)
-	hookEngine.MergeContext(map[string]string{
-		"branch":      "feature/hook",
-		"workdir":     "/repo/work",
-		"rootdir":     "/repo",
-		"status":      string(core.HookSessionStatusRunning),
-		"user_prompt": "merge via hook",
-	})
-	chatView := &worktreeTestOutputView{}
-
-	result, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/hook", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, chatView)
-	require.NoError(t, err)
-
-	assert.Equal(t, "", result.HeadCommitID)
-	require.Empty(t, mockVCS.GetMergeCalls())
-	require.Len(t, sandboxRunner.GetExecutions(), 1)
-	assert.Equal(t, "echo merge-hook /repo/.csw/conf/hooks/merge-custom", sandboxRunner.GetExecutions()[0].Command)
-	require.Len(t, chatView.ShowMessageCalls, 2)
-	assert.Contains(t, chatView.ShowMessageCalls[0].Message, "[hook:merge-custom] command")
-	assert.Contains(t, chatView.ShowMessageCalls[1].Message, "[hook:merge-custom][stdout]")
-}
-
-func TestFinalizeWorktreeSessionMergeLLMHookUsesUserPromptContext(t *testing.T) {
-	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge via llm hook", true)
-	provider, ok := sweSystem.ModelProviders["mock"].(*models.MockClient)
-	require.True(t, ok)
-	provider.AddChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "ok")})
-
-	configStore, ok := sweSystem.ConfigStore.(*confimpl.MockConfigStore)
-	require.True(t, ok)
-	configStore.SetHookConfigs(map[string]*conf.HookConfig{
-		"merge-llm": {
-			Name:    "merge-llm",
-			Hook:    "merge",
-			Enabled: true,
-			Type:    conf.HookTypeLLM,
-			Prompt:  "Prompt={{.user_prompt}}",
-		},
-	})
-
-	hookEngine := core.NewHookEngine(configStore, nil, nil, sweSystem.ModelProviders)
-	hookEngine.MergeContext(map[string]string{
-		"branch":      "feature/hook",
-		"workdir":     "/repo/work",
-		"rootdir":     "/repo",
-		"status":      string(core.HookSessionStatusRunning),
-		"user_prompt": "merge via llm hook",
-	})
-
-	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/hook", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "merge via llm hook", hookEngine, nil)
-	require.NoError(t, err)
-	require.Len(t, provider.RecordedMessages, 2)
-	require.Len(t, provider.RecordedMessages[1], 1)
-	assert.Equal(t, "Prompt=merge via llm hook", strings.TrimSpace(provider.RecordedMessages[1][0].GetText()))
-	assert.Equal(t, "ok", hookEngine.ContextData()["result"])
-}
-
-func TestFinalizeWorktreeSessionMergeHookProcessesFeedbackRequests(t *testing.T) {
-	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge via hook feedback", true)
-	provider, ok := sweSystem.ModelProviders["mock"].(*models.MockClient)
-	require.True(t, ok)
-	provider.AddChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "feedback-response")})
-
-	configStore, ok := sweSystem.ConfigStore.(*confimpl.MockConfigStore)
-	require.True(t, ok)
-	configStore.SetHookConfigs(map[string]*conf.HookConfig{
-		"merge-feedback": {
-			Name:    "merge-feedback",
-			Hook:    "merge",
-			Enabled: true,
-			Type:    conf.HookTypeShell,
-			Command: "echo merge-feedback",
-			RunOn:   conf.HookRunOnHost,
-		},
-	})
-
-	hostRunner := runner.NewMockRunner()
-	hostRunner.SetResponseDetailed(
-		"echo merge-feedback",
-		strings.Join([]string{
-			"CSWFEEDBACK: {\"fn\":\"context\",\"args\":{\"feedback-state\":\"ready\"},\"response\":\"none\",\"id\":\"ctx\"}",
-			"CSWFEEDBACK: {\"fn\":\"llm\",\"args\":{\"prompt\":\"feedback prompt\",\"model\":\"mock/test-model\"},\"response\":\"stdin\",\"id\":\"stdin-1\"}",
-			"CSWFEEDBACK: {\"fn\":\"llm\",\"args\":{\"prompt\":\"feedback prompt rerun\",\"model\":\"mock/test-model\"},\"response\":\"rerun\",\"id\":\"rerun-1\"}",
-		}, "\n")+"\n",
-		"",
-		0,
-		nil,
-	)
-	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
-	chatView := &worktreeTestOutputView{}
-
-	_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, "feature/hook-feedback", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, chatView)
-
-	assert.Equal(t, "ready", hookEngine.ContextData()["feedback-state"])
-	executions := hostRunner.GetExecutions()
-	require.Len(t, executions, 3)
-	assert.Equal(t, "echo merge-feedback", executions[0].Command)
-	assert.Contains(t, executions[1].Command, "| (echo merge-feedback)")
-	assert.Contains(t, executions[2].Command, "CSW_RESPONSE=")
-	assert.Contains(t, executions[2].Command, "echo merge-feedback")
-	require.Len(t, provider.RecordedMessages, 3)
-}
-
-func TestFinalizeWorktreeSessionCommitHookUsesReturnedCommitMessage(t *testing.T) {
-	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "llm fallback message", true)
-	configStore, ok := sweSystem.ConfigStore.(*confimpl.MockConfigStore)
-	require.True(t, ok)
-	configStore.SetHookConfigs(map[string]*conf.HookConfig{
-		"commit-custom": {
-			Name:    "commit-custom",
-			Hook:    "commit",
-			Enabled: true,
-			Type:    conf.HookTypeShell,
-			Command: "echo commit-hook",
-			RunOn:   conf.HookRunOnHost,
-		},
-	})
-
-	hostRunner := runner.NewMockRunner()
-	hostRunner.SetResponseDetailed(
-		"echo commit-hook",
-		"CSWFEEDBACK: {\"fn\":\"response\",\"args\":{\"status\":\"OK\",\"commit-message\":\"hook supplied message\"}}\n",
-		"",
-		0,
-		nil,
-	)
-	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
-
-	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/commit-hook", false, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, nil)
-	require.NoError(t, err)
-
-	commitCalls := mockVCS.GetCommitCalls()
-	require.Len(t, commitCalls, 1)
-	assert.Equal(t, "hook supplied message", commitCalls[0].Message)
-}
-
-func TestFinalizeWorktreeSessionCommitHookCommittedStatusSkipsBuiltinCommit(t *testing.T) {
-	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "llm fallback message", true)
-	configStore, ok := sweSystem.ConfigStore.(*confimpl.MockConfigStore)
-	require.True(t, ok)
-	configStore.SetHookConfigs(map[string]*conf.HookConfig{
-		"commit-custom": {
-			Name:    "commit-custom",
-			Hook:    "commit",
-			Enabled: true,
-			Type:    conf.HookTypeShell,
-			Command: "echo commit-hook",
-			RunOn:   conf.HookRunOnHost,
-		},
-	})
-
-	hostRunner := runner.NewMockRunner()
-	hostRunner.SetResponseDetailed(
-		"echo commit-hook",
-		"CSWFEEDBACK: {\"fn\":\"response\",\"args\":{\"status\":\"COMMITED\"}}\n",
-		"",
-		0,
-		nil,
-	)
-	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
-
-	originalRunGit := vcs.RunGitCommand
-	defer func() {
-		vcs.RunGitCommand = originalRunGit
-	}()
-
-	commands := make([]string, 0)
-	vcs.RunGitCommand = func(workDir string, args ...string) (string, error) {
-		commands = append(commands, fmt.Sprintf("%s::%s", workDir, strings.Join(args, " ")))
-		if len(args) == 3 && args[0] == "rev-parse" && args[1] == "--abbrev-ref" && args[2] == "HEAD" {
-			return "main", nil
-		}
-		return "", nil
-	}
-
-	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/commit-hook", false, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, nil)
-	require.NoError(t, err)
-
-	assert.Empty(t, mockVCS.GetCommitCalls())
-	assert.Contains(t, commands, "/repo/work::reset --hard HEAD")
-	assert.Contains(t, commands, "/repo/work::clean -fd")
-}
-
-func TestFinalizeWorktreeSessionCommitHookErrorStatusAborts(t *testing.T) {
-	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "llm fallback message", true)
-	configStore, ok := sweSystem.ConfigStore.(*confimpl.MockConfigStore)
-	require.True(t, ok)
-	configStore.SetHookConfigs(map[string]*conf.HookConfig{
-		"commit-custom": {
-			Name:    "commit-custom",
-			Hook:    "commit",
-			Enabled: true,
-			Type:    conf.HookTypeShell,
-			Command: "echo commit-hook",
-			RunOn:   conf.HookRunOnHost,
-		},
-	})
-
-	hostRunner := runner.NewMockRunner()
-	hostRunner.SetResponseDetailed(
-		"echo commit-hook",
-		"CSWFEEDBACK: {\"fn\":\"response\",\"args\":{\"status\":\"ERROR\"}}\n",
-		"",
-		0,
-		nil,
-	)
-	hookEngine := core.NewHookEngine(configStore, hostRunner, nil, sweSystem.ModelProviders)
-
-	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/commit-hook", false, "", sweSystem, session, &bytes.Buffer{}, "/repo", "/repo/work", "", hookEngine, nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "commit hook")
-	assert.Empty(t, mockVCS.GetCommitCalls())
 }
 
 func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTemplate bool) (*SweSystem, *core.SweSession, *vfs.MockVCS) {

@@ -23,7 +23,7 @@ type WorktreeFinalizeResult struct {
 	HeadCommitID string
 }
 
-func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *SweSystem, session *core.SweSession, stderr io.Writer, repoDir string, worktreeDir string, originalPrompt string, hookEngine *core.HookEngine, appView core.HookOutputView) (WorktreeFinalizeResult, error) {
+func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *SweSystem, session *core.SweSession, stderr io.Writer, repoDir string, worktreeDir string, originalPrompt string) (WorktreeFinalizeResult, error) {
 	result := WorktreeFinalizeResult{}
 	if worktreeBranch == "" || gitVcs == nil {
 		return result, nil
@@ -33,18 +33,6 @@ func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranc
 	stashedLocalChanges := false
 	commitMessage := ""
 	commitHandledByHook := false
-
-	hookCommitMessage, skipBuiltInCommit, commitHookErr := HandleCommitHookResponse(ctx, hookEngine, gitVcs, worktreeBranch, repoDir, worktreeDir, session, appView)
-	if commitHookErr != nil {
-		_, _ = fmt.Fprintf(stderr, "worktree commit hook failed: %v\n", commitHookErr)
-		return result, fmt.Errorf("finalizeWorktreeSession() [cli.go]: commit hook failed: %w", commitHookErr)
-	}
-	if strings.TrimSpace(hookCommitMessage) != "" {
-		commitMessage = hookCommitMessage
-	}
-	if skipBuiltInCommit {
-		commitHandledByHook = true
-	}
 
 	if !commitHandledByHook {
 		if strings.TrimSpace(commitMessage) == "" {
@@ -87,27 +75,7 @@ func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranc
 			}()
 		}
 
-		mergeHookExecuted := false
-		if hookEngine != nil {
-			hookEngine.MergeContext(map[string]string{
-				"branch":  strings.TrimSpace(worktreeBranch),
-				"workdir": strings.TrimSpace(firstNonEmpty(worktreeDir, repoDir)),
-				"rootdir": strings.TrimSpace(repoDir),
-			})
-			hookResult, hookErr := hookEngine.Execute(ctx, core.HookExecutionRequest{Name: "merge", View: appView, VCS: gitVcs, Session: session})
-			if hookResult != nil {
-				mergeHookExecuted = true
-			}
-			if hookErr != nil {
-				_, _ = fmt.Fprintf(stderr, "automatic merge failed: %v\n", hookErr)
-				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
-				return result, nil
-			}
-		}
-
-		if mergeHookExecuted {
-			result.HeadCommitID = vcs.ResolveGitCommitID(repoDir, baseBranch)
-		} else if strings.TrimSpace(repoDir) == "" || strings.TrimSpace(worktreeDir) == "" || sweSystem == nil || session == nil {
+		if strings.TrimSpace(repoDir) == "" || strings.TrimSpace(worktreeDir) == "" || sweSystem == nil || session == nil {
 			mergeErr := gitVcs.MergeBranches(baseBranch, worktreeBranch)
 			if mergeErr != nil {
 				if errors.Is(mergeErr, apis.ErrMergeConflict) {
