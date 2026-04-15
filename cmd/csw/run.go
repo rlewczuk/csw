@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	stdio "io"
 	"os"
@@ -85,6 +84,7 @@ var runCommandWithResultFunc = runCommandWithResult
 var resolveRunDefaultsFunc = system.ResolveRunDefaults
 var resolveWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
 var buildSystemFunc = system.BuildSystem
+var loadTaskBackendFunc = loadTaskBackend
 
 // RunCommand creates the run command.
 func RunCommand() *cobra.Command {
@@ -127,8 +127,6 @@ func RunCommand() *cobra.Command {
 		cliTaskNext          bool
 		cliTaskLast          bool
 		cliTaskReset         bool
-		cliTaskJSON          string
-		cliTaskDir           string
 	)
 
 	cmd := &cobra.Command{
@@ -221,15 +219,8 @@ func RunCommand() *cobra.Command {
 
 			var taskData *core.Task
 			var initialTaskData *core.Task
-			if strings.TrimSpace(cliTaskJSON) != "" {
-				var task core.Task
-				if unmarshalErr := json.Unmarshal([]byte(cliTaskJSON), &task); unmarshalErr != nil {
-					return fmt.Errorf("RunCommand.RunE() [run.go]: failed to parse --task-json: %w", unmarshalErr)
-				}
-				task.TaskDir = strings.TrimSpace(cliTaskDir)
-				taskData = &task
-				initialTaskData = cloneRunTask(taskData)
-			}
+			var taskManager *core.TaskManager
+			taskIdentifier := ""
 
 			if prompt == "" && !runInTaskMode {
 				return fmt.Errorf("RunCommand.RunE() [run.go]: prompt cannot be empty")
@@ -274,58 +265,49 @@ func RunCommand() *cobra.Command {
 					extraPositionalArgs = append([]string(nil), invocation.Arguments...)
 				}
 
-				manager, backend, err := loadTaskBackend(cmd)
+				manager, _, err := loadTaskBackendFunc(cmd)
 				if err != nil {
 					return err
 				}
+				taskManager = manager
 
 				identifier, err := resolveTaskRunIdentifier(manager, cliTaskIdentifier, cliTaskLast, cliTaskNext)
 				if err != nil {
 					return err
 				}
+				taskIdentifier = identifier
+
+				taskDir, resolvedTask, err := manager.ResolveTask(core.TaskLookup{Identifier: identifier})
+				if err != nil {
+					return err
+				}
+				resolvedTask.TaskDir = taskDir
+				taskData = cloneRunTask(resolvedTask)
+				initialTaskData = cloneRunTask(resolvedTask)
+
+				if prompt == "" {
+					taskPromptBytes, readErr := os.ReadFile(filepath.Join(taskDir, "task.md"))
+					if readErr != nil {
+						return fmt.Errorf("RunCommand.RunE() [run.go]: failed to read task prompt: %w", readErr)
+					}
+					prompt = strings.TrimSpace(string(taskPromptBytes))
+				}
+
+				if prompt == "" {
+					return fmt.Errorf("RunCommand.RunE() [run.go]: prompt cannot be empty")
+				}
+
+				runningStatus := core.TaskStatusRunning
+				if _, updateErr := manager.UpdateTask(core.TaskUpdateParams{Identifier: identifier, Status: &runningStatus}); updateErr != nil {
+					return updateErr
+				}
 
 				taskRunMerge := resolveTaskRunMerge(cmd.Flags().Changed("merge") || cliNoMerge, cliMerge, cliWorktree, resolveRunDefaultsFunc, cliWorkDir, cliShadowDir, cliProjectConfig, cliConfigPath)
-
-				outcome, runErr := backend.RunTaskWithParams(cmd.Context(), identifier, "", core.TaskRunParams{
-					Merge:          taskRunMerge,
-					Reset:          cliTaskReset,
-					PromptOverride: strings.TrimSpace(prompt),
-					PromptArgs:     append([]string(nil), extraPositionalArgs...),
-					RunOptions: core.TaskSessionRunOptions{
-						Model:             cliModel,
-						Role:              cliRole,
-						WorkDir:           cliWorkDir,
-						ShadowDir:         cliShadowDir,
-						ContainerImage:    cliContainerImage,
-						ContainerEnabled:  containerEnabledChanged && cliContainerOn,
-						ContainerDisabled: containerDisabledChanged && cliContainerOff,
-						ContainerMounts:   append([]string(nil), cliContainerMount...),
-						ContainerEnv:      append([]string(nil), cliContainerEnv...),
-						AllowAllPerms:     cliAllowAllPerms,
-						Interactive:       cliInteractive,
-						ConfigPath:        cliConfigPath,
-						ProjectConfig:     cliProjectConfig,
-						SaveSessionTo:     cliSaveSessionTo,
-						SaveSession:       cliSaveSession,
-						LogLLMRequests:    cliLogLLMRequests,
-						LogLLMRequestsRaw: cliLogLLMRequestsRaw,
-						NoRefresh:         cliNoRefresh,
-						LSPServer:         cliLSPServer,
-						Thinking:          cliThinking,
-						BashRunTimeout:    bashRunTimeout.String(),
-						MaxThreads:        cliMaxThreads,
-						OutputFormat:      cliOutputFormat,
-						VFSAllow:          parseVFSAllowPaths(cliVFSAllow),
-						MCPEnable:         parseMCPServerFlagValues(cliMCPEnable),
-						MCPDisable:        parseMCPServerFlagValues(cliMCPDisable),
-						HookOverrides:     append([]string(nil), cliHooks...),
-						ContextEntries:    append([]string(nil), cliContext...),
-						GitUserName:       strings.TrimSpace(cliGitUser),
-						GitUserEmail:      strings.TrimSpace(cliGitEmail),
-					},
-				})
-				printTaskRunOutcome(outcome)
-				return runErr
+				if strings.TrimSpace(cliWorktree) == "" {
+					cliWorktree = strings.TrimSpace(taskData.FeatureBranch)
+				}
+				cliMerge = taskRunMerge
+				_ = cliTaskReset
 			}
 
 			containerRequested := (containerEnabledChanged && cliContainerOn) || len(cliContainerMount) > 0 || len(cliContainerEnv) > 0
@@ -340,7 +322,7 @@ func RunCommand() *cobra.Command {
 			mcpEnableNames := parseMCPServerFlagValues(cliMCPEnable)
 			mcpDisableNames := parseMCPServerFlagValues(cliMCPDisable)
 
-			return runFunc(&RunParams{
+			runErr := runFunc(&RunParams{
 				Prompt:                prompt,
 				CommandName:           commandName,
 				CommandArgs:           commandArgs,
@@ -383,6 +365,21 @@ func RunCommand() *cobra.Command {
 				MCPDisable:            mcpDisableNames,
 				HookOverrides:         cliHooks,
 			})
+			if runErr != nil {
+				return runErr
+			}
+
+			if runInTaskMode && taskManager != nil && strings.TrimSpace(taskIdentifier) != "" {
+				finalStatus := core.TaskStatusCompleted
+				if cliMerge {
+					finalStatus = core.TaskStatusMerged
+				}
+				if _, err := taskManager.UpdateTask(core.TaskUpdateParams{Identifier: taskIdentifier, Status: &finalStatus}); err != nil {
+					return err
+				}
+			}
+
+			return nil
 		},
 	}
 
@@ -425,10 +422,6 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliTaskLast, "last", false, "Run latest unfinished task in task context")
 	cmd.Flags().BoolVar(&cliTaskNext, "next", false, "Run oldest unfinished task in task context")
 	cmd.Flags().BoolVar(&cliTaskReset, "reset", false, "Reset task branch before run in task context")
-	cmd.Flags().StringVar(&cliTaskJSON, "task-json", "", "Task metadata payload used for task session state")
-	cmd.Flags().StringVar(&cliTaskDir, "task-dir", "", "Task directory path used for task session state")
-	_ = cmd.Flags().MarkHidden("task-json")
-	_ = cmd.Flags().MarkHidden("task-dir")
 	return cmd
 }
 

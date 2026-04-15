@@ -974,7 +974,7 @@ func ensureBranchFrom(vcsRepo apis.VCS, branch string, from string) error {
 func isTaskStatusSupported(status string) bool {
 	trimmed := strings.TrimSpace(status)
 	switch trimmed {
-	case TaskStatusDraft, TaskStatusCreated, TaskStatusOpen, TaskStatusRunning, TaskStatusMerged:
+	case TaskStatusDraft, TaskStatusCreated, TaskStatusOpen, TaskStatusRunning, TaskStatusSubtasks, TaskStatusMerged, TaskStatusCompleted, TaskStatusFailed:
 		return true
 	default:
 		return false
