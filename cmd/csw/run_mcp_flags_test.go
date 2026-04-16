@@ -33,12 +33,12 @@ func TestCLIMCPFlagsPropagation(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			captured := ""
-			originalRun := runFunc
+			originalRun := runCommandFunc
 			t.Cleanup(func() {
-				runFunc = originalRun
+				runCommandFunc = originalRun
 			})
 
-			runFunc = func(params *RunParams) error {
+			runCommandFunc = func(params *RunParams) error {
 				captured = fmt.Sprintf("enable=%v,disable=%v", params.MCPEnable, params.MCPDisable)
 				return nil
 			}

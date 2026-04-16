@@ -78,7 +78,7 @@ type RunCommandResult struct {
 
 const defaultBashRunTimeout = 120 * time.Second
 
-var runFunc = runCommand
+var runCommandFunc = runCommand
 var resolveRunDefaultsFunc = system.ResolveRunDefaults
 var resolveWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
 var buildSystemFunc = system.BuildSystem
@@ -319,7 +319,7 @@ func RunCommand() *cobra.Command {
 			mcpEnableNames := parseMCPServerFlagValues(cliMCPEnable)
 			mcpDisableNames := parseMCPServerFlagValues(cliMCPDisable)
 
-			runErr := runFunc(&RunParams{
+			runErr := runCommandFunc(&RunParams{
 				Prompt:                prompt,
 				CommandName:           commandName,
 				CommandArgs:           commandArgs,

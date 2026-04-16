@@ -87,15 +87,15 @@ func TestCLIVFSAllowIntegration(t *testing.T) {
 		// This test verifies that the VFSAllow paths are correctly parsed and
 		// passed through RunParams to runtime code
 
-		// Create a mock runFunc to capture the params
+		// Create a mock runCommandFunc to capture the params
 		var capturedParams *RunParams
-		originalRunCLIFunc := runFunc
-		runFunc = func(params *RunParams) error {
+		originalRunCLIFunc := runCommandFunc
+		runCommandFunc = func(params *RunParams) error {
 			capturedParams = params
 			return nil
 		}
 		defer func() {
-			runFunc = originalRunCLIFunc
+			runCommandFunc = originalRunCLIFunc
 		}()
 
 		// Get the CLI command
@@ -122,13 +122,13 @@ func TestCLIVFSAllowIntegration(t *testing.T) {
 		// This test verifies that colon-separated paths work correctly
 
 		var capturedParams *RunParams
-		originalRunCLIFunc := runFunc
-		runFunc = func(params *RunParams) error {
+		originalRunCLIFunc := runCommandFunc
+		runCommandFunc = func(params *RunParams) error {
 			capturedParams = params
 			return nil
 		}
 		defer func() {
-			runFunc = originalRunCLIFunc
+			runCommandFunc = originalRunCLIFunc
 		}()
 
 		cmd := RunCommand()
@@ -156,13 +156,13 @@ func TestCLIVFSAllowIntegration(t *testing.T) {
 		defer os.RemoveAll(allowedDir3)
 
 		var capturedParams *RunParams
-		originalRunCLIFunc := runFunc
-		runFunc = func(params *RunParams) error {
+		originalRunCLIFunc := runCommandFunc
+		runCommandFunc = func(params *RunParams) error {
 			capturedParams = params
 			return nil
 		}
 		defer func() {
-			runFunc = originalRunCLIFunc
+			runCommandFunc = originalRunCLIFunc
 		}()
 
 		cmd := RunCommand()

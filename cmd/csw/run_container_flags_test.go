@@ -63,15 +63,15 @@ func TestCLIContainerFlagsPropagation(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			captured := ""
-			originalRun := runFunc
+			originalRun := runCommandFunc
 			t.Cleanup(func() {
-				runFunc = originalRun
+				runCommandFunc = originalRun
 			})
 
 			if tc.expectError {
-				runFunc = originalRun
+				runCommandFunc = originalRun
 			} else {
-				runFunc = func(params *RunParams) error {
+				runCommandFunc = func(params *RunParams) error {
 					captured = fmt.Sprintf("shadow=%s,enabled=%t,disabled=%t,image=%s,mounts=%v,env=%v", params.ShadowDir, params.ContainerEnabled, params.ContainerDisabled, params.ContainerImage, params.ContainerMounts, params.ContainerEnv)
 					return nil
 				}

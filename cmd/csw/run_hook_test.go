@@ -9,13 +9,13 @@ import (
 )
 
 func TestRunNoRefreshFlagPropagation(t *testing.T) {
-	originalRun := runFunc
+	originalRun := runCommandFunc
 	t.Cleanup(func() {
-		runFunc = originalRun
+		runCommandFunc = originalRun
 	})
 
 	var captured bool
-	runFunc = func(params *RunParams) error {
+	runCommandFunc = func(params *RunParams) error {
 		captured = params.NoRefresh
 		return nil
 	}

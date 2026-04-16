@@ -23,11 +23,11 @@ func TestRunCommandTaskModeUsesUnifiedRunFlowAndTaskPrompt(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	originalRun := runFunc
+	originalRun := runCommandFunc
 	originalDefaults := resolveRunDefaultsFunc
 	originalTaskBackendLoader := loadTaskBackendFunc
 	t.Cleanup(func() {
-		runFunc = originalRun
+		runCommandFunc = originalRun
 		resolveRunDefaultsFunc = originalDefaults
 		loadTaskBackendFunc = originalTaskBackendLoader
 	})
@@ -42,7 +42,7 @@ func TestRunCommandTaskModeUsesUnifiedRunFlowAndTaskPrompt(t *testing.T) {
 	}
 
 	var captured *RunParams
-	runFunc = func(params *RunParams) error {
+	runCommandFunc = func(params *RunParams) error {
 		captured = params
 		_, taskData, resolveErr := manager.ResolveTask(core.TaskLookup{Identifier: createdTask.UUID})
 		require.NoError(t, resolveErr)
@@ -78,11 +78,11 @@ func TestRunCommandTaskModeSetsMergedStatusWhenMergeRequested(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	originalRun := runFunc
+	originalRun := runCommandFunc
 	originalDefaults := resolveRunDefaultsFunc
 	originalTaskBackendLoader := loadTaskBackendFunc
 	t.Cleanup(func() {
-		runFunc = originalRun
+		runCommandFunc = originalRun
 		resolveRunDefaultsFunc = originalDefaults
 		loadTaskBackendFunc = originalTaskBackendLoader
 	})
@@ -97,7 +97,7 @@ func TestRunCommandTaskModeSetsMergedStatusWhenMergeRequested(t *testing.T) {
 	}
 
 	var captured *RunParams
-	runFunc = func(params *RunParams) error {
+	runCommandFunc = func(params *RunParams) error {
 		captured = params
 		return nil
 	}

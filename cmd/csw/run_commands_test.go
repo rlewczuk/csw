@@ -146,10 +146,10 @@ func TestCLICommandInvocation(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(workDir, ".agents", "commands", "review.md"), []byte(tt.commandContent), 0644))
 			}
 
-			originalRun := runFunc
+			originalRun := runCommandFunc
 			originalDefaults := resolveRunDefaultsFunc
 			t.Cleanup(func() {
-				runFunc = originalRun
+				runCommandFunc = originalRun
 				resolveRunDefaultsFunc = originalDefaults
 			})
 
@@ -159,7 +159,7 @@ func TestCLICommandInvocation(t *testing.T) {
 			}
 
 			captured := ""
-			runFunc = func(params *RunParams) error {
+			runCommandFunc = func(params *RunParams) error {
 				mockRunner := runner.NewMockRunner()
 				hostRunner := runner.NewMockRunner()
 				for command, output := range tt.shellResponse {

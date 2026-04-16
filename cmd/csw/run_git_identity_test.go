@@ -48,12 +48,12 @@ func TestCLIGitIdentityPropagation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			originalRun := runFunc
+			originalRun := runCommandFunc
 			originalDefaultsResolver := resolveRunDefaultsFunc
 			originalLookPath := vcs.GitLookPath
 			originalConfigValue := vcs.GitConfigValue
 			t.Cleanup(func() {
-				runFunc = originalRun
+				runCommandFunc = originalRun
 				resolveRunDefaultsFunc = originalDefaultsResolver
 				vcs.GitLookPath = originalLookPath
 				vcs.GitConfigValue = originalConfigValue
@@ -83,7 +83,7 @@ func TestCLIGitIdentityPropagation(t *testing.T) {
 
 			capturedName := ""
 			capturedEmail := ""
-			runFunc = func(params *RunParams) error {
+			runCommandFunc = func(params *RunParams) error {
 				capturedName = params.GitUserName
 				capturedEmail = params.GitUserEmail
 				return nil

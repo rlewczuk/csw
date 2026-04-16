@@ -73,13 +73,13 @@ func TestCliBashRunTimeoutFlagPropagation(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			originalRun := runFunc
+			originalRun := runCommandFunc
 			t.Cleanup(func() {
-				runFunc = originalRun
+				runCommandFunc = originalRun
 			})
 
 			captured := ""
-			runFunc = func(params *RunParams) error {
+			runCommandFunc = func(params *RunParams) error {
 				captured = fmt.Sprintf("timeout=%s", params.BashRunTimeout)
 				return nil
 			}

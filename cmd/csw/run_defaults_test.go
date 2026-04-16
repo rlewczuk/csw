@@ -29,10 +29,10 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 		VFSAllow:            []string{"/allowed/one", "/allowed/two"},
 	}
 
-	originalRun := runFunc
+	originalRun := runCommandFunc
 	originalDefaultsResolver := resolveRunDefaultsFunc
 	t.Cleanup(func() {
-		runFunc = originalRun
+		runCommandFunc = originalRun
 		resolveRunDefaultsFunc = originalDefaultsResolver
 	})
 
@@ -42,7 +42,7 @@ func TestCLIConfigDefaultsPropagation(t *testing.T) {
 	}
 
 	captured := ""
-	runFunc = func(params *RunParams) error {
+	runCommandFunc = func(params *RunParams) error {
 		taskDir := ""
 		if params.Task != nil {
 			taskDir = params.Task.TaskDir
@@ -117,10 +117,10 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 		VFSAllow:            []string{"/allowed/one", "/allowed/two"},
 	}
 
-	originalRun := runFunc
+	originalRun := runCommandFunc
 	originalDefaultsResolver := resolveRunDefaultsFunc
 	t.Cleanup(func() {
-		runFunc = originalRun
+		runCommandFunc = originalRun
 		resolveRunDefaultsFunc = originalDefaultsResolver
 	})
 
@@ -130,7 +130,7 @@ func TestCLIFlagsOverrideConfigDefaults(t *testing.T) {
 	}
 
 	captured := ""
-	runFunc = func(params *RunParams) error {
+	runCommandFunc = func(params *RunParams) error {
 		taskDir := ""
 		if params.Task != nil {
 			taskDir = params.Task.TaskDir
@@ -208,10 +208,10 @@ func TestCLINoMergeOverridesConfigDefaults(t *testing.T) {
 		Merge:    true,
 	}
 
-	originalRun := runFunc
+	originalRun := runCommandFunc
 	originalDefaultsResolver := resolveRunDefaultsFunc
 	t.Cleanup(func() {
-		runFunc = originalRun
+		runCommandFunc = originalRun
 		resolveRunDefaultsFunc = originalDefaultsResolver
 	})
 
@@ -221,7 +221,7 @@ func TestCLINoMergeOverridesConfigDefaults(t *testing.T) {
 	}
 
 	capturedMerge := true
-	runFunc = func(params *RunParams) error {
+	runCommandFunc = func(params *RunParams) error {
 		capturedMerge = params.Merge
 		return nil
 	}
@@ -239,13 +239,13 @@ func TestCLINoMergeOverridesConfigDefaults(t *testing.T) {
 }
 
 func TestCLIShadowDirFlagPropagation(t *testing.T) {
-	originalRun := runFunc
+	originalRun := runCommandFunc
 	t.Cleanup(func() {
-		runFunc = originalRun
+		runCommandFunc = originalRun
 	})
 
 	captured := ""
-	runFunc = func(params *RunParams) error {
+	runCommandFunc = func(params *RunParams) error {
 		captured = params.ShadowDir
 		return nil
 	}
