@@ -908,10 +908,10 @@ func (c *AnthropicClient) handleRateLimitErrorWithBody(resp *http.Response, body
 
 // convertToAnthropicMessage converts a models.ChatMessage to Anthropic AnthropicMessageParam format
 func convertToAnthropicMessage(msg *ChatMessage) AnthropicMessageParam {
-	// Check if message contains only text (no tool calls or tool responses)
+	// Check if message contains only plain text (no reasoning, tool calls or tool responses).
 	hasOnlyText := true
 	for _, part := range msg.Parts {
-		if part.ToolCall != nil || part.ToolResponse != nil {
+		if part.ReasoningContent != "" || part.ToolCall != nil || part.ToolResponse != nil {
 			hasOnlyText = false
 			break
 		}
@@ -932,6 +932,12 @@ func convertToAnthropicMessage(msg *ChatMessage) AnthropicMessageParam {
 			contentBlocks = append(contentBlocks, AnthropicContentBlock{
 				Type: "text",
 				Text: part.Text,
+			})
+		} else if part.ReasoningContent != "" {
+			contentBlocks = append(contentBlocks, AnthropicContentBlock{
+				Type:      "thinking",
+				Thinking:  part.ReasoningContent,
+				Signature: part.ReasoningSignature,
 			})
 		} else if part.ToolCall != nil {
 			toolInput := map[string]interface{}{}
@@ -986,6 +992,8 @@ func convertFromAnthropicResponse(content []AnthropicResponseContent) *ChatMessa
 	for _, c := range content {
 		if c.Type == "text" {
 			parts = append(parts, ChatMessagePart{Text: c.Text})
+		} else if c.Type == "thinking" {
+			parts = append(parts, ChatMessagePart{ReasoningContent: c.Thinking, ReasoningSignature: c.Signature})
 		} else if c.Type == "tool_use" {
 			parts = append(parts, ChatMessagePart{
 				ToolCall: &tool.ToolCall{

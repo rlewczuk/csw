@@ -294,3 +294,64 @@ func TestAnthropicClient_ChatAndChatStream_SendPromptCachingBetaHeader(t *testin
 		})
 	}
 }
+
+func TestConvertAnthropicMessage_PreservesReasoningAcrossToolRoundtrip(t *testing.T) {
+	t.Run("convertToAnthropicMessage includes thinking block with signature", func(t *testing.T) {
+		msg := &ChatMessage{
+			Role: ChatRoleAssistant,
+			Parts: []ChatMessagePart{
+				{
+					ReasoningContent:   "internal reasoning",
+					ReasoningSignature: "sig_123",
+				},
+				{
+					ToolCall: &tool.ToolCall{
+						ID:       "tool_1",
+						Function: "vfsRead",
+						Arguments: tool.NewToolValue(map[string]interface{}{"path": "pkg/models/anthropic_client.go"}),
+					},
+				},
+			},
+		}
+
+		converted := convertToAnthropicMessage(msg)
+		blocks, ok := converted.Content.([]AnthropicContentBlock)
+		require.True(t, ok)
+		require.Len(t, blocks, 2)
+
+		assert.Equal(t, "assistant", converted.Role)
+		assert.Equal(t, "thinking", blocks[0].Type)
+		assert.Equal(t, "internal reasoning", blocks[0].Thinking)
+		assert.Equal(t, "sig_123", blocks[0].Signature)
+		assert.Equal(t, "tool_use", blocks[1].Type)
+		assert.Equal(t, "tool_1", blocks[1].ID)
+		assert.Equal(t, "vfsRead", blocks[1].Name)
+	})
+
+	t.Run("convertFromAnthropicResponse extracts thinking block with signature", func(t *testing.T) {
+		msg := convertFromAnthropicResponse([]AnthropicResponseContent{
+			{
+				Type:      "thinking",
+				Thinking:  "internal reasoning",
+				Signature: "sig_123",
+			},
+			{
+				Type: "tool_use",
+				ID:   "tool_1",
+				Name: "vfsRead",
+				Input: map[string]interface{}{
+					"path": "pkg/models/anthropic_client.go",
+				},
+			},
+		})
+
+		require.NotNil(t, msg)
+		require.Len(t, msg.Parts, 2)
+		assert.Equal(t, ChatRoleAssistant, msg.Role)
+		assert.Equal(t, "internal reasoning", msg.Parts[0].ReasoningContent)
+		assert.Equal(t, "sig_123", msg.Parts[0].ReasoningSignature)
+		require.NotNil(t, msg.Parts[1].ToolCall)
+		assert.Equal(t, "tool_1", msg.Parts[1].ToolCall.ID)
+		assert.Equal(t, "vfsRead", msg.Parts[1].ToolCall.Function)
+	})
+}

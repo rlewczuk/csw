@@ -107,6 +107,9 @@ type ChatMessagePart struct {
 	Text string
 	// ReasoningContent contains reasoning/thinking content from thinking models (e.g., GLM-5)
 	ReasoningContent string
+	// ReasoningSignature contains an opaque reasoning signature required by some providers
+	// when reasoning blocks are echoed back in subsequent tool-call turns.
+	ReasoningSignature string
 	// ToolCall contains a tool call request from the LLM (if this part is a tool call)
 	ToolCall *tool.ToolCall
 	// ToolResponse contains a tool execution result (if this part is a tool response)

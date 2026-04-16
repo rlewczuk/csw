@@ -31,6 +31,8 @@ type AnthropicMessageParam struct {
 type AnthropicContentBlock struct {
 	Type      string                 `json:"type"`                  // Required: "text", "image", "tool_use", "tool_result"
 	Text      string                 `json:"text,omitempty"`        // For text type
+	Thinking  string                 `json:"thinking,omitempty"`    // For thinking type
+	Signature string                 `json:"signature,omitempty"`   // For thinking type
 	ID        string                 `json:"id,omitempty"`          // For tool_use and tool_result types
 	Name      string                 `json:"name,omitempty"`        // For tool_use type
 	Input     map[string]interface{} `json:"input,omitempty"`       // For tool_use type
@@ -60,11 +62,13 @@ type AnthropicMessagesResponse struct {
 
 // AnthropicResponseContent represents a content block in the response
 type AnthropicResponseContent struct {
-	Type  string                 `json:"type"`            // Required: "text" or "tool_use"
-	Text  string                 `json:"text,omitempty"`  // For text type
-	ID    string                 `json:"id,omitempty"`    // For tool_use type
-	Name  string                 `json:"name,omitempty"`  // For tool_use type
-	Input map[string]interface{} `json:"input,omitempty"` // For tool_use type
+	Type      string                 `json:"type"`                 // Required: "text", "thinking" or "tool_use"
+	Text      string                 `json:"text,omitempty"`       // For text type
+	Thinking  string                 `json:"thinking,omitempty"`   // For thinking type
+	Signature string                 `json:"signature,omitempty"`  // For thinking type
+	ID        string                 `json:"id,omitempty"`         // For tool_use type
+	Name      string                 `json:"name,omitempty"`       // For tool_use type
+	Input     map[string]interface{} `json:"input,omitempty"`      // For tool_use type
 }
 
 // AnthropicUsageInfo represents token usage information
