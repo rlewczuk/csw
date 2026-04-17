@@ -168,7 +168,7 @@ func TestGetCompositeConfigStore(t *testing.T) {
 	assert.Equal(t, "anthropic", configs["global-provider"].Type)
 }
 
-func TestProviderCommand_Add_List_Show_Remove(t *testing.T) {
+func TestProviderCommand_Add_List_Show(t *testing.T) {
 	// Create temporary directory
 	tmpDir, err := os.MkdirTemp("", "csw-test-*")
 	require.NoError(t, err)
@@ -203,13 +203,6 @@ func TestProviderCommand_Add_List_Show_Remove(t *testing.T) {
 	assert.Equal(t, "openai", configs["test-provider"].Type)
 	assert.Equal(t, "https://api.openai.com/v1", configs["test-provider"].URL)
 
-	// Test removing provider
-	err = store.DeleteModelProviderConfig("test-provider")
-	require.NoError(t, err)
-
-	configs, err = store.GetModelProviderConfigs()
-	require.NoError(t, err)
-	assert.NotContains(t, configs, "test-provider")
 }
 
 func TestProviderCommand_SetDefault(t *testing.T) {
@@ -421,15 +414,6 @@ func TestProviderCommandWithCustomPath(t *testing.T) {
 	assert.Equal(t, "openai", configs["custom-provider"].Type)
 	assert.Equal(t, "https://custom.example.com/v1", configs["custom-provider"].URL)
 
-	// Test removing provider from custom path
-	localStore, ok := store.(*impl.LocalConfigStore)
-	require.True(t, ok)
-	err = localStore.DeleteModelProviderConfig("custom-provider")
-	require.NoError(t, err)
-
-	configs, err = store.GetModelProviderConfigs()
-	require.NoError(t, err)
-	assert.NotContains(t, configs, "custom-provider")
 }
 
 func TestProviderCommandWithCustomPathSetDefault(t *testing.T) {

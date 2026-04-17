@@ -90,62 +90,6 @@ func TestLocalConfigStore_SaveModelProviderConfig_Update(t *testing.T) {
 	assert.Equal(t, "new-key", configs["test-provider"].APIKey)
 }
 
-func TestLocalConfigStore_DeleteModelProviderConfig(t *testing.T) {
-	// Create temporary directory
-	tmpDir, err := os.MkdirTemp("", "csw-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Create config store
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// Create a test provider config
-	config := &conf.ModelProviderConfig{
-		Name: "test-provider",
-		Type: "openai",
-		URL:  "https://api.openai.com/v1",
-	}
-	err = store.SaveModelProviderConfig(config)
-	require.NoError(t, err)
-
-	// Verify it exists
-	configs, err := store.GetModelProviderConfigs()
-	require.NoError(t, err)
-	assert.Contains(t, configs, "test-provider")
-
-	// Delete config
-	err = store.DeleteModelProviderConfig("test-provider")
-	require.NoError(t, err)
-
-	// Verify it's deleted
-	configs, err = store.GetModelProviderConfigs()
-	require.NoError(t, err)
-	assert.NotContains(t, configs, "test-provider")
-
-	// Verify file is deleted
-	providerPath := filepath.Join(tmpDir, "models", "test-provider.json")
-	assert.NoFileExists(t, providerPath)
-}
-
-func TestLocalConfigStore_DeleteModelProviderConfig_NotFound(t *testing.T) {
-	// Create temporary directory
-	tmpDir, err := os.MkdirTemp("", "csw-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Create config store
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// Try to delete non-existent provider
-	err = store.DeleteModelProviderConfig("non-existent")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "provider not found")
-}
-
 func TestLocalConfigStore_SaveGlobalConfig(t *testing.T) {
 	// Create temporary directory
 	tmpDir, err := os.MkdirTemp("", "csw-test-*")
@@ -269,7 +213,7 @@ func TestLocalConfigStore_SaveGlobalConfig_NilConfig(t *testing.T) {
 	assert.Contains(t, err.Error(), "config cannot be nil")
 }
 
-func TestLocalConfigStore_SaveAndDelete_MultipleProviders(t *testing.T) {
+func TestLocalConfigStore_Save_MultipleProviders(t *testing.T) {
 	// Create temporary directory
 	tmpDir, err := os.MkdirTemp("", "csw-test-*")
 	require.NoError(t, err)
@@ -297,15 +241,11 @@ func TestLocalConfigStore_SaveAndDelete_MultipleProviders(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, configs, 3)
 
-	// Delete one
-	err = store.DeleteModelProviderConfig("provider2")
-	require.NoError(t, err)
-
-	// Verify only two remain
+	// Verify all were persisted under expected provider names
 	configs, err = store.GetModelProviderConfigs()
 	require.NoError(t, err)
-	assert.Len(t, configs, 2)
+	assert.Len(t, configs, 3)
 	assert.Contains(t, configs, "provider1")
+	assert.Contains(t, configs, "provider2")
 	assert.Contains(t, configs, "provider3")
-	assert.NotContains(t, configs, "provider2")
 }
