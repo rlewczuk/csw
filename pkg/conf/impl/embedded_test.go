@@ -171,24 +171,6 @@ func TestEmbeddedConfigStore_GetAgentRoleConfigs(t *testing.T) {
 	assert.Contains(t, allRole.ToolFragments, "webFetch/.tooldir")
 }
 
-func TestEmbeddedConfigStore_GetHookConfigs(t *testing.T) {
-	store, err := NewEmbeddedConfigStore()
-	require.NoError(t, err)
-
-	hooks, err := store.GetHookConfigs()
-	require.NoError(t, err)
-	require.Contains(t, hooks, "merge")
-	require.Contains(t, hooks, "branch_name")
-	assert.Equal(t, "merge", hooks["merge"].Name)
-	assert.Equal(t, "conf/hooks/merge", hooks["merge"].HookDir)
-	assert.True(t, hooks["merge"].EmbeddedSource)
-	assert.Equal(t, "branch_name", hooks["branch_name"].Name)
-	assert.False(t, hooks["branch_name"].Enabled)
-	assert.Equal(t, conf.HookTypeLLM, hooks["branch_name"].Type)
-	assert.Equal(t, "conf/hooks/branch_name", hooks["branch_name"].HookDir)
-	assert.True(t, hooks["branch_name"].EmbeddedSource)
-}
-
 func TestEmbeddedConfigStore_ConcurrentAccess(t *testing.T) {
 	store, err := NewEmbeddedConfigStore()
 	require.NoError(t, err)

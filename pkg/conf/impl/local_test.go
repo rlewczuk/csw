@@ -285,35 +285,6 @@ func TestLocalConfigStore_AgentRoleConfigs(t *testing.T) {
 	assert.Equal(t, "test1", configs2["test1"].Name)
 }
 
-func TestLocalConfigStore_HookConfigs(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "test-config-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	hooksDir := filepath.Join(tmpDir, "hooks")
-	require.NoError(t, os.MkdirAll(hooksDir, 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(hooksDir, "merge-hook"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(hooksDir, "summary-hook"), 0755))
-
-	require.NoError(t, os.WriteFile(filepath.Join(hooksDir, "merge-hook", "merge-hook.yml"), []byte("name: merge-hook\nhook: merge\ncommand: echo merge\nrun-on: host\n"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(hooksDir, "summary-hook", "summary-hook.json"), []byte(`{"name":"summary-hook","hook":"summary","command":"echo summary"}`), 0644))
-
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	hooks, err := store.GetHookConfigs()
-	require.NoError(t, err)
-	require.Len(t, hooks, 2)
-	require.Contains(t, hooks, "merge-hook")
-	require.Contains(t, hooks, "summary-hook")
-	assert.Equal(t, conf.HookRunOnHost, hooks["merge-hook"].RunOn)
-	assert.Equal(t, conf.HookTypeShell, hooks["summary-hook"].Type)
-	assert.Equal(t, filepath.Join(hooksDir, "merge-hook"), hooks["merge-hook"].HookDir)
-	assert.Equal(t, filepath.Join(hooksDir, "summary-hook"), hooks["summary-hook"].HookDir)
-
-}
-
 func TestLocalConfigStore_MCPServerConfigs(t *testing.T) {
 	tmpDir := t.TempDir()
 	mcpDir := filepath.Join(tmpDir, "mcp")
@@ -383,23 +354,6 @@ func TestLocalConfigStore_MCPServerConfigs(t *testing.T) {
 		assert.Equal(t, "local-files", nestedConfigs["local-files"].Name)
 		assert.Equal(t, "remote-api", nestedConfigs["remote-api"].Name)
 	})
-}
-
-func TestLocalConfigStore_HookConfigsNameMismatchDisablesHook(t *testing.T) {
-	tmpDir := t.TempDir()
-	hooksDir := filepath.Join(tmpDir, "hooks")
-	require.NoError(t, os.MkdirAll(filepath.Join(hooksDir, "merge-hook"), 0755))
-
-	require.NoError(t, os.WriteFile(filepath.Join(hooksDir, "merge-hook", "wrong-name.yml"), []byte("name: merge-hook\nhook: merge\ncommand: echo merge\n"), 0644))
-
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	hooks, err := store.GetHookConfigs()
-	require.NoError(t, err)
-	require.Contains(t, hooks, "merge-hook")
-	assert.False(t, hooks["merge-hook"].Enabled)
 }
 
 func TestLocalConfigStore_MissingRoleConfig(t *testing.T) {

@@ -699,10 +699,6 @@ func (s *runtimeMCPConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServe
 	return cloned, nil
 }
 
-func (s *runtimeMCPConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
-	return s.base.GetHookConfigs()
-}
-
 func (s *runtimeMCPConfigStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
 	return s.base.GetAgentConfigFile(subdir, filename)
 }

@@ -539,24 +539,6 @@ func cloneModelTemplateGroups(input map[string]map[string]ModelProviderConfig) m
 	return cloned
 }
 
-// Clone returns a deep copy of HookConfig.
-func (c *HookConfig) Clone() *HookConfig {
-	if c == nil {
-		return nil
-	}
-
-	cloned := *c
-	if c.EmbeddedFiles != nil {
-		cloned.EmbeddedFiles = make(map[string][]byte, len(c.EmbeddedFiles))
-		for key, value := range c.EmbeddedFiles {
-			copied := make([]byte, len(value))
-			copy(copied, value)
-			cloned.EmbeddedFiles[key] = copied
-		}
-	}
-	return &cloned
-}
-
 // Clone returns a deep copy of MCPServerConfig.
 func (c *MCPServerConfig) Clone() *MCPServerConfig {
 	if c == nil {

@@ -535,16 +535,6 @@ func TestResolveWorktreeBranchNameIgnoresBranchNameHook(t *testing.T) {
 	store.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{
 		"mock": {Name: "mock", Type: "openai", URL: "http://example.com", ModelTags: []conf.ModelTagMapping{}},
 	})
-	store.SetHookConfigs(map[string]*conf.HookConfig{
-		"branch_name": {
-			Name:    "branch_name",
-			Hook:    "branch_name",
-			Enabled: true,
-			Type:    conf.HookTypeLLM,
-			Model:   "mock/test-model",
-			Prompt:  "{{.user_prompt}}",
-		},
-	})
 
 	originalNewComposite := newCompositeConfigStoreFunc
 	originalResolveModel := resolveModelNameFunc

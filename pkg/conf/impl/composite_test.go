@@ -248,32 +248,6 @@ func TestCompositeConfigStore_AgentRolesMerging(t *testing.T) {
 	assert.Equal(t, conf.AccessAllow, roleConfigs["role1"].VFSPrivileges["/"].Write)
 }
 
-func TestCompositeConfigStore_HooksOverrideByName(t *testing.T) {
-	tmpDir := t.TempDir()
-	dir1 := filepath.Join(tmpDir, "source1")
-	dir2 := filepath.Join(tmpDir, "source2")
-
-	require.NoError(t, os.MkdirAll(filepath.Join(dir1, "hooks", "merge-hook"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(dir2, "hooks", "merge-hook"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(dir2, "hooks", "summary-hook"), 0755))
-
-	require.NoError(t, os.WriteFile(filepath.Join(dir1, "hooks", "merge-hook", "merge-hook.yml"), []byte("name: merge-hook\nhook: merge\ncommand: echo one\nrun-on: host\n"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir2, "hooks", "merge-hook", "merge-hook.yml"), []byte("name: merge-hook\ncommand: echo two\nenabled: true\n"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir2, "hooks", "summary-hook", "summary-hook.yml"), []byte("name: summary-hook\nhook: summary\ncommand: echo summary\n"), 0644))
-
-	store, err := NewCompositeConfigStore(tmpDir, fmt.Sprintf("%s:%s", dir1, dir2))
-	require.NoError(t, err)
-
-	hooks, err := store.GetHookConfigs()
-	require.NoError(t, err)
-	require.Len(t, hooks, 2)
-	require.Contains(t, hooks, "merge-hook")
-	require.Contains(t, hooks, "summary-hook")
-	assert.Equal(t, "", hooks["merge-hook"].Hook)
-	assert.Equal(t, "echo two", hooks["merge-hook"].Command)
-	assert.Equal(t, conf.HookRunOnSandbox, hooks["merge-hook"].RunOn)
-}
-
 func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 	tmpDir := t.TempDir()
 	dir1 := filepath.Join(tmpDir, "source1")

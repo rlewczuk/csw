@@ -45,7 +45,6 @@ type LocalConfigStore struct {
 	modelProviderConfigs       map[string]*conf.ModelProviderConfig
 	modelAliases               map[string]conf.ModelAliasValue
 	mcpServerConfigs           map[string]*conf.MCPServerConfig
-	hookConfigs                map[string]*conf.HookConfig
 	agentRoleConfigs           map[string]*conf.AgentRoleConfig
 }
 
@@ -62,7 +61,6 @@ func NewLocalConfigStore(configDir string) (*LocalConfigStore, error) {
 		modelProviderConfigs: make(map[string]*conf.ModelProviderConfig),
 		modelAliases:         make(map[string]conf.ModelAliasValue),
 		mcpServerConfigs:     make(map[string]*conf.MCPServerConfig),
-		hookConfigs:          make(map[string]*conf.HookConfig),
 		agentRoleConfigs:     make(map[string]*conf.AgentRoleConfig),
 	}
 
@@ -121,19 +119,6 @@ func (s *LocalConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConf
 
 	configs := make(map[string]*conf.MCPServerConfig, len(s.mcpServerConfigs))
 	for key, value := range s.mcpServerConfigs {
-		configs[key] = value.Clone()
-	}
-
-	return configs, nil
-}
-
-// GetHookConfigs returns a map of hook configurations.
-func (s *LocalConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	configs := make(map[string]*conf.HookConfig, len(s.hookConfigs))
-	for key, value := range s.hookConfigs {
 		configs[key] = value.Clone()
 	}
 
@@ -229,9 +214,6 @@ func (s *LocalConfigStore) loadAllConfig() error {
 	}
 	if err := s.loadMCPServerConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load MCP server configs: %w", err)
-	}
-	if err := s.loadHookConfigs(); err != nil {
-		return fmt.Errorf("loadAllConfig(): failed to load hook configs: %w", err)
 	}
 	if err := s.loadAgentRoleConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load agent role configs: %w", err)
@@ -654,132 +636,6 @@ func (s *LocalConfigStore) loadMCPServerConfigs() error {
 	s.mcpServerConfigs = configs
 
 	return nil
-}
-
-// loadHookConfigs loads hook configurations from hooks directory.
-// Supports .json and .yml/.yaml files, with YAML taking precedence.
-func (s *LocalConfigStore) loadHookConfigs() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	hooksDir := filepath.Join(s.configDir, "hooks")
-
-	entries, err := os.ReadDir(hooksDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			s.hookConfigs = make(map[string]*conf.HookConfig)
-			return nil
-		}
-		return fmt.Errorf("loadHookConfigs() [local.go]: failed to read hooks directory: %w", err)
-	}
-
-	configs := make(map[string]*conf.HookConfig)
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		hookDirName := strings.TrimSpace(entry.Name())
-		hookDir := filepath.Join(hooksDir, hookDirName)
-		hookPath, hookBaseName, hookData, parseAsYAML, selectErr := selectLocalHookConfigFile(hookDir, hookDirName)
-		if selectErr != nil {
-			return fmt.Errorf("loadHookConfigs() [local.go]: %w", selectErr)
-		}
-		if strings.TrimSpace(hookPath) == "" {
-			continue
-		}
-
-		var hookConfig conf.HookConfig
-		if parseAsYAML {
-			if unmarshalErr := yaml.Unmarshal(hookData, &hookConfig); unmarshalErr != nil {
-				return fmt.Errorf("loadHookConfigs() [local.go]: failed to parse %s: %w", hookPath, unmarshalErr)
-			}
-		} else {
-			if unmarshalErr := json.Unmarshal(hookData, &hookConfig); unmarshalErr != nil {
-				return fmt.Errorf("loadHookConfigs() [local.go]: failed to parse %s: %w", hookPath, unmarshalErr)
-			}
-		}
-
-		hookConfig.HookDir = hookDir
-		nameInConfig := strings.TrimSpace(hookConfig.Name)
-		nameMatches := nameInConfig != "" && nameInConfig == hookDirName
-		filenameMatches := hookBaseName == hookDirName
-		if !nameMatches || !filenameMatches {
-			fmt.Fprintf(os.Stderr, "loadHookConfigs() [local.go]: warning: disabled hook in %s because hook name/filename mismatch (dir=%q file=%q name=%q)\n", hookDir, hookDirName, hookBaseName, nameInConfig)
-			hookConfig.Enabled = false
-			hookConfig.Name = hookDirName
-		} else {
-			hookConfig.Name = nameInConfig
-		}
-
-		configs[hookConfig.Name] = &hookConfig
-	}
-
-	s.hookConfigs = configs
-
-	return nil
-}
-
-func selectLocalHookConfigFile(hookDir string, hookDirName string) (string, string, []byte, bool, error) {
-	entries, err := os.ReadDir(hookDir)
-	if err != nil {
-		return "", "", nil, false, fmt.Errorf("selectLocalHookConfigFile() [local.go]: failed to read %s: %w", hookDir, err)
-	}
-
-	var candidatePath string
-	var candidateBase string
-	var candidateYAML bool
-	var fallbackPath string
-	var fallbackBase string
-	var fallbackYAML bool
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if ext != ".yml" && ext != ".yaml" && ext != ".json" {
-			continue
-		}
-		baseName := strings.TrimSuffix(entry.Name(), ext)
-		path := filepath.Join(hookDir, entry.Name())
-		isYAML := ext == ".yml" || ext == ".yaml"
-
-		if baseName == hookDirName {
-			if candidatePath == "" || (isYAML && !candidateYAML) {
-				candidatePath = path
-				candidateBase = baseName
-				candidateYAML = isYAML
-			}
-			continue
-		}
-
-		if fallbackPath == "" || (isYAML && !fallbackYAML) {
-			fallbackPath = path
-			fallbackBase = baseName
-			fallbackYAML = isYAML
-		}
-	}
-
-	if candidatePath != "" {
-		data, readErr := os.ReadFile(candidatePath)
-		if readErr != nil {
-			return "", "", nil, false, fmt.Errorf("selectLocalHookConfigFile() [local.go]: failed to read %s: %w", candidatePath, readErr)
-		}
-		return candidatePath, candidateBase, data, candidateYAML, nil
-	}
-
-	if fallbackPath == "" {
-		return "", "", nil, false, nil
-	}
-
-	data, readErr := os.ReadFile(fallbackPath)
-	if readErr != nil {
-		return "", "", nil, false, fmt.Errorf("selectLocalHookConfigFile() [local.go]: failed to read %s: %w", fallbackPath, readErr)
-	}
-
-	return fallbackPath, fallbackBase, data, fallbackYAML, nil
 }
 
 // loadAgentRoleConfigs loads all agent role configurations from the roles directory.

@@ -48,7 +48,6 @@ type CompositeConfigStore struct {
 	modelProviderConfigs map[string]*conf.ModelProviderConfig
 	modelAliases         map[string]conf.ModelAliasValue
 	mcpServerConfigs     map[string]*conf.MCPServerConfig
-	hookConfigs          map[string]*conf.HookConfig
 	agentRoleConfigs     map[string]*conf.AgentRoleConfig
 }
 
@@ -156,19 +155,6 @@ func (c *CompositeConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServer
 	return configs, nil
 }
 
-// GetHookConfigs returns merged hook configurations from all sources.
-func (c *CompositeConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	configs := make(map[string]*conf.HookConfig, len(c.hookConfigs))
-	for key, value := range c.hookConfigs {
-		configs[key] = value.Clone()
-	}
-
-	return configs, nil
-}
-
 // GetAgentRoleConfigs returns the merged agent role configurations from all sources.
 func (c *CompositeConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfig, error) {
 	c.mu.RLock()
@@ -231,9 +217,6 @@ func (c *CompositeConfigStore) refresh() error {
 		return err
 	}
 	if err := c.refreshMCPServerConfigs(); err != nil {
-		return err
-	}
-	if err := c.refreshHookConfigs(); err != nil {
 		return err
 	}
 	if err := c.refreshAgentRoleConfigs(); err != nil {
@@ -315,26 +298,6 @@ func (c *CompositeConfigStore) refreshMCPServerConfigs() error {
 	}
 
 	c.mcpServerConfigs = merged
-
-	return nil
-}
-
-// refreshHookConfigs reloads and merges hook configurations from all sources.
-func (c *CompositeConfigStore) refreshHookConfigs() error {
-	merged := make(map[string]*conf.HookConfig)
-
-	for i, store := range c.stores {
-		configs, err := store.GetHookConfigs()
-		if err != nil {
-			return fmt.Errorf("CompositeConfigStore.refreshHookConfigs() [composite.go]: failed to get configs from store %d: %w", i, err)
-		}
-
-		for key, value := range configs {
-			merged[key] = value.Clone()
-		}
-	}
-
-	c.hookConfigs = merged
 
 	return nil
 }

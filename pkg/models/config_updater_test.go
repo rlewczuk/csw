@@ -51,14 +51,6 @@ func (m *mockWritableStore) LastMCPServerConfigsUpdate() (time.Time, error) {
 	return time.Time{}, nil
 }
 
-func (m *mockWritableStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
-	return nil, nil
-}
-
-func (m *mockWritableStore) LastHookConfigsUpdate() (time.Time, error) {
-	return time.Time{}, nil
-}
-
 func (m *mockWritableStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfig, error) {
 	return nil, nil
 }

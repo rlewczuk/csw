@@ -18,7 +18,6 @@ type MockConfigStore struct {
 	modelProviderConfigs map[string]*conf.ModelProviderConfig
 	modelAliases         map[string]conf.ModelAliasValue
 	mcpServerConfigs     map[string]*conf.MCPServerConfig
-	hookConfigs          map[string]*conf.HookConfig
 	agentRoleConfigs     map[string]*conf.AgentRoleConfig
 	agentConfigFiles     map[string][]byte
 
@@ -28,7 +27,6 @@ type MockConfigStore struct {
 	GetAgentRoleConfigsErr     error
 	GetModelAliasesErr         error
 	GetMCPServerConfigsErr     error
-	GetHookConfigsErr          error
 	GetAgentConfigFileErr      error
 	SaveModelProviderConfigErr error
 	DeleteModelProviderConfigErr error
@@ -42,7 +40,6 @@ func NewMockConfigStore() *MockConfigStore {
 		modelProviderConfigs: make(map[string]*conf.ModelProviderConfig),
 		modelAliases:         make(map[string]conf.ModelAliasValue),
 		mcpServerConfigs:     make(map[string]*conf.MCPServerConfig),
-		hookConfigs:          make(map[string]*conf.HookConfig),
 		agentRoleConfigs:     make(map[string]*conf.AgentRoleConfig),
 		agentConfigFiles:     make(map[string][]byte),
 	}
@@ -53,13 +50,6 @@ func (m *MockConfigStore) SetMCPServerConfigs(configs map[string]*conf.MCPServer
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.mcpServerConfigs = configs
-}
-
-// SetHookConfigs sets hook configurations and updates timestamp.
-func (m *MockConfigStore) SetHookConfigs(configs map[string]*conf.HookConfig) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.hookConfigs = configs
 }
 
 // SetAgentConfigFile sets agent config file content for tests.
@@ -158,23 +148,6 @@ func (m *MockConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfi
 
 	configs := make(map[string]*conf.MCPServerConfig, len(m.mcpServerConfigs))
 	for key, value := range m.mcpServerConfigs {
-		configs[key] = value.Clone()
-	}
-
-	return configs, nil
-}
-
-// GetHookConfigs returns hook configurations.
-func (m *MockConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.GetHookConfigsErr != nil {
-		return nil, m.GetHookConfigsErr
-	}
-
-	configs := make(map[string]*conf.HookConfig, len(m.hookConfigs))
-	for key, value := range m.hookConfigs {
 		configs[key] = value.Clone()
 	}
 
