@@ -23,7 +23,6 @@ import (
 var resolveTaskRunDefaultsFunc = system.ResolveRunDefaults
 var resolveTaskWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
 var buildTaskSystemFunc = system.BuildSystem
-var taskEditorLookPathFunc = exec.LookPath
 var generateTaskDescriptionFunc = generateTaskDescription
 var taskDirUUIDPattern = regexp.MustCompile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
@@ -1064,7 +1063,7 @@ func isTaskEditorAvailable(command string) bool {
 		return !info.IsDir()
 	}
 
-	_, err := taskEditorLookPathFunc(executable)
+	_, err := exec.LookPath(executable)
 	return err == nil
 }
 
