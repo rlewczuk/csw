@@ -36,7 +36,27 @@ func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranc
 
 	if !commitHandledByHook {
 		if strings.TrimSpace(commitMessage) == "" {
-			generatedMessage, err := core.GenerateCommitMessage(ctx, sweSystem.ModelProviders, sweSystem.ConfigStore, session, worktreeBranch, commitMessageTemplate)
+			if sweSystem == nil || sweSystem.ConfigStore == nil {
+				_, _ = fmt.Fprintln(stderr, "worktree commit message generation failed: system config store is not available")
+				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
+				return result, nil
+			}
+			if session == nil {
+				_, _ = fmt.Fprintln(stderr, "worktree commit message generation failed: session is not available")
+				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
+				return result, nil
+			}
+
+			providerName := strings.TrimSpace(session.ProviderName())
+			provider, found := sweSystem.ModelProviders[providerName]
+			if !found {
+				_, _ = fmt.Fprintf(stderr, "worktree commit message generation failed: provider not found: %s\n", providerName)
+				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
+				return result, nil
+			}
+
+			chatModel := provider.ChatModel(strings.TrimSpace(session.Model()), nil)
+			generatedMessage, err := core.GenerateCommitMessage(ctx, chatModel, sweSystem.ConfigStore, strings.TrimSpace(originalPrompt), worktreeBranch, commitMessageTemplate)
 			if err != nil {
 				_, _ = fmt.Fprintf(stderr, "worktree commit message generation failed: %v\n", err)
 				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")

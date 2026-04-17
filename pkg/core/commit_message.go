@@ -24,13 +24,9 @@ type CommitMessageTemplateData struct {
 
 // GenerateCommitMessage generates a short commit message using the active chat model.
 // If customMessageTemplate is non-empty, it overrides the configured message template.
-func GenerateCommitMessage(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore conf.ConfigStore, session *SweSession, branch string, customMessageTemplate string) (string, error) {
-	if modelProviders == nil {
-		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: model providers cannot be nil")
-	}
-
-	if session == nil {
-		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: session cannot be nil")
+func GenerateCommitMessage(ctx context.Context, chatModel models.ChatModel, configStore conf.ConfigStore, userPrompt string, branch string, customMessageTemplate string) (string, error) {
+	if chatModel == nil {
+		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: chat model cannot be nil")
 	}
 
 	if configStore == nil {
@@ -46,23 +42,16 @@ func GenerateCommitMessage(ctx context.Context, modelProviders map[string]models
 		messageTemplate = customMessageTemplate
 	}
 
-	userMessages := CollectUserMessages(session.ChatMessages())
-	if len(userMessages) == 0 {
-		userMessages = []string{"No explicit user task provided"}
+	trimmedUserPrompt := strings.TrimSpace(userPrompt)
+	if trimmedUserPrompt == "" {
+		trimmedUserPrompt = "No explicit user task provided"
 	}
 
-	llmPrompt, err := RenderCommitPrompt(promptTemplate, CommitPromptData{Messages: userMessages})
+	llmPrompt, err := RenderCommitPrompt(promptTemplate, CommitPromptData{Messages: []string{trimmedUserPrompt}})
 	if err != nil {
 		return "", err
 	}
 
-	providerName := session.ProviderName()
-	provider, ok := modelProviders[providerName]
-	if !ok {
-		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: provider not found: %s", providerName)
-	}
-
-	chatModel := provider.ChatModel(session.Model(), nil)
 	response, err := chatModel.Chat(ctx, []*models.ChatMessage{
 		models.NewTextMessage(models.ChatRoleSystem, systemPrompt),
 		models.NewTextMessage(models.ChatRoleUser, llmPrompt),
@@ -118,22 +107,6 @@ func RenderCommitPrompt(templateText string, data any) (string, error) {
 	}
 
 	return buf.String(), nil
-}
-
-// CollectUserMessages extracts user text messages from a list of chat messages.
-func CollectUserMessages(messages []*models.ChatMessage) []string {
-	result := make([]string, 0)
-	for _, msg := range messages {
-		if msg == nil || msg.Role != models.ChatRoleUser {
-			continue
-		}
-		text := strings.TrimSpace(msg.GetText())
-		if text == "" {
-			continue
-		}
-		result = append(result, text)
-	}
-	return result
 }
 
 // LimitWords limits the input string to a maximum number of words.

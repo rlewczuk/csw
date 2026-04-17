@@ -1232,21 +1232,20 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 	}
 	defer buildResult.Cleanup()
 
-	modelRefs, err := models.ParseProviderModelChain(strings.TrimSpace(buildResult.ModelName))
+	modelRefs, err := models.ExpandProviderModelChain(strings.TrimSpace(buildResult.ModelName), sweSystem.ModelAliases)
 	if err != nil || len(modelRefs) == 0 {
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to parse resolved model name: %w", err)
 	}
 
-	seedSession := core.NewSweSession(&core.SweSessionParams{
-		ProviderName: modelRefs[0].Provider,
-		Model:        modelRefs[0].Model,
-		ModelSpec:    strings.TrimSpace(buildResult.ModelName),
-		Messages: []*models.ChatMessage{
-			models.NewTextMessage(models.ChatRoleUser, strings.TrimSpace(params.Prompt)),
-		},
-	})
+	providerName := strings.TrimSpace(modelRefs[0].Provider)
+	provider, found := sweSystem.ModelProviders[providerName]
+	if !found {
+		return "", fmt.Errorf("generateTaskDescription() [task.go]: provider not found: %s", providerName)
+	}
 
-	generatedDescription, err := core.GenerateCommitMessage(ctx, sweSystem.ModelProviders, sweSystem.ConfigStore, seedSession, strings.TrimSpace(params.Branch), "")
+	chatModel := provider.ChatModel(strings.TrimSpace(modelRefs[0].Model), nil)
+
+	generatedDescription, err := core.GenerateCommitMessage(ctx, chatModel, sweSystem.ConfigStore, strings.TrimSpace(params.Prompt), strings.TrimSpace(params.Branch), "")
 	if err != nil {
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to generate description: %w", err)
 	}

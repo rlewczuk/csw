@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/stretchr/testify/assert"
@@ -13,6 +14,7 @@ import (
 func TestGenerateCommitMessage(t *testing.T) {
 	tests := []struct {
 		name              string
+		userPrompt        string
 		branch            string
 		customTemplate    string
 		llmResponse       string
@@ -22,33 +24,30 @@ func TestGenerateCommitMessage(t *testing.T) {
 	}{
 		{
 			name:             "uses default message template and limits to ten words",
+			userPrompt:       "Implement commit message generator",
 			branch:           "feature/commit-gen",
 			llmResponse:      "implement commit message generator for worktree sessions and prompts now quickly",
 			expected:         "[feature/commit-gen] implement commit message generator for worktree sessions and prompts now",
 			expectedMsgCount: 2,
-			expectedContains: []string{"Implement commit message generator", "Add tests and integrate into worktree commit flow"},
+			expectedContains: []string{"Implement commit message generator"},
 		},
 		{
 			name:              "uses custom message template",
+			userPrompt:        "Add tests and integrate into worktree commit flow",
 			branch:            "feature/custom",
 			customTemplate:    "branch={{ .Branch }} msg={{ .Message }}",
 			llmResponse:       "add custom commit template option",
 			expected:          "branch=feature/custom msg=add custom commit template option",
 			expectedMsgCount:  2,
-			expectedContains:  []string{"Implement commit message generator", "Add tests and integrate into worktree commit flow"},
+			expectedContains:  []string{"Add tests and integrate into worktree commit flow"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sweSystem, session, provider := newCommitMessageTestSystem(t, tt.llmResponse)
+			configStore, chatModel, provider := newCommitMessageTestFixture(t, tt.llmResponse)
 
-			err := session.UserPrompt("Implement commit message generator")
-			require.NoError(t, err)
-			err = session.UserPrompt("Add tests and integrate into worktree commit flow")
-			require.NoError(t, err)
-
-			message, err := GenerateCommitMessage(context.Background(), sweSystem.ModelProviders, sweSystem.ConfigStore, session, tt.branch, tt.customTemplate)
+			message, err := GenerateCommitMessage(context.Background(), chatModel, configStore, tt.userPrompt, tt.branch, tt.customTemplate)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, message)
 
@@ -67,35 +66,42 @@ func TestGenerateCommitMessage(t *testing.T) {
 func TestGenerateCommitMessageErrors(t *testing.T) {
 	tests := []struct {
 		name           string
-		setupSystem    func(t *testing.T) (*SweSystem, *SweSession)
+		setup          func(t *testing.T) (models.ChatModel, conf.ConfigStore)
 		expectedErrSub string
 	}{
 		{
 			name: "fails when template file is missing",
-			setupSystem: func(t *testing.T) (*SweSystem, *SweSession) {
+			setup: func(t *testing.T) (models.ChatModel, conf.ConfigStore) {
 				model := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
 				store := confimpl.NewMockConfigStore()
-				system := &SweSystem{ModelProviders: map[string]models.ModelProvider{"mock": model}, ConfigStore: store}
-				session, err := system.NewSession("mock/test-model", nil)
-				require.NoError(t, err)
-				return system, session
+				return model.ChatModel("test-model", nil), store
 			},
 			expectedErrSub: "commit/system.md",
 		},
 		{
 			name: "fails when config store is missing",
-			setupSystem: func(t *testing.T) (*SweSystem, *SweSession) {
-				system, session, _ := newCommitMessageTestSystem(t, "ignored")
-				system.ConfigStore = nil
-				return system, session
+			setup: func(t *testing.T) (models.ChatModel, conf.ConfigStore) {
+				_, chatModel, _ := newCommitMessageTestFixture(t, "ignored")
+				return chatModel, nil
 			},
 			expectedErrSub: "config store cannot be nil",
 		},
 		{
+			name: "fails when chat model is missing",
+			setup: func(t *testing.T) (models.ChatModel, conf.ConfigStore) {
+				store := confimpl.NewMockConfigStore()
+				store.SetAgentConfigFile("commit", "system.md", []byte("system prompt"))
+				store.SetAgentConfigFile("commit", "prompt.md", []byte("messages:\n{{- range .Messages }}\n- {{ . }}\n{{- end }}"))
+				store.SetAgentConfigFile("commit", "message.md", []byte("[{{ .Branch }}] {{ .Message }}"))
+				return nil, store
+			},
+			expectedErrSub: "chat model cannot be nil",
+		},
+		{
 			name: "fails when generated message is empty",
-			setupSystem: func(t *testing.T) (*SweSystem, *SweSession) {
-				system, session, _ := newCommitMessageTestSystem(t, "   ")
-				return system, session
+			setup: func(t *testing.T) (models.ChatModel, conf.ConfigStore) {
+				store, chatModel, _ := newCommitMessageTestFixture(t, "   ")
+				return chatModel, store
 			},
 			expectedErrSub: "generated message is empty",
 		},
@@ -103,82 +109,29 @@ func TestGenerateCommitMessageErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			system, session := tt.setupSystem(t)
-			_, err := GenerateCommitMessage(context.Background(), system.ModelProviders, system.ConfigStore, session, "feature/test", "")
+			chatModel, configStore := tt.setup(t)
+			_, err := GenerateCommitMessage(context.Background(), chatModel, configStore, "user prompt", "feature/test", "")
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.expectedErrSub)
 		})
 	}
 }
 
-func newCommitMessageTestSystem(t *testing.T, llmResponse string) (*SweSystem, *SweSession, *models.MockClient) {
+func newCommitMessageTestFixture(t *testing.T, llmResponse string) (*confimpl.MockConfigStore, models.ChatModel, *models.MockClient) {
 	t.Helper()
 
 	model := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
 	model.SetChatResponse("test-model", &models.MockChatResponse{
 		Response: models.NewTextMessage(models.ChatRoleAssistant, llmResponse),
 	})
+	chatModel := model.ChatModel("test-model", nil)
 
 	store := confimpl.NewMockConfigStore()
 	store.SetAgentConfigFile("commit", "system.md", []byte("system prompt"))
 	store.SetAgentConfigFile("commit", "prompt.md", []byte("messages:\n{{- range .Messages }}\n- {{ . }}\n{{- end }}"))
 	store.SetAgentConfigFile("commit", "message.md", []byte("[{{ .Branch }}] {{ .Message }}"))
 
-	system := &SweSystem{
-		ModelProviders: map[string]models.ModelProvider{"mock": model},
-		ConfigStore:    store,
-	}
-
-	session, err := system.NewSession("mock/test-model", nil)
-	require.NoError(t, err)
-
-	return system, session, model
-}
-
-func TestCollectUserMessages(t *testing.T) {
-	tests := []struct {
-		name     string
-		messages []*models.ChatMessage
-		expected []string
-	}{
-		{
-			name:     "empty messages",
-			messages: []*models.ChatMessage{},
-			expected: []string{},
-		},
-		{
-			name: "only user messages collected",
-			messages: []*models.ChatMessage{
-				models.NewTextMessage(models.ChatRoleUser, "user message"),
-				models.NewTextMessage(models.ChatRoleAssistant, "assistant message"),
-				models.NewTextMessage(models.ChatRoleUser, "another user message"),
-			},
-			expected: []string{"user message", "another user message"},
-		},
-		{
-			name: "nil messages skipped",
-			messages: []*models.ChatMessage{
-				nil,
-				models.NewTextMessage(models.ChatRoleUser, "valid message"),
-			},
-			expected: []string{"valid message"},
-		},
-		{
-			name: "empty text skipped",
-			messages: []*models.ChatMessage{
-				models.NewTextMessage(models.ChatRoleUser, "   "),
-				models.NewTextMessage(models.ChatRoleUser, "valid"),
-			},
-			expected: []string{"valid"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := CollectUserMessages(tt.messages)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
+	return store, chatModel, model
 }
 
 func TestLimitWords(t *testing.T) {

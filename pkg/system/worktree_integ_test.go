@@ -324,7 +324,6 @@ func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTe
 
 	session, err := system.NewSession("mock/test-model", nil)
 	require.NoError(t, err)
-	require.NoError(t, session.UserPrompt("Implement commit message workflow"))
 
 	mockVCS := vfs.NewMockVCS(vfs.NewMockVFS())
 	return system, session, mockVCS

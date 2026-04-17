@@ -156,6 +156,7 @@ func TestResolveTaskCreateParamsGeneratesBranchAndDescription(t *testing.T) {
 		_ = ctx
 		assert.Equal(t, "do this task", params.Prompt)
 		assert.Equal(t, "feature/generated", params.Branch)
+		assert.Equal(t, "provider/model", params.ModelName)
 		return "generated description", nil
 	}
 
