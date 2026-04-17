@@ -255,36 +255,18 @@ func TestReadTaskPromptFileReturnsEmptyWhenFileIsMissing(t *testing.T) {
 }
 
 func TestEditTaskPromptDetectsPromptChange(t *testing.T) {
-	originalEditorRunner := runTaskEditorFunc
-	t.Cleanup(func() {
-		runTaskEditorFunc = originalEditorRunner
-	})
+	t.Setenv("EDITOR", `sh -c 'printf "new prompt\n" > "$1"' sh`)
 
-	runTaskEditorFunc = func(ctx context.Context, editorCommand string, promptFilePath string) error {
-		_ = ctx
-		_ = editorCommand
-		return os.WriteFile(promptFilePath, []byte("new prompt\n"), 0o644)
-	}
-
-	prompt, changed, err := editTaskPrompt(context.Background(), "editor", "old prompt")
+	prompt, changed, err := editTaskPrompt(context.Background(), os.Getenv("EDITOR"), "old prompt")
 	require.NoError(t, err)
 	assert.True(t, changed)
 	assert.Equal(t, "new prompt", prompt)
 }
 
 func TestEditTaskPromptDetectsNoPromptChange(t *testing.T) {
-	originalEditorRunner := runTaskEditorFunc
-	t.Cleanup(func() {
-		runTaskEditorFunc = originalEditorRunner
-	})
+	t.Setenv("EDITOR", `sh -c 'cat "$1" > /dev/null' sh`)
 
-	runTaskEditorFunc = func(ctx context.Context, editorCommand string, promptFilePath string) error {
-		_ = ctx
-		_ = editorCommand
-		return nil
-	}
-
-	prompt, changed, err := editTaskPrompt(context.Background(), "editor", "same prompt")
+	prompt, changed, err := editTaskPrompt(context.Background(), os.Getenv("EDITOR"), "same prompt")
 	require.NoError(t, err)
 	assert.False(t, changed)
 	assert.Equal(t, "same prompt", prompt)

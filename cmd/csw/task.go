@@ -24,7 +24,6 @@ var resolveTaskRunDefaultsFunc = system.ResolveRunDefaults
 var resolveTaskWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
 var buildTaskSystemFunc = system.BuildSystem
 var taskEditorLookPathFunc = exec.LookPath
-var runTaskEditorFunc = runTaskEditor
 var generateTaskDescriptionFunc = generateTaskDescription
 var taskDirUUIDPattern = regexp.MustCompile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
@@ -123,8 +122,13 @@ func taskNewCommand() *cobra.Command {
 					_ = os.Remove(temporaryFilePath)
 				}()
 
-				if err := runTaskEditorFunc(cmd.Context(), editorCommand, temporaryFilePath); err != nil {
-					return "", false, err
+				editorProcess := exec.CommandContext(cmd.Context(), "sh", "-c", editorCommand+" "+shellQuote(temporaryFilePath))
+				editorProcess.Stdin = os.Stdin
+				editorProcess.Stdout = os.Stdout
+				editorProcess.Stderr = os.Stderr
+
+				if err := editorProcess.Run(); err != nil {
+					return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to run editor: %w", err)
 				}
 
 				promptBytes, err := os.ReadFile(temporaryFilePath)
@@ -440,8 +444,13 @@ func editTaskPrompt(ctx context.Context, editorCommand string, currentPrompt str
 		_ = os.Remove(temporaryFilePath)
 	}()
 
-	if err := runTaskEditorFunc(ctx, editorCommand, temporaryFilePath); err != nil {
-		return "", false, err
+	editorProcess := exec.CommandContext(ctx, "sh", "-c", editorCommand+" "+shellQuote(temporaryFilePath))
+	editorProcess.Stdin = os.Stdin
+	editorProcess.Stdout = os.Stdout
+	editorProcess.Stderr = os.Stderr
+
+	if err := editorProcess.Run(); err != nil {
+		return "", false, fmt.Errorf("editTaskPrompt() [task.go]: failed to run editor: %w", err)
 	}
 
 	editedPromptBytes, err := os.ReadFile(temporaryFilePath)
@@ -1059,24 +1068,9 @@ func isTaskEditorAvailable(command string) bool {
 	return err == nil
 }
 
-func runTaskEditor(ctx context.Context, editorCommand string, promptFilePath string) error {
-	editorTokens := strings.Fields(strings.TrimSpace(editorCommand))
-	if len(editorTokens) == 0 {
-		return fmt.Errorf("runTaskEditor() [task.go]: editor command cannot be empty")
-	}
-
-	commandArgs := append([]string(nil), editorTokens[1:]...)
-	commandArgs = append(commandArgs, promptFilePath)
-	editorProcess := exec.CommandContext(ctx, editorTokens[0], commandArgs...)
-	editorProcess.Stdin = os.Stdin
-	editorProcess.Stdout = os.Stdout
-	editorProcess.Stderr = os.Stderr
-
-	if err := editorProcess.Run(); err != nil {
-		return fmt.Errorf("runTaskEditor() [task.go]: failed to run editor: %w", err)
-	}
-
-	return nil
+// shellQuote returns a shell-safe single-quoted value.
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 func resolveTaskCreateParams(ctx context.Context, params taskCreateResolveParams) (core.TaskCreateParams, error) {
