@@ -8,8 +8,7 @@
 //   - roles/all/ - special meta-role directory containing prompt fragments that are
 //     merged into all other roles (config.json is optional for this role)
 //
-// The store caches configuration in memory and watches for file changes
-// to automatically reload when configuration files are modified.
+// The store caches configuration in memory.
 //
 // Example usage:
 //
@@ -25,62 +24,37 @@
 package impl
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
-	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"gopkg.in/yaml.v3"
 )
 
 // LocalConfigStore implements conf.ConfigStore interface for local filesystem-based configuration.
-// It caches configuration in memory and watches for file changes to reload automatically.
+// It caches configuration in memory.
 type LocalConfigStore struct {
 	configDir string
 
 	mu                         sync.RWMutex
 	globalConfig               *conf.GlobalConfig
-	globalConfigUpdate         time.Time
 	modelProviderConfigs       map[string]*conf.ModelProviderConfig
-	modelProviderConfigsUpdate time.Time
 	modelAliases               map[string]conf.ModelAliasValue
-	modelAliasesUpdate         time.Time
 	mcpServerConfigs           map[string]*conf.MCPServerConfig
-	mcpServerConfigsUpdate     time.Time
 	hookConfigs                map[string]*conf.HookConfig
-	hookConfigsUpdate          time.Time
 	agentRoleConfigs           map[string]*conf.AgentRoleConfig
-	agentRoleConfigsUpdate     time.Time
-
-	watcher       *fsnotify.Watcher
-	watcherCtx    context.Context
-	watcherCancel context.CancelFunc
-	watcherWg     sync.WaitGroup
 }
 
 // NewLocalConfigStore creates a new LocalConfigStore instance that reads configuration
-// from the specified directory and watches for changes.
+// from the specified directory.
 func NewLocalConfigStore(configDir string) (*LocalConfigStore, error) {
 	if err := validateConfigDir(configDir); err != nil {
 		return nil, fmt.Errorf("NewLocalConfigStore(): invalid config directory: %w", err)
 	}
-
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		if !errors.Is(err, syscall.EMFILE) && !errors.Is(err, syscall.ENFILE) {
-			return nil, fmt.Errorf("NewLocalConfigStore(): failed to create file watcher: %w", err)
-		}
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
 
 	store := &LocalConfigStore{
 		configDir:            configDir,
@@ -90,43 +64,19 @@ func NewLocalConfigStore(configDir string) (*LocalConfigStore, error) {
 		mcpServerConfigs:     make(map[string]*conf.MCPServerConfig),
 		hookConfigs:          make(map[string]*conf.HookConfig),
 		agentRoleConfigs:     make(map[string]*conf.AgentRoleConfig),
-		watcher:              watcher,
-		watcherCtx:           ctx,
-		watcherCancel:        cancel,
 	}
 
 	// Initial load of all configuration
 	if err := store.loadAllConfig(); err != nil {
-		cancel()
-		watcher.Close()
 		return nil, fmt.Errorf("NewLocalConfigStore(): failed to load initial configuration: %w", err)
-	}
-
-	// Start watching for changes
-	if watcher != nil {
-		if err := store.setupWatchers(); err != nil {
-			cancel()
-			watcher.Close()
-			return nil, fmt.Errorf("NewLocalConfigStore(): failed to setup file watchers: %w", err)
-		}
-
-		store.watcherWg.Add(1)
-		go store.watchLoop()
 	}
 
 	return store, nil
 }
 
-// Close stops the file watcher and releases resources.
+// Close releases resources.
 func (s *LocalConfigStore) Close() error {
-	if s.watcherCancel != nil {
-		s.watcherCancel()
-	}
-	s.watcherWg.Wait()
-	if s.watcher == nil {
-		return nil
-	}
-	return s.watcher.Close()
+	return nil
 }
 
 // GetGlobalConfig returns the global configuration.
@@ -135,13 +85,6 @@ func (s *LocalConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 	defer s.mu.RUnlock()
 
 	return s.globalConfig.Clone(), nil
-}
-
-// LastGlobalConfigUpdate returns the timestamp of the last global config update.
-func (s *LocalConfigStore) LastGlobalConfigUpdate() (time.Time, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.globalConfigUpdate, nil
 }
 
 // GetModelProviderConfigs returns a map of model provider configurations.
@@ -158,13 +101,6 @@ func (s *LocalConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelProv
 	return configs, nil
 }
 
-// LastModelProviderConfigsUpdate returns the timestamp of the last model provider configs update.
-func (s *LocalConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.modelProviderConfigsUpdate, nil
-}
-
 // GetModelAliases returns configured model aliases.
 func (s *LocalConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, error) {
 	s.mu.RLock()
@@ -176,13 +112,6 @@ func (s *LocalConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, e
 	}
 
 	return aliases, nil
-}
-
-// LastModelAliasesUpdate returns timestamp of model aliases updates.
-func (s *LocalConfigStore) LastModelAliasesUpdate() (time.Time, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.modelAliasesUpdate, nil
 }
 
 // GetMCPServerConfigs returns a map of MCP server configurations.
@@ -198,13 +127,6 @@ func (s *LocalConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConf
 	return configs, nil
 }
 
-// LastMCPServerConfigsUpdate returns timestamp of last MCP server configs update.
-func (s *LocalConfigStore) LastMCPServerConfigsUpdate() (time.Time, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.mcpServerConfigsUpdate, nil
-}
-
 // GetHookConfigs returns a map of hook configurations.
 func (s *LocalConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
 	s.mu.RLock()
@@ -216,13 +138,6 @@ func (s *LocalConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error)
 	}
 
 	return configs, nil
-}
-
-// LastHookConfigsUpdate returns timestamp of last hook configs update.
-func (s *LocalConfigStore) LastHookConfigsUpdate() (time.Time, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.hookConfigsUpdate, nil
 }
 
 // GetAgentRoleConfigs returns a map of agent role configurations.
@@ -272,13 +187,6 @@ func (s *LocalConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConf
 	}
 
 	return configs, nil
-}
-
-// LastAgentRoleConfigsUpdate returns the timestamp of the last agent role configs update.
-func (s *LocalConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.agentRoleConfigsUpdate, nil
 }
 
 // GetAgentConfigFile returns file content from local agent/<subdir>/<filename>.
@@ -360,7 +268,6 @@ func (s *LocalConfigStore) loadGlobalConfig() error {
 				if os.IsNotExist(err) {
 					// Global config is optional, use empty config
 					s.globalConfig = &conf.GlobalConfig{}
-					s.globalConfigUpdate = time.Now()
 					return nil
 				}
 				return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", jsonPath, err)
@@ -385,7 +292,6 @@ func (s *LocalConfigStore) loadGlobalConfig() error {
 	}
 
 	s.globalConfig = &config
-	s.globalConfigUpdate = time.Now()
 
 	return nil
 }
@@ -487,7 +393,6 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 		if os.IsNotExist(err) {
 			// Models directory is optional
 			s.modelProviderConfigs = make(map[string]*conf.ModelProviderConfig)
-			s.modelProviderConfigsUpdate = time.Now()
 			return nil
 		}
 		return fmt.Errorf("loadModelProviderConfigs(): failed to read models directory: %w", err)
@@ -543,7 +448,6 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 	}
 
 	s.modelProviderConfigs = configs
-	s.modelProviderConfigsUpdate = time.Now()
 
 	return nil
 }
@@ -591,7 +495,6 @@ func (s *LocalConfigStore) loadModelAliases() error {
 	}
 
 	s.modelAliases = aliases
-	s.modelAliasesUpdate = time.Now()
 
 	return nil
 }
@@ -684,7 +587,6 @@ func (s *LocalConfigStore) loadMCPServerConfigs() error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			s.mcpServerConfigs = make(map[string]*conf.MCPServerConfig)
-			s.mcpServerConfigsUpdate = time.Now()
 			return nil
 		}
 		return fmt.Errorf("loadMCPServerConfigs() [local.go]: failed to read mcp directory: %w", err)
@@ -750,7 +652,6 @@ func (s *LocalConfigStore) loadMCPServerConfigs() error {
 	}
 
 	s.mcpServerConfigs = configs
-	s.mcpServerConfigsUpdate = time.Now()
 
 	return nil
 }
@@ -767,7 +668,6 @@ func (s *LocalConfigStore) loadHookConfigs() error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			s.hookConfigs = make(map[string]*conf.HookConfig)
-			s.hookConfigsUpdate = time.Now()
 			return nil
 		}
 		return fmt.Errorf("loadHookConfigs() [local.go]: failed to read hooks directory: %w", err)
@@ -817,7 +717,6 @@ func (s *LocalConfigStore) loadHookConfigs() error {
 	}
 
 	s.hookConfigs = configs
-	s.hookConfigsUpdate = time.Now()
 
 	return nil
 }
@@ -898,7 +797,6 @@ func (s *LocalConfigStore) loadAgentRoleConfigs() error {
 		if os.IsNotExist(err) {
 			// Roles directory is optional
 			s.agentRoleConfigs = make(map[string]*conf.AgentRoleConfig)
-			s.agentRoleConfigsUpdate = time.Now()
 			return nil
 		}
 		return fmt.Errorf("loadAgentRoleConfigs(): failed to read roles directory: %w", err)
@@ -1004,7 +902,6 @@ func (s *LocalConfigStore) loadAgentRoleConfigs() error {
 	}
 
 	s.agentRoleConfigs = configs
-	s.agentRoleConfigsUpdate = time.Now()
 
 	return nil
 }
@@ -1080,276 +977,6 @@ func (s *LocalConfigStore) loadToolFragments() (map[string]string, error) {
 	}
 
 	return fragments, nil
-}
-
-// setupWatchers sets up file system watchers for all configuration directories.
-func (s *LocalConfigStore) setupWatchers() error {
-	// Watch global config files (YAML takes precedence but watch all supported names)
-	ymlPath := filepath.Join(s.configDir, "global.yml")
-	yamlPath := filepath.Join(s.configDir, "global.yaml")
-	jsonPath := filepath.Join(s.configDir, "global.json")
-	if _, err := os.Stat(ymlPath); err == nil {
-		if err := s.watcher.Add(ymlPath); err != nil {
-			return fmt.Errorf("setupWatchers(): failed to watch global.yml: %w", err)
-		}
-	}
-	if _, err := os.Stat(yamlPath); err == nil {
-		if err := s.watcher.Add(yamlPath); err != nil {
-			return fmt.Errorf("setupWatchers(): failed to watch global.yaml: %w", err)
-		}
-	}
-	if _, err := os.Stat(jsonPath); err == nil {
-		if err := s.watcher.Add(jsonPath); err != nil {
-			return fmt.Errorf("setupWatchers(): failed to watch global.json: %w", err)
-		}
-	}
-
-	// Watch models directory
-	modelsDir := filepath.Join(s.configDir, "models")
-	modelAliasesYAMLPath := filepath.Join(s.configDir, "model_aliases.yaml")
-	modelAliasesYMLPath := filepath.Join(s.configDir, "model_aliases.yml")
-	modelAliasesJSONLPath := filepath.Join(s.configDir, "model_aliases.jsonl")
-	if _, err := os.Stat(modelsDir); err == nil {
-		if err := s.watcher.Add(modelsDir); err != nil {
-			return fmt.Errorf("setupWatchers(): failed to watch models directory: %w", err)
-		}
-
-		for _, nested := range []string{"families", "vendors", "templates"} {
-			nestedDir := filepath.Join(modelsDir, nested)
-			if _, err := os.Stat(nestedDir); err == nil {
-				if err := s.watcher.Add(nestedDir); err != nil {
-					return fmt.Errorf("setupWatchers(): failed to watch %s directory: %w", nestedDir, err)
-				}
-			}
-		}
-	}
-
-	for _, aliasesPath := range []string{modelAliasesYAMLPath, modelAliasesYMLPath, modelAliasesJSONLPath} {
-		if _, err := os.Stat(aliasesPath); err == nil {
-			if err := s.watcher.Add(aliasesPath); err != nil {
-				return fmt.Errorf("setupWatchers() [local.go]: failed to watch %s: %w", aliasesPath, err)
-			}
-		}
-	}
-
-	// Watch mcp directory
-	mcpDir := filepath.Join(s.configDir, "mcp")
-	if _, err := os.Stat(mcpDir); err == nil {
-		if err := s.watcher.Add(mcpDir); err != nil {
-			return fmt.Errorf("setupWatchers() [local.go]: failed to watch mcp directory: %w", err)
-		}
-	}
-
-	// Watch hooks directory
-	hooksDir := filepath.Join(s.configDir, "hooks")
-	if _, err := os.Stat(hooksDir); err == nil {
-		if err := s.watcher.Add(hooksDir); err != nil {
-			return fmt.Errorf("setupWatchers() [local.go]: failed to watch hooks directory: %w", err)
-		}
-
-		hookEntries, readErr := os.ReadDir(hooksDir)
-		if readErr == nil {
-			for _, hookEntry := range hookEntries {
-				if !hookEntry.IsDir() {
-					continue
-				}
-				hookSubDir := filepath.Join(hooksDir, hookEntry.Name())
-				if addErr := s.watcher.Add(hookSubDir); addErr != nil {
-					return fmt.Errorf("setupWatchers() [local.go]: failed to watch hook directory %s: %w", hookSubDir, addErr)
-				}
-			}
-		}
-	}
-
-	// Watch roles directory and all role subdirectories
-	rolesDir := filepath.Join(s.configDir, "roles")
-	if _, err := os.Stat(rolesDir); err == nil {
-		if err := s.watcher.Add(rolesDir); err != nil {
-			return fmt.Errorf("setupWatchers(): failed to watch roles directory: %w", err)
-		}
-
-		// Watch each role subdirectory
-		entries, err := os.ReadDir(rolesDir)
-		if err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() {
-					roleDir := filepath.Join(rolesDir, entry.Name())
-					if err := s.watcher.Add(roleDir); err != nil {
-						return fmt.Errorf("setupWatchers(): failed to watch role directory %s: %w", roleDir, err)
-					}
-				}
-			}
-		}
-	}
-
-	// Watch tools directory and tool subdirectories
-	toolsDir := filepath.Join(s.configDir, "tools")
-	if _, err := os.Stat(toolsDir); err == nil {
-		if err := s.watcher.Add(toolsDir); err != nil {
-			return fmt.Errorf("setupWatchers(): failed to watch tools directory: %w", err)
-		}
-
-		entries, err := os.ReadDir(toolsDir)
-		if err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() {
-					toolDir := filepath.Join(toolsDir, entry.Name())
-					if err := s.watcher.Add(toolDir); err != nil {
-						return fmt.Errorf("setupWatchers(): failed to watch tool directory %s: %w", toolDir, err)
-					}
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-// watchLoop processes file system events and reloads configuration as needed.
-func (s *LocalConfigStore) watchLoop() {
-	defer s.watcherWg.Done()
-
-	for {
-		select {
-		case <-s.watcherCtx.Done():
-			return
-		case event, ok := <-s.watcher.Events:
-			if !ok {
-				return
-			}
-			s.handleFileEvent(event)
-		case err, ok := <-s.watcher.Errors:
-			if !ok {
-				return
-			}
-			// Log error but continue watching
-			fmt.Fprintf(os.Stderr, "LocalConfigStore.watchLoop(): watcher error: %v\n", err)
-		}
-	}
-}
-
-// handleFileEvent processes a single file system event and reloads affected configuration.
-func (s *LocalConfigStore) handleFileEvent(event fsnotify.Event) {
-	// Only process Write and Create events
-	if event.Op&(fsnotify.Write|fsnotify.Create) == 0 {
-		return
-	}
-
-	globalYMLPath := filepath.Join(s.configDir, "global.yml")
-	globalYAMLPath := filepath.Join(s.configDir, "global.yaml")
-	globalJSONPath := filepath.Join(s.configDir, "global.json")
-	modelsDir := filepath.Join(s.configDir, "models")
-	modelAliasesYAMLPath := filepath.Join(s.configDir, "model_aliases.yaml")
-	modelAliasesYMLPath := filepath.Join(s.configDir, "model_aliases.yml")
-	modelAliasesJSONLPath := filepath.Join(s.configDir, "model_aliases.jsonl")
-	mcpDir := filepath.Join(s.configDir, "mcp")
-	hooksDir := filepath.Join(s.configDir, "hooks")
-	modelFamiliesDir := filepath.Join(modelsDir, "families")
-	modelVendorsDir := filepath.Join(modelsDir, "vendors")
-	modelTemplatesDir := filepath.Join(modelsDir, "templates")
-	rolesDir := filepath.Join(s.configDir, "roles")
-	toolsDir := filepath.Join(s.configDir, "tools")
-
-	// Check if it's global config file (YAML or JSON)
-	if event.Name == globalYMLPath || event.Name == globalYAMLPath || event.Name == globalJSONPath {
-		if err := s.loadGlobalConfig(); err != nil {
-			fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload global config: %v\n", err)
-		}
-		return
-	}
-
-	if event.Name == modelAliasesYAMLPath || event.Name == modelAliasesYMLPath || event.Name == modelAliasesJSONLPath {
-		if err := s.loadModelAliases(); err != nil {
-			fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent() [local.go]: failed to reload model aliases: %v\n", err)
-		}
-		return
-	}
-
-	// Check if it's in models directory
-	if filepath.Dir(event.Name) == modelsDir {
-		ext := strings.ToLower(filepath.Ext(event.Name))
-		if isAllowedModelProviderConfigExt(ext) {
-			if err := s.loadModelProviderConfigs(); err != nil {
-				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload model provider configs: %v\n", err)
-			}
-			return
-		}
-	}
-
-	if filepath.Dir(event.Name) == mcpDir {
-		ext := strings.ToLower(filepath.Ext(event.Name))
-		if ext == ".json" || ext == ".yml" || ext == ".yaml" {
-			if err := s.loadMCPServerConfigs(); err != nil {
-				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent() [local.go]: failed to reload mcp server configs: %v\n", err)
-			}
-			return
-		}
-	}
-
-	if filepath.Dir(event.Name) == hooksDir && event.Op&fsnotify.Create != 0 {
-		if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
-			if err := s.watcher.Add(event.Name); err != nil {
-				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent() [local.go]: failed to watch new hook directory: %v\n", err)
-			}
-		}
-	}
-
-	if filepath.Dir(event.Name) == hooksDir || filepath.Dir(filepath.Dir(event.Name)) == hooksDir {
-		ext := strings.ToLower(filepath.Ext(event.Name))
-		if ext == ".json" || ext == ".yml" || ext == ".yaml" {
-			if err := s.loadHookConfigs(); err != nil {
-				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent() [local.go]: failed to reload hook configs: %v\n", err)
-			}
-			return
-		}
-	}
-
-	if filepath.Dir(event.Name) == modelFamiliesDir || filepath.Dir(event.Name) == modelVendorsDir || filepath.Dir(event.Name) == modelTemplatesDir {
-		ext := strings.ToLower(filepath.Ext(event.Name))
-		if ext == ".json" || ext == ".yml" || ext == ".yaml" {
-			return
-		}
-	}
-
-	// Check if it's a new role directory
-	if filepath.Dir(event.Name) == rolesDir && event.Op&fsnotify.Create != 0 {
-		if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
-			// Watch the new role directory
-			if err := s.watcher.Add(event.Name); err != nil {
-				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to watch new role directory: %v\n", err)
-			}
-		}
-	}
-
-	if filepath.Dir(event.Name) == toolsDir && event.Op&fsnotify.Create != 0 {
-		if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
-			if err := s.watcher.Add(event.Name); err != nil {
-				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to watch new tool directory: %v\n", err)
-			}
-		}
-	}
-
-	// Check if it's in a role directory (config.yaml, config.yml, config.json, or .md file)
-	eventDir := filepath.Dir(event.Name)
-	baseName := filepath.Base(event.Name)
-	eventExt := strings.ToLower(filepath.Ext(event.Name))
-	if filepath.Dir(eventDir) == rolesDir {
-		isConfigFile := baseName == "config.yaml" || baseName == "config.yml" || baseName == "config.json"
-		isMarkdownFile := eventExt == ".md"
-		if isConfigFile || isMarkdownFile {
-			if err := s.loadAgentRoleConfigs(); err != nil {
-				fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload agent role configs: %v\n", err)
-			}
-			return
-		}
-	}
-
-	if filepath.Dir(eventDir) == toolsDir || filepath.Dir(filepath.Dir(eventDir)) == toolsDir {
-		if err := s.loadAgentRoleConfigs(); err != nil {
-			fmt.Fprintf(os.Stderr, "LocalConfigStore.handleFileEvent(): failed to reload agent role configs after tools change: %v\n", err)
-		}
-		return
-	}
 }
 
 // SaveModelProviderConfig saves or updates a model provider configuration.

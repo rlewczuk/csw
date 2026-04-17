@@ -706,34 +706,17 @@ type ConfigStore interface {
 	// GetModelProviderConfigs returns a map of model provider configurations, keyed by provider name.
 	GetModelProviderConfigs() (map[string]*ModelProviderConfig, error)
 
-	// LastModelProviderConfigsUpdate returns timestamp of last update of model provider configs
-	// this is used by client code to determine if model provider configuration has changed and needs to be reloaded
-	LastModelProviderConfigsUpdate() (time.Time, error)
-
 	// GetAgentRoleConfigs returns a map of agent role configurations, keyed by role name.
 	GetAgentRoleConfigs() (map[string]*AgentRoleConfig, error)
-
-	// LastAgentRoleConfigsUpdate returns timestamp of last update of agent role configs
-	// this is used by client code to determine if agent role configuration has changed and needs to be reloaded
-	LastAgentRoleConfigsUpdate() (time.Time, error)
 
 	// GetGlobalConfig returns global configuration
 	GetGlobalConfig() (*GlobalConfig, error)
 
-	// LastGlobalConfigUpdate returns timestamp of last update of global config
-	LastGlobalConfigUpdate() (time.Time, error)
-
 	// GetMCPServerConfigs returns MCP server configurations keyed by server name.
 	GetMCPServerConfigs() (map[string]*MCPServerConfig, error)
 
-	// LastMCPServerConfigsUpdate returns timestamp of last update of MCP server configs.
-	LastMCPServerConfigsUpdate() (time.Time, error)
-
 	// GetHookConfigs returns hook configurations keyed by hook name.
 	GetHookConfigs() (map[string]*HookConfig, error)
-
-	// LastHookConfigsUpdate returns timestamp of last update of hook configs.
-	LastHookConfigsUpdate() (time.Time, error)
 
 	// GetAgentConfigFile returns file content from agent configuration namespace.
 	// The expected virtual location is conf/agent/<subdir>/<filename>.
@@ -741,9 +724,6 @@ type ConfigStore interface {
 
 	// GetModelAliases returns model aliases keyed by alias name.
 	GetModelAliases() (map[string]ModelAliasValue, error)
-
-	// LastModelAliasesUpdate returns timestamp of last model alias update.
-	LastModelAliasesUpdate() (time.Time, error)
 }
 
 // WritableConfigStore extends ConfigStore with write operations.

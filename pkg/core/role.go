@@ -1,22 +1,19 @@
 package core
 
 import (
-	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 )
 
 // AgentRoleRegistry manages agent role configurations loaded from a ConfigStore.
-// It implements caching with automatic invalidation based on config update timestamps.
+// It caches loaded roles for quick lookup.
 type AgentRoleRegistry struct {
 	configStore  conf.ConfigStore
 	mu           sync.RWMutex
 	cache        map[string]conf.AgentRoleConfig
-	lastUpdate   time.Time
-	cacheInvalid bool
+	loaded       bool
 }
 
 func normalizeRoleLookupName(name string) string {
@@ -28,28 +25,21 @@ func NewAgentRoleRegistry(configStore conf.ConfigStore) *AgentRoleRegistry {
 	return &AgentRoleRegistry{
 		configStore:  configStore,
 		cache:        make(map[string]conf.AgentRoleConfig),
-		cacheInvalid: true, // Force initial load
+		loaded:       false,
 	}
 }
 
 // refreshCacheIfNeeded checks if the cache needs to be refreshed and does so if necessary.
 // Must be called with r.mu held for writing.
 func (r *AgentRoleRegistry) refreshCacheIfNeeded() error {
-	// Check timestamp to determine if cache is stale
-	lastConfigUpdate, err := r.configStore.LastAgentRoleConfigsUpdate()
-	if err != nil {
-		return fmt.Errorf("AgentRoleRegistry.refreshCacheIfNeeded() [role.go]: failed to get last update timestamp: %w", err)
-	}
-
-	// If cache is valid and timestamps match, no refresh needed
-	if !r.cacheInvalid && !lastConfigUpdate.After(r.lastUpdate) {
+	if r.loaded {
 		return nil
 	}
 
 	// Fetch fresh configs from store
 	configs, err := r.configStore.GetAgentRoleConfigs()
 	if err != nil {
-		return fmt.Errorf("AgentRoleRegistry.refreshCacheIfNeeded() [role.go]: failed to get agent role configs: %w", err)
+		return err
 	}
 
 	// Update cache, merging "all" role into other roles
@@ -93,14 +83,12 @@ func (r *AgentRoleRegistry) refreshCacheIfNeeded() error {
 		}
 	}
 
-	r.lastUpdate = lastConfigUpdate
-	r.cacheInvalid = false
+	r.loaded = true
 
 	return nil
 }
 
 // Get returns a role by name and a boolean indicating if it was found.
-// It automatically refreshes the cache if the configuration has been updated.
 func (r *AgentRoleRegistry) Get(name string) (conf.AgentRoleConfig, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -123,7 +111,6 @@ func (r *AgentRoleRegistry) Get(name string) (conf.AgentRoleConfig, bool) {
 }
 
 // List returns all role names in the registry.
-// It automatically refreshes the cache if the configuration has been updated.
 func (r *AgentRoleRegistry) List() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()

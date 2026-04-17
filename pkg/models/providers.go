@@ -10,12 +10,11 @@ import (
 
 // ProviderRegistry manages a collection of model providers.
 // It loads provider configurations from a ConfigStore and caches the created providers.
-// The cache is invalidated when the ConfigStore reports that configurations have changed.
 type ProviderRegistry struct {
 	mu          sync.RWMutex
 	configStore conf.ConfigStore
 	providers   map[string]ModelProvider
-	lastUpdate  time.Time
+	loaded      bool
 }
 
 // NewProviderRegistry creates a new provider registry that uses the given ConfigStore.
@@ -24,21 +23,14 @@ func NewProviderRegistry(configStore conf.ConfigStore) *ProviderRegistry {
 	return &ProviderRegistry{
 		configStore: configStore,
 		providers:   make(map[string]ModelProvider),
-		lastUpdate:  time.Time{},
+		loaded:      false,
 	}
 }
 
 // ensureLoaded checks if the provider cache needs to be refreshed and reloads if necessary.
 // It must be called with the write lock held.
 func (r *ProviderRegistry) ensureLoaded() error {
-	// Get the last update timestamp from config store
-	lastConfigUpdate, err := r.configStore.LastModelProviderConfigsUpdate()
-	if err != nil {
-		return fmt.Errorf("ProviderRegistry.ensureLoaded() [providers.go]: failed to get last update timestamp: %w", err)
-	}
-
-	// If cache is up to date, no need to reload
-	if !r.lastUpdate.IsZero() && !lastConfigUpdate.After(r.lastUpdate) {
+	if r.loaded {
 		return nil
 	}
 
@@ -60,8 +52,7 @@ func (r *ProviderRegistry) ensureLoaded() error {
 		r.providers[name] = provider
 	}
 
-	// Update the last loaded timestamp
-	r.lastUpdate = lastConfigUpdate
+	r.loaded = true
 
 	return nil
 }

@@ -13,8 +13,7 @@
 //   - roles/all/ - special meta-role directory containing prompt fragments that are
 //     merged into all other roles (config.json is optional for this role)
 //
-// Since the configuration is embedded at build time, it is immutable and all
-// LastUpdate() methods return a constant timestamp.
+// Since the configuration is embedded at build time, it is immutable.
 //
 // Example usage:
 //
@@ -34,7 +33,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/vfs"
@@ -43,10 +41,6 @@ import (
 
 //go:embed all:conf
 var embeddedConfigFS embed.FS
-
-// embeddedTimestamp is a constant timestamp returned by all LastUpdate() methods.
-// This is set to a fixed point in time since embedded configuration doesn't change.
-var embeddedTimestamp = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 // EmbeddedConfigStore implements conf.ConfigStore interface for embedded configuration.
 // It provides read-only access to configuration files that are embedded in the binary.
@@ -89,12 +83,6 @@ func (s *EmbeddedConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 	return s.globalConfig.Clone(), nil
 }
 
-// LastGlobalConfigUpdate returns the timestamp of the last global config update.
-// For embedded configuration, this always returns a constant timestamp.
-func (s *EmbeddedConfigStore) LastGlobalConfigUpdate() (time.Time, error) {
-	return embeddedTimestamp, nil
-}
-
 // GetModelProviderConfigs returns a map of model provider configurations.
 func (s *EmbeddedConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelProviderConfig, error) {
 	s.mu.RLock()
@@ -107,12 +95,6 @@ func (s *EmbeddedConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelP
 	}
 
 	return configs, nil
-}
-
-// LastModelProviderConfigsUpdate returns the timestamp of the last model provider configs update.
-// For embedded configuration, this always returns a constant timestamp.
-func (s *EmbeddedConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
-	return embeddedTimestamp, nil
 }
 
 // GetModelAliases returns configured model aliases.
@@ -128,11 +110,6 @@ func (s *EmbeddedConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue
 	return aliases, nil
 }
 
-// LastModelAliasesUpdate returns timestamp of last model aliases update.
-func (s *EmbeddedConfigStore) LastModelAliasesUpdate() (time.Time, error) {
-	return embeddedTimestamp, nil
-}
-
 // GetMCPServerConfigs returns map of MCP server configurations.
 func (s *EmbeddedConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
 	s.mu.RLock()
@@ -146,11 +123,6 @@ func (s *EmbeddedConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerC
 	return configs, nil
 }
 
-// LastMCPServerConfigsUpdate returns timestamp of last MCP server config update.
-func (s *EmbeddedConfigStore) LastMCPServerConfigsUpdate() (time.Time, error) {
-	return embeddedTimestamp, nil
-}
-
 // GetHookConfigs returns map of hook configurations.
 func (s *EmbeddedConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
 	s.mu.RLock()
@@ -162,11 +134,6 @@ func (s *EmbeddedConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, err
 	}
 
 	return configs, nil
-}
-
-// LastHookConfigsUpdate returns timestamp of last hook config update.
-func (s *EmbeddedConfigStore) LastHookConfigsUpdate() (time.Time, error) {
-	return embeddedTimestamp, nil
 }
 
 // GetAgentRoleConfigs returns a map of agent role configurations.
@@ -212,12 +179,6 @@ func (s *EmbeddedConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleC
 	}
 
 	return configs, nil
-}
-
-// LastAgentRoleConfigsUpdate returns the timestamp of the last agent role configs update.
-// For embedded configuration, this always returns a constant timestamp.
-func (s *EmbeddedConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
-	return embeddedTimestamp, nil
 }
 
 // GetAgentConfigFile returns file content from embedded conf/agent/<subdir>/<filename>.

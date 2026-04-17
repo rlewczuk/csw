@@ -670,41 +670,24 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 }
 
 type runtimeMCPConfigStore struct {
-	base                 conf.ConfigStore
-	mcpServerConfigs     map[string]*conf.MCPServerConfig
-	mcpServerConfigsTime time.Time
+	base             conf.ConfigStore
+	mcpServerConfigs map[string]*conf.MCPServerConfig
 }
 
 func (s *runtimeMCPConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, error) {
 	return s.base.GetModelAliases()
 }
 
-func (s *runtimeMCPConfigStore) LastModelAliasesUpdate() (time.Time, error) {
-	return s.base.LastModelAliasesUpdate()
-}
-
 func (s *runtimeMCPConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelProviderConfig, error) {
 	return s.base.GetModelProviderConfigs()
-}
-
-func (s *runtimeMCPConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
-	return s.base.LastModelProviderConfigsUpdate()
 }
 
 func (s *runtimeMCPConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfig, error) {
 	return s.base.GetAgentRoleConfigs()
 }
 
-func (s *runtimeMCPConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
-	return s.base.LastAgentRoleConfigsUpdate()
-}
-
 func (s *runtimeMCPConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 	return s.base.GetGlobalConfig()
-}
-
-func (s *runtimeMCPConfigStore) LastGlobalConfigUpdate() (time.Time, error) {
-	return s.base.LastGlobalConfigUpdate()
 }
 
 func (s *runtimeMCPConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
@@ -716,16 +699,8 @@ func (s *runtimeMCPConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServe
 	return cloned, nil
 }
 
-func (s *runtimeMCPConfigStore) LastMCPServerConfigsUpdate() (time.Time, error) {
-	return s.mcpServerConfigsTime, nil
-}
-
 func (s *runtimeMCPConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
 	return s.base.GetHookConfigs()
-}
-
-func (s *runtimeMCPConfigStore) LastHookConfigsUpdate() (time.Time, error) {
-	return s.base.LastHookConfigsUpdate()
 }
 
 func (s *runtimeMCPConfigStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
@@ -759,9 +734,8 @@ func buildRuntimeMCPConfigStore(base conf.ConfigStore, roleMCPServers []string, 
 	}
 
 	return &runtimeMCPConfigStore{
-		base:                 base,
-		mcpServerConfigs:     adjusted,
-		mcpServerConfigsTime: time.Now(),
+		base:             base,
+		mcpServerConfigs: adjusted,
 	}, nil
 }
 

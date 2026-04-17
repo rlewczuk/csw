@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"sync"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 )
@@ -15,55 +14,37 @@ import (
 type MockConfigStore struct {
 	mu sync.RWMutex
 
-	globalConfig               *conf.GlobalConfig
-	globalConfigUpdate         time.Time
-	modelProviderConfigs       map[string]*conf.ModelProviderConfig
-	modelProviderConfigsUpdate time.Time
-	modelAliases               map[string]conf.ModelAliasValue
-	modelAliasesUpdate         time.Time
-	mcpServerConfigs           map[string]*conf.MCPServerConfig
-	mcpServerConfigsUpdate     time.Time
-	hookConfigs                map[string]*conf.HookConfig
-	hookConfigsUpdate          time.Time
-	agentRoleConfigs           map[string]*conf.AgentRoleConfig
-	agentRoleConfigsUpdate     time.Time
-	agentConfigFiles           map[string][]byte
+	globalConfig         *conf.GlobalConfig
+	modelProviderConfigs map[string]*conf.ModelProviderConfig
+	modelAliases         map[string]conf.ModelAliasValue
+	mcpServerConfigs     map[string]*conf.MCPServerConfig
+	hookConfigs          map[string]*conf.HookConfig
+	agentRoleConfigs     map[string]*conf.AgentRoleConfig
+	agentConfigFiles     map[string][]byte
 
 	// Error injection for testing
-	GetGlobalConfigErr                error
-	GetModelProviderConfigsErr        error
-	GetAgentRoleConfigsErr            error
-	LastGlobalConfigUpdateErr         error
-	LastModelProviderConfigsUpdateErr error
-	GetModelAliasesErr                error
-	LastModelAliasesUpdateErr         error
-	GetMCPServerConfigsErr            error
-	LastMCPServerConfigsUpdateErr     error
-	GetHookConfigsErr                 error
-	LastHookConfigsUpdateErr          error
-	LastAgentRoleConfigsUpdateErr     error
-	GetAgentConfigFileErr             error
-	SaveModelProviderConfigErr        error
-	DeleteModelProviderConfigErr      error
-	SaveGlobalConfigErr               error
+	GetGlobalConfigErr         error
+	GetModelProviderConfigsErr error
+	GetAgentRoleConfigsErr     error
+	GetModelAliasesErr         error
+	GetMCPServerConfigsErr     error
+	GetHookConfigsErr          error
+	GetAgentConfigFileErr      error
+	SaveModelProviderConfigErr error
+	DeleteModelProviderConfigErr error
+	SaveGlobalConfigErr          error
 }
 
 // NewMockConfigStore creates a new MockConfigStore with empty configuration.
 func NewMockConfigStore() *MockConfigStore {
 	return &MockConfigStore{
-		globalConfig:               &conf.GlobalConfig{},
-		globalConfigUpdate:         time.Now(),
-		modelProviderConfigs:       make(map[string]*conf.ModelProviderConfig),
-		modelProviderConfigsUpdate: time.Now(),
-		modelAliases:               make(map[string]conf.ModelAliasValue),
-		modelAliasesUpdate:         time.Now(),
-		mcpServerConfigs:           make(map[string]*conf.MCPServerConfig),
-		mcpServerConfigsUpdate:     time.Now(),
-		hookConfigs:                make(map[string]*conf.HookConfig),
-		hookConfigsUpdate:          time.Now(),
-		agentRoleConfigs:           make(map[string]*conf.AgentRoleConfig),
-		agentRoleConfigsUpdate:     time.Now(),
-		agentConfigFiles:           make(map[string][]byte),
+		globalConfig:         &conf.GlobalConfig{},
+		modelProviderConfigs: make(map[string]*conf.ModelProviderConfig),
+		modelAliases:         make(map[string]conf.ModelAliasValue),
+		mcpServerConfigs:     make(map[string]*conf.MCPServerConfig),
+		hookConfigs:          make(map[string]*conf.HookConfig),
+		agentRoleConfigs:     make(map[string]*conf.AgentRoleConfig),
+		agentConfigFiles:     make(map[string][]byte),
 	}
 }
 
@@ -72,7 +53,6 @@ func (m *MockConfigStore) SetMCPServerConfigs(configs map[string]*conf.MCPServer
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.mcpServerConfigs = configs
-	m.mcpServerConfigsUpdate = time.Now()
 }
 
 // SetHookConfigs sets hook configurations and updates timestamp.
@@ -80,7 +60,6 @@ func (m *MockConfigStore) SetHookConfigs(configs map[string]*conf.HookConfig) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.hookConfigs = configs
-	m.hookConfigsUpdate = time.Now()
 }
 
 // SetAgentConfigFile sets agent config file content for tests.
@@ -98,7 +77,6 @@ func (m *MockConfigStore) SetGlobalConfig(config *conf.GlobalConfig) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.globalConfig = config
-	m.globalConfigUpdate = time.Now()
 }
 
 // SetModelProviderConfigs sets the model provider configurations and updates the timestamp.
@@ -106,7 +84,6 @@ func (m *MockConfigStore) SetModelProviderConfigs(configs map[string]*conf.Model
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.modelProviderConfigs = configs
-	m.modelProviderConfigsUpdate = time.Now()
 }
 
 // SetModelAliases sets model aliases and updates timestamp.
@@ -114,7 +91,6 @@ func (m *MockConfigStore) SetModelAliases(aliases map[string]conf.ModelAliasValu
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.modelAliases = aliases
-	m.modelAliasesUpdate = time.Now()
 }
 
 // SetAgentRoleConfigs sets the agent role configurations and updates the timestamp.
@@ -122,49 +98,6 @@ func (m *MockConfigStore) SetAgentRoleConfigs(configs map[string]*conf.AgentRole
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.agentRoleConfigs = configs
-	m.agentRoleConfigsUpdate = time.Now()
-}
-
-// UpdateGlobalConfigTimestamp updates the global config timestamp without changing the config.
-func (m *MockConfigStore) UpdateGlobalConfigTimestamp() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.globalConfigUpdate = time.Now()
-}
-
-// UpdateModelProviderConfigsTimestamp updates the model provider configs timestamp.
-func (m *MockConfigStore) UpdateModelProviderConfigsTimestamp() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.modelProviderConfigsUpdate = time.Now()
-}
-
-// UpdateModelAliasesTimestamp updates model aliases timestamp.
-func (m *MockConfigStore) UpdateModelAliasesTimestamp() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.modelAliasesUpdate = time.Now()
-}
-
-// UpdateMCPServerConfigsTimestamp updates MCP server configs timestamp.
-func (m *MockConfigStore) UpdateMCPServerConfigsTimestamp() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.mcpServerConfigsUpdate = time.Now()
-}
-
-// UpdateHookConfigsTimestamp updates hook configs timestamp.
-func (m *MockConfigStore) UpdateHookConfigsTimestamp() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.hookConfigsUpdate = time.Now()
-}
-
-// UpdateAgentRoleConfigsTimestamp updates the agent role configs timestamp.
-func (m *MockConfigStore) UpdateAgentRoleConfigsTimestamp() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.agentRoleConfigsUpdate = time.Now()
 }
 
 // GetGlobalConfig returns the global configuration.
@@ -177,18 +110,6 @@ func (m *MockConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
 	}
 
 	return m.globalConfig.Clone(), nil
-}
-
-// LastGlobalConfigUpdate returns the timestamp of the last global config update.
-func (m *MockConfigStore) LastGlobalConfigUpdate() (time.Time, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.LastGlobalConfigUpdateErr != nil {
-		return time.Time{}, m.LastGlobalConfigUpdateErr
-	}
-
-	return m.globalConfigUpdate, nil
 }
 
 // GetModelProviderConfigs returns the model provider configurations.
@@ -209,18 +130,6 @@ func (m *MockConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelProvi
 	return configs, nil
 }
 
-// LastModelProviderConfigsUpdate returns the timestamp of the last model provider configs update.
-func (m *MockConfigStore) LastModelProviderConfigsUpdate() (time.Time, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.LastModelProviderConfigsUpdateErr != nil {
-		return time.Time{}, m.LastModelProviderConfigsUpdateErr
-	}
-
-	return m.modelProviderConfigsUpdate, nil
-}
-
 // GetModelAliases returns configured model aliases.
 func (m *MockConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, error) {
 	m.mu.RLock()
@@ -236,18 +145,6 @@ func (m *MockConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, er
 	}
 
 	return aliases, nil
-}
-
-// LastModelAliasesUpdate returns timestamp of last model aliases update.
-func (m *MockConfigStore) LastModelAliasesUpdate() (time.Time, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.LastModelAliasesUpdateErr != nil {
-		return time.Time{}, m.LastModelAliasesUpdateErr
-	}
-
-	return m.modelAliasesUpdate, nil
 }
 
 // GetMCPServerConfigs returns MCP server configurations.
@@ -267,18 +164,6 @@ func (m *MockConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfi
 	return configs, nil
 }
 
-// LastMCPServerConfigsUpdate returns timestamp of last MCP server configs update.
-func (m *MockConfigStore) LastMCPServerConfigsUpdate() (time.Time, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.LastMCPServerConfigsUpdateErr != nil {
-		return time.Time{}, m.LastMCPServerConfigsUpdateErr
-	}
-
-	return m.mcpServerConfigsUpdate, nil
-}
-
 // GetHookConfigs returns hook configurations.
 func (m *MockConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) {
 	m.mu.RLock()
@@ -294,18 +179,6 @@ func (m *MockConfigStore) GetHookConfigs() (map[string]*conf.HookConfig, error) 
 	}
 
 	return configs, nil
-}
-
-// LastHookConfigsUpdate returns timestamp of last hook configs update.
-func (m *MockConfigStore) LastHookConfigsUpdate() (time.Time, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.LastHookConfigsUpdateErr != nil {
-		return time.Time{}, m.LastHookConfigsUpdateErr
-	}
-
-	return m.hookConfigsUpdate, nil
 }
 
 // GetAgentRoleConfigs returns the agent role configurations.
@@ -357,18 +230,6 @@ func (m *MockConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfi
 	return configs, nil
 }
 
-// LastAgentRoleConfigsUpdate returns the timestamp of the last agent role configs update.
-func (m *MockConfigStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.LastAgentRoleConfigsUpdateErr != nil {
-		return time.Time{}, m.LastAgentRoleConfigsUpdateErr
-	}
-
-	return m.agentRoleConfigsUpdate, nil
-}
-
 // SaveModelProviderConfig saves model provider configuration.
 func (m *MockConfigStore) SaveModelProviderConfig(config *conf.ModelProviderConfig) error {
 	m.mu.Lock()
@@ -388,7 +249,6 @@ func (m *MockConfigStore) SaveModelProviderConfig(config *conf.ModelProviderConf
 		m.modelProviderConfigs = make(map[string]*conf.ModelProviderConfig)
 	}
 	m.modelProviderConfigs[config.Name] = config.Clone()
-	m.modelProviderConfigsUpdate = time.Now()
 
 	return nil
 }
@@ -403,7 +263,6 @@ func (m *MockConfigStore) DeleteModelProviderConfig(name string) error {
 	}
 
 	delete(m.modelProviderConfigs, name)
-	m.modelProviderConfigsUpdate = time.Now()
 
 	return nil
 }
@@ -421,7 +280,6 @@ func (m *MockConfigStore) SaveGlobalConfig(config *conf.GlobalConfig) error {
 	}
 
 	m.globalConfig = config.Clone()
-	m.globalConfigUpdate = time.Now()
 
 	return nil
 }
