@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -115,7 +114,7 @@ func TestResolveTaskRunMerge(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			resolver := runDefaultsResolver(func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+			resolver := runDefaultsResolver(func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 				_ = params
 				if tc.resolverErr {
 					return conf.RunDefaultsConfig{}, assert.AnError

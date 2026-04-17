@@ -43,7 +43,7 @@ func TestCLIContainerModeRunBashBusybox(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := runCommand(&RunParams{
+	err := RunCommand(&RunParams{
 		Prompt:           "Run a shell command",
 		ModelName:        "ollama/test-model",
 		RoleName:         "developer",
@@ -113,7 +113,7 @@ func TestCLIContainerModeFromGlobalConfig(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := runCommand(&RunParams{
+	err := RunCommand(&RunParams{
 		Prompt:        "Run a shell command",
 		ModelName:     "ollama/test-model",
 		RoleName:      "developer",
@@ -172,7 +172,7 @@ func TestCLIContainerModeWithAdditionalMountAndEnv(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := runCommand(&RunParams{
+	err := RunCommand(&RunParams{
 		Prompt:           "Run a shell command",
 		ModelName:        "ollama/test-model",
 		RoleName:         "developer",
