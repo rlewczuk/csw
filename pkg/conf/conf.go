@@ -22,25 +22,6 @@ const (
 // HookType defines supported hook execution backend.
 type HookType string
 
-const (
-	// HookTypeShell runs a shell command.
-	HookTypeShell HookType = "shell"
-	// HookTypeLLM runs a one-shot LLM query.
-	HookTypeLLM HookType = "llm"
-	// HookTypeSubAgent runs a delegated subagent task.
-	HookTypeSubAgent HookType = "subagent"
-)
-
-// HookRunOn defines where shell hook commands are executed.
-type HookRunOn string
-
-const (
-	// HookRunOnHost executes command on host system.
-	HookRunOnHost HookRunOn = "host"
-	// HookRunOnSandbox executes command in sandbox/container when available.
-	HookRunOnSandbox HookRunOn = "sandbox"
-)
-
 // AuthMode represents the authentication mode for a model provider.
 type AuthMode string
 
@@ -200,7 +181,6 @@ type AgentRoleConfig struct {
 	// HiddenPatterns contains glob patterns for files and directories that should be hidden from VFS operations
 	// Supports .gitignore-compatible syntax
 	HiddenPatterns []string `json:"hidden-patterns,omitempty" yaml:"hidden-patterns,omitempty"`
-
 }
 
 // ModelTagMapping represents a single model-to-tag mapping rule.
