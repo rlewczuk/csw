@@ -6,10 +6,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var runCommandFunc = executeSystemRunCommand
-var resolveRunDefaultsFunc = system.ResolveRunDefaults
-var loadTaskBackendFunc = loadTaskBackend
-
 // RunCommand creates the run command.
 func RunCommand() *cobra.Command {
 	var (
@@ -60,11 +56,11 @@ func RunCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			system.SetRunCommandTaskManagerLoader(func(cmd *cobra.Command) (*core.TaskManager, error) {
-				manager, _, err := loadTaskBackendFunc(cmd)
+				manager, _, err := loadTaskBackend(cmd)
 				return manager, err
 			})
 			system.SetRunCommandTaskRunIdentifierResolver(resolveTaskRunIdentifier)
-			return runCommand(&system.RunParams{
+			return system.RunCommand(&system.RunParams{
 				Command:               cmd,
 				PositionalArgs:        append([]string(nil), args...),
 				ContextEntries:        append([]string(nil), cliContext...),
