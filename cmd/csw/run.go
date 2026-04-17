@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -59,22 +58,6 @@ func RunCommand() *cobra.Command {
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			effectiveTaskIdentifier := strings.TrimSpace(cliTaskIdentifier)
-			runPositionalArgs := append([]string(nil), args...)
-			if effectiveTaskIdentifier == "" && !cliTaskLast && !cliTaskNext && len(runPositionalArgs) > 0 {
-				manager, _, err := loadTaskBackend(cmd)
-				if err != nil {
-					return err
-				}
-				resolvedIdentifier, recognized, err := resolveTaskIdentifierFromPositional(manager, runPositionalArgs[0])
-				if err != nil {
-					return err
-				}
-				if recognized {
-					effectiveTaskIdentifier = resolvedIdentifier
-					runPositionalArgs = runPositionalArgs[1:]
-				}
-			}
 			system.SetRunCommandTaskManagerLoader(func(cmd *cobra.Command) (*core.TaskManager, error) {
 				manager, _, err := loadTaskBackend(cmd)
 				return manager, err
@@ -82,9 +65,9 @@ func RunCommand() *cobra.Command {
 			system.SetRunCommandTaskRunIdentifierResolver(resolveTaskRunIdentifier)
 			return system.RunCommand(&system.RunParams{
 				Command:               cmd,
-				PositionalArgs:        runPositionalArgs,
+				PositionalArgs:        append([]string(nil), args...),
 				ContextEntries:        append([]string(nil), cliContext...),
-				TaskIdentifier:        effectiveTaskIdentifier,
+				TaskIdentifier:        strings.TrimSpace(cliTaskIdentifier),
 				TaskNext:              cliTaskNext,
 				TaskLast:              cliTaskLast,
 				TaskReset:             cliTaskReset,
@@ -162,39 +145,4 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliTaskReset, "reset", false, "Reset task branch before run in task context")
 
 	return cmd
-}
-
-func resolveTaskIdentifierFromPositional(manager *core.TaskManager, candidate string) (string, bool, error) {
-	trimmedCandidate := strings.TrimSpace(candidate)
-	if trimmedCandidate == "" {
-		return "", false, nil
-	}
-	if taskDirUUIDPattern.MatchString(trimmedCandidate) {
-		return trimmedCandidate, true, nil
-	}
-	if manager == nil {
-		return "", false, nil
-	}
-
-	tasks, err := listAllCurrentTasks(manager)
-	if err != nil {
-		return "", false, err
-	}
-
-	matchedUUID := ""
-	for _, taskData := range tasks {
-		if taskData == nil || strings.TrimSpace(taskData.FeatureBranch) != trimmedCandidate {
-			continue
-		}
-		if matchedUUID != "" && matchedUUID != strings.TrimSpace(taskData.UUID) {
-			return "", false, fmt.Errorf("resolveTaskIdentifierFromPositional() [run.go]: multiple tasks match feature branch %q", trimmedCandidate)
-		}
-		matchedUUID = strings.TrimSpace(taskData.UUID)
-	}
-
-	if matchedUUID == "" {
-		return "", false, nil
-	}
-
-	return matchedUUID, true, nil
 }

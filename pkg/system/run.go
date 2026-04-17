@@ -6,6 +6,7 @@ import (
 	stdio "io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"reflect"
 	"strconv"
 	"strings"
@@ -100,6 +101,7 @@ var finalizeWorktreeSessionFunc = FinalizeWorktreeSession
 var emitSessionSummaryFunc = core.EmitSessionSummary
 var loadTaskManagerFunc TaskManagerLoader
 var resolveTaskRunIdentifierFunc TaskRunIdentifierResolver
+var runTaskDirUUIDPattern = regexp.MustCompile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 // SetRunCommandTaskManagerLoader sets task manager loader used by RunCommand.
 func SetRunCommandTaskManagerLoader(loader TaskManagerLoader) {
@@ -133,11 +135,36 @@ func RunCommand(params *RunParams) error {
 	}
 
 	var taskManager *core.TaskManager
+	var preloadedTaskManager *core.TaskManager
 	taskIdentifier := ""
 	runInTaskMode := false
 
 	if params.Command != nil {
 		positionalArgs := append([]string(nil), params.PositionalArgs...)
+		effectiveTaskIdentifier := strings.TrimSpace(params.TaskIdentifier)
+		if effectiveTaskIdentifier == "" && !params.TaskLast && !params.TaskNext && len(positionalArgs) > 0 {
+			resolvedIdentifier, recognized, err := resolveTaskIdentifierFromPosition(nil, positionalArgs[0])
+			if err != nil {
+				return err
+			}
+			if !recognized && loadTaskManagerFunc != nil {
+				loadedManager, loadErr := loadTaskManagerFunc(params.Command)
+				if loadErr != nil {
+					return loadErr
+				}
+				preloadedTaskManager = loadedManager
+				resolvedIdentifier, recognized, err = resolveTaskIdentifierFromPosition(loadedManager, positionalArgs[0])
+				if err != nil {
+					return err
+				}
+			}
+			if recognized {
+				effectiveTaskIdentifier = resolvedIdentifier
+				positionalArgs = positionalArgs[1:]
+			}
+		}
+		params.TaskIdentifier = effectiveTaskIdentifier
+
 		prompt := ""
 		extraPositionalArgs := []string(nil)
 		if len(positionalArgs) >= 1 {
@@ -164,7 +191,7 @@ func RunCommand(params *RunParams) error {
 			prompt = strings.TrimSpace(prompt)
 		}
 
-		runInTaskMode = strings.TrimSpace(params.TaskIdentifier) != "" || params.TaskLast || params.TaskNext
+		runInTaskMode = strings.TrimSpace(effectiveTaskIdentifier) != "" || params.TaskLast || params.TaskNext
 
 		invocation, isCommandInvocation, err := commands.ParseInvocation(prompt, extraPositionalArgs)
 		if err != nil {
@@ -261,12 +288,16 @@ func RunCommand(params *RunParams) error {
 			if resolveTaskRunIdentifierFunc == nil {
 				return fmt.Errorf("RunCommand() [run.go]: task run identifier resolver not configured")
 			}
-			manager, err := loadTaskManagerFunc(params.Command)
-			if err != nil {
-				return err
+			manager := preloadedTaskManager
+			if manager == nil {
+				var loadErr error
+				manager, loadErr = loadTaskManagerFunc(params.Command)
+				if loadErr != nil {
+					return loadErr
+				}
 			}
 			taskManager = manager
-			identifier, err := resolveTaskRunIdentifierFunc(manager, params.TaskIdentifier, params.TaskLast, params.TaskNext)
+			identifier, err := resolveTaskRunIdentifierFunc(manager, effectiveTaskIdentifier, params.TaskLast, params.TaskNext)
 			if err != nil {
 				return err
 			}
@@ -417,6 +448,68 @@ func RunCommand(params *RunParams) error {
 		}
 	}
 	return nil
+}
+
+func resolveTaskIdentifierFromPosition(manager *core.TaskManager, candidate string) (string, bool, error) {
+	trimmedCandidate := strings.TrimSpace(candidate)
+	if trimmedCandidate == "" {
+		return "", false, nil
+	}
+	if runTaskDirUUIDPattern.MatchString(trimmedCandidate) {
+		return trimmedCandidate, true, nil
+	}
+	if manager == nil {
+		return "", false, nil
+	}
+
+	tasks, err := listAllCurrentTasksForRun(manager)
+	if err != nil {
+		return "", false, err
+	}
+
+	matchedUUID := ""
+	for _, taskData := range tasks {
+		if taskData == nil || strings.TrimSpace(taskData.FeatureBranch) != trimmedCandidate {
+			continue
+		}
+		if matchedUUID != "" && matchedUUID != strings.TrimSpace(taskData.UUID) {
+			return "", false, fmt.Errorf("resolveTaskIdentifierFromPosition() [run.go]: multiple tasks match feature branch %q", trimmedCandidate)
+		}
+		matchedUUID = strings.TrimSpace(taskData.UUID)
+	}
+
+	if matchedUUID == "" {
+		return "", false, nil
+	}
+
+	return matchedUUID, true, nil
+}
+
+func listAllCurrentTasksForRun(manager *core.TaskManager) ([]*core.Task, error) {
+	if manager == nil {
+		return nil, fmt.Errorf("listAllCurrentTasksForRun() [run.go]: manager cannot be nil")
+	}
+
+	topLevelTasks, err := manager.ListTasks(core.TaskLookup{}, false)
+	if err != nil {
+		return nil, err
+	}
+
+	allTasks := make([]*core.Task, 0, len(topLevelTasks))
+	for _, topLevelTask := range topLevelTasks {
+		if topLevelTask == nil {
+			continue
+		}
+		allTasks = append(allTasks, topLevelTask)
+
+		children, childErr := manager.ListTasks(core.TaskLookup{Identifier: strings.TrimSpace(topLevelTask.UUID)}, true)
+		if childErr != nil {
+			return nil, childErr
+		}
+		allTasks = append(allTasks, children...)
+	}
+
+	return allTasks, nil
 }
 
 func applyRunDefaults(resolver runDefaultsResolver, cmd *cobra.Command, workDir string, shadowDir string, projectConfig string, configPath string, model *string, worktree *string, merge *bool, logLLMRequests *bool, logLLMRequestsRaw *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string) error {
