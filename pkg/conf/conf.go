@@ -503,9 +503,6 @@ type WritableConfigStore interface {
 	// SaveModelProviderConfig saves or updates a model provider configuration.
 	SaveModelProviderConfig(config *ModelProviderConfig) error
 
-	// DeleteModelProviderConfig deletes a model provider configuration.
-	DeleteModelProviderConfig(name string) error
-
 	// SaveGlobalConfig saves global configuration.
 	SaveGlobalConfig(config *GlobalConfig) error
 }

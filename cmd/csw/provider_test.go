@@ -422,7 +422,9 @@ func TestProviderCommandWithCustomPath(t *testing.T) {
 	assert.Equal(t, "https://custom.example.com/v1", configs["custom-provider"].URL)
 
 	// Test removing provider from custom path
-	err = store.DeleteModelProviderConfig("custom-provider")
+	localStore, ok := store.(*impl.LocalConfigStore)
+	require.True(t, ok)
+	err = localStore.DeleteModelProviderConfig("custom-provider")
 	require.NoError(t, err)
 
 	configs, err = store.GetModelProviderConfigs()
