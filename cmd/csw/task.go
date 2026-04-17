@@ -92,10 +92,15 @@ func taskNewCommand() *cobra.Command {
 					return "", false, err
 				}
 
-				temporaryDir, err := resolveTaskTempDir(workDir, strings.TrimSpace(cliShadowDir))
-				if err != nil {
-					return "", false, err
+				configRoot := workDir
+				if strings.TrimSpace(cliShadowDir) != "" {
+					resolvedShadowDir, shadowErr := system.ResolveWorkDir(strings.TrimSpace(cliShadowDir))
+					if shadowErr != nil {
+						return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to resolve shadow directory: %w", shadowErr)
+					}
+					configRoot = resolvedShadowDir
 				}
+				temporaryDir := filepath.Join(configRoot, ".cswdata", "tmp")
 				if err := os.MkdirAll(temporaryDir, 0o755); err != nil {
 					return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to create temporary directory: %w", err)
 				}
@@ -1023,24 +1028,6 @@ type taskCreateResolveParams struct {
 	ShadowDir     string
 	ProjectConfig string
 	ConfigPath    string
-}
-
-func resolveTaskTempDir(workDir string, shadowDir string) (string, error) {
-	resolvedWorkDir, err := system.ResolveWorkDir(strings.TrimSpace(workDir))
-	if err != nil {
-		return "", fmt.Errorf("resolveTaskTempDir() [task.go]: failed to resolve work directory: %w", err)
-	}
-
-	configRoot := resolvedWorkDir
-	if strings.TrimSpace(shadowDir) != "" {
-		resolvedShadowDir, shadowErr := system.ResolveWorkDir(strings.TrimSpace(shadowDir))
-		if shadowErr != nil {
-			return "", fmt.Errorf("resolveTaskTempDir() [task.go]: failed to resolve shadow directory: %w", shadowErr)
-		}
-		configRoot = resolvedShadowDir
-	}
-
-	return filepath.Join(configRoot, ".cswdata", "tmp"), nil
 }
 
 func resolveTaskEditorCommand(params taskNewPromptParams) (string, error) {
