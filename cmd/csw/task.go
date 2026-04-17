@@ -8,12 +8,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/spf13/cobra"
@@ -22,9 +22,7 @@ import (
 
 var resolveTaskRunDefaultsFunc = system.ResolveRunDefaults
 var resolveTaskWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
-var buildTaskSystemFunc = system.BuildSystem
 var generateTaskDescriptionFunc = generateTaskDescription
-var taskDirUUIDPattern = regexp.MustCompile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 // TaskCommand creates task command with persistent hierarchical task management.
 func TaskCommand() *cobra.Command {
@@ -791,7 +789,7 @@ func collectTaskYMLModTimes(tasksRoot string) (map[string]int64, error) {
 			return err
 		}
 		if entry != nil && entry.IsDir() {
-			if path != trimmedRoot && !taskDirUUIDPattern.MatchString(strings.TrimSpace(entry.Name())) {
+			if path != trimmedRoot && !shared.UUIDPattern.MatchString(strings.TrimSpace(entry.Name())) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -1172,7 +1170,7 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 		RoleName:      strings.TrimSpace(pickTaskRoleName(params.Role)),
 	}
 
-	sweSystem, buildResult, err := buildTaskSystemFunc(buildParams)
+	sweSystem, buildResult, err := system.BuildSystem(buildParams)
 	if err != nil {
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to build system: %w", err)
 	}

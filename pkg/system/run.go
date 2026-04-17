@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -100,7 +99,6 @@ var startRunSessionFunc = func(sweSystem *SweSystem, params StartRunSessionParam
 var emitSessionSummaryFunc = core.EmitSessionSummary
 var loadTaskManagerFunc TaskManagerLoader
 var resolveTaskRunIdentifierFunc TaskRunIdentifierResolver
-var runTaskDirUUIDPattern = regexp.MustCompile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 // SetRunCommandTaskManagerLoader sets task manager loader used by RunCommand.
 func SetRunCommandTaskManagerLoader(loader TaskManagerLoader) {
@@ -454,7 +452,7 @@ func resolveTaskIdentifierFromPosition(manager *core.TaskManager, candidate stri
 	if trimmedCandidate == "" {
 		return "", false, nil
 	}
-	if runTaskDirUUIDPattern.MatchString(trimmedCandidate) {
+	if shared.UUIDPattern.MatchString(trimmedCandidate) {
 		return trimmedCandidate, true, nil
 	}
 	if manager == nil {

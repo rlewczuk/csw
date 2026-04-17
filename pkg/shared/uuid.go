@@ -3,8 +3,11 @@ package shared
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"regexp"
 	"time"
 )
+
+var UUIDPattern = regexp.MustCompile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 // GenerateUUIDv7 generates a UUIDv7 string.
 // UUIDv7 is sortable by time and uses 48-bit timestamp in milliseconds since Unix epoch.
