@@ -229,17 +229,6 @@ func TestProviderCommand_SetDefault(t *testing.T) {
 	err = store.SaveModelProviderConfig(config)
 	require.NoError(t, err)
 
-	// Set as default
-	globalConfig, err := store.GetGlobalConfig()
-	require.NoError(t, err)
-	globalConfig.Defaults.DefaultProvider = "test-provider"
-	err = store.SaveGlobalConfig(globalConfig)
-	require.NoError(t, err)
-
-	// Verify default is set
-	loadedConfig, err := store.GetGlobalConfig()
-	require.NoError(t, err)
-	assert.Equal(t, "test-provider", loadedConfig.Defaults.DefaultProvider)
 }
 
 func TestMaskAPIKey(t *testing.T) {
@@ -414,46 +403,6 @@ func TestProviderCommandWithCustomPath(t *testing.T) {
 	assert.Equal(t, "openai", configs["custom-provider"].Type)
 	assert.Equal(t, "https://custom.example.com/v1", configs["custom-provider"].URL)
 
-}
-
-func TestProviderCommandWithCustomPathSetDefault(t *testing.T) {
-	// Create temporary directory for custom config
-	tmpDir, err := os.MkdirTemp("", "csw-custom-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	customConfigPath := filepath.Join(tmpDir, "custom-config")
-
-	// Create config store with custom path
-	store, err := GetConfigStore(ConfigScope(customConfigPath))
-	require.NoError(t, err)
-	defer func() {
-		if closer, ok := store.(interface{ Close() error }); ok {
-			closer.Close()
-		}
-	}()
-
-	// Add a provider
-	config := &conf.ModelProviderConfig{
-		Name:        "custom-default-provider",
-		Type:        "anthropic",
-		URL:         "https://api.anthropic.com/v1",
-		Description: "Custom default provider",
-	}
-	err = store.SaveModelProviderConfig(config)
-	require.NoError(t, err)
-
-	// Set as default
-	globalConfig, err := store.GetGlobalConfig()
-	require.NoError(t, err)
-	globalConfig.Defaults.DefaultProvider = "custom-default-provider"
-	err = store.SaveGlobalConfig(globalConfig)
-	require.NoError(t, err)
-
-	// Verify default is set
-	loadedConfig, err := store.GetGlobalConfig()
-	require.NoError(t, err)
-	assert.Equal(t, "custom-default-provider", loadedConfig.Defaults.DefaultProvider)
 }
 
 func TestProviderListShowComposite(t *testing.T) {

@@ -84,50 +84,6 @@ func TestRoleCommand_Show(t *testing.T) {
 	assert.NotNil(t, config.VFSPrivileges, "developer role should have VFS privileges")
 }
 
-func TestRoleCommand_SetGetDefault(t *testing.T) {
-	// Create temporary directory
-	tmpDir, err := os.MkdirTemp("", "csw-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	tmpHome, err := os.MkdirTemp("", "csw-home-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpHome)
-
-	// Set HOME to temp directory
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpHome)
-	defer os.Setenv("HOME", oldHome)
-
-	// Change to temp directory
-	oldDir, err := os.Getwd()
-	require.NoError(t, err)
-	defer os.Chdir(oldDir)
-	err = os.Chdir(tmpDir)
-	require.NoError(t, err)
-
-	// Get config store
-	store, err := GetConfigStore(ConfigScopeLocal)
-	require.NoError(t, err)
-	defer func() {
-		if closer, ok := store.(interface{ Close() error }); ok {
-			closer.Close()
-		}
-	}()
-
-	// Set default role to "developer" (which exists in embedded defaults)
-	globalConfig, err := store.GetGlobalConfig()
-	require.NoError(t, err)
-	globalConfig.Defaults.DefaultRole = "developer"
-	err = store.SaveGlobalConfig(globalConfig)
-	require.NoError(t, err)
-
-	// Verify default is set
-	loadedConfig, err := store.GetGlobalConfig()
-	require.NoError(t, err)
-	assert.Equal(t, "developer", loadedConfig.Defaults.DefaultRole)
-}
-
 func TestOutputRoleList(t *testing.T) {
 	configs := map[string]*conf.AgentRoleConfig{
 		"developer": {

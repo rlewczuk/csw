@@ -90,71 +90,6 @@ func TestLocalConfigStore_SaveModelProviderConfig_Update(t *testing.T) {
 	assert.Equal(t, "new-key", configs["test-provider"].APIKey)
 }
 
-func TestLocalConfigStore_SaveGlobalConfig(t *testing.T) {
-	// Create temporary directory
-	tmpDir, err := os.MkdirTemp("", "csw-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Create config store
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// Create global config
-	globalConfig := &conf.GlobalConfig{
-		Defaults:                   conf.RunDefaultsConfig{DefaultProvider: "test-provider"},
-		ContextCompactionThreshold: 0.9,
-		ModelTags: []conf.ModelTagMapping{
-			{Model: "gpt-4", Tag: "large"},
-		},
-	}
-
-	// Save global config
-	err = store.SaveGlobalConfig(globalConfig)
-	require.NoError(t, err)
-
-	// Verify file exists
-	globalPath := filepath.Join(tmpDir, "global.json")
-	assert.FileExists(t, globalPath)
-
-	// Reload and verify
-	loadedConfig, err := store.GetGlobalConfig()
-	require.NoError(t, err)
-	assert.Equal(t, "test-provider", loadedConfig.Defaults.DefaultProvider)
-	assert.Equal(t, 0.9, loadedConfig.ContextCompactionThreshold)
-	assert.Len(t, loadedConfig.ModelTags, 1)
-	assert.Equal(t, "gpt-4", loadedConfig.ModelTags[0].Model)
-}
-
-func TestLocalConfigStore_SaveGlobalConfig_Update(t *testing.T) {
-	// Create temporary directory
-	tmpDir, err := os.MkdirTemp("", "csw-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Create config store
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// Create initial config
-	globalConfig := &conf.GlobalConfig{
-		Defaults: conf.RunDefaultsConfig{DefaultProvider: "provider1"},
-	}
-	err = store.SaveGlobalConfig(globalConfig)
-	require.NoError(t, err)
-
-	// Update config
-	globalConfig.Defaults.DefaultProvider = "provider2"
-	err = store.SaveGlobalConfig(globalConfig)
-	require.NoError(t, err)
-
-	// Verify update
-	loadedConfig, err := store.GetGlobalConfig()
-	require.NoError(t, err)
-	assert.Equal(t, "provider2", loadedConfig.Defaults.DefaultProvider)
-}
 
 func TestLocalConfigStore_SaveModelProviderConfig_NilConfig(t *testing.T) {
 	// Create temporary directory
@@ -194,23 +129,6 @@ func TestLocalConfigStore_SaveModelProviderConfig_EmptyName(t *testing.T) {
 	err = store.SaveModelProviderConfig(config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "name cannot be empty")
-}
-
-func TestLocalConfigStore_SaveGlobalConfig_NilConfig(t *testing.T) {
-	// Create temporary directory
-	tmpDir, err := os.MkdirTemp("", "csw-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Create config store
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// Try to save nil config
-	err = store.SaveGlobalConfig(nil)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "config cannot be nil")
 }
 
 func TestLocalConfigStore_Save_MultipleProviders(t *testing.T) {

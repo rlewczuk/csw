@@ -20,8 +20,6 @@ type mockWritableStore struct {
 	saveCalled   bool
 	saveError    error
 	globalConfig *conf.GlobalConfig
-	globalSaved  bool
-	globalError  error
 }
 
 func (m *mockWritableStore) GetModelProviderConfigs() (map[string]*conf.ModelProviderConfig, error) {
@@ -66,15 +64,6 @@ func (m *mockWritableStore) SaveModelProviderConfig(config *conf.ModelProviderCo
 		return m.saveError
 	}
 	m.savedConfig = config
-	return nil
-}
-
-func (m *mockWritableStore) SaveGlobalConfig(config *conf.GlobalConfig) error {
-	m.globalSaved = true
-	if m.globalError != nil {
-		return m.globalError
-	}
-	m.globalConfig = config
 	return nil
 }
 

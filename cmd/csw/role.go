@@ -24,7 +24,6 @@ func RoleCommand() *cobra.Command {
 	// Add subcommands
 	cmd.AddCommand(roleListCommand())
 	cmd.AddCommand(roleShowCommand())
-	cmd.AddCommand(roleSetDefaultCommand())
 	cmd.AddCommand(roleGetDefaultCommand())
 
 	return cmd
@@ -103,89 +102,6 @@ func roleShowCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&useJSON, "json", false, "Output in JSON format")
 	cmd.Flags().BoolVar(&showSystemPrompt, "system-prompt", false, "Render and output system prompt")
 	cmd.Flags().StringVar(&modelName, "model", "", "Model name to use for prompt rendering (provider/model format; fallback lists not supported)")
-
-	return cmd
-}
-
-func roleSetDefaultCommand() *cobra.Command {
-	var useGlobal bool
-	var useLocal bool
-	var toPath string
-	var scope ConfigScope = ConfigScopeLocal
-
-	cmd := &cobra.Command{
-		Use:   "set-default <role>",
-		Short: "Set default role",
-		Args:  cobra.ExactArgs(1),
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Handle --to, --global and --local flags
-			if toPath != "" {
-				if useGlobal || useLocal {
-					return fmt.Errorf("cannot specify --to with --global or --local")
-				}
-				scope = ConfigScope(toPath)
-				return nil
-			}
-
-			if useGlobal && useLocal {
-				return fmt.Errorf("cannot specify both --global and --local")
-			}
-			if useGlobal {
-				scope = ConfigScopeGlobal
-			} else if useLocal {
-				scope = ConfigScopeLocal
-			}
-			return nil
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			roleName := args[0]
-
-			store, err := GetConfigStore(scope)
-			if err != nil {
-				return err
-			}
-			if closer, ok := store.(interface{ Close() error }); ok {
-				defer closer.Close()
-			}
-
-			// Check if role exists in composite config
-			compositeStore, err := GetCompositeConfigStore()
-			if err != nil {
-				return err
-			}
-
-			configs, err := compositeStore.GetAgentRoleConfigs()
-			if err != nil {
-				return fmt.Errorf("roleSetDefaultCommand() [role.go]: failed to get role configs: %w", err)
-			}
-
-			resolvedRole, exists := findRoleConfigByName(configs, roleName)
-			if !exists {
-				return fmt.Errorf("roleSetDefaultCommand() [role.go]: role not found: %s", roleName)
-			}
-
-			// Load global config
-			globalConfig, err := store.GetGlobalConfig()
-			if err != nil {
-				return fmt.Errorf("roleSetDefaultCommand() [role.go]: failed to get global config: %w", err)
-			}
-
-			// Update default role
-			globalConfig.Defaults.DefaultRole = resolvedRole.Name
-
-			// Save global config
-			if err := store.SaveGlobalConfig(globalConfig); err != nil {
-				return fmt.Errorf("roleSetDefaultCommand() [role.go]: failed to save global config: %w", err)
-			}
-
-			fmt.Printf("Default role set to '%s'\n", resolvedRole.Name)
-			return nil
-		},
-	}
-
-	cmd.Flags().BoolVar(&useGlobal, "global", false, "Use global configuration")
-	cmd.Flags().BoolVar(&useLocal, "local", false, "Use local configuration (default)")
-	cmd.Flags().StringVar(&toPath, "to", "", "Custom path to configuration directory")
 
 	return cmd
 }

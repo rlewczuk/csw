@@ -815,34 +815,6 @@ func (s *LocalConfigStore) SaveModelProviderConfig(config *conf.ModelProviderCon
 	return nil
 }
 
-// SaveGlobalConfig saves global configuration.
-func (s *LocalConfigStore) SaveGlobalConfig(config *conf.GlobalConfig) error {
-	if config == nil {
-		return fmt.Errorf("LocalConfigStore.SaveGlobalConfig() [local.go]: config cannot be nil")
-	}
-
-	if err := os.MkdirAll(s.configDir, 0755); err != nil {
-		return fmt.Errorf("LocalConfigStore.SaveGlobalConfig() [local.go]: failed to create config directory: %w", err)
-	}
-
-	globalPath := filepath.Join(s.configDir, "global.json")
-	data, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return fmt.Errorf("LocalConfigStore.SaveGlobalConfig() [local.go]: failed to marshal config: %w", err)
-	}
-
-	if err := os.WriteFile(globalPath, data, 0644); err != nil {
-		return fmt.Errorf("LocalConfigStore.SaveGlobalConfig() [local.go]: failed to write config file: %w", err)
-	}
-
-	// Reload configuration to update cache
-	if err := s.loadGlobalConfig(); err != nil {
-		return fmt.Errorf("LocalConfigStore.SaveGlobalConfig() [local.go]: failed to reload config: %w", err)
-	}
-
-	return nil
-}
-
 // validateConfigDir checks if the configuration directory exists and is readable.
 func validateConfigDir(configDir string) error {
 	info, err := os.Stat(configDir)

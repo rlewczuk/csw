@@ -27,7 +27,6 @@ type MockConfigStore struct {
 	GetModelAliasesErr         error
 	GetAgentConfigFileErr      error
 	SaveModelProviderConfigErr error
-	SaveGlobalConfigErr          error
 }
 
 // NewMockConfigStore creates a new MockConfigStore with empty configuration.
@@ -194,23 +193,6 @@ func (m *MockConfigStore) SaveModelProviderConfig(config *conf.ModelProviderConf
 		m.modelProviderConfigs = make(map[string]*conf.ModelProviderConfig)
 	}
 	m.modelProviderConfigs[config.Name] = config.Clone()
-
-	return nil
-}
-
-// SaveGlobalConfig saves global configuration.
-func (m *MockConfigStore) SaveGlobalConfig(config *conf.GlobalConfig) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.SaveGlobalConfigErr != nil {
-		return m.SaveGlobalConfigErr
-	}
-	if config == nil {
-		return fmt.Errorf("MockConfigStore.SaveGlobalConfig() [mock.go]: config cannot be nil")
-	}
-
-	m.globalConfig = config.Clone()
 
 	return nil
 }

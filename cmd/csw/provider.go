@@ -77,7 +77,6 @@ func ProviderCommand() *cobra.Command {
 	// Add subcommands
 	cmd.AddCommand(providerListCommand(&useJSON))
 	cmd.AddCommand(providerShowCommand(&useJSON))
-	cmd.AddCommand(providerSetDefaultCommand(&scope))
 	cmd.AddCommand(providerTestCommand(&scope))
 	cmd.AddCommand(providerAuthCommand())
 	cmd.AddCommand(providerModelsCommand(&useJSON))
@@ -137,52 +136,6 @@ func providerShowCommand(useJSON *bool) *cobra.Command {
 			}
 
 			return outputProviderDetails(config)
-		},
-	}
-}
-
-func providerSetDefaultCommand(scope *ConfigScope) *cobra.Command {
-	return &cobra.Command{
-		Use:   "set-default <provider-name>",
-		Short: "Set default provider",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			providerName := args[0]
-
-			store, err := GetConfigStore(*scope)
-			if err != nil {
-				return err
-			}
-			if closer, ok := store.(interface{ Close() error }); ok {
-				defer closer.Close()
-			}
-
-			// Check if provider exists
-			configs, err := store.GetModelProviderConfigs()
-			if err != nil {
-				return fmt.Errorf("providerSetDefaultCommand() [provider.go]: failed to get provider configs: %w", err)
-			}
-
-			if _, exists := configs[providerName]; !exists {
-				return fmt.Errorf("providerSetDefaultCommand() [provider.go]: provider not found: %s", providerName)
-			}
-
-			// Load global config
-			globalConfig, err := store.GetGlobalConfig()
-			if err != nil {
-				return fmt.Errorf("providerSetDefaultCommand() [provider.go]: failed to get global config: %w", err)
-			}
-
-			// Update default provider
-			globalConfig.Defaults.DefaultProvider = providerName
-
-			// Save global config
-			if err := store.SaveGlobalConfig(globalConfig); err != nil {
-				return fmt.Errorf("providerSetDefaultCommand() [provider.go]: failed to save global config: %w", err)
-			}
-
-			fmt.Printf("Default provider set to '%s'\n", providerName)
-			return nil
 		},
 	}
 }
