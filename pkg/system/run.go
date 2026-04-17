@@ -6,8 +6,8 @@ import (
 	stdio "io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -97,7 +97,6 @@ var buildSystemFunc = BuildSystem
 var startRunSessionFunc = func(sweSystem *SweSystem, params StartRunSessionParams) (StartRunSessionResult, error) {
 	return sweSystem.StartRunSession(params)
 }
-var finalizeWorktreeSessionFunc = FinalizeWorktreeSession
 var emitSessionSummaryFunc = core.EmitSessionSummary
 var loadTaskManagerFunc TaskManagerLoader
 var resolveTaskRunIdentifierFunc TaskRunIdentifierResolver
@@ -426,7 +425,7 @@ func RunCommand(params *RunParams) error {
 		sessionRunErr = ctx.Err()
 	}
 
-	finalizeResult, finalizeErr := finalizeWorktreeSessionFunc(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt)
+	finalizeResult, finalizeErr := FinalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt)
 	if finalizeErr != nil {
 		sessionRunErr = finalizeErr
 	}
