@@ -70,14 +70,68 @@ func taskNewCommand() *cobra.Command {
 		Use:   "new",
 		Short: "Create new persistent task",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			resolvedPrompt, shouldCreate, err := resolveTaskNewPrompt(cmd.Context(), taskNewPromptParams{
-				Prompt:        strings.TrimSpace(prompt),
-				Editor:        strings.TrimSpace(cliEditor),
-				WorkDir:       strings.TrimSpace(cliWorkDir),
-				ShadowDir:     strings.TrimSpace(cliShadowDir),
-				ProjectConfig: strings.TrimSpace(cliProjectConfig),
-				ConfigPath:    strings.TrimSpace(cliConfigPath),
-			})
+			resolvedPrompt, shouldCreate, err := func() (string, bool, error) {
+				trimmedPrompt := strings.TrimSpace(prompt)
+				if trimmedPrompt != "" {
+					return trimmedPrompt, true, nil
+				}
+
+				workDir, err := system.ResolveWorkDir(strings.TrimSpace(cliWorkDir))
+				if err != nil {
+					return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to resolve work directory: %w", err)
+				}
+
+				editorCommand, err := resolveTaskEditorCommand(taskNewPromptParams{
+					Editor:        strings.TrimSpace(cliEditor),
+					WorkDir:       workDir,
+					ShadowDir:     strings.TrimSpace(cliShadowDir),
+					ProjectConfig: strings.TrimSpace(cliProjectConfig),
+					ConfigPath:    strings.TrimSpace(cliConfigPath),
+				})
+				if err != nil {
+					return "", false, err
+				}
+
+				temporaryDir, err := resolveTaskTempDir(workDir, strings.TrimSpace(cliShadowDir))
+				if err != nil {
+					return "", false, err
+				}
+				if err := os.MkdirAll(temporaryDir, 0o755); err != nil {
+					return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to create temporary directory: %w", err)
+				}
+
+				temporaryFile, err := os.CreateTemp(temporaryDir, "csw-task-new-*.md")
+				if err != nil {
+					return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to create temporary prompt file: %w", err)
+				}
+				temporaryFilePath := temporaryFile.Name()
+				if closeErr := temporaryFile.Close(); closeErr != nil {
+					_ = os.Remove(temporaryFilePath)
+					return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to close temporary prompt file: %w", closeErr)
+				}
+				defer func() {
+					_ = os.Remove(temporaryFilePath)
+				}()
+
+				if err := runTaskEditorFunc(cmd.Context(), editorCommand, temporaryFilePath); err != nil {
+					return "", false, err
+				}
+
+				promptBytes, err := os.ReadFile(temporaryFilePath)
+				if err != nil {
+					if os.IsNotExist(err) {
+						return "", false, nil
+					}
+					return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to read temporary prompt file: %w", err)
+				}
+
+				editedPrompt := strings.TrimSpace(string(promptBytes))
+				if editedPrompt == "" {
+					return "", false, nil
+				}
+
+				return editedPrompt, true, nil
+			}()
 			if err != nil {
 				return err
 			}
@@ -969,69 +1023,6 @@ type taskCreateResolveParams struct {
 	ShadowDir     string
 	ProjectConfig string
 	ConfigPath    string
-}
-
-func resolveTaskNewPrompt(ctx context.Context, params taskNewPromptParams) (string, bool, error) {
-	prompt := strings.TrimSpace(params.Prompt)
-	if prompt != "" {
-		return prompt, true, nil
-	}
-
-	workDir, err := system.ResolveWorkDir(strings.TrimSpace(params.WorkDir))
-	if err != nil {
-		return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to resolve work directory: %w", err)
-	}
-
-	editorCommand, err := resolveTaskEditorCommand(taskNewPromptParams{
-		Editor:        strings.TrimSpace(params.Editor),
-		WorkDir:       workDir,
-		ShadowDir:     strings.TrimSpace(params.ShadowDir),
-		ProjectConfig: strings.TrimSpace(params.ProjectConfig),
-		ConfigPath:    strings.TrimSpace(params.ConfigPath),
-	})
-	if err != nil {
-		return "", false, err
-	}
-
-	temporaryDir, err := resolveTaskTempDir(workDir, strings.TrimSpace(params.ShadowDir))
-	if err != nil {
-		return "", false, err
-	}
-	if err := os.MkdirAll(temporaryDir, 0o755); err != nil {
-		return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to create temporary directory: %w", err)
-	}
-
-	temporaryFile, err := os.CreateTemp(temporaryDir, "csw-task-new-*.md")
-	if err != nil {
-		return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to create temporary prompt file: %w", err)
-	}
-	temporaryFilePath := temporaryFile.Name()
-	if closeErr := temporaryFile.Close(); closeErr != nil {
-		_ = os.Remove(temporaryFilePath)
-		return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to close temporary prompt file: %w", closeErr)
-	}
-	defer func() {
-		_ = os.Remove(temporaryFilePath)
-	}()
-
-	if err := runTaskEditorFunc(ctx, editorCommand, temporaryFilePath); err != nil {
-		return "", false, err
-	}
-
-	promptBytes, err := os.ReadFile(temporaryFilePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", false, nil
-		}
-		return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to read temporary prompt file: %w", err)
-	}
-
-	resolvedPrompt := strings.TrimSpace(string(promptBytes))
-	if resolvedPrompt == "" {
-		return "", false, nil
-	}
-
-	return resolvedPrompt, true, nil
 }
 
 func resolveTaskTempDir(workDir string, shadowDir string) (string, error) {
