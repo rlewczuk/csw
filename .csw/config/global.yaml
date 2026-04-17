@@ -9,9 +9,6 @@ defaults:
   lsp-server: /home/rlew/go/bin/gopls
   allow-all-permissions: true
   worktree: "%"
-  editors:
-    - "/usr/bin/mcedit"
-    - "/usr/bin/vim"
   vfs-allow:
     - "/home/rlew/codesnort/src/csw/_local/files"
   container:

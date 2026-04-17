@@ -81,15 +81,20 @@ func taskNewCommand() *cobra.Command {
 					return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to resolve work directory: %w", err)
 				}
 
-				editorCommand, err := resolveTaskEditorCommand(taskNewPromptParams{
-					Editor:        strings.TrimSpace(cliEditor),
-					WorkDir:       workDir,
-					ShadowDir:     strings.TrimSpace(cliShadowDir),
-					ProjectConfig: strings.TrimSpace(cliProjectConfig),
-					ConfigPath:    strings.TrimSpace(cliConfigPath),
-				})
-				if err != nil {
-					return "", false, err
+				editorCommand := strings.TrimSpace(cliEditor)
+				if editorCommand == "" {
+					editorCommand = strings.TrimSpace(os.Getenv("EDITOR"))
+				}
+				if editorCommand == "" {
+					for _, candidate := range []string{"editor", "vim", "mcedit", "nano"} {
+						if isTaskEditorAvailable(candidate) {
+							editorCommand = candidate
+							break
+						}
+					}
+				}
+				if editorCommand == "" {
+					return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: no editor command found")
 				}
 
 				configRoot := workDir
@@ -298,9 +303,20 @@ func taskUpdateCommandWithDefaults(use string, short string, defaultEdit bool) *
 			}
 			resolvedPrompt := currentPrompt
 			if edit {
-				editorCommand, editorErr := resolveTaskEditorCommand(taskNewPromptParams{Editor: strings.TrimSpace(cliEditor)})
-				if editorErr != nil {
-					return editorErr
+				editorCommand := strings.TrimSpace(cliEditor)
+				if editorCommand == "" {
+					editorCommand = strings.TrimSpace(os.Getenv("EDITOR"))
+				}
+				if editorCommand == "" {
+					for _, candidate := range []string{"editor", "vim", "mcedit", "nano"} {
+						if isTaskEditorAvailable(candidate) {
+							editorCommand = candidate
+							break
+						}
+					}
+				}
+				if editorCommand == "" {
+					return fmt.Errorf("taskUpdateCommand.RunE() [task.go]: no editor command found")
 				}
 
 				editedPrompt, promptChanged, editErr := editTaskPrompt(cmd.Context(), editorCommand, currentPrompt)
@@ -1005,15 +1021,6 @@ func resolveTaskDirPath(cmd *cobra.Command, workDir string) (string, error) {
 	return filepath.Clean(resolvedTaskDir), nil
 }
 
-type taskNewPromptParams struct {
-	Prompt        string
-	Editor        string
-	WorkDir       string
-	ShadowDir     string
-	ProjectConfig string
-	ConfigPath    string
-}
-
 type taskCreateResolveParams struct {
 	Prompt        string
 	Name          string
@@ -1028,38 +1035,6 @@ type taskCreateResolveParams struct {
 	ShadowDir     string
 	ProjectConfig string
 	ConfigPath    string
-}
-
-func resolveTaskEditorCommand(params taskNewPromptParams) (string, error) {
-	if trimmedEditor := strings.TrimSpace(params.Editor); trimmedEditor != "" {
-		return trimmedEditor, nil
-	}
-
-	if envEditor := strings.TrimSpace(os.Getenv("EDITOR")); envEditor != "" {
-		return envEditor, nil
-	}
-
-	defaults, err := resolveTaskRunDefaultsFunc(system.ResolveRunDefaultsParams{
-		WorkDir:       strings.TrimSpace(params.WorkDir),
-		ShadowDir:     strings.TrimSpace(params.ShadowDir),
-		ProjectConfig: strings.TrimSpace(params.ProjectConfig),
-		ConfigPath:    strings.TrimSpace(params.ConfigPath),
-	})
-	if err != nil {
-		return "", fmt.Errorf("resolveTaskEditorCommand() [task.go]: failed to resolve CLI defaults: %w", err)
-	}
-
-	for _, candidate := range defaults.Editors {
-		trimmedCandidate := strings.TrimSpace(candidate)
-		if trimmedCandidate == "" {
-			continue
-		}
-		if isTaskEditorAvailable(trimmedCandidate) {
-			return trimmedCandidate, nil
-		}
-	}
-
-	return "", fmt.Errorf("resolveTaskEditorCommand() [task.go]: no editor command found")
 }
 
 func isTaskEditorAvailable(command string) bool {

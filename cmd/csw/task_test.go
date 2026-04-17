@@ -19,45 +19,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestResolveTaskEditorCommandPrefersFlagValue(t *testing.T) {
-	command, err := resolveTaskEditorCommand(taskNewPromptParams{Editor: "custom-editor --flag"})
-	require.NoError(t, err)
-	assert.Equal(t, "custom-editor --flag", command)
-}
-
-func TestResolveTaskEditorCommandUsesEditorEnvironment(t *testing.T) {
-	t.Setenv("EDITOR", "env-editor")
-
-	command, err := resolveTaskEditorCommand(taskNewPromptParams{})
-	require.NoError(t, err)
-	assert.Equal(t, "env-editor", command)
-}
-
-func TestResolveTaskEditorCommandUsesConfiguredEditorsFallback(t *testing.T) {
-	originalResolver := resolveTaskRunDefaultsFunc
-	originalLookPath := taskEditorLookPathFunc
-	t.Cleanup(func() {
-		resolveTaskRunDefaultsFunc = originalResolver
-		taskEditorLookPathFunc = originalLookPath
-	})
-
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
-		_ = params
-		return conf.RunDefaultsConfig{Editors: []string{"missing-editor", "vim"}}, nil
-	}
-
-	taskEditorLookPathFunc = func(file string) (string, error) {
-		if file == "vim" {
-			return "/usr/bin/vim", nil
-		}
-		return "", os.ErrNotExist
-	}
-
-	command, err := resolveTaskEditorCommand(taskNewPromptParams{})
-	require.NoError(t, err)
-	assert.Equal(t, "vim", command)
-}
-
 func TestResolveTaskCreateParamsGeneratesBranchAndDescription(t *testing.T) {
 	originalDefaults := resolveTaskRunDefaultsFunc
 	originalBranchResolver := resolveTaskWorktreeBranchNameFunc
