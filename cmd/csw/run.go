@@ -1,9 +1,13 @@
 package main
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/spf13/cobra"
+
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/system"
-	"github.com/spf13/cobra"
 )
 
 // RunCommand creates the run command.
@@ -49,12 +53,28 @@ func RunCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "run [--task <name|uuid>|--last|--next] [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--merge|--no-merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [\"prompt\"] [command-args...]",
+		Use:   "run [<task-uuid-or-branch>|--last|--next] [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--merge|--no-merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [\"prompt\"] [command-args...]",
 		Short: "Start a run chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
+			effectiveTaskIdentifier := strings.TrimSpace(cliTaskIdentifier)
+			runPositionalArgs := append([]string(nil), args...)
+			if effectiveTaskIdentifier == "" && !cliTaskLast && !cliTaskNext && len(runPositionalArgs) > 0 {
+				manager, _, err := loadTaskBackend(cmd)
+				if err != nil {
+					return err
+				}
+				resolvedIdentifier, recognized, err := resolveTaskIdentifierFromPositional(manager, runPositionalArgs[0])
+				if err != nil {
+					return err
+				}
+				if recognized {
+					effectiveTaskIdentifier = resolvedIdentifier
+					runPositionalArgs = runPositionalArgs[1:]
+				}
+			}
 			system.SetRunCommandTaskManagerLoader(func(cmd *cobra.Command) (*core.TaskManager, error) {
 				manager, _, err := loadTaskBackend(cmd)
 				return manager, err
@@ -62,9 +82,9 @@ func RunCommand() *cobra.Command {
 			system.SetRunCommandTaskRunIdentifierResolver(resolveTaskRunIdentifier)
 			return system.RunCommand(&system.RunParams{
 				Command:               cmd,
-				PositionalArgs:        append([]string(nil), args...),
+				PositionalArgs:        runPositionalArgs,
 				ContextEntries:        append([]string(nil), cliContext...),
-				TaskIdentifier:        cliTaskIdentifier,
+				TaskIdentifier:        effectiveTaskIdentifier,
 				TaskNext:              cliTaskNext,
 				TaskLast:              cliTaskLast,
 				TaskReset:             cliTaskReset,
@@ -137,10 +157,44 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().StringArrayVar(&cliMCPEnable, "mcp-enable", nil, "Enable MCP server by name (repeatable, accepts comma-separated list)")
 	cmd.Flags().StringArrayVar(&cliMCPDisable, "mcp-disable", nil, "Disable MCP server by name (repeatable, accepts comma-separated list)")
 	cmd.Flags().StringArrayVarP(&cliContext, "context", "c", nil, "Template context value in KEY=VAL format (repeatable)")
-	cmd.Flags().StringVar(&cliTaskIdentifier, "task", "", "Run in task context for specified task name or UUID")
 	cmd.Flags().BoolVar(&cliTaskLast, "last", false, "Run latest unfinished task in task context")
 	cmd.Flags().BoolVar(&cliTaskNext, "next", false, "Run oldest unfinished task in task context")
 	cmd.Flags().BoolVar(&cliTaskReset, "reset", false, "Reset task branch before run in task context")
 
 	return cmd
+}
+
+func resolveTaskIdentifierFromPositional(manager *core.TaskManager, candidate string) (string, bool, error) {
+	trimmedCandidate := strings.TrimSpace(candidate)
+	if trimmedCandidate == "" {
+		return "", false, nil
+	}
+	if taskDirUUIDPattern.MatchString(trimmedCandidate) {
+		return trimmedCandidate, true, nil
+	}
+	if manager == nil {
+		return "", false, nil
+	}
+
+	tasks, err := listAllCurrentTasks(manager)
+	if err != nil {
+		return "", false, err
+	}
+
+	matchedUUID := ""
+	for _, taskData := range tasks {
+		if taskData == nil || strings.TrimSpace(taskData.FeatureBranch) != trimmedCandidate {
+			continue
+		}
+		if matchedUUID != "" && matchedUUID != strings.TrimSpace(taskData.UUID) {
+			return "", false, fmt.Errorf("resolveTaskIdentifierFromPositional() [run.go]: multiple tasks match feature branch %q", trimmedCandidate)
+		}
+		matchedUUID = strings.TrimSpace(taskData.UUID)
+	}
+
+	if matchedUUID == "" {
+		return "", false, nil
+	}
+
+	return matchedUUID, true, nil
 }
