@@ -138,8 +138,6 @@ type TaskSessionRunOptions struct {
 	MaxThreads        int
 	OutputFormat      string
 	VFSAllow          []string
-	MCPEnable         []string
-	MCPDisable        []string
 	HookOverrides     []string
 	ContextEntries    []string
 	GitUserName       string

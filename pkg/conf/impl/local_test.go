@@ -217,7 +217,6 @@ func TestLocalConfigStore_AgentRoleConfigs(t *testing.T) {
 	test1Config := conf.AgentRoleConfig{
 		Name:        "test1",
 		Description: "Test role 1",
-		MCPServers:  []string{"srv-a", "srv-b"},
 		VFSPrivileges: map[string]conf.FileAccess{
 			"/tmp": {Read: conf.AccessAllow, Write: conf.AccessDeny},
 		},
@@ -270,7 +269,6 @@ func TestLocalConfigStore_AgentRoleConfigs(t *testing.T) {
 	assert.Equal(t, conf.AccessAllow, test1.VFSPrivileges["/tmp"].Read)
 	assert.Len(t, test1.ToolsAccess, 2)
 	assert.Len(t, test1.RunPrivileges, 1)
-	assert.Equal(t, []string{"srv-a", "srv-b"}, test1.MCPServers)
 
 	test2, ok := configs["test2"]
 	require.True(t, ok)
@@ -283,77 +281,6 @@ func TestLocalConfigStore_AgentRoleConfigs(t *testing.T) {
 	configs2, err := store.GetAgentRoleConfigs()
 	require.NoError(t, err)
 	assert.Equal(t, "test1", configs2["test1"].Name)
-}
-
-func TestLocalConfigStore_MCPServerConfigs(t *testing.T) {
-	tmpDir := t.TempDir()
-	mcpDir := filepath.Join(tmpDir, "mcp")
-	require.NoError(t, os.MkdirAll(mcpDir, 0o755))
-
-	jsonConfig := `{"description":"JSON server","enabled":true,"transport":"http","url":"http://json.example/mcp","api-key":"json-key"}`
-	yamlConfig := "description: YAML server\nenabled: true\ntransport: https\nurl: https://yaml.example/mcp\napi-key: yaml-key\n"
-
-	require.NoError(t, os.WriteFile(filepath.Join(mcpDir, "json-srv.json"), []byte(jsonConfig), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(mcpDir, "yaml-srv.yml"), []byte(yamlConfig), 0o644))
-
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	configs, err := store.GetMCPServerConfigs()
-	require.NoError(t, err)
-	require.Len(t, configs, 2)
-
-	jsonSrv, ok := configs["json-srv"]
-	require.True(t, ok)
-	assert.Equal(t, "JSON server", jsonSrv.Description)
-	assert.Equal(t, conf.MCPTransportTypeHTTP, jsonSrv.Transport)
-	assert.Equal(t, "http://json.example/mcp", jsonSrv.URL)
-	assert.Equal(t, "json-key", jsonSrv.APIKey)
-
-	yamlSrv, ok := configs["yaml-srv"]
-	require.True(t, ok)
-	assert.Equal(t, "YAML server", yamlSrv.Description)
-	assert.Equal(t, conf.MCPTransportTypeHTTPS, yamlSrv.Transport)
-	assert.Equal(t, "https://yaml.example/mcp", yamlSrv.URL)
-	assert.Equal(t, "yaml-key", yamlSrv.APIKey)
-
-	t.Run("missing enabled field defaults to false", func(t *testing.T) {
-		tmpDirNested := t.TempDir()
-		mcpDirNested := filepath.Join(tmpDirNested, "mcp")
-		require.NoError(t, os.MkdirAll(mcpDirNested, 0o755))
-
-		require.NoError(t, os.WriteFile(filepath.Join(mcpDirNested, "default-disabled.yml"), []byte("description: no enabled field\ncmd: server\n"), 0o644))
-
-		storeNested, nestedErr := NewLocalConfigStore(tmpDirNested)
-		require.NoError(t, nestedErr)
-		defer storeNested.Close()
-
-		nestedConfigs, nestedErr := storeNested.GetMCPServerConfigs()
-		require.NoError(t, nestedErr)
-		require.Contains(t, nestedConfigs, "default-disabled")
-		assert.False(t, nestedConfigs["default-disabled"].Enabled)
-	})
-
-	t.Run("missing name field defaults to filename without extension", func(t *testing.T) {
-		tmpDirNested := t.TempDir()
-		mcpDirNested := filepath.Join(tmpDirNested, "mcp")
-		require.NoError(t, os.MkdirAll(mcpDirNested, 0o755))
-
-		require.NoError(t, os.WriteFile(filepath.Join(mcpDirNested, "local-files.yml"), []byte("description: no name field\ncmd: local-files\nenabled: true\n"), 0o644))
-		require.NoError(t, os.WriteFile(filepath.Join(mcpDirNested, "remote-api.json"), []byte(`{"description":"no name field","url":"https://example.com/mcp","transport":"https","enabled":true}`), 0o644))
-
-		storeNested, nestedErr := NewLocalConfigStore(tmpDirNested)
-		require.NoError(t, nestedErr)
-		defer storeNested.Close()
-
-		nestedConfigs, nestedErr := storeNested.GetMCPServerConfigs()
-		require.NoError(t, nestedErr)
-		require.Contains(t, nestedConfigs, "local-files")
-		require.Contains(t, nestedConfigs, "remote-api")
-		assert.Equal(t, "local-files", nestedConfigs["local-files"].Name)
-		assert.Equal(t, "remote-api", nestedConfigs["remote-api"].Name)
-	})
 }
 
 func TestLocalConfigStore_MissingRoleConfig(t *testing.T) {

@@ -47,7 +47,6 @@ type CompositeConfigStore struct {
 	globalConfig         *conf.GlobalConfig
 	modelProviderConfigs map[string]*conf.ModelProviderConfig
 	modelAliases         map[string]conf.ModelAliasValue
-	mcpServerConfigs     map[string]*conf.MCPServerConfig
 	agentRoleConfigs     map[string]*conf.AgentRoleConfig
 }
 
@@ -142,19 +141,6 @@ func (c *CompositeConfigStore) GetModelAliases() (map[string]conf.ModelAliasValu
 	return aliases, nil
 }
 
-// GetMCPServerConfigs returns merged MCP server configurations from all sources.
-func (c *CompositeConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	configs := make(map[string]*conf.MCPServerConfig, len(c.mcpServerConfigs))
-	for key, value := range c.mcpServerConfigs {
-		configs[key] = value.Clone()
-	}
-
-	return configs, nil
-}
-
 // GetAgentRoleConfigs returns the merged agent role configurations from all sources.
 func (c *CompositeConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfig, error) {
 	c.mu.RLock()
@@ -216,9 +202,6 @@ func (c *CompositeConfigStore) refresh() error {
 	if err := c.refreshModelAliases(); err != nil {
 		return err
 	}
-	if err := c.refreshMCPServerConfigs(); err != nil {
-		return err
-	}
 	if err := c.refreshAgentRoleConfigs(); err != nil {
 		return err
 	}
@@ -278,26 +261,6 @@ func (c *CompositeConfigStore) refreshModelAliases() error {
 	}
 
 	c.modelAliases = merged
-
-	return nil
-}
-
-// refreshMCPServerConfigs reloads and merges MCP server configurations from all sources.
-func (c *CompositeConfigStore) refreshMCPServerConfigs() error {
-	merged := make(map[string]*conf.MCPServerConfig)
-
-	for i, store := range c.stores {
-		configs, err := store.GetMCPServerConfigs()
-		if err != nil {
-			return fmt.Errorf("CompositeConfigStore.refreshMCPServerConfigs() [composite.go]: failed to get configs from store %d: %w", i, err)
-		}
-
-		for key, value := range configs {
-			merged[key] = value.Clone()
-		}
-	}
-
-	c.mcpServerConfigs = merged
 
 	return nil
 }

@@ -19,18 +19,6 @@ const (
 	AccessAsk   AccessFlag = "ask"
 )
 
-// MCPTransportType defines transport used to connect to MCP server.
-type MCPTransportType string
-
-const (
-	// MCPTransportTypeStdio runs MCP over stdio with local subprocess.
-	MCPTransportTypeStdio MCPTransportType = "stdio"
-	// MCPTransportTypeHTTP runs MCP over streamable HTTP.
-	MCPTransportTypeHTTP MCPTransportType = "http"
-	// MCPTransportTypeHTTPS runs MCP over streamable HTTPS.
-	MCPTransportTypeHTTPS MCPTransportType = "https"
-)
-
 // HookType defines supported hook execution backend.
 type HookType string
 
@@ -213,9 +201,6 @@ type AgentRoleConfig struct {
 	// Supports .gitignore-compatible syntax
 	HiddenPatterns []string `json:"hidden-patterns,omitempty" yaml:"hidden-patterns,omitempty"`
 
-	// MCPServers contains MCP server names that should be enabled for this role.
-	// Names must match files under conf/mcp/<server-name>.
-	MCPServers []string `json:"mcp-servers,omitempty" yaml:"mcp-servers,omitempty"`
 }
 
 // ModelTagMapping represents a single model-to-tag mapping rule.
@@ -250,33 +235,6 @@ type ContainerConfig struct {
 	Image string `json:"image,omitempty" yaml:"image,omitempty"`
 	// Enabled enables container mode for all commands by default.
 	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-}
-
-// MCPServerConfig defines configuration for running a local MCP server.
-type MCPServerConfig struct {
-	// Name is a short computer-friendly identifier of MCP server.
-	Name string `json:"name,omitempty" yaml:"name,omitempty"`
-	// Description is optional human-readable server description.
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
-	// Transport defines MCP transport type: stdio, http, or https.
-	// Empty value defaults to stdio.
-	Transport MCPTransportType `json:"transport,omitempty" yaml:"transport,omitempty"`
-	// URL is MCP endpoint URL for HTTP(S) transports.
-	URL string `json:"url,omitempty" yaml:"url,omitempty"`
-	// APIKey is optional bearer token used for HTTP(S) transport requests.
-	APIKey string `json:"api-key,omitempty" yaml:"api-key,omitempty"`
-	// Cmd is the command to run MCP server (may include arguments).
-	Cmd string `json:"cmd,omitempty" yaml:"cmd,omitempty"`
-	// Enabled controls whether MCP server should be started.
-	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	// Args are additional command arguments appended to Cmd arguments.
-	Args []string `json:"args,omitempty" yaml:"args,omitempty"`
-	// Env contains environment variables set for MCP server process.
-	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
-	// Tools contains tool filters selecting enabled tool names.
-	// Each item is either an exact tool name or a glob pattern.
-	// Empty or nil slice means all tools enabled.
-	Tools []string `json:"tools" yaml:"tools"`
 }
 
 // RunDefaultsConfig defines default values for the cli command flags.
@@ -549,9 +507,6 @@ type ConfigStore interface {
 
 	// GetGlobalConfig returns global configuration
 	GetGlobalConfig() (*GlobalConfig, error)
-
-	// GetMCPServerConfigs returns MCP server configurations keyed by server name.
-	GetMCPServerConfigs() (map[string]*MCPServerConfig, error)
 
 	// GetAgentConfigFile returns file content from agent configuration namespace.
 	// The expected virtual location is conf/agent/<subdir>/<filename>.

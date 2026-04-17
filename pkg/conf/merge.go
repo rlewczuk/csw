@@ -539,34 +539,6 @@ func cloneModelTemplateGroups(input map[string]map[string]ModelProviderConfig) m
 	return cloned
 }
 
-// Clone returns a deep copy of MCPServerConfig.
-func (c *MCPServerConfig) Clone() *MCPServerConfig {
-	if c == nil {
-		return nil
-	}
-
-	cloned := &MCPServerConfig{
-		Name:        c.Name,
-		Description: c.Description,
-		Transport:   c.Transport,
-		URL:         c.URL,
-		APIKey:      c.APIKey,
-		Cmd:         c.Cmd,
-		Enabled:     c.Enabled,
-		Args:        append([]string(nil), c.Args...),
-		Tools:       append([]string(nil), c.Tools...),
-	}
-
-	if c.Env != nil {
-		cloned.Env = make(map[string]string, len(c.Env))
-		for key, value := range c.Env {
-			cloned.Env[key] = value
-		}
-	}
-
-	return cloned
-}
-
 func cloneVendorFamilyOverrides(input map[string]ModelVendorFamilyTemplateOverride) map[string]ModelVendorFamilyTemplateOverride {
 	if input == nil {
 		return nil
@@ -631,11 +603,6 @@ func (c *AgentRoleConfig) Clone() *AgentRoleConfig {
 		copy(cloned.Aliases, c.Aliases)
 	}
 
-	if c.MCPServers != nil {
-		cloned.MCPServers = make([]string, len(c.MCPServers))
-		copy(cloned.MCPServers, c.MCPServers)
-	}
-
 	return &cloned
 }
 
@@ -665,9 +632,6 @@ func (c *AgentRoleConfig) Merge(override *AgentRoleConfig) {
 	c.HiddenPatterns = append(existingHiddenPatterns, override.HiddenPatterns...)
 	if override.Aliases != nil {
 		c.Aliases = append([]string(nil), override.Aliases...)
-	}
-	if len(override.MCPServers) > 0 {
-		c.MCPServers = append([]string(nil), override.MCPServers...)
 	}
 }
 

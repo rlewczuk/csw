@@ -42,8 +42,6 @@ func RunCommand() *cobra.Command {
 		cliMaxThreads        int
 		cliOutputFormat      string
 		cliVFSAllow          []string
-		cliMCPEnable         []string
-		cliMCPDisable        []string
 		cliContext           []string
 		cliTaskIdentifier    string
 		cliTaskNext          bool
@@ -101,8 +99,6 @@ func RunCommand() *cobra.Command {
 				MaxThreads:            cliMaxThreads,
 				OutputFormat:          cliOutputFormat,
 				VFSAllow:              append([]string(nil), cliVFSAllow...),
-				MCPEnable:             append([]string(nil), cliMCPEnable...),
-				MCPDisable:            append([]string(nil), cliMCPDisable...),
 			})
 		},
 	}
@@ -137,8 +133,6 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().IntVar(&cliMaxThreads, "max-threads", 0, "Maximum number of tool calls executed in parallel")
 	cmd.Flags().StringVar(&cliOutputFormat, "output-format", "short", "Console output format: short, full, jsonl")
 	cmd.Flags().StringArrayVar(&cliVFSAllow, "vfs-allow", nil, "Additional path to allow VFS access outside of worktree (repeatable, or use ':' separated list)")
-	cmd.Flags().StringArrayVar(&cliMCPEnable, "mcp-enable", nil, "Enable MCP server by name (repeatable, accepts comma-separated list)")
-	cmd.Flags().StringArrayVar(&cliMCPDisable, "mcp-disable", nil, "Disable MCP server by name (repeatable, accepts comma-separated list)")
 	cmd.Flags().StringArrayVarP(&cliContext, "context", "c", nil, "Template context value in KEY=VAL format (repeatable)")
 	cmd.Flags().BoolVar(&cliTaskLast, "last", false, "Run latest unfinished task in task context")
 	cmd.Flags().BoolVar(&cliTaskNext, "next", false, "Run oldest unfinished task in task context")

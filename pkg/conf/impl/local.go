@@ -44,7 +44,6 @@ type LocalConfigStore struct {
 	globalConfig               *conf.GlobalConfig
 	modelProviderConfigs       map[string]*conf.ModelProviderConfig
 	modelAliases               map[string]conf.ModelAliasValue
-	mcpServerConfigs           map[string]*conf.MCPServerConfig
 	agentRoleConfigs           map[string]*conf.AgentRoleConfig
 }
 
@@ -60,7 +59,6 @@ func NewLocalConfigStore(configDir string) (*LocalConfigStore, error) {
 		globalConfig:         &conf.GlobalConfig{},
 		modelProviderConfigs: make(map[string]*conf.ModelProviderConfig),
 		modelAliases:         make(map[string]conf.ModelAliasValue),
-		mcpServerConfigs:     make(map[string]*conf.MCPServerConfig),
 		agentRoleConfigs:     make(map[string]*conf.AgentRoleConfig),
 	}
 
@@ -110,19 +108,6 @@ func (s *LocalConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, e
 	}
 
 	return aliases, nil
-}
-
-// GetMCPServerConfigs returns a map of MCP server configurations.
-func (s *LocalConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	configs := make(map[string]*conf.MCPServerConfig, len(s.mcpServerConfigs))
-	for key, value := range s.mcpServerConfigs {
-		configs[key] = value.Clone()
-	}
-
-	return configs, nil
 }
 
 // GetAgentRoleConfigs returns a map of agent role configurations.
@@ -211,9 +196,6 @@ func (s *LocalConfigStore) loadAllConfig() error {
 	}
 	if err := s.loadModelAliases(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load model aliases: %w", err)
-	}
-	if err := s.loadMCPServerConfigs(); err != nil {
-		return fmt.Errorf("loadAllConfig(): failed to load MCP server configs: %w", err)
 	}
 	if err := s.loadAgentRoleConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load agent role configs: %w", err)
@@ -555,87 +537,6 @@ func parseModelAliasesJSONL(data []byte, source string) (map[string]conf.ModelAl
 	}
 
 	return aliases, nil
-}
-
-// loadMCPServerConfigs loads MCP server configurations from mcp directory.
-// Supports .json and .yml/.yaml files, with YAML taking precedence.
-func (s *LocalConfigStore) loadMCPServerConfigs() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	mcpDir := filepath.Join(s.configDir, "mcp")
-
-	entries, err := os.ReadDir(mcpDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			s.mcpServerConfigs = make(map[string]*conf.MCPServerConfig)
-			return nil
-		}
-		return fmt.Errorf("loadMCPServerConfigs() [local.go]: failed to read mcp directory: %w", err)
-	}
-
-	loadedServers := make(map[string]bool)
-	configs := make(map[string]*conf.MCPServerConfig)
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if ext != ".yml" && ext != ".yaml" {
-			continue
-		}
-
-		serverPath := filepath.Join(mcpDir, entry.Name())
-		data, readErr := os.ReadFile(serverPath)
-		if readErr != nil {
-			return fmt.Errorf("loadMCPServerConfigs() [local.go]: failed to read %s: %w", serverPath, readErr)
-		}
-
-		var config conf.MCPServerConfig
-		if unmarshalErr := yaml.Unmarshal(data, &config); unmarshalErr != nil {
-			return fmt.Errorf("loadMCPServerConfigs() [local.go]: failed to parse %s: %w", serverPath, unmarshalErr)
-		}
-
-		baseName := entry.Name()[:len(entry.Name())-len(ext)]
-		if strings.TrimSpace(config.Name) == "" {
-			config.Name = baseName
-		}
-		configs[baseName] = &config
-		loadedServers[baseName] = true
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
-			continue
-		}
-
-		baseName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
-		if loadedServers[baseName] {
-			continue
-		}
-
-		serverPath := filepath.Join(mcpDir, entry.Name())
-		data, readErr := os.ReadFile(serverPath)
-		if readErr != nil {
-			return fmt.Errorf("loadMCPServerConfigs() [local.go]: failed to read %s: %w", serverPath, readErr)
-		}
-
-		var config conf.MCPServerConfig
-		if unmarshalErr := json.Unmarshal(data, &config); unmarshalErr != nil {
-			return fmt.Errorf("loadMCPServerConfigs() [local.go]: failed to parse %s: %w", serverPath, unmarshalErr)
-		}
-
-		if strings.TrimSpace(config.Name) == "" {
-			config.Name = baseName
-		}
-		configs[baseName] = &config
-	}
-
-	s.mcpServerConfigs = configs
-
-	return nil
 }
 
 // loadAgentRoleConfigs loads all agent role configurations from the roles directory.

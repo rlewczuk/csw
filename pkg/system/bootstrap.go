@@ -18,7 +18,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/lsp"
-	"github.com/rlewczuk/csw/pkg/mcp"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/tool"
@@ -119,10 +118,6 @@ type BuildSystemParams struct {
 	MaxToolThreads int
 	// AllowAllPermissions forces all tool permission checks to allow mode for this run.
 	AllowAllPermissions bool
-	// MCPEnable lists MCP server names to force-enable for this run.
-	MCPEnable []string
-	// MCPDisable lists MCP server names to force-disable for this run.
-	MCPDisable []string
 }
 
 // BuildSystemResult contains outputs from building a SweSystem.
@@ -419,12 +414,6 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		}
 	}
 
-	configStore, err = buildRuntimeMCPConfigStore(configStore, roleConfig.MCPServers, params.MCPEnable, params.MCPDisable)
-	if err != nil {
-		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to build runtime mcp config: %w", err)
-	}
-
 	hidePatterns, err := vfs.BuildHidePatterns(workDir, roleConfig.HiddenPatterns)
 	if err != nil {
 		logging.FlushLogs()
@@ -572,19 +561,6 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	tool.RegisterWebFetchTool(toolRegistry, nil)
 	tool.RegisterSkillTool(toolRegistry, configRoot)
 
-	mcpManager, err := mcp.NewManager(configStore)
-	if err != nil {
-		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to initialize mcp manager: %w", err)
-	}
-	cleanupFns = append(cleanupFns, func() {
-		_ = mcpManager.Close()
-	})
-	if err := mcp.RegisterTools(toolRegistry, mcpManager); err != nil {
-		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to register mcp tools: %w", err)
-	}
-
 	if err := tool.RegisterCustomTools(toolRegistry, configStore, configRoot, bashRunner); err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to register custom tools: %w", err)
@@ -595,7 +571,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create prompt generator: %w", err)
 	}
-	promptGenerator := mcp.NewPromptGenerator(basePromptGenerator, mcpManager)
+	promptGenerator := basePromptGenerator
 
 	modelTagRegistry, err := CreateModelTagRegistry(configStore, providerRegistry)
 	if err != nil {
@@ -616,7 +592,6 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		LSP:                 lspClient,
 		ConfigStore:         configStore,
 		TaskBackend:         taskBackend,
-		mcpManager:          mcpManager,
 		LogBaseDir:          logsDir,
 		WorkDir:             effectiveWorkDir,
 		ShadowDir:           shadowDir,
@@ -667,138 +642,6 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	cleanupOnError = false
 
 	return sweSystem, result, nil
-}
-
-type runtimeMCPConfigStore struct {
-	base             conf.ConfigStore
-	mcpServerConfigs map[string]*conf.MCPServerConfig
-}
-
-func (s *runtimeMCPConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, error) {
-	return s.base.GetModelAliases()
-}
-
-func (s *runtimeMCPConfigStore) GetModelProviderConfigs() (map[string]*conf.ModelProviderConfig, error) {
-	return s.base.GetModelProviderConfigs()
-}
-
-func (s *runtimeMCPConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfig, error) {
-	return s.base.GetAgentRoleConfigs()
-}
-
-func (s *runtimeMCPConfigStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
-	return s.base.GetGlobalConfig()
-}
-
-func (s *runtimeMCPConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
-	cloned := make(map[string]*conf.MCPServerConfig, len(s.mcpServerConfigs))
-	for key, value := range s.mcpServerConfigs {
-		cloned[key] = value.Clone()
-	}
-
-	return cloned, nil
-}
-
-func (s *runtimeMCPConfigStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
-	return s.base.GetAgentConfigFile(subdir, filename)
-}
-
-func buildRuntimeMCPConfigStore(base conf.ConfigStore, roleMCPServers []string, mcpEnable []string, mcpDisable []string) (conf.ConfigStore, error) {
-	if base == nil {
-		return nil, fmt.Errorf("buildRuntimeMCPConfigStore() [bootstrap.go]: base config store is nil")
-	}
-
-	enableNames := normalizeMCPServerNames(mcpEnable)
-	disableNames := normalizeMCPServerNames(mcpDisable)
-	hasFlagOverrides := len(enableNames) > 0 || len(disableNames) > 0
-	if !hasFlagOverrides {
-		enableNames = normalizeMCPServerNames(roleMCPServers)
-	}
-
-	if len(enableNames) == 0 && len(disableNames) == 0 {
-		return base, nil
-	}
-
-	configs, err := base.GetMCPServerConfigs()
-	if err != nil {
-		return nil, fmt.Errorf("buildRuntimeMCPConfigStore() [bootstrap.go]: failed to load mcp configs: %w", err)
-	}
-
-	adjusted, err := applyMCPServerOverrides(configs, enableNames, disableNames, hasFlagOverrides)
-	if err != nil {
-		return nil, err
-	}
-
-	return &runtimeMCPConfigStore{
-		base:             base,
-		mcpServerConfigs: adjusted,
-	}, nil
-}
-
-func applyMCPServerOverrides(configs map[string]*conf.MCPServerConfig, enableNames []string, disableNames []string, hasFlagOverrides bool) (map[string]*conf.MCPServerConfig, error) {
-	cloned := make(map[string]*conf.MCPServerConfig, len(configs))
-	for key, value := range configs {
-		cloned[key] = value.Clone()
-	}
-
-	for _, name := range enableNames {
-		cfg, ok := cloned[name]
-		if !ok {
-			return nil, fmt.Errorf("applyMCPServerOverrides() [bootstrap.go]: mcp server %q is not configured", name)
-		}
-		cfg.Enabled = true
-	}
-
-	for _, name := range disableNames {
-		cfg, ok := cloned[name]
-		if !ok {
-			return nil, fmt.Errorf("applyMCPServerOverrides() [bootstrap.go]: mcp server %q is not configured", name)
-		}
-		cfg.Enabled = false
-	}
-
-	if hasFlagOverrides {
-		return cloned, nil
-	}
-
-	enabledSet := make(map[string]struct{}, len(enableNames))
-	for _, name := range enableNames {
-		enabledSet[name] = struct{}{}
-	}
-	for name, cfg := range cloned {
-		if _, ok := enabledSet[name]; ok {
-			cfg.Enabled = true
-			continue
-		}
-		cfg.Enabled = false
-	}
-
-	return cloned, nil
-}
-
-func normalizeMCPServerNames(values []string) []string {
-	if len(values) == 0 {
-		return nil
-	}
-
-	result := make([]string, 0, len(values))
-	seen := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		parts := strings.Split(value, ",")
-		for _, part := range parts {
-			name := strings.TrimSpace(part)
-			if name == "" {
-				continue
-			}
-			if _, exists := seen[name]; exists {
-				continue
-			}
-			seen[name] = struct{}{}
-			result = append(result, name)
-		}
-	}
-
-	return result
 }
 
 // containerRuntimeConfig describes effective container runtime setup.

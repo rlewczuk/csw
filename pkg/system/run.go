@@ -73,8 +73,6 @@ type RunParams struct {
 	AllowAllPermissions   bool
 	OutputFormat          string
 	VFSAllow              []string
-	MCPEnable             []string
-	MCPDisable            []string
 	Stdin                 stdio.Reader
 	Stdout                stdio.Writer
 	Stderr                stdio.Writer
@@ -348,8 +346,6 @@ func RunCommand(params *RunParams) error {
 		params.ContainerEnabled = containerRequested
 		params.ContainerDisabled = containerDisabledChanged && containerOff
 		params.VFSAllow = parseVFSAllowPaths(params.VFSAllow)
-		params.MCPEnable = parseMCPServerFlagValues(params.MCPEnable)
-		params.MCPDisable = parseMCPServerFlagValues(params.MCPDisable)
 	}
 
 	if params.BashRunTimeout <= 0 {
@@ -374,7 +370,7 @@ func RunCommand(params *RunParams) error {
 		_, _ = fmt.Fprintf(stdout, "[INFO] Worktree branch: %s\n", params.WorktreeBranch)
 	}
 
-	sweSystem, buildResult, err := buildSystemFunc(BuildSystemParams{WorkDir: params.WorkDir, ShadowDir: params.ShadowDir, ConfigPath: params.ConfigPath, ProjectConfig: params.ProjectConfig, ModelName: params.ModelName, RoleName: params.RoleName, WorktreeBranch: params.WorktreeBranch, GitUserName: params.GitUserName, GitUserEmail: params.GitUserEmail, ContainerEnabled: params.ContainerEnabled, ContainerDisabled: params.ContainerDisabled, ContainerImage: params.ContainerImage, ContainerMounts: params.ContainerMounts, ContainerEnv: params.ContainerEnv, LSPServer: params.LSPServer, LogLLMRequests: params.LogLLMRequests, LogLLMRequestsRaw: params.LogLLMRequestsRaw, NoRefresh: params.NoRefresh, Thinking: params.Thinking, BashRunTimeout: params.BashRunTimeout, AllowedPaths: params.VFSAllow, MaxToolThreads: params.MaxThreads, AllowAllPermissions: params.AllowAllPerms, MCPEnable: params.MCPEnable, MCPDisable: params.MCPDisable})
+	sweSystem, buildResult, err := buildSystemFunc(BuildSystemParams{WorkDir: params.WorkDir, ShadowDir: params.ShadowDir, ConfigPath: params.ConfigPath, ProjectConfig: params.ProjectConfig, ModelName: params.ModelName, RoleName: params.RoleName, WorktreeBranch: params.WorktreeBranch, GitUserName: params.GitUserName, GitUserEmail: params.GitUserEmail, ContainerEnabled: params.ContainerEnabled, ContainerDisabled: params.ContainerDisabled, ContainerImage: params.ContainerImage, ContainerMounts: params.ContainerMounts, ContainerEnv: params.ContainerEnv, LSPServer: params.LSPServer, LogLLMRequests: params.LogLLMRequests, LogLLMRequestsRaw: params.LogLLMRequestsRaw, NoRefresh: params.NoRefresh, Thinking: params.Thinking, BashRunTimeout: params.BashRunTimeout, AllowedPaths: params.VFSAllow, MaxToolThreads: params.MaxThreads, AllowAllPermissions: params.AllowAllPerms})
 	if err != nil {
 		return err
 	}
@@ -656,27 +652,6 @@ func parseVFSAllowPaths(values []string) []string {
 		}
 	}
 	return r
-}
-func parseMCPServerFlagValues(values []string) []string {
-	if len(values) == 0 {
-		return nil
-	}
-	result := make([]string, 0, len(values))
-	seen := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		for _, part := range strings.Split(value, ",") {
-			name := strings.TrimSpace(part)
-			if name == "" {
-				continue
-			}
-			if _, exists := seen[name]; exists {
-				continue
-			}
-			seen[name] = struct{}{}
-			result = append(result, name)
-		}
-	}
-	return result
 }
 
 func applyCommandTaskMetadata(params *RunParams) error {

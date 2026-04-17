@@ -17,7 +17,6 @@ type MockConfigStore struct {
 	globalConfig         *conf.GlobalConfig
 	modelProviderConfigs map[string]*conf.ModelProviderConfig
 	modelAliases         map[string]conf.ModelAliasValue
-	mcpServerConfigs     map[string]*conf.MCPServerConfig
 	agentRoleConfigs     map[string]*conf.AgentRoleConfig
 	agentConfigFiles     map[string][]byte
 
@@ -26,7 +25,6 @@ type MockConfigStore struct {
 	GetModelProviderConfigsErr error
 	GetAgentRoleConfigsErr     error
 	GetModelAliasesErr         error
-	GetMCPServerConfigsErr     error
 	GetAgentConfigFileErr      error
 	SaveModelProviderConfigErr error
 	DeleteModelProviderConfigErr error
@@ -39,17 +37,9 @@ func NewMockConfigStore() *MockConfigStore {
 		globalConfig:         &conf.GlobalConfig{},
 		modelProviderConfigs: make(map[string]*conf.ModelProviderConfig),
 		modelAliases:         make(map[string]conf.ModelAliasValue),
-		mcpServerConfigs:     make(map[string]*conf.MCPServerConfig),
 		agentRoleConfigs:     make(map[string]*conf.AgentRoleConfig),
 		agentConfigFiles:     make(map[string][]byte),
 	}
-}
-
-// SetMCPServerConfigs sets MCP server configurations and updates timestamp.
-func (m *MockConfigStore) SetMCPServerConfigs(configs map[string]*conf.MCPServerConfig) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.mcpServerConfigs = configs
 }
 
 // SetAgentConfigFile sets agent config file content for tests.
@@ -135,23 +125,6 @@ func (m *MockConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue, er
 	}
 
 	return aliases, nil
-}
-
-// GetMCPServerConfigs returns MCP server configurations.
-func (m *MockConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.GetMCPServerConfigsErr != nil {
-		return nil, m.GetMCPServerConfigsErr
-	}
-
-	configs := make(map[string]*conf.MCPServerConfig, len(m.mcpServerConfigs))
-	for key, value := range m.mcpServerConfigs {
-		configs[key] = value.Clone()
-	}
-
-	return configs, nil
 }
 
 // GetAgentRoleConfigs returns the agent role configurations.

@@ -44,7 +44,6 @@ func main() {
 	rootCmd.AddCommand(ToolCommand())
 	rootCmd.AddCommand(RunCommand())
 	rootCmd.AddCommand(CleanCommand())
-	rootCmd.AddCommand(McpCommand())
 	rootCmd.AddCommand(TaskCommand())
 
 	if err := rootCmd.Execute(); err != nil {

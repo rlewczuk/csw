@@ -410,16 +410,15 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 		assert.Equal(t, 1.0, cfg.Cost[0].Input)
 	})
 
-	t.Run("agent role clone is deep copy", func(t *testing.T) {
-		cfg := &AgentRoleConfig{
-			VFSPrivileges:   map[string]FileAccess{"/": {Read: AccessAllow}},
-			ToolsAccess:     map[string]AccessFlag{"vfsRead": AccessAllow},
-			RunPrivileges:   map[string]AccessFlag{".*": AccessAsk},
-			PromptFragments: map[string]string{"a": "1"},
-			ToolFragments:   map[string]string{"x": "1"},
-			HiddenPatterns:  []string{".git/"},
-			MCPServers:      []string{"srv1"},
-		}
+		t.Run("agent role clone is deep copy", func(t *testing.T) {
+			cfg := &AgentRoleConfig{
+				VFSPrivileges:   map[string]FileAccess{"/": {Read: AccessAllow}},
+				ToolsAccess:     map[string]AccessFlag{"vfsRead": AccessAllow},
+				RunPrivileges:   map[string]AccessFlag{".*": AccessAsk},
+				PromptFragments: map[string]string{"a": "1"},
+				ToolFragments:   map[string]string{"x": "1"},
+				HiddenPatterns:  []string{".git/"},
+			}
 
 		clone := cfg.Clone()
 		require.NotNil(t, clone)
@@ -427,19 +426,17 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 		clone.VFSPrivileges["/"] = FileAccess{Read: AccessDeny}
 		clone.ToolsAccess["vfsRead"] = AccessDeny
 		clone.RunPrivileges[".*"] = AccessDeny
-		clone.PromptFragments["a"] = "2"
-		clone.ToolFragments["x"] = "2"
-		clone.HiddenPatterns[0] = "tmp/"
-		clone.MCPServers[0] = "srv2"
+			clone.PromptFragments["a"] = "2"
+			clone.ToolFragments["x"] = "2"
+			clone.HiddenPatterns[0] = "tmp/"
 
 		assert.Equal(t, AccessAllow, cfg.VFSPrivileges["/"].Read)
 		assert.Equal(t, AccessAllow, cfg.ToolsAccess["vfsRead"])
 		assert.Equal(t, AccessAsk, cfg.RunPrivileges[".*"])
-		assert.Equal(t, "1", cfg.PromptFragments["a"])
-		assert.Equal(t, "1", cfg.ToolFragments["x"])
-		assert.Equal(t, ".git/", cfg.HiddenPatterns[0])
-		assert.Equal(t, "srv1", cfg.MCPServers[0])
-	})
+			assert.Equal(t, "1", cfg.PromptFragments["a"])
+			assert.Equal(t, "1", cfg.ToolFragments["x"])
+			assert.Equal(t, ".git/", cfg.HiddenPatterns[0])
+		})
 
 	t.Run("tool selection clone is deep copy", func(t *testing.T) {
 		cfg := ToolSelectionConfig{
@@ -455,34 +452,6 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 		assert.True(t, cfg.Tags["safe"]["vfsRead"])
 	})
 
-	t.Run("mcp server clone preserves and copies transport fields", func(t *testing.T) {
-		cfg := &MCPServerConfig{
-			Description: "server description",
-			Transport:   MCPTransportTypeHTTPS,
-			URL:         "https://example.com/mcp",
-			APIKey:      "secret",
-			Cmd:         "server",
-			Enabled:     true,
-			Args:        []string{"--x"},
-			Env:         map[string]string{"A": "1"},
-			Tools:       []string{"^read_"},
-		}
-
-		clone := cfg.Clone()
-		require.NotNil(t, clone)
-		assert.Equal(t, "server description", clone.Description)
-		assert.Equal(t, MCPTransportTypeHTTPS, clone.Transport)
-		assert.Equal(t, "https://example.com/mcp", clone.URL)
-		assert.Equal(t, "secret", clone.APIKey)
-
-		clone.Args[0] = "--y"
-		clone.Env["A"] = "2"
-		clone.Tools[0] = "^write_"
-
-		assert.Equal(t, "--x", cfg.Args[0])
-		assert.Equal(t, "1", cfg.Env["A"])
-		assert.Equal(t, "^read_", cfg.Tools[0])
-	})
 }
 
 func TestGlobalConfig_Merge_NilOverride(t *testing.T) {
@@ -495,15 +464,6 @@ func TestAgentRoleConfig_Merge_NilOverride(t *testing.T) {
 	base := &AgentRoleConfig{Name: "role", HiddenPatterns: []string{".git/"}}
 	base.Merge(nil)
 	assert.Equal(t, []string{".git/"}, base.HiddenPatterns)
-}
-
-func TestAgentRoleConfig_Merge_MCPServers(t *testing.T) {
-	base := &AgentRoleConfig{Name: "developer", MCPServers: []string{"srv-a"}}
-	override := &AgentRoleConfig{Name: "developer", MCPServers: []string{"srv-b", "srv-c"}}
-
-	base.Merge(override)
-
-	assert.Equal(t, []string{"srv-b", "srv-c"}, base.MCPServers)
 }
 
 func TestAgentRoleConfig_Merge_Aliases(t *testing.T) {

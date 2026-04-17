@@ -48,7 +48,6 @@ type EmbeddedConfigStore struct {
 	globalConfig         *conf.GlobalConfig
 	modelProviderConfigs map[string]*conf.ModelProviderConfig
 	modelAliases         map[string]conf.ModelAliasValue
-	mcpServerConfigs     map[string]*conf.MCPServerConfig
 	agentRoleConfigs     map[string]*conf.AgentRoleConfig
 	loaded               bool
 }
@@ -60,7 +59,6 @@ func NewEmbeddedConfigStore() (conf.ConfigStore, error) {
 		globalConfig:         &conf.GlobalConfig{},
 		modelProviderConfigs: make(map[string]*conf.ModelProviderConfig),
 		modelAliases:         make(map[string]conf.ModelAliasValue),
-		mcpServerConfigs:     make(map[string]*conf.MCPServerConfig),
 		agentRoleConfigs:     make(map[string]*conf.AgentRoleConfig),
 	}
 
@@ -105,19 +103,6 @@ func (s *EmbeddedConfigStore) GetModelAliases() (map[string]conf.ModelAliasValue
 	}
 
 	return aliases, nil
-}
-
-// GetMCPServerConfigs returns map of MCP server configurations.
-func (s *EmbeddedConfigStore) GetMCPServerConfigs() (map[string]*conf.MCPServerConfig, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	configs := make(map[string]*conf.MCPServerConfig, len(s.mcpServerConfigs))
-	for key, value := range s.mcpServerConfigs {
-		configs[key] = value.Clone()
-	}
-
-	return configs, nil
 }
 
 // GetAgentRoleConfigs returns a map of agent role configurations.
@@ -209,9 +194,6 @@ func (s *EmbeddedConfigStore) loadAllConfig() error {
 	}
 	if err := s.loadModelAliases(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load model aliases: %w", err)
-	}
-	if err := s.loadMCPServerConfigs(); err != nil {
-		return fmt.Errorf("loadAllConfig(): failed to load MCP server configs: %w", err)
 	}
 	if err := s.loadAgentRoleConfigs(); err != nil {
 		return fmt.Errorf("loadAllConfig(): failed to load agent role configs: %w", err)
@@ -396,78 +378,6 @@ func (s *EmbeddedConfigStore) loadModelProviderConfigs() error {
 	}
 
 	s.modelProviderConfigs = configs
-	return nil
-}
-
-// loadMCPServerConfigs loads MCP server configurations from embedded mcp directory.
-// YAML files take precedence over JSON files if both exist for the same server.
-func (s *EmbeddedConfigStore) loadMCPServerConfigs() error {
-	mcpDir := "conf/mcp"
-
-	entries, err := embeddedConfigFS.ReadDir(mcpDir)
-	if err != nil {
-		if isNotExist(err) {
-			s.mcpServerConfigs = make(map[string]*conf.MCPServerConfig)
-			return nil
-		}
-		return fmt.Errorf("loadMCPServerConfigs() [embedded.go]: failed to read mcp directory: %w", err)
-	}
-
-	configs := make(map[string]*conf.MCPServerConfig)
-	loadedServers := make(map[string]bool)
-
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".yml" {
-			continue
-		}
-
-		serverName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
-		serverPath := filepath.Join(mcpDir, entry.Name())
-		data, readErr := embeddedConfigFS.ReadFile(serverPath)
-		if readErr != nil {
-			return fmt.Errorf("loadMCPServerConfigs() [embedded.go]: failed to read %s: %w", serverPath, readErr)
-		}
-
-		var config conf.MCPServerConfig
-		if unmarshalErr := yaml.Unmarshal(data, &config); unmarshalErr != nil {
-			return fmt.Errorf("loadMCPServerConfigs() [embedded.go]: failed to parse %s: %w", serverPath, unmarshalErr)
-		}
-
-		if strings.TrimSpace(config.Name) == "" {
-			config.Name = serverName
-		}
-		configs[serverName] = &config
-		loadedServers[serverName] = true
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
-			continue
-		}
-
-		serverName := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
-		if loadedServers[serverName] {
-			continue
-		}
-
-		serverPath := filepath.Join(mcpDir, entry.Name())
-		data, readErr := embeddedConfigFS.ReadFile(serverPath)
-		if readErr != nil {
-			return fmt.Errorf("loadMCPServerConfigs() [embedded.go]: failed to read %s: %w", serverPath, readErr)
-		}
-
-		var config conf.MCPServerConfig
-		if unmarshalErr := json.Unmarshal(data, &config); unmarshalErr != nil {
-			return fmt.Errorf("loadMCPServerConfigs() [embedded.go]: failed to parse %s: %w", serverPath, unmarshalErr)
-		}
-
-		if strings.TrimSpace(config.Name) == "" {
-			config.Name = serverName
-		}
-		configs[serverName] = &config
-	}
-
-	s.mcpServerConfigs = configs
 	return nil
 }
 
