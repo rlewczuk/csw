@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/stretchr/testify/assert"
@@ -115,11 +114,6 @@ func TestLocalConfigStore_GlobalConfig(t *testing.T) {
 	require.True(t, exists)
 	assert.True(t, safeRule["vfsRead"])
 
-	// Test LastGlobalConfigUpdate
-	updateTime, err := store.LastGlobalConfigUpdate()
-	require.NoError(t, err)
-	assert.False(t, updateTime.IsZero())
-
 	// Test that returned config is a copy (modification doesn't affect cached data)
 	config.ModelTags[0].Tag = "modified"
 	config2, err := store.GetGlobalConfig()
@@ -201,11 +195,6 @@ func TestLocalConfigStore_ModelProviderConfigs(t *testing.T) {
 	openai, ok := configs["openai"]
 	require.True(t, ok)
 	assert.Equal(t, "openai", openai.Type)
-
-	// Test LastModelProviderConfigsUpdate
-	updateTime, err := store.LastModelProviderConfigsUpdate()
-	require.NoError(t, err)
-	assert.False(t, updateTime.IsZero())
 
 	// Test that returned configs are copies
 	anthropic.Type = "modified"
@@ -289,11 +278,6 @@ func TestLocalConfigStore_AgentRoleConfigs(t *testing.T) {
 	assert.Len(t, test2.ToolsAccess, 1)
 	assert.Equal(t, conf.AccessDeny, test2.ToolsAccess["bash"])
 
-	// Test LastAgentRoleConfigsUpdate
-	updateTime, err := store.LastAgentRoleConfigsUpdate()
-	require.NoError(t, err)
-	assert.False(t, updateTime.IsZero())
-
 	// Test that returned configs are copies
 	test1.Name = "modified"
 	configs2, err := store.GetAgentRoleConfigs()
@@ -327,10 +311,6 @@ func TestLocalConfigStore_HookConfigs(t *testing.T) {
 	assert.Equal(t, conf.HookTypeShell, hooks["summary-hook"].Type)
 	assert.Equal(t, filepath.Join(hooksDir, "merge-hook"), hooks["merge-hook"].HookDir)
 	assert.Equal(t, filepath.Join(hooksDir, "summary-hook"), hooks["summary-hook"].HookDir)
-
-	updateTime, err := store.LastHookConfigsUpdate()
-	require.NoError(t, err)
-	assert.False(t, updateTime.IsZero())
 
 }
 
@@ -583,217 +563,19 @@ func TestLocalConfigStore_GetAgentConfigFile(t *testing.T) {
 }
 
 func TestLocalConfigStore_FileWatching_GlobalConfig(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "test-config-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Create initial global.json
-	globalConfig := conf.GlobalConfig{
-		ModelTags: []conf.ModelTagMapping{
-			{Model: "^claude-.*", Tag: "anthropic"},
-		},
-	}
-	globalData, err := json.MarshalIndent(globalConfig, "", "  ")
-	require.NoError(t, err)
-	globalPath := filepath.Join(tmpDir, "global.json")
-	err = os.WriteFile(globalPath, globalData, 0644)
-	require.NoError(t, err)
-
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// Get initial timestamp
-	initialTime, err := store.LastGlobalConfigUpdate()
-	require.NoError(t, err)
-
-	// Wait a bit to ensure timestamp difference
-	time.Sleep(10 * time.Millisecond)
-
-	// Modify global.json
-	globalConfig.ModelTags = append(globalConfig.ModelTags, conf.ModelTagMapping{
-		Model: "^gpt-.*", Tag: "openai",
-	})
-	globalData, err = json.MarshalIndent(globalConfig, "", "  ")
-	require.NoError(t, err)
-	err = os.WriteFile(globalPath, globalData, 0644)
-	require.NoError(t, err)
-
-	// Wait for file watcher to process the event
-	time.Sleep(20 * time.Millisecond)
-
-	// Verify config was reloaded
-	config, err := store.GetGlobalConfig()
-	require.NoError(t, err)
-	assert.Len(t, config.ModelTags, 2)
-	assert.Equal(t, "openai", config.ModelTags[1].Tag)
-
-	// Verify timestamp was updated
-	newTime, err := store.LastGlobalConfigUpdate()
-	require.NoError(t, err)
-	assert.True(t, newTime.After(initialTime))
+	t.Skip("hot reload removed")
 }
 
 func TestLocalConfigStore_FileWatching_ModelProvider(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "test-config-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	modelsDir := filepath.Join(tmpDir, "models")
-	require.NoError(t, os.Mkdir(modelsDir, 0755))
-
-	// Create initial model provider
-	anthropicConfig := conf.ModelProviderConfig{
-		Type: "anthropic",
-		Name: "anthropic",
-		URL:  "https://api.anthropic.com",
-	}
-	anthropicData, err := json.MarshalIndent(anthropicConfig, "", "  ")
-	require.NoError(t, err)
-	anthropicPath := filepath.Join(modelsDir, "anthropic.json")
-	err = os.WriteFile(anthropicPath, anthropicData, 0644)
-	require.NoError(t, err)
-
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// Get initial timestamp
-	initialTime, err := store.LastModelProviderConfigsUpdate()
-	require.NoError(t, err)
-
-	// Wait a bit to ensure timestamp difference
-	time.Sleep(10 * time.Millisecond)
-
-	// Add a new model provider
-	openaiConfig := conf.ModelProviderConfig{
-		Type: "openai",
-		Name: "openai",
-		URL:  "https://api.openai.com",
-	}
-	openaiData, err := json.MarshalIndent(openaiConfig, "", "  ")
-	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(modelsDir, "openai.json"), openaiData, 0644)
-	require.NoError(t, err)
-
-	// Wait for file watcher to process the event
-	time.Sleep(20 * time.Millisecond)
-
-	// Verify config was reloaded
-	configs, err := store.GetModelProviderConfigs()
-	require.NoError(t, err)
-	assert.Len(t, configs, 2)
-
-	_, ok := configs["openai"]
-	assert.True(t, ok)
-
-	// Verify timestamp was updated
-	newTime, err := store.LastModelProviderConfigsUpdate()
-	require.NoError(t, err)
-	assert.True(t, newTime.After(initialTime))
+	t.Skip("hot reload removed")
 }
 
 func TestLocalConfigStore_FileWatching_AgentRole(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "test-config-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	rolesDir := filepath.Join(tmpDir, "roles")
-	require.NoError(t, os.Mkdir(rolesDir, 0755))
-
-	// Create initial role
-	test1Dir := filepath.Join(rolesDir, "test1")
-	require.NoError(t, os.Mkdir(test1Dir, 0755))
-	test1Config := conf.AgentRoleConfig{
-		Name:        "test1",
-		Description: "Test role 1",
-	}
-	test1Data, err := json.MarshalIndent(test1Config, "", "  ")
-	require.NoError(t, err)
-	test1Path := filepath.Join(test1Dir, "config.json")
-	err = os.WriteFile(test1Path, test1Data, 0644)
-	require.NoError(t, err)
-
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// Get initial timestamp
-	initialTime, err := store.LastAgentRoleConfigsUpdate()
-	require.NoError(t, err)
-
-	// Wait a bit to ensure timestamp difference
-	time.Sleep(10 * time.Millisecond)
-
-	// Modify existing role
-	test1Config.Description = "Modified description"
-	test1Data, err = json.MarshalIndent(test1Config, "", "  ")
-	require.NoError(t, err)
-	err = os.WriteFile(test1Path, test1Data, 0644)
-	require.NoError(t, err)
-
-	// Wait for file watcher to process the event
-	time.Sleep(20 * time.Millisecond)
-
-	// Verify config was reloaded
-	configs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
-	assert.Equal(t, "Modified description", configs["test1"].Description)
-
-	// Verify timestamp was updated
-	newTime, err := store.LastAgentRoleConfigsUpdate()
-	require.NoError(t, err)
-	assert.True(t, newTime.After(initialTime))
+	t.Skip("hot reload removed")
 }
 
 func TestLocalConfigStore_FileWatching_NewRole(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "test-config-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	rolesDir := filepath.Join(tmpDir, "roles")
-	require.NoError(t, os.Mkdir(rolesDir, 0755))
-
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// Verify no roles initially
-	configs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
-	assert.Empty(t, configs)
-
-	// Wait a bit
-	time.Sleep(10 * time.Millisecond)
-
-	// Add a new role directory
-	test1Dir := filepath.Join(rolesDir, "test1")
-	require.NoError(t, os.Mkdir(test1Dir, 0755))
-
-	// Wait for directory creation to be detected
-	time.Sleep(10 * time.Millisecond)
-
-	// Add config.json to the new role
-	test1Config := conf.AgentRoleConfig{
-		Name:        "test1",
-		Description: "New test role",
-	}
-	test1Data, err := json.MarshalIndent(test1Config, "", "  ")
-	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(test1Dir, "config.json"), test1Data, 0644)
-	require.NoError(t, err)
-
-	// Wait for file watcher to process the event
-	time.Sleep(10 * time.Millisecond)
-
-	// Verify config was loaded
-	configs, err = store.GetAgentRoleConfigs()
-	require.NoError(t, err)
-	assert.Len(t, configs, 1)
-
-	test1, ok := configs["test1"]
-	assert.True(t, ok)
-	assert.Equal(t, "New test role", test1.Description)
+	t.Skip("hot reload removed")
 }
 
 func TestLocalConfigStore_Close(t *testing.T) {
@@ -839,8 +621,6 @@ func TestLocalConfigStore_ConcurrentAccess(t *testing.T) {
 		go func() {
 			for j := 0; j < 100; j++ {
 				_, err := store.GetGlobalConfig()
-				assert.NoError(t, err)
-				_, err = store.LastGlobalConfigUpdate()
 				assert.NoError(t, err)
 			}
 			done <- true
@@ -891,18 +671,6 @@ func TestLocalConfigStore_WithTestdataConfig(t *testing.T) {
 	_, hasTest1 := roleConfigs["test1"]
 	assert.True(t, hasTest1, "test1 role should exist")
 
-	// Test timestamps
-	globalTime, err := store.LastGlobalConfigUpdate()
-	require.NoError(t, err)
-	assert.False(t, globalTime.IsZero())
-
-	modelTime, err := store.LastModelProviderConfigsUpdate()
-	require.NoError(t, err)
-	assert.False(t, modelTime.IsZero())
-
-	roleTime, err := store.LastAgentRoleConfigsUpdate()
-	require.NoError(t, err)
-	assert.False(t, roleTime.IsZero())
 }
 
 func TestLocalConfigStore_PromptFragments(t *testing.T) {
@@ -1025,124 +793,11 @@ func TestLocalConfigStore_ToolFragments(t *testing.T) {
 }
 
 func TestLocalConfigStore_FileWatching_PromptFragments(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "test-config-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	rolesDir := filepath.Join(tmpDir, "roles")
-	require.NoError(t, os.Mkdir(rolesDir, 0755))
-
-	// Create test1 role
-	test1Dir := filepath.Join(rolesDir, "test1")
-	require.NoError(t, os.Mkdir(test1Dir, 0755))
-	test1Config := conf.AgentRoleConfig{
-		Name:        "test1",
-		Description: "Test role 1",
-	}
-	test1Data, err := json.MarshalIndent(test1Config, "", "  ")
-	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(test1Dir, "config.json"), test1Data, 0644)
-	require.NoError(t, err)
-
-	// Create initial prompt fragment
-	err = os.WriteFile(filepath.Join(test1Dir, "10-system.md"), []byte("Initial prompt."), 0644)
-	require.NoError(t, err)
-
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// Get initial timestamp
-	initialTime, err := store.LastAgentRoleConfigsUpdate()
-	require.NoError(t, err)
-
-	// Verify initial prompt fragment
-	configs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
-	test1, ok := configs["test1"]
-	require.True(t, ok)
-	assert.Equal(t, "Initial prompt.", test1.PromptFragments["10-system"])
-
-	// Wait a bit to ensure timestamp difference
-	time.Sleep(10 * time.Millisecond)
-
-	// Modify the prompt fragment
-	err = os.WriteFile(filepath.Join(test1Dir, "10-system.md"), []byte("Updated prompt."), 0644)
-	require.NoError(t, err)
-
-	// Wait for file watcher to process the event
-	time.Sleep(20 * time.Millisecond)
-
-	// Verify prompt fragment was reloaded
-	configs, err = store.GetAgentRoleConfigs()
-	require.NoError(t, err)
-	test1, ok = configs["test1"]
-	require.True(t, ok)
-	assert.Equal(t, "Updated prompt.", test1.PromptFragments["10-system"])
-
-	// Verify timestamp was updated
-	newTime, err := store.LastAgentRoleConfigsUpdate()
-	require.NoError(t, err)
-	assert.True(t, newTime.After(initialTime))
+	t.Skip("hot reload removed")
 }
 
 func TestLocalConfigStore_FileWatching_NewPromptFragment(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "test-config-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	rolesDir := filepath.Join(tmpDir, "roles")
-	require.NoError(t, os.Mkdir(rolesDir, 0755))
-
-	// Create test1 role
-	test1Dir := filepath.Join(rolesDir, "test1")
-	require.NoError(t, os.Mkdir(test1Dir, 0755))
-	test1Config := conf.AgentRoleConfig{
-		Name:        "test1",
-		Description: "Test role 1",
-	}
-	test1Data, err := json.MarshalIndent(test1Config, "", "  ")
-	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(test1Dir, "config.json"), test1Data, 0644)
-	require.NoError(t, err)
-
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// Verify no prompt fragments initially
-	configs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
-	test1, ok := configs["test1"]
-	require.True(t, ok)
-	assert.Empty(t, test1.PromptFragments)
-
-	// Get initial timestamp
-	initialTime, err := store.LastAgentRoleConfigsUpdate()
-	require.NoError(t, err)
-
-	// Wait a bit
-	time.Sleep(10 * time.Millisecond)
-
-	// Add a new prompt fragment
-	err = os.WriteFile(filepath.Join(test1Dir, "10-system.md"), []byte("New prompt fragment."), 0644)
-	require.NoError(t, err)
-
-	// Wait for file watcher to process the event
-	time.Sleep(20 * time.Millisecond)
-
-	// Verify prompt fragment was loaded
-	configs, err = store.GetAgentRoleConfigs()
-	require.NoError(t, err)
-	test1, ok = configs["test1"]
-	require.True(t, ok)
-	assert.Len(t, test1.PromptFragments, 1)
-	assert.Equal(t, "New prompt fragment.", test1.PromptFragments["10-system"])
-
-	// Verify timestamp was updated
-	newTime, err := store.LastAgentRoleConfigsUpdate()
-	require.NoError(t, err)
-	assert.True(t, newTime.After(initialTime))
+	t.Skip("hot reload removed")
 }
 
 func TestLocalConfigStore_PromptFragments_Copy(t *testing.T) {
@@ -1488,51 +1143,7 @@ tools-access:
 }
 
 func TestLocalConfigStore_YAMLConfigFileWatching(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "test-config-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Create initial global.yml
-	globalYAML := `model-tags:
-  - model: "^gpt-.*"
-    tag: "openai"
-`
-	err = os.WriteFile(filepath.Join(tmpDir, "global.yml"), []byte(globalYAML), 0644)
-	require.NoError(t, err)
-
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// Get initial timestamp
-	initialTime, err := store.LastGlobalConfigUpdate()
-	require.NoError(t, err)
-
-	// Wait a bit to ensure timestamp difference
-	time.Sleep(10 * time.Millisecond)
-
-	// Modify global.yml
-	globalYAML = `model-tags:
-  - model: "^claude-.*"
-    tag: "anthropic"
-  - model: "^gpt-.*"
-    tag: "openai"
-`
-	err = os.WriteFile(filepath.Join(tmpDir, "global.yml"), []byte(globalYAML), 0644)
-	require.NoError(t, err)
-
-	// Wait for file watcher to process the event
-	time.Sleep(20 * time.Millisecond)
-
-	// Verify config was reloaded
-	config, err := store.GetGlobalConfig()
-	require.NoError(t, err)
-	assert.Len(t, config.ModelTags, 2)
-
-	// Verify timestamp was updated
-	newTime, err := store.LastGlobalConfigUpdate()
-	require.NoError(t, err)
-	assert.True(t, newTime.After(initialTime))
+	t.Skip("hot reload removed")
 }
 
 func TestLocalConfigStore_GlobalConfigSupportsYAMLExtension(t *testing.T) {
@@ -1560,42 +1171,5 @@ func TestLocalConfigStore_GlobalConfigSupportsYAMLExtension(t *testing.T) {
 }
 
 func TestLocalConfigStore_YAMLLongExtensionConfigFileWatching(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "test-config-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	globalYAML := `model-tags:
-  - model: "^gpt-.*"
-    tag: "openai"
-`
-	err = os.WriteFile(filepath.Join(tmpDir, "global.yaml"), []byte(globalYAML), 0644)
-	require.NoError(t, err)
-
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	initialTime, err := store.LastGlobalConfigUpdate()
-	require.NoError(t, err)
-
-	time.Sleep(10 * time.Millisecond)
-
-	globalYAML = `model-tags:
-  - model: "^claude-.*"
-    tag: "anthropic"
-  - model: "^gpt-.*"
-    tag: "openai"
-`
-	err = os.WriteFile(filepath.Join(tmpDir, "global.yaml"), []byte(globalYAML), 0644)
-	require.NoError(t, err)
-
-	time.Sleep(20 * time.Millisecond)
-
-	config, err := store.GetGlobalConfig()
-	require.NoError(t, err)
-	assert.Len(t, config.ModelTags, 2)
-
-	newTime, err := store.LastGlobalConfigUpdate()
-	require.NoError(t, err)
-	assert.True(t, newTime.After(initialTime))
+	t.Skip("hot reload removed")
 }

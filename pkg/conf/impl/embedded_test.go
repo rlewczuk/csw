@@ -2,7 +2,6 @@ package impl
 
 import (
 	"testing"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/stretchr/testify/assert"
@@ -73,23 +72,6 @@ func TestEmbeddedConfigStore_GetGlobalConfig(t *testing.T) {
 	}
 }
 
-func TestEmbeddedConfigStore_LastGlobalConfigUpdate(t *testing.T) {
-	store, err := NewEmbeddedConfigStore()
-	require.NoError(t, err)
-
-	updateTime, err := store.LastGlobalConfigUpdate()
-	require.NoError(t, err)
-
-	// Should return the constant embedded timestamp
-	assert.Equal(t, embeddedTimestamp, updateTime)
-	assert.Equal(t, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), updateTime)
-
-	// Multiple calls should return the same timestamp
-	updateTime2, err := store.LastGlobalConfigUpdate()
-	require.NoError(t, err)
-	assert.Equal(t, updateTime, updateTime2)
-}
-
 func TestEmbeddedConfigStore_GetModelProviderConfigs(t *testing.T) {
 	store, err := NewEmbeddedConfigStore()
 	require.NoError(t, err)
@@ -120,22 +102,6 @@ func TestEmbeddedConfigStore_GetModelProviderConfigs(t *testing.T) {
 			break
 		}
 	}
-}
-
-func TestEmbeddedConfigStore_LastModelProviderConfigsUpdate(t *testing.T) {
-	store, err := NewEmbeddedConfigStore()
-	require.NoError(t, err)
-
-	updateTime, err := store.LastModelProviderConfigsUpdate()
-	require.NoError(t, err)
-
-	// Should return the constant embedded timestamp
-	assert.Equal(t, embeddedTimestamp, updateTime)
-
-	// Multiple calls should return the same timestamp
-	updateTime2, err := store.LastModelProviderConfigsUpdate()
-	require.NoError(t, err)
-	assert.Equal(t, updateTime, updateTime2)
 }
 
 func TestEmbeddedConfigStore_GetAgentRoleConfigs(t *testing.T) {
@@ -223,22 +189,6 @@ func TestEmbeddedConfigStore_GetHookConfigs(t *testing.T) {
 	assert.True(t, hooks["branch_name"].EmbeddedSource)
 }
 
-func TestEmbeddedConfigStore_LastAgentRoleConfigsUpdate(t *testing.T) {
-	store, err := NewEmbeddedConfigStore()
-	require.NoError(t, err)
-
-	updateTime, err := store.LastAgentRoleConfigsUpdate()
-	require.NoError(t, err)
-
-	// Should return the constant embedded timestamp
-	assert.Equal(t, embeddedTimestamp, updateTime)
-
-	// Multiple calls should return the same timestamp
-	updateTime2, err := store.LastAgentRoleConfigsUpdate()
-	require.NoError(t, err)
-	assert.Equal(t, updateTime, updateTime2)
-}
-
 func TestEmbeddedConfigStore_ConcurrentAccess(t *testing.T) {
 	store, err := NewEmbeddedConfigStore()
 	require.NoError(t, err)
@@ -254,12 +204,6 @@ func TestEmbeddedConfigStore_ConcurrentAccess(t *testing.T) {
 				assert.NoError(t, err)
 				_, err = store.GetAgentRoleConfigs()
 				assert.NoError(t, err)
-				_, err = store.LastGlobalConfigUpdate()
-				assert.NoError(t, err)
-				_, err = store.LastModelProviderConfigsUpdate()
-				assert.NoError(t, err)
-				_, err = store.LastAgentRoleConfigsUpdate()
-				assert.NoError(t, err)
 			}
 			done <- true
 		}()
@@ -269,26 +213,6 @@ func TestEmbeddedConfigStore_ConcurrentAccess(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		<-done
 	}
-}
-
-func TestEmbeddedConfigStore_ConstantTimestamp(t *testing.T) {
-	// Verify that all timestamp methods return the same constant value
-	store, err := NewEmbeddedConfigStore()
-	require.NoError(t, err)
-
-	globalTime, err := store.LastGlobalConfigUpdate()
-	require.NoError(t, err)
-
-	modelTime, err := store.LastModelProviderConfigsUpdate()
-	require.NoError(t, err)
-
-	roleTime, err := store.LastAgentRoleConfigsUpdate()
-	require.NoError(t, err)
-
-	// All timestamps should be the same constant
-	assert.Equal(t, globalTime, modelTime)
-	assert.Equal(t, modelTime, roleTime)
-	assert.Equal(t, embeddedTimestamp, globalTime)
 }
 
 func TestEmbeddedConfigStore_ReadOnly(t *testing.T) {

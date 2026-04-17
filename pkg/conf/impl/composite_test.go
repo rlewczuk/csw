@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/stretchr/testify/assert"
@@ -390,107 +389,6 @@ func TestCompositeConfigStore_GlobalConfigMerging(t *testing.T) {
 	assert.False(t, safeRule["runBash"])
 }
 
-func TestCompositeConfigStore_Caching(t *testing.T) {
-	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, "config")
-	require.NoError(t, os.MkdirAll(filepath.Join(configDir, "models"), 0755))
-
-	// Create initial config
-	provider := `{
-		"type": "ollama",
-		"name": "test",
-		"url": "http://localhost:11434"
-	}`
-	require.NoError(t, os.WriteFile(filepath.Join(configDir, "models", "test.json"), []byte(provider), 0644))
-
-	// Create composite store
-	store, err := NewCompositeConfigStore(tmpDir, configDir)
-	require.NoError(t, err)
-
-	composite, ok := store.(*CompositeConfigStore)
-	require.True(t, ok)
-
-	// Get configs (should load from disk)
-	configs1, err := store.GetModelProviderConfigs()
-	require.NoError(t, err)
-	assert.Len(t, configs1, 1)
-	assert.Equal(t, "http://localhost:11434", configs1["test"].URL)
-
-	// Record the update timestamp
-	updateTime1 := composite.modelProviderConfigsUpdate
-
-	// Get configs again (should use cache, no disk read)
-	configs2, err := store.GetModelProviderConfigs()
-	require.NoError(t, err)
-	assert.Equal(t, configs1, configs2)
-
-	// Update timestamp should be the same (used cache)
-	assert.Equal(t, updateTime1, composite.modelProviderConfigsUpdate)
-}
-
-func TestCompositeConfigStore_ChangeDetection(t *testing.T) {
-	// Create mock stores
-	store1 := NewMockConfigStore()
-	store2 := NewMockConfigStore()
-
-	// Set initial configs
-	store1.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{
-		"provider1": {
-			Type: "ollama",
-			Name: "provider1",
-			URL:  "http://localhost:11434",
-		},
-	})
-
-	store2.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{
-		"provider2": {
-			Type: "openai",
-			Name: "provider2",
-			URL:  "https://api.openai.com/v1",
-		},
-	})
-
-	// Create composite store manually
-	composite := &CompositeConfigStore{
-		stores:             []conf.ConfigStore{store1, store2},
-		storeGlobalUpdates: make([]time.Time, 2),
-		storeModelUpdates:  make([]time.Time, 2),
-		storeMCPUpdates:    make([]time.Time, 2),
-		storeRoleUpdates:   make([]time.Time, 2),
-	}
-
-	// Initial refresh
-	require.NoError(t, composite.refresh())
-
-	// Should have both providers
-	configs, err := composite.GetModelProviderConfigs()
-	require.NoError(t, err)
-	assert.Len(t, configs, 2)
-
-	// Record initial timestamps
-	initialUpdate := composite.modelProviderConfigsUpdate
-
-	// Wait a bit to ensure different timestamp
-	time.Sleep(10 * time.Millisecond)
-
-	// Update store2's config
-	store2.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{
-		"provider2": {
-			Type: "openai",
-			Name: "provider2",
-			URL:  "https://custom.openai.com/v1", // Changed URL
-		},
-	})
-
-	// Get configs again - should detect change and refresh
-	configs, err = composite.GetModelProviderConfigs()
-	require.NoError(t, err)
-	assert.Len(t, configs, 2)
-	assert.Equal(t, "https://custom.openai.com/v1", configs["provider2"].URL)
-
-	// Timestamp should be updated
-	assert.True(t, composite.modelProviderConfigsUpdate.After(initialUpdate))
-}
 
 func TestCompositeConfigStore_NonExistentPath(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -534,39 +432,6 @@ func TestCompositeConfigStore_EmptyConfigPath(t *testing.T) {
 	require.NotNil(t, configs)
 }
 
-func TestCompositeConfigStore_LastUpdateTimestamps(t *testing.T) {
-	// Create mock stores
-	store1 := NewMockConfigStore()
-	store2 := NewMockConfigStore()
-
-	// Create composite
-	composite := &CompositeConfigStore{
-		stores:             []conf.ConfigStore{store1, store2},
-		storeGlobalUpdates: make([]time.Time, 2),
-		storeModelUpdates:  make([]time.Time, 2),
-		storeMCPUpdates:    make([]time.Time, 2),
-		storeRoleUpdates:   make([]time.Time, 2),
-	}
-
-	// Initial refresh
-	require.NoError(t, composite.refresh())
-
-	// Get timestamps
-	globalUpdate, err := composite.LastGlobalConfigUpdate()
-	require.NoError(t, err)
-
-	modelUpdate, err := composite.LastModelProviderConfigsUpdate()
-	require.NoError(t, err)
-
-	roleUpdate, err := composite.LastAgentRoleConfigsUpdate()
-	require.NoError(t, err)
-
-	// All should be valid timestamps
-	assert.False(t, globalUpdate.IsZero())
-	assert.False(t, modelUpdate.IsZero())
-	assert.False(t, roleUpdate.IsZero())
-}
-
 func TestCompositeConfigStore_GetMCPServerConfigs_MergesWithTransportFields(t *testing.T) {
 	store1 := NewMockConfigStore()
 	store2 := NewMockConfigStore()
@@ -590,11 +455,7 @@ func TestCompositeConfigStore_GetMCPServerConfigs_MergesWithTransportFields(t *t
 	})
 
 	composite := &CompositeConfigStore{
-		stores:             []conf.ConfigStore{store1, store2},
-		storeGlobalUpdates: make([]time.Time, 2),
-		storeModelUpdates:  make([]time.Time, 2),
-		storeMCPUpdates:    make([]time.Time, 2),
-		storeRoleUpdates:   make([]time.Time, 2),
+		stores: []conf.ConfigStore{store1, store2},
 	}
 
 	require.NoError(t, composite.refresh())
@@ -635,11 +496,7 @@ func TestCompositeConfigStore_GetMCPServerConfigs_OverridesWholeConfigByKey(t *t
 	})
 
 	composite := &CompositeConfigStore{
-		stores:             []conf.ConfigStore{store1, store2},
-		storeGlobalUpdates: make([]time.Time, 2),
-		storeModelUpdates:  make([]time.Time, 2),
-		storeMCPUpdates:    make([]time.Time, 2),
-		storeRoleUpdates:   make([]time.Time, 2),
+		stores: []conf.ConfigStore{store1, store2},
 	}
 	require.NoError(t, composite.refresh())
 
@@ -664,11 +521,7 @@ func TestCompositeConfigStore_CopyProtection(t *testing.T) {
 	})
 
 	composite := &CompositeConfigStore{
-		stores:             []conf.ConfigStore{mockStore},
-		storeGlobalUpdates: make([]time.Time, 1),
-		storeModelUpdates:  make([]time.Time, 1),
-		storeMCPUpdates:    make([]time.Time, 1),
-		storeRoleUpdates:   make([]time.Time, 1),
+		stores: []conf.ConfigStore{mockStore},
 	}
 
 	require.NoError(t, composite.refresh())
@@ -692,11 +545,7 @@ func TestCompositeConfigStore_MultipleRefreshes(t *testing.T) {
 	mockStore := NewMockConfigStore()
 
 	composite := &CompositeConfigStore{
-		stores:             []conf.ConfigStore{mockStore},
-		storeGlobalUpdates: make([]time.Time, 1),
-		storeModelUpdates:  make([]time.Time, 1),
-		storeMCPUpdates:    make([]time.Time, 1),
-		storeRoleUpdates:   make([]time.Time, 1),
+		stores: []conf.ConfigStore{mockStore},
 	}
 
 	// Multiple refreshes should work without error
@@ -712,11 +561,7 @@ func TestCompositeConfigStore_ConcurrentAccess(t *testing.T) {
 	})
 
 	composite := &CompositeConfigStore{
-		stores:             []conf.ConfigStore{mockStore},
-		storeGlobalUpdates: make([]time.Time, 1),
-		storeModelUpdates:  make([]time.Time, 1),
-		storeMCPUpdates:    make([]time.Time, 1),
-		storeRoleUpdates:   make([]time.Time, 1),
+		stores: []conf.ConfigStore{mockStore},
 	}
 
 	require.NoError(t, composite.refresh())
@@ -748,11 +593,7 @@ func TestCompositeConfigStore_GetAgentConfigFile(t *testing.T) {
 		localStore.SetAgentConfigFile("commit", "system.md", []byte("local"))
 
 		composite := &CompositeConfigStore{
-			stores:             []conf.ConfigStore{embeddedStore, globalStore, localStore},
-			storeGlobalUpdates: make([]time.Time, 3),
-			storeModelUpdates:  make([]time.Time, 3),
-			storeMCPUpdates:    make([]time.Time, 3),
-			storeRoleUpdates:   make([]time.Time, 3),
+			stores: []conf.ConfigStore{embeddedStore, globalStore, localStore},
 		}
 
 		data, err := composite.GetAgentConfigFile("commit", "system.md")
@@ -769,11 +610,7 @@ func TestCompositeConfigStore_GetAgentConfigFile(t *testing.T) {
 		globalStore.SetAgentConfigFile("commit", "system.md", []byte("global"))
 
 		composite := &CompositeConfigStore{
-			stores:             []conf.ConfigStore{embeddedStore, globalStore, localStore},
-			storeGlobalUpdates: make([]time.Time, 3),
-			storeModelUpdates:  make([]time.Time, 3),
-			storeMCPUpdates:    make([]time.Time, 3),
-			storeRoleUpdates:   make([]time.Time, 3),
+			stores: []conf.ConfigStore{embeddedStore, globalStore, localStore},
 		}
 
 		data, err := composite.GetAgentConfigFile("commit", "system.md")
@@ -783,11 +620,7 @@ func TestCompositeConfigStore_GetAgentConfigFile(t *testing.T) {
 
 	t.Run("returns error when file missing in all sources", func(t *testing.T) {
 		composite := &CompositeConfigStore{
-			stores:             []conf.ConfigStore{NewMockConfigStore(), NewMockConfigStore()},
-			storeGlobalUpdates: make([]time.Time, 2),
-			storeModelUpdates:  make([]time.Time, 2),
-			storeMCPUpdates:    make([]time.Time, 2),
-			storeRoleUpdates:   make([]time.Time, 2),
+			stores: []conf.ConfigStore{NewMockConfigStore(), NewMockConfigStore()},
 		}
 
 		_, err := composite.GetAgentConfigFile("commit", "system.md")
@@ -840,11 +673,7 @@ func TestCompositeConfigStore_PromptFragmentsMerging(t *testing.T) {
 
 	// Create composite store
 	composite := &CompositeConfigStore{
-		stores:             []conf.ConfigStore{store1, store2, store3},
-		storeGlobalUpdates: make([]time.Time, 3),
-		storeModelUpdates:  make([]time.Time, 3),
-		storeMCPUpdates:    make([]time.Time, 3),
-		storeRoleUpdates:   make([]time.Time, 3),
+		stores: []conf.ConfigStore{store1, store2, store3},
 	}
 
 	require.NoError(t, composite.refresh())
@@ -905,11 +734,7 @@ func TestCompositeConfigStore_PromptFragmentsRemovalAndReaddition(t *testing.T) 
 	})
 
 	composite := &CompositeConfigStore{
-		stores:             []conf.ConfigStore{store1, store2, store3},
-		storeGlobalUpdates: make([]time.Time, 3),
-		storeModelUpdates:  make([]time.Time, 3),
-		storeMCPUpdates:    make([]time.Time, 3),
-		storeRoleUpdates:   make([]time.Time, 3),
+		stores: []conf.ConfigStore{store1, store2, store3},
 	}
 
 	require.NoError(t, composite.refresh())
@@ -951,11 +776,7 @@ func TestCompositeConfigStore_PromptFragmentsEmptyString(t *testing.T) {
 	})
 
 	composite := &CompositeConfigStore{
-		stores:             []conf.ConfigStore{store1, store2},
-		storeGlobalUpdates: make([]time.Time, 2),
-		storeModelUpdates:  make([]time.Time, 2),
-		storeMCPUpdates:    make([]time.Time, 2),
-		storeRoleUpdates:   make([]time.Time, 2),
+		stores: []conf.ConfigStore{store1, store2},
 	}
 
 	require.NoError(t, composite.refresh())
@@ -1009,11 +830,7 @@ func TestCompositeConfigStore_PromptFragmentsMultipleRoles(t *testing.T) {
 	})
 
 	composite := &CompositeConfigStore{
-		stores:             []conf.ConfigStore{store1, store2},
-		storeGlobalUpdates: make([]time.Time, 2),
-		storeModelUpdates:  make([]time.Time, 2),
-		storeMCPUpdates:    make([]time.Time, 2),
-		storeRoleUpdates:   make([]time.Time, 2),
+		stores: []conf.ConfigStore{store1, store2},
 	}
 
 	require.NoError(t, composite.refresh())
@@ -1049,11 +866,7 @@ func TestCompositeConfigStore_PromptFragmentsCopyProtection(t *testing.T) {
 	})
 
 	composite := &CompositeConfigStore{
-		stores:             []conf.ConfigStore{mockStore},
-		storeGlobalUpdates: make([]time.Time, 1),
-		storeModelUpdates:  make([]time.Time, 1),
-		storeMCPUpdates:    make([]time.Time, 1),
-		storeRoleUpdates:   make([]time.Time, 1),
+		stores: []conf.ConfigStore{mockStore},
 	}
 
 	require.NoError(t, composite.refresh())
@@ -1102,11 +915,7 @@ func TestCompositeConfigStore_ToolFragmentsMerging(t *testing.T) {
 	})
 
 	composite := &CompositeConfigStore{
-		stores:             []conf.ConfigStore{store1, store2},
-		storeGlobalUpdates: make([]time.Time, 2),
-		storeModelUpdates:  make([]time.Time, 2),
-		storeMCPUpdates:    make([]time.Time, 2),
-		storeRoleUpdates:   make([]time.Time, 2),
+		stores: []conf.ConfigStore{store1, store2},
 	}
 
 	require.NoError(t, composite.refresh())

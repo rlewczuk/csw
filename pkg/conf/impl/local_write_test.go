@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/stretchr/testify/assert"
@@ -309,39 +308,4 @@ func TestLocalConfigStore_SaveAndDelete_MultipleProviders(t *testing.T) {
 	assert.Contains(t, configs, "provider1")
 	assert.Contains(t, configs, "provider3")
 	assert.NotContains(t, configs, "provider2")
-}
-
-func TestLocalConfigStore_Timestamps(t *testing.T) {
-	// Create temporary directory
-	tmpDir, err := os.MkdirTemp("", "csw-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Create config store
-	store, err := NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// Get initial timestamp
-	timestamp1, err := store.LastModelProviderConfigsUpdate()
-	require.NoError(t, err)
-
-	// Wait a bit
-	time.Sleep(10 * time.Millisecond)
-
-	// Save config
-	config := &conf.ModelProviderConfig{
-		Name: "test-provider",
-		Type: "openai",
-		URL:  "https://api.openai.com/v1",
-	}
-	err = store.SaveModelProviderConfig(config)
-	require.NoError(t, err)
-
-	// Get new timestamp
-	timestamp2, err := store.LastModelProviderConfigsUpdate()
-	require.NoError(t, err)
-
-	// Verify timestamp changed
-	assert.True(t, timestamp2.After(timestamp1))
 }

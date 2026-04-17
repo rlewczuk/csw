@@ -19,7 +19,6 @@ func TestNewProviderRegistry(t *testing.T) {
 	assert.NotNil(t, registry.configStore)
 	assert.NotNil(t, registry.providers)
 	assert.Equal(t, 0, len(registry.providers))
-	assert.True(t, registry.lastUpdate.IsZero())
 }
 
 func TestProviderRegistry_Get(t *testing.T) {
@@ -74,14 +73,6 @@ func TestProviderRegistry_Get(t *testing.T) {
 			name: "config store returns error on GetModelProviderConfigs",
 			setupStore: func(store *impl.MockConfigStore) {
 				store.GetModelProviderConfigsErr = errors.New("config store error")
-			},
-			provName: "test",
-			wantErr:  true,
-		},
-		{
-			name: "config store returns error on LastModelProviderConfigsUpdate",
-			setupStore: func(store *impl.MockConfigStore) {
-				store.LastModelProviderConfigsUpdateErr = errors.New("timestamp error")
 			},
 			provName: "test",
 			wantErr:  true,
@@ -183,58 +174,6 @@ func TestProviderRegistry_List(t *testing.T) {
 			assert.Equal(t, tt.expectedNames, names)
 		})
 	}
-}
-
-func TestProviderRegistry_CacheInvalidation(t *testing.T) {
-	configStore := impl.NewMockConfigStore()
-
-	// Initial configuration
-	configs1 := map[string]*conf.ModelProviderConfig{
-		"ollama": {
-			Type: "ollama",
-			Name: "ollama",
-			URL:  "http://localhost:11434",
-		},
-	}
-	configStore.SetModelProviderConfigs(configs1)
-
-	registry := NewProviderRegistry(configStore)
-
-	// First access - should load from config store
-	provider1, err := registry.Get("ollama")
-	require.NoError(t, err)
-	assert.NotNil(t, provider1)
-
-	// Verify only ollama is in the list
-	names := registry.List()
-	assert.Equal(t, []string{"ollama"}, names)
-
-	// Update configuration with new provider
-	time.Sleep(10 * time.Millisecond) // Ensure timestamp changes
-	configs2 := map[string]*conf.ModelProviderConfig{
-		"ollama": {
-			Type: "ollama",
-			Name: "ollama",
-			URL:  "http://localhost:11434",
-		},
-		"anthropic": {
-			Type:   "anthropic",
-			Name:   "anthropic",
-			URL:    "https://api.anthropic.com",
-			APIKey: "test-key",
-		},
-	}
-	configStore.SetModelProviderConfigs(configs2)
-
-	// Access should trigger reload because timestamp changed
-	provider2, err := registry.Get("anthropic")
-	require.NoError(t, err)
-	assert.NotNil(t, provider2)
-
-	// Verify both providers are now in the list
-	names = registry.List()
-	sort.Strings(names)
-	assert.Equal(t, []string{"anthropic", "ollama"}, names)
 }
 
 func TestProviderRegistry_CacheNotInvalidatedWhenTimestampSame(t *testing.T) {
@@ -390,52 +329,6 @@ func TestProviderRegistry_MultipleProviderTypes(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, provider)
 	}
-}
-
-func TestProviderRegistry_ReloadAfterConfigRemoval(t *testing.T) {
-	configStore := impl.NewMockConfigStore()
-
-	// Initial configuration with two providers
-	configs1 := map[string]*conf.ModelProviderConfig{
-		"ollama": {
-			Type: "ollama",
-			Name: "ollama",
-			URL:  "http://localhost:11434",
-		},
-		"anthropic": {
-			Type:   "anthropic",
-			Name:   "anthropic",
-			URL:    "https://api.anthropic.com",
-			APIKey: "test-key",
-		},
-	}
-	configStore.SetModelProviderConfigs(configs1)
-
-	registry := NewProviderRegistry(configStore)
-
-	// Verify both providers exist
-	names := registry.List()
-	assert.Equal(t, 2, len(names))
-
-	// Remove one provider
-	time.Sleep(10 * time.Millisecond)
-	configs2 := map[string]*conf.ModelProviderConfig{
-		"ollama": {
-			Type: "ollama",
-			Name: "ollama",
-			URL:  "http://localhost:11434",
-		},
-	}
-	configStore.SetModelProviderConfigs(configs2)
-
-	// Access should trigger reload
-	names = registry.List()
-	assert.Equal(t, 1, len(names))
-	assert.Equal(t, []string{"ollama"}, names)
-
-	// Anthropic should no longer be accessible
-	_, err := registry.Get("anthropic")
-	assert.ErrorIs(t, err, ErrProviderNotFound)
 }
 
 func TestFromConfig(t *testing.T) {

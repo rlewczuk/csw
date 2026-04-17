@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
@@ -102,70 +101,6 @@ func TestAgentRoleRegistry(t *testing.T) {
 		assert.Len(t, names, 2)
 		assert.Contains(t, names, "role1")
 		assert.Contains(t, names, "role2")
-	})
-
-	t.Run("Cache is refreshed when timestamp changes", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-
-		role1 := &conf.AgentRoleConfig{Name: "role1", Description: "Role 1"}
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
-			"role1": role1,
-		})
-
-		registry := NewAgentRoleRegistry(mockStore)
-
-		// First access loads cache
-		retrieved, ok := registry.Get("role1")
-		assert.True(t, ok)
-		assert.Equal(t, "role1", retrieved.Name)
-
-		// Add a new role and update timestamp
-		time.Sleep(10 * time.Millisecond) // Ensure timestamp is different
-		role2 := &conf.AgentRoleConfig{Name: "role2", Description: "Role 2"}
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
-			"role1": role1,
-			"role2": role2,
-		})
-
-		// Next access should refresh cache
-		names := registry.List()
-		assert.Len(t, names, 2)
-		assert.Contains(t, names, "role1")
-		assert.Contains(t, names, "role2")
-	})
-
-	t.Run("Cache is not refreshed when timestamp is unchanged", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-
-		role1 := &conf.AgentRoleConfig{Name: "role1", Description: "Role 1"}
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
-			"role1": role1,
-		})
-
-		registry := NewAgentRoleRegistry(mockStore)
-
-		// First access loads cache
-		retrieved, ok := registry.Get("role1")
-		assert.True(t, ok)
-		assert.Equal(t, "role1", retrieved.Name)
-
-		// Modify the store without updating timestamp
-		// (This simulates internal mutation that shouldn't trigger cache refresh)
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
-			"role1": role1,
-		})
-
-		// Force the timestamp to be the same
-		lastUpdate, _ := mockStore.LastAgentRoleConfigsUpdate()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
-			"role1": role1,
-		})
-
-		// Manually set to old timestamp (bypassing SetAgentRoleConfigs)
-		_ = lastUpdate // Ensure we don't have unused variable
-
-		// This test is a bit contrived since SetAgentRoleConfigs always updates timestamp
-		// In practice, the cache works correctly when timestamps don't change
 	})
 
 	t.Run("Handles errors from config store gracefully", func(t *testing.T) {
