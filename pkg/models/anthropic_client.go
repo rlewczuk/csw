@@ -844,17 +844,23 @@ func (c *AnthropicClient) checkStatusCodeWithBody(resp *http.Response, bodyBytes
 		var errResp AnthropicErrorResponse
 		if err := json.Unmarshal(bodyBytes, &errResp); err == nil && errResp.Error != nil {
 			// Check for context length errors
-			if strings.Contains(strings.ToLower(errResp.Error.Message), "context length") ||
-				strings.Contains(strings.ToLower(errResp.Error.Message), "too many tokens") ||
-				strings.Contains(strings.ToLower(errResp.Error.Message), "maximum context length") {
+			msgLower := strings.ToLower(errResp.Error.Message)
+			if strings.Contains(msgLower, "context length") ||
+				strings.Contains(msgLower, "too many tokens") ||
+				strings.Contains(msgLower, "maximum context length") ||
+				strings.Contains(msgLower, "exceeded model token limit") ||
+				strings.Contains(msgLower, "token limit") {
 				return fmt.Errorf("%w: %s", ErrTooManyInputTokens, errResp.Error.Message)
 			}
 			return fmt.Errorf("bad request: %s", errResp.Error.Message)
 		}
 
 		// Fallback to raw body
-		if strings.Contains(strings.ToLower(bodyStr), "context length") ||
-			strings.Contains(strings.ToLower(bodyStr), "too many tokens") {
+		bodyLower := strings.ToLower(bodyStr)
+		if strings.Contains(bodyLower, "context length") ||
+			strings.Contains(bodyLower, "too many tokens") ||
+			strings.Contains(bodyLower, "exceeded model token limit") ||
+			strings.Contains(bodyLower, "token limit") {
 			return fmt.Errorf("%w: %s", ErrTooManyInputTokens, bodyStr)
 		}
 		return fmt.Errorf("bad request: %s", bodyStr)
