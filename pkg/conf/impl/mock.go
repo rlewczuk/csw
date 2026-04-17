@@ -27,7 +27,6 @@ type MockConfigStore struct {
 	GetModelAliasesErr         error
 	GetAgentConfigFileErr      error
 	SaveModelProviderConfigErr error
-	DeleteModelProviderConfigErr error
 	SaveGlobalConfigErr          error
 }
 
@@ -195,20 +194,6 @@ func (m *MockConfigStore) SaveModelProviderConfig(config *conf.ModelProviderConf
 		m.modelProviderConfigs = make(map[string]*conf.ModelProviderConfig)
 	}
 	m.modelProviderConfigs[config.Name] = config.Clone()
-
-	return nil
-}
-
-// DeleteModelProviderConfig deletes model provider configuration.
-func (m *MockConfigStore) DeleteModelProviderConfig(name string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.DeleteModelProviderConfigErr != nil {
-		return m.DeleteModelProviderConfigErr
-	}
-
-	delete(m.modelProviderConfigs, name)
 
 	return nil
 }

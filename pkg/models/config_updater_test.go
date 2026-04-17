@@ -19,9 +19,6 @@ type mockWritableStore struct {
 	savedConfig  *conf.ModelProviderConfig
 	saveCalled   bool
 	saveError    error
-	deletedName  string
-	deleteCalled bool
-	deleteError  error
 	globalConfig *conf.GlobalConfig
 	globalSaved  bool
 	globalError  error
@@ -69,15 +66,6 @@ func (m *mockWritableStore) SaveModelProviderConfig(config *conf.ModelProviderCo
 		return m.saveError
 	}
 	m.savedConfig = config
-	return nil
-}
-
-func (m *mockWritableStore) DeleteModelProviderConfig(name string) error {
-	m.deleteCalled = true
-	if m.deleteError != nil {
-		return m.deleteError
-	}
-	m.deletedName = name
 	return nil
 }
 
