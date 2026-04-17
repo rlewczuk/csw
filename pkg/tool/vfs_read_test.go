@@ -462,8 +462,8 @@ func TestVFSReadToolRender(t *testing.T) {
 		oneLiner, full, _, _ := tool.Render(call)
 
 		// Assert - path should be relative to worktree with line count
-		assert.Equal(t, "read cmd/csw/main.go (0 lines)", oneLiner)
-		assert.Contains(t, full, "read cmd/csw/main.go (0 lines)")
+		assert.Equal(t, "read cmd/csw/main.go (1:1, 0 lines)", oneLiner)
+		assert.Contains(t, full, "read cmd/csw/main.go (1:1, 0 lines)")
 	})
 
 	t.Run("should render with original path for relative path", func(t *testing.T) {
@@ -482,7 +482,7 @@ func TestVFSReadToolRender(t *testing.T) {
 		oneLiner, _, _, _ := tool.Render(call)
 
 		// Assert
-		assert.Equal(t, "read cmd/csw/main.go (0 lines)", oneLiner)
+		assert.Equal(t, "read cmd/csw/main.go (1:1, 0 lines)", oneLiner)
 	})
 
 	t.Run("should render with original path for path outside worktree", func(t *testing.T) {
@@ -501,7 +501,7 @@ func TestVFSReadToolRender(t *testing.T) {
 		oneLiner, _, _, _ := tool.Render(call)
 
 		// Assert - path should remain as-is since it's outside worktree with line count
-		assert.Equal(t, "read /other/path/file.go (0 lines)", oneLiner)
+		assert.Equal(t, "read /other/path/file.go (1:1, 0 lines)", oneLiner)
 	})
 
 	t.Run("should render error in oneLiner and full when error is present", func(t *testing.T) {
@@ -584,7 +584,7 @@ func TestVFSReadToolRender(t *testing.T) {
 		oneLiner, full, _, _ := tool.Render(callWithResult)
 
 		// Assert - should show correct line count (3 lines)
-		assert.Contains(t, oneLiner, "read test.txt (3 lines)")
+		assert.Contains(t, oneLiner, "read test.txt (1:4, 3 lines)")
 		assert.Contains(t, full, "line1")
 		assert.Contains(t, full, "line2")
 		assert.Contains(t, full, "line3")
@@ -617,6 +617,6 @@ func TestVFSReadToolRender(t *testing.T) {
 		// BUG: This shows "0 lines" because content is not in Arguments
 		// After fix, this should still show "0 lines" since we're testing
 		// the current broken behavior to document the issue
-		assert.Contains(t, oneLiner, "read test.txt (0 lines)")
+		assert.Contains(t, oneLiner, "read test.txt (1:1, 0 lines)")
 	})
 }

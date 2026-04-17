@@ -103,7 +103,18 @@ func (t *VFSReadTool) Render(call *ToolCall) (string, string, string, map[string
 	// Try to get content from result if available
 	content, _ := call.Arguments.Get("content").AsStringOK()
 	lineCount := countLines(content)
-	oneLiner := truncateString(fmt.Sprintf("read %s (%d lines)", relativePath, lineCount), 128)
+
+	// Get offset from arguments, default to 0
+	offset := int64(0)
+	if call.Arguments.Has("offset") {
+		if o, ok := call.Arguments.IntOK("offset"); ok {
+			offset = o
+		}
+	}
+
+	startPos := offset + 1
+	endPos := offset + 1 + int64(lineCount)
+	oneLiner := truncateString(fmt.Sprintf("read %s (%d:%d, %d lines)", relativePath, startPos, endPos, lineCount), 128)
 	full := oneLiner + "\n\n"
 	if content != "" {
 		full += content
