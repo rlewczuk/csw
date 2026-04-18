@@ -1043,10 +1043,10 @@ func ResolveModelSpec(modelSpec string, configStore conf.ConfigStore) (string, e
 func CreateProviderMap(providerRegistry *models.ProviderRegistry) (map[string]models.ModelProvider, error) {
 	modelProviders := make(map[string]models.ModelProvider)
 	configStore := providerRegistry.ConfigStore()
-	providerWritableStore := make(map[string]conf.WritableConfigStore)
+	providerConfigPresence := make(map[string]struct{})
 	if configStore != nil {
 		var err error
-		providerWritableStore, err = resolveWritableStoresForProviders(configStore)
+		providerConfigPresence, err = resolveProviderConfigPresence(configStore)
 		if err != nil {
 			return nil, err
 		}
@@ -1059,7 +1059,7 @@ func CreateProviderMap(providerRegistry *models.ProviderRegistry) (map[string]mo
 		}
 
 		if updaterTarget, ok := provider.(interface{ SetConfigUpdater(models.ConfigUpdater) }); ok {
-			if writableStore, exists := providerWritableStore[name]; exists && writableStore != nil {
+			if _, exists := providerConfigPresence[name]; exists {
 				updater := createConfigUpdaterFunc(name)
 				updaterTarget.SetConfigUpdater(updater.Update())
 			}
@@ -1085,46 +1085,15 @@ func applyDisableRefreshToProviders(modelProviders map[string]models.ModelProvid
 	}
 }
 
-func resolveWritableStoresForProviders(configStore conf.ConfigStore) (map[string]conf.WritableConfigStore, error) {
-	resolved := make(map[string]conf.WritableConfigStore)
-
-	if writable, ok := configStore.(conf.WritableConfigStore); ok {
-		configs, err := writable.GetModelProviderConfigs()
-		if err != nil {
-			return nil, fmt.Errorf("resolveWritableStoresForProviders() [bootstrap.go]: failed to read writable provider configs: %w", err)
-		}
-		for providerName := range configs {
-			resolved[providerName] = writable
-		}
-		return resolved, nil
-	}
-
-	compositeStore, ok := configStore.(*impl.CompositeConfigStore)
-	if !ok {
-		return resolved, nil
-	}
-
-	stores, err := compositeStore.Stores()
+func resolveProviderConfigPresence(configStore conf.ConfigStore) (map[string]struct{}, error) {
+	resolved := make(map[string]struct{})
+	configs, err := configStore.GetModelProviderConfigs()
 	if err != nil {
-		return nil, fmt.Errorf("resolveWritableStoresForProviders() [bootstrap.go]: failed to resolve composite stores: %w", err)
+		return nil, fmt.Errorf("resolveProviderConfigPresence() [bootstrap.go]: failed to get provider configs: %w", err)
 	}
 
-	for i := len(stores) - 1; i >= 0; i-- {
-		writable, ok := stores[i].(conf.WritableConfigStore)
-		if !ok {
-			continue
-		}
-
-		configs, err := writable.GetModelProviderConfigs()
-		if err != nil {
-			continue
-		}
-
-		for providerName := range configs {
-			if _, exists := resolved[providerName]; !exists {
-				resolved[providerName] = writable
-			}
-		}
+	for providerName := range configs {
+		resolved[providerName] = struct{}{}
 	}
 
 	return resolved, nil

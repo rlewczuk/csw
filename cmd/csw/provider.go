@@ -631,7 +631,7 @@ func providerAuthRedirectURI() string {
 	return fmt.Sprintf("http://localhost:%d%s", providerAuthPort, providerAuthCallbackPath)
 }
 
-func findWritableStoreForProvider(providerName string) (conf.WritableConfigStore, func() error, error) {
+func findWritableStoreForProvider(providerName string) (conf.ConfigStore, func() error, error) {
 	localStore, err := GetConfigStore(ConfigScopeLocal)
 	if err != nil {
 		return nil, nil, fmt.Errorf("findWritableStoreForProvider() [provider.go]: failed to open local config store: %w", err)

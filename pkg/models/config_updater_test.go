@@ -5,65 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// mockWritableStore is a mock implementation of conf.WritableConfigStore for testing.
-type mockWritableStore struct {
-	savedConfig  *conf.ModelProviderConfig
-	saveCalled   bool
-	saveError    error
-	globalConfig *conf.GlobalConfig
-}
-
-func (m *mockWritableStore) GetModelProviderConfigs() (map[string]*conf.ModelProviderConfig, error) {
-	return nil, nil
-}
-
-func (m *mockWritableStore) LastModelProviderConfigsUpdate() (time.Time, error) {
-	return time.Time{}, nil
-}
-
-func (m *mockWritableStore) GetModelAliases() (map[string]conf.ModelAliasValue, error) {
-	return map[string]conf.ModelAliasValue{}, nil
-}
-
-func (m *mockWritableStore) LastModelAliasesUpdate() (time.Time, error) {
-	return time.Time{}, nil
-}
-
-func (m *mockWritableStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfig, error) {
-	return nil, nil
-}
-
-func (m *mockWritableStore) LastAgentRoleConfigsUpdate() (time.Time, error) {
-	return time.Time{}, nil
-}
-
-func (m *mockWritableStore) GetGlobalConfig() (*conf.GlobalConfig, error) {
-	return m.globalConfig, nil
-}
-
-func (m *mockWritableStore) LastGlobalConfigUpdate() (time.Time, error) {
-	return time.Time{}, nil
-}
-
-func (m *mockWritableStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
-	return nil, nil
-}
-
-func (m *mockWritableStore) SaveModelProviderConfig(config *conf.ModelProviderConfig) error {
-	m.saveCalled = true
-	if m.saveError != nil {
-		return m.saveError
-	}
-	m.savedConfig = config
-	return nil
-}
 
 func TestNewConfigUpdater(t *testing.T) {
 	t.Run("creates config updater with store and provider name", func(t *testing.T) {
@@ -84,7 +30,6 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 		require.NoError(t, os.Setenv("HOME", tmpHome))
 		defer os.Setenv("HOME", oldHome)
 
-		mockStore := &mockWritableStore{}
 		updater := NewConfigUpdater("test-provider")
 		callback := updater.Update()
 
@@ -96,7 +41,6 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 		}
 
 		require.NoError(t, callback(config))
-		assert.False(t, mockStore.saveCalled)
 
 		configPath := filepath.Join(tmpHome, ".config", "csw", "models", "test-provider.json")
 		data, err := os.ReadFile(configPath)
@@ -110,18 +54,15 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 	})
 
 	t.Run("returns error for nil config", func(t *testing.T) {
-		mockStore := &mockWritableStore{}
 		updater := NewConfigUpdater("test-provider")
 		callback := updater.Update()
 
 		err := callback(nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "config cannot be nil")
-		assert.False(t, mockStore.saveCalled)
 	})
 
 	t.Run("returns error for empty config name", func(t *testing.T) {
-		mockStore := &mockWritableStore{}
 		updater := NewConfigUpdater("test-provider")
 		callback := updater.Update()
 
@@ -134,10 +75,9 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 		err := callback(config)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "config name cannot be empty")
-		assert.False(t, mockStore.saveCalled)
 	})
 
-	t.Run("does not use writable store save method", func(t *testing.T) {
+	t.Run("saves config without writable store dependency", func(t *testing.T) {
 		tmpHome, err := os.MkdirTemp("", "csw-home-*")
 		require.NoError(t, err)
 		defer os.RemoveAll(tmpHome)
@@ -146,9 +86,6 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 		require.NoError(t, os.Setenv("HOME", tmpHome))
 		defer os.Setenv("HOME", oldHome)
 
-		mockStore := &mockWritableStore{
-			saveError: assert.AnError,
-		}
 		updater := NewConfigUpdater("test-provider")
 		callback := updater.Update()
 
@@ -158,7 +95,6 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 		}
 
 		require.NoError(t, callback(config))
-		assert.False(t, mockStore.saveCalled)
 	})
 }
 

@@ -132,7 +132,7 @@ func TestGetCompositeConfigStore(t *testing.T) {
 		URL:         "https://local.example.com/v1",
 		Description: "Local provider",
 	}
-	err = localStore.SaveModelProviderConfig(localProvider)
+	err = models.SaveProviderConfigToModelsDir(localProvider, filepath.Join(localConfigDir, "models"))
 	require.NoError(t, err)
 	localStore.Close()
 
@@ -149,7 +149,7 @@ func TestGetCompositeConfigStore(t *testing.T) {
 		URL:         "https://api.anthropic.com/v1",
 		Description: "Global provider",
 	}
-	err = globalStore.SaveModelProviderConfig(globalProvider)
+	err = models.SaveProviderConfigToModelsDir(globalProvider, filepath.Join(globalConfigDir, "models"))
 	require.NoError(t, err)
 	globalStore.Close()
 
@@ -191,7 +191,11 @@ func TestProviderCommand_Add_List_Show(t *testing.T) {
 		Description: "Test provider",
 		APIKey:      "test-key",
 	}
-	err = store.SaveModelProviderConfig(config)
+	err = models.SaveProviderConfigToModelsDir(config, filepath.Join(configDir, "models"))
+	require.NoError(t, err)
+	require.NoError(t, store.Close())
+
+	store, err = impl.NewLocalConfigStore(configDir)
 	require.NoError(t, err)
 
 	// Test listing providers
@@ -226,7 +230,7 @@ func TestProviderCommand_SetDefault(t *testing.T) {
 		Type: "openai",
 		URL:  "https://api.openai.com/v1",
 	}
-	err = store.SaveModelProviderConfig(config)
+	err = models.SaveProviderConfigToModelsDir(config, filepath.Join(configDir, "models"))
 	require.NoError(t, err)
 
 }
@@ -378,14 +382,6 @@ func TestProviderCommandWithCustomPath(t *testing.T) {
 	customConfigPath := filepath.Join(tmpDir, "custom-config")
 
 	// Test adding a provider to custom path
-	store, err := GetConfigStore(ConfigScope(customConfigPath))
-	require.NoError(t, err)
-	defer func() {
-		if closer, ok := store.(interface{ Close() error }); ok {
-			closer.Close()
-		}
-	}()
-
 	config := &conf.ModelProviderConfig{
 		Name:        "custom-provider",
 		Type:        "openai",
@@ -393,8 +389,16 @@ func TestProviderCommandWithCustomPath(t *testing.T) {
 		Description: "Custom path provider",
 		APIKey:      "custom-key",
 	}
-	err = store.SaveModelProviderConfig(config)
+	err = models.SaveProviderConfigToModelsDir(config, filepath.Join(customConfigPath, "models"))
 	require.NoError(t, err)
+
+	store, err := GetConfigStore(ConfigScope(customConfigPath))
+	require.NoError(t, err)
+	defer func() {
+		if closer, ok := store.(interface{ Close() error }); ok {
+			closer.Close()
+		}
+	}()
 
 	// Verify the provider was saved to custom path
 	configs, err := store.GetModelProviderConfigs()
@@ -440,7 +444,7 @@ func TestProviderListShowComposite(t *testing.T) {
 		URL:         "http://localhost:11434",
 		Description: "Local test provider",
 	}
-	err = localStore.SaveModelProviderConfig(localProvider)
+	err = models.SaveProviderConfigToModelsDir(localProvider, filepath.Join(localConfigDir, "models"))
 	require.NoError(t, err)
 	localStore.Close()
 
@@ -457,7 +461,7 @@ func TestProviderListShowComposite(t *testing.T) {
 		URL:         "https://api.openai.com/v1",
 		Description: "Global test provider",
 	}
-	err = globalStore.SaveModelProviderConfig(globalProvider)
+	err = models.SaveProviderConfigToModelsDir(globalProvider, filepath.Join(globalConfigDir, "models"))
 	require.NoError(t, err)
 	globalStore.Close()
 
@@ -780,8 +784,6 @@ func TestProviderAuthCommand_Success(t *testing.T) {
 	defer mock.Close()
 	mock.AddRestResponse("/oauth/token", "POST", `{"access_token":"new-access-token","refresh_token":"new-refresh-token","expires_in":3600}`)
 
-	store, err := GetConfigStore(ConfigScopeLocal)
-	require.NoError(t, err)
 	providerConfig := &conf.ModelProviderConfig{
 		Name:        "openai-auth",
 		Type:        "openai",
@@ -794,11 +796,8 @@ func TestProviderAuthCommand_Success(t *testing.T) {
 		Headers:     map[string]string{"originator": "opencode"},
 		QueryParams: map[string]string{},
 	}
-	err = store.SaveModelProviderConfig(providerConfig)
+	err = models.SaveProviderConfigToModelsDir(providerConfig, filepath.Join(tmpDir, ".csw", "config", "models"))
 	require.NoError(t, err)
-	if closer, ok := store.(interface{ Close() error }); ok {
-		require.NoError(t, closer.Close())
-	}
 
 	originalPort := providerAuthPort
 	originalTimeout := providerAuthTimeout
@@ -898,8 +897,6 @@ func TestProviderAuthCommand_ClearsPreviousAuthDataBeforeReauth(t *testing.T) {
 	defer mock.Close()
 	mock.AddRestResponse("/oauth/token", "POST", `{"access_token":"new-access-token","expires_in":3600}`)
 
-	store, err := GetConfigStore(ConfigScopeLocal)
-	require.NoError(t, err)
 	providerConfig := &conf.ModelProviderConfig{
 		Name:         "openai-auth",
 		Type:         "openai",
@@ -913,11 +910,8 @@ func TestProviderAuthCommand_ClearsPreviousAuthDataBeforeReauth(t *testing.T) {
 		Headers:      map[string]string{"originator": "opencode"},
 		QueryParams:  map[string]string{},
 	}
-	err = store.SaveModelProviderConfig(providerConfig)
+	err = models.SaveProviderConfigToModelsDir(providerConfig, filepath.Join(tmpDir, ".csw", "config", "models"))
 	require.NoError(t, err)
-	if closer, ok := store.(interface{ Close() error }); ok {
-		require.NoError(t, closer.Close())
-	}
 
 	originalPort := providerAuthPort
 	originalTimeout := providerAuthTimeout

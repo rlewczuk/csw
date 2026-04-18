@@ -19,8 +19,8 @@ const (
 	ConfigScopeGlobal ConfigScope = "global"
 )
 
-// GetConfigStore returns a writable config store for the specified scope or custom path.
-func GetConfigStore(scope ConfigScope) (conf.WritableConfigStore, error) {
+// GetConfigStore returns a local config store for the specified scope or custom path.
+func GetConfigStore(scope ConfigScope) (conf.ConfigStore, error) {
 	var configDir string
 
 	switch scope {

@@ -174,29 +174,6 @@ func (m *MockConfigStore) GetAgentRoleConfigs() (map[string]*conf.AgentRoleConfi
 	return configs, nil
 }
 
-// SaveModelProviderConfig saves model provider configuration.
-func (m *MockConfigStore) SaveModelProviderConfig(config *conf.ModelProviderConfig) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.SaveModelProviderConfigErr != nil {
-		return m.SaveModelProviderConfigErr
-	}
-	if config == nil {
-		return fmt.Errorf("MockConfigStore.SaveModelProviderConfig() [mock.go]: config cannot be nil")
-	}
-	if config.Name == "" {
-		return fmt.Errorf("MockConfigStore.SaveModelProviderConfig() [mock.go]: config name cannot be empty")
-	}
-
-	if m.modelProviderConfigs == nil {
-		m.modelProviderConfigs = make(map[string]*conf.ModelProviderConfig)
-	}
-	m.modelProviderConfigs[config.Name] = config.Clone()
-
-	return nil
-}
-
 // GetAgentConfigFile returns configured agent config file content.
 func (m *MockConfigStore) GetAgentConfigFile(subdir, filename string) ([]byte, error) {
 	m.mu.RLock()

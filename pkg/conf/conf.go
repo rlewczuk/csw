@@ -495,11 +495,3 @@ type ConfigStore interface {
 	// GetModelAliases returns model aliases keyed by alias name.
 	GetModelAliases() (map[string]ModelAliasValue, error)
 }
-
-// WritableConfigStore extends ConfigStore with write operations.
-type WritableConfigStore interface {
-	ConfigStore
-
-	// SaveModelProviderConfig saves or updates a model provider configuration.
-	SaveModelProviderConfig(config *ModelProviderConfig) error
-}
