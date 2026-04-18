@@ -758,10 +758,194 @@ func TestProviderTestCommand_NonStreamingEmptyResponse(t *testing.T) {
 	assert.Equal(t, "", response.GetText())
 }
 
+func TestSaveProviderConfigToModelsDir(t *testing.T) {
+	tests := []struct {
+		name          string
+		config        *conf.ModelProviderConfig
+		prepareDir    func(t *testing.T, root string) string
+		expectedError string
+		verify        func(t *testing.T, modelsDir string, config *conf.ModelProviderConfig)
+	}{
+		{
+			name: "success writes json and creates directory",
+			config: &conf.ModelProviderConfig{
+				Name:        "provider-a",
+				Type:        "openai",
+				URL:         "https://api.example.com/v1",
+				APIKey:      "token-1",
+				RefreshToken: "refresh-1",
+				AuthMode:    conf.AuthModeOAuth2,
+			},
+			prepareDir: func(t *testing.T, root string) string {
+				return filepath.Join(root, "nested", "models")
+			},
+			verify: func(t *testing.T, modelsDir string, config *conf.ModelProviderConfig) {
+				t.Helper()
+
+				configPath := filepath.Join(modelsDir, config.Name+".json")
+				data, err := os.ReadFile(configPath)
+				require.NoError(t, err)
+
+				var saved conf.ModelProviderConfig
+				err = json.Unmarshal(data, &saved)
+				require.NoError(t, err)
+
+				assert.Equal(t, config.Type, saved.Type)
+				assert.Equal(t, config.URL, saved.URL)
+				assert.Equal(t, config.APIKey, saved.APIKey)
+				assert.Equal(t, config.RefreshToken, saved.RefreshToken)
+				assert.Equal(t, config.AuthMode, saved.AuthMode)
+
+				assert.FileExists(t, filepath.Join(modelsDir, config.Name+".json"))
+				assert.NoFileExists(t, filepath.Join(modelsDir, config.Name+".json.bak"))
+			},
+		},
+		{
+			name: "creates backup when overwriting existing provider file",
+			config: &conf.ModelProviderConfig{
+				Name:   "provider-overwrite",
+				Type:   "openai",
+				URL:    "https://new.example.com/v1",
+				APIKey: "new-token",
+			},
+			prepareDir: func(t *testing.T, root string) string {
+				t.Helper()
+				modelsDir := filepath.Join(root, "models")
+				err := os.MkdirAll(modelsDir, 0755)
+				require.NoError(t, err)
+
+				existing := []byte(`{"type":"openai","url":"https://old.example.com/v1","api-key":"old-token"}`)
+				err = os.WriteFile(filepath.Join(modelsDir, "provider-overwrite.json"), existing, 0644)
+				require.NoError(t, err)
+				return modelsDir
+			},
+			verify: func(t *testing.T, modelsDir string, config *conf.ModelProviderConfig) {
+				t.Helper()
+
+				backupPath := filepath.Join(modelsDir, config.Name+".json.bak")
+				backupData, err := os.ReadFile(backupPath)
+				require.NoError(t, err)
+				assert.Contains(t, string(backupData), "https://old.example.com/v1")
+				assert.Contains(t, string(backupData), "old-token")
+
+				configData, err := os.ReadFile(filepath.Join(modelsDir, config.Name+".json"))
+				require.NoError(t, err)
+				assert.Contains(t, string(configData), "https://new.example.com/v1")
+				assert.Contains(t, string(configData), "new-token")
+			},
+		},
+		{
+			name:          "fails for nil config",
+			config:        nil,
+			prepareDir:    func(t *testing.T, root string) string { return filepath.Join(root, "models") },
+			expectedError: "provider config is nil",
+		},
+		{
+			name: "fails for empty provider name",
+			config: &conf.ModelProviderConfig{
+				Name: "",
+				Type: "openai",
+				URL:  "https://api.example.com/v1",
+			},
+			prepareDir:    func(t *testing.T, root string) string { return filepath.Join(root, "models") },
+			expectedError: "provider config name is empty",
+		},
+		{
+			name: "fails when models path is file",
+			config: &conf.ModelProviderConfig{
+				Name: "provider-b",
+				Type: "openai",
+				URL:  "https://api.example.com/v1",
+			},
+			prepareDir: func(t *testing.T, root string) string {
+				t.Helper()
+				modelsDir := filepath.Join(root, "models-file")
+				err := os.WriteFile(modelsDir, []byte("not-a-directory"), 0644)
+				require.NoError(t, err)
+				return modelsDir
+			},
+			expectedError: "failed to create models directory",
+		},
+		{
+			name: "fails when config cannot be marshaled",
+			config: &conf.ModelProviderConfig{
+				Name: "provider-c",
+				Type: "openai",
+				URL:  "https://api.example.com/v1",
+				Options: map[string]any{
+					"invalid": make(chan int),
+				},
+			},
+			prepareDir:    func(t *testing.T, root string) string { return filepath.Join(root, "models") },
+			expectedError: "failed to marshal provider config",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir, err := os.MkdirTemp("", "csw-provider-save-*")
+			require.NoError(t, err)
+			defer os.RemoveAll(tmpDir)
+
+			modelsDir := tt.prepareDir(t, tmpDir)
+			err = saveProviderConfigToModelsDir(tt.config, modelsDir)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				return
+			}
+
+			require.NoError(t, err)
+			if tt.verify != nil {
+				tt.verify(t, modelsDir, tt.config)
+			}
+		})
+	}
+}
+
+func TestSaveProviderConfigToUserModelsDir(t *testing.T) {
+	tmpHome, err := os.MkdirTemp("", "csw-home-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpHome)
+
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", oldHome)
+
+	providerConfig := &conf.ModelProviderConfig{
+		Name:   "provider-user-dir",
+		Type:   "openai",
+		URL:    "https://api.example.com/v1",
+		APIKey: "secret",
+	}
+
+	err = saveProviderConfigToUserModelsDir(providerConfig)
+	require.NoError(t, err)
+
+	configPath := filepath.Join(tmpHome, ".config", "csw", "models", providerConfig.Name+".json")
+	data, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+
+	var saved conf.ModelProviderConfig
+	err = json.Unmarshal(data, &saved)
+	require.NoError(t, err)
+	assert.Equal(t, providerConfig.Type, saved.Type)
+	assert.Equal(t, providerConfig.URL, saved.URL)
+	assert.Equal(t, providerConfig.APIKey, saved.APIKey)
+}
+
 func TestProviderAuthCommand_Success(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "csw-provider-auth-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
+	tmpHome, err := os.MkdirTemp("", "csw-home-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpHome)
+
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", oldHome)
 
 	oldDir, err := os.Getwd()
 	require.NoError(t, err)
@@ -852,7 +1036,7 @@ func TestProviderAuthCommand_Success(t *testing.T) {
 	assert.Contains(t, string(req[0].Body), "client_id=client-id")
 	assert.Contains(t, string(req[0].Body), "code_verifier=")
 
-	storeAfter, err := GetConfigStore(ConfigScopeLocal)
+	storeAfter, err := GetConfigStore(ConfigScopeGlobal)
 	require.NoError(t, err)
 	defer func() {
 		if closer, ok := storeAfter.(interface{ Close() error }); ok {
@@ -873,6 +1057,13 @@ func TestProviderAuthCommand_ClearsPreviousAuthDataBeforeReauth(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "csw-provider-auth-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
+	tmpHome, err := os.MkdirTemp("", "csw-home-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpHome)
+
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", oldHome)
 
 	oldDir, err := os.Getwd()
 	require.NoError(t, err)
@@ -955,7 +1146,7 @@ func TestProviderAuthCommand_ClearsPreviousAuthDataBeforeReauth(t *testing.T) {
 
 	<-scanDone
 
-	storeAfter, err := GetConfigStore(ConfigScopeLocal)
+	storeAfter, err := GetConfigStore(ConfigScopeGlobal)
 	require.NoError(t, err)
 	defer func() {
 		if closer, ok := storeAfter.(interface{ Close() error }); ok {

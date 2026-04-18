@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -289,7 +290,7 @@ func providerAuthCommand() *cobra.Command {
 
 			config.APIKey = ""
 			config.RefreshToken = ""
-			if err := store.SaveModelProviderConfig(config); err != nil {
+			if err := saveProviderConfigToUserModelsDir(config); err != nil {
 				return fmt.Errorf("providerAuthCommand() [provider.go]: failed to clear previous provider auth data: %w", err)
 			}
 
@@ -347,7 +348,7 @@ func providerAuthCommand() *cobra.Command {
 				config.RefreshToken = tokenResp.RefreshToken
 			}
 
-			if err := store.SaveModelProviderConfig(config); err != nil {
+			if err := saveProviderConfigToUserModelsDir(config); err != nil {
 				return fmt.Errorf("providerAuthCommand() [provider.go]: failed to save provider config: %w", err)
 			}
 
@@ -618,6 +619,56 @@ func outputModelsList(modelsList []modelEntry) error {
 	fmt.Fprintln(w, "PROVIDER\tMODEL")
 	for _, entry := range modelsList {
 		fmt.Fprintf(w, "%s\t%s\n", entry.Provider, entry.Model)
+	}
+
+	return nil
+}
+
+// saveProviderConfigToUserModelsDir saves provider config as JSON in ~/.config/csw/models.
+func saveProviderConfigToUserModelsDir(config *conf.ModelProviderConfig) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("saveProviderConfigToUserModelsDir() [provider.go]: failed to get home directory: %w", err)
+	}
+
+	modelsDir := filepath.Join(homeDir, ".config", "csw", "models")
+	return saveProviderConfigToModelsDir(config, modelsDir)
+}
+
+// saveProviderConfigToModelsDir saves provider config as JSON in the provided models directory.
+func saveProviderConfigToModelsDir(config *conf.ModelProviderConfig, modelsDir string) error {
+	if config == nil {
+		return fmt.Errorf("saveProviderConfigToModelsDir() [provider.go]: provider config is nil")
+	}
+	if config.Name == "" {
+		return fmt.Errorf("saveProviderConfigToModelsDir() [provider.go]: provider config name is empty")
+	}
+
+	if err := os.MkdirAll(modelsDir, 0755); err != nil {
+		return fmt.Errorf("saveProviderConfigToModelsDir() [provider.go]: failed to create models directory: %w", err)
+	}
+
+	configPath := filepath.Join(modelsDir, config.Name+".json")
+	backupPath := configPath + ".bak"
+	if _, err := os.Stat(configPath); err == nil {
+		existingData, err := os.ReadFile(configPath)
+		if err != nil {
+			return fmt.Errorf("saveProviderConfigToModelsDir() [provider.go]: failed to read existing provider config: %w", err)
+		}
+		if err := os.WriteFile(backupPath, existingData, 0644); err != nil {
+			return fmt.Errorf("saveProviderConfigToModelsDir() [provider.go]: failed to create provider config backup: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("saveProviderConfigToModelsDir() [provider.go]: failed to inspect provider config path: %w", err)
+	}
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("saveProviderConfigToModelsDir() [provider.go]: failed to marshal provider config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("saveProviderConfigToModelsDir() [provider.go]: failed to save provider config: %w", err)
 	}
 
 	return nil
