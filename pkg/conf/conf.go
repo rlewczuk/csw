@@ -495,3 +495,29 @@ type ConfigStore interface {
 	// GetModelAliases returns model aliases keyed by alias name.
 	GetModelAliases() (map[string]ModelAliasValue, error)
 }
+
+// CswConfig represents the complete consolidated configuration for the CSW application.
+// It aggregates all configuration sources including global settings, agent roles,
+// model providers, agent-specific files, and model aliases.
+type CswConfig struct {
+
+	// GlobalConfig holds shared system-wide configuration settings for the application.
+	GlobalConfig *GlobalConfig `json:"global,omitempty" yaml:"global,omitempty"`
+
+	// AgentRoleConfigs contains agent role configurations keyed by role name.
+	// Each role defines permissions, tool access, and behavioral settings for agents.
+	AgentRoleConfigs map[string]*AgentRoleConfig `json:"agent-role-configs,omitempty" yaml:"agent-role-configs,omitempty"`
+
+	// ModelProviderConfigs contains model provider configurations keyed by provider name.
+	// Each provider defines connection settings, capabilities, and model-specific parameters.
+	ModelProviderConfigs map[string]*ModelProviderConfig `json:"model-provider-configs,omitempty" yaml:"model-provider-configs,omitempty"`
+
+	// AgentConfigFiles contains agent configuration file contents organized by subdirectory and filename.
+	// The outer map key is the subdirectory name, the inner map key is the filename,
+	// and the value is the file content as a string.
+	AgentConfigFiles map[string]map[string]string `json:"agent-config-files,omitempty" yaml:"agent-config-files,omitempty"`
+
+	// ModelAliases contains model alias definitions keyed by alias name.
+	// Each alias maps to one or more provider/model combinations for flexible model selection.
+	ModelAliases map[string]ModelAliasValue `json:"model-aliases,omitempty" yaml:"model-aliases,omitempty"`
+}
