@@ -26,7 +26,6 @@ type MockConfigStore struct {
 	GetAgentRoleConfigsErr     error
 	GetModelAliasesErr         error
 	GetAgentConfigFileErr      error
-	SaveModelProviderConfigErr error
 }
 
 // NewMockConfigStore creates a new MockConfigStore with empty configuration.
