@@ -26,6 +26,11 @@ func (u *UnstreamingChatModel) ChatStream(ctx context.Context, messages []*ChatM
 	return u.wrapped.ChatStream(ctx, messages, options, tools)
 }
 
+// Compactor returns nil because unstreaming wrapper does not provide session compaction.
+func (u *UnstreamingChatModel) Compactor() ChatCompator {
+	return nil
+}
+
 // Chat calls the wrapped model's Chat method to perform synchronous communication.
 // If a model returns an empty response without error, it falls back to collecting
 // fragments from ChatStream.

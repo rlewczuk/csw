@@ -287,6 +287,11 @@ func (m *MockChatModel) Chat(ctx context.Context, messages []*ChatMessage, optio
 	return result, nil
 }
 
+// Compactor returns nil because mock chat model does not provide session compaction.
+func (m *MockChatModel) Compactor() ChatCompator {
+	return nil
+}
+
 // ChatStream sends a chat request and returns a standard Go iterator for streaming responses.
 func (m *MockChatModel) ChatStream(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) iter.Seq[*ChatMessage] {
 	return func(yield func(*ChatMessage) bool) {

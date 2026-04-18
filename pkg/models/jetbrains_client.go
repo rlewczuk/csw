@@ -214,6 +214,11 @@ func (m *JetBrainsChatModel) Chat(ctx context.Context, messages []*ChatMessage, 
 	return result, nil
 }
 
+// Compactor returns nil because JetBrains chat model does not provide session compaction.
+func (m *JetBrainsChatModel) Compactor() ChatCompator {
+	return nil
+}
+
 // ChatStream sends chat request and yields stream fragments from JetBrains SSE.
 func (m *JetBrainsChatModel) ChatStream(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) iter.Seq[*ChatMessage] {
 	return func(yield func(*ChatMessage) bool) {

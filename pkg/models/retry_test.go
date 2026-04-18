@@ -49,6 +49,10 @@ func (m *testChatModel) ChatStream(_ context.Context, _ []*ChatMessage, _ *ChatO
 	}
 }
 
+func (m *testChatModel) Compactor() ChatCompator {
+	return nil
+}
+
 func (m *testChatModel) getCalls() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()

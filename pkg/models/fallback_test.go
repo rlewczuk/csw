@@ -45,6 +45,10 @@ func (m *fallbackTestModel) ChatStream(_ context.Context, _ []*ChatMessage, _ *C
 	}
 }
 
+func (m *fallbackTestModel) Compactor() ChatCompator {
+	return nil
+}
+
 func (m *fallbackTestModel) Calls() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()

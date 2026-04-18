@@ -210,8 +210,22 @@ func (m *ChatMessage) GetToolResponses() []*tool.ToolResponse {
 	return responses
 }
 
+// ChatCompator compacts chat message history before sending it to a model.
+type ChatCompator interface {
+	// CompactMessages compacts provided message history and returns compacted messages.
+	CompactMessages(messages []*ChatMessage) ([]*ChatMessage, error)
+}
+
+// ChatProvider represents optional chat-specific capabilities.
+type ChatProvider interface {
+	// Compactor returns optional session compactor implementation.
+	Compactor() ChatCompator
+}
+
 // ChatModel represents a model that can be used for chat.
 type ChatModel interface {
+	ChatProvider
+
 	// Chat sends a chat request to the model and returns the response. This method is blocking and returns full response.
 	// Tools parameter is optional and can be nil if no tools are available.
 	Chat(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) (*ChatMessage, error)

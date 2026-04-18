@@ -109,6 +109,11 @@ func (f *FallbackChatModel) ChatStream(ctx context.Context, messages []*ChatMess
 	return model.ChatStream(ctx, messages, options, tools)
 }
 
+// Compactor returns nil because fallback wrapper does not provide session compaction.
+func (f *FallbackChatModel) Compactor() ChatCompator {
+	return nil
+}
+
 // getSelectedIndex returns the currently selected model index.
 func (f *FallbackChatModel) getSelectedIndex() int {
 	f.mu.Lock()

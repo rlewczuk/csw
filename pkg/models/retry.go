@@ -99,6 +99,11 @@ func (r *RetryChatModel) ChatStream(ctx context.Context, messages []*ChatMessage
 	return r.wrapped.ChatStream(ctx, messages, options, tools)
 }
 
+// Compactor returns nil because retry wrapper does not provide session compaction.
+func (r *RetryChatModel) Compactor() ChatCompator {
+	return nil
+}
+
 // calculateDelay computes the backoff delay for the given attempt number and error.
 func (r *RetryChatModel) calculateDelay(attempt int, err error) time.Duration {
 	// Check for rate limit retry-after header.

@@ -207,6 +207,10 @@ func (m *tokenLimitChatModel) ChatStream(ctx context.Context, messages []*models
 	}
 }
 
+func (m *tokenLimitChatModel) Compactor() models.ChatCompator {
+	return nil
+}
+
 func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 	t.Run("compacts context and retries", func(t *testing.T) {
 		handler := &compactionOutputHandler{}
