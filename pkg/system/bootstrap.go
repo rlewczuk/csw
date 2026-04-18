@@ -1060,7 +1060,7 @@ func CreateProviderMap(providerRegistry *models.ProviderRegistry) (map[string]mo
 
 		if updaterTarget, ok := provider.(interface{ SetConfigUpdater(models.ConfigUpdater) }); ok {
 			if writableStore, exists := providerWritableStore[name]; exists && writableStore != nil {
-				updater := createConfigUpdaterFunc(writableStore, name)
+				updater := createConfigUpdaterFunc(name)
 				updaterTarget.SetConfigUpdater(updater.Update())
 			}
 		}

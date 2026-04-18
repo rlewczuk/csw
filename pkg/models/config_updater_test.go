@@ -67,8 +67,7 @@ func (m *mockWritableStore) SaveModelProviderConfig(config *conf.ModelProviderCo
 
 func TestNewConfigUpdater(t *testing.T) {
 	t.Run("creates config updater with store and provider name", func(t *testing.T) {
-		mockStore := &mockWritableStore{}
-		updater := NewConfigUpdater(mockStore, "test-provider")
+		updater := NewConfigUpdater("test-provider")
 
 		require.NotNil(t, updater)
 		assert.Equal(t, "test-provider", updater.ProviderName())
@@ -86,7 +85,7 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 		defer os.Setenv("HOME", oldHome)
 
 		mockStore := &mockWritableStore{}
-		updater := NewConfigUpdater(mockStore, "test-provider")
+		updater := NewConfigUpdater("test-provider")
 		callback := updater.Update()
 
 		config := &conf.ModelProviderConfig{
@@ -112,7 +111,7 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 
 	t.Run("returns error for nil config", func(t *testing.T) {
 		mockStore := &mockWritableStore{}
-		updater := NewConfigUpdater(mockStore, "test-provider")
+		updater := NewConfigUpdater("test-provider")
 		callback := updater.Update()
 
 		err := callback(nil)
@@ -123,7 +122,7 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 
 	t.Run("returns error for empty config name", func(t *testing.T) {
 		mockStore := &mockWritableStore{}
-		updater := NewConfigUpdater(mockStore, "test-provider")
+		updater := NewConfigUpdater("test-provider")
 		callback := updater.Update()
 
 		config := &conf.ModelProviderConfig{
@@ -150,7 +149,7 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 		mockStore := &mockWritableStore{
 			saveError: assert.AnError,
 		}
-		updater := NewConfigUpdater(mockStore, "test-provider")
+		updater := NewConfigUpdater("test-provider")
 		callback := updater.Update()
 
 		config := &conf.ModelProviderConfig{

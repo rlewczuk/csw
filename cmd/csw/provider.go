@@ -186,7 +186,7 @@ func providerTestCommand(scope *ConfigScope) *cobra.Command {
 					if closeFn != nil {
 						defer closeFn()
 					}
-					updater := models.NewConfigUpdater(store, providerName)
+					updater := models.NewConfigUpdater(providerName)
 					updaterTarget.SetConfigUpdater(updater.Update())
 				}
 			}

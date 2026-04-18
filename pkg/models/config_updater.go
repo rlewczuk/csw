@@ -18,16 +18,14 @@ type ConfigUpdater func(config *conf.ModelProviderConfig) error
 // their configuration. It wraps a WritableConfigStore and provides a
 // callback function that can be called by providers to persist changes.
 type ConfigUpdaterImpl struct {
-	store    conf.WritableConfigStore
 	provider string
 }
 
 // NewConfigUpdater creates a new ConfigUpdaterImpl for the given provider
 // and config store. The returned instance can be used to create a callback
 // function for the provider to persist configuration changes.
-func NewConfigUpdater(store conf.WritableConfigStore, providerName string) *ConfigUpdaterImpl {
+func NewConfigUpdater(providerName string) *ConfigUpdaterImpl {
 	return &ConfigUpdaterImpl{
-		store:    store,
 		provider: providerName,
 	}
 }
