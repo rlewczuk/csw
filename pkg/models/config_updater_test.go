@@ -8,10 +8,8 @@ import (
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 // mockWritableStore is a mock implementation of conf.WritableConfigStore for testing.
@@ -78,7 +76,15 @@ func TestNewConfigUpdater(t *testing.T) {
 }
 
 func TestConfigUpdaterImpl_Update(t *testing.T) {
-	t.Run("saves config to store", func(t *testing.T) {
+	t.Run("saves config to user models directory", func(t *testing.T) {
+		tmpHome, err := os.MkdirTemp("", "csw-home-*")
+		require.NoError(t, err)
+		defer os.RemoveAll(tmpHome)
+
+		oldHome := os.Getenv("HOME")
+		require.NoError(t, os.Setenv("HOME", tmpHome))
+		defer os.Setenv("HOME", oldHome)
+
 		mockStore := &mockWritableStore{}
 		updater := NewConfigUpdater(mockStore, "test-provider")
 		callback := updater.Update()
@@ -90,10 +96,18 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 			APIKey: "new-api-key",
 		}
 
-		err := callback(config)
+		require.NoError(t, callback(config))
+		assert.False(t, mockStore.saveCalled)
+
+		configPath := filepath.Join(tmpHome, ".config", "csw", "models", "test-provider.json")
+		data, err := os.ReadFile(configPath)
 		require.NoError(t, err)
-		assert.True(t, mockStore.saveCalled)
-		assert.Equal(t, config, mockStore.savedConfig)
+
+		var saved conf.ModelProviderConfig
+		require.NoError(t, json.Unmarshal(data, &saved))
+		assert.Equal(t, config.Type, saved.Type)
+		assert.Equal(t, config.URL, saved.URL)
+		assert.Equal(t, config.APIKey, saved.APIKey)
 	})
 
 	t.Run("returns error for nil config", func(t *testing.T) {
@@ -124,7 +138,15 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 		assert.False(t, mockStore.saveCalled)
 	})
 
-	t.Run("propagates store save error", func(t *testing.T) {
+	t.Run("does not use writable store save method", func(t *testing.T) {
+		tmpHome, err := os.MkdirTemp("", "csw-home-*")
+		require.NoError(t, err)
+		defer os.RemoveAll(tmpHome)
+
+		oldHome := os.Getenv("HOME")
+		require.NoError(t, os.Setenv("HOME", tmpHome))
+		defer os.Setenv("HOME", oldHome)
+
 		mockStore := &mockWritableStore{
 			saveError: assert.AnError,
 		}
@@ -136,170 +158,184 @@ func TestConfigUpdaterImpl_Update(t *testing.T) {
 			URL:  "https://api.example.com",
 		}
 
-		err := callback(config)
-		assert.Error(t, err)
-		assert.True(t, mockStore.saveCalled)
+		require.NoError(t, callback(config))
+		assert.False(t, mockStore.saveCalled)
 	})
 }
 
-func TestConfigUpdaterImpl_Update_PreservesYAMLFormatAndCreatesBackup(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "csw-config-updater-yaml-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+func TestSaveProviderConfigToModelsDir(t *testing.T) {
+	tests := []struct {
+		name          string
+		config        *conf.ModelProviderConfig
+		prepareDir    func(t *testing.T, root string) string
+		expectedError string
+		verify        func(t *testing.T, modelsDir string, config *conf.ModelProviderConfig)
+	}{
+		{
+			name: "success writes json and creates directory",
+			config: &conf.ModelProviderConfig{
+				Name:         "provider-a",
+				Type:         "openai",
+				URL:          "https://api.example.com/v1",
+				APIKey:       "token-1",
+				RefreshToken: "refresh-1",
+				AuthMode:     conf.AuthModeOAuth2,
+			},
+			prepareDir: func(t *testing.T, root string) string {
+				return filepath.Join(root, "nested", "models")
+			},
+			verify: func(t *testing.T, modelsDir string, config *conf.ModelProviderConfig) {
+				t.Helper()
 
-	modelsDir := filepath.Join(tmpDir, "models")
-	require.NoError(t, os.MkdirAll(modelsDir, 0o755))
+				configPath := filepath.Join(modelsDir, config.Name+".json")
+				data, err := os.ReadFile(configPath)
+				require.NoError(t, err)
 
-	originalConfig := &conf.ModelProviderConfig{
-		Name:   "provider-yaml",
-		Type:   "openai",
-		URL:    "https://api.example.com/v1",
-		APIKey: "old-token",
+				var saved conf.ModelProviderConfig
+				err = json.Unmarshal(data, &saved)
+				require.NoError(t, err)
+
+				assert.Equal(t, config.Type, saved.Type)
+				assert.Equal(t, config.URL, saved.URL)
+				assert.Equal(t, config.APIKey, saved.APIKey)
+				assert.Equal(t, config.RefreshToken, saved.RefreshToken)
+				assert.Equal(t, config.AuthMode, saved.AuthMode)
+
+				assert.FileExists(t, filepath.Join(modelsDir, config.Name+".json"))
+				assert.NoFileExists(t, filepath.Join(modelsDir, config.Name+".json.bak"))
+			},
+		},
+		{
+			name: "creates backup when overwriting existing provider file",
+			config: &conf.ModelProviderConfig{
+				Name:   "provider-overwrite",
+				Type:   "openai",
+				URL:    "https://new.example.com/v1",
+				APIKey: "new-token",
+			},
+			prepareDir: func(t *testing.T, root string) string {
+				t.Helper()
+				modelsDir := filepath.Join(root, "models")
+				err := os.MkdirAll(modelsDir, 0755)
+				require.NoError(t, err)
+
+				existing := []byte(`{"type":"openai","url":"https://old.example.com/v1","api-key":"old-token"}`)
+				err = os.WriteFile(filepath.Join(modelsDir, "provider-overwrite.json"), existing, 0644)
+				require.NoError(t, err)
+				return modelsDir
+			},
+			verify: func(t *testing.T, modelsDir string, config *conf.ModelProviderConfig) {
+				t.Helper()
+
+				backupPath := filepath.Join(modelsDir, config.Name+".json.bak")
+				backupData, err := os.ReadFile(backupPath)
+				require.NoError(t, err)
+				assert.Contains(t, string(backupData), "https://old.example.com/v1")
+				assert.Contains(t, string(backupData), "old-token")
+
+				configData, err := os.ReadFile(filepath.Join(modelsDir, config.Name+".json"))
+				require.NoError(t, err)
+				assert.Contains(t, string(configData), "https://new.example.com/v1")
+				assert.Contains(t, string(configData), "new-token")
+			},
+		},
+		{
+			name:          "fails for nil config",
+			config:        nil,
+			prepareDir:    func(t *testing.T, root string) string { return filepath.Join(root, "models") },
+			expectedError: "provider config is nil",
+		},
+		{
+			name: "fails for empty provider name",
+			config: &conf.ModelProviderConfig{
+				Name: "",
+				Type: "openai",
+				URL:  "https://api.example.com/v1",
+			},
+			prepareDir:    func(t *testing.T, root string) string { return filepath.Join(root, "models") },
+			expectedError: "provider config name is empty",
+		},
+		{
+			name: "fails when models path is file",
+			config: &conf.ModelProviderConfig{
+				Name: "provider-b",
+				Type: "openai",
+				URL:  "https://api.example.com/v1",
+			},
+			prepareDir: func(t *testing.T, root string) string {
+				t.Helper()
+				modelsDir := filepath.Join(root, "models-file")
+				err := os.WriteFile(modelsDir, []byte("not-a-directory"), 0644)
+				require.NoError(t, err)
+				return modelsDir
+			},
+			expectedError: "failed to create models directory",
+		},
+		{
+			name: "fails when config cannot be marshaled",
+			config: &conf.ModelProviderConfig{
+				Name: "provider-c",
+				Type: "openai",
+				URL:  "https://api.example.com/v1",
+				Options: map[string]any{
+					"invalid": make(chan int),
+				},
+			},
+			prepareDir:    func(t *testing.T, root string) string { return filepath.Join(root, "models") },
+			expectedError: "failed to marshal provider config",
+		},
 	}
-	originalData, err := yaml.Marshal(originalConfig)
-	require.NoError(t, err)
 
-	providerPath := filepath.Join(modelsDir, "provider-yaml.yaml")
-	require.NoError(t, os.WriteFile(providerPath, originalData, 0o644))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir, err := os.MkdirTemp("", "csw-provider-save-*")
+			require.NoError(t, err)
+			defer os.RemoveAll(tmpDir)
 
-	backupPath := providerPath + ".bkp"
-	require.NoError(t, os.WriteFile(backupPath, []byte("old-backup"), 0o644))
+			modelsDir := tt.prepareDir(t, tmpDir)
+			err = SaveProviderConfigToModelsDir(tt.config, modelsDir)
 
-	store, err := confimpl.NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				return
+			}
 
-	updater := NewConfigUpdater(store, "provider-yaml")
-	callback := updater.Update()
-
-	updatedConfig := &conf.ModelProviderConfig{
-		Name:   "provider-yaml",
-		Type:   "openai",
-		URL:    "https://api.example.com/v1",
-		APIKey: "new-token",
+			require.NoError(t, err)
+			if tt.verify != nil {
+				tt.verify(t, modelsDir, tt.config)
+			}
+		})
 	}
-
-	err = callback(updatedConfig)
-	require.NoError(t, err)
-
-	backupData, err := os.ReadFile(backupPath)
-	require.NoError(t, err)
-	assert.Equal(t, string(originalData), string(backupData))
-
-	currentData, err := os.ReadFile(providerPath)
-	require.NoError(t, err)
-
-	var persisted conf.ModelProviderConfig
-	require.NoError(t, yaml.Unmarshal(currentData, &persisted))
-	assert.Equal(t, "new-token", persisted.APIKey)
-	assert.Empty(t, persisted.Name)
-
-	jsonPath := filepath.Join(modelsDir, "provider-yaml.json")
-	assert.NoFileExists(t, jsonPath)
 }
 
-func TestConfigUpdaterImpl_Update_PreservesJSONFormatAndCreatesBackup(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "csw-config-updater-json-*")
+func TestSaveProviderConfigToUserModelsDir(t *testing.T) {
+	tmpHome, err := os.MkdirTemp("", "csw-home-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpHome)
 
-	modelsDir := filepath.Join(tmpDir, "models")
-	require.NoError(t, os.MkdirAll(modelsDir, 0o755))
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", oldHome)
 
-	originalConfig := &conf.ModelProviderConfig{
-		Name:   "provider-json",
+	providerConfig := &conf.ModelProviderConfig{
+		Name:   "provider-user-dir",
 		Type:   "openai",
 		URL:    "https://api.example.com/v1",
-		APIKey: "old-token",
-	}
-	originalData, err := json.MarshalIndent(originalConfig, "", "  ")
-	require.NoError(t, err)
-
-	providerPath := filepath.Join(modelsDir, "provider-json.json")
-	require.NoError(t, os.WriteFile(providerPath, originalData, 0o644))
-
-	store, err := confimpl.NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	updater := NewConfigUpdater(store, "provider-json")
-	callback := updater.Update()
-
-	updatedConfig := &conf.ModelProviderConfig{
-		Name:   "provider-json",
-		Type:   "openai",
-		URL:    "https://api.example.com/v1",
-		APIKey: "new-token",
+		APIKey: "secret",
 	}
 
-	err = callback(updatedConfig)
+	err = SaveProviderConfigToUserModelsDir(providerConfig)
 	require.NoError(t, err)
 
-	backupData, err := os.ReadFile(providerPath + ".bkp")
-	require.NoError(t, err)
-	assert.Equal(t, string(originalData), string(backupData))
-
-	currentData, err := os.ReadFile(providerPath)
+	configPath := filepath.Join(tmpHome, ".config", "csw", "models", providerConfig.Name+".json")
+	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)
 
-	var persisted conf.ModelProviderConfig
-	require.NoError(t, json.Unmarshal(currentData, &persisted))
-	assert.Equal(t, "new-token", persisted.APIKey)
-	assert.Empty(t, persisted.Name)
-
-	yamlPath := filepath.Join(modelsDir, "provider-json.yaml")
-	assert.NoFileExists(t, yamlPath)
-}
-
-func TestConfigUpdaterImpl_Update_PreservesDurationFieldsAfterReadBack(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "csw-config-updater-durations-*")
+	var saved conf.ModelProviderConfig
+	err = json.Unmarshal(data, &saved)
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	modelsDir := filepath.Join(tmpDir, "models")
-	require.NoError(t, os.MkdirAll(modelsDir, 0o755))
-
-	providerPath := filepath.Join(modelsDir, "provider-duration.json")
- 	originalRaw := []byte(`{
-  "type": "openai",
-  "url": "https://api.example.com/v1",
-  "api-key": "old-token",
-  "connect-timeout": "3600s",
-  "request-timeout": "120s"
-}`)
-	require.NoError(t, os.WriteFile(providerPath, originalRaw, 0o644))
-
-	store, err := confimpl.NewLocalConfigStore(tmpDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	configs, err := store.GetModelProviderConfigs()
-	require.NoError(t, err)
-
-	config, ok := configs["provider-duration"]
-	require.True(t, ok)
-	assert.Equal(t, 3600*time.Second, config.ConnectTimeout)
-	assert.Equal(t, 120*time.Second, config.RequestTimeout)
-
-	updater := NewConfigUpdater(store, "provider-duration")
-	callback := updater.Update()
-
-	config.APIKey = "new-token"
-	require.NoError(t, callback(config))
-
-	configsAfterUpdate, err := store.GetModelProviderConfigs()
-	require.NoError(t, err)
-
-	updatedConfig, ok := configsAfterUpdate["provider-duration"]
-	require.True(t, ok)
-	assert.Equal(t, 3600*time.Second, updatedConfig.ConnectTimeout)
-	assert.Equal(t, 120*time.Second, updatedConfig.RequestTimeout)
-
-	updatedRaw, err := os.ReadFile(providerPath)
-	require.NoError(t, err)
-
-	var persisted map[string]any
-	require.NoError(t, json.Unmarshal(updatedRaw, &persisted))
-	assert.Equal(t, "3600s", persisted["connect-timeout"])
-	assert.Equal(t, "120s", persisted["request-timeout"])
+	assert.Equal(t, providerConfig.Type, saved.Type)
+	assert.Equal(t, providerConfig.URL, saved.URL)
+	assert.Equal(t, providerConfig.APIKey, saved.APIKey)
 }

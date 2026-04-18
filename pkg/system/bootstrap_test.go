@@ -2,6 +2,7 @@ package system
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -585,6 +586,14 @@ func TestResolveWorktreeBranchNameIgnoresBranchNameHook(t *testing.T) {
 }
 
 func TestCreateProviderMapConfigUpdaterWiring(t *testing.T) {
+	tmpHome, err := os.MkdirTemp("", "csw-home-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpHome)
+
+	oldHome := os.Getenv("HOME")
+	require.NoError(t, os.Setenv("HOME", tmpHome))
+	defer os.Setenv("HOME", oldHome)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/oauth/token" {
 			w.WriteHeader(http.StatusNotFound)
@@ -624,10 +633,12 @@ func TestCreateProviderMapConfigUpdaterWiring(t *testing.T) {
 	err = responsesClient.RefreshTokenIfNeeded()
 	require.NoError(t, err)
 
-	configs, err := store.GetModelProviderConfigs()
+	updatedConfigPath := filepath.Join(tmpHome, ".config", "csw", "models", "resp.json")
+	updatedConfigData, err := os.ReadFile(updatedConfigPath)
 	require.NoError(t, err)
-	updatedConfig, exists := configs["resp"]
-	require.True(t, exists)
+
+	var updatedConfig conf.ModelProviderConfig
+	require.NoError(t, json.Unmarshal(updatedConfigData, &updatedConfig))
 	assert.Equal(t, "new-access-token", updatedConfig.APIKey)
 	assert.Equal(t, "new-refresh-token", updatedConfig.RefreshToken)
 }
