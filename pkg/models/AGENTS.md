@@ -17,6 +17,7 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `openai_client.go` - OpenAI-compatible provider client implementation.
 * `openai_client_tool_calling_test.go` - OpenAI tool-calling tests split from the main OpenAI client test file.
 * `openai_client_reasoning_test.go` - OpenAI reasoning-content tests split from the main OpenAI client test file.
+* `openai_client_logging_test.go` - OpenAI logging and raw request/response callback tests split from the main OpenAI client test file.
 * `openai_client_conversion.go` - OpenAI chat/tool payload conversion and prompt-cache request-stability helpers.
 * `openai_client_conversion_test.go` - Tests for OpenAI conversion and request-stability helpers.
 * `anthropic_client.go` - Anthropic provider client implementation.
