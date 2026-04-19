@@ -16,6 +16,7 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `config_updater.go` - Config update callback implementation.
 * `openai_client.go` - OpenAI-compatible provider client implementation.
 * `openai_client_test_tool_calling_test.go` - OpenAI tool-calling and request-stability tests split from the main OpenAI client test file.
+* `openai_client_reasoning_test.go` - OpenAI reasoning-content tests split from the main OpenAI client test file.
 * `anthropic_client.go` - Anthropic provider client implementation.
 * `ollama_client.go` - Ollama provider client implementation.
 * `ollama_client_tool_calling_test.go` - Ollama client tool-calling tests split from the main Ollama client test file.
