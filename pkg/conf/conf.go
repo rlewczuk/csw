@@ -272,10 +272,10 @@ type ModelProviderConfig struct {
 	URL string `json:"url" yaml:"url"`
 	// APIKey is the API key for authentication (if required)
 	APIKey string `json:"api-key,omitempty" yaml:"api-key,omitempty"`
-	// ConnectTimeout is the timeout for establishing connections
-	ConnectTimeout time.Duration `json:"connect-timeout,omitempty" yaml:"connect-timeout,omitempty"`
-	// RequestTimeout is the timeout for complete requests
-	RequestTimeout time.Duration `json:"request-timeout,omitempty" yaml:"request-timeout,omitempty"`
+	// ConnectTimeout is the timeout for establishing connections in seconds.
+	ConnectTimeout int `json:"connect-timeout,omitempty" yaml:"connect-timeout,omitempty"`
+	// RequestTimeout is the timeout for complete requests in seconds.
+	RequestTimeout int `json:"request-timeout,omitempty" yaml:"request-timeout,omitempty"`
 	// DefaultTemperature is the default temperature for chat completions
 	DefaultTemperature float32 `json:"default-temperature,omitempty" yaml:"default-temperature,omitempty"`
 	// DefaultTopP is the default top_p for chat completions
@@ -325,9 +325,9 @@ type ModelProviderConfig struct {
 	// MaxRetries is the maximum number of retries for rate limit (429) errors
 	// Defaults to 3 if not specified
 	MaxRetries int `json:"max-retries,omitempty" yaml:"max-retries,omitempty"`
-	// RateLimitBackoffScale is the base duration to scale rate limit backoff delays.
-	// Defaults to 1s when unset or invalid.
-	RateLimitBackoffScale time.Duration `json:"rate-limit-backoff-scale,omitempty" yaml:"rate-limit-backoff-scale,omitempty"`
+	// RateLimitBackoffScale is the base duration scale for rate limit backoff delays in seconds.
+	// Defaults to 1 second when unset or invalid.
+	RateLimitBackoffScale int `json:"rate-limit-backoff-scale,omitempty" yaml:"rate-limit-backoff-scale,omitempty"`
 	// AuthMode specifies the authentication mode for the provider.
 	// Possible values: "none", "api_key" (default), "oauth2".
 	AuthMode AuthMode `json:"auth-mode,omitempty" yaml:"auth-mode,omitempty"`
@@ -345,112 +345,19 @@ type ModelProviderConfig struct {
 	DisableRefresh bool `json:"disable-refresh,omitempty" yaml:"disable-refresh,omitempty"`
 }
 
-// MarshalJSON implements custom JSON marshaling for ModelProviderConfig.
-// It serializes duration fields as strings (e.g., "30s", "5m", "1h0m0s").
-func (c ModelProviderConfig) MarshalJSON() ([]byte, error) {
-	type Alias ModelProviderConfig
-	aux := &struct {
-		ConnectTimeout        string `json:"connect-timeout,omitempty"`
-		RequestTimeout        string `json:"request-timeout,omitempty"`
-		RateLimitBackoffScale string `json:"rate-limit-backoff-scale,omitempty"`
-		*Alias
-	}{
-		Alias: (*Alias)(&c),
-	}
-
-	if c.ConnectTimeout != 0 {
-		aux.ConnectTimeout = formatDurationForConfig(c.ConnectTimeout)
-	}
-	if c.RequestTimeout != 0 {
-		aux.RequestTimeout = formatDurationForConfig(c.RequestTimeout)
-	}
-	if c.RateLimitBackoffScale != 0 {
-		aux.RateLimitBackoffScale = formatDurationForConfig(c.RateLimitBackoffScale)
-	}
-
-	data, err := json.Marshal(aux)
-	if err != nil {
-		return nil, fmt.Errorf("ModelProviderConfig.MarshalJSON() [conf.go]: %w", err)
-	}
-
-	return data, nil
+// GetConnectTimeoutDuration returns ConnectTimeout interpreted as seconds.
+func (c ModelProviderConfig) GetConnectTimeoutDuration() time.Duration {
+	return time.Duration(c.ConnectTimeout) * time.Second
 }
 
-// MarshalYAML implements custom YAML marshaling for ModelProviderConfig.
-// It keeps duration fields serialized as strings, same as JSON marshaling.
-func (c ModelProviderConfig) MarshalYAML() (any, error) {
-	data, err := c.MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("ModelProviderConfig.MarshalYAML() [conf.go]: %w", err)
-	}
-
-	var out map[string]any
-	if err := json.Unmarshal(data, &out); err != nil {
-		return nil, fmt.Errorf("ModelProviderConfig.MarshalYAML() [conf.go]: failed to unmarshal marshaled json: %w", err)
-	}
-
-	return out, nil
+// GetRequestTimeoutDuration returns RequestTimeout interpreted as seconds.
+func (c ModelProviderConfig) GetRequestTimeoutDuration() time.Duration {
+	return time.Duration(c.RequestTimeout) * time.Second
 }
 
-// formatDurationForConfig converts duration value to a string with explicit unit suffix.
-func formatDurationForConfig(d time.Duration) string {
-	if d%time.Second == 0 {
-		return fmt.Sprintf("%ds", d/time.Second)
-	}
-	if d%time.Millisecond == 0 {
-		return fmt.Sprintf("%dms", d/time.Millisecond)
-	}
-	if d%time.Microsecond == 0 {
-		return fmt.Sprintf("%dus", d/time.Microsecond)
-	}
-
-	return fmt.Sprintf("%dns", d)
-}
-
-// UnmarshalJSON implements custom JSON unmarshaling for ModelProviderConfig.
-// It handles duration fields that are represented as strings in JSON (e.g., "30s", "5m").
-func (c *ModelProviderConfig) UnmarshalJSON(data []byte) error {
-	// Define a temporary struct with string fields for durations
-	type Alias ModelProviderConfig
-	aux := &struct {
-		ConnectTimeout        string `json:"connect-timeout,omitempty"`
-		RequestTimeout        string `json:"request-timeout,omitempty"`
-		RateLimitBackoffScale string `json:"rate-limit-backoff-scale,omitempty"`
-		*Alias
-	}{
-		Alias: (*Alias)(c),
-	}
-
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("ModelProviderConfig.UnmarshalJSON(): %w", err)
-	}
-
-	// Parse duration strings
-	if aux.ConnectTimeout != "" {
-		d, err := time.ParseDuration(aux.ConnectTimeout)
-		if err != nil {
-			return fmt.Errorf("ModelProviderConfig.UnmarshalJSON(): invalid connect_timeout: %w", err)
-		}
-		c.ConnectTimeout = d
-	}
-
-	if aux.RequestTimeout != "" {
-		d, err := time.ParseDuration(aux.RequestTimeout)
-		if err != nil {
-			return fmt.Errorf("ModelProviderConfig.UnmarshalJSON(): invalid request_timeout: %w", err)
-		}
-		c.RequestTimeout = d
-	}
-
-	if aux.RateLimitBackoffScale != "" {
-		d, err := time.ParseDuration(aux.RateLimitBackoffScale)
-		if err != nil {
-			return fmt.Errorf("ModelProviderConfig.UnmarshalJSON(): invalid rate_limit_backoff_scale: %w", err)
-		}
-		c.RateLimitBackoffScale = d
-	}
-
-	return nil
+// GetRateLimitBackoffScaleDuration returns RateLimitBackoffScale interpreted as seconds.
+func (c ModelProviderConfig) GetRateLimitBackoffScaleDuration() time.Duration {
+	return time.Duration(c.RateLimitBackoffScale) * time.Second
 }
 
 // GlobalConfig represents the global configuration file structure.

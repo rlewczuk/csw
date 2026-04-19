@@ -59,10 +59,10 @@ func outputProviderDetails(config *conf.ModelProviderConfig) error {
 		fmt.Fprintf(w, "API Key\t%s\n", maskAPIKey(config.APIKey))
 	}
 	if config.ConnectTimeout > 0 {
-		fmt.Fprintf(w, "Connect Timeout\t%s\n", config.ConnectTimeout)
+		fmt.Fprintf(w, "Connect Timeout\t%s\n", config.GetConnectTimeoutDuration())
 	}
 	if config.RequestTimeout > 0 {
-		fmt.Fprintf(w, "Request Timeout\t%s\n", config.RequestTimeout)
+		fmt.Fprintf(w, "Request Timeout\t%s\n", config.GetRequestTimeoutDuration())
 	}
 	if len(config.Headers) > 0 {
 		for name, value := range config.Headers {

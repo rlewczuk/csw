@@ -3,7 +3,6 @@ package conf
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -503,16 +502,16 @@ func TestAgentRoleConfig_Clone_NilReceiver(t *testing.T) {
 
 func TestModelProviderConfig_Clone_PreservesDurations(t *testing.T) {
 	cfg := &ModelProviderConfig{
-		ConnectTimeout:        5 * time.Second,
-		RequestTimeout:        15 * time.Second,
-		RateLimitBackoffScale: 2 * time.Second,
+		ConnectTimeout:        5,
+		RequestTimeout:        15,
+		RateLimitBackoffScale: 2,
 	}
 
 	clone := cfg.Clone()
 	require.NotNil(t, clone)
-	assert.Equal(t, 5*time.Second, clone.ConnectTimeout)
-	assert.Equal(t, 15*time.Second, clone.RequestTimeout)
-	assert.Equal(t, 2*time.Second, clone.RateLimitBackoffScale)
+	assert.Equal(t, 5, clone.ConnectTimeout)
+	assert.Equal(t, 15, clone.RequestTimeout)
+	assert.Equal(t, 2, clone.RateLimitBackoffScale)
 }
 
 func TestModelProviderConfig_Merge(t *testing.T) {

@@ -65,10 +65,10 @@ func NewAnthropicClient(config *conf.ModelProviderConfig) (*AnthropicClient, err
 	apiVersion := "2023-06-01" // Default Anthropic API version
 
 	if config.ConnectTimeout > 0 {
-		connectTimeout = config.ConnectTimeout
+		connectTimeout = config.GetConnectTimeoutDuration()
 	}
 	if config.RequestTimeout > 0 {
-		requestTimeout = config.RequestTimeout
+		requestTimeout = config.GetRequestTimeoutDuration()
 	}
 	if config.APIKey != "" {
 		apiKey = config.APIKey

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/conf/impl"
@@ -344,8 +343,8 @@ func TestFromConfig(t *testing.T) {
 				Type:               "ollama",
 				Name:               "local-ollama",
 				URL:                "http://localhost:11434",
-				ConnectTimeout:     5 * time.Second,
-				RequestTimeout:     30 * time.Second,
+				ConnectTimeout:     5,
+				RequestTimeout:     30,
 				DefaultTemperature: 0.7,
 				DefaultTopP:        0.9,
 				DefaultTopK:        40,
@@ -360,8 +359,8 @@ func TestFromConfig(t *testing.T) {
 				Name:               "openai-cloud",
 				URL:                "http://localhost:11434/v1",
 				APIKey:             "test-key",
-				ConnectTimeout:     5 * time.Second,
-				RequestTimeout:     30 * time.Second,
+				ConnectTimeout:     5,
+				RequestTimeout:     30,
 				DefaultTemperature: 0.7,
 				DefaultTopP:        0.9,
 				MaxTokens:          4096,
@@ -375,8 +374,8 @@ func TestFromConfig(t *testing.T) {
 				Name:               "anthropic-cloud",
 				URL:                "https://api.anthropic.com",
 				APIKey:             "test-key",
-				ConnectTimeout:     5 * time.Second,
-				RequestTimeout:     30 * time.Second,
+				ConnectTimeout:     5,
+				RequestTimeout:     30,
 				DefaultTemperature: 0.7,
 				DefaultTopP:        0.9,
 				DefaultTopK:        40,
@@ -392,8 +391,8 @@ func TestFromConfig(t *testing.T) {
 				URL:            "https://api.jetbrains.ai",
 				APIKey:         "jwt-token",
 				RefreshToken:   "bearer-token",
-				ConnectTimeout: 5 * time.Second,
-				RequestTimeout: 30 * time.Second,
+				ConnectTimeout: 5,
+				RequestTimeout: 30,
 				MaxTokens:      4096,
 			},
 			expectError: false,

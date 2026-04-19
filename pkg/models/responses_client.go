@@ -59,10 +59,10 @@ func NewResponsesClient(config *conf.ModelProviderConfig) (*ResponsesClient, err
 	apiKey := ""
 
 	if config.ConnectTimeout > 0 {
-		connectTimeout = config.ConnectTimeout
+		connectTimeout = config.GetConnectTimeoutDuration()
 	}
 	if config.RequestTimeout > 0 {
-		requestTimeout = config.RequestTimeout
+		requestTimeout = config.GetRequestTimeoutDuration()
 	}
 	if config.APIKey != "" {
 		apiKey = config.APIKey

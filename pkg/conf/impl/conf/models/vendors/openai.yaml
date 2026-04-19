@@ -3,5 +3,5 @@ url: https://api.openai.com/v1
 auth-mode: api_key
 headers:
   Content-Type: application/json
-request-timeout: 300s
-connect-timeout: 30s
+request-timeout: 300
+connect-timeout: 30

@@ -3,7 +3,6 @@ package models
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 )
@@ -116,10 +115,10 @@ func ModelFromConfig(config *conf.ModelProviderConfig) (ModelProvider, error) {
 
 	// Set defaults if not specified
 	if config.ConnectTimeout == 0 {
-		config.ConnectTimeout = 10 * time.Second
+		config.ConnectTimeout = 10
 	}
 	if config.RequestTimeout == 0 {
-		config.RequestTimeout = 60 * time.Second
+		config.RequestTimeout = 60
 	}
 
 	// Call factory function directly based on provider type

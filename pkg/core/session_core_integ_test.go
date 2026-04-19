@@ -599,7 +599,7 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 		mockProvider.RateLimitError = rateLimitErr
 		rateLimitCount := 1
 		mockProvider.RateLimitErrorCount = &rateLimitCount
-		mockProvider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 5 * time.Millisecond}
+		mockProvider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 1}
 
 		successResponse := &models.MockChatResponse{
 			Response: &models.ChatMessage{
@@ -646,7 +646,7 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 		mockProvider.RateLimitError = rateLimitErr
 		rateLimitCount := 1
 		mockProvider.RateLimitErrorCount = &rateLimitCount
-		mockProvider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 5 * time.Millisecond}
+		mockProvider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 1}
 
 		successResponse := &models.MockChatResponse{
 			Response: &models.ChatMessage{
@@ -688,7 +688,7 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 		mockProvider.RateLimitError = rateLimitErr
 		rateLimitCount := 2
 		mockProvider.RateLimitErrorCount = &rateLimitCount
-		mockProvider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 5 * time.Millisecond}
+		mockProvider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 1}
 
 		fixture := newSweSystemFixture(t, "You are a helpful assistant.",
 			withModelProviders(map[string]models.ModelProvider{"mock": mockProvider}),
@@ -722,7 +722,7 @@ func TestSweSession_NetworkErrorRetry(t *testing.T) {
 		mockProvider.NetworkError = networkErr
 		networkErrorCount := 1
 		mockProvider.NetworkErrorCount = &networkErrorCount
-		mockProvider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 5 * time.Millisecond}
+		mockProvider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 1}
 
 		successResponse := &models.MockChatResponse{
 			Response: &models.ChatMessage{
@@ -768,7 +768,7 @@ func TestSweSession_NetworkErrorRetry(t *testing.T) {
 		mockProvider.NetworkError = networkErr
 		networkErrorCount := 2
 		mockProvider.NetworkErrorCount = &networkErrorCount
-		mockProvider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 5 * time.Millisecond}
+		mockProvider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 1}
 
 		fixture := newSweSystemFixture(t, "You are a helpful assistant.",
 			withModelProviders(map[string]models.ModelProvider{"mock": mockProvider}),

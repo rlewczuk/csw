@@ -18,8 +18,8 @@ const (
 	defaultOllamaHost        = "http://localhost:11434"
 	testOllamaModelName      = "devstral-small-2:latest"
 	testOllamaEmbedModelName = "nomic-embed-text:latest"
-	testOllamaTimeout        = 30 * time.Second
-	connectOllamaTimeout     = 5 * time.Second
+	testOllamaTimeout        = 30
+	connectOllamaTimeout     = 5
 )
 
 // getOllamaHost returns the Ollama host URL from config file or default

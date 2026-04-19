@@ -62,10 +62,10 @@ func NewOllamaClient(config *conf.ModelProviderConfig) (*OllamaClient, error) {
 	requestTimeout := 3600 * time.Second
 
 	if config.ConnectTimeout > 0 {
-		connectTimeout = config.ConnectTimeout
+		connectTimeout = config.GetConnectTimeoutDuration()
 	}
 	if config.RequestTimeout > 0 {
-		requestTimeout = config.RequestTimeout
+		requestTimeout = config.GetRequestTimeoutDuration()
 	}
 
 	// Create HTTP client with custom transport for connection timeout

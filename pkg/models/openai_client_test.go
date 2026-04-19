@@ -19,8 +19,8 @@ const (
 	defaultOpenAITestURL     = "http://localhost:11434/v1"
 	testOpenAIModelName      = "devstral-small-2:latest"
 	testOpenAIEmbedModelName = "nomic-embed-text:latest"
-	testOpenAITimeout        = 30 * time.Second
-	connectOpenAITimeout     = 5 * time.Second
+	testOpenAITimeout        = 30
+	connectOpenAITimeout     = 5
 )
 
 // openaiTestClient holds either a real or mock client and provides cleanup

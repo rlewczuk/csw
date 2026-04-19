@@ -279,7 +279,7 @@ func TestSweSessionRunNonStreamingChat_UsageLimitWait(t *testing.T) {
 	t.Run("waits retry-after plus buffer before retrying", func(t *testing.T) {
 		handler := &retryOutputHandler{}
 		provider := models.NewMockProvider(nil)
-		provider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: time.Millisecond}
+		provider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 1}
 
 		session := &SweSession{
 			messages: []*models.ChatMessage{models.NewTextMessage(models.ChatRoleUser, "hello")},

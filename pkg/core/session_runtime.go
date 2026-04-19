@@ -180,7 +180,7 @@ func (s *SweSession) llmRetryPolicy() models.RetryPolicy {
 	}); ok {
 		config := configProvider.GetConfig()
 		if config != nil && config.RateLimitBackoffScale > 0 {
-			backoffScale = config.RateLimitBackoffScale
+			backoffScale = config.GetRateLimitBackoffScaleDuration()
 		}
 	}
 

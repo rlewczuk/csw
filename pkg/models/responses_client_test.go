@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/testutil"
@@ -15,8 +14,8 @@ import (
 const (
 	defaultResponsesTestURL = "https://api.openai.com/v1"
 	testResponsesModelName  = "gpt-4o-mini"
-	testResponsesTimeout    = 30 * time.Second
-	connectResponsesTimeout = 5 * time.Second
+	testResponsesTimeout    = 30
+	connectResponsesTimeout = 5
 )
 
 // responsesTestClient holds either a real or mock client and provides cleanup.

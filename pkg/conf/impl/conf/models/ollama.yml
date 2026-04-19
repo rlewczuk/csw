@@ -2,8 +2,8 @@ type: ollama
 name: ollama-local
 description: Local Ollama instance
 url: http://localhost:11434
-connect-timeout: 30s
-request-timeout: 300s
+connect-timeout: 30
+request-timeout: 300
 default-temperature: 0.7
 default-top-p: 0.9
 default-top-k: 40

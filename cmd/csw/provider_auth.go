@@ -97,7 +97,7 @@ func providerAuthCommand() *cobra.Command {
 
 			httpClient := &http.Client{Timeout: 30 * time.Second}
 			if config.RequestTimeout > 0 {
-				httpClient.Timeout = config.RequestTimeout
+				httpClient.Timeout = config.GetRequestTimeoutDuration()
 			}
 
 			tokenResp, err := models.ExchangeAuthorizationCode(config, httpClient, callback.Code, redirectURI, pkce.Verifier)
