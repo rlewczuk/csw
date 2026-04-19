@@ -20,6 +20,7 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `anthropic_client.go` - Anthropic provider client implementation.
 * `ollama_client.go` - Ollama provider client implementation.
 * `ollama_client_tool_calling_test.go` - Ollama client tool-calling tests split from the main Ollama client test file.
+* `ollama_client_raw_request_logging_test.go` - Ollama client raw request/response logging tests split from the main Ollama client test file.
 * `responses_client.go` - OpenAI Responses provider client implementation core (provider, model listing, shared helpers).
 * `responses_client_chat.go` - Responses chat model implementation (`ResponsesChatModel`) and chat/stream request handling.
 * `responses_client_compactor.go` - Responses chat compactor implementation and compact endpoint URL helper.
