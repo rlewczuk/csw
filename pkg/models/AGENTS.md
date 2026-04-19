@@ -27,6 +27,7 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `responses_client_errors_test.go` - Error-handling and rate-limit tests for Responses client helpers.
 * `responses_client_oauth_refresh_test.go` - OAuth2 token refresh and 401 retry tests for Responses client.
 * `responses_client_chat_test.go` - Chat-model-specific tests for Responses client (`ResponsesChatModel` chat/stream behavior).
+* `responses_client_chat_test_request_payload.go` - Request-payload-focused chat tests (headers, instructions, codex payload compatibility, and request stability).
 * `jetbrains_client.go` - JetBrains provider client implementation.
 * `mock.go` - Mock provider and chat/embedding models.
 
