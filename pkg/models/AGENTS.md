@@ -17,7 +17,8 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `openai_client.go` - OpenAI-compatible provider client implementation.
 * `anthropic_client.go` - Anthropic provider client implementation.
 * `ollama_client.go` - Ollama provider client implementation.
-* `responses_client.go` - OpenAI Responses provider client implementation.
+* `responses_client.go` - OpenAI Responses provider client implementation core (provider, model listing, shared helpers).
+* `responses_client_chat.go` - Responses chat model implementation (`ResponsesChatModel`) and chat/stream request handling.
 * `responses_client_compactor.go` - Responses chat compactor implementation and compact endpoint URL helper.
 * `responses_client_errors.go` - Responses client HTTP/network error mapping and raw-response formatting helpers.
 * `responses_client_oauth_refresh.go` - OAuth2 token refresh lifecycle helpers for Responses client.
@@ -25,6 +26,7 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `responses_client_compactor_test.go` - Compactor behavior and compact URL helper tests.
 * `responses_client_errors_test.go` - Error-handling and rate-limit tests for Responses client helpers.
 * `responses_client_oauth_refresh_test.go` - OAuth2 token refresh and 401 retry tests for Responses client.
+* `responses_client_chat_test.go` - Chat-model-specific tests for Responses client (`ResponsesChatModel` chat/stream behavior).
 * `jetbrains_client.go` - JetBrains provider client implementation.
 * `mock.go` - Mock provider and chat/embedding models.
 
