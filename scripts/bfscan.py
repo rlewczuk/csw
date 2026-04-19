@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Print top-N biggest Go files in cmd/ and pkg/ by line count."""
+"""Print biggest Go files in cmd/ and pkg/ by line count."""
 
 from __future__ import annotations
 
@@ -29,10 +29,25 @@ def collect_go_files(base_dirs: list[Path]) -> list[tuple[Path, int]]:
 def main() -> int:
     """Run bfscan CLI."""
     parser = argparse.ArgumentParser(
-        description="Find top N biggest Go files in cmd/ and pkg/ directories.",
+        description=(
+            "Find biggest Go files in cmd/ and pkg/ directories, filtered by "
+            "minimum line count."
+        ),
     )
-    parser.add_argument("n", type=int, help="Number of files to print")
+    parser.add_argument(
+        "min_lines",
+        type=int,
+        help="Minimum line count required for a file to be reported",
+    )
+    parser.add_argument(
+        "n",
+        type=int,
+        help="Number of biggest files to print",
+    )
     args = parser.parse_args()
+
+    if args.min_lines < 0:
+        parser.error("min_lines must be non-negative")
 
     if args.n < 0:
         parser.error("n must be non-negative")
@@ -40,8 +55,9 @@ def main() -> int:
     base_dirs = [Path("cmd"), Path("pkg")]
     files_with_counts = collect_go_files(base_dirs)
     files_with_counts.sort(key=lambda entry: (-entry[1], str(entry[0])))
+    filtered_files = [entry for entry in files_with_counts if entry[1] >= args.min_lines]
 
-    for path, line_count in files_with_counts[: args.n]:
+    for path, line_count in filtered_files[: args.n]:
         print(f"{path}\t{line_count}")
 
     return 0
