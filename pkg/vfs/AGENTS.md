@@ -13,6 +13,7 @@ Package `pkg/vfs` provides filesystem abstractions, local and in-memory VFS impl
 * `patch.go` - Patch parsing for file operations.
 * `patcher.go` - Text patching and unified diff.
 * `shadow.go` - Shadow filesystem routing wrapper.
+* `vfs_findfiles_test.go` - FindFiles and glob-pattern behavior tests.
 
 ## Important public API objects
 
