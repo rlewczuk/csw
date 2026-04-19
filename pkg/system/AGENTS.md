@@ -5,6 +5,7 @@
 ## Important files
 
 * `bootstrap.go` - build system and configuration wiring
+* `bootstrap_container.go` - container runtime resolution and identity helpers for bootstrap
 * `context.go` - run context parsing helpers
 * `hooks.go` - hook parsing and runtime config
 * `runtime.go` - run session startup flow
