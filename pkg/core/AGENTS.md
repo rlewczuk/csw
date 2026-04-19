@@ -14,6 +14,7 @@ Package `pkg/core` provides runtime orchestration for agent sessions and tasks. 
 * `hooks_engine.go` - Hook execution and feedback handling
 * `task.go` - Persistent task management backend
 * `task_storage.go` - Task metadata file persistence and task tree scanning helpers
+* `task_summary.go` - Task session summary/output persistence helpers
 * `session_persistence.go` - Session state persistence and restore
 * `session_summary.go` - Session summary JSON and markdown output
 * `commit_message.go` - LLM-based commit message generation
