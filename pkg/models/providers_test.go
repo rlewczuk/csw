@@ -451,9 +451,6 @@ func TestFromConfig(t *testing.T) {
 				chatModel := provider.ChatModel("test-model", nil)
 				assert.NotNil(t, chatModel)
 
-				// Verify the provider can create embedding models
-				embedModel := provider.EmbeddingModel("test-model")
-				assert.NotNil(t, embedModel)
 			}
 		})
 	}

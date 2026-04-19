@@ -305,7 +305,7 @@ func (c *ResponsesClient) ChatModel(model string, options *ChatOptions) ChatMode
 
 // EmbeddingModel returns an EmbeddingModel implementation for the given model.
 // Note: Responses API doesn't support embeddings.
-func (c *ResponsesClient) EmbeddingModel(model string) EmbeddingModel {
+func (c *ResponsesClient) EmbeddingModel(model string) *ResponsesEmbeddingModel {
 	return &ResponsesEmbeddingModel{
 		client: c,
 		model:  model,
@@ -892,10 +892,4 @@ func (m *ResponsesChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			}
 		}
 	}
-}
-
-// Embed generates embeddings for the given input text.
-// Note: Responses API doesn't support embeddings, so this always returns an error.
-func (m *ResponsesEmbeddingModel) Embed(ctx context.Context, input string) ([]float64, error) {
-	return nil, fmt.Errorf("ResponsesEmbeddingModel.Embed() [responses_client.go]: not implemented")
 }

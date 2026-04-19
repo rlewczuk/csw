@@ -309,73 +309,10 @@ func TestMockChatModel_ChatStream_ContextTimeout(t *testing.T) {
 	}
 }
 
-func TestMockEmbeddingModel_Embed(t *testing.T) {
-	provider := NewMockProvider([]ModelInfo{})
-
-	testCases := []struct {
-		name              string
-		modelName         string
-		setupEmbedding    []float64
-		expectedEmbedding []float64
-	}{
-		{
-			name:              "default embedding",
-			modelName:         "test-embed-model",
-			expectedEmbedding: []float64{0.1, 0.2, 0.3},
-		},
-		{
-			name:              "custom embedding",
-			modelName:         "test-embed-model",
-			setupEmbedding:    []float64{1.0, 2.0, 3.0, 4.0, 5.0},
-			expectedEmbedding: []float64{1.0, 2.0, 3.0, 4.0, 5.0},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.setupEmbedding != nil {
-				provider.SetEmbedResponse(tc.modelName, tc.setupEmbedding)
-			}
-
-			embedModel := provider.EmbeddingModel(tc.modelName)
-			ctx := context.Background()
-
-			embedding, err := embedModel.Embed(ctx, "test input")
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if len(embedding) != len(tc.expectedEmbedding) {
-				t.Fatalf("expected embedding length %d, got %d", len(tc.expectedEmbedding), len(embedding))
-			}
-
-			for i, val := range tc.expectedEmbedding {
-				if embedding[i] != val {
-					t.Errorf("embedding[%d]: expected %f, got %f", i, val, embedding[i])
-				}
-			}
-		})
-	}
-}
-
-func TestMockEmbeddingModel_Embed_Cancellation(t *testing.T) {
-	provider := NewMockProvider([]ModelInfo{})
-	embedModel := provider.EmbeddingModel("test-model")
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately
-
-	_, err := embedModel.Embed(ctx, "test input")
-	if err != context.Canceled {
-		t.Fatalf("expected context.Canceled error, got %v", err)
-	}
-}
-
 func TestMockProvider_InterfaceCompliance(t *testing.T) {
 	// This test verifies that MockClient implements the ModelProvider interface
 	var _ ModelProvider = (*MockClient)(nil)
 	var _ ChatModel = (*MockChatModel)(nil)
-	var _ EmbeddingModel = (*MockEmbeddingModel)(nil)
 }
 
 func TestMockProvider_ConcurrentAccess(t *testing.T) {

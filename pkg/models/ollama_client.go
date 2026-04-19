@@ -258,7 +258,7 @@ func (c *OllamaClient) ChatModel(model string, options *ChatOptions) ChatModel {
 }
 
 // EmbeddingModel returns an EmbeddingModel implementation for the given model
-func (c *OllamaClient) EmbeddingModel(model string) EmbeddingModel {
+func (c *OllamaClient) EmbeddingModel(model string) *OllamaEmbeddingModel {
 	return &OllamaEmbeddingModel{
 		client: c,
 		model:  model,
@@ -672,60 +672,6 @@ func (m *OllamaChatModel) ChatStream(ctx context.Context, messages []*ChatMessag
 			}
 		}
 	}
-}
-
-// Embed generates embeddings for the given input text
-func (m *OllamaEmbeddingModel) Embed(ctx context.Context, input string) ([]float64, error) {
-	if input == "" {
-		return nil, fmt.Errorf("OllamaEmbeddingModel.Embed() [ollama_client.go]: input cannot be empty")
-	}
-
-	if m.model == "" {
-		return nil, fmt.Errorf("OllamaEmbeddingModel.Embed() [ollama_client.go]: model not set")
-	}
-
-	embedReq := OllamaEmbedRequest{
-		Model: m.model,
-		Input: []string{input},
-	}
-
-	url := m.client.baseURL + "/api/embed"
-
-	body, err := json.Marshal(embedReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	setUserAgentHeader(req)
-	m.client.applyConfiguredHeaders(req)
-	m.client.applyConfiguredQueryParams(req)
-	applyOptionsHeaders(req, nil)
-
-	resp, err := m.client.httpClient.Do(req)
-	if err != nil {
-		return nil, m.client.handleHTTPError(err)
-	}
-	defer resp.Body.Close()
-
-	if err := m.client.checkStatusCode(resp); err != nil {
-		return nil, err
-	}
-
-	var embedResp OllamaEmbedResponse
-	if err := json.NewDecoder(resp.Body).Decode(&embedResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	if len(embedResp.Embeddings) == 0 {
-		return nil, fmt.Errorf("OllamaEmbeddingModel.Embed() [ollama_client.go]: no embeddings returned")
-	}
-
-	return embedResp.Embeddings[0], nil
 }
 
 // handleHTTPError converts HTTP errors to appropriate model errors.

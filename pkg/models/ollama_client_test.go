@@ -595,69 +595,6 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 	})
 }
 
-func TestOllamaClient_EmbeddingModel(t *testing.T) {
-	tc := getOllamaTestClient(t)
-	defer tc.Close()
-
-	ctx := context.Background()
-
-	t.Run("creates embedding model with model name", func(t *testing.T) {
-		embedModel := tc.Client.EmbeddingModel(testOllamaEmbedModelName)
-
-		assert.NotNil(t, embedModel)
-	})
-
-	t.Run("generates embeddings for text", func(t *testing.T) {
-		// Setup mock response if using mock
-		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/embed", "POST", `{"model":"nomic-embed-text:latest","embeddings":[[0.1,0.2,0.3,0.4,0.5]]}`)
-		}
-
-		embedModel := tc.Client.EmbeddingModel(testOllamaEmbedModelName)
-
-		embedding, err := embedModel.Embed(ctx, "Hello, world!")
-
-		require.NoError(t, err)
-		assert.NotNil(t, embedding)
-		assert.NotEmpty(t, embedding)
-		assert.Greater(t, len(embedding), 0)
-	})
-
-	t.Run("generates embeddings for different texts", func(t *testing.T) {
-		// Setup mock responses if using mock
-		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/embed", "POST", `{"model":"nomic-embed-text:latest","embeddings":[[0.1,0.2,0.3,0.4,0.5]]}`)
-		}
-
-		embedModel := tc.Client.EmbeddingModel(testOllamaEmbedModelName)
-
-		embedding1, err := embedModel.Embed(ctx, "The quick brown fox")
-		require.NoError(t, err)
-		assert.NotNil(t, embedding1)
-
-		// For mock mode, we need to add another response
-		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/api/embed", "POST", `{"model":"nomic-embed-text:latest","embeddings":[[0.2,0.3,0.4,0.5,0.6]]}`)
-		}
-
-		embedding2, err := embedModel.Embed(ctx, "jumps over the lazy dog")
-		require.NoError(t, err)
-		assert.NotNil(t, embedding2)
-
-		// Embeddings should have the same dimension
-		assert.Equal(t, len(embedding1), len(embedding2))
-	})
-
-	t.Run("returns error for empty input", func(t *testing.T) {
-		embedModel := tc.Client.EmbeddingModel(testOllamaEmbedModelName)
-
-		embedding, err := embedModel.Embed(ctx, "")
-
-		assert.Error(t, err)
-		assert.Nil(t, embedding)
-	})
-}
-
 func TestOllamaClient_ErrorHandling(t *testing.T) {
 	t.Run("handles endpoint not found", func(t *testing.T) {
 		mock := testutil.NewMockHTTPServer()
@@ -1519,31 +1456,6 @@ func TestOllamaClient_QueryParamsChatStream(t *testing.T) {
 	request := reqs[0]
 
 	assert.Contains(t, request.Query, "stream-format=json")
-}
-
-func TestOllamaClient_QueryParamsEmbed(t *testing.T) {
-	mock := testutil.NewMockHTTPServer()
-	defer mock.Close()
-
-	client, err := NewOllamaClient(&conf.ModelProviderConfig{
-		URL: mock.URL(),
-		QueryParams: map[string]string{
-			"api-version": "2024-01-01",
-		},
-	})
-	require.NoError(t, err)
-
-	mock.AddRestResponse("/api/embed", "POST", `{"model":"test-model","embeddings":[[0.1,0.2,0.3]]}`)
-
-	embedModel := client.EmbeddingModel("test-model")
-	_, err = embedModel.Embed(context.Background(), "Hello")
-	require.NoError(t, err)
-
-	reqs := mock.GetRequests()
-	require.Len(t, reqs, 1)
-	request := reqs[0]
-
-	assert.Contains(t, request.Query, "api-version=2024-01-01")
 }
 
 func TestOllamaClient_QueryParamsDoesNotOverrideExisting(t *testing.T) {

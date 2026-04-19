@@ -138,18 +138,11 @@ func (c *JetBrainsClient) ChatModel(model string, options *ChatOptions) ChatMode
 }
 
 // EmbeddingModel returns embedding model implementation.
-func (c *JetBrainsClient) EmbeddingModel(model string) EmbeddingModel {
+func (c *JetBrainsClient) EmbeddingModel(model string) *JetBrainsEmbeddingModel {
 	return &JetBrainsEmbeddingModel{
 		client: c,
 		model:  model,
 	}
-}
-
-// Embed is not implemented for JetBrains endpoint.
-func (m *JetBrainsEmbeddingModel) Embed(ctx context.Context, input string) ([]float64, error) {
-	_ = ctx
-	_ = input
-	return nil, fmt.Errorf("JetBrainsEmbeddingModel.Embed() [jetbrains_client.go]: not implemented")
 }
 
 // Chat sends non-streaming chat request and returns accumulated final answer.

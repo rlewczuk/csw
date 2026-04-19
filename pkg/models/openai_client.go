@@ -355,7 +355,7 @@ func (c *OpenAIClient) ChatModel(model string, options *ChatOptions) ChatModel {
 }
 
 // EmbeddingModel returns an EmbeddingModel implementation for the given model
-func (c *OpenAIClient) EmbeddingModel(model string) EmbeddingModel {
+func (c *OpenAIClient) EmbeddingModel(model string) *OpenAIEmbeddingModel {
 	return &OpenAIEmbeddingModel{
 		client: c,
 		model:  model,
@@ -981,67 +981,6 @@ func (c *OpenAIClient) promptCacheRetention() string {
 	default:
 		return ""
 	}
-}
-
-// Embed generates embeddings for the given input text
-func (m *OpenAIEmbeddingModel) Embed(ctx context.Context, input string) ([]float64, error) {
-	if input == "" {
-		return nil, fmt.Errorf("OpenAIEmbeddingModel.Embed() [openai_client.go]: input cannot be empty")
-	}
-
-	if m.model == "" {
-		return nil, fmt.Errorf("OpenAIEmbeddingModel.Embed() [openai_client.go]: model not set")
-	}
-
-	embedReq := OpenaiEmbeddingRequest{
-		Model: m.model,
-		Input: input,
-	}
-
-	url := m.client.baseURL + "/embeddings"
-
-	body, err := json.Marshal(embedReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	token, err := m.client.GetAccessToken()
-	if err != nil {
-		return nil, err
-	}
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	m.client.applyConfiguredQueryParams(req)
-	setUserAgentHeader(req)
-	m.client.applyConfiguredHeaders(req)
-	applyOptionsHeaders(req, nil)
-
-	resp, err := m.client.httpClient.Do(req)
-	if err != nil {
-		return nil, m.client.handleHTTPError(err)
-	}
-	defer resp.Body.Close()
-
-	if err := m.client.checkStatusCode(resp); err != nil {
-		return nil, err
-	}
-
-	var embedResp OpenaiEmbeddingResponse
-	if err := json.NewDecoder(resp.Body).Decode(&embedResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	if len(embedResp.Data) == 0 {
-		return nil, fmt.Errorf("OpenAIEmbeddingModel.Embed() [openai_client.go]: no embeddings returned")
-	}
-
-	return embedResp.Data[0].Embedding, nil
 }
 
 // handleHTTPError converts HTTP errors to appropriate model errors.

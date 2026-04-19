@@ -925,24 +925,6 @@ func TestResponsesClient_SystemMessageInInstructions(t *testing.T) {
 	})
 }
 
-func TestResponsesClient_EmbeddingModel(t *testing.T) {
-	tc := getResponsesTestClient(t)
-	defer tc.Close()
-
-	ctx := context.Background()
-
-	t.Run("returns error for embedding model", func(t *testing.T) {
-		embedModel := tc.Client.EmbeddingModel("any-model")
-
-		assert.NotNil(t, embedModel)
-
-		_, err := embedModel.Embed(ctx, "Hello")
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not implemented")
-	})
-}
-
 func TestResponsesClient_StreamLogging(t *testing.T) {
 	tc := getResponsesTestClient(t)
 	defer tc.Close()

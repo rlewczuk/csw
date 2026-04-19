@@ -534,65 +534,6 @@ func TestOpenAIClient_ChatModelStream(t *testing.T) {
 	})
 }
 
-func TestOpenAIClient_EmbeddingModel(t *testing.T) {
-	tc := getOpenAITestClient(t)
-	defer tc.Close()
-
-	ctx := context.Background()
-
-	t.Run("creates embedding model with model name", func(t *testing.T) {
-		embedModel := tc.Client.EmbeddingModel(testOpenAIEmbedModelName)
-
-		assert.NotNil(t, embedModel)
-	})
-
-	t.Run("generates embeddings for text", func(t *testing.T) {
-		// Setup mock response if using mock
-		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/embeddings", "POST", `{"object":"list","data":[{"object":"embedding","embedding":[0.1,0.2,0.3,0.4,0.5],"index":0}],"model":"nomic-embed-text:latest"}`)
-		}
-
-		embedModel := tc.Client.EmbeddingModel(testOpenAIEmbedModelName)
-
-		embedding, err := embedModel.Embed(ctx, "Hello, world!")
-
-		require.NoError(t, err)
-		assert.NotNil(t, embedding)
-		assert.NotEmpty(t, embedding)
-		assert.Greater(t, len(embedding), 0)
-	})
-
-	t.Run("generates embeddings for different texts", func(t *testing.T) {
-		// Setup mock responses if using mock
-		if tc.Mock != nil {
-			tc.Mock.AddRestResponse("/embeddings", "POST", `{"object":"list","data":[{"object":"embedding","embedding":[0.1,0.2,0.3,0.4,0.5],"index":0}],"model":"nomic-embed-text:latest"}`)
-			tc.Mock.AddRestResponse("/embeddings", "POST", `{"object":"list","data":[{"object":"embedding","embedding":[0.2,0.3,0.4,0.5,0.6],"index":0}],"model":"nomic-embed-text:latest"}`)
-		}
-
-		embedModel := tc.Client.EmbeddingModel(testOpenAIEmbedModelName)
-
-		embedding1, err := embedModel.Embed(ctx, "The quick brown fox")
-		require.NoError(t, err)
-		assert.NotNil(t, embedding1)
-
-		embedding2, err := embedModel.Embed(ctx, "jumps over the lazy dog")
-		require.NoError(t, err)
-		assert.NotNil(t, embedding2)
-
-		// Embeddings should have the same dimension
-		assert.Equal(t, len(embedding1), len(embedding2))
-	})
-
-	t.Run("returns error for empty input", func(t *testing.T) {
-		embedModel := tc.Client.EmbeddingModel(testOpenAIEmbedModelName)
-
-		embedding, err := embedModel.Embed(ctx, "")
-
-		assert.Error(t, err)
-		assert.Nil(t, embedding)
-	})
-}
-
 func TestOpenAIClient_ToolCalling(t *testing.T) {
 	tc := getOpenAITestClient(t)
 	defer tc.Close()

@@ -262,7 +262,7 @@ func (c *AnthropicClient) ChatModel(model string, options *ChatOptions) ChatMode
 
 // EmbeddingModel returns an EmbeddingModel implementation for the given model
 // Note: Anthropic doesn't support embeddings, so this will return an error when used
-func (c *AnthropicClient) EmbeddingModel(model string) EmbeddingModel {
+func (c *AnthropicClient) EmbeddingModel(model string) *AnthropicEmbeddingModel {
 	return &AnthropicEmbeddingModel{
 		client: c,
 		model:  model,
@@ -744,12 +744,6 @@ func (m *AnthropicChatModel) ChatStream(ctx context.Context, messages []*ChatMes
 			return
 		}
 	}
-}
-
-// Embed generates embeddings for the given input text
-// Note: Anthropic doesn't support embeddings, so this always returns an error
-func (m *AnthropicEmbeddingModel) Embed(ctx context.Context, input string) ([]float64, error) {
-	return nil, fmt.Errorf("AnthropicEmbeddingModel.Embed() [anthropic_client.go]: not implemented")
 }
 
 // handleHTTPError converts HTTP errors to appropriate model errors.

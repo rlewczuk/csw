@@ -132,7 +132,7 @@ func (p *MockClient) ChatModel(model string, options *ChatOptions) ChatModel {
 }
 
 // EmbeddingModel returns a MockEmbeddingModel implementation for the given model.
-func (p *MockClient) EmbeddingModel(model string) EmbeddingModel {
+func (p *MockClient) EmbeddingModel(model string) *MockEmbeddingModel {
 	return &MockEmbeddingModel{
 		provider: p,
 		model:    model,
@@ -378,25 +378,4 @@ func (m *MockChatModel) ChatStream(ctx context.Context, messages []*ChatMessage,
 type MockEmbeddingModel struct {
 	provider *MockClient
 	model    string
-}
-
-// Embed returns the predefined embedding for the input.
-func (m *MockEmbeddingModel) Embed(ctx context.Context, input string) ([]float64, error) {
-	// Check for cancellation first
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
-	m.provider.mu.RLock()
-	embedding := m.provider.embedResponses[m.model]
-	m.provider.mu.RUnlock()
-
-	if embedding == nil {
-		// Default embedding if none configured
-		return []float64{0.1, 0.2, 0.3}, nil
-	}
-
-	return embedding, nil
 }

@@ -235,18 +235,11 @@ type ChatModel interface {
 	ChatStream(ctx context.Context, messages []*ChatMessage, options *ChatOptions, tools []tool.ToolInfo) iter.Seq[*ChatMessage]
 }
 
-type EmbeddingModel interface {
-	Embed(ctx context.Context, input string) ([]float64, error)
-}
-
 type ModelProvider interface {
 	ListModels() ([]ModelInfo, error)
 
 	// ChatModel returns a ChatModel implementation for the given model and options.
 	ChatModel(model string, options *ChatOptions) ChatModel
-
-	// EmbeddingModel returns an EmbeddingModel implementation for the given model.
-	EmbeddingModel(model string) EmbeddingModel
 
 	// SetVerbose enables or disables verbose logging for HTTP requests and responses.
 	SetVerbose(verbose bool)
