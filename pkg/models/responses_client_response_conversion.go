@@ -427,6 +427,93 @@ func convertFromResponsesOutput(items []ResponsesItem) (*ChatMessage, error) {
 	return result, nil
 }
 
+// convertFromResponsesCompactedOutput converts compacted Responses API output
+// into session messages preserving role and tool/function items.
+func convertFromResponsesCompactedOutput(items []ResponsesItem) ([]*ChatMessage, error) {
+	if len(items) == 0 {
+		return nil, fmt.Errorf("convertFromResponsesCompactedOutput() [responses_client_response_conversion.go]: no output items in response")
+	}
+
+	messages := make([]*ChatMessage, 0, len(items))
+	for _, item := range items {
+		switch item.Type {
+		case "message":
+			msgRole := ChatRoleAssistant
+			switch item.Role {
+			case string(ChatRoleUser):
+				msgRole = ChatRoleUser
+			case string(ChatRoleAssistant):
+				msgRole = ChatRoleAssistant
+			case string(ChatRoleSystem):
+				msgRole = ChatRoleSystem
+			case string(ChatRoleDeveloper):
+				msgRole = ChatRoleDeveloper
+			}
+
+			parts := make([]ChatMessagePart, 0, len(item.Content))
+			for _, content := range item.Content {
+				switch content.Type {
+				case "output_text", "input_text", "text":
+					if content.Text != "" {
+						parts = append(parts, ChatMessagePart{Text: content.Text})
+					}
+				case "refusal":
+					if content.Refusal != "" {
+						parts = append(parts, ChatMessagePart{Text: content.Refusal})
+					}
+				}
+			}
+			if len(parts) == 0 {
+				continue
+			}
+			messages = append(messages, &ChatMessage{Role: msgRole, Parts: parts})
+		case "function_call":
+			if item.CallID == "" || item.Name == "" {
+				continue
+			}
+			args := tool.NewToolValue(map[string]any{})
+			if item.Arguments != "" {
+				if parsed, err := tool.NewToolValueFromJSON(item.Arguments); err == nil {
+					args = parsed
+				} else {
+					args = tool.NewToolValue(map[string]any{"raw": item.Arguments})
+				}
+			}
+			messages = append(messages, NewToolCallMessage(&tool.ToolCall{ID: item.CallID, Function: item.Name, Arguments: args}))
+		case "function_call_output":
+			if item.CallID == "" {
+				continue
+			}
+			response := &tool.ToolResponse{
+				Call: &tool.ToolCall{ID: item.CallID},
+				Done: true,
+			}
+			if outputJSON, ok := item.Output.(string); ok && outputJSON != "" {
+				if parsed, err := tool.NewToolValueFromJSON(outputJSON); err == nil {
+					response.Result = parsed
+				} else {
+					response.Result = tool.NewToolValue(outputJSON)
+				}
+			}
+			messages = append(messages, NewToolResponseMessage(response))
+		case "compaction":
+			if item.EncryptedContent == "" {
+				continue
+			}
+			messages = append(messages, &ChatMessage{
+				Role:  ChatRoleAssistant,
+				Parts: []ChatMessagePart{{Text: item.EncryptedContent}},
+			})
+		}
+	}
+
+	if len(messages) == 0 {
+		return nil, fmt.Errorf("convertFromResponsesCompactedOutput() [responses_client_response_conversion.go]: no usable output items in response")
+	}
+
+	return messages, nil
+}
+
 func convertToolsToResponses(tools []tool.ToolInfo) []ResponsesTool {
 	if len(tools) == 0 {
 		return nil

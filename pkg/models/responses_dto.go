@@ -2,20 +2,20 @@ package models
 
 // ResponsesCreateRequest represents a request to the Responses API.
 type ResponsesCreateRequest struct {
-	Model           string              `json:"model,omitempty"`
-	Input           []ResponsesItem     `json:"input,omitempty"`
-	Tools           []ResponsesTool     `json:"tools,omitempty"`
-	ToolChoice      interface{}         `json:"tool_choice,omitempty"`
-	Store           *bool               `json:"store,omitempty"`
-	Instructions    string              `json:"instructions,omitempty"`
-	Include         []string            `json:"include,omitempty"`
-	PromptCacheKey  string              `json:"prompt_cache_key,omitempty"`
-	PromptCacheRetention string         `json:"prompt_cache_retention,omitempty"`
-	Reasoning       *ResponsesReasoning `json:"reasoning,omitempty"`
-	Stream          bool                `json:"stream,omitempty"`
-	Temperature     float64             `json:"temperature,omitempty"`
-	TopP            float64             `json:"top_p,omitempty"`
-	MaxOutputTokens int                 `json:"max_output_tokens,omitempty"`
+	Model                string              `json:"model,omitempty"`
+	Input                []ResponsesItem     `json:"input,omitempty"`
+	Tools                []ResponsesTool     `json:"tools,omitempty"`
+	ToolChoice           interface{}         `json:"tool_choice,omitempty"`
+	Store                *bool               `json:"store,omitempty"`
+	Instructions         string              `json:"instructions,omitempty"`
+	Include              []string            `json:"include,omitempty"`
+	PromptCacheKey       string              `json:"prompt_cache_key,omitempty"`
+	PromptCacheRetention string              `json:"prompt_cache_retention,omitempty"`
+	Reasoning            *ResponsesReasoning `json:"reasoning,omitempty"`
+	Stream               bool                `json:"stream,omitempty"`
+	Temperature          float64             `json:"temperature,omitempty"`
+	TopP                 float64             `json:"top_p,omitempty"`
+	MaxOutputTokens      int                 `json:"max_output_tokens,omitempty"`
 }
 
 // ResponsesTool represents a tool definition for Responses API.
@@ -28,14 +28,15 @@ type ResponsesTool struct {
 
 // ResponsesItem represents an item in Responses API requests or responses.
 type ResponsesItem struct {
-	ID        string             `json:"id,omitempty"`
-	Type      string             `json:"type"`
-	Role      string             `json:"role,omitempty"`
-	Content   []ResponsesContent `json:"content,omitempty"`
-	CallID    string             `json:"call_id,omitempty"`
-	Name      string             `json:"name,omitempty"`
-	Arguments string             `json:"arguments,omitempty"`
-	Output    interface{}        `json:"output,omitempty"`
+	ID               string             `json:"id,omitempty"`
+	Type             string             `json:"type"`
+	Role             string             `json:"role,omitempty"`
+	Content          []ResponsesContent `json:"content,omitempty"`
+	CallID           string             `json:"call_id,omitempty"`
+	Name             string             `json:"name,omitempty"`
+	Arguments        string             `json:"arguments,omitempty"`
+	Output           interface{}        `json:"output,omitempty"`
+	EncryptedContent string             `json:"encrypted_content,omitempty"`
 }
 
 // ResponsesContent represents a content part for Responses API.
@@ -75,6 +76,15 @@ type ResponsesResponse struct {
 	ToolChoice           interface{}          `json:"tool_choice,omitempty"`
 	Tools                []ResponsesTool      `json:"tools,omitempty"`
 	Usage                *ResponsesUsage      `json:"usage,omitempty"`
+}
+
+// ResponsesCompactedResponse represents a response from /responses/compact endpoint.
+type ResponsesCompactedResponse struct {
+	ID        string          `json:"id"`
+	Object    string          `json:"object"`
+	CreatedAt int64           `json:"created_at,omitempty"`
+	Output    []ResponsesItem `json:"output,omitempty"`
+	Usage     *ResponsesUsage `json:"usage,omitempty"`
 }
 
 // ResponsesStreamEvent represents a streaming event from Responses API.
