@@ -15,6 +15,7 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `oauth.go` - OAuth PKCE, token exchange, renewal helpers.
 * `config_updater.go` - Config update callback implementation.
 * `openai_client.go` - OpenAI-compatible provider client implementation.
+* `openai_client_test_tool_calling_test.go` - OpenAI tool-calling and request-stability tests split from the main OpenAI client test file.
 * `anthropic_client.go` - Anthropic provider client implementation.
 * `ollama_client.go` - Ollama provider client implementation.
 * `responses_client.go` - OpenAI Responses provider client implementation core (provider, model listing, shared helpers).
