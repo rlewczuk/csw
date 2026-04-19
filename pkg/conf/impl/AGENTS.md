@@ -7,6 +7,7 @@ Package `pkg/conf/impl` provides concrete configuration store implementations fo
 * `composite.go` - Composite merged config store
 * `embedded.go` - Embedded read-only config store
 * `local.go` - Local filesystem config store
+* `local_yaml_test.go` - YAML-specific local config store tests extracted from `local_test.go`
 * `mock.go` - Mock config store for tests
 
 ## Important public API objects
