@@ -18,6 +18,7 @@ File listed by script is too big and part of its code needs to be split into sma
   * if there are no significant secondary definitions and file consists mostly of methods of its main class, consider finding big enough group of related methods and splitting them out
 * look through all tests for original file and also split them out if needed
 * new file should be placed in the same directory as original file and named `<original-file>_<group-name>.go`, where group name is a slug indicating purpose of the group, for example functions for generating session summary when moved from `session.go` should land in `session_summary.go`
+  * note that if file you are splitting out is a test file (ends with `_test.go`), then you need to keep naming convention for test files, i.e. `<original-file-sans-test-suffix>_<group-name>_test.go` in order for tests and build run properly
 * look through other files in the same package (and possibly other packages) to find functions that should belong to the group that is split out
   * for each such function, also move it to the new file along with all its tests
   * if such function was in other package and has dependencies that conflict with the new file (eg. would create circular dependency), consider factoring out logic if this function belonging to the group and then move only those parts that are not dependent on the group to the new file
