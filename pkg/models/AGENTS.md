@@ -18,6 +18,7 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `anthropic_client.go` - Anthropic provider client implementation.
 * `ollama_client.go` - Ollama provider client implementation.
 * `responses_client.go` - OpenAI Responses provider client implementation.
+* `responses_client_response_conversion.go` - Responses request/response conversion and stream parsing helpers.
 * `jetbrains_client.go` - JetBrains provider client implementation.
 * `mock.go` - Mock provider and chat/embedding models.
 
