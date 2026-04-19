@@ -9,6 +9,7 @@ related secondary functions/definitions that can be moved to a separate file:
   * but if file contains definitions of several classes (with a bunch of methods each), one can be considered as a main class and all other classes can be considered as secondary definitions
 * closely related helper code (functions, secondary structs etc.) which together form a group of related functions/definitions should be moved to a separate file
   * find biggest such group and split it out; process only one such group, leave remaining helper code in original file
+  * if there are no significant secondary definitions and file consists mostly of methods of its main class, consider finding big enough group of related methods and splitting them out
 * look through all tests for original file and also split them out if needed
 * new file should be placed in the same directory as original file and named `<original-file>_<group-name>.go`, where group name is a slug indicating purpose of the group, for example functions for generating session summary when moved from `session.go` should land in `session_summary.go`
 * look through other files in the same package (and possibly other packages) to find functions that should belong to the group that is split out
