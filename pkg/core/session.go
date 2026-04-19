@@ -87,6 +87,7 @@ type SweSession struct {
 	tokenUsage       models.TokenUsage
 	contextLength    int
 	compactionCount int
+	compactor       ChatCompactor
 	taskBackend     tool.TaskBackend
 
 	subAgentRunner       SubAgentTaskRunner
@@ -192,12 +193,13 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 
 			pendingToolResponses: make([]*tool.ToolResponse, 0, len(params.PendingToolResponses)),
 			loadedAgentFiles:     make(map[string]struct{}, len(params.LoadedAgentFiles)),
-			tokenUsage:           params.TokenUsage,
-			contextLength:        params.ContextLength,
-			compactionCount:      params.CompactionCount,
-			taskBackend:          params.TaskBackend,
-			subAgentRunner:       params.SubAgentRunner,
-			subAgentSlugs:        make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
+		tokenUsage:           params.TokenUsage,
+		contextLength:        params.ContextLength,
+		compactionCount:      params.CompactionCount,
+		compactor:            NewCompactMessagesChatCompactor(),
+		taskBackend:          params.TaskBackend,
+		subAgentRunner:       params.SubAgentRunner,
+		subAgentSlugs:        make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
 	}
 
 	if session.modelSpec == "" {
@@ -1297,7 +1299,11 @@ func (s *SweSession) compactContext(statusMessage string) error {
 		return fmt.Errorf("SweSession.maybeCompactContext() [session.go]: failed to persist pre-compaction snapshot: %w", err)
 	}
 
-	compacted := CompactMessages(s.messages)
+	if s.compactor == nil {
+		s.compactor = NewCompactMessagesChatCompactor()
+	}
+
+	compacted := s.compactor.CompactMessages(s.messages)
 	if err := s.persistCompactionMessagesSnapshot("post", compactionNumber, compacted); err != nil {
 		return fmt.Errorf("SweSession.maybeCompactContext() [session.go]: failed to persist post-compaction snapshot: %w", err)
 	}

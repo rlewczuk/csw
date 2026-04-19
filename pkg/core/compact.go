@@ -17,6 +17,25 @@ const (
 	compactDefaultContextLimit = 4000
 )
 
+// ChatCompactor compacts chat message history.
+type ChatCompactor interface {
+	// CompactMessages compacts provided message history.
+	CompactMessages(messages []*models.ChatMessage) []*models.ChatMessage
+}
+
+// CompactMessagesChatCompactor applies CompactMessages function-based compaction.
+type CompactMessagesChatCompactor struct{}
+
+// NewCompactMessagesChatCompactor creates default ChatCompactor implementation.
+func NewCompactMessagesChatCompactor() ChatCompactor {
+	return &CompactMessagesChatCompactor{}
+}
+
+// CompactMessages compacts provided message history using CompactMessages function.
+func (c *CompactMessagesChatCompactor) CompactMessages(messages []*models.ChatMessage) []*models.ChatMessage {
+	return CompactMessages(messages)
+}
+
 // CompactMessages applies multi-step compaction to chat messages.
 func CompactMessages(messages []*models.ChatMessage) []*models.ChatMessage {
 	return compactMessagesWithLimit(messages, compactDefaultContextLimit)
