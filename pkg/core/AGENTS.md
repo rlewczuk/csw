@@ -5,6 +5,7 @@ Package `pkg/core` provides runtime orchestration for agent sessions and tasks. 
 ## Important files
 
 * `session.go` - Main session loop and tool execution
+* `session_runtime.go` - Retry, compaction, and runtime helper logic for sessions
 * `session_model_role.go` - Session model/role switching and tool registry selection
 * `session_thread.go` - Thread-safe async session controller
 * `session_agents.go` - Injects AGENTS.md into context
