@@ -130,9 +130,9 @@ func TestLocalConfigStore_ModelTemplateConfig(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "models", "vendors"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "models", "templates"), 0755))
 
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "families", "openai-gpt.yaml"), []byte("max-tokens: 4096\nmodel-tags:\n  - model: '^gpt'\n    tag: 'openai'\n"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "vendors", "openai.yaml"), []byte("type: openai\nurl: https://api.openai.com/v1\n"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "templates", "openai.yaml"), []byte("gpt-4.1:\n  family: openai-gpt\n  max-tokens: 8192\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "families", "openai-gpt.json"), []byte("{\n  \"max-tokens\": 4096,\n  \"model-tags\": [\n    {\n      \"model\": \"^gpt\",\n      \"tag\": \"openai\"\n    }\n  ]\n}\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "vendors", "openai.json"), []byte("{\n  \"type\": \"openai\",\n  \"url\": \"https://api.openai.com/v1\"\n}\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models", "templates", "openai.json"), []byte("{\n  \"gpt-4.1\": {\n    \"family\": \"openai-gpt\",\n    \"max-tokens\": 8192\n  }\n}\n"), 0644))
 
 	store, err := NewLocalConfigStore(tmpDir)
 	require.NoError(t, err)

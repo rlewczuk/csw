@@ -32,7 +32,6 @@ import (
 	"sync"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"gopkg.in/yaml.v3"
 )
 
 // LocalConfigStore implements conf.ConfigStore interface for local filesystem-based configuration.
@@ -203,56 +202,26 @@ func (s *LocalConfigStore) loadAllConfig() error {
 	return nil
 }
 
-// loadGlobalConfig loads the global configuration from global.yml/global.yaml or global.json.
-// YAML takes precedence over JSON if both exist.
+// loadGlobalConfig loads the global configuration from global.json.
 func (s *LocalConfigStore) loadGlobalConfig() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	ymlPath := filepath.Join(s.configDir, "global.yml")
-	yamlPath := filepath.Join(s.configDir, "global.yaml")
 	jsonPath := filepath.Join(s.configDir, "global.json")
 
-	var data []byte
-	var configPath string
-	var err error
-
-	// Try YAML first (takes precedence)
-	data, err = os.ReadFile(ymlPath)
-	if err == nil {
-		configPath = ymlPath
-	} else if os.IsNotExist(err) {
-		data, err = os.ReadFile(yamlPath)
-		if err == nil {
-			configPath = yamlPath
-		} else if os.IsNotExist(err) {
-			// Try JSON if YAML doesn't exist
-			data, err = os.ReadFile(jsonPath)
-			if err != nil {
-				if os.IsNotExist(err) {
-					// Global config is optional, use empty config
-					s.globalConfig = &conf.GlobalConfig{}
-					return nil
-				}
-				return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", jsonPath, err)
-			}
-			configPath = jsonPath
-		} else {
-			return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", yamlPath, err)
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Global config is optional, use empty config
+			s.globalConfig = &conf.GlobalConfig{}
+			return nil
 		}
-	} else {
-		return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", ymlPath, err)
+		return fmt.Errorf("loadGlobalConfig(): failed to read %s: %w", jsonPath, err)
 	}
 
 	var config conf.GlobalConfig
-	if strings.HasSuffix(configPath, ".yml") || strings.HasSuffix(configPath, ".yaml") {
-		if err := yaml.Unmarshal(data, &config); err != nil {
-			return fmt.Errorf("loadGlobalConfig(): failed to parse %s: %w", configPath, err)
-		}
-	} else {
-		if err := json.Unmarshal(data, &config); err != nil {
-			return fmt.Errorf("loadGlobalConfig(): failed to parse %s: %w", configPath, err)
-		}
+	if err := json.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("loadGlobalConfig(): failed to parse %s: %w", jsonPath, err)
 	}
 
 	s.globalConfig = &config
@@ -275,7 +244,7 @@ func (s *LocalConfigStore) loadModelProviderConfigMapDir(dir string) (map[string
 			continue
 		}
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if ext != ".yml" && ext != ".yaml" && ext != ".json" {
+		if ext != ".json" {
 			continue
 		}
 
@@ -287,14 +256,8 @@ func (s *LocalConfigStore) loadModelProviderConfigMapDir(dir string) (map[string
 		}
 
 		var item conf.ModelProviderConfig
-		if ext == ".json" {
-			if err := json.Unmarshal(data, &item); err != nil {
-				return nil, fmt.Errorf("loadModelProviderConfigMapDir(): failed to parse %s: %w", path, err)
-			}
-		} else {
-			if err := yaml.Unmarshal(data, &item); err != nil {
-				return nil, fmt.Errorf("loadModelProviderConfigMapDir(): failed to parse %s: %w", path, err)
-			}
+		if err := json.Unmarshal(data, &item); err != nil {
+			return nil, fmt.Errorf("loadModelProviderConfigMapDir(): failed to parse %s: %w", path, err)
 		}
 		result[key] = item
 	}
@@ -317,7 +280,7 @@ func (s *LocalConfigStore) loadModelTemplateGroupsDir(dir string) (map[string]ma
 			continue
 		}
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if ext != ".yml" && ext != ".yaml" && ext != ".json" {
+		if ext != ".json" {
 			continue
 		}
 
@@ -329,14 +292,8 @@ func (s *LocalConfigStore) loadModelTemplateGroupsDir(dir string) (map[string]ma
 		}
 
 		items := make(map[string]conf.ModelProviderConfig)
-		if ext == ".json" {
-			if err := json.Unmarshal(data, &items); err != nil {
-				return nil, fmt.Errorf("loadModelTemplateGroupsDir(): failed to parse %s: %w", path, err)
-			}
-		} else {
-			if err := yaml.Unmarshal(data, &items); err != nil {
-				return nil, fmt.Errorf("loadModelTemplateGroupsDir(): failed to parse %s: %w", path, err)
-			}
+		if err := json.Unmarshal(data, &items); err != nil {
+			return nil, fmt.Errorf("loadModelTemplateGroupsDir(): failed to parse %s: %w", path, err)
 		}
 		result[group] = items
 	}
@@ -345,7 +302,7 @@ func (s *LocalConfigStore) loadModelTemplateGroupsDir(dir string) (map[string]ma
 }
 
 // loadModelProviderConfigs loads all model provider configurations from the models directory.
-// Supports both .json and .yml/.yaml files, with YAML taking precedence over JSON if both exist.
+// Supports .json files.
 func (s *LocalConfigStore) loadModelProviderConfigs() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -364,7 +321,6 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 
 	configs := make(map[string]*conf.ModelProviderConfig)
 
-	selectedByProviderName := make(map[string]os.DirEntry)
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -376,19 +332,6 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 		}
 
 		providerName := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
-		existingEntry, exists := selectedByProviderName[providerName]
-		if !exists {
-			selectedByProviderName[providerName] = entry
-			continue
-		}
-
-		existingExt := strings.ToLower(filepath.Ext(existingEntry.Name()))
-		if modelProviderConfigExtPriority(ext) < modelProviderConfigExtPriority(existingExt) {
-			selectedByProviderName[providerName] = entry
-		}
-	}
-
-	for providerName, entry := range selectedByProviderName {
 		providerPath := filepath.Join(modelsDir, entry.Name())
 		data, err := os.ReadFile(providerPath)
 		if err != nil {
@@ -396,15 +339,8 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 		}
 
 		var config conf.ModelProviderConfig
-		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if ext == ".json" {
-			if err := json.Unmarshal(data, &config); err != nil {
-				return fmt.Errorf("loadModelProviderConfigs(): failed to parse %s: %w", providerPath, err)
-			}
-		} else {
-			if err := yaml.Unmarshal(data, &config); err != nil {
-				return fmt.Errorf("loadModelProviderConfigs(): failed to parse %s: %w", providerPath, err)
-			}
+		if err := json.Unmarshal(data, &config); err != nil {
+			return fmt.Errorf("loadModelProviderConfigs(): failed to parse %s: %w", providerPath, err)
 		}
 
 		config.Name = providerName
@@ -418,39 +354,21 @@ func (s *LocalConfigStore) loadModelProviderConfigs() error {
 
 func isAllowedModelProviderConfigExt(ext string) bool {
 	switch ext {
-	case ".yml", ".yaml", ".json", ".conf":
+	case ".json":
 		return true
 	default:
 		return false
 	}
 }
 
-func modelProviderConfigExtPriority(ext string) int {
-	switch ext {
-	case ".yml":
-		return 1
-	case ".yaml":
-		return 2
-	case ".json":
-		return 3
-	case ".conf":
-		return 4
-	default:
-		return 100
-	}
-}
-
-// loadModelAliases loads model aliases from model_aliases.yaml/yml/jsonl files.
-// YAML takes precedence over JSONL.
+// loadModelAliases loads model aliases from model_aliases.jsonl file.
 func (s *LocalConfigStore) loadModelAliases() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	yamlPath := filepath.Join(s.configDir, "model_aliases.yaml")
-	ymlPath := filepath.Join(s.configDir, "model_aliases.yml")
 	jsonlPath := filepath.Join(s.configDir, "model_aliases.jsonl")
 
-	aliases, loaded, err := loadModelAliasesFromFiles(yamlPath, ymlPath, jsonlPath)
+	aliases, loaded, err := loadModelAliasesFromFiles(jsonlPath)
 	if err != nil {
 		return err
 	}
@@ -463,27 +381,7 @@ func (s *LocalConfigStore) loadModelAliases() error {
 	return nil
 }
 
-func loadModelAliasesFromFiles(yamlPath string, ymlPath string, jsonlPath string) (map[string]conf.ModelAliasValue, bool, error) {
-	if data, err := os.ReadFile(yamlPath); err == nil {
-		aliases, parseErr := parseModelAliasesYAML(data, yamlPath)
-		if parseErr != nil {
-			return nil, false, parseErr
-		}
-		return aliases, true, nil
-	} else if !os.IsNotExist(err) {
-		return nil, false, fmt.Errorf("loadModelAliasesFromFiles() [local.go]: failed to read %s: %w", yamlPath, err)
-	}
-
-	if data, err := os.ReadFile(ymlPath); err == nil {
-		aliases, parseErr := parseModelAliasesYAML(data, ymlPath)
-		if parseErr != nil {
-			return nil, false, parseErr
-		}
-		return aliases, true, nil
-	} else if !os.IsNotExist(err) {
-		return nil, false, fmt.Errorf("loadModelAliasesFromFiles() [local.go]: failed to read %s: %w", ymlPath, err)
-	}
-
+func loadModelAliasesFromFiles(jsonlPath string) (map[string]conf.ModelAliasValue, bool, error) {
 	if data, err := os.ReadFile(jsonlPath); err == nil {
 		aliases, parseErr := parseModelAliasesJSONL(data, jsonlPath)
 		if parseErr != nil {
@@ -495,15 +393,6 @@ func loadModelAliasesFromFiles(yamlPath string, ymlPath string, jsonlPath string
 	}
 
 	return nil, false, nil
-}
-
-func parseModelAliasesYAML(data []byte, source string) (map[string]conf.ModelAliasValue, error) {
-	aliases := make(map[string]conf.ModelAliasValue)
-	if err := yaml.Unmarshal(data, &aliases); err != nil {
-		return nil, fmt.Errorf("parseModelAliasesYAML() [local.go]: failed to parse %s: %w", source, err)
-	}
-
-	return aliases, nil
 }
 
 func parseModelAliasesJSONL(data []byte, source string) (map[string]conf.ModelAliasValue, error) {
@@ -542,7 +431,7 @@ func parseModelAliasesJSONL(data []byte, source string) (map[string]conf.ModelAl
 // loadAgentRoleConfigs loads all agent role configurations from the roles directory.
 // The special "all" meta-role is loaded without requiring config.json, as it only contains
 // prompt fragments that are merged into other roles.
-// Supports both config.yaml and config.json, with YAML taking precedence.
+// Supports config.json.
 func (s *LocalConfigStore) loadAgentRoleConfigs() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -568,73 +457,39 @@ func (s *LocalConfigStore) loadAgentRoleConfigs() error {
 		roleName := entry.Name()
 		roleDir := filepath.Join(rolesDir, roleName)
 
-		// Try YAML first (takes precedence), then JSON
-		yamlPath := filepath.Join(roleDir, "config.yaml")
-		ymlPath := filepath.Join(roleDir, "config.yml")
 		jsonPath := filepath.Join(roleDir, "config.json")
 
-		var data []byte
-		var configPath string
-		var useYAML bool
-
-		// Try config.yaml first
-		data, err = os.ReadFile(yamlPath)
-		if err == nil {
-			configPath = yamlPath
-			useYAML = true
-		} else if os.IsNotExist(err) {
-			// Try config.yml next
-			data, err = os.ReadFile(ymlPath)
-			if err == nil {
-				configPath = ymlPath
-				useYAML = true
-			} else if os.IsNotExist(err) {
-				// Try config.json last
-				data, err = os.ReadFile(jsonPath)
-				if err != nil {
-					if os.IsNotExist(err) {
-						// Special case: "all" is a meta-role that only contains prompt fragments
-						// to be merged into other roles. It doesn't require a config file.
-						if roleName == "all" {
-							// Load only prompt fragments for the "all" meta-role
-							promptFragments, err := s.loadPromptFragments(roleDir)
-							if err != nil {
-								return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, err)
-							}
-							toolFragments, err := s.loadToolFragments()
-							if err != nil {
-								return fmt.Errorf("loadAgentRoleConfigs(): failed to load tool fragments: %w", err)
-							}
-							configs["all"] = &conf.AgentRoleConfig{
-								Name:            "all",
-								PromptFragments: promptFragments,
-								ToolFragments:   toolFragments,
-							}
-							continue
-						}
-						// config file is required for all other roles
-						return fmt.Errorf("loadAgentRoleConfigs(): role %s missing config.json or config.yaml", roleName)
+		data, err := os.ReadFile(jsonPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// Special case: "all" is a meta-role that only contains prompt fragments
+				// to be merged into other roles. It doesn't require a config file.
+				if roleName == "all" {
+					// Load only prompt fragments for the "all" meta-role
+					promptFragments, loadErr := s.loadPromptFragments(roleDir)
+					if loadErr != nil {
+						return fmt.Errorf("loadAgentRoleConfigs(): failed to load prompt fragments for role %s: %w", roleName, loadErr)
 					}
-					return fmt.Errorf("loadAgentRoleConfigs(): failed to read %s: %w", jsonPath, err)
+					toolFragments, loadErr := s.loadToolFragments()
+					if loadErr != nil {
+						return fmt.Errorf("loadAgentRoleConfigs(): failed to load tool fragments: %w", loadErr)
+					}
+					configs["all"] = &conf.AgentRoleConfig{
+						Name:            "all",
+						PromptFragments: promptFragments,
+						ToolFragments:   toolFragments,
+					}
+					continue
 				}
-				configPath = jsonPath
-				useYAML = false
-			} else {
-				return fmt.Errorf("loadAgentRoleConfigs(): failed to read %s: %w", ymlPath, err)
+				// config file is required for all other roles
+				return fmt.Errorf("loadAgentRoleConfigs(): role %s missing config.json", roleName)
 			}
-		} else {
-			return fmt.Errorf("loadAgentRoleConfigs(): failed to read %s: %w", yamlPath, err)
+			return fmt.Errorf("loadAgentRoleConfigs(): failed to read %s: %w", jsonPath, err)
 		}
 
 		var config conf.AgentRoleConfig
-		if useYAML {
-			if err := yaml.Unmarshal(data, &config); err != nil {
-				return fmt.Errorf("loadAgentRoleConfigs(): failed to parse %s: %w", configPath, err)
-			}
-		} else {
-			if err := json.Unmarshal(data, &config); err != nil {
-				return fmt.Errorf("loadAgentRoleConfigs(): failed to parse %s: %w", configPath, err)
-			}
+		if err := json.Unmarshal(data, &config); err != nil {
+			return fmt.Errorf("loadAgentRoleConfigs(): failed to parse %s: %w", jsonPath, err)
 		}
 
 		// If name is not set, use directory name
