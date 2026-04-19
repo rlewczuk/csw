@@ -8,6 +8,7 @@ Package `pkg/lsp` provides a Language Server Protocol client, protocol DTOs, and
 * `client.go` - JSON-RPC stdio LSP client.
 * `client_integ_test.go` - Core LSP integration tests (init, diagnostics, definitions, refs, hover, symbols).
 * `client_integ_call_hierarchy_test.go` - Call hierarchy focused integration tests split from `client_integ_test.go`.
+* `client_integ_symbols_test.go` - Document/workspace symbols integration tests split from `client_integ_test.go`.
 * `dto.go` - Protocol DTOs and enums.
 * `mock.go` - In-memory LSP test double.
 
