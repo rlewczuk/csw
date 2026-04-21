@@ -6,8 +6,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"gopkg.in/yaml.v3"
 )
 
 type AccessFlag string
@@ -92,42 +90,6 @@ func (v *ModelAliasValue) UnmarshalJSON(data []byte) error {
 	}
 
 	return fmt.Errorf("ModelAliasValue.UnmarshalJSON() [conf.go]: alias value must be string or string array")
-}
-
-// UnmarshalYAML decodes alias value from string or string list.
-func (v *ModelAliasValue) UnmarshalYAML(node *yaml.Node) error {
-	if node == nil {
-		return fmt.Errorf("ModelAliasValue.UnmarshalYAML() [conf.go]: node is nil")
-	}
-
-	switch node.Kind {
-	case yaml.ScalarNode:
-		trimmed := strings.TrimSpace(node.Value)
-		if trimmed == "" {
-			return fmt.Errorf("ModelAliasValue.UnmarshalYAML() [conf.go]: alias value cannot be empty")
-		}
-		v.Values = []string{trimmed}
-		return nil
-	case yaml.SequenceNode:
-		if len(node.Content) == 0 {
-			return fmt.Errorf("ModelAliasValue.UnmarshalYAML() [conf.go]: alias list cannot be empty")
-		}
-		values := make([]string, 0, len(node.Content))
-		for _, child := range node.Content {
-			if child == nil || child.Kind != yaml.ScalarNode {
-				return fmt.Errorf("ModelAliasValue.UnmarshalYAML() [conf.go]: alias list items must be strings")
-			}
-			trimmed := strings.TrimSpace(child.Value)
-			if trimmed == "" {
-				return fmt.Errorf("ModelAliasValue.UnmarshalYAML() [conf.go]: alias list contains empty item")
-			}
-			values = append(values, trimmed)
-		}
-		v.Values = values
-		return nil
-	default:
-		return fmt.Errorf("ModelAliasValue.UnmarshalYAML() [conf.go]: alias value must be string or string array")
-	}
 }
 
 // ModelVendorFamilyTemplateOverride groups vendor and family template overrides for a specific provider template set.
