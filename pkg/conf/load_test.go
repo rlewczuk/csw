@@ -173,6 +173,29 @@ func TestCswConfigLoad(t *testing.T) {
 		require.NotNil(t, cfg)
 		require.NotNil(t, cfg.GlobalConfig)
 	})
+
+	t.Run("loads embedded defaults and allows later override", func(t *testing.T) {
+		t.Parallel()
+		overrideDir := t.TempDir()
+
+		require.NoError(t, os.WriteFile(filepath.Join(overrideDir, "global.json"), []byte(`{
+			"llm-retry-max-attempts": 123
+		}`), 0o644))
+		require.NoError(t, os.MkdirAll(filepath.Join(overrideDir, "roles", "developer"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(overrideDir, "roles", "developer", "config.json"), []byte(`{
+			"name": "developer",
+			"description": "custom developer"
+		}`), 0o644))
+
+		cfg, err := CswConfigLoad("@DEFAULTS:" + overrideDir)
+
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+		require.NotNil(t, cfg.GlobalConfig)
+		require.Equal(t, 123, cfg.GlobalConfig.LLMRetryMaxAttempts)
+		require.Contains(t, cfg.AgentRoleConfigs, "developer")
+		require.Equal(t, "custom developer", cfg.AgentRoleConfigs["developer"].Description)
+	})
 }
 
 func TestParseConfigLoadPath(t *testing.T) {
@@ -186,12 +209,12 @@ func TestParseConfigLoadPath(t *testing.T) {
 		{
 			name: "defaults for empty path",
 			path: "",
-			want: []string{"@DEFAULTS"},
+			want: []string{"@DEFAULTS", "~/.config/csw", ".csw"},
 		},
 		{
 			name: "defaults for whitespace path",
 			path: "   ",
-			want: []string{"@DEFAULTS"},
+			want: []string{"@DEFAULTS", "~/.config/csw", ".csw"},
 		},
 		{
 			name: "splits and trims and skips empty entries",
