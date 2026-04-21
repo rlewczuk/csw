@@ -7,13 +7,16 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func sessionTestRoleRegistry(role conf.AgentRoleConfig) *AgentRoleRegistry {
+	return NewAgentRoleRegistry(&conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{"test": &role}})
+}
 
 func TestSessionLSPIntegration(t *testing.T) {
 	// Create mock LSP
@@ -51,11 +54,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 			Name:        "test",
 			Description: "Test role",
 		}
-		configStore := impl.NewMockConfigStore()
-		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
-			"test": &testRoleConfig,
-		})
-		roleRegistry := NewAgentRoleRegistry(configStore)
+		roleRegistry := sessionTestRoleRegistry(testRoleConfig)
 		session.roles = roleRegistry
 
 		// Set role to trigger tool re-registration
@@ -107,11 +106,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 			Name:        "test",
 			Description: "Test role",
 		}
-		configStore := impl.NewMockConfigStore()
-		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
-			"test": &testRoleConfig,
-		})
-		roleRegistry := NewAgentRoleRegistry(configStore)
+		roleRegistry := sessionTestRoleRegistry(testRoleConfig)
 		session.roles = roleRegistry
 		err = session.SetRole("test")
 		require.NoError(t, err)
@@ -173,11 +168,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 			Name:        "test",
 			Description: "Test role",
 		}
-		configStore := impl.NewMockConfigStore()
-		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
-			"test": &testRoleConfig,
-		})
-		roleRegistry := NewAgentRoleRegistry(configStore)
+		roleRegistry := sessionTestRoleRegistry(testRoleConfig)
 		session.roles = roleRegistry
 		err = session.SetRole("test")
 		require.NoError(t, err)
@@ -237,11 +228,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 			Name:        "test",
 			Description: "Test role",
 		}
-		configStore := impl.NewMockConfigStore()
-		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
-			"test": &testRoleConfig,
-		})
-		roleRegistry := NewAgentRoleRegistry(configStore)
+		roleRegistry := sessionTestRoleRegistry(testRoleConfig)
 		session.roles = roleRegistry
 		err = session.SetRole("test")
 		require.NoError(t, err)
@@ -287,11 +274,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 			Name:        "test",
 			Description: "Test role",
 		}
-		configStore := impl.NewMockConfigStore()
-		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
-			"test": &testRoleConfig,
-		})
-		roleRegistry := NewAgentRoleRegistry(configStore)
+		roleRegistry := sessionTestRoleRegistry(testRoleConfig)
 		session.roles = roleRegistry
 		err = session.SetRole("test")
 		require.NoError(t, err)

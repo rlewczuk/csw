@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/testutil"
@@ -15,8 +14,7 @@ import (
 )
 
 func TestSessionCustomToolIntegration(t *testing.T) {
-	store := impl.NewMockConfigStore()
-	store.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+	store := &conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{
 		"all": {
 			Name: "all",
 			ToolFragments: map[string]string{
@@ -42,8 +40,8 @@ func TestSessionCustomToolIntegration(t *testing.T) {
 				},
 			},
 		},
-	})
-	store.SetGlobalConfig(&conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{DefaultRole: "developer"}})
+	}}
+	store.GlobalConfig = &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{DefaultRole: "developer"}}
 
 	promptGenerator, err := NewConfPromptGenerator(store, nil)
 	require.NoError(t, err)

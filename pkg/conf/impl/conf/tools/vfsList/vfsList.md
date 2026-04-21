@@ -1,6 +1,0 @@
-- Lists files and directories under a given path.
-- Supports recursive traversal.
-- Supports glob filtering via `pattern`.
-- Supports limiting number of returned results.
-- `path` can be relative (resolved from worktree root) or absolute (host filesystem path).
-- Absolute paths are constrained by VFS access rules, including configured `allowedPaths`.

@@ -8,19 +8,23 @@ import (
 )
 
 // ProviderRegistry manages a collection of model providers.
-// It loads provider configurations from a ConfigStore and caches the created providers.
+// It loads provider configurations from a CswConfig and caches the created providers.
 type ProviderRegistry struct {
 	mu          sync.RWMutex
-	configStore conf.ConfigStore
+	config      *conf.CswConfig
 	providers   map[string]ModelProvider
 	loaded      bool
 }
 
-// NewProviderRegistry creates a new provider registry that uses the given ConfigStore.
+// NewProviderRegistry creates a new provider registry that uses the given CswConfig.
 // Providers are loaded lazily when accessed via Get() or List().
-func NewProviderRegistry(configStore conf.ConfigStore) *ProviderRegistry {
+func NewProviderRegistry(config *conf.CswConfig) *ProviderRegistry {
+	if config == nil {
+		config = &conf.CswConfig{}
+	}
+
 	return &ProviderRegistry{
-		configStore: configStore,
+		config:      config,
 		providers:   make(map[string]ModelProvider),
 		loaded:      false,
 	}
@@ -33,10 +37,9 @@ func (r *ProviderRegistry) ensureLoaded() error {
 		return nil
 	}
 
-	// Load configurations from config store
-	configs, err := r.configStore.GetModelProviderConfigs()
-	if err != nil {
-		return fmt.Errorf("ProviderRegistry.ensureLoaded() [providers.go]: failed to load provider configs: %w", err)
+	configs := r.config.ModelProviderConfigs
+	if configs == nil {
+		configs = map[string]*conf.ModelProviderConfig{}
 	}
 
 	// Clear existing providers
@@ -93,13 +96,13 @@ func (r *ProviderRegistry) List() []string {
 	return names
 }
 
-// ConfigStore returns the config store used by this provider registry.
-func (r *ProviderRegistry) ConfigStore() conf.ConfigStore {
+// ConfigStore returns the config used by this provider registry.
+func (r *ProviderRegistry) ConfigStore() *conf.CswConfig {
 	if r == nil {
 		return nil
 	}
 
-	return r.configStore
+	return r.config
 }
 
 // ModelFromConfig creates a new ModelProvider instance from the configuration.

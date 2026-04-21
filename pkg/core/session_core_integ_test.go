@@ -12,7 +12,6 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/testutil"
@@ -52,7 +51,6 @@ func (g *agentFilePromptGenerator) GetAgentFiles(dir string) (map[string]string,
 // a session with default role and when changing roles.
 func TestSessionSystemPrompt(t *testing.T) {
 	// Create mock config store with roles
-	configStore := impl.NewMockConfigStore()
 	developerRole := &conf.AgentRoleConfig{
 		Name:        "developer",
 		Description: "Software developer role",
@@ -61,10 +59,10 @@ func TestSessionSystemPrompt(t *testing.T) {
 		Name:        "tester",
 		Description: "QA tester role",
 	}
-	configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+	configStore := &conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{
 		"developer": developerRole,
 		"tester":    testerRole,
-	})
+	}}
 
 	roleRegistry := NewAgentRoleRegistry(configStore)
 	fixture := newSweSystemFixture(t, "You are a skilled software developer.", withConfigStore(configStore), withRoles(roleRegistry))

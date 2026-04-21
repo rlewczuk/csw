@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -113,12 +112,17 @@ func TestGenerateWorktreeBranchNameAliasModel(t *testing.T) {
 		Response: models.NewTextMessage(models.ChatRoleAssistant, "alias-branch-name"),
 	})
 
-	store := confimpl.NewMockConfigStore()
-	store.SetAgentConfigFile("worktree", "system.md", []byte("system worktree prompt"))
-	store.SetAgentConfigFile("worktree", "message.md", []byte("input:\n{{ .Input }}"))
-	store.SetModelAliases(map[string]conf.ModelAliasValue{
+	store := &conf.CswConfig{
+		AgentConfigFiles: map[string]map[string]string{
+			"worktree": {
+				"system.md":  "system worktree prompt",
+				"message.md": "input:\n{{ .Input }}",
+			},
+		},
+		ModelAliases: map[string]conf.ModelAliasValue{
 		"default": {Values: []string{"mock/test-model", "mock/backup-model"}},
-	})
+		},
+	}
 
 	branch, err := GenerateWorktreeBranchName(
 		context.Background(),
@@ -197,9 +201,14 @@ func newWorktreeBranchTestSystem(t *testing.T, llmResponse string) (*SweSystem, 
 		Response: models.NewTextMessage(models.ChatRoleAssistant, llmResponse),
 	})
 
-	store := confimpl.NewMockConfigStore()
-	store.SetAgentConfigFile("worktree", "system.md", []byte("system worktree prompt"))
-	store.SetAgentConfigFile("worktree", "message.md", []byte("input:\n{{ .Input }}"))
+	store := &conf.CswConfig{
+		AgentConfigFiles: map[string]map[string]string{
+			"worktree": {
+				"system.md":  "system worktree prompt",
+				"message.md": "input:\n{{ .Input }}",
+			},
+		},
+	}
 
 	sweSystem := &SweSystem{
 		ModelProviders: map[string]models.ModelProvider{"mock": provider},

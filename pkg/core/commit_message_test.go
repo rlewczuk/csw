@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,21 +65,21 @@ func TestGenerateCommitMessage(t *testing.T) {
 func TestGenerateCommitMessageErrors(t *testing.T) {
 	tests := []struct {
 		name           string
-		setup          func(t *testing.T) (models.ChatModel, conf.ConfigStore)
+		setup          func(t *testing.T) (models.ChatModel, *conf.CswConfig)
 		expectedErrSub string
 	}{
 		{
 			name: "fails when template file is missing",
-			setup: func(t *testing.T) (models.ChatModel, conf.ConfigStore) {
+			setup: func(t *testing.T) (models.ChatModel, *conf.CswConfig) {
 				model := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
-				store := confimpl.NewMockConfigStore()
+				store := &conf.CswConfig{}
 				return model.ChatModel("test-model", nil), store
 			},
 			expectedErrSub: "commit/system.md",
 		},
 		{
 			name: "fails when config store is missing",
-			setup: func(t *testing.T) (models.ChatModel, conf.ConfigStore) {
+			setup: func(t *testing.T) (models.ChatModel, *conf.CswConfig) {
 				_, chatModel, _ := newCommitMessageTestFixture(t, "ignored")
 				return chatModel, nil
 			},
@@ -88,18 +87,15 @@ func TestGenerateCommitMessageErrors(t *testing.T) {
 		},
 		{
 			name: "fails when chat model is missing",
-			setup: func(t *testing.T) (models.ChatModel, conf.ConfigStore) {
-				store := confimpl.NewMockConfigStore()
-				store.SetAgentConfigFile("commit", "system.md", []byte("system prompt"))
-				store.SetAgentConfigFile("commit", "prompt.md", []byte("messages:\n{{- range .Messages }}\n- {{ . }}\n{{- end }}"))
-				store.SetAgentConfigFile("commit", "message.md", []byte("[{{ .Branch }}] {{ .Message }}"))
+			setup: func(t *testing.T) (models.ChatModel, *conf.CswConfig) {
+				store := newCommitMessageConfigStore()
 				return nil, store
 			},
 			expectedErrSub: "chat model cannot be nil",
 		},
 		{
 			name: "fails when generated message is empty",
-			setup: func(t *testing.T) (models.ChatModel, conf.ConfigStore) {
+			setup: func(t *testing.T) (models.ChatModel, *conf.CswConfig) {
 				store, chatModel, _ := newCommitMessageTestFixture(t, "   ")
 				return chatModel, store
 			},
@@ -117,7 +113,7 @@ func TestGenerateCommitMessageErrors(t *testing.T) {
 	}
 }
 
-func newCommitMessageTestFixture(t *testing.T, llmResponse string) (*confimpl.MockConfigStore, models.ChatModel, *models.MockClient) {
+func newCommitMessageTestFixture(t *testing.T, llmResponse string) (*conf.CswConfig, models.ChatModel, *models.MockClient) {
 	t.Helper()
 
 	model := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
@@ -126,12 +122,21 @@ func newCommitMessageTestFixture(t *testing.T, llmResponse string) (*confimpl.Mo
 	})
 	chatModel := model.ChatModel("test-model", nil)
 
-	store := confimpl.NewMockConfigStore()
-	store.SetAgentConfigFile("commit", "system.md", []byte("system prompt"))
-	store.SetAgentConfigFile("commit", "prompt.md", []byte("messages:\n{{- range .Messages }}\n- {{ . }}\n{{- end }}"))
-	store.SetAgentConfigFile("commit", "message.md", []byte("[{{ .Branch }}] {{ .Message }}"))
+	store := newCommitMessageConfigStore()
 
 	return store, chatModel, model
+}
+
+func newCommitMessageConfigStore() *conf.CswConfig {
+	return &conf.CswConfig{
+		AgentConfigFiles: map[string]map[string]string{
+			"commit": {
+				"system.md":  "system prompt",
+				"prompt.md":  "messages:\n{{- range .Messages }}\n- {{ . }}\n{{- end }}",
+				"message.md": "[{{ .Branch }}] {{ .Message }}",
+			},
+		},
+	}
 }
 
 func TestLimitWords(t *testing.T) {

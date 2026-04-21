@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/stretchr/testify/assert"
@@ -74,8 +73,7 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 	t.Run("compacts messages and writes pre/post snapshots", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		configStore := impl.NewMockConfigStore()
-		configStore.SetGlobalConfig(&conf.GlobalConfig{ContextCompactionThreshold: 0.95})
+		configStore := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{ContextCompactionThreshold: 0.95}}
 
 		provider := models.NewMockProvider(nil)
 		provider.Config = &conf.ModelProviderConfig{ContextLengthLimit: 100}
@@ -116,8 +114,7 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 	t.Run("skips compaction when below configured threshold", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		configStore := impl.NewMockConfigStore()
-		configStore.SetGlobalConfig(&conf.GlobalConfig{ContextCompactionThreshold: 0.95})
+		configStore := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{ContextCompactionThreshold: 0.95}}
 
 		provider := models.NewMockProvider(nil)
 		provider.Config = &conf.ModelProviderConfig{ContextLengthLimit: 100}
@@ -145,8 +142,7 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 	})
 
 	t.Run("uses default threshold when configured value is invalid", func(t *testing.T) {
-		configStore := impl.NewMockConfigStore()
-		configStore.SetGlobalConfig(&conf.GlobalConfig{ContextCompactionThreshold: 1.5})
+		configStore := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{ContextCompactionThreshold: 1.5}}
 
 		provider := models.NewMockProvider(nil)
 		provider.Config = &conf.ModelProviderConfig{ContextLengthLimit: 100}
@@ -214,6 +210,7 @@ func (m *tokenLimitChatModel) Compactor() models.ChatCompator {
 func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 	t.Run("compacts context and retries", func(t *testing.T) {
 		handler := &compactionOutputHandler{}
+		configStore := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{LLMRetryMaxAttempts: 2}}
 		session := &SweSession{
 			messages: []*models.ChatMessage{
 				models.NewTextMessage(models.ChatRoleSystem, "system"),
@@ -256,9 +253,8 @@ func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 				models.NewTextMessage(models.ChatRoleUser, "second"),
 			},
 			outputHandler: handler,
-			configStore:   impl.NewMockConfigStore(),
+			configStore:   configStore,
 		}
-		session.configStore.(*impl.MockConfigStore).SetGlobalConfig(&conf.GlobalConfig{LLMRetryMaxAttempts: 2})
 
 		chatModel := &tokenLimitChatModel{
 			errors: []error{models.ErrTooManyInputTokens, models.ErrTooManyInputTokens},
@@ -280,14 +276,14 @@ func TestSweSessionRunNonStreamingChat_UsageLimitWait(t *testing.T) {
 		handler := &retryOutputHandler{}
 		provider := models.NewMockProvider(nil)
 		provider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 1}
+		configStore := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{LLMRetryMaxAttempts: 2, LLMRetryMaxBackoffSeconds: 30}}
 
 		session := &SweSession{
 			messages: []*models.ChatMessage{models.NewTextMessage(models.ChatRoleUser, "hello")},
 			outputHandler: handler,
 			provider: provider,
-			configStore: impl.NewMockConfigStore(),
+			configStore: configStore,
 		}
-		session.configStore.(*impl.MockConfigStore).SetGlobalConfig(&conf.GlobalConfig{LLMRetryMaxAttempts: 2, LLMRetryMaxBackoffSeconds: 30})
 
 		chatModel := &tokenLimitChatModel{
 			errors: []error{

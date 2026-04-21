@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,11 +27,6 @@ func TestGetConfigStore_Local(t *testing.T) {
 	// Get local config store
 	store, err := GetConfigStore(ConfigScopeLocal)
 	require.NoError(t, err)
-	defer func() {
-		if closer, ok := store.(interface{ Close() error }); ok {
-			closer.Close()
-		}
-	}()
 
 	// Verify directory was created
 	configDir := filepath.Join(tmpDir, ".csw", "config")
@@ -50,11 +44,6 @@ func TestGetConfigStore_CustomPath(t *testing.T) {
 	// Get config store with custom path
 	store, err := GetConfigStore(ConfigScope(customPath))
 	require.NoError(t, err)
-	defer func() {
-		if closer, ok := store.(interface{ Close() error }); ok {
-			closer.Close()
-		}
-	}()
 
 	// Verify directory was created
 	assert.DirExists(t, customPath)
@@ -74,11 +63,6 @@ func TestGetConfigStore_Global(t *testing.T) {
 	// Get global config store
 	store, err := GetConfigStore(ConfigScopeGlobal)
 	require.NoError(t, err)
-	defer func() {
-		if closer, ok := store.(interface{ Close() error }); ok {
-			closer.Close()
-		}
-	}()
 
 	// Verify directory was created
 	configDir := filepath.Join(tmpHome, ".config", "csw")
@@ -111,9 +95,6 @@ func TestGetCompositeConfigStore(t *testing.T) {
 	localConfigDir := filepath.Join(tmpDir, ".csw", "config")
 	err = os.MkdirAll(localConfigDir, 0755)
 	require.NoError(t, err)
-	localStore, err := impl.NewLocalConfigStore(localConfigDir)
-	require.NoError(t, err)
-
 	localProvider := &conf.ModelProviderConfig{
 		Name:        "local-provider",
 		Type:        "openai",
@@ -122,15 +103,11 @@ func TestGetCompositeConfigStore(t *testing.T) {
 	}
 	err = models.SaveProviderConfigToModelsDir(localProvider, filepath.Join(localConfigDir, "models"))
 	require.NoError(t, err)
-	localStore.Close()
 
 	// Create global config directory with a provider
 	globalConfigDir := filepath.Join(tmpHome, ".config", "csw")
 	err = os.MkdirAll(globalConfigDir, 0755)
 	require.NoError(t, err)
-	globalStore, err := impl.NewLocalConfigStore(globalConfigDir)
-	require.NoError(t, err)
-
 	globalProvider := &conf.ModelProviderConfig{
 		Name:        "global-provider",
 		Type:        "anthropic",
@@ -139,15 +116,13 @@ func TestGetCompositeConfigStore(t *testing.T) {
 	}
 	err = models.SaveProviderConfigToModelsDir(globalProvider, filepath.Join(globalConfigDir, "models"))
 	require.NoError(t, err)
-	globalStore.Close()
 
 	// Get composite config store
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
 	// Get all provider configs
-	configs, err := store.GetModelProviderConfigs()
-	require.NoError(t, err)
+	configs := store.ModelProviderConfigs
 
 	// Verify both providers are available
 	assert.Contains(t, configs, "local-provider")
@@ -167,10 +142,6 @@ func TestProviderCommand_Add_List_Show(t *testing.T) {
 	err = os.MkdirAll(configDir, 0755)
 	require.NoError(t, err)
 
-	store, err := impl.NewLocalConfigStore(configDir)
-	require.NoError(t, err)
-	defer store.Close()
-
 	// Test adding a provider
 	config := &conf.ModelProviderConfig{
 		Name:        "test-provider",
@@ -181,14 +152,12 @@ func TestProviderCommand_Add_List_Show(t *testing.T) {
 	}
 	err = models.SaveProviderConfigToModelsDir(config, filepath.Join(configDir, "models"))
 	require.NoError(t, err)
-	require.NoError(t, store.Close())
 
-	store, err = impl.NewLocalConfigStore(configDir)
+	store, err := conf.CswConfigLoad(configDir)
 	require.NoError(t, err)
 
 	// Test listing providers
-	configs, err := store.GetModelProviderConfigs()
-	require.NoError(t, err)
+	configs := store.ModelProviderConfigs
 	assert.Contains(t, configs, "test-provider")
 
 	// Test showing provider details
@@ -207,10 +176,6 @@ func TestProviderCommand_SetDefault(t *testing.T) {
 	configDir := filepath.Join(tmpDir, ".csw", "config")
 	err = os.MkdirAll(configDir, 0755)
 	require.NoError(t, err)
-
-	store, err := impl.NewLocalConfigStore(configDir)
-	require.NoError(t, err)
-	defer store.Close()
 
 	// Add a provider
 	config := &conf.ModelProviderConfig{
@@ -315,15 +280,9 @@ func TestProviderCommandWithCustomPath(t *testing.T) {
 
 	store, err := GetConfigStore(ConfigScope(customConfigPath))
 	require.NoError(t, err)
-	defer func() {
-		if closer, ok := store.(interface{ Close() error }); ok {
-			closer.Close()
-		}
-	}()
 
 	// Verify the provider was saved to custom path
-	configs, err := store.GetModelProviderConfigs()
-	require.NoError(t, err)
+	configs := store.ModelProviderConfigs
 	assert.Contains(t, configs, "custom-provider")
 	assert.Equal(t, "openai", configs["custom-provider"].Type)
 	assert.Equal(t, "https://custom.example.com/v1", configs["custom-provider"].URL)
@@ -356,9 +315,6 @@ func TestProviderListShowComposite(t *testing.T) {
 	localConfigDir := filepath.Join(tmpDir, ".csw", "config")
 	err = os.MkdirAll(localConfigDir, 0755)
 	require.NoError(t, err)
-	localStore, err := impl.NewLocalConfigStore(localConfigDir)
-	require.NoError(t, err)
-
 	localProvider := &conf.ModelProviderConfig{
 		Name:        "local-test",
 		Type:        "ollama",
@@ -367,15 +323,11 @@ func TestProviderListShowComposite(t *testing.T) {
 	}
 	err = models.SaveProviderConfigToModelsDir(localProvider, filepath.Join(localConfigDir, "models"))
 	require.NoError(t, err)
-	localStore.Close()
 
 	// Create global config with provider
 	globalConfigDir := filepath.Join(tmpHome, ".config", "csw")
 	err = os.MkdirAll(globalConfigDir, 0755)
 	require.NoError(t, err)
-	globalStore, err := impl.NewLocalConfigStore(globalConfigDir)
-	require.NoError(t, err)
-
 	globalProvider := &conf.ModelProviderConfig{
 		Name:        "global-test",
 		Type:        "openai",
@@ -384,14 +336,12 @@ func TestProviderListShowComposite(t *testing.T) {
 	}
 	err = models.SaveProviderConfigToModelsDir(globalProvider, filepath.Join(globalConfigDir, "models"))
 	require.NoError(t, err)
-	globalStore.Close()
 
 	// Get composite store and verify both providers are listed
 	compositeStore, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	configs, err := compositeStore.GetModelProviderConfigs()
-	require.NoError(t, err)
+	configs := compositeStore.ModelProviderConfigs
 
 	// Both providers should be available
 	assert.Contains(t, configs, "local-test")

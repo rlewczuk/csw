@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/stretchr/testify/assert"
@@ -153,8 +152,7 @@ func TestExecuteToolCalls_RespectsConfiguredMaxThreadsAndQueuesRemainingCalls(t 
 	registry.Register("toolB", &probeTool{started: started, release: release, active: &active, maxActive: &maxActive})
 	registry.Register("toolC", &probeTool{started: started, release: release, active: &active, maxActive: &maxActive})
 
-	configStore := impl.NewMockConfigStore()
-	configStore.SetGlobalConfig(nil)
+	configStore := &conf.CswConfig{}
 
 	session := &SweSession{
 		Tools:          registry,
@@ -230,8 +228,7 @@ func TestExecuteToolCalls_SpacesToolStartsByMinimumDelay(t *testing.T) {
 }
 
 func TestMaxToolThreadsLimit_UsesOverrideThenConfigThenDefault(t *testing.T) {
-	configStore := impl.NewMockConfigStore()
-	configStore.SetGlobalConfig(&conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{MaxThreads: 11}})
+	configStore := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{MaxThreads: 11}}}
 
 	session := &SweSession{configStore: configStore}
 	assert.Equal(t, 11, session.maxToolThreadsLimit())
@@ -239,7 +236,7 @@ func TestMaxToolThreadsLimit_UsesOverrideThenConfigThenDefault(t *testing.T) {
 	session.maxToolThreads = 3
 	assert.Equal(t, 3, session.maxToolThreadsLimit())
 
-	configStore.SetGlobalConfig(nil)
+	configStore.GlobalConfig = nil
 	session.maxToolThreads = 0
 	assert.Equal(t, defaultMaxToolThreads, session.maxToolThreadsLimit())
 }

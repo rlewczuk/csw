@@ -5,7 +5,6 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/models"
@@ -33,7 +32,7 @@ type sweSystemFixtureConfig struct {
 	tools            *tool.ToolRegistry
 	workDir          string
 	roles            *AgentRoleRegistry
-	configStore      conf.ConfigStore
+	configStore      *conf.CswConfig
 	lspInstance      lsp.LSP
 	logBaseDir       string
 	logLLMRequests   *bool
@@ -104,14 +103,21 @@ func newSweSystemFixture(t *testing.T, prompt string, opts ...sweSystemFixtureOp
 		Thinking:             config.thinking,
 	}
 	if config.globalConfig != nil {
-		cfgStore := impl.NewMockConfigStore()
-		cfgStore.SetGlobalConfig(config.globalConfig)
+		cfgStore := &conf.CswConfig{
+			GlobalConfig: config.globalConfig.Clone(),
+		}
 		if config.configStore != nil {
-			if roles, err := config.configStore.GetAgentRoleConfigs(); err == nil {
-				cfgStore.SetAgentRoleConfigs(roles)
+			if config.configStore.AgentRoleConfigs != nil {
+				cfgStore.AgentRoleConfigs = make(map[string]*conf.AgentRoleConfig, len(config.configStore.AgentRoleConfigs))
+				for roleName, roleConfig := range config.configStore.AgentRoleConfigs {
+					cfgStore.AgentRoleConfigs[roleName] = roleConfig.Clone()
+				}
 			}
-			if providers, err := config.configStore.GetModelProviderConfigs(); err == nil {
-				cfgStore.SetModelProviderConfigs(providers)
+			if config.configStore.ModelProviderConfigs != nil {
+				cfgStore.ModelProviderConfigs = make(map[string]*conf.ModelProviderConfig, len(config.configStore.ModelProviderConfigs))
+				for providerName, providerConfig := range config.configStore.ModelProviderConfigs {
+					cfgStore.ModelProviderConfigs[providerName] = providerConfig.Clone()
+				}
 			}
 		}
 		system.ConfigStore = cfgStore
@@ -194,7 +200,7 @@ func withRoles(roles *AgentRoleRegistry) sweSystemFixtureOption {
 	}
 }
 
-func withConfigStore(store conf.ConfigStore) sweSystemFixtureOption {
+func withConfigStore(store *conf.CswConfig) sweSystemFixtureOption {
 	return func(config *sweSystemFixtureConfig) {
 		config.configStore = store
 	}

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/tool"
@@ -35,20 +34,22 @@ func (s *stateAwarePromptGenerator) GetAgentFiles(dir string) (map[string]string
 	return make(map[string]string), nil
 }
 
-func TestAgentRoleRegistry(t *testing.T) {
-	t.Run("Get retrieves role from config store", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
+func testCswConfigWithRoles(roles map[string]*conf.AgentRoleConfig) *conf.CswConfig {
+	return &conf.CswConfig{AgentRoleConfigs: roles}
+}
 
+func TestAgentRoleRegistry(t *testing.T) {
+	t.Run("Get retrieves role from config", func(t *testing.T) {
 		role := &conf.AgentRoleConfig{
 			Name:        "test-role",
 			Description: "A test role",
 		}
 
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		cfg := testCswConfigWithRoles(map[string]*conf.AgentRoleConfig{
 			"test-role": role,
 		})
 
-		registry := NewAgentRoleRegistry(mockStore)
+		registry := NewAgentRoleRegistry(cfg)
 
 		retrieved, ok := registry.Get("test-role")
 		assert.True(t, ok)
@@ -60,19 +61,17 @@ func TestAgentRoleRegistry(t *testing.T) {
 	})
 
 	t.Run("Get resolves role aliases", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-
 		role := &conf.AgentRoleConfig{
 			Name:        "developer",
 			Description: "Developer role",
 			Aliases:     []string{"dev", "build"},
 		}
 
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		cfg := testCswConfigWithRoles(map[string]*conf.AgentRoleConfig{
 			"developer": role,
 		})
 
-		registry := NewAgentRoleRegistry(mockStore)
+		registry := NewAgentRoleRegistry(cfg)
 
 		resolvedByAlias, ok := registry.Get("dev")
 		assert.True(t, ok)
@@ -84,17 +83,15 @@ func TestAgentRoleRegistry(t *testing.T) {
 	})
 
 	t.Run("List returns all role names", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-
 		role1 := &conf.AgentRoleConfig{Name: "role1", Description: "Role 1"}
 		role2 := &conf.AgentRoleConfig{Name: "role2", Description: "Role 2"}
 
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		cfg := testCswConfigWithRoles(map[string]*conf.AgentRoleConfig{
 			"role1": role1,
 			"role2": role2,
 		})
 
-		registry := NewAgentRoleRegistry(mockStore)
+		registry := NewAgentRoleRegistry(cfg)
 
 		names := registry.List()
 		assert.Len(t, names, 2)
@@ -102,17 +99,12 @@ func TestAgentRoleRegistry(t *testing.T) {
 		assert.Contains(t, names, "role2")
 	})
 
-	t.Run("Handles errors from config store gracefully", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-		mockStore.GetAgentRoleConfigsErr = fmt.Errorf("config store error")
+	t.Run("Handles missing role config gracefully", func(t *testing.T) {
+		registry := NewAgentRoleRegistry(&conf.CswConfig{})
 
-		registry := NewAgentRoleRegistry(mockStore)
-
-		// Get should return false when config store fails
 		_, ok := registry.Get("any-role")
 		assert.False(t, ok)
 
-		// List should return empty slice when config store fails
 		names := registry.List()
 		assert.Len(t, names, 0)
 	})
@@ -125,8 +117,7 @@ func TestSweSessionGetState(t *testing.T) {
 	mockVFS := vfs.NewMockVFS()
 	tools := tool.NewToolRegistry()
 
-	mockStore := impl.NewMockConfigStore()
-	registry := NewAgentRoleRegistry(mockStore)
+	registry := NewAgentRoleRegistry(&conf.CswConfig{})
 
 	t.Run("GetState returns current work directory", func(t *testing.T) {
 		expectedWorkDir, err := filepath.Abs(".")
@@ -199,13 +190,11 @@ func TestSweSessionGetState(t *testing.T) {
 			Description: "Developer role",
 		}
 
-		mockStore := impl.NewMockConfigStore()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		cfg := testCswConfigWithRoles(map[string]*conf.AgentRoleConfig{
 			"dev": role,
 		})
-		registry := NewAgentRoleRegistry(mockStore)
+		registry := NewAgentRoleRegistry(cfg)
 
-		// Create a simple mock prompt generator
 		mockGen := &stateAwarePromptGenerator{}
 
 		system := &SweSystem{
@@ -229,7 +218,6 @@ func TestSweSessionGetState(t *testing.T) {
 		messages := session.ChatMessages()
 		require.Len(t, messages, 1)
 		assert.Equal(t, models.ChatRoleSystem, messages[0].Role)
-		// The mock generator includes the work dir in the prompt
 		assert.Contains(t, messages[0].Parts[0].Text, "/test/path")
 	})
 }

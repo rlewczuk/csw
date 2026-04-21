@@ -381,28 +381,6 @@ type GlobalConfig struct {
 	ShadowPaths []string `json:"shadow-paths,omitempty"`
 }
 
-// ConfigStore is an interface for accessing configuration data.
-// For single config source, it returns up to date data from it.
-// For multiple config sources, implementation behind is responsible for collecting config data
-// from all sources and present merged view of it.
-type ConfigStore interface {
-	// GetModelProviderConfigs returns a map of model provider configurations, keyed by provider name.
-	GetModelProviderConfigs() (map[string]*ModelProviderConfig, error)
-
-	// GetAgentRoleConfigs returns a map of agent role configurations, keyed by role name.
-	GetAgentRoleConfigs() (map[string]*AgentRoleConfig, error)
-
-	// GetGlobalConfig returns global configuration
-	GetGlobalConfig() (*GlobalConfig, error)
-
-	// GetAgentConfigFile returns file content from agent configuration namespace.
-	// The expected virtual location is conf/agent/<subdir>/<filename>.
-	GetAgentConfigFile(subdir, filename string) ([]byte, error)
-
-	// GetModelAliases returns model aliases keyed by alias name.
-	GetModelAliases() (map[string]ModelAliasValue, error)
-}
-
 // CswConfig represents the complete consolidated configuration for the CSW application.
 // It aggregates all configuration sources including global settings, agent roles,
 // model providers, agent-specific files, and model aliases.

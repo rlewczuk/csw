@@ -5,7 +5,6 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/tool"
@@ -13,6 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func testConfigWithRoles(roles map[string]*conf.AgentRoleConfig) *conf.CswConfig {
+	return &conf.CswConfig{AgentRoleConfigs: roles}
+}
 
 func TestAgentRoleIntegration(t *testing.T) {
 	// Create mock components
@@ -63,8 +66,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 	}
 
 	t.Run("SetRole updates role field", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		mockStore := testConfigWithRoles(map[string]*conf.AgentRoleConfig{
 			"custom": {
 				Name:        "custom",
 				Description: "A custom role",
@@ -94,8 +96,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 	})
 
 	t.Run("SetRole updates system prompt", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		mockStore := testConfigWithRoles(map[string]*conf.AgentRoleConfig{
 			"tester": {
 				Name:        "tester",
 				Description: "A software tester role",
@@ -131,8 +132,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 	})
 
 	t.Run("SetRole wraps VFS with access control", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{"readonly": readOnlyRole})
+		mockStore := testConfigWithRoles(map[string]*conf.AgentRoleConfig{"readonly": readOnlyRole})
 		registry := NewAgentRoleRegistry(mockStore)
 
 		system := &SweSystem{
@@ -167,8 +167,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 	})
 
 	t.Run("SetRole keeps base VFS when allow all permissions enabled", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{"readonly": readOnlyRole})
+		mockStore := testConfigWithRoles(map[string]*conf.AgentRoleConfig{"readonly": readOnlyRole})
 		registry := NewAgentRoleRegistry(mockStore)
 
 		session := NewSweSession(&SweSessionParams{
@@ -196,8 +195,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 	})
 
 	t.Run("SetRole wraps tools with access control", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{"readonly": readOnlyRole})
+		mockStore := testConfigWithRoles(map[string]*conf.AgentRoleConfig{"readonly": readOnlyRole})
 		registry := NewAgentRoleRegistry(mockStore)
 
 		system := &SweSystem{
@@ -237,8 +235,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 	})
 
 	t.Run("SetRole returns error for unknown role", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{})
+		mockStore := testConfigWithRoles(map[string]*conf.AgentRoleConfig{})
 		registry := NewAgentRoleRegistry(mockStore)
 
 		system := &SweSystem{
@@ -260,8 +257,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 	})
 
 	t.Run("SetRole can switch between roles", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		mockStore := testConfigWithRoles(map[string]*conf.AgentRoleConfig{
 			"developer": developerRole,
 			"readonly":  readOnlyRole,
 		})

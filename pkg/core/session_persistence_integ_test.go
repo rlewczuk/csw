@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/rlewczuk/csw/pkg/tool"
@@ -18,14 +17,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func persistenceConfigWithRoles(roles map[string]*conf.AgentRoleConfig) *conf.CswConfig {
+	return &conf.CswConfig{AgentRoleConfigs: roles}
+}
+
 func TestSessionPersistenceStateJSON(t *testing.T) {
 	t.Run("overwrites session state and includes resumption-critical fields", func(t *testing.T) {
 		tmpDir := filepath.Join("../../tmp", "session_persistence", t.Name())
 		require.NoError(t, os.MkdirAll(tmpDir, 0755))
 		defer os.RemoveAll(tmpDir)
 
-		configStore := impl.NewMockConfigStore()
-		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		configStore := persistenceConfigWithRoles(map[string]*conf.AgentRoleConfig{
 			"developer": {
 				Name:        "developer",
 				Description: "dev",
@@ -171,8 +173,7 @@ func TestSessionPersistenceSessionJSONAlwaysLatest(t *testing.T) {
 		require.NoError(t, os.MkdirAll(tmpDir, 0755))
 		defer os.RemoveAll(tmpDir)
 
-		configStore := impl.NewMockConfigStore()
-		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		configStore := persistenceConfigWithRoles(map[string]*conf.AgentRoleConfig{
 			"developer": {
 				Name:        "developer",
 				Description: "dev",
@@ -215,8 +216,7 @@ func TestSessionPersistenceSetRolePersisted(t *testing.T) {
 		require.NoError(t, os.MkdirAll(tmpDir, 0755))
 		defer os.RemoveAll(tmpDir)
 
-		configStore := impl.NewMockConfigStore()
-		configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		configStore := persistenceConfigWithRoles(map[string]*conf.AgentRoleConfig{
 			"developer": {
 				Name:        "developer",
 				Description: "dev",

@@ -7,10 +7,10 @@ import (
 	"github.com/rlewczuk/csw/pkg/conf"
 )
 
-// AgentRoleRegistry manages agent role configurations loaded from a ConfigStore.
+// AgentRoleRegistry manages agent role configurations loaded from a CswConfig.
 // It caches loaded roles for quick lookup.
 type AgentRoleRegistry struct {
-	configStore  conf.ConfigStore
+	config       *conf.CswConfig
 	mu           sync.RWMutex
 	cache        map[string]conf.AgentRoleConfig
 	loaded       bool
@@ -20,10 +20,14 @@ func normalizeRoleLookupName(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
 
-// NewAgentRoleRegistry creates a new AgentRoleRegistry with the given ConfigStore.
-func NewAgentRoleRegistry(configStore conf.ConfigStore) *AgentRoleRegistry {
+// NewAgentRoleRegistry creates a new AgentRoleRegistry with the given CswConfig.
+func NewAgentRoleRegistry(config *conf.CswConfig) *AgentRoleRegistry {
+	if config == nil {
+		config = &conf.CswConfig{}
+	}
+
 	return &AgentRoleRegistry{
-		configStore:  configStore,
+		config:       config,
 		cache:        make(map[string]conf.AgentRoleConfig),
 		loaded:       false,
 	}
@@ -36,10 +40,9 @@ func (r *AgentRoleRegistry) refreshCacheIfNeeded() error {
 		return nil
 	}
 
-	// Fetch fresh configs from store
-	configs, err := r.configStore.GetAgentRoleConfigs()
-	if err != nil {
-		return err
+	configs := r.config.AgentRoleConfigs
+	if configs == nil {
+		configs = map[string]*conf.AgentRoleConfig{}
 	}
 
 	// Update cache, merging "all" role into other roles

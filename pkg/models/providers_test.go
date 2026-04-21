@@ -6,16 +6,15 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewProviderRegistry(t *testing.T) {
-	configStore := impl.NewMockConfigStore()
+	configStore := &conf.CswConfig{}
 	registry := NewProviderRegistry(configStore)
 	assert.NotNil(t, registry)
-	assert.NotNil(t, registry.configStore)
+	assert.NotNil(t, registry.config)
 	assert.NotNil(t, registry.providers)
 	assert.Equal(t, 0, len(registry.providers))
 }
@@ -23,14 +22,14 @@ func TestNewProviderRegistry(t *testing.T) {
 func TestProviderRegistry_Get(t *testing.T) {
 	tests := []struct {
 		name        string
-		setupStore  func(*impl.MockConfigStore)
+		setupStore  func(*conf.CswConfig)
 		provName    string
 		wantErr     bool
 		expectedErr error
 	}{
 		{
 			name: "get existing provider",
-			setupStore: func(store *impl.MockConfigStore) {
+			setupStore: func(store *conf.CswConfig) {
 				configs := map[string]*conf.ModelProviderConfig{
 					"test-ollama": {
 						Type: "ollama",
@@ -38,14 +37,14 @@ func TestProviderRegistry_Get(t *testing.T) {
 						URL:  "http://localhost:11434",
 					},
 				}
-				store.SetModelProviderConfigs(configs)
+				store.ModelProviderConfigs = configs
 			},
 			provName: "test-ollama",
 			wantErr:  false,
 		},
 		{
 			name: "get non-existent provider",
-			setupStore: func(store *impl.MockConfigStore) {
+			setupStore: func(store *conf.CswConfig) {
 				configs := map[string]*conf.ModelProviderConfig{
 					"test-ollama": {
 						Type: "ollama",
@@ -53,7 +52,7 @@ func TestProviderRegistry_Get(t *testing.T) {
 						URL:  "http://localhost:11434",
 					},
 				}
-				store.SetModelProviderConfigs(configs)
+				store.ModelProviderConfigs = configs
 			},
 			provName:    "non-existent",
 			wantErr:     true,
@@ -61,26 +60,28 @@ func TestProviderRegistry_Get(t *testing.T) {
 		},
 		{
 			name: "get from empty store",
-			setupStore: func(store *impl.MockConfigStore) {
-				store.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{})
+			setupStore: func(store *conf.CswConfig) {
+				store.ModelProviderConfigs = map[string]*conf.ModelProviderConfig{}
 			},
 			provName:    "test",
 			wantErr:     true,
 			expectedErr: ErrProviderNotFound,
 		},
 		{
-			name: "config store returns error on GetModelProviderConfigs",
-			setupStore: func(store *impl.MockConfigStore) {
-				store.GetModelProviderConfigsErr = errors.New("config store error")
+			name: "invalid provider config returns error",
+			setupStore: func(store *conf.CswConfig) {
+				store.ModelProviderConfigs = map[string]*conf.ModelProviderConfig{
+					"broken": {Type: "unsupported", Name: "broken", URL: "http://localhost"},
+				}
 			},
-			provName: "test",
+			provName: "broken",
 			wantErr:  true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			configStore := impl.NewMockConfigStore()
+			configStore := &conf.CswConfig{}
 			tt.setupStore(configStore)
 
 			registry := NewProviderRegistry(configStore)
@@ -103,13 +104,13 @@ func TestProviderRegistry_Get(t *testing.T) {
 func TestProviderRegistry_List(t *testing.T) {
 	tests := []struct {
 		name          string
-		setupStore    func(*impl.MockConfigStore)
+		setupStore    func(*conf.CswConfig)
 		expectedCount int
 		expectedNames []string
 	}{
 		{
 			name: "list multiple providers",
-			setupStore: func(store *impl.MockConfigStore) {
+			setupStore: func(store *conf.CswConfig) {
 				configs := map[string]*conf.ModelProviderConfig{
 					"ollama": {
 						Type: "ollama",
@@ -136,23 +137,25 @@ func TestProviderRegistry_List(t *testing.T) {
 						RefreshToken: "bearer-token",
 					},
 				}
-				store.SetModelProviderConfigs(configs)
+				store.ModelProviderConfigs = configs
 			},
 			expectedCount: 4,
 			expectedNames: []string{"anthropic", "jetbrains", "ollama", "openai"},
 		},
 		{
 			name: "list empty providers",
-			setupStore: func(store *impl.MockConfigStore) {
-				store.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{})
+			setupStore: func(store *conf.CswConfig) {
+				store.ModelProviderConfigs = map[string]*conf.ModelProviderConfig{}
 			},
 			expectedCount: 0,
 			expectedNames: []string{},
 		},
 		{
-			name: "list with config store error returns empty list",
-			setupStore: func(store *impl.MockConfigStore) {
-				store.GetModelProviderConfigsErr = errors.New("config error")
+			name: "list with invalid config returns empty list",
+			setupStore: func(store *conf.CswConfig) {
+				store.ModelProviderConfigs = map[string]*conf.ModelProviderConfig{
+					"broken": {Type: "unsupported", Name: "broken", URL: "http://localhost"},
+				}
 			},
 			expectedCount: 0,
 			expectedNames: []string{},
@@ -161,7 +164,7 @@ func TestProviderRegistry_List(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			configStore := impl.NewMockConfigStore()
+			configStore := &conf.CswConfig{}
 			tt.setupStore(configStore)
 
 			registry := NewProviderRegistry(configStore)
@@ -176,7 +179,7 @@ func TestProviderRegistry_List(t *testing.T) {
 }
 
 func TestProviderRegistry_CacheNotInvalidatedWhenTimestampSame(t *testing.T) {
-	configStore := impl.NewMockConfigStore()
+	configStore := &conf.CswConfig{}
 
 	// Initial configuration
 	configs := map[string]*conf.ModelProviderConfig{
@@ -186,7 +189,7 @@ func TestProviderRegistry_CacheNotInvalidatedWhenTimestampSame(t *testing.T) {
 			URL:  "http://localhost:11434",
 		},
 	}
-	configStore.SetModelProviderConfigs(configs)
+	configStore.ModelProviderConfigs = configs
 
 	registry := NewProviderRegistry(configStore)
 
@@ -204,7 +207,7 @@ func TestProviderRegistry_CacheNotInvalidatedWhenTimestampSame(t *testing.T) {
 }
 
 func TestProviderRegistry_ConcurrentAccess(t *testing.T) {
-	configStore := impl.NewMockConfigStore()
+	configStore := &conf.CswConfig{}
 	configs := map[string]*conf.ModelProviderConfig{
 		"ollama": {
 			Type: "ollama",
@@ -212,7 +215,7 @@ func TestProviderRegistry_ConcurrentAccess(t *testing.T) {
 			URL:  "http://localhost:11434",
 		},
 	}
-	configStore.SetModelProviderConfigs(configs)
+	configStore.ModelProviderConfigs = configs
 
 	registry := NewProviderRegistry(configStore)
 
@@ -240,7 +243,7 @@ func TestProviderRegistry_ConcurrentAccess(t *testing.T) {
 }
 
 func TestProviderRegistry_InvalidProviderConfig(t *testing.T) {
-	configStore := impl.NewMockConfigStore()
+	configStore := &conf.CswConfig{}
 
 	// Configuration with invalid provider type
 	configs := map[string]*conf.ModelProviderConfig{
@@ -250,7 +253,7 @@ func TestProviderRegistry_InvalidProviderConfig(t *testing.T) {
 			URL:  "http://localhost:8080",
 		},
 	}
-	configStore.SetModelProviderConfigs(configs)
+	configStore.ModelProviderConfigs = configs
 
 	registry := NewProviderRegistry(configStore)
 
@@ -261,7 +264,7 @@ func TestProviderRegistry_InvalidProviderConfig(t *testing.T) {
 }
 
 func TestProviderRegistry_MissingRequiredFields(t *testing.T) {
-	configStore := impl.NewMockConfigStore()
+	configStore := &conf.CswConfig{}
 
 	// Configuration without URL (required field)
 	configs := map[string]*conf.ModelProviderConfig{
@@ -271,7 +274,7 @@ func TestProviderRegistry_MissingRequiredFields(t *testing.T) {
 			URL:  "", // Missing URL
 		},
 	}
-	configStore.SetModelProviderConfigs(configs)
+	configStore.ModelProviderConfigs = configs
 
 	registry := NewProviderRegistry(configStore)
 
@@ -282,7 +285,7 @@ func TestProviderRegistry_MissingRequiredFields(t *testing.T) {
 }
 
 func TestProviderRegistry_MultipleProviderTypes(t *testing.T) {
-	configStore := impl.NewMockConfigStore()
+	configStore := &conf.CswConfig{}
 
 	configs := map[string]*conf.ModelProviderConfig{
 		"ollama-local": {
@@ -315,7 +318,7 @@ func TestProviderRegistry_MultipleProviderTypes(t *testing.T) {
 			RefreshToken: "bearer-token",
 		},
 	}
-	configStore.SetModelProviderConfigs(configs)
+	configStore.ModelProviderConfigs = configs
 
 	registry := NewProviderRegistry(configStore)
 

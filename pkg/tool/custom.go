@@ -59,21 +59,21 @@ func (t *CustomCommandTool) GetDescription() (string, bool) {
 }
 
 // RegisterCustomTools discovers and registers custom tools from loaded role tool fragments.
-func RegisterCustomTools(registry *ToolRegistry, configStore conf.ConfigStore, workdir string, commandRunner runner.CommandRunner) error {
+func RegisterCustomTools(registry *ToolRegistry, config *conf.CswConfig, workdir string, commandRunner runner.CommandRunner) error {
 	if registry == nil {
 		return fmt.Errorf("RegisterCustomTools() [custom.go]: registry cannot be nil")
 	}
-	if configStore == nil {
-		return fmt.Errorf("RegisterCustomTools() [custom.go]: configStore cannot be nil")
+	if config == nil {
+		return fmt.Errorf("RegisterCustomTools() [custom.go]: config cannot be nil")
 	}
 	if commandRunner == nil {
 		return fmt.Errorf("RegisterCustomTools() [custom.go]: commandRunner cannot be nil")
 	}
 
-	roleConfigs, err := configStore.GetAgentRoleConfigs()
-	if err != nil {
-		return fmt.Errorf("RegisterCustomTools() [custom.go]: failed to load role configs: %w", err)
-	}
+ 	roleConfigs := config.AgentRoleConfigs
+ 	if roleConfigs == nil {
+ 		return nil
+ 	}
 
 	allRole, ok := roleConfigs["all"]
 	if !ok || allRole == nil || len(allRole.ToolFragments) == 0 {

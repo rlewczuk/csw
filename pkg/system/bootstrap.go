@@ -11,7 +11,6 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/lsp"
@@ -22,29 +21,31 @@ import (
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
-var newCompositeConfigStoreFunc = impl.NewCompositeConfigStore
+var newCompositeConfigStoreFunc = func(_ string, configPath string) (*conf.CswConfig, error) {
+	return conf.CswConfigLoad(configPath)
+}
 var resolveModelNameFunc = ResolveModelName
 var createProviderMapFunc = CreateProviderMap
 var generateWorktreeBranchNameFunc = core.GenerateWorktreeBranchName
 var createConfigUpdaterFunc = models.NewConfigUpdater
 
 // SetNewCompositeConfigStoreFuncForTest overrides composite store constructor in tests.
-func SetNewCompositeConfigStoreFuncForTest(fn func(projectRoot string, configPath string) (conf.ConfigStore, error)) {
+func SetNewCompositeConfigStoreFuncForTest(fn func(projectRoot string, configPath string) (*conf.CswConfig, error)) {
 	newCompositeConfigStoreFunc = fn
 }
 
 // NewCompositeConfigStoreFuncForTest returns current composite store constructor.
-func NewCompositeConfigStoreFuncForTest() func(projectRoot string, configPath string) (conf.ConfigStore, error) {
+func NewCompositeConfigStoreFuncForTest() func(projectRoot string, configPath string) (*conf.CswConfig, error) {
 	return newCompositeConfigStoreFunc
 }
 
 // SetResolveModelNameFuncForTest overrides model name resolver in tests.
-func SetResolveModelNameFuncForTest(fn func(modelName string, configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (string, error)) {
+func SetResolveModelNameFuncForTest(fn func(modelName string, configStore *conf.CswConfig, providerRegistry *models.ProviderRegistry) (string, error)) {
 	resolveModelNameFunc = fn
 }
 
 // ResolveModelNameFuncForTest returns current model name resolver.
-func ResolveModelNameFuncForTest() func(modelName string, configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (string, error) {
+func ResolveModelNameFuncForTest() func(modelName string, configStore *conf.CswConfig, providerRegistry *models.ProviderRegistry) (string, error) {
 	return resolveModelNameFunc
 }
 
@@ -59,12 +60,12 @@ func CreateProviderMapFuncForTest() func(providerRegistry *models.ProviderRegist
 }
 
 // SetGenerateWorktreeBranchNameFuncForTest overrides branch name generator in tests.
-func SetGenerateWorktreeBranchNameFuncForTest(fn func(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore conf.ConfigStore, model string, inputPrompt string) (string, error)) {
+func SetGenerateWorktreeBranchNameFuncForTest(fn func(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore *conf.CswConfig, model string, inputPrompt string) (string, error)) {
 	generateWorktreeBranchNameFunc = fn
 }
 
 // GenerateWorktreeBranchNameFuncForTest returns current branch name generator.
-func GenerateWorktreeBranchNameFuncForTest() func(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore conf.ConfigStore, model string, inputPrompt string) (string, error) {
+func GenerateWorktreeBranchNameFuncForTest() func(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore *conf.CswConfig, model string, inputPrompt string) (string, error) {
 	return generateWorktreeBranchNameFunc
 }
 
@@ -111,7 +112,7 @@ type BuildSystemResult struct {
 	ShadowDir             string
 	RoleConfig            conf.AgentRoleConfig
 	ModelName             string
-	ConfigStore           conf.ConfigStore
+	ConfigStore           *conf.CswConfig
 	ProviderRegistry      *models.ProviderRegistry
 	LogsDir               string
 	VCS                   apis.VCS
@@ -176,11 +177,7 @@ func ResolveRunDefaults(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig
 		return defaults, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to create config store: %w", err)
 	}
 
-	globalConfig, err := configStore.GetGlobalConfig()
-	if err != nil {
-		return defaults, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to load global config: %w", err)
-	}
-
+	globalConfig := configStore.GlobalConfig
 	if globalConfig == nil {
 		return defaults, nil
 	}
@@ -327,16 +324,15 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 
-	configStore, err := impl.NewCompositeConfigStore(configRoot, configPathStr)
+	configStore, err := newCompositeConfigStoreFunc(configRoot, configPathStr)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create config store: %w", err)
 	}
 
-	globalConfig, err := configStore.GetGlobalConfig()
-	if err != nil {
-		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to load global config: %w", err)
+	globalConfig := configStore.GlobalConfig
+ 	if globalConfig == nil {
+		globalConfig = &conf.GlobalConfig{}
 	}
 
 	shadowPatterns := append([]string(nil), globalConfig.ShadowPaths...)
@@ -365,12 +361,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		applyDisableRefreshToProviders(modelProviders)
 	}
 
-	modelAliasValues, err := configStore.GetModelAliases()
-	if err != nil {
-		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to load model aliases: %w", err)
-	}
-	modelAliases, err := models.NormalizeModelAliasMap(modelAliasValues)
+	modelAliases, err := models.NormalizeModelAliasMap(configStore.ModelAliases)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to normalize model aliases: %w", err)
@@ -743,17 +734,13 @@ func hasProjectMarker(dirPath string) bool {
 }
 
 // ResolveModelName determines the model name to use.
-func ResolveModelName(modelName string, configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (string, error) {
+func ResolveModelName(modelName string, configStore *conf.CswConfig, providerRegistry *models.ProviderRegistry) (string, error) {
 	if modelName != "" {
 		return ResolveModelSpec(modelName, configStore)
 	}
 
-	globalConfig, err := configStore.GetGlobalConfig()
-	if err != nil {
-		return "", fmt.Errorf("ResolveModelName() [bootstrap.go]: failed to get global config: %w", err)
-	}
-
-	if globalConfig.Defaults.DefaultProvider != "" {
+	if configStore != nil && configStore.GlobalConfig != nil && configStore.GlobalConfig.Defaults.DefaultProvider != "" {
+		globalConfig := configStore.GlobalConfig
 		return globalConfig.Defaults.DefaultProvider + "/default", nil
 	}
 
@@ -766,7 +753,7 @@ func ResolveModelName(modelName string, configStore conf.ConfigStore, providerRe
 }
 
 // ResolveModelSpec resolves model alias or provider/model chain to normalized provider/model chain.
-func ResolveModelSpec(modelSpec string, configStore conf.ConfigStore) (string, error) {
+func ResolveModelSpec(modelSpec string, configStore *conf.CswConfig) (string, error) {
 	trimmedModelSpec := strings.TrimSpace(modelSpec)
 	if trimmedModelSpec == "" {
 		return "", fmt.Errorf("ResolveModelSpec() [bootstrap.go]: model spec cannot be empty")
@@ -780,11 +767,7 @@ func ResolveModelSpec(modelSpec string, configStore conf.ConfigStore) (string, e
 		return models.ComposeProviderModelSpec(refs), nil
 	}
 
-	aliasValues, err := configStore.GetModelAliases()
-	if err != nil {
-		return "", fmt.Errorf("ResolveModelSpec() [bootstrap.go]: failed to load model aliases: %w", err)
-	}
-	aliases, err := models.NormalizeModelAliasMap(aliasValues)
+	aliases, err := models.NormalizeModelAliasMap(configStore.ModelAliases)
 	if err != nil {
 		return "", fmt.Errorf("ResolveModelSpec() [bootstrap.go]: failed to normalize model aliases: %w", err)
 	}
@@ -843,14 +826,9 @@ func applyDisableRefreshToProviders(modelProviders map[string]models.ModelProvid
 	}
 }
 
-func resolveProviderConfigPresence(configStore conf.ConfigStore) (map[string]struct{}, error) {
+func resolveProviderConfigPresence(configStore *conf.CswConfig) (map[string]struct{}, error) {
 	resolved := make(map[string]struct{})
-	configs, err := configStore.GetModelProviderConfigs()
-	if err != nil {
-		return nil, fmt.Errorf("resolveProviderConfigPresence() [bootstrap.go]: failed to get provider configs: %w", err)
-	}
-
-	for providerName := range configs {
+	for providerName := range configStore.ModelProviderConfigs {
 		resolved[providerName] = struct{}{}
 	}
 
@@ -858,12 +836,11 @@ func resolveProviderConfigPresence(configStore conf.ConfigStore) (map[string]str
 }
 
 // CreateModelTagRegistry creates and populates a model tag registry from config store.
-func CreateModelTagRegistry(configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (*models.ModelTagRegistry, error) {
+func CreateModelTagRegistry(configStore *conf.CswConfig, providerRegistry *models.ProviderRegistry) (*models.ModelTagRegistry, error) {
 	modelTagRegistry := models.NewModelTagRegistry()
 
-	globalConfig, err := configStore.GetGlobalConfig()
-	if err == nil && globalConfig != nil && len(globalConfig.ModelTags) > 0 {
-		if err := modelTagRegistry.SetGlobalMappings(globalConfig.ModelTags); err != nil {
+	if configStore != nil && configStore.GlobalConfig != nil && len(configStore.GlobalConfig.ModelTags) > 0 {
+		if err := modelTagRegistry.SetGlobalMappings(configStore.GlobalConfig.ModelTags); err != nil {
 			return nil, fmt.Errorf("CreateModelTagRegistry() [bootstrap.go]: failed to set global model tags: %w", err)
 		}
 	}

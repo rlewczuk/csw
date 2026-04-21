@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,8 +11,7 @@ import (
 func TestAgentRoleRegistry_HiddenPatternsMerging(t *testing.T) {
 	t.Run("MergesAllRoleHiddenPatternsIntoSpecificRoles", func(t *testing.T) {
 		// Create a mock config store with "all" role and a specific role
-		mockStore := impl.NewMockConfigStore()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		mockStore := &conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{
 			"all": {
 				Name:        "all",
 				Description: "Common configuration",
@@ -31,7 +29,7 @@ func TestAgentRoleRegistry_HiddenPatternsMerging(t *testing.T) {
 					"tmp/",
 				},
 			},
-		})
+		}}
 
 		registry := NewAgentRoleRegistry(mockStore)
 
@@ -52,8 +50,7 @@ func TestAgentRoleRegistry_HiddenPatternsMerging(t *testing.T) {
 	})
 
 	t.Run("AllRoleItselfIsNotModified", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		mockStore := &conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{
 			"all": {
 				Name:        "all",
 				Description: "Common configuration",
@@ -62,7 +59,7 @@ func TestAgentRoleRegistry_HiddenPatternsMerging(t *testing.T) {
 					".git/",
 				},
 			},
-		})
+		}}
 
 		registry := NewAgentRoleRegistry(mockStore)
 
@@ -79,8 +76,7 @@ func TestAgentRoleRegistry_HiddenPatternsMerging(t *testing.T) {
 	})
 
 	t.Run("RoleWithoutHiddenPatternsGetsAllRolePatterns", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		mockStore := &conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{
 			"all": {
 				Name:        "all",
 				Description: "Common configuration",
@@ -93,7 +89,7 @@ func TestAgentRoleRegistry_HiddenPatternsMerging(t *testing.T) {
 				Description:    "Reviewer role",
 				HiddenPatterns: nil, // No specific patterns
 			},
-		})
+		}}
 
 		registry := NewAgentRoleRegistry(mockStore)
 
@@ -109,8 +105,7 @@ func TestAgentRoleRegistry_HiddenPatternsMerging(t *testing.T) {
 	})
 
 	t.Run("NoAllRoleDoesNotCrash", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		mockStore := &conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{
 			"developer": {
 				Name:        "developer",
 				Description: "Developer role",
@@ -118,7 +113,7 @@ func TestAgentRoleRegistry_HiddenPatternsMerging(t *testing.T) {
 					"*.log",
 				},
 			},
-		})
+		}}
 
 		registry := NewAgentRoleRegistry(mockStore)
 
@@ -134,8 +129,7 @@ func TestAgentRoleRegistry_HiddenPatternsMerging(t *testing.T) {
 	})
 
 	t.Run("AllRoleWithNilPatternsDoesNotCrash", func(t *testing.T) {
-		mockStore := impl.NewMockConfigStore()
-		mockStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		mockStore := &conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{
 			"all": {
 				Name:           "all",
 				Description:    "Common configuration",
@@ -148,7 +142,7 @@ func TestAgentRoleRegistry_HiddenPatternsMerging(t *testing.T) {
 					"*.log",
 				},
 			},
-		})
+		}}
 
 		registry := NewAgentRoleRegistry(mockStore)
 

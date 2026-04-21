@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vfs"
 	"github.com/stretchr/testify/assert"
@@ -437,7 +436,7 @@ func TestConfPromptGenerator_GetPrompt_Ordering(t *testing.T) {
 }
 
 func TestSystemPromptGenerationForKimi(t *testing.T) {
-	store, err := confimpl.NewEmbeddedConfigStore()
+	store, err := conf.CswConfigLoad("@DEFAULTS")
 	require.NoError(t, err)
 
 	vfsInstance := vfs.NewMockVFS()
@@ -447,8 +446,7 @@ func TestSystemPromptGenerationForKimi(t *testing.T) {
 
 	tags := []string{"kimi"}
 
-	roleConfigs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	roleConfigs := store.AgentRoleConfigs
 	developerRole := roleConfigs["developer"]
 
 	state := AgentState{
@@ -505,21 +503,19 @@ func TestConfPromptGenerator_GetPrompt_ToolsFiltering(t *testing.T) {
 }
 
 func TestConfPromptGenerator_GetToolInfo_SchemaOptional(t *testing.T) {
-	store := confimpl.NewMockConfigStore()
-	store.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+	store := &conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{
 		"all": {
 			Name: "all",
 			ToolFragments: map[string]string{
 				"custom/custom.md": "Custom description",
 			},
 		},
-	})
+	}}
 
 	gen, err := NewConfPromptGenerator(store, vfs.NewMockVFS())
 	require.NoError(t, err)
 
-	roleConfigs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	roleConfigs := store.AgentRoleConfigs
 	allRole := roleConfigs["all"]
 
 	info, err := gen.GetToolInfo(nil, "custom", allRole, &AgentState{})
@@ -530,9 +526,8 @@ func TestConfPromptGenerator_GetToolInfo_SchemaOptional(t *testing.T) {
 }
 
 // newMockConfigStoreWithFragments creates a mock config store with test fragment data.
-func newMockConfigStoreWithFragments() *confimpl.MockConfigStore {
-	store := confimpl.NewMockConfigStore()
-	store.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+func newMockConfigStoreWithFragments() *conf.CswConfig {
+	store := &conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{
 		"all": {
 			Name: "all",
 			PromptFragments: map[string]string{
@@ -544,7 +539,7 @@ func newMockConfigStoreWithFragments() *confimpl.MockConfigStore {
 				"50-tools-write-anthropic": "# Write Tool Instructions (Anthropic)\n\nUse write tool with Anthropic.",
 			},
 		},
-	})
+ 	}}
 
 	return store
 }
