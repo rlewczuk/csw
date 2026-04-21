@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Updates task metadata/prompt.",
+  "type": "object",
+  "properties": {
+    "uuid": {
+      "type": "string",
+      "description": "Task UUID. Optional if name is provided or current session is already bound to a task."
+    },
+    "name": {
+      "type": "string",
+      "description": "Task name/slug. Used as identifier when uuid is omitted, or new name when uuid is provided."
+    },
+      "description": {
+        "type": "string",
+        "description": "Updated task description."
+      },
+      "status": {
+        "type": "string",
+        "description": "Updated task status. Supported values: draft, created, open, running, merged."
+      },
+      "branch": {
+        "type": "string",
+        "description": "Updated task feature branch name."
+      },
+    "parent-branch": {
+      "type": "string",
+      "description": "Updated parent branch name."
+    },
+    "role": {
+      "type": "string",
+      "description": "Updated task agent role."
+    },
+    "deps": {
+      "type": "array",
+      "description": "Updated dependency task UUID list.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Updated task prompt content."
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

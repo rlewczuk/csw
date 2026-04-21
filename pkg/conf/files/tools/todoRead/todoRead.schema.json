@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Retrieves the current todo list with all items and their statuses.",
+  "type": "object",
+  "properties": {},
+  "required": [],
+  "additionalProperties": false
+}

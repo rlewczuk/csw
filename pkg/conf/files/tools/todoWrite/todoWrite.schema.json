@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Updates the todo list with the provided array of todo items. This replaces the entire list.",
+  "type": "object",
+  "properties": {
+    "todos": {
+      "type": "array",
+      "description": "Array of todo items to set as the complete todo list.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the todo item (UUIDv7 string)."
+          },
+          "content": {
+            "type": "string",
+            "description": "Brief description of the task."
+          },
+          "status": {
+            "type": "string",
+            "description": "Status of the task.",
+            "enum": ["pending", "in_progress", "completed", "cancelled"]
+          },
+          "priority": {
+            "type": "string",
+            "description": "Priority level of the task.",
+            "enum": ["low", "medium", "high"]
+          }
+        },
+        "required": ["id", "content", "status", "priority"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["todos"],
+  "additionalProperties": false
+}

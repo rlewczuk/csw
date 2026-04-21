@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Creates a persistent task.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Optional task name/slug. Defaults to generated task UUID when omitted."
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional task description."
+    },
+    "branch": {
+      "type": "string",
+      "description": "Optional feature branch name for collecting task results. Defaults to task name."
+    },
+    "parent-branch": {
+      "type": "string",
+      "description": "Optional parent branch used to create task feature branch and merge target."
+    },
+    "role": {
+      "type": "string",
+      "description": "Optional agent role used to run task sessions (for example: developer)."
+    },
+    "deps": {
+      "type": "array",
+      "description": "Optional list of dependency task UUIDs that must be completed before this task can run.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Initial task prompt. This value is required."
+    },
+    "parent": {
+      "type": "string",
+      "description": "Optional parent task name or UUID. When set, the task is created as a subtask."
+    }
+  },
+  "required": [
+    "prompt"
+  ],
+  "additionalProperties": false
+}

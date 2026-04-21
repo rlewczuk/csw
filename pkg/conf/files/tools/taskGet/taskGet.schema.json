@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Returns task metadata and optionally last session summary.",
+  "type": "object",
+  "properties": {
+    "uuid": {
+      "type": "string",
+      "description": "Task UUID. Optional if name is provided or current session belongs to a task."
+    },
+    "name": {
+      "type": "string",
+      "description": "Task name/slug. Used when uuid is not provided."
+    },
+    "summary": {
+      "type": "boolean",
+      "description": "If true, include last session summary (metadata and markdown summary text)."
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}
