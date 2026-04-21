@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/core"
 	coretestfixture "github.com/rlewczuk/csw/pkg/core/testfixture"
 	"github.com/rlewczuk/csw/pkg/models"
@@ -286,10 +285,9 @@ func TestSweSystem_SubAgentIntegration(t *testing.T) {
 }
 
 func TestSweSystem_SubAgentIntegrationRoleAlias(t *testing.T) {
-	configStore := confimpl.NewMockConfigStore()
-	configStore.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+	configStore := &conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{
 		"developer": {Name: "developer", Description: "Developer", Aliases: []string{"dev", "build"}},
-	})
+	}}
 
 	fixture := coretestfixture.NewSweSystemFixture(
 		t,

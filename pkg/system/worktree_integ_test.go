@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/apis"
-	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/tool"
@@ -310,16 +310,19 @@ func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTe
 		Response: models.NewTextMessage(models.ChatRoleAssistant, llmMessage),
 	})
 
-	configStore := confimpl.NewMockConfigStore()
+	configStore := &conf.CswConfig{AgentConfigFiles: map[string]map[string]string{
+		"commit": {
+			"prompt.md":  "{{- range .Messages }}{{ . }}\n{{- end }}",
+			"message.md": "[{{ .Branch }}] {{ .Message }}",
+		},
+	}}
 	if includeSystemTemplate {
-		configStore.SetAgentConfigFile("commit", "system.md", []byte("system prompt"))
+		configStore.AgentConfigFiles["commit"]["system.md"] = "system prompt"
 	}
-	configStore.SetAgentConfigFile("commit", "prompt.md", []byte("{{- range .Messages }}{{ . }}\n{{- end }}"))
-	configStore.SetAgentConfigFile("commit", "message.md", []byte("[{{ .Branch }}] {{ .Message }}"))
 
 	system := &SweSystem{
 		ModelProviders: map[string]models.ModelProvider{"mock": provider},
-		ConfigStore:    configStore,
+		Config:         configStore,
 	}
 
 	session, err := system.NewSession("mock/test-model", nil)
@@ -522,12 +525,15 @@ func newConflictResolutionFixture(t *testing.T) (*SweSystem, *core.SweSession) {
 	t.Helper()
 
 	provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
-	configStore := confimpl.NewMockConfigStore()
-	configStore.SetAgentConfigFile("conflict", "prompt.md", []byte("You are running in a conflict resolution session.\n{{ .OriginalPrompt }}\n{{ .ConflictFiles }}\n{{ .ConflictOutput }}"))
+	configStore := &conf.CswConfig{AgentConfigFiles: map[string]map[string]string{
+		"conflict": {
+			"prompt.md": "You are running in a conflict resolution session.\n{{ .OriginalPrompt }}\n{{ .ConflictFiles }}\n{{ .ConflictOutput }}",
+		},
+	}}
 
 	sweSystem := &SweSystem{
 		ModelProviders: map[string]models.ModelProvider{"mock": provider},
-		ConfigStore:    configStore,
+		Config:         configStore,
 	}
 
 	session, err := sweSystem.NewSession("mock/test-model", nil)

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	"github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,8 +13,7 @@ import (
 
 func TestRegisterCustomTools(t *testing.T) {
 	t.Run("registers json and yaml custom tools", func(t *testing.T) {
-		store := impl.NewMockConfigStore()
-		store.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		store := &conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{
 			"all": {
 				Name: "all",
 				ToolFragments: map[string]string{
@@ -27,7 +25,7 @@ func TestRegisterCustomTools(t *testing.T) {
 					"builtin/vfsRead.schema.json": `{}`,
 				},
 			},
-		})
+		}}
 
 		registry := NewToolRegistry()
 		err := RegisterCustomTools(registry, store, "/project", runner.NewMockRunner())
@@ -47,15 +45,14 @@ func TestRegisterCustomTools(t *testing.T) {
 	})
 
 	t.Run("returns error for invalid config", func(t *testing.T) {
-		store := impl.NewMockConfigStore()
-		store.SetAgentRoleConfigs(map[string]*conf.AgentRoleConfig{
+		store := &conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{
 			"all": {
 				Name: "all",
 				ToolFragments: map[string]string{
 					"broken/broken.json": "{invalid}",
 				},
 			},
-		})
+		}}
 
 		err := RegisterCustomTools(NewToolRegistry(), store, "/project", runner.NewMockRunner())
 		require.Error(t, err)

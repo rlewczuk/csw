@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
-	confimpl "github.com/rlewczuk/csw/pkg/conf/impl"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/stretchr/testify/assert"
@@ -63,7 +62,7 @@ func TestApplyDisableRefreshToProviders(t *testing.T) {
 }
 
 func TestKimiTagResolution(t *testing.T) {
-	store, err := confimpl.NewEmbeddedConfigStore()
+	store, err := conf.CswConfigLoad("@DEFAULTS")
 	require.NoError(t, err)
 
 	providerRegistry := models.NewProviderRegistry(store)
@@ -237,12 +236,11 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := confimpl.NewMockConfigStore()
-			store.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{
+			store := &conf.CswConfig{ModelProviderConfigs: map[string]*conf.ModelProviderConfig{
 				"mock": {Name: "mock", Type: "openai", URL: "http://example.com", ModelTags: []conf.ModelTagMapping{}},
-			})
+			}}
 			if len(tt.aliases) > 0 {
-				store.SetModelAliases(tt.aliases)
+				store.ModelAliases = tt.aliases
 			}
 
 			originalNewComposite := newCompositeConfigStoreFunc
@@ -256,10 +254,10 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 				generateWorktreeBranchNameFunc = originalGenerateBranch
 			})
 
-			newCompositeConfigStoreFunc = func(rootPath, configPath string) (conf.ConfigStore, error) {
+			newCompositeConfigStoreFunc = func(rootPath, configPath string) (*conf.CswConfig, error) {
 				return store, nil
 			}
-			resolveModelNameFunc = func(modelName string, configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (string, error) {
+			resolveModelNameFunc = func(modelName string, configStore *conf.CswConfig, providerRegistry *models.ProviderRegistry) (string, error) {
 				return ResolveModelName(modelName, configStore, providerRegistry)
 			}
 			createProviderMapFunc = func(providerRegistry *models.ProviderRegistry) (map[string]models.ModelProvider, error) {
@@ -268,7 +266,7 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 			}
 
 			generateCalls := 0
-			generateWorktreeBranchNameFunc = func(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore conf.ConfigStore, model string, inputPrompt string) (string, error) {
+			generateWorktreeBranchNameFunc = func(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore *conf.CswConfig, model string, inputPrompt string) (string, error) {
 				generateCalls++
 				if tt.generatorError != nil {
 					return "", tt.generatorError
@@ -302,10 +300,9 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 }
 
 func TestResolveWorktreeBranchNameIgnoresBranchNameHook(t *testing.T) {
-	store := confimpl.NewMockConfigStore()
-	store.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{
+	store := &conf.CswConfig{ModelProviderConfigs: map[string]*conf.ModelProviderConfig{
 		"mock": {Name: "mock", Type: "openai", URL: "http://example.com", ModelTags: []conf.ModelTagMapping{}},
-	})
+	}}
 
 	originalNewComposite := newCompositeConfigStoreFunc
 	originalResolveModel := resolveModelNameFunc
@@ -318,10 +315,10 @@ func TestResolveWorktreeBranchNameIgnoresBranchNameHook(t *testing.T) {
 		generateWorktreeBranchNameFunc = originalGenerateBranch
 	})
 
-	newCompositeConfigStoreFunc = func(rootPath, configPath string) (conf.ConfigStore, error) {
+	newCompositeConfigStoreFunc = func(rootPath, configPath string) (*conf.CswConfig, error) {
 		return store, nil
 	}
-	resolveModelNameFunc = func(modelName string, configStore conf.ConfigStore, providerRegistry *models.ProviderRegistry) (string, error) {
+	resolveModelNameFunc = func(modelName string, configStore *conf.CswConfig, providerRegistry *models.ProviderRegistry) (string, error) {
 		return "mock/test-model", nil
 	}
 
@@ -335,7 +332,7 @@ func TestResolveWorktreeBranchNameIgnoresBranchNameHook(t *testing.T) {
 	}
 
 	generateCalls := 0
-	generateWorktreeBranchNameFunc = func(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore conf.ConfigStore, model string, inputPrompt string) (string, error) {
+	generateWorktreeBranchNameFunc = func(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore *conf.CswConfig, model string, inputPrompt string) (string, error) {
 		generateCalls++
 		return "fallback-generated", nil
 	}
@@ -376,8 +373,7 @@ func TestCreateProviderMapConfigUpdaterWiring(t *testing.T) {
 	}))
 	defer server.Close()
 
-	store := confimpl.NewMockConfigStore()
-	store.SetModelProviderConfigs(map[string]*conf.ModelProviderConfig{
+	store := &conf.CswConfig{ModelProviderConfigs: map[string]*conf.ModelProviderConfig{
 		"resp": {
 			Name:         "resp",
 			Type:         "responses",
@@ -387,7 +383,7 @@ func TestCreateProviderMapConfigUpdaterWiring(t *testing.T) {
 			ClientID:     "test-client-id",
 			RefreshToken: "old-refresh-token",
 		},
-	})
+	}}
 
 	registry := models.NewProviderRegistry(store)
 	providers, err := CreateProviderMap(registry)
