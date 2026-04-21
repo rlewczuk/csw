@@ -1,0 +1,21 @@
+{
+  "claude-sonnet-4": {
+    "family": "anthropic-claude",
+    "max-tokens": 8192,
+    "max-output-tokens": 8192,
+    "reasoning": {
+      "none": false,
+      "low": "low",
+      "medium": "medium",
+      "high": "high",
+      "xhigh": "max"
+    },
+    "cost": [
+      {
+        "context": 0,
+        "input": 3.0,
+        "output": 15.0
+      }
+    ]
+  }
+}

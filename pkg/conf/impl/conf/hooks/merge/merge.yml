@@ -1,7 +1,0 @@
-name: merge
-enabled: false
-hook: merge
-type: shell
-run-on: sandbox
-command: |
-  echo "merge hook is disabled by default"

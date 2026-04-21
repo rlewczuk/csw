@@ -1,16 +1,18 @@
 {
-  "description": "A role for exploring the codebase",
+  "name": "explorer",
+  "description": "Explorer role for testing",
   "vfs-privileges": {
     "**": {
       "read": "allow",
       "write": "deny",
       "delete": "deny",
       "list": "allow",
-      "find": "allow",
-      "move": "deny"
+      "find": "allow"
     }
   },
   "tools-access": {
-    "**": "allow"
+    "read": "allow",
+    "list": "allow",
+    "find": "allow"
   }
 }

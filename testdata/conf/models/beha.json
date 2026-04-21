@@ -1,12 +1,6 @@
 {
-  "type": "ollama",
+  "type": "beha",
   "name": "beha",
-  "description": "Local server running ollama",
-  "url": "http://beha:11434",
-  "model-tags": [
-    {
-      "model": "^devstral.*",
-      "tag": "devstral"
-    }
-  ]
+  "description": "Beha API",
+  "url": "http://localhost:8080"
 }

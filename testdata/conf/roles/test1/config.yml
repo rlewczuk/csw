@@ -1,7 +1,0 @@
-name: test1
-description: Test role 1
-vfs-privileges: {}
-tools-access:
-  read: allow
-  write: allow
-  bash: allow

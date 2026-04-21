@@ -8,18 +8,6 @@
     {
       "model": "^claude-3-opus.*",
       "tag": "opus"
-    },
-    {
-      "model": "^claude-3-sonnet.*",
-      "tag": "sonnet"
-    },
-    {
-      "model": "^claude-3-haiku.*",
-      "tag": "haiku"
-    },
-    {
-      "model": "^claude-.*",
-      "tag": "anthropic"
     }
   ]
 }

@@ -3,18 +3,6 @@
   "name": "ollama",
   "description": "Local Ollama instance",
   "url": "http://localhost:11434",
-  "model-tags": [
-    {
-      "model": "^devstral.*",
-      "tag": "devstral"
-    },
-    {
-      "model": "^llama.*",
-      "tag": "llama"
-    },
-    {
-      "model": "^codellama.*",
-      "tag": "codellama"
-    }
-  ]
+  "connect-timeout": 30,
+  "request-timeout": 300
 }

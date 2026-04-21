@@ -1,21 +1,13 @@
 {
-  "description": "A software developer role with full VFS access",
+  "name": "developer",
+  "description": "Developer role for testing",
   "vfs-privileges": {
     "**": {
       "read": "allow",
-      "write": "ask",
+      "write": "allow",
       "delete": "ask",
-      "list": "ask",
-      "find": "ask",
-      "move": "ask"
-    },
-    "/**": {
-      "read": "deny",
-      "write": "deny",
-      "delete": "deny",
-      "list": "deny",
-      "find": "deny",
-      "move": "deny"
+      "list": "allow",
+      "find": "allow"
     }
   },
   "tools-access": {

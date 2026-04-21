@@ -1,0 +1,23 @@
+{
+  "model-tags": [
+    {
+      "model": "^gpt-.*",
+      "tag": "openai"
+    },
+    {
+      "model": "^o[0-9].*",
+      "tag": "openai-reasoning"
+    }
+  ],
+  "reasoning": {
+    "none": "disabled",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "xhigh": "max"
+  },
+  "tool-call": true,
+  "max-tokens": 16384,
+  "max-output-tokens": 16384,
+  "context-length-limit": 128000
+}

@@ -12,10 +12,10 @@
       "model": ".*-instruct$",
       "tag": "instruct"
     },
-      {
-        "model": ".*:latest$",
-        "tag": "latest"
-      }
+    {
+      "model": ".*:latest$",
+      "tag": "latest"
+    }
   ],
   "context-compaction-threshold": 0.95
 }
