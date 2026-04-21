@@ -174,11 +174,11 @@ type TaskSessionRunResult struct {
 
 // TaskManager manages persistent hierarchical tasks.
 type TaskManager struct {
-	baseDir     string
-	tasksDir    string
-	configStore conf.ConfigStore
-	uuidFn      func() string
-	nowFn       func() time.Time
+	baseDir  string
+	tasksDir string
+	config   *conf.CswConfig
+	uuidFn   func() string
+	nowFn    func() time.Time
 }
 
 // TaskBackendAdapter exposes TaskManager through tool.TaskBackend interface.
@@ -189,16 +189,16 @@ type TaskBackendAdapter struct {
 }
 
 // NewTaskManager creates a new TaskManager.
-func NewTaskManager(baseDir string, configStore conf.ConfigStore) (*TaskManager, error) {
+func NewTaskManager(baseDir string, config *conf.CswConfig) (*TaskManager, error) {
 	if strings.TrimSpace(baseDir) == "" {
 		return nil, fmt.Errorf("NewTaskManager() [task.go]: baseDir cannot be empty")
 	}
 
-	return NewTaskManagerWithTasksDir(baseDir, ".cswdata/tasks", configStore)
+	return NewTaskManagerWithTasksDir(baseDir, ".cswdata/tasks", config)
 }
 
 // NewTaskManagerWithTasksDir creates a new TaskManager with custom tasks directory.
-func NewTaskManagerWithTasksDir(baseDir string, tasksDir string, configStore conf.ConfigStore) (*TaskManager, error) {
+func NewTaskManagerWithTasksDir(baseDir string, tasksDir string, config *conf.CswConfig) (*TaskManager, error) {
 	trimmedBaseDir := strings.TrimSpace(baseDir)
 	if trimmedBaseDir == "" {
 		return nil, fmt.Errorf("NewTaskManagerWithTasksDir() [task.go]: baseDir cannot be empty")
@@ -209,11 +209,11 @@ func NewTaskManagerWithTasksDir(baseDir string, tasksDir string, configStore con
 	}
 
 	return &TaskManager{
-		baseDir:     trimmedBaseDir,
-		tasksDir:    trimmedTasksDir,
-		configStore: configStore,
-		uuidFn:      shared.GenerateUUIDv7,
-		nowFn:       time.Now,
+		baseDir:  trimmedBaseDir,
+		tasksDir: trimmedTasksDir,
+		config:   config,
+		uuidFn:   shared.GenerateUUIDv7,
+		nowFn:    time.Now,
 	}, nil
 }
 
@@ -897,7 +897,7 @@ func (m *TaskManager) resolveTaskPromptOverride(task *Task, params TaskRunParams
 		return renderedPrompt, nil
 	}
 
-	if m.configStore == nil {
+	if m.config == nil {
 		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: config store is not available for command invocation")
 	}
 	commandsRoot := filepath.Join(strings.TrimSpace(m.baseDir), ".agents", "commands")

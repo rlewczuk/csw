@@ -157,7 +157,7 @@ func TestExecuteToolCalls_RespectsConfiguredMaxThreadsAndQueuesRemainingCalls(t 
 	session := &SweSession{
 		Tools:          registry,
 		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
-		configStore:    configStore,
+		config:         configStore,
 		maxToolThreads: 2,
 		toolStartDelay: time.Millisecond,
 	}
@@ -230,7 +230,7 @@ func TestExecuteToolCalls_SpacesToolStartsByMinimumDelay(t *testing.T) {
 func TestMaxToolThreadsLimit_UsesOverrideThenConfigThenDefault(t *testing.T) {
 	configStore := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{MaxThreads: 11}}}
 
-	session := &SweSession{configStore: configStore}
+	session := &SweSession{config: configStore}
 	assert.Equal(t, 11, session.maxToolThreadsLimit())
 
 	session.maxToolThreads = 3

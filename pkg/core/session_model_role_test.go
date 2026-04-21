@@ -74,16 +74,16 @@ func TestAgentRoleIntegration(t *testing.T) {
 		})
 		registry := NewAgentRoleRegistry(mockStore)
 
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
-			ModelTags:            models.NewModelTagRegistry(),
-			Tools:                tools,
-			VFS:                  mockVFS,
-			Roles:                registry,
-			ConfigStore:          mockStore,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+			system := &SweSystem{
+				ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+				ModelTags:            models.NewModelTagRegistry(),
+				Tools:                tools,
+				VFS:                  mockVFS,
+				Roles:                registry,
+				Config:               mockStore,
+				SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+				WorkDir:              ".",
+			}
 
 		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
@@ -104,17 +104,17 @@ func TestAgentRoleIntegration(t *testing.T) {
 		})
 		registry := NewAgentRoleRegistry(mockStore)
 
-		system := &SweSystem{
-			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
-			ModelTags:            models.NewModelTagRegistry(),
-			PromptGenerator:      &testPromptGenerator{prompt: "You are an experienced software tester."},
-			Tools:                tools,
-			VFS:                  mockVFS,
-			Roles:                registry,
-			ConfigStore:          mockStore,
-			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-			WorkDir:              ".",
-		}
+			system := &SweSystem{
+				ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+				ModelTags:            models.NewModelTagRegistry(),
+				PromptGenerator:      &testPromptGenerator{prompt: "You are an experienced software tester."},
+				Tools:                tools,
+				VFS:                  mockVFS,
+				Roles:                registry,
+				Config:               mockStore,
+				SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+				WorkDir:              ".",
+			}
 
 		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)

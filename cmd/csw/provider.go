@@ -198,51 +198,23 @@ func parseHeadersFlag(headers []string) (map[string]string, error) {
 	return parsed, nil
 }
 
-func findWritableStoreForProvider(providerName string) (conf.ConfigStore, func() error, error) {
+func findWritableStoreForProvider(providerName string) (*conf.CswConfig, func() error, error) {
 	localStore, err := GetConfigStore(ConfigScopeLocal)
 	if err != nil {
 		return nil, nil, fmt.Errorf("findWritableStoreForProvider() [provider.go]: failed to open local config store: %w", err)
 	}
-	localConfigs, err := localStore.GetModelProviderConfigs()
-	if err != nil {
-		if closer, ok := localStore.(interface{ Close() error }); ok {
-			_ = closer.Close()
-		}
-		return nil, nil, fmt.Errorf("findWritableStoreForProvider() [provider.go]: failed to load local provider configs: %w", err)
-	}
+	localConfigs := localStore.ModelProviderConfigs
 	if _, exists := localConfigs[providerName]; exists {
-		return localStore, func() error {
-			if closer, ok := localStore.(interface{ Close() error }); ok {
-				return closer.Close()
-			}
-			return nil
-		}, nil
-	}
-	if closer, ok := localStore.(interface{ Close() error }); ok {
-		_ = closer.Close()
+		return localStore, nil, nil
 	}
 
 	globalStore, err := GetConfigStore(ConfigScopeGlobal)
 	if err != nil {
 		return nil, nil, fmt.Errorf("findWritableStoreForProvider() [provider.go]: failed to open global config store: %w", err)
 	}
-	globalConfigs, err := globalStore.GetModelProviderConfigs()
-	if err != nil {
-		if closer, ok := globalStore.(interface{ Close() error }); ok {
-			_ = closer.Close()
-		}
-		return nil, nil, fmt.Errorf("findWritableStoreForProvider() [provider.go]: failed to load global provider configs: %w", err)
-	}
+	globalConfigs := globalStore.ModelProviderConfigs
 	if _, exists := globalConfigs[providerName]; exists {
-		return globalStore, func() error {
-			if closer, ok := globalStore.(interface{ Close() error }); ok {
-				return closer.Close()
-			}
-			return nil
-		}, nil
-	}
-	if closer, ok := globalStore.(interface{ Close() error }); ok {
-		_ = closer.Close()
+		return globalStore, nil, nil
 	}
 
 	return nil, nil, nil

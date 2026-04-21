@@ -52,10 +52,7 @@ func toolListCommand() *cobra.Command {
 			}
 
 			// Get role configs to access tool fragments
-			roleConfigs, err := store.GetAgentRoleConfigs()
-			if err != nil {
-				return fmt.Errorf("toolListCommand() [tool.go]: failed to get role configs: %w", err)
-			}
+			roleConfigs := store.AgentRoleConfigs
 
 			var toolFragments map[string]string
 			var roleConfig *conf.AgentRoleConfig
@@ -161,10 +158,7 @@ func toolInfoCommand() *cobra.Command {
 			}
 
 			// Get role configs
-			roleConfigs, err := store.GetAgentRoleConfigs()
-			if err != nil {
-				return fmt.Errorf("toolInfoCommand() [tool.go]: failed to get role configs: %w", err)
-			}
+			roleConfigs := store.AgentRoleConfigs
 
 			// Use "all" role to get tool info
 			allRole, exists := roleConfigs["all"]
@@ -214,10 +208,7 @@ func toolDescCommand() *cobra.Command {
 			}
 
 			// Get role configs
-			roleConfigs, err := store.GetAgentRoleConfigs()
-			if err != nil {
-				return fmt.Errorf("toolDescCommand() [tool.go]: failed to get role configs: %w", err)
-			}
+			roleConfigs := store.AgentRoleConfigs
 
 			// Use "all" role to get tool info
 			allRole, exists := roleConfigs["all"]

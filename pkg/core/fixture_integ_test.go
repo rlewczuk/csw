@@ -95,7 +95,7 @@ func newSweSystemFixture(t *testing.T, prompt string, opts ...sweSystemFixtureOp
 		Tools:                config.tools,
 		VFS:                  config.vfsInstance,
 		Roles:                config.roles,
-		ConfigStore:          config.configStore,
+		Config:               config.configStore,
 		LSP:                  config.lspInstance,
 		SessionLoggerFactory: logging.NewTestLoggerFactory(t),
 		WorkDir:              config.workDir,
@@ -120,9 +120,9 @@ func newSweSystemFixture(t *testing.T, prompt string, opts ...sweSystemFixtureOp
 				}
 			}
 		}
-		system.ConfigStore = cfgStore
+		system.Config = cfgStore
 	} else {
-		system.ConfigStore = config.configStore
+		system.Config = config.configStore
 	}
 	if config.logLLMRequests != nil {
 		system.LogLLMRequests = *config.logLLMRequests

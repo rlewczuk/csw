@@ -69,7 +69,7 @@ type SweSystemFixtureConfig struct {
 	WorkDir          string
 	SessionLogger    system.SessionLoggerFactory
 	Roles            *core.AgentRoleRegistry
-	ConfigStore      conf.ConfigStore
+	Config           *conf.CswConfig
 	LSP              lsp.LSP
 	LogBaseDir       string
 	LogLLMRequests   *bool
@@ -135,7 +135,7 @@ func NewSweSystemFixture(t *testing.T, opts ...SweSystemFixtureOption) *SweSyste
 		Tools:                config.Tools,
 		VFS:                  config.VFS,
 		Roles:                config.Roles,
-		ConfigStore:          config.ConfigStore,
+		Config:               config.Config,
 		LSP:                  config.LSP,
 		SessionLoggerFactory: config.SessionLogger,
 		WorkDir:              config.WorkDir,
@@ -218,9 +218,9 @@ func WithRoles(roles *core.AgentRoleRegistry) SweSystemFixtureOption {
 }
 
 // WithConfigStore sets the config store.
-func WithConfigStore(store conf.ConfigStore) SweSystemFixtureOption {
+func WithConfigStore(store *conf.CswConfig) SweSystemFixtureOption {
 	return func(config *SweSystemFixtureConfig) {
-		config.ConfigStore = store
+		config.Config = store
 	}
 }
 

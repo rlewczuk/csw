@@ -28,10 +28,7 @@ func providerTestCommand(scope *ConfigScope) *cobra.Command {
 				return err
 			}
 
-			configs, err := store.GetModelProviderConfigs()
-			if err != nil {
-				return fmt.Errorf("providerTestCommand() [provider_test_cmd.go]: failed to get provider configs: %w", err)
-			}
+			configs := store.ModelProviderConfigs
 
 			config, exists := configs[providerName]
 			if !exists {

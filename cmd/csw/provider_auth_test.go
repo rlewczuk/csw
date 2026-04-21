@@ -117,14 +117,8 @@ func TestProviderAuthCommand_Success(t *testing.T) {
 
 	storeAfter, err := GetConfigStore(ConfigScopeGlobal)
 	require.NoError(t, err)
-	defer func() {
-		if closer, ok := storeAfter.(interface{ Close() error }); ok {
-			_ = closer.Close()
-		}
-	}()
 
-	configs, err := storeAfter.GetModelProviderConfigs()
-	require.NoError(t, err)
+	configs := storeAfter.ModelProviderConfigs
 	updated, exists := configs["openai-auth"]
 	require.True(t, exists)
 	assert.Equal(t, conf.AuthModeOAuth2, updated.AuthMode)
@@ -222,14 +216,8 @@ func TestProviderAuthCommand_ClearsPreviousAuthDataBeforeReauth(t *testing.T) {
 
 	storeAfter, err := GetConfigStore(ConfigScopeGlobal)
 	require.NoError(t, err)
-	defer func() {
-		if closer, ok := storeAfter.(interface{ Close() error }); ok {
-			_ = closer.Close()
-		}
-	}()
 
-	configs, err := storeAfter.GetModelProviderConfigs()
-	require.NoError(t, err)
+	configs := storeAfter.ModelProviderConfigs
 	updated, exists := configs["openai-auth"]
 	require.True(t, exists)
 	assert.Equal(t, conf.AuthModeOAuth2, updated.AuthMode)

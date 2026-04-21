@@ -82,7 +82,7 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 		session := &SweSession{
 			id:         "session-1",
 			logBaseDir: tmpDir,
-			configStore: configStore,
+			config:      configStore,
 			provider:      provider,
 			contextLength: 96,
 			messages: []*models.ChatMessage{
@@ -123,7 +123,7 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 		session := &SweSession{
 			id:          "session-2",
 			logBaseDir:  tmpDir,
-			configStore: configStore,
+			config:      configStore,
 			provider:      provider,
 			contextLength: 94,
 			messages: []*models.ChatMessage{
@@ -148,7 +148,7 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 		provider.Config = &conf.ModelProviderConfig{ContextLengthLimit: 100}
 
 		session := &SweSession{
-			configStore: configStore,
+			config:      configStore,
 			provider:      provider,
 			contextLength: 96,
 			messages: []*models.ChatMessage{
@@ -210,7 +210,6 @@ func (m *tokenLimitChatModel) Compactor() models.ChatCompator {
 func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 	t.Run("compacts context and retries", func(t *testing.T) {
 		handler := &compactionOutputHandler{}
-		configStore := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{LLMRetryMaxAttempts: 2}}
 		session := &SweSession{
 			messages: []*models.ChatMessage{
 				models.NewTextMessage(models.ChatRoleSystem, "system"),
@@ -245,6 +244,7 @@ func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 
 	t.Run("returns error after reaching max attempts", func(t *testing.T) {
 		handler := &compactionOutputHandler{}
+		configStore := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{LLMRetryMaxAttempts: 2}}
 		session := &SweSession{
 			messages: []*models.ChatMessage{
 				models.NewTextMessage(models.ChatRoleSystem, "system"),
@@ -253,7 +253,7 @@ func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 				models.NewTextMessage(models.ChatRoleUser, "second"),
 			},
 			outputHandler: handler,
-			configStore:   configStore,
+			config:        configStore,
 		}
 
 		chatModel := &tokenLimitChatModel{
@@ -282,7 +282,7 @@ func TestSweSessionRunNonStreamingChat_UsageLimitWait(t *testing.T) {
 			messages: []*models.ChatMessage{models.NewTextMessage(models.ChatRoleUser, "hello")},
 			outputHandler: handler,
 			provider: provider,
-			configStore: configStore,
+			config:      configStore,
 		}
 
 		chatModel := &tokenLimitChatModel{

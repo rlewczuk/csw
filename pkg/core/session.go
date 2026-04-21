@@ -66,7 +66,7 @@ type SweSession struct {
 	toolSelection   conf.ToolSelectionConfig
 	promptGenerator PromptGenerator
 	roles           *AgentRoleRegistry
-	configStore     conf.ConfigStore
+	config          *conf.CswConfig
 	systemTools     *tool.ToolRegistry
 	logBaseDir      string
 	thinking        string
@@ -113,7 +113,7 @@ type SweSessionParams struct {
 	ToolSelection   conf.ToolSelectionConfig
 	PromptGenerator PromptGenerator
 	Roles           *AgentRoleRegistry
-	ConfigStore     conf.ConfigStore
+	Config          *conf.CswConfig
 
 	OutputHandler  SessionThreadOutput
 	WorkDir        string
@@ -179,7 +179,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		toolSelection:   params.ToolSelection,
 		promptGenerator: params.PromptGenerator,
 		roles:           params.Roles,
-		configStore:     params.ConfigStore,
+		config:          params.Config,
 		systemTools:     params.SystemTools,
 		logBaseDir:      params.LogBaseDir,
 		thinking:        params.Thinking,

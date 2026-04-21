@@ -565,7 +565,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		VCS:                 selectedVCS,
 		Roles:               roleRegistry,
 		LSP:                 lspClient,
-		ConfigStore:         configStore,
+		Config:              configStore,
 		TaskBackend:         taskBackend,
 		LogBaseDir:          logsDir,
 		WorkDir:             effectiveWorkDir,

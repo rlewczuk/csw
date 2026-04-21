@@ -22,10 +22,7 @@ func providerModelsCommand(useJSON *bool) *cobra.Command {
 				return err
 			}
 
-			configs, err := store.GetModelProviderConfigs()
-			if err != nil {
-				return fmt.Errorf("providerModelsCommand() [provider_models.go]: failed to get provider configs: %w", err)
-			}
+			configs := store.ModelProviderConfigs
 
 			var targetProviders []string
 			if len(args) == 1 {

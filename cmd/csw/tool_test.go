@@ -39,8 +39,7 @@ func TestToolCommand_List(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	roleConfigs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	roleConfigs := store.AgentRoleConfigs
 
 	// Verify that at least some default tools are available
 	allRole, exists := roleConfigs["all"]
@@ -91,8 +90,7 @@ func TestToolCommand_ListJSON(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	roleConfigs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	roleConfigs := store.AgentRoleConfigs
 
 	// Get tool fragments from all role
 	allRole, exists := roleConfigs["all"]
@@ -144,8 +142,7 @@ func TestToolCommand_Info(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	roleConfigs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	roleConfigs := store.AgentRoleConfigs
 
 	allRole, exists := roleConfigs["all"]
 	require.True(t, exists)
@@ -186,8 +183,7 @@ func TestToolCommand_Desc(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	roleConfigs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	roleConfigs := store.AgentRoleConfigs
 
 	allRole, exists := roleConfigs["all"]
 	require.True(t, exists)
@@ -311,8 +307,7 @@ func TestToolCommand_ListWithRole(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	roleConfigs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	roleConfigs := store.AgentRoleConfigs
 
 	// Test with developer role
 	developerRole, exists := roleConfigs["developer"]
@@ -348,8 +343,7 @@ func TestToolCommand_InfoNotFound(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	roleConfigs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	roleConfigs := store.AgentRoleConfigs
 
 	allRole, exists := roleConfigs["all"]
 	require.True(t, exists)
@@ -385,8 +379,7 @@ func TestVFSDeleteTool_RegisteredAndAdvertised(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	roleConfigs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	roleConfigs := store.AgentRoleConfigs
 
 	// Verify vfsDelete is advertised to LLM via tool fragments
 	allRole, exists := roleConfigs["all"]
@@ -435,8 +428,7 @@ func TestVFSMoveTool_RegisteredAndAdvertised(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	roleConfigs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	roleConfigs := store.AgentRoleConfigs
 
 	// Verify vfsMove is advertised to LLM via tool fragments
 	allRole, exists := roleConfigs["all"]
@@ -486,8 +478,7 @@ func TestVFSListTool_RegisteredAndAdvertised(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	roleConfigs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	roleConfigs := store.AgentRoleConfigs
 
 	// Verify vfsList is advertised to LLM via tool fragments
 	allRole, exists := roleConfigs["all"]

@@ -273,7 +273,7 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 			ToolSelection:   params.ToolSelection,
 			PromptGenerator: params.PromptGenerator,
 			Roles:           params.Roles,
-			ConfigStore:     params.ConfigStore,
+			Config:          params.Config,
 			OutputHandler:   outputHandler,
 			WorkDir:         state.WorkDir,
 			ShadowDir:       params.ShadowDir,

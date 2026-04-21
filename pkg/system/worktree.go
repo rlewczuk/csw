@@ -12,6 +12,7 @@ import (
 	"text/template"
 
 	"github.com/rlewczuk/csw/pkg/apis"
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vcs"
@@ -36,7 +37,7 @@ func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranc
 
 	if !commitHandledByHook {
 		if strings.TrimSpace(commitMessage) == "" {
-			if sweSystem == nil || sweSystem.ConfigStore == nil {
+			if sweSystem == nil || sweSystem.Config == nil {
 				_, _ = fmt.Fprintln(stderr, "worktree commit message generation failed: system config store is not available")
 				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
 				return result, nil
@@ -56,7 +57,7 @@ func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranc
 			}
 
 			chatModel := provider.ChatModel(strings.TrimSpace(session.Model()), nil)
-			generatedMessage, err := core.GenerateCommitMessage(ctx, chatModel, sweSystem.ConfigStore, strings.TrimSpace(originalPrompt), worktreeBranch, commitMessageTemplate)
+			generatedMessage, err := core.GenerateCommitMessage(ctx, chatModel, sweSystem.Config, strings.TrimSpace(originalPrompt), worktreeBranch, commitMessageTemplate)
 			if err != nil {
 				_, _ = fmt.Fprintf(stderr, "worktree commit message generation failed: %v\n", err)
 				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
@@ -206,7 +207,7 @@ func restoreStashedLocalChangesAfterMerge(repoDir string, stashed bool, stderr i
 }
 
 func mergeWorktreeWithConflictResolution(ctx context.Context, repoDir string, worktreeDir string, worktreeBranch string, baseBranch string, originalPrompt string, sweSystem *SweSystem, session *core.SweSession, stderr io.Writer) (string, error) {
-	if sweSystem == nil || sweSystem.ConfigStore == nil {
+	if sweSystem == nil || sweSystem.Config == nil {
 		return "", fmt.Errorf("mergeWorktreeWithConflictResolution() [cli.go]: system config store is not available")
 	}
 	if session == nil {
@@ -244,7 +245,7 @@ func mergeWorktreeWithConflictResolution(ctx context.Context, repoDir string, wo
 			_, _ = fmt.Fprintf(stderr, "[conflict] conflicted files: %s\n", strings.Join(conflictFiles, ", "))
 		}
 
-		prompt, err := buildConflictResolutionPrompt(sweSystem.ConfigStore, conflictResolutionPromptData{
+		prompt, err := buildConflictResolutionPrompt(sweSystem.Config, conflictResolutionPromptData{
 			Branch:         worktreeBranch,
 			OriginalPrompt: originalPrompt,
 			ConflictFiles:  strings.Join(conflictFiles, "\n"),
@@ -294,15 +295,20 @@ func mergeWorktreeWithConflictResolution(ctx context.Context, repoDir string, wo
 	return strings.TrimSpace(headCommitID), nil
 }
 
-func buildConflictResolutionPrompt(configStore interface {
-	GetAgentConfigFile(subdir, filename string) ([]byte, error)
-}, data conflictResolutionPromptData) (string, error) {
-	templateBytes, err := configStore.GetAgentConfigFile("conflict", "prompt.md")
-	if err != nil {
-		return "", fmt.Errorf("buildConflictResolutionPrompt() [cli.go]: failed to read conflict/prompt.md: %w", err)
+func buildConflictResolutionPrompt(config *conf.CswConfig, data conflictResolutionPromptData) (string, error) {
+	if config == nil {
+		return "", fmt.Errorf("buildConflictResolutionPrompt() [cli.go]: config cannot be nil")
+	}
+	conflictFiles, ok := config.AgentConfigFiles["conflict"]
+	if !ok {
+		return "", fmt.Errorf("buildConflictResolutionPrompt() [cli.go]: failed to read conflict/prompt.md: conflict files not found")
+	}
+	templateText, ok := conflictFiles["prompt.md"]
+	if !ok {
+		return "", fmt.Errorf("buildConflictResolutionPrompt() [cli.go]: failed to read conflict/prompt.md: file not found")
 	}
 
-	tmpl, err := template.New("conflict-prompt").Parse(string(templateBytes))
+	tmpl, err := template.New("conflict-prompt").Parse(templateText)
 	if err != nil {
 		return "", fmt.Errorf("buildConflictResolutionPrompt() [cli.go]: failed to parse prompt template: %w", err)
 	}

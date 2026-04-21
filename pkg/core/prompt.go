@@ -33,10 +33,10 @@ type PromptGenerator interface {
 }
 
 // ConfPromptGenerator implements PromptGenerator interface.
-// It uses conf.ConfigStore to get prompt fragments from AgentRoleConfig.PromptFragments.
+// It uses conf.CswConfig to get prompt fragments from AgentRoleConfig.PromptFragments.
 type ConfPromptGenerator struct {
-	store conf.ConfigStore
-	vfs   apis.VFS
+	config *conf.CswConfig
+	vfs    apis.VFS
 }
 
 // promptFragment represents a single prompt fragment file.
@@ -50,16 +50,16 @@ type promptFragment struct {
 	isAll    bool // true if from "all" directory
 }
 
-// NewConfPromptGenerator creates a new ConfPromptGenerator with the given ConfigStore and VFS.
+// NewConfPromptGenerator creates a new ConfPromptGenerator with the given CswConfig and VFS.
 // If vfs is nil, GetAgentFiles() will return an error.
-func NewConfPromptGenerator(store conf.ConfigStore, filesystem apis.VFS) (*ConfPromptGenerator, error) {
-	if store == nil {
-		return nil, fmt.Errorf("NewConfPromptGenerator() [prompt.go]: store cannot be nil")
+func NewConfPromptGenerator(config *conf.CswConfig, filesystem apis.VFS) (*ConfPromptGenerator, error) {
+	if config == nil {
+		return nil, fmt.Errorf("NewConfPromptGenerator() [prompt.go]: config cannot be nil")
 	}
 
 	return &ConfPromptGenerator{
-		store: store,
-		vfs:   filesystem,
+		config: config,
+		vfs:    filesystem,
 	}, nil
 }
 
@@ -153,11 +153,8 @@ func (g *ConfPromptGenerator) GetPrompt(tags []string, role *conf.AgentRoleConfi
 		return "", fmt.Errorf("GetPrompt() [prompt.go]: role cannot be nil")
 	}
 
-	// Get all role configs from store to access both "all" and role-specific fragments
-	roleConfigs, err := g.store.GetAgentRoleConfigs()
-	if err != nil {
-		return "", fmt.Errorf("GetPrompt() [prompt.go]: failed to get role configs: %w", err)
-	}
+	// Get all role configs from config to access both "all" and role-specific fragments
+	roleConfigs := g.config.AgentRoleConfigs
 
 	// Collect fragments from "all" role and the specific role
 	var allFragments []promptFragment
@@ -346,11 +343,8 @@ func (g *ConfPromptGenerator) GetToolInfo(tags []string, toolName string, role *
 		return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: role cannot be nil")
 	}
 
-	// Get all role configs from store to access both "all" and role-specific fragments
-	roleConfigs, err := g.store.GetAgentRoleConfigs()
-	if err != nil {
-		return tool.ToolInfo{}, fmt.Errorf("GetToolInfo() [prompt.go]: failed to get role configs: %w", err)
-	}
+	// Get all role configs from config to access both "all" and role-specific fragments
+	roleConfigs := g.config.AgentRoleConfigs
 
 	// Collect tool fragments from "all" role and role-specific
 	var toolFragments map[string]string
@@ -597,8 +591,8 @@ func (g *ConfPromptGenerator) GetAgentFiles(dir string) (map[string]string, erro
 	return result, nil
 }
 
-// GetConfigStore returns the underlying config store.
+// GetConfig returns the underlying config object.
 // This is useful for accessing global configuration like default role.
-func (g *ConfPromptGenerator) GetConfigStore() conf.ConfigStore {
-	return g.store
+func (g *ConfPromptGenerator) GetConfig() *conf.CswConfig {
+	return g.config
 }

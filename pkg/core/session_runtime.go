@@ -88,9 +88,9 @@ func (s *SweSession) compactContext(statusMessage string) error {
 }
 
 func (s *SweSession) contextCompactionThreshold() float64 {
-	if s.configStore != nil {
-		globalConfig, err := s.configStore.GetGlobalConfig()
-		if err == nil && globalConfig != nil && globalConfig.ContextCompactionThreshold > 0 && globalConfig.ContextCompactionThreshold <= 1 {
+	if s.config != nil && s.config.GlobalConfig != nil {
+		globalConfig := s.config.GlobalConfig
+		if globalConfig.ContextCompactionThreshold > 0 && globalConfig.ContextCompactionThreshold <= 1 {
 			return globalConfig.ContextCompactionThreshold
 		}
 	}
@@ -132,9 +132,9 @@ func (s *SweSession) persistCompactionMessagesSnapshot(phase string, compactionN
 // llmRetryMaxAttempts returns the maximum number of retries for rate limit/network errors.
 // Returns default value from models.DefaultMaxRetries if not configured.
 func (s *SweSession) llmRetryMaxAttempts() int {
-	if s.configStore != nil {
-		globalConfig, err := s.configStore.GetGlobalConfig()
-		if err == nil && globalConfig != nil && globalConfig.LLMRetryMaxAttempts > 0 {
+	if s.config != nil && s.config.GlobalConfig != nil {
+		globalConfig := s.config.GlobalConfig
+		if globalConfig.LLMRetryMaxAttempts > 0 {
 			return globalConfig.LLMRetryMaxAttempts
 		}
 	}
@@ -153,9 +153,9 @@ func (s *SweSession) llmRetryMaxAttempts() int {
 
 // llmRetryMaxBackoffSeconds returns the maximum backoff in seconds for temporary failures.
 func (s *SweSession) llmRetryMaxBackoffSeconds() int {
-	if s.configStore != nil {
-		globalConfig, err := s.configStore.GetGlobalConfig()
-		if err == nil && globalConfig != nil && globalConfig.LLMRetryMaxBackoffSeconds > 0 {
+	if s.config != nil && s.config.GlobalConfig != nil {
+		globalConfig := s.config.GlobalConfig
+		if globalConfig.LLMRetryMaxBackoffSeconds > 0 {
 			return globalConfig.LLMRetryMaxBackoffSeconds
 		}
 	}
@@ -202,9 +202,9 @@ func (s *SweSession) maxToolThreadsLimit() int {
 		return s.maxToolThreads
 	}
 
-	if s.configStore != nil {
-		globalConfig, err := s.configStore.GetGlobalConfig()
-		if err == nil && globalConfig != nil && globalConfig.Defaults.MaxThreads > 0 {
+	if s.config != nil && s.config.GlobalConfig != nil {
+		globalConfig := s.config.GlobalConfig
+		if globalConfig.Defaults.MaxThreads > 0 {
 			return globalConfig.Defaults.MaxThreads
 		}
 	}

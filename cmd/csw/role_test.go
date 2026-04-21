@@ -39,8 +39,7 @@ func TestRoleCommand_List(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	configs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	configs := store.AgentRoleConfigs
 
 	// Verify that at least some default roles are present
 	// The embedded defaults should include "developer" and "all" roles
@@ -74,8 +73,7 @@ func TestRoleCommand_Show(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	configs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	configs := store.AgentRoleConfigs
 
 	// Test with the embedded "developer" role
 	config, exists := configs["developer"]
@@ -259,8 +257,7 @@ func TestRoleComposite(t *testing.T) {
 	compositeStore, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	configs, err := compositeStore.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	configs := compositeStore.AgentRoleConfigs
 
 	// Should have at least the developer role from embedded defaults
 	assert.GreaterOrEqual(t, len(configs), 1, "should have at least one role from embedded defaults")
@@ -298,8 +295,7 @@ func TestOutputSystemPrompt(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	configs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	configs := store.AgentRoleConfigs
 
 	config, exists := configs["developer"]
 	require.True(t, exists, "developer role should exist in embedded defaults")
@@ -347,8 +343,7 @@ func TestOutputSystemPromptWithModel(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	configs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	configs := store.AgentRoleConfigs
 
 	config, exists := configs["developer"]
 	require.True(t, exists)
@@ -385,8 +380,7 @@ func TestOutputSystemPromptJSON(t *testing.T) {
 	store, err := GetCompositeConfigStore()
 	require.NoError(t, err)
 
-	configs, err := store.GetAgentRoleConfigs()
-	require.NoError(t, err)
+	configs := store.AgentRoleConfigs
 
 	config, exists := configs["developer"]
 	require.True(t, exists, "developer role should exist in embedded defaults")

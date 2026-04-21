@@ -290,7 +290,7 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 
 	chatModel := provider.ChatModel(strings.TrimSpace(modelRefs[0].Model), nil)
 
-	generatedDescription, err := core.GenerateCommitMessage(ctx, chatModel, sweSystem.ConfigStore, strings.TrimSpace(params.Prompt), strings.TrimSpace(params.Branch), "")
+	generatedDescription, err := core.GenerateCommitMessage(ctx, chatModel, sweSystem.Config, strings.TrimSpace(params.Prompt), strings.TrimSpace(params.Branch), "")
 	if err != nil {
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to generate description: %w", err)
 	}

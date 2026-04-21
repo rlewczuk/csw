@@ -41,10 +41,7 @@ func providerAuthCommand() *cobra.Command {
 				defer closeFn()
 			}
 
-			configs, err := store.GetModelProviderConfigs()
-			if err != nil {
-				return fmt.Errorf("providerAuthCommand() [provider_auth.go]: failed to get provider configs: %w", err)
-			}
+			configs := store.ModelProviderConfigs
 
 			config, exists := configs[providerName]
 			if !exists {

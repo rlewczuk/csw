@@ -41,10 +41,7 @@ func roleListCommand() *cobra.Command {
 				return err
 			}
 
-			configs, err := store.GetAgentRoleConfigs()
-			if err != nil {
-				return fmt.Errorf("roleListCommand() [role.go]: failed to get role configs: %w", err)
-			}
+			configs := store.AgentRoleConfigs
 
 			if useJSON {
 				return outputJSON(configs)
@@ -76,10 +73,7 @@ func roleShowCommand() *cobra.Command {
 				return err
 			}
 
-			configs, err := store.GetAgentRoleConfigs()
-			if err != nil {
-				return fmt.Errorf("roleShowCommand() [role.go]: failed to get role configs: %w", err)
-			}
+			configs := store.AgentRoleConfigs
 
 			config, exists := findRoleConfigByName(configs, roleName)
 			if !exists {
@@ -118,9 +112,9 @@ func roleGetDefaultCommand() *cobra.Command {
 				return err
 			}
 
-			globalConfig, err := store.GetGlobalConfig()
-			if err != nil {
-				return fmt.Errorf("roleGetDefaultCommand() [role.go]: failed to get global config: %w", err)
+			globalConfig := store.GlobalConfig
+			if globalConfig == nil {
+				return fmt.Errorf("roleGetDefaultCommand() [role.go]: global config is nil")
 			}
 
 			if useJSON {
@@ -293,7 +287,7 @@ func formatAccessFlag(flag conf.AccessFlag) string {
 	}
 }
 
-func outputSystemPrompt(store conf.ConfigStore, roleConfig *conf.AgentRoleConfig, modelName string, useJSON bool) error {
+func outputSystemPrompt(store *conf.CswConfig, roleConfig *conf.AgentRoleConfig, modelName string, useJSON bool) error {
 	// Create prompt generator
 	promptGenerator, err := core.NewConfPromptGenerator(store, nil)
 	if err != nil {

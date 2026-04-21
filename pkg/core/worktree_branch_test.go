@@ -45,7 +45,7 @@ func TestGenerateWorktreeBranchName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sweSystem, provider := newWorktreeBranchTestSystem(t, tt.llmResponse)
 
-			branch, err := GenerateWorktreeBranchName(context.Background(), sweSystem.ModelProviders, sweSystem.ConfigStore, "mock/test-model", tt.inputPrompt)
+			branch, err := GenerateWorktreeBranchName(context.Background(), sweSystem.ModelProviders, sweSystem.Config, "mock/test-model", tt.inputPrompt)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedBranch, branch)
 
@@ -70,7 +70,7 @@ func TestGenerateWorktreeBranchNameErrors(t *testing.T) {
 			name: "fails when config store missing",
 			setupSystem: func(t *testing.T) *SweSystem {
 				sweSystem, _ := newWorktreeBranchTestSystem(t, "valid-name")
-				sweSystem.ConfigStore = nil
+				sweSystem.Config = nil
 				return sweSystem
 			},
 			modelName:      "mock/test-model",
@@ -99,7 +99,7 @@ func TestGenerateWorktreeBranchNameErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sweSystem := tt.setupSystem(t)
-			_, err := GenerateWorktreeBranchName(context.Background(), sweSystem.ModelProviders, sweSystem.ConfigStore, tt.modelName, "Fix cleanup issue")
+			_, err := GenerateWorktreeBranchName(context.Background(), sweSystem.ModelProviders, sweSystem.Config, tt.modelName, "Fix cleanup issue")
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.expectedErrSub)
 		})
@@ -212,7 +212,7 @@ func newWorktreeBranchTestSystem(t *testing.T, llmResponse string) (*SweSystem, 
 
 	sweSystem := &SweSystem{
 		ModelProviders: map[string]models.ModelProvider{"mock": provider},
-		ConfigStore:    store,
+		Config:         store,
 	}
 
 	return sweSystem, provider

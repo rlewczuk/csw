@@ -24,16 +24,16 @@ type CommitMessageTemplateData struct {
 
 // GenerateCommitMessage generates a short commit message using the active chat model.
 // If customMessageTemplate is non-empty, it overrides the configured message template.
-func GenerateCommitMessage(ctx context.Context, chatModel models.ChatModel, configStore conf.ConfigStore, userPrompt string, branch string, customMessageTemplate string) (string, error) {
+func GenerateCommitMessage(ctx context.Context, chatModel models.ChatModel, config *conf.CswConfig, userPrompt string, branch string, customMessageTemplate string) (string, error) {
 	if chatModel == nil {
 		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: chat model cannot be nil")
 	}
 
-	if configStore == nil {
+	if config == nil {
 		return "", fmt.Errorf("GenerateCommitMessage() [commit_message.go]: config store cannot be nil")
 	}
 
-	systemPrompt, promptTemplate, messageTemplate, err := LoadCommitPromptTemplates(configStore)
+	systemPrompt, promptTemplate, messageTemplate, err := LoadCommitPromptTemplates(config)
 	if err != nil {
 		return "", err
 	}
@@ -77,21 +77,29 @@ func GenerateCommitMessage(ctx context.Context, chatModel models.ChatModel, conf
 }
 
 // LoadCommitPromptTemplates loads commit prompt templates from configuration store.
-func LoadCommitPromptTemplates(configStore conf.ConfigStore) (string, string, string, error) {
-	systemPromptBytes, err := configStore.GetAgentConfigFile("commit", "system.md")
-	if err != nil {
-		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: failed to read commit/system.md: %w", err)
+func LoadCommitPromptTemplates(config *conf.CswConfig) (string, string, string, error) {
+	if config == nil {
+		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: config cannot be nil")
 	}
-	promptTemplateBytes, err := configStore.GetAgentConfigFile("commit", "prompt.md")
-	if err != nil {
-		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: failed to read commit/prompt.md: %w", err)
-	}
-	messageTemplateBytes, err := configStore.GetAgentConfigFile("commit", "message.md")
-	if err != nil {
-		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: failed to read commit/message.md: %w", err)
+	commitFiles, ok := config.AgentConfigFiles["commit"]
+	if !ok {
+		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: failed to read commit/system.md: commit files not found")
 	}
 
-	return string(systemPromptBytes), string(promptTemplateBytes), string(messageTemplateBytes), nil
+	systemPrompt, ok := commitFiles["system.md"]
+	if !ok {
+		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: failed to read commit/system.md: file not found")
+	}
+	promptTemplate, ok := commitFiles["prompt.md"]
+	if !ok {
+		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: failed to read commit/prompt.md: file not found")
+	}
+	messageTemplate, ok := commitFiles["message.md"]
+	if !ok {
+		return "", "", "", fmt.Errorf("LoadCommitPromptTemplates() [commit_message.go]: failed to read commit/message.md: file not found")
+	}
+
+	return systemPrompt, promptTemplate, messageTemplate, nil
 }
 
 // RenderCommitPrompt renders a commit prompt template with the given data.

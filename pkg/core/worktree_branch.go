@@ -22,19 +22,16 @@ type WorktreeBranchPromptData struct {
 }
 
 // GenerateWorktreeBranchName generates a symbolic worktree branch suffix using the active chat model.
-func GenerateWorktreeBranchName(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore conf.ConfigStore, model string, inputPrompt string) (string, error) {
+func GenerateWorktreeBranchName(ctx context.Context, modelProviders map[string]models.ModelProvider, config *conf.CswConfig, model string, inputPrompt string) (string, error) {
 	if modelProviders == nil {
 		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: model providers cannot be nil")
 	}
 
-	if configStore == nil {
+	if config == nil {
 		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: config store cannot be nil")
 	}
 
-	aliasValues, err := configStore.GetModelAliases()
-	if err != nil {
-		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: failed to load model aliases: %w", err)
-	}
+	aliasValues := config.ModelAliases
 	aliases, err := models.NormalizeModelAliasMap(aliasValues)
 	if err != nil {
 		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: failed to normalize model aliases: %w", err)
@@ -60,7 +57,7 @@ func GenerateWorktreeBranchName(ctx context.Context, modelProviders map[string]m
 		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: provider not found: %s", providerName)
 	}
 
-	systemPrompt, messageTemplate, err := LoadWorktreeBranchPromptTemplates(configStore)
+	systemPrompt, messageTemplate, err := LoadWorktreeBranchPromptTemplates(config)
 	if err != nil {
 		return "", err
 	}
@@ -88,18 +85,26 @@ func GenerateWorktreeBranchName(ctx context.Context, modelProviders map[string]m
 }
 
 // LoadWorktreeBranchPromptTemplates loads worktree branch prompts from configuration store.
-func LoadWorktreeBranchPromptTemplates(configStore conf.ConfigStore) (string, string, error) {
-	systemPromptBytes, err := configStore.GetAgentConfigFile("worktree", "system.md")
-	if err != nil {
-		return "", "", fmt.Errorf("LoadWorktreeBranchPromptTemplates() [worktree_branch.go]: failed to read worktree/system.md: %w", err)
+func LoadWorktreeBranchPromptTemplates(config *conf.CswConfig) (string, string, error) {
+	if config == nil {
+		return "", "", fmt.Errorf("LoadWorktreeBranchPromptTemplates() [worktree_branch.go]: config cannot be nil")
+	}
+	worktreeFiles, ok := config.AgentConfigFiles["worktree"]
+	if !ok {
+		return "", "", fmt.Errorf("LoadWorktreeBranchPromptTemplates() [worktree_branch.go]: failed to read worktree/system.md: worktree files not found")
 	}
 
-	messageTemplateBytes, err := configStore.GetAgentConfigFile("worktree", "message.md")
-	if err != nil {
-		return "", "", fmt.Errorf("LoadWorktreeBranchPromptTemplates() [worktree_branch.go]: failed to read worktree/message.md: %w", err)
+	systemPrompt, ok := worktreeFiles["system.md"]
+	if !ok {
+		return "", "", fmt.Errorf("LoadWorktreeBranchPromptTemplates() [worktree_branch.go]: failed to read worktree/system.md: file not found")
 	}
 
-	return string(systemPromptBytes), string(messageTemplateBytes), nil
+	messageTemplate, ok := worktreeFiles["message.md"]
+	if !ok {
+		return "", "", fmt.Errorf("LoadWorktreeBranchPromptTemplates() [worktree_branch.go]: failed to read worktree/message.md: file not found")
+	}
+
+	return systemPrompt, messageTemplate, nil
 }
 
 // RenderWorktreeBranchPrompt renders a worktree branch prompt template with the given data.

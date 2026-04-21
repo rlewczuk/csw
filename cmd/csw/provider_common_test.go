@@ -25,7 +25,7 @@ func TestGetConfigStore_Local(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get local config store
-	store, err := GetConfigStore(ConfigScopeLocal)
+	_, err = GetConfigStore(ConfigScopeLocal)
 	require.NoError(t, err)
 
 	// Verify directory was created
@@ -42,7 +42,7 @@ func TestGetConfigStore_CustomPath(t *testing.T) {
 	customPath := filepath.Join(tmpDir, "custom", "config")
 
 	// Get config store with custom path
-	store, err := GetConfigStore(ConfigScope(customPath))
+	_, err = GetConfigStore(ConfigScope(customPath))
 	require.NoError(t, err)
 
 	// Verify directory was created
@@ -61,7 +61,7 @@ func TestGetConfigStore_Global(t *testing.T) {
 	defer os.Setenv("HOME", oldHome)
 
 	// Get global config store
-	store, err := GetConfigStore(ConfigScopeGlobal)
+	_, err = GetConfigStore(ConfigScopeGlobal)
 	require.NoError(t, err)
 
 	// Verify directory was created
