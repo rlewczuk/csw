@@ -283,6 +283,11 @@ func TestSweSessionRunNonStreamingChat_UsageLimitWait(t *testing.T) {
 			outputHandler: handler,
 			provider: provider,
 			config:      configStore,
+			llmRetryPolicyOverride: &models.RetryPolicy{
+				InitialDelay: time.Millisecond,
+				MaxRetries:   1,
+				MaxDelay:     time.Millisecond,
+			},
 		}
 
 		chatModel := &tokenLimitChatModel{

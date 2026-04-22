@@ -72,6 +72,7 @@ type SweSession struct {
 	thinking        string
 	maxToolThreads  int
 	toolStartDelay  time.Duration
+	llmRetryPolicyOverride *models.RetryPolicy
 	allowAllPerms   bool
 
 	// pendingToolResponses stores tool responses that were executed before a permission query

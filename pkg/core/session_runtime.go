@@ -164,6 +164,10 @@ func (s *SweSession) llmRetryMaxBackoffSeconds() int {
 }
 
 func (s *SweSession) llmRetryPolicy() models.RetryPolicy {
+	if s != nil && s.llmRetryPolicyOverride != nil {
+		return *s.llmRetryPolicyOverride
+	}
+
 	attempts := s.llmRetryMaxAttempts()
 	if attempts <= 0 {
 		attempts = defaultLLMRetryMaxAttempts

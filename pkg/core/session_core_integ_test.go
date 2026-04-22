@@ -617,10 +617,11 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
+		session.llmRetryPolicyOverride = &models.RetryPolicy{InitialDelay: time.Millisecond, MaxRetries: 1, MaxDelay: time.Millisecond}
 
 		session.UserPrompt("Hello")
 
-		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 		err = session.Run(ctx)
 		cancel()
 
@@ -664,10 +665,11 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
+		session.llmRetryPolicyOverride = &models.RetryPolicy{InitialDelay: time.Millisecond, MaxRetries: 1, MaxDelay: time.Millisecond}
 
 		session.UserPrompt("Hello")
 
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 		err = session.Run(ctx)
 		cancel()
 
@@ -696,10 +698,11 @@ func TestSweSession_RateLimitRetry(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
+		session.llmRetryPolicyOverride = &models.RetryPolicy{InitialDelay: time.Millisecond, MaxRetries: 1, MaxDelay: time.Millisecond}
 
 		session.UserPrompt("Hello")
 
-		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 		err = session.Run(ctx)
 		cancel()
 
@@ -740,10 +743,11 @@ func TestSweSession_NetworkErrorRetry(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
+		session.llmRetryPolicyOverride = &models.RetryPolicy{InitialDelay: time.Millisecond, MaxRetries: 1, MaxDelay: time.Millisecond}
 
 		session.UserPrompt("Hello")
 
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 		err = session.Run(ctx)
 		cancel()
 
@@ -776,10 +780,11 @@ func TestSweSession_NetworkErrorRetry(t *testing.T) {
 		mockHandler := testutil.NewMockSessionOutputHandler()
 		session, err := fixture.system.NewSession("mock/test-model", mockHandler)
 		require.NoError(t, err)
+		session.llmRetryPolicyOverride = &models.RetryPolicy{InitialDelay: time.Millisecond, MaxRetries: 1, MaxDelay: time.Millisecond}
 
 		session.UserPrompt("Hello")
 
-		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 		err = session.Run(ctx)
 		cancel()
 
