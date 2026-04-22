@@ -44,9 +44,9 @@ func DefaultLLMRetryPolicy(config *conf.CswConfig, provider models.ModelProvider
 		maxBackoffSeconds = config.GlobalConfig.LLMRetryMaxBackoffSeconds
 	}
 
-	maxDelay := time.Duration(maxBackoffSeconds) * backoffScale
+	maxDelay := time.Duration(maxBackoffSeconds) * time.Second
 	if maxDelay <= 0 {
-		maxDelay = 60 * backoffScale
+		maxDelay = 60 * time.Second
 	}
 
 	return models.RetryPolicy{
@@ -64,6 +64,7 @@ func NewGenerationChatModelFromSpec(
 	config *conf.CswConfig,
 	primaryProvider models.ModelProvider,
 	aliases map[string][]string,
+	retryPolicyOverride *models.RetryPolicy,
 	retryLogFn func(string, shared.MessageType),
 ) (models.ChatModel, error) {
 	if primaryProvider == nil {
@@ -71,6 +72,9 @@ func NewGenerationChatModelFromSpec(
 	}
 
 	retryPolicy := DefaultLLMRetryPolicy(config, primaryProvider)
+	if retryPolicyOverride != nil {
+		retryPolicy = *retryPolicyOverride
+	}
 	chatModel, err := models.NewChatModelFromProviderChain(
 		modelSpec,
 		providers,

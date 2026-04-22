@@ -66,7 +66,7 @@ func GenerateWorktreeBranchName(ctx context.Context, modelProviders map[string]m
 		return "", err
 	}
 
-	chatModel, err := NewGenerationChatModelFromSpec(model, modelProviders, nil, config, primaryProvider, aliases, nil)
+	chatModel, err := NewGenerationChatModelFromSpec(model, modelProviders, nil, config, primaryProvider, aliases, nil, nil)
 	if err != nil {
 		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: failed to create chat model chain: %w", err)
 	}

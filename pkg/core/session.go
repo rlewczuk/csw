@@ -261,6 +261,7 @@ func (s *SweSession) Run(ctx context.Context) error {
 		s.config,
 		s.provider,
 		s.modelAliases,
+		s.llmRetryPolicyOverride,
 		s.handleRetryChatModelMessage,
 	)
 	if chatModelErr != nil {

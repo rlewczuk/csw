@@ -25,7 +25,7 @@ func TestDefaultLLMRetryPolicy(t *testing.T) {
 			assertFn: func(t *testing.T, policy models.RetryPolicy) {
 				assert.Equal(t, defaultLLMRetryMaxAttempts-1, policy.MaxRetries)
 				assert.Equal(t, models.DefaultRetryBackoffScale, policy.InitialDelay)
-				assert.Equal(t, time.Duration(defaultLLMRetryMaxBackoffSeconds)*models.DefaultRetryBackoffScale, policy.MaxDelay)
+				assert.Equal(t, time.Duration(defaultLLMRetryMaxBackoffSeconds)*time.Second, policy.MaxDelay)
 			},
 		},
 		{
@@ -53,7 +53,7 @@ func TestDefaultLLMRetryPolicy(t *testing.T) {
 			assertFn: func(t *testing.T, policy models.RetryPolicy) {
 				assert.Equal(t, 2, policy.MaxRetries)
 				assert.Equal(t, 3*time.Second, policy.InitialDelay)
-				assert.Equal(t, time.Duration(defaultLLMRetryMaxBackoffSeconds)*3*time.Second, policy.MaxDelay)
+				assert.Equal(t, time.Duration(defaultLLMRetryMaxBackoffSeconds)*time.Second, policy.MaxDelay)
 			},
 		},
 	}
@@ -79,6 +79,7 @@ func TestNewGenerationChatModelFromSpecUsesFallbackAndRetry(t *testing.T) {
 		nil,
 		&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{LLMRetryMaxAttempts: 2}},
 		primary,
+		nil,
 		nil,
 		nil,
 	)

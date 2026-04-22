@@ -296,6 +296,7 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 		provider,
 		sweSystem.ModelAliases,
 		nil,
+		nil,
 	)
 	if err != nil {
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to create chat model chain: %w", err)

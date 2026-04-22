@@ -66,6 +66,7 @@ func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranc
 				sweSystem.Config,
 				provider,
 				sweSystem.ModelAliases,
+				nil,
 				func(message string, msgType shared.MessageType) {
 					if strings.TrimSpace(message) == "" {
 						return

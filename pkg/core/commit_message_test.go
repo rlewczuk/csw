@@ -163,6 +163,7 @@ func TestGenerateCommitMessageUsesRetryAndFallbackChatModelChain(t *testing.T) {
 				primary,
 				nil,
 				nil,
+				nil,
 			)
 			require.NoError(t, err)
 
