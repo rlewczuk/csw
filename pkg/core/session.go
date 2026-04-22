@@ -267,9 +267,7 @@ func (s *SweSession) Run(ctx context.Context) error {
 		return fmt.Errorf("SweSession.Run() [session.go]: failed to create chat model chain: %w", chatModelErr)
 	}
 	chatModel := models.NewUnstreamingChatModel(chatModelImpl)
-	if kimiCompactor, ok := s.compactor.(*KimiCompactor); ok && kimiCompactor.model == nil {
-		s.compactor = NewKimiCompactor(chatModel, kimiCompactor.nmessages)
-	}
+	s.configureCompactor(chatModel, chatModelImpl)
 
 	// Build tools list using PromptGenerator.GetToolInfo()
 	tools := []tool.ToolInfo{}
@@ -355,6 +353,26 @@ func (s *SweSession) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *SweSession) configureCompactor(chatModel models.ChatModel, compactorProvider models.ChatModel) {
+	if s == nil {
+		return
+	}
+
+	if compactorProvider != nil {
+		if modelCompactor := compactorProvider.Compactor(); modelCompactor != nil {
+			s.compactor = &modelChatCompactorAdapter{
+				modelCompactor: modelCompactor,
+				fallback:       s.compactor,
+			}
+			return
+		}
+	}
+
+	if kimiCompactor, ok := s.compactor.(*KimiCompactor); ok && kimiCompactor.model == nil {
+		s.compactor = NewKimiCompactor(chatModel, kimiCompactor.nmessages)
+	}
 }
 
 func (s *SweSession) buildChatOptions() *models.ChatOptions {
