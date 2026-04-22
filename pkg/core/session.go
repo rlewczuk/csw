@@ -22,6 +22,7 @@ const (
 	defaultLLMRetryMaxAttempts        = 10
 	defaultLLMRetryMaxBackoffSeconds  = 60
 	defaultContextCompactionThreshold = 0.95
+	defaultKimiCompactorMessagesToKeep = 2
 	defaultMaxToolThreads             = 8
 	toolExecutionStartDelay           = 250 * time.Millisecond
 	sessionMessageTypeInfo            = "info"
@@ -192,7 +193,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		tokenUsage:           params.TokenUsage,
 		contextLength:        params.ContextLength,
 		compactionCount:      params.CompactionCount,
-		compactor:            NewCompactMessagesChatCompactor(),
+		compactor:            NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep),
 		taskBackend:          params.TaskBackend,
 		subAgentRunner:       params.SubAgentRunner,
 		subAgentSlugs:        make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
@@ -266,6 +267,9 @@ func (s *SweSession) Run(ctx context.Context) error {
 		return fmt.Errorf("SweSession.Run() [session.go]: failed to create chat model chain: %w", chatModelErr)
 	}
 	chatModel := models.NewUnstreamingChatModel(chatModelImpl)
+	if kimiCompactor, ok := s.compactor.(*KimiCompactor); ok && kimiCompactor.model == nil {
+		s.compactor = NewKimiCompactor(chatModel, kimiCompactor.nmessages)
+	}
 
 	// Build tools list using PromptGenerator.GetToolInfo()
 	tools := []tool.ToolInfo{}
