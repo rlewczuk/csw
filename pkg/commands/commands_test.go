@@ -107,6 +107,12 @@ func TestLoadFromDirFallsBackToEmbeddedCommand(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "csw/task-critic", command.Name)
 	assert.Equal(t, "embedded:data/csw/task-critic.md", command.Path)
+	assert.Equal(t, "Analyses your task specification for ambiguities, errors and missing parts", command.Metadata.Description)
+	assert.Equal(t, "critic", command.Metadata.Agent)
+	assert.Contains(t, command.Template, "Analyze below task specification for errors, ambiguities and missing parts:")
+	assert.Contains(t, command.Template, "<task-specification>")
+	assert.Contains(t, command.Template, "{{.Task.Prompt}}")
+	assert.Contains(t, command.Template, "</task-specification>")
 	assert.NotEmpty(t, strings.TrimSpace(command.Template))
 }
 
