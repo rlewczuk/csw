@@ -69,11 +69,11 @@ func TestKimiCompactorCompactMessages(t *testing.T) {
 		got := compactor.CompactMessages(messages)
 
 		require.Len(t, got, 3)
-		assert.Equal(t, models.ChatRoleUser, got[0].Role)
-		assert.Contains(t, got[0].GetText(), kimiCompactorPrefix)
-		assert.Contains(t, got[0].GetText(), "summary line")
-		assert.NotContains(t, got[0].GetText(), "hidden")
-		assert.Equal(t, "keep user", got[1].GetText())
+		assert.Equal(t, "keep user", got[0].GetText())
+		assert.Equal(t, models.ChatRoleUser, got[1].Role)
+		assert.Contains(t, got[1].GetText(), kimiCompactorPrefix)
+		assert.Contains(t, got[1].GetText(), "summary line")
+		assert.NotContains(t, got[1].GetText(), "hidden")
 		assert.Equal(t, "keep assistant", got[2].GetText())
 
 		require.Equal(t, 1, chatModel.calls)
@@ -82,6 +82,27 @@ func TestKimiCompactorCompactMessages(t *testing.T) {
 		assert.Equal(t, kimiCompactorSystemPrompt, chatModel.lastMessages[0].GetText())
 		assert.Contains(t, chatModel.lastMessages[1].GetText(), "## Message 1")
 		assert.Contains(t, chatModel.lastMessages[1].GetText(), kimiCompactorPrompt)
+	})
+
+	t.Run("places first preserved user before summary when preserved starts with assistant", func(t *testing.T) {
+		chatModel := &kimiTestChatModel{
+			response: models.NewTextMessage(models.ChatRoleAssistant, "summary"),
+		}
+
+		compactor := NewKimiCompactor(chatModel, 2)
+		messages := []*models.ChatMessage{
+			models.NewTextMessage(models.ChatRoleSystem, "system prompt"),
+			models.NewTextMessage(models.ChatRoleUser, "old user"),
+			models.NewTextMessage(models.ChatRoleAssistant, "keep assistant"),
+			models.NewTextMessage(models.ChatRoleUser, "keep user"),
+		}
+
+		got := compactor.CompactMessages(messages)
+
+		require.Len(t, got, 3)
+		assert.Equal(t, "keep user", got[0].GetText())
+		assert.Contains(t, got[1].GetText(), kimiCompactorPrefix)
+		assert.Equal(t, "keep assistant", got[2].GetText())
 	})
 
 	t.Run("returns original messages when chat model fails", func(t *testing.T) {

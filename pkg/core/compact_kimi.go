@@ -61,6 +61,24 @@ func (c *KimiCompactor) CompactMessages(messages []*models.ChatMessage) []*model
 
 	compacted := &models.ChatMessage{Role: models.ChatRoleUser, Parts: parts}
 	result := make([]*models.ChatMessage, 0, len(preserved)+1)
+
+	firstUserIndex := -1
+	for index, message := range preserved {
+		if message.Role == models.ChatRoleUser {
+			firstUserIndex = index
+			break
+		}
+	}
+
+	if firstUserIndex >= 0 {
+		result = append(result, preserved[firstUserIndex])
+		result = append(result, compacted)
+		result = append(result, preserved[:firstUserIndex]...)
+		result = append(result, preserved[firstUserIndex+1:]...)
+
+		return result
+	}
+
 	result = append(result, compacted)
 	result = append(result, preserved...)
 
