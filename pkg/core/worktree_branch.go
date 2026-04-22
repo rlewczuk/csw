@@ -23,6 +23,18 @@ type WorktreeBranchPromptData struct {
 
 // GenerateWorktreeBranchName generates a symbolic worktree branch suffix using the active chat model.
 func GenerateWorktreeBranchName(ctx context.Context, modelProviders map[string]models.ModelProvider, config *conf.CswConfig, model string, inputPrompt string) (string, error) {
+	return generateWorktreeBranchNameWithRetryPolicyOverride(ctx, modelProviders, config, model, inputPrompt, nil)
+}
+
+// generateWorktreeBranchNameWithRetryPolicyOverride generates branch name using optional retry policy override.
+func generateWorktreeBranchNameWithRetryPolicyOverride(
+	ctx context.Context,
+	modelProviders map[string]models.ModelProvider,
+	config *conf.CswConfig,
+	model string,
+	inputPrompt string,
+	retryPolicyOverride *models.RetryPolicy,
+) (string, error) {
 	if modelProviders == nil {
 		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: model providers cannot be nil")
 	}
@@ -66,7 +78,7 @@ func GenerateWorktreeBranchName(ctx context.Context, modelProviders map[string]m
 		return "", err
 	}
 
-	chatModel, err := NewGenerationChatModelFromSpec(model, modelProviders, nil, config, primaryProvider, aliases, nil, nil)
+	chatModel, err := NewGenerationChatModelFromSpec(model, modelProviders, nil, config, primaryProvider, aliases, retryPolicyOverride, nil)
 	if err != nil {
 		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: failed to create chat model chain: %w", err)
 	}

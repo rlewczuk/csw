@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
@@ -141,9 +142,11 @@ func TestGenerateWorktreeBranchNameUsesRetryAndFallbackChatModelChain(t *testing
 		name            string
 		modelSpec       string
 		setupProviders  func(primary *models.MockClient, secondary *models.MockClient)
+		retryPolicy     *models.RetryPolicy
 		expectPrimary   int
 		expectSecondary int
 		expectedBranch  string
+		maxDuration     time.Duration
 	}{
 		{
 			name:      "retries temporary rate limit errors",
@@ -155,9 +158,11 @@ func TestGenerateWorktreeBranchNameUsesRetryAndFallbackChatModelChain(t *testing
 				primary.RateLimitErrorCount = &rateLimitCount
 				primary.SetChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "retry branch output")})
 			},
+			retryPolicy:     &models.RetryPolicy{InitialDelay: time.Millisecond, MaxRetries: 1, MaxDelay: time.Millisecond},
 			expectPrimary:   2,
 			expectSecondary: 0,
 			expectedBranch:  "retry-branch-output",
+			maxDuration:     50 * time.Millisecond,
 		},
 		{
 			name:      "falls back to secondary provider",
@@ -166,9 +171,11 @@ func TestGenerateWorktreeBranchNameUsesRetryAndFallbackChatModelChain(t *testing
 				primary.SetChatResponse("test-model", &models.MockChatResponse{Error: &models.NetworkError{Message: "temporary network issue", IsRetryable: true}})
 				secondary.SetChatResponse("backup-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "fallback branch output")})
 			},
+			retryPolicy:     &models.RetryPolicy{InitialDelay: time.Millisecond, MaxRetries: 1, MaxDelay: time.Millisecond},
 			expectPrimary:   1,
 			expectSecondary: 1,
 			expectedBranch:  "fallback-branch-output",
+			maxDuration:     50 * time.Millisecond,
 		},
 	}
 
@@ -188,17 +195,22 @@ func TestGenerateWorktreeBranchNameUsesRetryAndFallbackChatModelChain(t *testing
 				},
 			}
 
-			branch, err := GenerateWorktreeBranchName(
+			start := time.Now()
+
+			branch, err := generateWorktreeBranchNameWithRetryPolicyOverride(
 				context.Background(),
 				map[string]models.ModelProvider{"p1": primary, "p2": secondary},
 				store,
 				tt.modelSpec,
 				"Fix branch naming",
+				tt.retryPolicy,
 			)
+			elapsed := time.Since(start)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedBranch, branch)
 			assert.Len(t, primary.RecordedMessages, tt.expectPrimary)
 			assert.Len(t, secondary.RecordedMessages, tt.expectSecondary)
+			assert.Less(t, elapsed, tt.maxDuration)
 		})
 	}
 }
