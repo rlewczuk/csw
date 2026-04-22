@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vcs"
 	"github.com/rlewczuk/csw/pkg/vfs"
@@ -256,6 +258,28 @@ func TestFinalizeWorktreeSessionMergeStashesAndRestoresLocalChanges(t *testing.T
 
 func TestFinalizeWorktreeSessionRetriesCommitMessageGenerationOnTemporaryError(t *testing.T) {
 	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "retry generated message", true)
+	originalNewGenerationChatModelForWorktreeFunc := newGenerationChatModelForWorktreeFunc
+	defer func() {
+		newGenerationChatModelForWorktreeFunc = originalNewGenerationChatModelForWorktreeFunc
+	}()
+
+	newGenerationChatModelForWorktreeFunc = func(
+		modelSpec string,
+		providers map[string]models.ModelProvider,
+		options *models.ChatOptions,
+		config *conf.CswConfig,
+		primaryProvider models.ModelProvider,
+		aliases map[string][]string,
+		retryPolicyOverride *models.RetryPolicy,
+		retryLogFn func(string, shared.MessageType),
+	) (models.ChatModel, error) {
+		fastRetryPolicy := &models.RetryPolicy{
+			InitialDelay: time.Millisecond,
+			MaxRetries:   1,
+			MaxDelay:     time.Millisecond,
+		}
+		return core.NewGenerationChatModelFromSpec(modelSpec, providers, options, config, primaryProvider, aliases, fastRetryPolicy, retryLogFn)
+	}
 
 	provider, ok := sweSystem.ModelProviders["mock"].(*models.MockClient)
 	require.True(t, ok)
