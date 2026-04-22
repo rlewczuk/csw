@@ -219,6 +219,8 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 		name           string
 		prompt         string
 		modelName      string
+		globalConfig   *conf.GlobalConfig
+		providerConfig *conf.ModelProviderConfig
 		aliases        map[string]conf.ModelAliasValue
 		worktree       string
 		generatorError error
@@ -231,14 +233,23 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 		{name: "generates and appends branch suffix", prompt: "Fix worktree cleanup issue", modelName: "mock/test-model", worktree: "sp-1234-%", expected: "sp-1234-worktree-cleanup", generateCalls: 1},
 		{name: "prefix length does not affect generated suffix length", prompt: "Fix worktree cleanup issue", modelName: "mock/test-model", worktree: "very-long-constant-prefix-%", expected: "very-long-constant-prefix-kebab-case-configuration", generateCalls: 1},
 		{name: "generates and appends branch suffix with model alias", prompt: "Fix worktree cleanup issue", modelName: "default", aliases: map[string]conf.ModelAliasValue{"default": {Values: []string{"mock/test-model"}}}, worktree: "sp-1234-%", expected: "sp-1234-worktree-cleanup", generateCalls: 1},
+		{name: "generates branch with retry on temporary provider error", prompt: "Fix worktree cleanup issue", modelName: "mock/test-model", worktree: "sp-1234-%", expected: "sp-1234-worktree-cleanup", generateCalls: 1, globalConfig: &conf.GlobalConfig{LLMRetryMaxAttempts: 2}},
+		{name: "generates branch using fallback model when primary fails", prompt: "Fix worktree cleanup issue", modelName: "mock/test-model,mock/backup-model", worktree: "sp-1234-%", expected: "sp-1234-worktree-cleanup", generateCalls: 1, globalConfig: &conf.GlobalConfig{LLMRetryMaxAttempts: 1}},
 		{name: "propagates generator error", prompt: "Fix worktree cleanup issue", modelName: "mock/test-model", worktree: "sp-1234-%", generatorError: errors.New("generation failed"), expectError: "generation failed", generateCalls: 1},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			mockProviderConfig := &conf.ModelProviderConfig{Name: "mock", Type: "openai", URL: "http://example.com", ModelTags: []conf.ModelTagMapping{}}
+			if tt.providerConfig != nil {
+				mockProviderConfig = tt.providerConfig.Clone()
+			}
 			store := &conf.CswConfig{ModelProviderConfigs: map[string]*conf.ModelProviderConfig{
-				"mock": {Name: "mock", Type: "openai", URL: "http://example.com", ModelTags: []conf.ModelTagMapping{}},
+				"mock": mockProviderConfig,
 			}}
+			if tt.globalConfig != nil {
+				store.GlobalConfig = tt.globalConfig.Clone()
+			}
 			if len(tt.aliases) > 0 {
 				store.ModelAliases = tt.aliases
 			}
@@ -261,7 +272,16 @@ func TestResolveWorktreeBranchName(t *testing.T) {
 				return ResolveModelName(modelName, configStore, providerRegistry)
 			}
 			createProviderMapFunc = func(providerRegistry *models.ProviderRegistry) (map[string]models.ModelProvider, error) {
-				provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+				provider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}, {Name: "backup-model"}})
+				provider.Config = mockProviderConfig.Clone()
+				if strings.Contains(tt.name, "retry on temporary provider error") {
+					rateLimitCount := 1
+					provider.RateLimitError = &models.RateLimitError{Message: "rate exceeded", RetryAfterSeconds: 0}
+					provider.RateLimitErrorCount = &rateLimitCount
+				}
+				if strings.Contains(tt.name, "fallback model") {
+					provider.SetChatResponse("test-model", &models.MockChatResponse{Error: &models.NetworkError{Message: "temporary network issue", IsRetryable: true}})
+				}
 				return map[string]models.ModelProvider{"mock": provider}, nil
 			}
 

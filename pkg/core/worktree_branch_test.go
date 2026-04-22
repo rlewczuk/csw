@@ -120,7 +120,7 @@ func TestGenerateWorktreeBranchNameAliasModel(t *testing.T) {
 			},
 		},
 		ModelAliases: map[string]conf.ModelAliasValue{
-		"default": {Values: []string{"mock/test-model", "mock/backup-model"}},
+			"default": {Values: []string{"mock/test-model", "mock/backup-model"}},
 		},
 	}
 
@@ -134,6 +134,73 @@ func TestGenerateWorktreeBranchNameAliasModel(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "alias-branch-name", branch)
 	require.NotEmpty(t, provider.RecordedMessages)
+}
+
+func TestGenerateWorktreeBranchNameUsesRetryAndFallbackChatModelChain(t *testing.T) {
+	tests := []struct {
+		name            string
+		modelSpec       string
+		setupProviders  func(primary *models.MockClient, secondary *models.MockClient)
+		expectPrimary   int
+		expectSecondary int
+		expectedBranch  string
+	}{
+		{
+			name:      "retries temporary rate limit errors",
+			modelSpec: "p1/test-model",
+			setupProviders: func(primary *models.MockClient, secondary *models.MockClient) {
+				_ = secondary
+				rateLimitCount := 1
+				primary.RateLimitError = &models.RateLimitError{Message: "rate exceeded", RetryAfterSeconds: 0}
+				primary.RateLimitErrorCount = &rateLimitCount
+				primary.SetChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "retry branch output")})
+			},
+			expectPrimary:   2,
+			expectSecondary: 0,
+			expectedBranch:  "retry-branch-output",
+		},
+		{
+			name:      "falls back to secondary provider",
+			modelSpec: "p1/test-model,p2/backup-model",
+			setupProviders: func(primary *models.MockClient, secondary *models.MockClient) {
+				primary.SetChatResponse("test-model", &models.MockChatResponse{Error: &models.NetworkError{Message: "temporary network issue", IsRetryable: true}})
+				secondary.SetChatResponse("backup-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "fallback branch output")})
+			},
+			expectPrimary:   1,
+			expectSecondary: 1,
+			expectedBranch:  "fallback-branch-output",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			primary := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+			secondary := models.NewMockProvider([]models.ModelInfo{{Name: "backup-model"}})
+			tt.setupProviders(primary, secondary)
+
+			store := &conf.CswConfig{
+				GlobalConfig: &conf.GlobalConfig{LLMRetryMaxAttempts: 2},
+				AgentConfigFiles: map[string]map[string]string{
+					"worktree": {
+						"system.md":  "system worktree prompt",
+						"message.md": "input:\n{{ .Input }}",
+					},
+				},
+			}
+
+			branch, err := GenerateWorktreeBranchName(
+				context.Background(),
+				map[string]models.ModelProvider{"p1": primary, "p2": secondary},
+				store,
+				tt.modelSpec,
+				"Fix branch naming",
+			)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedBranch, branch)
+			assert.Len(t, primary.RecordedMessages, tt.expectPrimary)
+			assert.Len(t, secondary.RecordedMessages, tt.expectSecondary)
+		})
+	}
 }
 
 func TestRenderWorktreeBranchPrompt(t *testing.T) {

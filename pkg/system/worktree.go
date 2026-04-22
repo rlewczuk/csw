@@ -14,11 +14,14 @@ import (
 	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/rlewczuk/csw/pkg/vcs"
 )
 
 var executeConflictSubAgentFunc = executeConflictSubAgentTask
+
+var newGenerationChatModelForWorktreeFunc = core.NewGenerationChatModelFromSpec
 
 type WorktreeFinalizeResult struct {
 	HeadCommitID string
@@ -56,7 +59,30 @@ func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranc
 				return result, nil
 			}
 
-			chatModel := provider.ChatModel(strings.TrimSpace(session.Model()), nil)
+			chatModel, modelErr := newGenerationChatModelForWorktreeFunc(
+				session.ModelWithProvider(),
+				sweSystem.ModelProviders,
+				nil,
+				sweSystem.Config,
+				provider,
+				sweSystem.ModelAliases,
+				func(message string, msgType shared.MessageType) {
+					if strings.TrimSpace(message) == "" {
+						return
+					}
+					if msgType == shared.MessageTypeError {
+						_, _ = fmt.Fprintf(stderr, "worktree commit message generation retry: %s\n", message)
+						return
+					}
+					_, _ = fmt.Fprintf(stderr, "worktree commit message generation: %s\n", message)
+				},
+			)
+			if modelErr != nil {
+				_, _ = fmt.Fprintf(stderr, "worktree commit message generation failed: %v\n", modelErr)
+				_, _ = fmt.Fprintln(stderr, "worktree and feature branch were kept for manual investigation.")
+				return result, nil
+			}
+
 			generatedMessage, err := core.GenerateCommitMessage(ctx, chatModel, sweSystem.Config, strings.TrimSpace(originalPrompt), worktreeBranch, commitMessageTemplate)
 			if err != nil {
 				_, _ = fmt.Fprintf(stderr, "worktree commit message generation failed: %v\n", err)

@@ -254,6 +254,67 @@ func TestFinalizeWorktreeSessionMergeStashesAndRestoresLocalChanges(t *testing.T
 	assert.NotContains(t, stderr.String(), "failed to restore stashed local changes")
 }
 
+func TestFinalizeWorktreeSessionRetriesCommitMessageGenerationOnTemporaryError(t *testing.T) {
+	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "retry generated message", true)
+
+	provider, ok := sweSystem.ModelProviders["mock"].(*models.MockClient)
+	require.True(t, ok)
+	rateLimitCount := 1
+	provider.RateLimitError = &models.RateLimitError{Message: "rate exceeded", RetryAfterSeconds: 0}
+	provider.RateLimitErrorCount = &rateLimitCount
+	provider.SetChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "retry generated message")})
+	if sweSystem.Config == nil {
+		sweSystem.Config = &conf.CswConfig{}
+	}
+	sweSystem.Config.GlobalConfig = &conf.GlobalConfig{LLMRetryMaxAttempts: 2}
+
+	var stderr bytes.Buffer
+	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/retry-finalize", false, "", sweSystem, session, &stderr, "", "", "")
+	require.NoError(t, err)
+
+	commitCalls := mockVCS.GetCommitCalls()
+	require.Len(t, commitCalls, 1)
+	assert.Equal(t, "[feature/retry-finalize] retry generated message", commitCalls[0].Message)
+	assert.Contains(t, stderr.String(), "worktree commit message generation retry")
+	require.GreaterOrEqual(t, len(provider.RecordedMessages), 2)
+}
+
+func TestFinalizeWorktreeSessionUsesFallbackModelForCommitMessageGeneration(t *testing.T) {
+	primary := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+	secondary := models.NewMockProvider([]models.ModelInfo{{Name: "backup-model"}})
+	primary.SetChatResponse("test-model", &models.MockChatResponse{Error: &models.NetworkError{Message: "temporary network issue", IsRetryable: true}})
+	secondary.SetChatResponse("backup-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "fallback generated message")})
+
+	sweSystem := &SweSystem{
+		ModelProviders: map[string]models.ModelProvider{"p1": primary, "p2": secondary},
+		ModelAliases:   map[string][]string{},
+		Config: &conf.CswConfig{
+			GlobalConfig: &conf.GlobalConfig{LLMRetryMaxAttempts: 1},
+			AgentConfigFiles: map[string]map[string]string{
+				"commit": {
+					"system.md":  "system prompt",
+					"prompt.md":  "{{- range .Messages }}{{ . }}\n{{- end }}",
+					"message.md": "[{{ .Branch }}] {{ .Message }}",
+				},
+			},
+		},
+	}
+
+	session, err := sweSystem.NewSession("p1/test-model,p2/backup-model", nil)
+	require.NoError(t, err)
+	mockVCS := vfs.NewMockVCS(vfs.NewMockVFS())
+
+	var stderr bytes.Buffer
+	_, finalizeErr := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/fallback-finalize", false, "", sweSystem, session, &stderr, "", "", "")
+	require.NoError(t, finalizeErr)
+
+	commitCalls := mockVCS.GetCommitCalls()
+	require.Len(t, commitCalls, 1)
+	assert.Equal(t, "[feature/fallback-finalize] fallback generated message", commitCalls[0].Message)
+	require.Len(t, primary.RecordedMessages, 1)
+	require.Len(t, secondary.RecordedMessages, 1)
+}
+
 func TestFinalizeWorktreeSessionMergeUnstashConflictRestoresCleanStateAndKeepsStash(t *testing.T) {
 	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge with local changes", true)
 	repoDir := t.TempDir()

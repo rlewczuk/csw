@@ -271,7 +271,7 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 		RoleName:      strings.TrimSpace(pickTaskRoleName(params.Role)),
 	}
 
-	sweSystem, buildResult, err := system.BuildSystem(buildParams)
+	sweSystem, buildResult, err := buildTaskDescriptionSystemFunc(buildParams)
 	if err != nil {
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to build system: %w", err)
 	}
@@ -288,7 +288,18 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: provider not found: %s", providerName)
 	}
 
-	chatModel := provider.ChatModel(strings.TrimSpace(modelRefs[0].Model), nil)
+	chatModel, err := core.NewGenerationChatModelFromSpec(
+		strings.TrimSpace(buildResult.ModelName),
+		sweSystem.ModelProviders,
+		nil,
+		sweSystem.Config,
+		provider,
+		sweSystem.ModelAliases,
+		nil,
+	)
+	if err != nil {
+		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to create chat model chain: %w", err)
+	}
 
 	generatedDescription, err := core.GenerateCommitMessage(ctx, chatModel, sweSystem.Config, strings.TrimSpace(params.Prompt), strings.TrimSpace(params.Branch), "")
 	if err != nil {

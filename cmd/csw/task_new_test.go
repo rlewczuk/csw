@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -57,4 +58,77 @@ func TestTaskNewCommandPromptFlagIsOptional(t *testing.T) {
 	_, required := promptFlag.Annotations[cobra.BashCompOneRequiredFlag]
 	assert.False(t, required)
 	assert.Nil(t, command.Flags().Lookup("run"))
+}
+
+func TestGenerateTaskDescriptionUsesRetryAndFallbackChain(t *testing.T) {
+	originalBuilder := buildTaskDescriptionSystemFunc
+	t.Cleanup(func() {
+		buildTaskDescriptionSystemFunc = originalBuilder
+	})
+
+	tests := []struct {
+		name      string
+		modelSpec string
+		setup     func(primary *models.MockClient, backup *models.MockClient)
+	}{
+		{
+			name:      "retries temporary failures for single model",
+			modelSpec: "mock/test-model",
+			setup: func(primary *models.MockClient, backup *models.MockClient) {
+				_ = backup
+				rateLimitCount := 1
+				primary.RateLimitError = &models.RateLimitError{Message: "rate exceeded", RetryAfterSeconds: 0}
+				primary.RateLimitErrorCount = &rateLimitCount
+				primary.SetChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "retry description")})
+			},
+		},
+		{
+			name:      "falls back to secondary model when primary fails",
+			modelSpec: "mock/test-model,mockb/backup-model",
+			setup: func(primary *models.MockClient, backup *models.MockClient) {
+				primary.SetChatResponse("test-model", &models.MockChatResponse{Error: &models.NetworkError{Message: "temporary network issue", IsRetryable: true}})
+				backup.SetChatResponse("backup-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "fallback description")})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			primary := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+			backup := models.NewMockProvider([]models.ModelInfo{{Name: "backup-model"}})
+			tt.setup(primary, backup)
+
+			configStore := &conf.CswConfig{
+				GlobalConfig: &conf.GlobalConfig{LLMRetryMaxAttempts: 2},
+				AgentConfigFiles: map[string]map[string]string{
+					"commit": {
+						"system.md":  "system prompt",
+						"prompt.md":  "messages:\n{{- range .Messages }}\n- {{ . }}\n{{- end }}",
+						"message.md": "[{{ .Branch }}] {{ .Message }}",
+					},
+				},
+			}
+
+			buildTaskDescriptionSystemFunc = func(params system.BuildSystemParams) (*system.SweSystem, system.BuildSystemResult, error) {
+				_ = params
+				return &system.SweSystem{
+					ModelProviders: map[string]models.ModelProvider{"mock": primary, "mockb": backup},
+					ModelAliases:   map[string][]string{},
+					Config:         configStore,
+				}, system.BuildSystemResult{ModelName: tt.modelSpec, Cleanup: func() {}}, nil
+			}
+
+			description, err := generateTaskDescription(context.Background(), taskCreateResolveParams{
+				Prompt:    "improve retry handling",
+				Branch:    "feature/retry",
+				ModelName: tt.modelSpec,
+			})
+			require.NoError(t, err)
+			assert.NotEmpty(t, description)
+			require.NotEmpty(t, primary.RecordedMessages)
+			if tt.modelSpec == "mock/test-model,mockb/backup-model" {
+				require.NotEmpty(t, backup.RecordedMessages)
+			}
+		})
+	}
 }

@@ -254,14 +254,14 @@ func (s *SweSession) Run(ctx context.Context) error {
 		}
 	}
 
-	retryPolicy := s.llmRetryPolicy()
-	chatModelImpl, chatModelErr := models.NewChatModelFromProviderChain(
+	chatModelImpl, chatModelErr := NewGenerationChatModelFromSpec(
 		s.ModelWithProvider(),
 		providerMap,
 		chatOptions,
-		&retryPolicy,
-		s.handleRetryChatModelMessage,
+		s.config,
+		s.provider,
 		s.modelAliases,
+		s.handleRetryChatModelMessage,
 	)
 	if chatModelErr != nil {
 		return fmt.Errorf("SweSession.Run() [session.go]: failed to create chat model chain: %w", chatModelErr)

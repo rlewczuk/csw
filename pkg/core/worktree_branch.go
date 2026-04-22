@@ -45,14 +45,13 @@ func GenerateWorktreeBranchName(ctx context.Context, modelProviders map[string]m
 		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: resolved model spec is empty")
 	}
 	providerName := modelRefs[0].Provider
-	modelName := modelRefs[0].Model
 	for _, ref := range modelRefs {
 		if _, ok := modelProviders[ref.Provider]; !ok {
 			return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: provider not found: %s", ref.Provider)
 		}
 	}
 
-	provider, ok := modelProviders[providerName]
+	primaryProvider, ok := modelProviders[providerName]
 	if !ok {
 		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: provider not found: %s", providerName)
 	}
@@ -67,7 +66,11 @@ func GenerateWorktreeBranchName(ctx context.Context, modelProviders map[string]m
 		return "", err
 	}
 
-	chatModel := provider.ChatModel(modelName, nil)
+	chatModel, err := NewGenerationChatModelFromSpec(model, modelProviders, nil, config, primaryProvider, aliases, nil)
+	if err != nil {
+		return "", fmt.Errorf("GenerateWorktreeBranchName() [worktree_branch.go]: failed to create chat model chain: %w", err)
+	}
+
 	response, err := chatModel.Chat(ctx, []*models.ChatMessage{
 		models.NewTextMessage(models.ChatRoleSystem, systemPrompt),
 		models.NewTextMessage(models.ChatRoleUser, userPrompt),

@@ -113,6 +113,68 @@ func TestGenerateCommitMessageErrors(t *testing.T) {
 	}
 }
 
+func TestGenerateCommitMessageUsesRetryAndFallbackChatModelChain(t *testing.T) {
+	tests := []struct {
+		name            string
+		modelSpec       string
+		setupProviders  func(primary *models.MockClient, secondary *models.MockClient)
+		expectPrimary   int
+		expectSecondary int
+	}{
+		{
+			name:      "retries temporary rate limit errors",
+			modelSpec: "p1/test-model",
+			setupProviders: func(primary *models.MockClient, secondary *models.MockClient) {
+				_ = secondary
+				rateLimitCount := 1
+				primary.RateLimitError = &models.RateLimitError{Message: "rate exceeded", RetryAfterSeconds: 0}
+				primary.RateLimitErrorCount = &rateLimitCount
+				primary.SetChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "retry commit description")})
+			},
+			expectPrimary:   2,
+			expectSecondary: 0,
+		},
+		{
+			name:      "falls back to secondary provider",
+			modelSpec: "p1/test-model,p2/backup-model",
+			setupProviders: func(primary *models.MockClient, secondary *models.MockClient) {
+				primary.SetChatResponse("test-model", &models.MockChatResponse{Error: &models.NetworkError{Message: "temporary network issue", IsRetryable: true}})
+				secondary.SetChatResponse("backup-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "fallback commit description")})
+			},
+			expectPrimary:   1,
+			expectSecondary: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			primary := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+			secondary := models.NewMockProvider([]models.ModelInfo{{Name: "backup-model"}})
+			tt.setupProviders(primary, secondary)
+
+			configStore := newCommitMessageConfigStore()
+			configStore.GlobalConfig = &conf.GlobalConfig{LLMRetryMaxAttempts: 2}
+
+			chatModel, err := NewGenerationChatModelFromSpec(
+				tt.modelSpec,
+				map[string]models.ModelProvider{"p1": primary, "p2": secondary},
+				nil,
+				configStore,
+				primary,
+				nil,
+				nil,
+			)
+			require.NoError(t, err)
+
+			message, generationErr := GenerateCommitMessage(context.Background(), chatModel, configStore, "do task", "feature/retry", "")
+			require.NoError(t, generationErr)
+			assert.NotEmpty(t, message)
+			assert.Len(t, primary.RecordedMessages, tt.expectPrimary)
+			assert.Len(t, secondary.RecordedMessages, tt.expectSecondary)
+		})
+	}
+}
+
 func newCommitMessageTestFixture(t *testing.T, llmResponse string) (*conf.CswConfig, models.ChatModel, *models.MockClient) {
 	t.Helper()
 
