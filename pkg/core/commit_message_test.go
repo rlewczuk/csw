@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
@@ -118,6 +119,8 @@ func TestGenerateCommitMessageUsesRetryAndFallbackChatModelChain(t *testing.T) {
 		name            string
 		modelSpec       string
 		setupProviders  func(primary *models.MockClient, secondary *models.MockClient)
+		retryPolicy     *models.RetryPolicy
+		maxDuration     time.Duration
 		expectPrimary   int
 		expectSecondary int
 	}{
@@ -131,6 +134,8 @@ func TestGenerateCommitMessageUsesRetryAndFallbackChatModelChain(t *testing.T) {
 				primary.RateLimitErrorCount = &rateLimitCount
 				primary.SetChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "retry commit description")})
 			},
+			retryPolicy: &models.RetryPolicy{InitialDelay: time.Millisecond, MaxRetries: 1, MaxDelay: time.Millisecond},
+			maxDuration:     50 * time.Millisecond,
 			expectPrimary:   2,
 			expectSecondary: 0,
 		},
@@ -154,6 +159,7 @@ func TestGenerateCommitMessageUsesRetryAndFallbackChatModelChain(t *testing.T) {
 
 			configStore := newCommitMessageConfigStore()
 			configStore.GlobalConfig = &conf.GlobalConfig{LLMRetryMaxAttempts: 2}
+			startedAt := time.Now()
 
 			chatModel, err := NewGenerationChatModelFromSpec(
 				tt.modelSpec,
@@ -162,13 +168,16 @@ func TestGenerateCommitMessageUsesRetryAndFallbackChatModelChain(t *testing.T) {
 				configStore,
 				primary,
 				nil,
-				nil,
+				tt.retryPolicy,
 				nil,
 			)
 			require.NoError(t, err)
 
 			message, generationErr := GenerateCommitMessage(context.Background(), chatModel, configStore, "do task", "feature/retry", "")
 			require.NoError(t, generationErr)
+			if tt.maxDuration > 0 {
+				assert.Less(t, time.Since(startedAt), tt.maxDuration)
+			}
 			assert.NotEmpty(t, message)
 			assert.Len(t, primary.RecordedMessages, tt.expectPrimary)
 			assert.Len(t, secondary.RecordedMessages, tt.expectSecondary)
