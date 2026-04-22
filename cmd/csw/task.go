@@ -17,6 +17,7 @@ var resolveTaskRunDefaultsFunc = system.ResolveRunDefaults
 var resolveTaskWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
 var generateTaskDescriptionFunc = generateTaskDescription
 var buildTaskDescriptionSystemFunc = system.BuildSystem
+var newGenerationChatModelFromSpecFunc = core.NewGenerationChatModelFromSpec
 
 // TaskCommand creates task command with persistent hierarchical task management.
 func TaskCommand() *cobra.Command {

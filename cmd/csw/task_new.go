@@ -288,7 +288,7 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: provider not found: %s", providerName)
 	}
 
-	chatModel, err := core.NewGenerationChatModelFromSpec(
+	chatModel, err := newGenerationChatModelFromSpecFunc(
 		strings.TrimSpace(buildResult.ModelName),
 		sweSystem.ModelProviders,
 		nil,

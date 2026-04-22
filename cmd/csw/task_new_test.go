@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -62,8 +64,10 @@ func TestTaskNewCommandPromptFlagIsOptional(t *testing.T) {
 
 func TestGenerateTaskDescriptionUsesRetryAndFallbackChain(t *testing.T) {
 	originalBuilder := buildTaskDescriptionSystemFunc
+	originalModelBuilder := newGenerationChatModelFromSpecFunc
 	t.Cleanup(func() {
 		buildTaskDescriptionSystemFunc = originalBuilder
+		newGenerationChatModelFromSpecFunc = originalModelBuilder
 	})
 
 	tests := []struct {
@@ -76,9 +80,9 @@ func TestGenerateTaskDescriptionUsesRetryAndFallbackChain(t *testing.T) {
 			modelSpec: "mock/test-model",
 			setup: func(primary *models.MockClient, backup *models.MockClient) {
 				_ = backup
-				rateLimitCount := 1
-				primary.RateLimitError = &models.RateLimitError{Message: "rate exceeded", RetryAfterSeconds: 0}
-				primary.RateLimitErrorCount = &rateLimitCount
+				networkErrorCount := 1
+				primary.NetworkError = &models.NetworkError{Message: "temporary network issue", IsRetryable: true}
+				primary.NetworkErrorCount = &networkErrorCount
 				primary.SetChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "retry description")})
 			},
 		},
@@ -116,6 +120,32 @@ func TestGenerateTaskDescriptionUsesRetryAndFallbackChain(t *testing.T) {
 					ModelAliases:   map[string][]string{},
 					Config:         configStore,
 				}, system.BuildSystemResult{ModelName: tt.modelSpec, Cleanup: func() {}}, nil
+			}
+
+			newGenerationChatModelFromSpecFunc = func(
+				modelSpec string,
+				providers map[string]models.ModelProvider,
+				options *models.ChatOptions,
+				config *conf.CswConfig,
+				primaryProvider models.ModelProvider,
+				aliases map[string][]string,
+				retryPolicyOverride *models.RetryPolicy,
+				retryLogFn func(string, shared.MessageType),
+			) (models.ChatModel, error) {
+				_ = config
+				_ = primaryProvider
+				_ = retryLogFn
+
+				retryPolicy := retryPolicyOverride
+				if retryPolicy == nil {
+					retryPolicy = &models.RetryPolicy{
+						InitialDelay: 0,
+						MaxRetries:   1,
+						MaxDelay:     time.Millisecond,
+					}
+				}
+
+				return models.NewChatModelFromProviderChain(modelSpec, providers, options, retryPolicy, nil, aliases)
 			}
 
 			description, err := generateTaskDescription(context.Background(), taskCreateResolveParams{
