@@ -844,17 +844,6 @@ func sortTasks(tasks []*Task) {
 	})
 }
 
-func firstNonEmptyTask(values ...string) string {
-	for _, value := range values {
-		trimmed := strings.TrimSpace(value)
-		if trimmed != "" {
-			return trimmed
-		}
-	}
-
-	return ""
-}
-
 func (m *TaskManager) resolveTaskPromptOverride(task *Task, params TaskRunParams, taskPrompt string) (string, error) {
 	if task == nil {
 		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: task cannot be nil")
