@@ -40,18 +40,14 @@ func (s *SweSystem) StartRunSession(params StartRunSessionParams) (StartRunSessi
 		}
 	}
 
-	session, err := s.newSessionWithOptions(modelName, nil, "", "", params.Thinking, params.RoleName)
+	session, err := s.newSessionWithOptions(modelName, nil, "", "", params.Thinking, params.RoleName, params.Task)
 	if err != nil {
 		return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to create session: %w", err)
 	}
 
-	thread := core.NewSessionThreadWithSession(s, session, nil)
-
-	session.SetTask(params.Task)
-
 	done := make(chan error, 1)
 	wrappedHandler := &runOutputHandler{delegate: params.OutputHandler, done: done}
-	thread.SetOutputHandler(wrappedHandler)
+	thread := core.NewSessionThreadWithSession(s, session, wrappedHandler)
 
 	if err := thread.UserPrompt(params.Prompt); err != nil {
 		return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to send initial message: %w", err)

@@ -201,10 +201,6 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		subAgentSlugs:        make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
 	}
 
-	if session.modelSpec == "" {
-		session.modelSpec = composeProviderModel(session.providerName, session.model)
-	}
-
 	if session.baseVFS == nil {
 		session.baseVFS = session.VFS
 	}

@@ -13,7 +13,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 type persistedToolResponse struct {
@@ -243,6 +242,13 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 		return nil, fmt.Errorf("RestoreSessionFromPersistedState() [session_persistence.go]: provider not found: %s", state.ProviderName)
 	}
 
+	roleName := strings.TrimSpace(state.RoleName)
+	if roleName != "" {
+		if _, roleOK := params.Roles.Get(roleName); !roleOK {
+			return nil, fmt.Errorf("RestoreSessionFromPersistedState() [session_persistence.go]: role not found: %s", roleName)
+		}
+	}
+
 	session := NewSweSession(
 		&SweSessionParams{
 			ID:       state.SessionID,
@@ -264,6 +270,7 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 			ToolsUsed:       state.ToolsUsed,
 			Messages:        []*models.ChatMessage{},
 			Role:            nil,
+			RoleName:        roleName,
 			VFS:             params.VFS,
 			BaseVFS:         params.VFS,
 			LSP:             params.LSP,
@@ -305,29 +312,6 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 			TaskBackend: params.TaskBackend,
 		},
 	)
-
-	if strings.TrimSpace(state.RoleName) != "" {
-		role, roleOK := params.Roles.Get(state.RoleName)
-		if !roleOK {
-			return nil, fmt.Errorf("RestoreSessionFromPersistedState() [session_persistence.go]: role not found: %s", state.RoleName)
-		}
-
-		session.role = &role
-
-		if !session.allowAllPerms && role.VFSPrivileges != nil {
-			session.VFS = vfs.NewAccessControlVFS(params.VFS, role.VFSPrivileges)
-		} else {
-			session.VFS = params.VFS
-		}
-
-		session.applyModelTagToolSelection()
-		if role.ToolsAccess != nil {
-			session.Tools = wrapToolsWithAccessControl(session.Tools, role.ToolsAccess)
-		}
-		if len(session.rolesUsed) == 0 {
-			session.rolesUsed = append(session.rolesUsed, role.Name)
-		}
-	}
 
 	for _, persistedMsg := range state.Messages {
 		message, err := deserializeChatMessage(persistedMsg)

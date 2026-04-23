@@ -94,7 +94,9 @@ func NewSessionThread(system SessionFactory, outputHandler SessionThreadOutput) 
 // This allows creating a new thread/presenter while preserving session state and messages.
 func NewSessionThreadWithSession(system SessionFactory, session *SweSession, outputHandler SessionThreadOutput) *SessionThread {
 	// Update the session's output handler to the new one
-	session.SetOutputHandler(outputHandler)
+	if session != nil {
+		session.outputHandler = outputHandler
+	}
 	return &SessionThread{
 		system:        system,
 		session:       session,
@@ -294,7 +296,7 @@ func (c *SessionThread) SetOutputHandler(handler SessionThreadOutput) {
 
 	c.outputHandler = handler
 	if c.session != nil {
-		c.session.SetOutputHandler(handler)
+		c.session.outputHandler = handler
 	}
 }
 

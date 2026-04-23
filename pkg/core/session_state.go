@@ -55,16 +55,6 @@ func (s *SweSession) SetTaskID(taskID string) {
 	s.persistSessionState()
 }
 
-// SetTask sets task context associated with this session.
-func (s *SweSession) SetTask(task *Task) {
-	if s == nil {
-		return
-	}
-
-	s.task = cloneTask(task)
-	s.persistSessionState()
-}
-
 // ParentID returns the parent session identifier for delegated child sessions.
 func (s *SweSession) ParentID() string {
 	if s == nil {
@@ -147,11 +137,6 @@ func (s *SweSession) ReserveUniqueSubAgentSlug(slug string) (string, error) {
 // This is useful for testing or when you want to use a different logger implementation.
 func (s *SweSession) SetLogger(logger *slog.Logger) {
 	s.logger = logger
-}
-
-// SetOutputHandler sets output handler used by session callbacks.
-func (s *SweSession) SetOutputHandler(handler SessionThreadOutput) {
-	s.outputHandler = handler
 }
 
 // OutputHandler returns currently configured output handler.
