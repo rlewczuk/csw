@@ -5,7 +5,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/system"
 )
 
@@ -56,11 +55,6 @@ func RunCommand() *cobra.Command {
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			system.SetRunCommandTaskManagerLoader(func(cmd *cobra.Command) (*core.TaskManager, error) {
-				manager, _, err := loadTaskBackend(cmd)
-				return manager, err
-			})
-			system.SetRunCommandTaskRunIdentifierResolver(resolveTaskRunIdentifier)
 			return system.RunCommand(&system.RunParams{
 				Command:               cmd,
 				PositionalArgs:        append([]string(nil), args...),

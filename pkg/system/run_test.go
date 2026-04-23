@@ -1,9 +1,12 @@
 package system
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -86,5 +89,57 @@ func TestAppendTaskPromptVFSAllowPaths(t *testing.T) {
 		updated := appendTaskPromptVFSAllowPaths(values, "  /tmp/task-dir  ")
 		require.Len(t, updated, 1)
 		assert.Equal(t, "/tmp/task-dir/task.md", updated[0])
+	})
+}
+
+func TestResolveTaskRunIdentifierForRun(t *testing.T) {
+	t.Run("returns error when both --last and --next are set", func(t *testing.T) {
+		identifier, err := resolveTaskRunIdentifierForRun(nil, "", true, true)
+		require.Error(t, err)
+		assert.Equal(t, "", identifier)
+	})
+
+	t.Run("returns error when identifier is used with --last", func(t *testing.T) {
+		identifier, err := resolveTaskRunIdentifierForRun(nil, "task-id", true, false)
+		require.Error(t, err)
+		assert.Equal(t, "", identifier)
+	})
+
+	t.Run("returns identifier when explicit identifier is provided", func(t *testing.T) {
+		identifier, err := resolveTaskRunIdentifierForRun(nil, " task-id ", false, false)
+		require.NoError(t, err)
+		assert.Equal(t, "task-id", identifier)
+	})
+
+	t.Run("returns error when identifier is empty without --last/--next", func(t *testing.T) {
+		identifier, err := resolveTaskRunIdentifierForRun(nil, " ", false, false)
+		require.Error(t, err)
+		assert.Equal(t, "", identifier)
+	})
+}
+
+func TestResolveRunTaskDirPath(t *testing.T) {
+	t.Run("uses task-dir flag value when present", func(t *testing.T) {
+		workDir := t.TempDir()
+		cmd := &cobra.Command{Use: "run"}
+		cmd.Flags().String("task-dir", "", "")
+		require.NoError(t, cmd.Flags().Set("task-dir", "custom/tasks"))
+
+		resolvedTaskDir, err := resolveRunTaskDirPath(cmd, workDir, "", "", "")
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Clean(filepath.Join(workDir, "custom/tasks")), resolvedTaskDir)
+	})
+
+	t.Run("falls back to default task directory when flag is empty", func(t *testing.T) {
+		workDir := t.TempDir()
+		projectConfigDir := filepath.Join(workDir, "project-config")
+		require.NoError(t, os.MkdirAll(projectConfigDir, 0o755))
+
+		cmd := &cobra.Command{Use: "run"}
+		cmd.Flags().String("task-dir", "", "")
+
+		resolvedTaskDir, err := resolveRunTaskDirPath(cmd, workDir, "", projectConfigDir, "")
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Clean(filepath.Join(workDir, ".cswdata/tasks")), resolvedTaskDir)
 	})
 }

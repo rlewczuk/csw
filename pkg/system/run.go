@@ -80,26 +80,7 @@ type RunParams struct {
 
 type runDefaultsResolver func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error)
 
-// TaskManagerLoader loads task manager for run command task-mode.
-type TaskManagerLoader func(cmd *cobra.Command) (*core.TaskManager, error)
-
-// TaskRunIdentifierResolver resolves task identifier for run command task-mode.
-type TaskRunIdentifierResolver func(manager *core.TaskManager, identifier string, useLast bool, useNext bool) (string, error)
-
 const defaultBashRunTimeout = 120 * time.Second
-
-var loadTaskManagerFunc TaskManagerLoader
-var resolveTaskRunIdentifierFunc TaskRunIdentifierResolver
-
-// SetRunCommandTaskManagerLoader sets task manager loader used by RunCommand.
-func SetRunCommandTaskManagerLoader(loader TaskManagerLoader) {
-	loadTaskManagerFunc = loader
-}
-
-// SetRunCommandTaskRunIdentifierResolver sets task identifier resolver used by RunCommand.
-func SetRunCommandTaskRunIdentifierResolver(resolver TaskRunIdentifierResolver) {
-	resolveTaskRunIdentifierFunc = resolver
-}
 
 // RunCommand runs a non-TUI agent session.
 func RunCommand(params *RunParams) error {
@@ -135,8 +116,8 @@ func RunCommand(params *RunParams) error {
 			if err != nil {
 				return err
 			}
-			if !recognized && loadTaskManagerFunc != nil {
-				loadedManager, loadErr := loadTaskManagerFunc(params.Command)
+			if !recognized {
+				loadedManager, loadErr := loadRunTaskManager(params.Command, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath)
 				if loadErr != nil {
 					return loadErr
 				}
@@ -270,22 +251,16 @@ func RunCommand(params *RunParams) error {
 				prompt = "/" + strings.TrimSpace(invocation.Name)
 				extraPositionalArgs = append([]string(nil), invocation.Arguments...)
 			}
-			if loadTaskManagerFunc == nil {
-				return fmt.Errorf("RunCommand() [run.go]: task manager loader not configured")
-			}
-			if resolveTaskRunIdentifierFunc == nil {
-				return fmt.Errorf("RunCommand() [run.go]: task run identifier resolver not configured")
-			}
 			manager := preloadedTaskManager
 			if manager == nil {
 				var loadErr error
-				manager, loadErr = loadTaskManagerFunc(params.Command)
+				manager, loadErr = loadRunTaskManager(params.Command, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath)
 				if loadErr != nil {
 					return loadErr
 				}
 			}
 			taskManager = manager
-			identifier, err := resolveTaskRunIdentifierFunc(manager, effectiveTaskIdentifier, params.TaskLast, params.TaskNext)
+			identifier, err := resolveTaskRunIdentifierForRun(manager, effectiveTaskIdentifier, params.TaskLast, params.TaskNext)
 			if err != nil {
 				return err
 			}
@@ -472,6 +447,206 @@ func resolveTaskIdentifierFromPosition(manager *core.TaskManager, candidate stri
 	}
 
 	return matchedUUID, true, nil
+}
+
+func loadRunTaskManager(cmd *cobra.Command, workDir string, shadowDir string, projectConfig string, configPath string) (*core.TaskManager, error) {
+	if cmd == nil {
+		return nil, fmt.Errorf("loadRunTaskManager() [run.go]: command cannot be nil")
+	}
+
+	resolvedWorkDir, err := ResolveWorkDir(workDir)
+	if err != nil {
+		return nil, err
+	}
+	resolvedTaskDir, err := resolveRunTaskDirPath(cmd, resolvedWorkDir, shadowDir, projectConfig, configPath)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvedConfigPath, err := BuildConfigPath(projectConfig, configPath)
+	if err != nil {
+		return nil, err
+	}
+	configStore, err := conf.CswConfigLoad(resolvedConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("loadRunTaskManager() [run.go]: failed to load config: %w", err)
+	}
+
+	taskManager, err := core.NewTaskManagerWithTasksDir(resolvedWorkDir, resolvedTaskDir, configStore)
+	if err != nil {
+		return nil, err
+	}
+
+	return taskManager, nil
+}
+
+func resolveRunTaskDirPath(cmd *cobra.Command, workDir string, shadowDir string, projectConfig string, configPath string) (string, error) {
+	if cmd == nil {
+		return "", fmt.Errorf("resolveRunTaskDirPath() [run.go]: command cannot be nil")
+	}
+
+	flagTaskDir := ""
+	flag := cmd.Flag("task-dir")
+	if flag != nil {
+		flagTaskDir = strings.TrimSpace(flag.Value.String())
+	}
+
+	resolvedTaskDir := strings.TrimSpace(flagTaskDir)
+	if resolvedTaskDir == "" {
+		defaults, defaultsErr := ResolveRunDefaults(ResolveRunDefaultsParams{
+			WorkDir:       workDir,
+			ShadowDir:     shadowDir,
+			ProjectConfig: projectConfig,
+			ConfigPath:    configPath,
+		})
+		if defaultsErr != nil {
+			return "", fmt.Errorf("resolveRunTaskDirPath() [run.go]: failed to resolve CLI defaults: %w", defaultsErr)
+		}
+		resolvedTaskDir = strings.TrimSpace(defaults.TaskDir)
+	}
+
+	if resolvedTaskDir == "" {
+		resolvedTaskDir = ".cswdata/tasks"
+	}
+	if !filepath.IsAbs(resolvedTaskDir) {
+		resolvedTaskDir = filepath.Join(workDir, resolvedTaskDir)
+	}
+
+	return filepath.Clean(resolvedTaskDir), nil
+}
+
+func resolveTaskRunIdentifierForRun(manager *core.TaskManager, identifier string, useLast bool, useNext bool) (string, error) {
+	if useLast && useNext {
+		return "", fmt.Errorf("resolveTaskRunIdentifierForRun() [run.go]: --last and --next cannot be used together")
+	}
+	if (useLast || useNext) && strings.TrimSpace(identifier) != "" {
+		return "", fmt.Errorf("resolveTaskRunIdentifierForRun() [run.go]: task identifier cannot be used with --last or --next")
+	}
+
+	if useLast || useNext {
+		if manager == nil {
+			return "", fmt.Errorf("resolveTaskRunIdentifierForRun() [run.go]: manager cannot be nil")
+		}
+
+		taskData, err := findRunnableTaskByModTimeForRun(manager, useLast)
+		if err != nil {
+			return "", err
+		}
+
+		return strings.TrimSpace(taskData.UUID), nil
+	}
+
+	trimmedIdentifier := strings.TrimSpace(identifier)
+	if trimmedIdentifier == "" {
+		return "", fmt.Errorf("resolveTaskRunIdentifierForRun() [run.go]: task identifier cannot be empty")
+	}
+
+	return trimmedIdentifier, nil
+}
+
+func findRunnableTaskByModTimeForRun(manager *core.TaskManager, newest bool) (*core.Task, error) {
+	tasks, err := listAllCurrentTasksForRun(manager)
+	if err != nil {
+		return nil, err
+	}
+
+	modTimes, err := collectTaskYMLModTimesForRun(manager.TasksRoot())
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+		modTimes = map[string]int64{}
+	}
+
+	var selected *core.Task
+	selectedModTime := int64(0)
+	for _, taskData := range tasks {
+		if !isUnfinishedTaskForRun(taskData) {
+			continue
+		}
+
+		taskID := strings.TrimSpace(taskData.UUID)
+		currentModTime := modTimes[taskID]
+		if selected == nil {
+			selected = taskData
+			selectedModTime = currentModTime
+			continue
+		}
+
+		isBetter := false
+		if newest {
+			isBetter = currentModTime > selectedModTime || (currentModTime == selectedModTime && taskID > strings.TrimSpace(selected.UUID))
+		} else {
+			isBetter = currentModTime < selectedModTime || (currentModTime == selectedModTime && taskID < strings.TrimSpace(selected.UUID))
+		}
+
+		if isBetter {
+			selected = taskData
+			selectedModTime = currentModTime
+		}
+	}
+
+	if selected == nil {
+		return nil, fmt.Errorf("findRunnableTaskByModTimeForRun() [run.go]: no unfinished task found")
+	}
+
+	return selected, nil
+}
+
+func collectTaskYMLModTimesForRun(tasksRoot string) (map[string]int64, error) {
+	result := map[string]int64{}
+	trimmedRoot := strings.TrimSpace(tasksRoot)
+	if trimmedRoot == "" {
+		return result, fmt.Errorf("collectTaskYMLModTimesForRun() [run.go]: tasks root cannot be empty")
+	}
+
+	if _, err := os.Stat(trimmedRoot); err != nil {
+		return nil, fmt.Errorf("collectTaskYMLModTimesForRun() [run.go]: failed to stat tasks root: %w", err)
+	}
+
+	walkErr := filepath.WalkDir(trimmedRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry != nil && entry.IsDir() {
+			if path != trimmedRoot && !shared.UUIDPattern.MatchString(strings.TrimSpace(entry.Name())) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry == nil || entry.IsDir() || strings.TrimSpace(entry.Name()) != "task.yml" {
+			return nil
+		}
+		info, infoErr := entry.Info()
+		if infoErr != nil {
+			return infoErr
+		}
+
+		taskUUID := strings.TrimSpace(filepath.Base(filepath.Dir(path)))
+		if taskUUID == "" {
+			return nil
+		}
+		result[taskUUID] = info.ModTime().UnixNano()
+		return nil
+	})
+	if walkErr != nil {
+		return nil, fmt.Errorf("collectTaskYMLModTimesForRun() [run.go]: failed to collect task modification times: %w", walkErr)
+	}
+
+	return result, nil
+}
+
+func isUnfinishedTaskForRun(taskData *core.Task) bool {
+	if taskData == nil {
+		return false
+	}
+
+	status := strings.TrimSpace(taskData.Status)
+	if status == core.TaskStatusMerged || status == core.TaskStatusRunning || status == core.TaskStatusDraft {
+		return false
+	}
+
+	return true
 }
 
 func listAllCurrentTasksForRun(manager *core.TaskManager) ([]*core.Task, error) {
