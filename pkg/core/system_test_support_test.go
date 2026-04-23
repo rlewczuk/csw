@@ -173,7 +173,7 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *SweSession, request tool.SubAgen
 	}
 
 	thinking := firstNonEmpty(strings.TrimSpace(request.Thinking), strings.TrimSpace(parent.ThinkingLevel()))
-	childOutput := &subAgentOutputHandler{delegate: parent.OutputHandler(), slug: resolvedSlug}
+	childOutput := parent.OutputHandler()
 	resolvedRoleName := strings.TrimSpace(request.Role)
 	if resolvedRoleName == "" {
 		if parentRole := parent.Role(); parentRole != nil {
@@ -293,84 +293,6 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
-}
-
-type subAgentOutputHandler struct {
-	delegate SessionThreadOutput
-	slug     string
-}
-
-func (h *subAgentOutputHandler) ShowMessage(message string, messageType string) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.ShowMessage(prefixSubAgentMessage(h.slug, message), messageType)
-}
-
-func (h *subAgentOutputHandler) AddAssistantMessage(text string, thinking string) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.AddAssistantMessage(prefixSubAgentMessage(h.slug, text), prefixSubAgentMessage(h.slug, thinking))
-}
-
-func (h *subAgentOutputHandler) AddUserMessage(text string) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.AddUserMessage(prefixSubAgentMessage(h.slug, text))
-}
-
-func (h *subAgentOutputHandler) AddToolCall(call *tool.ToolCall) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.AddToolCall(call)
-}
-
-func (h *subAgentOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.AddToolCallResult(result)
-}
-
-func (h *subAgentOutputHandler) RunFinished(err error) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.RunFinished(err)
-}
-
-func (h *subAgentOutputHandler) OnRateLimitError(retryAfterSeconds int) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.OnRateLimitError(retryAfterSeconds)
-}
-
-func (h *subAgentOutputHandler) ShouldRetryAfterFailure(message string) bool {
-	if h.delegate == nil {
-		return false
-	}
-	return h.delegate.ShouldRetryAfterFailure(prefixSubAgentMessage(h.slug, message))
-}
-
-func prefixSubAgentMessage(slug string, message string) string {
-	trimmedSlug := strings.TrimSpace(slug)
-	if trimmedSlug == "" || strings.TrimSpace(message) == "" {
-		return message
-	}
-
-	lines := strings.Split(message, "\n")
-	for i, line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		lines[i] = fmt.Sprintf("*%s* %s", trimmedSlug, line)
-	}
-
-	return strings.Join(lines, "\n")
 }
 
 func (s *SweSystem) createSessionLoggers(sessionID string) (*slog.Logger, *slog.Logger) {

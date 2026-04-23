@@ -108,40 +108,40 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 	}
 
 	session := core.NewSweSession(&core.SweSessionParams{
-		ID:                   sessionID,
-		ParentID:             strings.TrimSpace(parentID),
-		Task:                 task,
-		Slug:                 strings.TrimSpace(slug),
-		ModelSpec:            modelSpec,
-		Provider:             provider,
-		ProviderName:         providerName,
-		Model:                modelName,
-		VFS:                  s.VFS,
-		BaseVFS:              s.VFS,
-		LSP:                  s.LSP,
-		SystemTools:          s.Tools,
-		ModelProviders:       s.ModelProviders,
-		ModelAliases:         s.ModelAliases,
-		ModelTags:            s.ModelTags,
-		ToolSelection:        s.ToolSelection,
-		PromptGenerator:      s.PromptGenerator,
-		Roles:                s.Roles,
-		Config:               s.Config,
-		OutputHandler:        outputHandler,
-		WorkDir:              s.WorkDir,
-		ShadowDir:            s.ShadowDir,
-		LogBaseDir:           s.LogBaseDir,
-		Thinking:             firstNonEmpty(strings.TrimSpace(thinking), strings.TrimSpace(s.Thinking)),
-		MaxToolThreads:       s.MaxToolThreads,
-		AllowAllPermissions:  s.AllowAllPermissions,
-		TaskManager:          s.TaskManager,
-		TaskVCS:              s.TaskVCS,
-		Logger:               sessionLogger,
-		LLMLogger:            llmLogger,
-		RoleName:             resolvedRoleName,
-		Messages:             []*models.ChatMessage{},
-		TodoList:             []tool.TodoItem{},
-		SubAgentRunner:       s,
+		ID:                  sessionID,
+		ParentID:            strings.TrimSpace(parentID),
+		Task:                task,
+		Slug:                strings.TrimSpace(slug),
+		ModelSpec:           modelSpec,
+		Provider:            provider,
+		ProviderName:        providerName,
+		Model:               modelName,
+		VFS:                 s.VFS,
+		BaseVFS:             s.VFS,
+		LSP:                 s.LSP,
+		SystemTools:         s.Tools,
+		ModelProviders:      s.ModelProviders,
+		ModelAliases:        s.ModelAliases,
+		ModelTags:           s.ModelTags,
+		ToolSelection:       s.ToolSelection,
+		PromptGenerator:     s.PromptGenerator,
+		Roles:               s.Roles,
+		Config:              s.Config,
+		OutputHandler:       outputHandler,
+		WorkDir:             s.WorkDir,
+		ShadowDir:           s.ShadowDir,
+		LogBaseDir:          s.LogBaseDir,
+		Thinking:            firstNonEmpty(strings.TrimSpace(thinking), strings.TrimSpace(s.Thinking)),
+		MaxToolThreads:      s.MaxToolThreads,
+		AllowAllPermissions: s.AllowAllPermissions,
+		TaskManager:         s.TaskManager,
+		TaskVCS:             s.TaskVCS,
+		Logger:              sessionLogger,
+		LLMLogger:           llmLogger,
+		RoleName:            resolvedRoleName,
+		Messages:            []*models.ChatMessage{},
+		TodoList:            []tool.TodoItem{},
+		SubAgentRunner:      s,
 	})
 
 	if sessionLogger != nil {
@@ -243,7 +243,7 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *core.SweSession, request tool.Su
 	if thinking == "" {
 		thinking = strings.TrimSpace(parent.ThinkingLevel())
 	}
-	childOutput := &subAgentOutputHandler{delegate: parent.OutputHandler(), slug: resolvedSlug}
+	childOutput := parent.OutputHandler()
 	child, err := s.newSessionWithOptions(modelName, childOutput, parent.ID(), resolvedSlug, thinking, resolvedRoleName, nil)
 	if err != nil {
 		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: failed to create child session: %w", err)
@@ -281,118 +281,6 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *core.SweSession, request tool.Su
 	return tool.SubAgentTaskResult{Status: "completed", Summary: summaryText}, nil
 }
 
-type subAgentOutputHandler struct {
-	delegate core.SessionThreadOutput
-	slug     string
-}
-
-func (h *subAgentOutputHandler) ShowMessage(message string, messageType string) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.ShowMessage(prefixSubAgentMessage(h.slug, message), messageType)
-}
-
-func (h *subAgentOutputHandler) AddAssistantMessage(text string, thinking string) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.AddAssistantMessage(prefixSubAgentMessage(h.slug, text), prefixSubAgentMessage(h.slug, thinking))
-}
-
-func (h *subAgentOutputHandler) AddUserMessage(text string) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.AddUserMessage(prefixSubAgentMessage(h.slug, text))
-}
-
-func (h *subAgentOutputHandler) AddToolCall(call *tool.ToolCall) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.AddToolCall(withSubAgentSlugOnToolCall(call, h.slug))
-}
-
-func (h *subAgentOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
-	if h.delegate == nil {
-		return
-	}
-	if result == nil {
-		h.delegate.AddToolCallResult(nil)
-		return
-	}
-
-	h.delegate.AddToolCallResult(&tool.ToolResponse{
-		Call:   withSubAgentSlugOnToolCall(result.Call, h.slug),
-		Error:  result.Error,
-		Result: result.Result,
-		Done:   result.Done,
-	})
-}
-
-func (h *subAgentOutputHandler) RunFinished(err error) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.RunFinished(err)
-}
-
-func (h *subAgentOutputHandler) OnRateLimitError(retryAfterSeconds int) {
-	if h.delegate == nil {
-		return
-	}
-	h.delegate.OnRateLimitError(retryAfterSeconds)
-}
-
-func (h *subAgentOutputHandler) ShouldRetryAfterFailure(message string) bool {
-	if h.delegate == nil {
-		return false
-	}
-	return h.delegate.ShouldRetryAfterFailure(prefixSubAgentMessage(h.slug, message))
-}
-
-func prefixSubAgentMessage(slug string, message string) string {
-	trimmedSlug := strings.TrimSpace(slug)
-	if trimmedSlug == "" || strings.TrimSpace(message) == "" {
-		return message
-	}
-	lines := strings.Split(message, "\n")
-	for i, line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		lines[i] = fmt.Sprintf("*%s* %s", trimmedSlug, line)
-	}
-	return strings.Join(lines, "\n")
-}
-
-func withSubAgentSlugOnToolCall(call *tool.ToolCall, slug string) *tool.ToolCall {
-	if call == nil {
-		return nil
-	}
-
-	trimmedSlug := strings.TrimSpace(slug)
-	if trimmedSlug == "" {
-		return call
-	}
-
-	args := make(map[string]any)
-	if obj := call.Arguments.Object(); obj != nil {
-		for key, value := range obj {
-			args[key] = value.Raw()
-		}
-	}
-	args["__subagent_slug"] = trimmedSlug
-
-	return &tool.ToolCall{
-		ID:        call.ID,
-		Function:  call.Function,
-		Arguments: tool.NewToolValue(args),
-		Access:    call.Access,
-	}
-}
-
 func (s *SweSystem) createSessionLoggers(sessionID string) (*slog.Logger, *slog.Logger) {
 	var sessionLogger *slog.Logger
 	if s.SessionLoggerFactory != nil {
@@ -416,25 +304,25 @@ func (s *SweSystem) createSessionLoggers(sessionID string) (*slog.Logger, *slog.
 
 func (s *SweSystem) buildSessionParams() *core.SweSessionParams {
 	return &core.SweSessionParams{
-		VFS:             s.VFS,
-		BaseVFS:         s.VFS,
-		LSP:             s.LSP,
-		SystemTools:     s.Tools,
-		ModelProviders:  s.ModelProviders,
-		ModelAliases:    s.ModelAliases,
-		ModelTags:       s.ModelTags,
-		ToolSelection:   s.ToolSelection,
-		PromptGenerator: s.PromptGenerator,
-		Roles:           s.Roles,
-		Config:          s.Config,
-		LogBaseDir:      s.LogBaseDir,
-		ShadowDir:       s.ShadowDir,
-		Thinking:        s.Thinking,
-		MaxToolThreads:  s.MaxToolThreads,
+		VFS:                 s.VFS,
+		BaseVFS:             s.VFS,
+		LSP:                 s.LSP,
+		SystemTools:         s.Tools,
+		ModelProviders:      s.ModelProviders,
+		ModelAliases:        s.ModelAliases,
+		ModelTags:           s.ModelTags,
+		ToolSelection:       s.ToolSelection,
+		PromptGenerator:     s.PromptGenerator,
+		Roles:               s.Roles,
+		Config:              s.Config,
+		LogBaseDir:          s.LogBaseDir,
+		ShadowDir:           s.ShadowDir,
+		Thinking:            s.Thinking,
+		MaxToolThreads:      s.MaxToolThreads,
 		AllowAllPermissions: s.AllowAllPermissions,
-		SubAgentRunner:  s,
-		TaskManager:     s.TaskManager,
-		TaskVCS:         s.TaskVCS,
+		SubAgentRunner:      s,
+		TaskManager:         s.TaskManager,
+		TaskVCS:             s.TaskVCS,
 	}
 }
 
