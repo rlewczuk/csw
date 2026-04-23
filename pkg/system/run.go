@@ -301,6 +301,7 @@ func RunCommand(params *RunParams) error {
 			if err != nil {
 				return err
 			}
+			params.VFSAllow = appendTaskPromptVFSAllowPaths(params.VFSAllow, taskDir)
 			resolvedTask.TaskDir = taskDir
 			params.Task = cloneRunTask(resolvedTask)
 			params.InitialTask = cloneRunTask(resolvedTask)
@@ -652,6 +653,19 @@ func parseVFSAllowPaths(values []string) []string {
 		}
 	}
 	return r
+}
+
+func appendTaskPromptVFSAllowPaths(values []string, taskDir string) []string {
+	taskPromptPath := strings.TrimSpace(filepath.Join(strings.TrimSpace(taskDir), "task.md"))
+	if taskPromptPath == "" {
+		return values
+	}
+	for _, existingValue := range values {
+		if strings.TrimSpace(existingValue) == taskPromptPath {
+			return values
+		}
+	}
+	return append(values, taskPromptPath)
 }
 
 func applyCommandTaskMetadata(params *RunParams) error {

@@ -65,3 +65,26 @@ func TestResolveTaskIdentifierFromPosition(t *testing.T) {
 		assert.Contains(t, err.Error(), "multiple tasks match feature branch")
 	})
 }
+
+func TestAppendTaskPromptVFSAllowPaths(t *testing.T) {
+	t.Run("appends task md path when missing", func(t *testing.T) {
+		values := []string{"/tmp/one"}
+		updated := appendTaskPromptVFSAllowPaths(values, "/tmp/task-dir")
+		require.Len(t, updated, 2)
+		assert.Equal(t, "/tmp/task-dir/task.md", updated[1])
+	})
+
+	t.Run("does not duplicate existing task md path", func(t *testing.T) {
+		values := []string{"/tmp/task-dir/task.md"}
+		updated := appendTaskPromptVFSAllowPaths(values, "/tmp/task-dir")
+		require.Len(t, updated, 1)
+		assert.Equal(t, "/tmp/task-dir/task.md", updated[0])
+	})
+
+	t.Run("ignores whitespace around task dir", func(t *testing.T) {
+		values := []string{}
+		updated := appendTaskPromptVFSAllowPaths(values, "  /tmp/task-dir  ")
+		require.Len(t, updated, 1)
+		assert.Equal(t, "/tmp/task-dir/task.md", updated[0])
+	})
+}
