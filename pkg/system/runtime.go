@@ -40,14 +40,12 @@ func (s *SweSystem) StartRunSession(params StartRunSessionParams) (StartRunSessi
 		}
 	}
 
-	session, err := s.newSessionWithOptions(modelName, nil, "", "", "", params.RoleName)
+	session, err := s.newSessionWithOptions(modelName, nil, "", "", params.Thinking, params.RoleName)
 	if err != nil {
 		return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to create session: %w", err)
 	}
 
 	thread := core.NewSessionThreadWithSession(s, session, nil)
-	session.SetThinkingLevel(params.Thinking)
-	session.SetWorkDir(s.WorkDir)
 
 	session.SetTask(params.Task)
 

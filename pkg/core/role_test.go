@@ -155,7 +155,7 @@ func TestSweSessionGetState(t *testing.T) {
 		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
-		session.SetWorkDir("/home/user/project")
+		session.workDir = "/home/user/project"
 
 		state := session.GetState()
 		assert.Equal(t, "/home/user/project", state.Info.WorkDir)
@@ -211,7 +211,7 @@ func TestSweSessionGetState(t *testing.T) {
 		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
-		session.SetWorkDir("/test/path")
+		session.workDir = "/test/path"
 		resolvedRole, ok := registry.Get("dev")
 		require.True(t, ok)
 		session.role = &resolvedRole

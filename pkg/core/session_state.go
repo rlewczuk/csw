@@ -232,12 +232,6 @@ func (s *SweSession) CompactionCount() int {
 	return s.compactionCount
 }
 
-// SetWorkDir sets the working directory for this session.
-func (s *SweSession) SetWorkDir(dir string) {
-	s.workDir = dir
-	s.persistSessionState()
-}
-
 // PersistSessionState persists current session state to disk.
 func (s *SweSession) PersistSessionState() {
 	s.persistSessionState()
@@ -260,16 +254,6 @@ func (s *SweSession) ThinkingLevel() string {
 	}
 
 	return strings.TrimSpace(s.thinking)
-}
-
-// SetThinkingLevel updates configured thinking mode for this session.
-func (s *SweSession) SetThinkingLevel(thinking string) {
-	if s == nil {
-		return
-	}
-
-	s.thinking = strings.TrimSpace(thinking)
-	s.persistSessionState()
 }
 
 // UsedRoles returns roles used during this session in first-seen order.
