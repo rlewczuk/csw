@@ -88,10 +88,6 @@ type TaskRunIdentifierResolver func(manager *core.TaskManager, identifier string
 
 const defaultBashRunTimeout = 120 * time.Second
 
-var startRunSessionFunc = func(sweSystem *SweSystem, params StartRunSessionParams) (StartRunSessionResult, error) {
-	return sweSystem.StartRunSession(params)
-}
-var emitSessionSummaryFunc = core.EmitSessionSummary
 var loadTaskManagerFunc TaskManagerLoader
 var resolveTaskRunIdentifierFunc TaskRunIdentifierResolver
 
@@ -397,7 +393,9 @@ func RunCommand(params *RunParams) error {
 	}
 
 	sessionOutput := buildRunSessionOutput(params, stdout)
-	runtimeResult, err := startRunSessionFunc(sweSystem, StartRunSessionParams{ModelName: params.ModelName, RoleName: params.RoleName, Task: params.Task, Thinking: params.Thinking, ModelOverridden: params.ModelOverridden, Prompt: params.Prompt, OutputHandler: sessionOutput})
+	runtimeResult, err := func(sweSystem *SweSystem, params StartRunSessionParams) (StartRunSessionResult, error) {
+		return sweSystem.StartRunSession(params)
+	}(sweSystem, StartRunSessionParams{ModelName: params.ModelName, RoleName: params.RoleName, Task: params.Task, Thinking: params.Thinking, ModelOverridden: params.ModelOverridden, Prompt: params.Prompt, OutputHandler: sessionOutput})
 	if err != nil {
 		return fmt.Errorf("RunCommand() [run.go]: failed to start run session runtime: %w", err)
 	}
@@ -423,7 +421,7 @@ func RunCommand(params *RunParams) error {
 	}
 	endTime := time.Now()
 
-	if err := emitSessionSummaryFunc(startTime, endTime, session, core.SessionSummaryBuildResult{LogsDir: buildResult.LogsDir, WorkDirRoot: buildResult.WorkDirRoot, WorkDir: buildResult.WorkDir, LSPServer: buildResult.LSPServer, ContainerImage: buildResult.ContainerImage}, buildSummaryMessageFunc(sessionOutput), sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
+	if err := core.EmitSessionSummary(startTime, endTime, session, core.SessionSummaryBuildResult{LogsDir: buildResult.LogsDir, WorkDirRoot: buildResult.WorkDirRoot, WorkDir: buildResult.WorkDir, LSPServer: buildResult.LSPServer, ContainerImage: buildResult.ContainerImage}, buildSummaryMessageFunc(sessionOutput), sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
 		return err
 	}
 	if err := applyCommandTaskMetadata(params); err != nil {
