@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/system"
 	"github.com/rlewczuk/csw/pkg/tool"
@@ -41,7 +42,7 @@ func TaskCommand() *cobra.Command {
 	return command
 }
 
-func loadTaskBackend(cmd *cobra.Command) (*core.TaskManager, *core.TaskBackendAdapter, error) {
+func loadTaskManager(cmd *cobra.Command) (*core.TaskManager, apis.VCS, error) {
 	workDir, err := system.ResolveWorkDir("")
 	if err != nil {
 		return nil, nil, err
@@ -59,7 +60,7 @@ func loadTaskBackend(cmd *cobra.Command) (*core.TaskManager, *core.TaskBackendAd
 
 	vcsRepo, _, err := system.PrepareSessionVFS(workDir, workDir, "", nil, "", "", nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("loadTaskBackend() [task.go]: failed to prepare vcs: %w", err)
+		return nil, nil, fmt.Errorf("loadTaskManager() [task.go]: failed to prepare vcs: %w", err)
 	}
 
 	manager, err := core.NewTaskManagerWithTasksDir(workDir, resolvedTaskDir, store)
@@ -67,12 +68,7 @@ func loadTaskBackend(cmd *cobra.Command) (*core.TaskManager, *core.TaskBackendAd
 		return nil, nil, err
 	}
 
-	backend, err := core.NewTaskBackendAdapter(manager, vcsRepo, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return manager, backend, nil
+	return manager, vcsRepo, nil
 }
 
 func resolveTaskDirPath(cmd *cobra.Command, workDir string) (string, error) {

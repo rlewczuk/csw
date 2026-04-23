@@ -1,7 +1,6 @@
 package tool
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -595,15 +594,6 @@ type TaskRunOutcome struct {
 	SummaryText    string
 	Merged         bool
 	TaskBranchName string
-}
-
-// TaskBackend defines task management operations used by task tools.
-type TaskBackend interface {
-	CreateTask(ctx context.Context, params TaskRecord, prompt string, parentTaskID string) (TaskRecord, error)
-	UpdateTask(ctx context.Context, identifier string, params TaskRecord, prompt *string) (TaskRecord, error)
-	GetTask(ctx context.Context, identifier string, fallbackTaskID string, includeSummary bool) (TaskRecord, *TaskSessionSummary, string, error)
-	ListTasks(ctx context.Context, identifier string, fallbackTaskID string, recursive bool) ([]TaskRecord, error)
-	MergeTask(ctx context.Context, identifier string, fallbackTaskID string) (TaskRecord, error)
 }
 
 // TaskSessionRef exposes task ID from current session for task tools.

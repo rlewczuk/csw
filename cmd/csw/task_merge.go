@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/spf13/cobra"
 )
 
@@ -14,12 +15,12 @@ func taskMergeCommand() *cobra.Command {
 		Short: "Merge task feature branch to parent branch",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, backend, err := loadTaskBackend(cmd)
+			manager, vcsRepo, err := loadTaskManager(cmd)
 			if err != nil {
 				return err
 			}
 
-			merged, err := backend.MergeTask(cmd.Context(), strings.TrimSpace(args[0]), "")
+			merged, err := manager.MergeTask(core.TaskLookup{Identifier: strings.TrimSpace(args[0])}, vcsRepo)
 			if err != nil {
 				return err
 			}

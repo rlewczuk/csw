@@ -6,15 +6,18 @@ import (
 	"strings"
 )
 
+// TaskUpdateFunc updates a persistent task record.
+type TaskUpdateFunc func(ctx context.Context, identifier string, params TaskRecord, prompt *string) (TaskRecord, error)
+
 // TaskUpdateTool updates persistent tasks.
 type TaskUpdateTool struct {
-	backend TaskBackend
-	session TaskSessionRef
+	updateTask TaskUpdateFunc
+	session    TaskSessionRef
 }
 
 // NewTaskUpdateTool creates a new TaskUpdateTool instance.
-func NewTaskUpdateTool(backend TaskBackend, session TaskSessionRef) *TaskUpdateTool {
-	return &TaskUpdateTool{backend: backend, session: session}
+func NewTaskUpdateTool(updateTask TaskUpdateFunc, session TaskSessionRef) *TaskUpdateTool {
+	return &TaskUpdateTool{updateTask: updateTask, session: session}
 }
 
 // GetDescription returns additional dynamic description.
@@ -22,8 +25,8 @@ func (t *TaskUpdateTool) GetDescription() (string, bool) { return "", false }
 
 // Execute executes task update.
 func (t *TaskUpdateTool) Execute(args *ToolCall) *ToolResponse {
-	if t.backend == nil {
-		return &ToolResponse{Call: args, Error: fmt.Errorf("TaskUpdateTool.Execute() [task_update.go]: backend is nil"), Done: true}
+	if t.updateTask == nil {
+		return &ToolResponse{Call: args, Error: fmt.Errorf("TaskUpdateTool.Execute() [task_update.go]: updateTask is nil"), Done: true}
 	}
 
 	identifier, fallback := resolveTaskIdentifier(args, t.session)
@@ -42,7 +45,7 @@ func (t *TaskUpdateTool) Execute(args *ToolCall) *ToolResponse {
 		prompt = &trimmed
 	}
 
-	updated, err := t.backend.UpdateTask(context.Background(), firstNonEmptyTool(identifier, fallback), TaskRecord{
+	updated, err := t.updateTask(context.Background(), firstNonEmptyTool(identifier, fallback), TaskRecord{
 		Name:          strings.TrimSpace(args.Arguments.String("name")),
 		Description:   strings.TrimSpace(args.Arguments.String("description")),
 		Status:        strings.TrimSpace(args.Arguments.String("status")),

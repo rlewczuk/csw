@@ -59,7 +59,7 @@ func taskUpdateCommandWithDefaults(use string, short string, defaultEdit bool) *
 				return fmt.Errorf("taskUpdateCommand.RunE() [task.go]: --edit and --prompt cannot be used together")
 			}
 
-			manager, _, err := loadTaskBackend(cmd)
+			manager, _, err := loadTaskManager(cmd)
 			if err != nil {
 				return err
 			}

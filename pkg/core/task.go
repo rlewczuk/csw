@@ -2,10 +2,8 @@ package core
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -181,13 +179,6 @@ type TaskManager struct {
 	nowFn    func() time.Time
 }
 
-// TaskBackendAdapter exposes TaskManager through tool.TaskBackend interface.
-type TaskBackendAdapter struct {
-	manager *TaskManager
-	vcsRepo apis.VCS
-	logger  *slog.Logger
-}
-
 // NewTaskManager creates a new TaskManager.
 func NewTaskManager(baseDir string, config *conf.CswConfig) (*TaskManager, error) {
 	if strings.TrimSpace(baseDir) == "" {
@@ -215,152 +206,6 @@ func NewTaskManagerWithTasksDir(baseDir string, tasksDir string, config *conf.Cs
 		uuidFn:   shared.GenerateUUIDv7,
 		nowFn:    time.Now,
 	}, nil
-}
-
-// NewTaskBackendAdapter creates task backend adapter for tools.
-func NewTaskBackendAdapter(manager *TaskManager, vcsRepo apis.VCS, logger *slog.Logger) (*TaskBackendAdapter, error) {
-	if manager == nil {
-		return nil, fmt.Errorf("NewTaskBackendAdapter() [task.go]: manager is nil")
-	}
-
-	return &TaskBackendAdapter{manager: manager, vcsRepo: vcsRepo, logger: logger}, nil
-}
-
-// CreateTask creates task through backend interface.
-func (a *TaskBackendAdapter) CreateTask(ctx context.Context, params tool.TaskRecord, prompt string, parentTaskID string) (tool.TaskRecord, error) {
-	_ = ctx
-	if a == nil || a.manager == nil {
-		return tool.TaskRecord{}, fmt.Errorf("TaskBackendAdapter.CreateTask() [task.go]: adapter is not configured")
-	}
-
-	created, err := a.manager.CreateTask(TaskCreateParams{
-		ParentTaskID:  strings.TrimSpace(parentTaskID),
-		Name:          strings.TrimSpace(params.Name),
-		Description:   strings.TrimSpace(params.Description),
-		FeatureBranch: strings.TrimSpace(params.FeatureBranch),
-		ParentBranch:  strings.TrimSpace(params.ParentBranch),
-		Role:          strings.TrimSpace(params.Role),
-		Deps:          append([]string(nil), params.Deps...),
-		Prompt:        strings.TrimSpace(prompt),
-	})
-	if err != nil {
-		return tool.TaskRecord{}, err
-	}
-
-	return toToolTaskRecord(created), nil
-}
-
-// UpdateTask updates task through backend interface.
-func (a *TaskBackendAdapter) UpdateTask(ctx context.Context, identifier string, params tool.TaskRecord, prompt *string) (tool.TaskRecord, error) {
-	_ = ctx
-	if a == nil || a.manager == nil {
-		return tool.TaskRecord{}, fmt.Errorf("TaskBackendAdapter.UpdateTask() [task.go]: adapter is not configured")
-	}
-
-	update := TaskUpdateParams{Identifier: strings.TrimSpace(identifier)}
-	if strings.TrimSpace(params.Name) != "" {
-		value := strings.TrimSpace(params.Name)
-		update.Name = &value
-	}
-	if params.Description != "" {
-		value := strings.TrimSpace(params.Description)
-		update.Description = &value
-	}
-	if params.Status != "" {
-		value := strings.TrimSpace(params.Status)
-		update.Status = &value
-	}
-	if strings.TrimSpace(params.FeatureBranch) != "" {
-		value := strings.TrimSpace(params.FeatureBranch)
-		update.FeatureBranch = &value
-	}
-	if strings.TrimSpace(params.ParentBranch) != "" {
-		value := strings.TrimSpace(params.ParentBranch)
-		update.ParentBranch = &value
-	}
-	if params.Role != "" {
-		value := strings.TrimSpace(params.Role)
-		update.Role = &value
-	}
-	if params.Deps != nil {
-		value := append([]string(nil), params.Deps...)
-		update.Deps = &value
-	}
-	if prompt != nil {
-		trimmedPrompt := strings.TrimSpace(*prompt)
-		update.Prompt = &trimmedPrompt
-	}
-
-	updated, err := a.manager.UpdateTask(update)
-	if err != nil {
-		return tool.TaskRecord{}, err
-	}
-
-	return toToolTaskRecord(updated), nil
-}
-
-// GetTask gets task through backend interface.
-func (a *TaskBackendAdapter) GetTask(ctx context.Context, identifier string, fallbackTaskID string, includeSummary bool) (tool.TaskRecord, *tool.TaskSessionSummary, string, error) {
-	_ = ctx
-	if a == nil || a.manager == nil {
-		return tool.TaskRecord{}, nil, "", fmt.Errorf("TaskBackendAdapter.GetTask() [task.go]: adapter is not configured")
-	}
-
-	taskData, summaryMeta, summaryText, err := a.manager.GetTask(TaskLookup{Identifier: strings.TrimSpace(identifier), FallbackTaskID: strings.TrimSpace(fallbackTaskID)}, includeSummary)
-	if err != nil {
-		return tool.TaskRecord{}, nil, "", err
-	}
-
-	var summary *tool.TaskSessionSummary
-	if summaryMeta != nil {
-		summary = &tool.TaskSessionSummary{
-			SessionID:   summaryMeta.SessionID,
-			Status:      summaryMeta.Status,
-			StartedAt:   summaryMeta.StartedAt,
-			CompletedAt: summaryMeta.CompletedAt,
-			TaskID:      summaryMeta.TaskID,
-		}
-	}
-
-	return toToolTaskRecord(taskData), summary, summaryText, nil
-}
-
-// ListTasks lists tasks through backend interface.
-func (a *TaskBackendAdapter) ListTasks(ctx context.Context, identifier string, fallbackTaskID string, recursive bool) ([]tool.TaskRecord, error) {
-	_ = ctx
-	if a == nil || a.manager == nil {
-		return nil, fmt.Errorf("TaskBackendAdapter.ListTasks() [task.go]: adapter is not configured")
-	}
-
-	tasks, err := a.manager.ListTasks(TaskLookup{Identifier: strings.TrimSpace(identifier), FallbackTaskID: strings.TrimSpace(fallbackTaskID)}, recursive)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]tool.TaskRecord, 0, len(tasks))
-	for _, item := range tasks {
-		result = append(result, toToolTaskRecord(item))
-	}
-
-	return result, nil
-}
-
-// MergeTask merges task through backend interface.
-func (a *TaskBackendAdapter) MergeTask(ctx context.Context, identifier string, fallbackTaskID string) (tool.TaskRecord, error) {
-	_ = ctx
-	if a == nil || a.manager == nil {
-		return tool.TaskRecord{}, fmt.Errorf("TaskBackendAdapter.MergeTask() [task.go]: adapter is not configured")
-	}
-	if a.vcsRepo == nil {
-		return tool.TaskRecord{}, fmt.Errorf("TaskBackendAdapter.MergeTask() [task.go]: vcs repository is not configured")
-	}
-
-	merged, err := a.manager.MergeTask(TaskLookup{Identifier: strings.TrimSpace(identifier), FallbackTaskID: strings.TrimSpace(fallbackTaskID)}, a.vcsRepo)
-	if err != nil {
-		return tool.TaskRecord{}, err
-	}
-
-	return toToolTaskRecord(merged), nil
 }
 
 func toToolTaskRecord(taskData *Task) tool.TaskRecord {

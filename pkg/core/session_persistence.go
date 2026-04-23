@@ -309,7 +309,8 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 				}
 				return result
 			}(),
-			TaskBackend: params.TaskBackend,
+			TaskManager: params.TaskManager,
+			TaskVCS:     params.TaskVCS,
 		},
 	)
 

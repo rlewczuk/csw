@@ -6,15 +6,18 @@ import (
 	"strings"
 )
 
+// TaskCreateFunc creates a persistent task record.
+type TaskCreateFunc func(ctx context.Context, params TaskRecord, prompt string, parentTaskID string) (TaskRecord, error)
+
 // TaskNewTool creates persistent tasks.
 type TaskNewTool struct {
-	backend TaskBackend
-	session TaskSessionRef
+	createTask TaskCreateFunc
+	session    TaskSessionRef
 }
 
 // NewTaskNewTool creates a new TaskNewTool instance.
-func NewTaskNewTool(backend TaskBackend, session TaskSessionRef) *TaskNewTool {
-	return &TaskNewTool{backend: backend, session: session}
+func NewTaskNewTool(createTask TaskCreateFunc, session TaskSessionRef) *TaskNewTool {
+	return &TaskNewTool{createTask: createTask, session: session}
 }
 
 // GetDescription returns additional dynamic description.
@@ -24,8 +27,8 @@ func (t *TaskNewTool) GetDescription() (string, bool) {
 
 // Execute executes task creation.
 func (t *TaskNewTool) Execute(args *ToolCall) *ToolResponse {
-	if t.backend == nil {
-		return &ToolResponse{Call: args, Error: fmt.Errorf("TaskNewTool.Execute() [task_new.go]: backend is nil"), Done: true}
+	if t.createTask == nil {
+		return &ToolResponse{Call: args, Error: fmt.Errorf("TaskNewTool.Execute() [task_new.go]: createTask is nil"), Done: true}
 	}
 
 	prompt, ok := args.Arguments.StringOK("prompt")
@@ -38,7 +41,7 @@ func (t *TaskNewTool) Execute(args *ToolCall) *ToolResponse {
 		return &ToolResponse{Call: args, Error: err, Done: true}
 	}
 
-	record, err := t.backend.CreateTask(context.Background(), TaskRecord{
+	record, err := t.createTask(context.Background(), TaskRecord{
 		Name:          strings.TrimSpace(args.Arguments.String("name")),
 		Description:   strings.TrimSpace(args.Arguments.String("description")),
 		FeatureBranch: strings.TrimSpace(args.Arguments.String("branch")),

@@ -19,7 +19,7 @@ func taskArchiveCommand() *cobra.Command {
 		Short: "Archive tasks",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			manager, _, err := loadTaskBackend(cmd)
+			manager, _, err := loadTaskManager(cmd)
 			if err != nil {
 				return err
 			}

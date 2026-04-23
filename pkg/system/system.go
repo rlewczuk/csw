@@ -37,7 +37,8 @@ type SweSystem struct {
 	Roles           *core.AgentRoleRegistry
 	LSP             lsp.LSP
 	Config          *conf.CswConfig
-	TaskBackend     tool.TaskBackend
+	TaskManager     *core.TaskManager
+	TaskVCS         apis.VCS
 	mcpManager      interface{ Close() error }
 
 	sessions   map[string]*core.SweSession
@@ -133,7 +134,8 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 		Thinking:             firstNonEmpty(strings.TrimSpace(thinking), strings.TrimSpace(s.Thinking)),
 		MaxToolThreads:       s.MaxToolThreads,
 		AllowAllPermissions:  s.AllowAllPermissions,
-		TaskBackend:          s.TaskBackend,
+		TaskManager:          s.TaskManager,
+		TaskVCS:              s.TaskVCS,
 		Logger:               sessionLogger,
 		LLMLogger:            llmLogger,
 		RoleName:             resolvedRoleName,
@@ -431,7 +433,8 @@ func (s *SweSystem) buildSessionParams() *core.SweSessionParams {
 		MaxToolThreads:  s.MaxToolThreads,
 		AllowAllPermissions: s.AllowAllPermissions,
 		SubAgentRunner:  s,
-		TaskBackend:     s.TaskBackend,
+		TaskManager:     s.TaskManager,
+		TaskVCS:         s.TaskVCS,
 	}
 }
 

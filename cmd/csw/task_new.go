@@ -138,7 +138,7 @@ func taskNewCommand() *cobra.Command {
 				return err
 			}
 
-			manager, _, err := loadTaskBackend(cmd)
+			manager, _, err := loadTaskManager(cmd)
 			if err != nil {
 				return err
 			}

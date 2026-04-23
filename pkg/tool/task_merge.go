@@ -5,15 +5,18 @@ import (
 	"fmt"
 )
 
+// TaskMergeFunc merges a task record.
+type TaskMergeFunc func(ctx context.Context, identifier string, fallbackTaskID string) (TaskRecord, error)
+
 // TaskMergeTool merges tasks.
 type TaskMergeTool struct {
-	backend TaskBackend
-	session TaskSessionRef
+	mergeTask TaskMergeFunc
+	session   TaskSessionRef
 }
 
 // NewTaskMergeTool creates a new TaskMergeTool instance.
-func NewTaskMergeTool(backend TaskBackend, session TaskSessionRef) *TaskMergeTool {
-	return &TaskMergeTool{backend: backend, session: session}
+func NewTaskMergeTool(mergeTask TaskMergeFunc, session TaskSessionRef) *TaskMergeTool {
+	return &TaskMergeTool{mergeTask: mergeTask, session: session}
 }
 
 // GetDescription returns additional dynamic description.
@@ -21,12 +24,12 @@ func (t *TaskMergeTool) GetDescription() (string, bool) { return "", false }
 
 // Execute executes task merge.
 func (t *TaskMergeTool) Execute(args *ToolCall) *ToolResponse {
-	if t.backend == nil {
-		return &ToolResponse{Call: args, Error: fmt.Errorf("TaskMergeTool.Execute() [task_merge.go]: backend is nil"), Done: true}
+	if t.mergeTask == nil {
+		return &ToolResponse{Call: args, Error: fmt.Errorf("TaskMergeTool.Execute() [task_merge.go]: mergeTask is nil"), Done: true}
 	}
 
 	identifier, fallback := resolveTaskIdentifier(args, t.session)
-	taskData, err := t.backend.MergeTask(context.Background(), identifier, fallback)
+	taskData, err := t.mergeTask(context.Background(), identifier, fallback)
 	if err != nil {
 		return &ToolResponse{Call: args, Error: err, Done: true}
 	}

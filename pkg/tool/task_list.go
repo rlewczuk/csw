@@ -5,15 +5,18 @@ import (
 	"fmt"
 )
 
+// TaskListFunc lists task records.
+type TaskListFunc func(ctx context.Context, identifier string, fallbackTaskID string, recursive bool) ([]TaskRecord, error)
+
 // TaskListTool lists tasks.
 type TaskListTool struct {
-	backend TaskBackend
-	session TaskSessionRef
+	listTasks TaskListFunc
+	session   TaskSessionRef
 }
 
 // NewTaskListTool creates a new TaskListTool instance.
-func NewTaskListTool(backend TaskBackend, session TaskSessionRef) *TaskListTool {
-	return &TaskListTool{backend: backend, session: session}
+func NewTaskListTool(listTasks TaskListFunc, session TaskSessionRef) *TaskListTool {
+	return &TaskListTool{listTasks: listTasks, session: session}
 }
 
 // GetDescription returns additional dynamic description.
@@ -21,12 +24,12 @@ func (t *TaskListTool) GetDescription() (string, bool) { return "", false }
 
 // Execute executes task list.
 func (t *TaskListTool) Execute(args *ToolCall) *ToolResponse {
-	if t.backend == nil {
-		return &ToolResponse{Call: args, Error: fmt.Errorf("TaskListTool.Execute() [task_list.go]: backend is nil"), Done: true}
+	if t.listTasks == nil {
+		return &ToolResponse{Call: args, Error: fmt.Errorf("TaskListTool.Execute() [task_list.go]: listTasks is nil"), Done: true}
 	}
 
 	identifier, fallback := resolveTaskIdentifier(args, t.session)
-	tasks, err := t.backend.ListTasks(context.Background(), identifier, fallback, args.Arguments.Bool("recursive"))
+	tasks, err := t.listTasks(context.Background(), identifier, fallback, args.Arguments.Bool("recursive"))
 	if err != nil {
 		return &ToolResponse{Call: args, Error: err, Done: true}
 	}

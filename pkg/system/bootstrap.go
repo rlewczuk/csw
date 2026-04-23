@@ -450,11 +450,6 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create task manager: %w", err)
 	}
-	taskBackend, err := core.NewTaskBackendAdapter(taskManager, selectedVCS, nil)
-	if err != nil {
-		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create task backend: %w", err)
-	}
 
 	bashRunner := runner.CommandRunner(runner.NewBashRunner(effectiveWorkDir, params.BashRunTimeout))
 	cleanupFns := make([]func(), 0)
@@ -566,7 +561,8 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		Roles:               roleRegistry,
 		LSP:                 lspClient,
 		Config:              configStore,
-		TaskBackend:         taskBackend,
+		TaskManager:         taskManager,
+		TaskVCS:             selectedVCS,
 		LogBaseDir:          logsDir,
 		WorkDir:             effectiveWorkDir,
 		ShadowDir:           shadowDir,

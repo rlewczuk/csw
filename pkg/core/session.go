@@ -86,7 +86,8 @@ type SweSession struct {
 	contextLength    int
 	compactionCount int
 	compactor       ChatCompactor
-	taskBackend     tool.TaskBackend
+	taskManager     *TaskManager
+	taskVCS         apis.VCS
 
 	subAgentRunner       SubAgentTaskRunner
 	subAgentSlugs        map[string]struct{}
@@ -142,7 +143,8 @@ type SweSessionParams struct {
 	TokenUsage           models.TokenUsage
 	ContextLength        int
 	CompactionCount      int
-	TaskBackend          tool.TaskBackend
+	TaskManager          *TaskManager
+	TaskVCS              apis.VCS
 	SubAgentRunner       SubAgentTaskRunner
 	UsedSubAgentSlugs    map[string]struct{}
 }
@@ -196,7 +198,8 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		contextLength:        params.ContextLength,
 		compactionCount:      params.CompactionCount,
 		compactor:            NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep),
-		taskBackend:          params.TaskBackend,
+		taskManager:          params.TaskManager,
+		taskVCS:              params.TaskVCS,
 		subAgentRunner:       params.SubAgentRunner,
 		subAgentSlugs:        make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
 	}

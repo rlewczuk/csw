@@ -20,7 +20,7 @@ func taskGetCommand() *cobra.Command {
 		Short: "Get task details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			manager, _, err := loadTaskBackend(cmd)
+			manager, _, err := loadTaskManager(cmd)
 			if err != nil {
 				return err
 			}

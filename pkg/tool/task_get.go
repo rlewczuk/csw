@@ -6,15 +6,18 @@ import (
 	"strings"
 )
 
+// TaskGetFunc gets task details and optional summary.
+type TaskGetFunc func(ctx context.Context, identifier string, fallbackTaskID string, includeSummary bool) (TaskRecord, *TaskSessionSummary, string, error)
+
 // TaskGetTool retrieves task details.
 type TaskGetTool struct {
-	backend TaskBackend
+	getTask TaskGetFunc
 	session TaskSessionRef
 }
 
 // NewTaskGetTool creates a new TaskGetTool instance.
-func NewTaskGetTool(backend TaskBackend, session TaskSessionRef) *TaskGetTool {
-	return &TaskGetTool{backend: backend, session: session}
+func NewTaskGetTool(getTask TaskGetFunc, session TaskSessionRef) *TaskGetTool {
+	return &TaskGetTool{getTask: getTask, session: session}
 }
 
 // GetDescription returns additional dynamic description.
@@ -22,12 +25,12 @@ func (t *TaskGetTool) GetDescription() (string, bool) { return "", false }
 
 // Execute executes task get.
 func (t *TaskGetTool) Execute(args *ToolCall) *ToolResponse {
-	if t.backend == nil {
-		return &ToolResponse{Call: args, Error: fmt.Errorf("TaskGetTool.Execute() [task_get.go]: backend is nil"), Done: true}
+	if t.getTask == nil {
+		return &ToolResponse{Call: args, Error: fmt.Errorf("TaskGetTool.Execute() [task_get.go]: getTask is nil"), Done: true}
 	}
 
 	identifier, fallback := resolveTaskIdentifier(args, t.session)
-	taskData, summaryMeta, summaryText, err := t.backend.GetTask(context.Background(), identifier, fallback, args.Arguments.Bool("summary"))
+	taskData, summaryMeta, summaryText, err := t.getTask(context.Background(), identifier, fallback, args.Arguments.Bool("summary"))
 	if err != nil {
 		return &ToolResponse{Call: args, Error: err, Done: true}
 	}
