@@ -102,7 +102,10 @@ func TestSessionSystemPrompt(t *testing.T) {
 		session.UserPrompt("Hello")
 
 		// Change role to tester
-		err = session.SetRole("tester")
+		testerResolvedRole, testerResolvedRoleOK := roleRegistry.Get("tester")
+		require.True(t, testerResolvedRoleOK)
+		session.role = &testerResolvedRole
+		err = session.updateSystemPromptForRole(testerResolvedRole)
 		require.NoError(t, err)
 
 		// Verify role was changed
@@ -133,7 +136,10 @@ func TestSessionSystemPrompt(t *testing.T) {
 		initialPrompt := session.messages[0].GetText()
 
 		// Set the same role again (this happens in CLI)
-		err = session.SetRole("developer")
+		developerResolvedRole, developerResolvedRoleOK := roleRegistry.Get("developer")
+		require.True(t, developerResolvedRoleOK)
+		session.role = &developerResolvedRole
+		err = session.updateSystemPromptForRole(developerResolvedRole)
 		require.NoError(t, err)
 
 		// Verify role is still set

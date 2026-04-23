@@ -298,20 +298,6 @@ func (c *SessionThread) SetOutputHandler(handler SessionThreadOutput) {
 	}
 }
 
-// SetModel sets the model for the current session.
-// model string should be formatted as `provider/model-name`
-// or a comma-separated `provider/model-name` list for fallback.
-func (c *SessionThread) SetModel(model string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.session == nil {
-		return fmt.Errorf("SessionThread.SetModel() [session_thread.go]: session not initialized")
-	}
-
-	return c.session.SetModel(model)
-}
-
 // StartSession initializes a new session with the given model.
 // This method is non-blocking and thread-safe.
 func (c *SessionThread) StartSession(model string) error {

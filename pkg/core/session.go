@@ -16,6 +16,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 const (
@@ -130,6 +131,7 @@ type SweSessionParams struct {
 	LLMLogger *slog.Logger
 
 	Role             *conf.AgentRoleConfig
+	RoleName         string
 	Messages         []*models.ChatMessage
 	TodoList         []tool.TodoItem
 	RolesUsed        []string
@@ -210,6 +212,19 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 	copy(session.todoList, params.TodoList)
 	session.messages = append(session.messages, params.Messages...)
 	session.pendingToolResponses = append(session.pendingToolResponses, params.PendingToolResponses...)
+	if session.role == nil && strings.TrimSpace(params.RoleName) != "" && session.roles != nil {
+		if resolvedRole, ok := session.roles.Get(params.RoleName); ok {
+			session.role = &resolvedRole
+		}
+	}
+	if session.role != nil {
+		session.rolesUsed = appendUniqueString(session.rolesUsed, session.role.Name)
+		if !session.allowAllPerms && session.role.VFSPrivileges != nil {
+			session.VFS = vfs.NewAccessControlVFS(session.baseVFS, session.role.VFSPrivileges)
+		} else {
+			session.VFS = session.baseVFS
+		}
+	}
 	for path := range params.LoadedAgentFiles {
 		session.loadedAgentFiles[path] = struct{}{}
 	}
@@ -223,6 +238,11 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 	session.applyModelTagToolSelection()
 	if session.role != nil && session.role.ToolsAccess != nil {
 		session.Tools = wrapToolsWithAccessControl(session.Tools, session.role.ToolsAccess)
+	}
+	if session.role != nil {
+		if err := session.updateSystemPromptForRole(*session.role); err != nil && session.logger != nil {
+			session.logger.Warn("role_prompt_initialization_failed", "role", session.role.Name, "error", err)
+		}
 	}
 
 	return session

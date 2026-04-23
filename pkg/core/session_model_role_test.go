@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/apis"
@@ -15,6 +16,31 @@ import (
 
 func testConfigWithRoles(roles map[string]*conf.AgentRoleConfig) *conf.CswConfig {
 	return &conf.CswConfig{AgentRoleConfigs: roles}
+}
+
+func applyRoleForTest(session *SweSession, roleName string) error {
+	if session == nil || session.roles == nil {
+		return errors.New("role not found")
+	}
+
+	role, ok := session.roles.Get(roleName)
+	if !ok {
+		return errors.New("role not found")
+	}
+
+	session.role = &role
+	session.rolesUsed = appendUniqueString(session.rolesUsed, role.Name)
+	if !session.allowAllPerms && role.VFSPrivileges != nil {
+		session.VFS = vfs.NewAccessControlVFS(session.baseVFS, role.VFSPrivileges)
+	} else {
+		session.VFS = session.baseVFS
+	}
+	session.applyModelTagToolSelection()
+	if role.ToolsAccess != nil {
+		session.Tools = wrapToolsWithAccessControl(session.Tools, role.ToolsAccess)
+	}
+
+	return session.updateSystemPromptForRole(role)
 }
 
 func TestAgentRoleIntegration(t *testing.T) {
@@ -89,7 +115,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, session.Role())
 
-		err = session.SetRole("custom")
+		err = applyRoleForTest(session, "custom")
 		require.NoError(t, err)
 		assert.NotNil(t, session.Role())
 		assert.Equal(t, "custom", session.Role().Name)
@@ -122,7 +148,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 		messages := session.ChatMessages()
 		require.Len(t, messages, 0)
 
-		err = session.SetRole("tester")
+		err = applyRoleForTest(session, "tester")
 		require.NoError(t, err)
 
 		messages = session.ChatMessages()
@@ -150,7 +176,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 
 		assert.Equal(t, mockVFS, session.VFS)
 
-		err = session.SetRole("readonly")
+		err = applyRoleForTest(session, "readonly")
 		require.NoError(t, err)
 
 		assert.NotEqual(t, mockVFS, session.VFS)
@@ -183,7 +209,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 			AllowAllPermissions: true,
 		})
 
-		err := session.SetRole("readonly")
+		err := applyRoleForTest(session, "readonly")
 		require.NoError(t, err)
 
 		assert.Equal(t, mockVFS, session.VFS)
@@ -211,7 +237,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
-		err = session.SetRole("readonly")
+		err = applyRoleForTest(session, "readonly")
 		require.NoError(t, err)
 
 		writeArgs := tool.NewToolValue(map[string]interface{}{
@@ -251,7 +277,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
-		err = session.SetRole("unknown")
+		err = applyRoleForTest(session, "unknown")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role not found")
 	})
@@ -276,7 +302,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
 
-		err = session.SetRole("developer")
+		err = applyRoleForTest(session, "developer")
 		require.NoError(t, err)
 		assert.Equal(t, "developer", session.Role().Name)
 
@@ -290,7 +316,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 		})
 		assert.NoError(t, writeResponse.Error)
 
-		err = session.SetRole("readonly")
+		err = applyRoleForTest(session, "readonly")
 		require.NoError(t, err)
 		assert.Equal(t, "readonly", session.Role().Name)
 

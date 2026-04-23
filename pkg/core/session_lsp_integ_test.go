@@ -18,6 +18,16 @@ func sessionTestRoleRegistry(role conf.AgentRoleConfig) *AgentRoleRegistry {
 	return NewAgentRoleRegistry(&conf.CswConfig{AgentRoleConfigs: map[string]*conf.AgentRoleConfig{"test": &role}})
 }
 
+func applySessionTestRole(t *testing.T, session *SweSession, roleName string) {
+	t.Helper()
+
+	resolvedRole, ok := session.roles.Get(roleName)
+	require.True(t, ok)
+	session.role = &resolvedRole
+	session.rolesUsed = appendUniqueString(session.rolesUsed, resolvedRole.Name)
+	session.applyModelTagToolSelection()
+}
+
 func TestSessionLSPIntegration(t *testing.T) {
 	// Create mock LSP
 	mockLSP, err := lsp.NewMockLSP(".")
@@ -58,8 +68,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 		session.roles = roleRegistry
 
 		// Set role to trigger tool re-registration
-		err = session.SetRole("test")
-		require.NoError(t, err)
+		applySessionTestRole(t, session, "test")
 
 		// Verify VFS tools are registered
 		editTool, err := session.Tools.Get("vfsEdit")
@@ -108,8 +117,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 		}
 		roleRegistry := sessionTestRoleRegistry(testRoleConfig)
 		session.roles = roleRegistry
-		err = session.SetRole("test")
-		require.NoError(t, err)
+		applySessionTestRole(t, session, "test")
 
 		// Get edit tool
 		editTool, err := session.Tools.Get("vfsEdit")
@@ -170,8 +178,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 		}
 		roleRegistry := sessionTestRoleRegistry(testRoleConfig)
 		session.roles = roleRegistry
-		err = session.SetRole("test")
-		require.NoError(t, err)
+		applySessionTestRole(t, session, "test")
 
 		// Get write tool
 		writeTool, err := session.Tools.Get("vfsWrite")
@@ -230,8 +237,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 		}
 		roleRegistry := sessionTestRoleRegistry(testRoleConfig)
 		session.roles = roleRegistry
-		err = session.SetRole("test")
-		require.NoError(t, err)
+		applySessionTestRole(t, session, "test")
 
 		patchTool, err := session.Tools.Get("vfsPatch")
 		require.NoError(t, err)
@@ -276,8 +282,7 @@ func TestSessionLSPIntegration(t *testing.T) {
 		}
 		roleRegistry := sessionTestRoleRegistry(testRoleConfig)
 		session.roles = roleRegistry
-		err = session.SetRole("test")
-		require.NoError(t, err)
+		applySessionTestRole(t, session, "test")
 
 		// Write a test file
 		err = vfsInstance.WriteFile("no-lsp.go", []byte("package main\n\nfunc main() {}"))

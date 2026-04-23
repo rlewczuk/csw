@@ -234,7 +234,12 @@ func TestSessionPersistenceSetRolePersisted(t *testing.T) {
 		session, err := system.NewSession("ollama/test-model:latest", handler)
 		require.NoError(t, err)
 
-		require.NoError(t, session.SetRole("tester"))
+		resolvedRole, resolvedRoleOK := roles.Get("tester")
+		require.True(t, resolvedRoleOK)
+		session.role = &resolvedRole
+		session.rolesUsed = appendUniqueString(session.rolesUsed, resolvedRole.Name)
+		require.NoError(t, session.updateSystemPromptForRole(resolvedRole))
+		session.PersistSessionState()
 
 		statePath := filepath.Join(tmpDir, "sessions", session.ID(), "session.json")
 		stateBytes, err := os.ReadFile(statePath)

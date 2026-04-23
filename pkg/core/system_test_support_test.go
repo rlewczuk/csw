@@ -61,10 +61,10 @@ type subAgentSummaryJSON struct {
 
 // NewSession creates new session for tests.
 func (s *SweSystem) NewSession(model string, outputHandler SessionThreadOutput) (*SweSession, error) {
-	return s.newSessionWithOptions(model, outputHandler, "", "", "")
+	return s.newSessionWithOptions(model, outputHandler, "", "", "", "")
 }
 
-func (s *SweSystem) newSessionWithOptions(model string, outputHandler SessionThreadOutput, parentID string, slug string, thinking string) (*SweSession, error) {
+func (s *SweSystem) newSessionWithOptions(model string, outputHandler SessionThreadOutput, parentID string, slug string, thinking string, roleName string) (*SweSession, error) {
 	modelRefs, err := models.ExpandProviderModelChain(model, s.ModelAliases)
 	if err != nil || len(modelRefs) == 0 {
 		return nil, fmt.Errorf("SweSystem.NewSession() [system_test_support_test.go]: invalid model format, expected provider/model, comma-separated provider/model list, or model alias, got '%s'", model)
@@ -82,6 +82,19 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler SessionThr
 
 	sessionID := shared.GenerateUUIDv7()
 	sessionLogger, llmLogger := s.createSessionLoggers(sessionID)
+
+	resolvedRoleName := strings.TrimSpace(roleName)
+	if resolvedRoleName == "" {
+		defaultRole, roleErr := s.resolveDefaultRole()
+		if roleErr == nil {
+			resolvedRoleName = strings.TrimSpace(defaultRole)
+		}
+	}
+	if resolvedRoleName != "" && s.Roles != nil {
+		if _, ok := s.Roles.Get(resolvedRoleName); !ok {
+			resolvedRoleName = ""
+		}
+	}
 
 	session := NewSweSession(&SweSessionParams{
 		ID:              sessionID,
@@ -109,15 +122,11 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler SessionThr
 		Thinking:        firstNonEmpty(strings.TrimSpace(thinking), strings.TrimSpace(s.Thinking)),
 		Logger:          sessionLogger,
 		LLMLogger:       llmLogger,
+		RoleName:        resolvedRoleName,
 		Messages:        []*models.ChatMessage{},
 		TodoList:        []tool.TodoItem{},
 		SubAgentRunner:  s,
 	})
-
-	defaultRole, err := s.resolveDefaultRole()
-	if err == nil && defaultRole != "" {
-		_ = session.SetRole(defaultRole)
-	}
 
 	s.sessionsMu.Lock()
 	if s.sessions == nil {
@@ -165,19 +174,16 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *SweSession, request tool.SubAgen
 
 	thinking := firstNonEmpty(strings.TrimSpace(request.Thinking), strings.TrimSpace(parent.ThinkingLevel()))
 	childOutput := &subAgentOutputHandler{delegate: parent.OutputHandler(), slug: resolvedSlug}
-	child, err := s.newSessionWithOptions(modelName, childOutput, parent.ID(), resolvedSlug, thinking)
-	if err != nil {
-		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system_test_support_test.go]: failed to create child session: %w", err)
+	resolvedRoleName := strings.TrimSpace(request.Role)
+	if resolvedRoleName == "" {
+		if parentRole := parent.Role(); parentRole != nil {
+			resolvedRoleName = strings.TrimSpace(parentRole.Name)
+		}
 	}
 
-	if roleName := strings.TrimSpace(request.Role); roleName != "" {
-		if err := child.SetRole(roleName); err != nil {
-			return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system_test_support_test.go]: failed to set child role: %w", err)
-		}
-	} else if parentRole := parent.Role(); parentRole != nil {
-		if err := child.SetRole(parentRole.Name); err != nil {
-			return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system_test_support_test.go]: failed to inherit parent role: %w", err)
-		}
+	child, err := s.newSessionWithOptions(modelName, childOutput, parent.ID(), resolvedSlug, thinking, resolvedRoleName)
+	if err != nil {
+		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system_test_support_test.go]: failed to create child session: %w", err)
 	}
 
 	if err := child.UserPrompt(request.Prompt); err != nil {

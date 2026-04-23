@@ -212,7 +212,10 @@ func TestSweSessionGetState(t *testing.T) {
 		require.NoError(t, err)
 
 		session.SetWorkDir("/test/path")
-		err = session.SetRole("dev")
+		resolvedRole, ok := registry.Get("dev")
+		require.True(t, ok)
+		session.role = &resolvedRole
+		err = session.updateSystemPromptForRole(resolvedRole)
 		require.NoError(t, err)
 
 		messages := session.ChatMessages()

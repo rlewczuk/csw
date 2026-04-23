@@ -30,26 +30,22 @@ type StartRunSessionResult struct {
 func (s *SweSystem) StartRunSession(params StartRunSessionParams) (StartRunSessionResult, error) {
 	var result StartRunSessionResult
 
-	thread := core.NewSessionThread(s, nil)
-	if err := thread.StartSession(params.ModelName); err != nil {
-		return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to start session: %w", err)
-	}
-	session := thread.GetSession()
-
-	if session == nil {
-		return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: session is not available")
-	}
-
-	if err := session.SetRole(params.RoleName); err != nil {
-		return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to set role: %w", err)
-	}
+	modelName := strings.TrimSpace(params.ModelName)
 	if !params.ModelOverridden {
-		if roleConfig := session.Role(); roleConfig != nil && strings.TrimSpace(roleConfig.Model) != "" {
-			if err := session.SetModel(roleConfig.Model); err != nil {
-				return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to apply role model: %w", err)
+		resolvedRoleName := strings.TrimSpace(params.RoleName)
+		if resolvedRoleName != "" && s.Roles != nil {
+			if roleConfig, ok := s.Roles.Get(resolvedRoleName); ok && strings.TrimSpace(roleConfig.Model) != "" {
+				modelName = strings.TrimSpace(roleConfig.Model)
 			}
 		}
 	}
+
+	session, err := s.newSessionWithOptions(modelName, nil, "", "", "", params.RoleName)
+	if err != nil {
+		return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to create session: %w", err)
+	}
+
+	thread := core.NewSessionThreadWithSession(s, session, nil)
 	session.SetThinkingLevel(params.Thinking)
 	session.SetWorkDir(s.WorkDir)
 

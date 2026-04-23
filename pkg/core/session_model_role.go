@@ -10,7 +10,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/tool"
-	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 func composeProviderModel(providerName string, modelName string) string {
@@ -26,46 +25,6 @@ func composeProviderModel(providerName string, modelName string) string {
 	return trimmedProvider + "/" + trimmedModel
 }
 
-// SetModel sets the model used for the session.
-// model string should be formatted as `provider/model-name`
-// or a comma-separated `provider/model-name` list for fallback.
-func (s *SweSession) SetModel(modelStr string) error {
-	if s.logger != nil {
-		s.logger.Info("set_model", "model", modelStr)
-	}
-
-	refs, parseErr := models.ExpandProviderModelChain(modelStr, s.modelAliases)
-	if parseErr != nil || len(refs) == 0 {
-		if s.logger != nil {
-			s.logger.Error("set_model_failed", "model", modelStr, "error", "invalid format")
-		}
-		return fmt.Errorf("SweSession.SetModel() [session_model_role.go]: invalid model format: %s, expected provider/model, comma-separated provider/model list, or model alias", modelStr)
-	}
-
-	for _, ref := range refs {
-		if _, exists := s.modelProviders[ref.Provider]; !exists {
-			if s.logger != nil {
-				s.logger.Error("set_model_failed", "model", modelStr, "error", "provider not found")
-			}
-			return fmt.Errorf("SweSession.SetModel() [session_model_role.go]: provider not found: %s", ref.Provider)
-		}
-	}
-	providerName := refs[0].Provider
-	modelName := refs[0].Model
-	provider := s.modelProviders[providerName]
-
-	s.provider = provider
-	s.providerName = providerName
-	s.model = modelName
-	s.modelSpec = models.ComposeProviderModelSpec(refs)
-	s.applyModelTagToolSelection()
-	if s.role != nil && s.role.ToolsAccess != nil {
-		s.Tools = wrapToolsWithAccessControl(s.Tools, s.role.ToolsAccess)
-	}
-	s.persistSessionState()
-	return nil
-}
-
 // applyModelTagToolSelection rebuilds tools and applies model-tag based tool selection rules.
 func (s *SweSession) applyModelTagToolSelection() {
 	baseTools := buildSessionToolRegistry(s.systemTools, s.VFS, s.LSP, s)
@@ -77,72 +36,29 @@ func (s *SweSession) applyModelTagToolSelection() {
 	s.Tools = filterToolsForRole(baseTools.FilterByModelTags(tags, s.toolSelection), s.role)
 }
 
-// SetRole changes the agent role for this session.
-// It updates the VFS and Tools with access controls based on the new role,
-// and adds or updates the system prompt at the beginning of the conversation.
-func (s *SweSession) SetRole(roleName string) error {
-	if s.logger != nil {
-		s.logger.Info("set_role", "role", roleName)
+func (s *SweSession) updateSystemPromptForRole(role conf.AgentRoleConfig) error {
+	if s.promptGenerator == nil {
+		return nil
 	}
 
-	role, ok := s.roles.Get(roleName)
-	if !ok {
-		if s.logger != nil {
-			s.logger.Error("set_role_failed", "role", roleName, "error", "role not found")
-		}
-		return fmt.Errorf("SweSession.SetRole() [session_model_role.go]: role not found: %s", roleName)
+	state := s.GetState()
+	tags := s.GetModelTags()
+	if tags == nil {
+		tags = []string{}
 	}
 
-	// Store the new role
-	s.role = &role
-	s.rolesUsed = appendUniqueString(s.rolesUsed, role.Name)
-
-	// Wrap VFS with access control based on role privileges
-	if !s.allowAllPerms && role.VFSPrivileges != nil {
-		s.VFS = vfs.NewAccessControlVFS(s.baseVFS, role.VFSPrivileges)
-	} else {
-		s.VFS = s.baseVFS
+	renderedPrompt, err := s.promptGenerator.GetPrompt(tags, &role, &state)
+	if err != nil {
+		return fmt.Errorf("SweSession.updateSystemPromptForRole() [session_model_role.go]: failed to generate system prompt: %w", err)
 	}
 
-	// Rebuild tools with the session's VFS and role and apply model-tag selection
-	s.applyModelTagToolSelection()
-
-	// Create a new tool registry with access-controlled tools if needed
-	if role.ToolsAccess != nil {
-		s.Tools = wrapToolsWithAccessControl(s.Tools, role.ToolsAccess)
+	if len(s.messages) > 0 && s.messages[0].Role == models.ChatRoleSystem {
+		s.messages[0] = models.NewTextMessage(models.ChatRoleSystem, renderedPrompt)
+		s.persistSessionState()
+		return nil
 	}
 
-	// Generate and update system prompt using the prompt generator
-	if s.promptGenerator != nil {
-		state := s.GetState()
-
-		// Get model tags from registry
-		tags := s.GetModelTags()
-		// If no specific tags are assigned, use empty list
-		// The prompt system will include fragments with tag "all" by default
-		if tags == nil {
-			tags = []string{}
-		}
-
-		renderedPrompt, err := s.promptGenerator.GetPrompt(tags, &role, &state)
-		if err != nil {
-			return fmt.Errorf("SweSession.SetRole() [session_model_role.go]: failed to generate system prompt: %w", err)
-		}
-
-		// Check if there's already a system message
-		if len(s.messages) > 0 && s.messages[0].Role == models.ChatRoleSystem {
-			// Replace the existing system message
-			systemMessage := models.NewTextMessage(models.ChatRoleSystem, renderedPrompt)
-			s.messages[0] = systemMessage
-			s.persistSessionState()
-		} else {
-			// Insert system message at the beginning
-			systemMessage := models.NewTextMessage(models.ChatRoleSystem, renderedPrompt)
-			s.messages = append([]*models.ChatMessage{systemMessage}, s.messages...)
-			s.persistSessionState()
-		}
-	}
-
+	s.messages = append([]*models.ChatMessage{models.NewTextMessage(models.ChatRoleSystem, renderedPrompt)}, s.messages...)
 	s.persistSessionState()
 
 	return nil

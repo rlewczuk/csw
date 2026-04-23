@@ -57,10 +57,10 @@ type SweSystem struct {
 
 // NewSession creates a new session for selected model.
 func (s *SweSystem) NewSession(model string, outputHandler core.SessionThreadOutput) (*core.SweSession, error) {
-	return s.newSessionWithOptions(model, outputHandler, "", "", "")
+	return s.newSessionWithOptions(model, outputHandler, "", "", "", "")
 }
 
-func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.SessionThreadOutput, parentID string, slug string, thinking string) (*core.SweSession, error) {
+func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.SessionThreadOutput, parentID string, slug string, thinking string, roleName string) (*core.SweSession, error) {
 	modelRefs, err := models.ExpandProviderModelChain(model, s.ModelAliases)
 	if err != nil || len(modelRefs) == 0 {
 		return nil, fmt.Errorf("SweSystem.NewSession() [system.go]: invalid model format, expected provider/model, comma-separated provider/model list, or model alias, got '%s'", model)
@@ -90,7 +90,23 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 			}
 		}
 	}
-		session := core.NewSweSession(&core.SweSessionParams{
+	resolvedRoleName := strings.TrimSpace(roleName)
+	if resolvedRoleName == "" {
+		defaultRole, roleErr := s.resolveDefaultRole()
+		if roleErr == nil {
+			resolvedRoleName = strings.TrimSpace(defaultRole)
+		}
+	}
+	if resolvedRoleName != "" && s.Roles != nil {
+		if _, ok := s.Roles.Get(resolvedRoleName); !ok {
+			if sessionLogger != nil {
+				sessionLogger.Warn("failed_to_resolve_role", "role", resolvedRoleName)
+			}
+			resolvedRoleName = ""
+		}
+	}
+
+	session := core.NewSweSession(&core.SweSessionParams{
 		ID:                   sessionID,
 		ParentID:             strings.TrimSpace(parentID),
 		Slug:                 strings.TrimSpace(slug),
@@ -119,6 +135,7 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 		TaskBackend:          s.TaskBackend,
 		Logger:               sessionLogger,
 		LLMLogger:            llmLogger,
+		RoleName:             resolvedRoleName,
 		Messages:             []*models.ChatMessage{},
 		TodoList:             []tool.TodoItem{},
 		SubAgentRunner:       s,
@@ -128,15 +145,8 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 		sessionLogger.Info("session_created", "session_id", sessionID, "provider", providerName, "model", modelName, "model_spec", modelSpec)
 	}
 
-	defaultRole, err := s.resolveDefaultRole()
-	if err == nil && defaultRole != "" {
-		if err := session.SetRole(defaultRole); err != nil {
-			if sessionLogger != nil {
-				sessionLogger.Warn("failed to set default role", "role", defaultRole, "error", err)
-			}
-		} else if sessionLogger != nil {
-			sessionLogger.Info("default_role_set", "role", defaultRole)
-		}
+	if resolvedRoleName != "" && sessionLogger != nil {
+		sessionLogger.Info("default_role_set", "role", resolvedRoleName)
 	}
 
 	s.sessionsMu.Lock()
@@ -231,19 +241,9 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *core.SweSession, request tool.Su
 		thinking = strings.TrimSpace(parent.ThinkingLevel())
 	}
 	childOutput := &subAgentOutputHandler{delegate: parent.OutputHandler(), slug: resolvedSlug}
-	child, err := s.newSessionWithOptions(modelName, childOutput, parent.ID(), resolvedSlug, thinking)
+	child, err := s.newSessionWithOptions(modelName, childOutput, parent.ID(), resolvedSlug, thinking, resolvedRoleName)
 	if err != nil {
 		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: failed to create child session: %w", err)
-	}
-
-	if roleName := strings.TrimSpace(request.Role); roleName != "" {
-		if err := child.SetRole(roleName); err != nil {
-			return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: failed to set child role: %w", err)
-		}
-	} else if parentRole := parent.Role(); parentRole != nil {
-		if err := child.SetRole(parentRole.Name); err != nil {
-			return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: failed to inherit parent role: %w", err)
-		}
 	}
 
 	if err := child.UserPrompt(request.Prompt); err != nil {
