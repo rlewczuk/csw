@@ -11,63 +11,11 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type compactionOutputHandler struct {
-	messages []string
-}
-
-func (h *compactionOutputHandler) ShowMessage(message string, messageType string) {
-	h.messages = append(h.messages, messageType+":"+message)
-}
-
-func (h *compactionOutputHandler) AddAssistantMessage(text string, thinking string) {}
-
-func (h *compactionOutputHandler) AddUserMessage(text string) {}
-
-func (h *compactionOutputHandler) AddToolCall(call *tool.ToolCall) {}
-
-func (h *compactionOutputHandler) AddToolCallResult(result *tool.ToolResponse) {}
-
-func (h *compactionOutputHandler) RunFinished(err error) {}
-
-func (h *compactionOutputHandler) OnRateLimitError(retryAfterSeconds int) {}
-
-func (h *compactionOutputHandler) ShouldRetryAfterFailure(message string) bool {
-	return false
-}
-
-type capturedSessionMessage struct {
-	message     string
-	messageType string
-}
-
-type retryOutputHandler struct {
-	messages []capturedSessionMessage
-}
-
-func (h *retryOutputHandler) ShowMessage(message string, messageType string) {
-	h.messages = append(h.messages, capturedSessionMessage{message: message, messageType: messageType})
-}
-
-func (h *retryOutputHandler) AddAssistantMessage(text string, thinking string) {}
-
-func (h *retryOutputHandler) AddUserMessage(text string) {}
-
-func (h *retryOutputHandler) AddToolCall(call *tool.ToolCall) {}
-
-func (h *retryOutputHandler) AddToolCallResult(result *tool.ToolResponse) {}
-
-func (h *retryOutputHandler) RunFinished(err error) {}
-
-func (h *retryOutputHandler) OnRateLimitError(retryAfterSeconds int) {}
-
-func (h *retryOutputHandler) ShouldRetryAfterFailure(message string) bool {
-	return false
-}
 
 func TestSweSessionMaybeCompactContext(t *testing.T) {
 	t.Run("compacts messages and writes pre/post snapshots", func(t *testing.T) {
@@ -78,7 +26,7 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 		provider := models.NewMockProvider(nil)
 		provider.Config = &conf.ModelProviderConfig{ContextLengthLimit: 100}
 
-		handler := &compactionOutputHandler{}
+		handler := testutil.NewMockSessionOutputHandler()
 		session := &SweSession{
 			id:         "session-1",
 			logBaseDir: tmpDir,
@@ -96,8 +44,8 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, session.compactionCount)
-		require.NotEmpty(t, handler.messages)
-		assert.Contains(t, handler.messages[0], "Compacting messages")
+		require.NotEmpty(t, handler.StatusMessages)
+		assert.Contains(t, handler.StatusMessages[0].Message, "Compacting messages")
 
 		prePath := filepath.Join(tmpDir, "sessions", "session-1", "messages-pre-1.jsonl")
 		postPath := filepath.Join(tmpDir, "sessions", "session-1", "messages-post-1.jsonl")
@@ -119,7 +67,7 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 		provider := models.NewMockProvider(nil)
 		provider.Config = &conf.ModelProviderConfig{ContextLengthLimit: 100}
 
-		handler := &compactionOutputHandler{}
+		handler := testutil.NewMockSessionOutputHandler()
 		session := &SweSession{
 			id:          "session-2",
 			logBaseDir:  tmpDir,
@@ -136,7 +84,7 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, 0, session.compactionCount)
-		assert.Empty(t, handler.messages)
+		assert.Empty(t, handler.StatusMessages)
 		_, statErr := os.Stat(filepath.Join(tmpDir, "sessions", "session-2", "messages-pre-1.jsonl"))
 		assert.Error(t, statErr)
 	})
@@ -209,7 +157,7 @@ func (m *tokenLimitChatModel) Compactor() models.ChatCompator {
 
 func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 	t.Run("compacts context and retries", func(t *testing.T) {
-		handler := &compactionOutputHandler{}
+		handler := testutil.NewMockSessionOutputHandler()
 		session := &SweSession{
 			messages: []*models.ChatMessage{
 				models.NewTextMessage(models.ChatRoleSystem, "system"),
@@ -237,13 +185,13 @@ func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 		assert.Equal(t, "done", response.GetText())
 		assert.Equal(t, 1, session.compactionCount)
 		require.Len(t, chatModel.callSizes, 2)
-		require.NotEmpty(t, handler.messages)
-		assert.Contains(t, handler.messages[0], "too large")
-		assert.Contains(t, handler.messages[1], "Context exceeded model input token limit")
+		require.NotEmpty(t, handler.StatusMessages)
+		assert.Contains(t, handler.StatusMessages[0].Message, "too large")
+		assert.Contains(t, handler.StatusMessages[1].Message, "Context exceeded model input token limit")
 	})
 
 	t.Run("returns error after reaching max attempts", func(t *testing.T) {
-		handler := &compactionOutputHandler{}
+		handler := testutil.NewMockSessionOutputHandler()
 		configStore := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{LLMRetryMaxAttempts: 2}}
 		session := &SweSession{
 			messages: []*models.ChatMessage{
@@ -273,7 +221,7 @@ func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 
 func TestSweSessionRunNonStreamingChat_UsageLimitWait(t *testing.T) {
 	t.Run("waits retry-after plus buffer before retrying", func(t *testing.T) {
-		handler := &retryOutputHandler{}
+		handler := testutil.NewMockSessionOutputHandler()
 		provider := models.NewMockProvider(nil)
 		provider.Config = &conf.ModelProviderConfig{RateLimitBackoffScale: 1}
 		configStore := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{LLMRetryMaxAttempts: 2, LLMRetryMaxBackoffSeconds: 30}}
@@ -309,15 +257,15 @@ func TestSweSessionRunNonStreamingChat_UsageLimitWait(t *testing.T) {
 		assert.Equal(t, "done", response.GetText())
 		assert.GreaterOrEqual(t, elapsed, time.Millisecond)
 
-		messages := collectSessionMessages(handler.messages)
+		messages := collectSessionMessages(handler.StatusMessages)
 		assert.Contains(t, messages, "Retrying in")
 	})
 }
 
-func collectSessionMessages(records []capturedSessionMessage) string {
+func collectSessionMessages(records []testutil.SessionMessageRecord) string {
 	parts := make([]string, 0, len(records))
 	for _, record := range records {
-		parts = append(parts, record.message)
+		parts = append(parts, record.Message)
 	}
 
 	return strings.Join(parts, "\n")

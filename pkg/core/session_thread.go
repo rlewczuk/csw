@@ -68,6 +68,7 @@ type SessionFactory interface {
 type SessionThread struct {
 	system        SessionFactory
 	outputHandler SessionThreadOutput
+	done          chan error
 
 	mu                     sync.Mutex
 	session                *SweSession
@@ -86,6 +87,7 @@ func NewSessionThread(system SessionFactory, outputHandler SessionThreadOutput) 
 	return &SessionThread{
 		system:        system,
 		outputHandler: outputHandler,
+		done:          make(chan error, 1),
 		inputQueue:    make([]string, 0),
 	}
 }
@@ -101,7 +103,24 @@ func NewSessionThreadWithSession(system SessionFactory, session *SweSession, out
 		system:        system,
 		session:       session,
 		outputHandler: outputHandler,
+		done:          make(chan error, 1),
 		inputQueue:    make([]string, 0),
+	}
+}
+
+// Done returns a channel that receives run completion errors.
+func (c *SessionThread) Done() <-chan error {
+	return c.done
+}
+
+// finishRun forwards run completion to output handler and done channel.
+func (c *SessionThread) finishRun(err error) {
+	if c.outputHandler != nil {
+		c.outputHandler.RunFinished(err)
+	}
+	select {
+	case c.done <- err:
+	default:
 	}
 }
 
@@ -162,8 +181,8 @@ func (c *SessionThread) Interrupt() error {
 
 		if outputHandler != nil {
 			outputHandler.ShowMessage("Session terminated.", "info")
-			outputHandler.RunFinished(fmt.Errorf("SessionThread.Interrupt() [session_thread.go]: terminated by interrupt while suspended"))
 		}
+		c.finishRun(fmt.Errorf("SessionThread.Interrupt() [session_thread.go]: terminated by interrupt while suspended"))
 
 		return nil
 	}
@@ -365,7 +384,7 @@ func (c *SessionThread) runSessionLoop() {
 				// Run the session without new input (processing pending state/tools)
 				err := c.session.Run(ctx)
 				if err != nil {
-					c.outputHandler.RunFinished(err)
+					c.finishRun(err)
 					return
 				}
 
@@ -378,12 +397,12 @@ func (c *SessionThread) runSessionLoop() {
 
 				if wasPaused {
 					if !wasSuspended {
-						c.outputHandler.RunFinished(nil)
+						c.finishRun(nil)
 					}
 					return
 				}
 				if wasInterrupted {
-					c.outputHandler.RunFinished(fmt.Errorf("SessionThread.runSessionLoop() [session_thread.go]: interrupted"))
+					c.finishRun(fmt.Errorf("SessionThread.runSessionLoop() [session_thread.go]: interrupted"))
 					return
 				}
 
@@ -393,14 +412,14 @@ func (c *SessionThread) runSessionLoop() {
 
 			// No more input, stop the loop
 			c.mu.Unlock()
-			c.outputHandler.RunFinished(nil)
+			c.finishRun(nil)
 			return
 		}
 
 		// Check if paused
 		if c.paused {
 			c.mu.Unlock()
-			c.outputHandler.RunFinished(nil)
+			c.finishRun(nil)
 			return
 		}
 
@@ -415,7 +434,7 @@ func (c *SessionThread) runSessionLoop() {
 		}
 		err := c.session.UserPrompt(input)
 		if err != nil {
-			c.outputHandler.RunFinished(err)
+			c.finishRun(err)
 			return
 		}
 
@@ -432,18 +451,18 @@ func (c *SessionThread) runSessionLoop() {
 		if wasPaused {
 			if !wasSuspended {
 				// Paused cleanly, no error
-				c.outputHandler.RunFinished(nil)
+				c.finishRun(nil)
 			}
 			return
 		}
 
 		if wasInterrupted {
-			c.outputHandler.RunFinished(fmt.Errorf("SessionThread.runSessionLoop() [session_thread.go]: interrupted"))
+			c.finishRun(fmt.Errorf("SessionThread.runSessionLoop() [session_thread.go]: interrupted"))
 			return
 		}
 
 		if err != nil {
-			c.outputHandler.RunFinished(err)
+			c.finishRun(err)
 			return
 		}
 	}

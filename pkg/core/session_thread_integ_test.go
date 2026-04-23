@@ -3,77 +3,15 @@
 package core
 
 import (
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/testutil"
-	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type interruptMessageRecord struct {
-	message     string
-	messageType string
-}
-
-type interruptOutputDouble struct {
-	mu               sync.Mutex
-	messages         []interruptMessageRecord
-	runFinishedCalls int
-	runFinishedErr   error
-}
-
-func (d *interruptOutputDouble) ShowMessage(message string, messageType string) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.messages = append(d.messages, interruptMessageRecord{message: message, messageType: messageType})
-}
-
-func (d *interruptOutputDouble) AddUserMessage(text string) {
-	_ = text
-}
-
-func (d *interruptOutputDouble) AddAssistantMessage(text string, thinking string) {
-	_ = text
-	_ = thinking
-}
-
-func (d *interruptOutputDouble) AddToolCall(call *tool.ToolCall) {
-	_ = call
-}
-
-func (d *interruptOutputDouble) AddToolCallResult(result *tool.ToolResponse) {
-	_ = result
-}
-
-func (d *interruptOutputDouble) RunFinished(err error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.runFinishedCalls++
-	d.runFinishedErr = err
-}
-
-func (d *interruptOutputDouble) OnRateLimitError(retryAfterSeconds int) {
-	_ = retryAfterSeconds
-}
-
-func (d *interruptOutputDouble) ShouldRetryAfterFailure(message string) bool {
-	_ = message
-	return false
-}
-
-func (d *interruptOutputDouble) snapshot() ([]interruptMessageRecord, int, error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	messagesCopy := append([]interruptMessageRecord(nil), d.messages...)
-	return messagesCopy, d.runFinishedCalls, d.runFinishedErr
-}
-
-var _ SessionThreadOutput = (*interruptOutputDouble)(nil)
 
 func TestSessionThread(t *testing.T) {
 	fixture := newSweSystemFixture(t, "You are skilled software developer.")
@@ -253,10 +191,11 @@ func TestSessionThreadSafety(t *testing.T) {
 
 func TestSessionThreadInterruptFlow(t *testing.T) {
 	t.Run("first interrupt suspends and clears queue, second interrupt terminates", func(t *testing.T) {
-		output := &interruptOutputDouble{}
+		output := testutil.NewMockSessionOutputHandler()
 		cancelled := false
 		controller := &SessionThread{
 			outputHandler: output,
+			done:          make(chan error, 1),
 			sessionRunning: true,
 			inputQueue: []string{"queued-1", "queued-2"},
 			cancelFunc: func() {
@@ -274,14 +213,14 @@ func TestSessionThreadInterruptFlow(t *testing.T) {
 		assert.Len(t, controller.inputQueue, 0)
 		controller.mu.Unlock()
 
-		messages, runFinishedCalls, runFinishedErr := output.snapshot()
+		messages := output.StatusMessages
 		require.Len(t, messages, 2)
-		assert.Equal(t, "Session suspended.", messages[0].message)
-		assert.Equal(t, "info", messages[0].messageType)
-		assert.Equal(t, "Removed 2 queued user prompt(s).", messages[1].message)
-		assert.Equal(t, "warning", messages[1].messageType)
-		assert.Equal(t, 0, runFinishedCalls)
-		assert.NoError(t, runFinishedErr)
+		assert.Equal(t, "Session suspended.", messages[0].Message)
+		assert.Equal(t, "info", messages[0].MessageType)
+		assert.Equal(t, "Removed 2 queued user prompt(s).", messages[1].Message)
+		assert.Equal(t, "warning", messages[1].MessageType)
+		assert.Equal(t, 0, output.RunFinishedCalls)
+		assert.NoError(t, output.RunFinishedError)
 
 		err = controller.Interrupt()
 		require.NoError(t, err)
@@ -290,13 +229,13 @@ func TestSessionThreadInterruptFlow(t *testing.T) {
 		assert.False(t, controller.suspended)
 		controller.mu.Unlock()
 
-		messages, runFinishedCalls, runFinishedErr = output.snapshot()
+		messages = output.StatusMessages
 		require.Len(t, messages, 3)
-		assert.Equal(t, "Session terminated.", messages[2].message)
-		assert.Equal(t, "info", messages[2].messageType)
-		assert.Equal(t, 1, runFinishedCalls)
-		require.Error(t, runFinishedErr)
-		assert.Contains(t, runFinishedErr.Error(), "terminated by interrupt while suspended")
+		assert.Equal(t, "Session terminated.", messages[2].Message)
+		assert.Equal(t, "info", messages[2].MessageType)
+		assert.Equal(t, 1, output.RunFinishedCalls)
+		require.Error(t, output.RunFinishedError)
+		assert.Contains(t, output.RunFinishedError.Error(), "terminated by interrupt while suspended")
 	})
 
 	t.Run("user prompt resumes suspended session", func(t *testing.T) {
