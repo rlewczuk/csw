@@ -88,9 +88,6 @@ type TaskRunIdentifierResolver func(manager *core.TaskManager, identifier string
 
 const defaultBashRunTimeout = 120 * time.Second
 
-var resolveRunDefaultsFunc = ResolveRunDefaults
-var resolveWorktreeBranchNameFunc = ResolveWorktreeBranchName
-var buildSystemFunc = BuildSystem
 var startRunSessionFunc = func(sweSystem *SweSystem, params StartRunSessionParams) (StartRunSessionResult, error) {
 	return sweSystem.StartRunSession(params)
 }
@@ -241,7 +238,7 @@ func RunCommand(params *RunParams) error {
 			return err
 		}
 
-		if err := applyRunDefaults(resolveRunDefaultsFunc, params.Command, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath, &params.ModelName, &params.WorktreeBranch, &params.Merge, &params.LogLLMRequests, &params.LogLLMRequestsRaw, &params.Thinking, &params.LSPServer, &params.GitUserName, &params.GitUserEmail, &params.MaxThreads, &params.ShadowDir, &params.AllowAllPerms, &params.VFSAllow); err != nil {
+		if err := applyRunDefaults(ResolveRunDefaults, params.Command, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath, &params.ModelName, &params.WorktreeBranch, &params.Merge, &params.LogLLMRequests, &params.LogLLMRequestsRaw, &params.Thinking, &params.LSPServer, &params.GitUserName, &params.GitUserEmail, &params.MaxThreads, &params.ShadowDir, &params.AllowAllPerms, &params.VFSAllow); err != nil {
 			return err
 		}
 
@@ -319,7 +316,7 @@ func RunCommand(params *RunParams) error {
 			if _, updateErr := manager.UpdateTask(core.TaskUpdateParams{Identifier: identifier, Status: &runningStatus}); updateErr != nil {
 				return updateErr
 			}
-			taskRunMerge := resolveTaskRunMerge(params.Command.Flags().Changed("merge") || params.NoMerge, params.Merge, params.WorktreeBranch, resolveRunDefaultsFunc, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath)
+			taskRunMerge := resolveTaskRunMerge(params.Command.Flags().Changed("merge") || params.NoMerge, params.Merge, params.WorktreeBranch, ResolveRunDefaults, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath)
 			if strings.TrimSpace(params.WorktreeBranch) == "" {
 				params.WorktreeBranch = strings.TrimSpace(params.Task.FeatureBranch)
 			}
@@ -362,7 +359,7 @@ func RunCommand(params *RunParams) error {
 		return err
 	}
 
-	resolvedWorktreeBranch, err := resolveWorktreeBranchNameFunc(ctx, ResolveWorktreeBranchNameParams{Prompt: params.Prompt, ModelName: params.ModelName, WorkDir: params.WorkDir, ShadowDir: params.ShadowDir, ProjectConfig: params.ProjectConfig, ConfigPath: params.ConfigPath, WorktreeBranch: params.WorktreeBranch})
+	resolvedWorktreeBranch, err := ResolveWorktreeBranchName(ctx, ResolveWorktreeBranchNameParams{Prompt: params.Prompt, ModelName: params.ModelName, WorkDir: params.WorkDir, ShadowDir: params.ShadowDir, ProjectConfig: params.ProjectConfig, ConfigPath: params.ConfigPath, WorktreeBranch: params.WorktreeBranch})
 	if err != nil {
 		return fmt.Errorf("RunCommand() [run.go]: failed to resolve worktree branch: %w", err)
 	}
@@ -371,7 +368,7 @@ func RunCommand(params *RunParams) error {
 		_, _ = fmt.Fprintf(stdout, "[INFO] Worktree branch: %s\n", params.WorktreeBranch)
 	}
 
-	sweSystem, buildResult, err := buildSystemFunc(BuildSystemParams{WorkDir: params.WorkDir, ShadowDir: params.ShadowDir, ConfigPath: params.ConfigPath, ProjectConfig: params.ProjectConfig, ModelName: params.ModelName, RoleName: params.RoleName, WorktreeBranch: params.WorktreeBranch, GitUserName: params.GitUserName, GitUserEmail: params.GitUserEmail, ContainerEnabled: params.ContainerEnabled, ContainerDisabled: params.ContainerDisabled, ContainerImage: params.ContainerImage, ContainerMounts: params.ContainerMounts, ContainerEnv: params.ContainerEnv, LSPServer: params.LSPServer, LogLLMRequests: params.LogLLMRequests, LogLLMRequestsRaw: params.LogLLMRequestsRaw, NoRefresh: params.NoRefresh, Thinking: params.Thinking, BashRunTimeout: params.BashRunTimeout, AllowedPaths: params.VFSAllow, MaxToolThreads: params.MaxThreads, AllowAllPermissions: params.AllowAllPerms})
+	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{WorkDir: params.WorkDir, ShadowDir: params.ShadowDir, ConfigPath: params.ConfigPath, ProjectConfig: params.ProjectConfig, ModelName: params.ModelName, RoleName: params.RoleName, WorktreeBranch: params.WorktreeBranch, GitUserName: params.GitUserName, GitUserEmail: params.GitUserEmail, ContainerEnabled: params.ContainerEnabled, ContainerDisabled: params.ContainerDisabled, ContainerImage: params.ContainerImage, ContainerMounts: params.ContainerMounts, ContainerEnv: params.ContainerEnv, LSPServer: params.LSPServer, LogLLMRequests: params.LogLLMRequests, LogLLMRequestsRaw: params.LogLLMRequestsRaw, NoRefresh: params.NoRefresh, Thinking: params.Thinking, BashRunTimeout: params.BashRunTimeout, AllowedPaths: params.VFSAllow, MaxToolThreads: params.MaxThreads, AllowAllPermissions: params.AllowAllPerms})
 	if err != nil {
 		return err
 	}
