@@ -16,16 +16,8 @@
       "description": "If true, include last session summary (metadata and markdown summary text)."
     },
     "promptOnly": {
-      "description": "If true/\"yes\", returns task prompt content.",
-      "oneOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "type": "string",
-          "enum": ["yes", "true"]
-        }
-      ]
+      "description": "If true, returns task prompt content.",
+      "type": "boolean"
     }
   },
   "required": [],
