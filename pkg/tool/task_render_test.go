@@ -95,6 +95,23 @@ func TestTaskToolRender(t *testing.T) {
 			},
 		},
 		{
+			name: "taskEdit includes target and replaceAll flag",
+			tool: NewTaskEditTool(nil, nil),
+			call: &ToolCall{Function: "taskEdit", Arguments: NewToolValue(map[string]any{
+				"name":       "task-edit-target",
+				"oldString":  "before",
+				"newString":  "after",
+				"replaceAll": true,
+			})},
+			wantSummary: []string{"taskEdit", "name=task-edit-target"},
+			wantDetails: []string{"replace_all=true"},
+			wantJSONLField: map[string]any{
+				"tool":        "taskEdit",
+				"target":      "name=task-edit-target",
+				"replace_all": true,
+			},
+		},
+		{
 			name: "taskUpdate includes target changed fields and status",
 			tool: NewTaskUpdateTool(nil, nil),
 			call: &ToolCall{Function: "taskUpdate", Arguments: NewToolValue(map[string]any{
@@ -106,10 +123,10 @@ func TestTaskToolRender(t *testing.T) {
 			wantSummary: []string{"taskUpdate", "uuid=task-update-id", "fields=status,role,prompt"},
 			wantDetails: []string{"status=running", "updated_count=3"},
 			wantJSONLField: map[string]any{
-				"tool":         "taskUpdate",
-				"target":       "uuid=task-update-id",
+				"tool":          "taskUpdate",
+				"target":        "uuid=task-update-id",
 				"updated_count": float64(3),
-				"task_status":  "running",
+				"task_status":   "running",
 			},
 		},
 	}

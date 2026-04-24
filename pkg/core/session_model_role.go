@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"strings"
 
 	"github.com/rlewczuk/csw/pkg/apis"
@@ -11,6 +12,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/lsp"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/tool"
+	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
 func composeProviderModel(providerName string, modelName string) string {
@@ -209,6 +211,21 @@ func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 			}
 
 			return result, nil
+		}, s))
+
+		registry.Register("taskEdit", tool.NewTaskEditTool(func(_ context.Context, identifier string, fallbackTaskID string, oldString string, newString string, replaceAll bool) (tool.TaskRecord, error) {
+			taskDir, taskData, err := s.taskManager.ResolveTask(TaskLookup{Identifier: strings.TrimSpace(identifier), FallbackTaskID: strings.TrimSpace(fallbackTaskID)})
+			if err != nil {
+				return tool.TaskRecord{}, err
+			}
+
+			promptPath := filepath.Join(taskDir, "task.md")
+			patcher := vfs.NewFilePatcher(s.VFS)
+			if _, err := patcher.ApplyEdits(promptPath, oldString, newString, replaceAll); err != nil {
+				return tool.TaskRecord{}, err
+			}
+
+			return toToolTaskRecord(taskData), nil
 		}, s))
 
 		registry.Register("taskMerge", tool.NewTaskMergeTool(func(_ context.Context, identifier string, fallbackTaskID string) (tool.TaskRecord, error) {

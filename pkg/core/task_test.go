@@ -227,6 +227,22 @@ func TestTaskManagerUpdateTaskRejectsEmptyPrompt(t *testing.T) {
 	assert.Contains(t, err.Error(), "prompt cannot be empty")
 }
 
+func TestTaskManagerUpdateTaskSupportsNameIdentifier(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := NewTaskManager(baseDir, nil)
+	require.NoError(t, err)
+
+	created, err := manager.CreateTask(TaskCreateParams{Name: "task-by-name", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	status := TaskStatusOpen
+	updated, err := manager.UpdateTask(TaskUpdateParams{Identifier: created.Name, Status: &status})
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	assert.Equal(t, created.UUID, updated.UUID)
+	assert.Equal(t, TaskStatusOpen, updated.Status)
+}
+
 func TestTaskManagerUpdateTaskRejectsEmptyStatus(t *testing.T) {
 	baseDir := t.TempDir()
 	manager, err := NewTaskManager(baseDir, nil)

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Edits task prompt content by replacing exact text fragments.",
+  "type": "object",
+  "properties": {
+    "uuid": {
+      "type": "string",
+      "description": "Task UUID. Optional if name is provided or current session is already bound to a task."
+    },
+    "name": {
+      "type": "string",
+      "description": "Task name/slug. Used when uuid is omitted."
+    },
+    "oldString": {
+      "type": "string",
+      "description": "The text fragment to replace in task prompt (`task.md`)."
+    },
+    "newString": {
+      "type": "string",
+      "description": "The replacement text fragment."
+    },
+    "replaceAll": {
+      "type": "boolean",
+      "description": "Replace all occurrences of oldString (default false)."
+    }
+  },
+  "required": ["oldString", "newString"],
+  "additionalProperties": false
+}

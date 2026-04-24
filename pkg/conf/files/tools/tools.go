@@ -5,6 +5,7 @@ var Names = []string{
 	"runBash",
 	"skill",
 	"taskGet",
+	"taskEdit",
 	"taskList",
 	"taskMerge",
 	"taskNew",
