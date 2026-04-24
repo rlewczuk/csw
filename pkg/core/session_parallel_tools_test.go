@@ -15,38 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type noopSessionOutputHandler struct{}
-
-func (h *noopSessionOutputHandler) ShowMessage(message string, messageType string) {
-	_ = message
-	_ = messageType
-}
-
-func (h *noopSessionOutputHandler) AddUserMessage(text string) {
-	_ = text
-}
-
-func (h *noopSessionOutputHandler) AddAssistantMessage(text string, thinking string) {
-	_ = text
-	_ = thinking
-}
-
-func (h *noopSessionOutputHandler) AddToolCall(call *tool.ToolCall) {
-	_ = call
-}
-
-func (h *noopSessionOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
-	_ = result
-}
-
-func (h *noopSessionOutputHandler) RunFinished(err error) {
-	_ = err
-}
-
-func (h *noopSessionOutputHandler) OnRateLimitError(retryAfterSeconds int) {
-	_ = retryAfterSeconds
-}
-
 type orderedSessionOutputHandler struct {
 	mu       sync.Mutex
 	events   []string
@@ -220,8 +188,8 @@ func TestSessionRun_FlushesQueuedUserPromptsAfterToolResponsesBeforeNextLLMReque
 		Role: models.ChatRoleAssistant,
 		Parts: []models.ChatMessagePart{{
 			ToolCall: &tool.ToolCall{
-				ID:       "call-1",
-				Function: "block",
+				ID:        "call-1",
+				Function:  "block",
 				Arguments: tool.NewToolValue(map[string]any{}),
 			},
 		}},
@@ -312,8 +280,8 @@ func TestExecuteToolCalls_ExecutesCallsInParallelAndAggregatesResponses(t *testi
 	})
 
 	session := &SweSession{
-		Tools:  registry,
-		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Tools:          registry,
+		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 		toolStartDelay: time.Millisecond,
 	}
 
@@ -347,8 +315,6 @@ func TestExecuteToolCalls_ExecutesCallsInParallelAndAggregatesResponses(t *testi
 	assert.Equal(t, "call-1", toolMessage.GetToolResponses()[0].Call.ID)
 	assert.Equal(t, "call-2", toolMessage.GetToolResponses()[1].Call.ID)
 }
-
-
 
 func TestExecuteToolCalls_RespectsConfiguredMaxThreadsAndQueuesRemainingCalls(t *testing.T) {
 	started := make(chan string, 3)
