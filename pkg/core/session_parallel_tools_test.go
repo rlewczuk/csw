@@ -10,85 +10,11 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
+	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type orderedSessionOutputHandler struct {
-	mu       sync.Mutex
-	events   []string
-	finished chan struct{}
-	err      error
-}
-
-func newOrderedSessionOutputHandler() *orderedSessionOutputHandler {
-	return &orderedSessionOutputHandler{
-		events:   make([]string, 0),
-		finished: make(chan struct{}),
-	}
-}
-
-func (h *orderedSessionOutputHandler) ShowMessage(message string, messageType string) {
-	_ = message
-	_ = messageType
-}
-
-func (h *orderedSessionOutputHandler) AddUserMessage(text string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.events = append(h.events, "user:"+text)
-}
-
-func (h *orderedSessionOutputHandler) AddAssistantMessage(text string, thinking string) {
-	_ = text
-	_ = thinking
-}
-
-func (h *orderedSessionOutputHandler) AddToolCall(call *tool.ToolCall) {
-	_ = call
-}
-
-func (h *orderedSessionOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.events = append(h.events, "tool_result")
-	_ = result
-}
-
-func (h *orderedSessionOutputHandler) RunFinished(err error) {
-	h.mu.Lock()
-	h.err = err
-	h.mu.Unlock()
-	close(h.finished)
-}
-
-func (h *orderedSessionOutputHandler) OnRateLimitError(retryAfterSeconds int) {
-	_ = retryAfterSeconds
-}
-
-func (h *orderedSessionOutputHandler) WaitForFinished(t *testing.T) {
-	t.Helper()
-	select {
-	case <-h.finished:
-	case <-time.After(2 * time.Second):
-		t.Fatal("timeout waiting for session finish")
-	}
-}
-
-func (h *orderedSessionOutputHandler) Events() []string {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	result := make([]string, len(h.events))
-	copy(result, h.events)
-	return result
-}
-
-func (h *orderedSessionOutputHandler) FinishedError() error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.err
-}
 
 // probeTool is a test double that can be synchronized to verify parallel execution.
 type probeTool struct {
@@ -204,7 +130,7 @@ func TestSessionRun_FlushesQueuedUserPromptsAfterToolResponsesBeforeNextLLMReque
 		withoutVFSTools(),
 	)
 
-	handler := newOrderedSessionOutputHandler()
+	handler := testutil.NewMockSessionOutputHandler()
 	thread := NewSessionThread(fixture.system, handler)
 	require.NoError(t, thread.StartSession("mock/test-model"))
 	require.NoError(t, thread.UserPrompt("first prompt"))
@@ -237,7 +163,7 @@ func TestSessionRun_FlushesQueuedUserPromptsAfterToolResponsesBeforeNextLLMReque
 	require.NotEqual(t, -1, queuedPromptIndex, "queued user prompt should be present before second LLM call")
 	assert.Greater(t, queuedPromptIndex, toolResponseIndex, "queued prompt should be appended after tool responses")
 
-	events := handler.Events()
+	events := handler.EventsSnapshot()
 	toolResultEventIndex := -1
 	queuedEventIndex := -1
 	for i, event := range events {

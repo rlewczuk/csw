@@ -2,6 +2,8 @@ package testutil
 
 import (
 	"sync"
+	"testing"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/tool"
 )
@@ -21,8 +23,14 @@ type SessionMessageRecord struct {
 // MockSessionOutputHandler is a mock implementation of SessionOutputHandler that keeps all output in memory.
 // It is used for testing and capturing output from agent operations.
 type MockSessionOutputHandler struct {
+	// UserMessages stores user prompts received via AddUserMessage.
+	UserMessages []string
+
 	// AssistantMessages stores assistant outputs received via AddAssistantMessage.
 	AssistantMessages []AssistantMessageRecord
+
+	// Events stores ordered high-level events emitted by handler callbacks.
+	Events []string
 
 	// ToolCalls stores all tool calls received via AddToolCall.
 	ToolCalls []*tool.ToolCall
@@ -49,7 +57,9 @@ type MockSessionOutputHandler struct {
 // NewMockSessionOutputHandler creates a new MockSessionOutputHandler.
 func NewMockSessionOutputHandler() *MockSessionOutputHandler {
 	return &MockSessionOutputHandler{
+		UserMessages:          make([]string, 0),
 		AssistantMessages:     make([]AssistantMessageRecord, 0),
+		Events:                make([]string, 0),
 		ToolCalls:             make([]*tool.ToolCall, 0),
 		ToolCallResults:       make([]*tool.ToolResponse, 0),
 		StatusMessages:        make([]SessionMessageRecord, 0),
@@ -73,12 +83,16 @@ func (h *MockSessionOutputHandler) OnRateLimitError(retryAfterSeconds int) {
 func (h *MockSessionOutputHandler) ShowMessage(message string, messageType string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.Events = append(h.Events, "status")
 	h.StatusMessages = append(h.StatusMessages, SessionMessageRecord{Message: message, MessageType: messageType})
 }
 
-// AddUserMessage records user message (ignored in this mock).
+// AddUserMessage records user message.
 func (h *MockSessionOutputHandler) AddUserMessage(text string) {
-	_ = text
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.UserMessages = append(h.UserMessages, text)
+	h.Events = append(h.Events, "user:"+text)
 }
 
 // WaitForRateLimitError blocks until OnRateLimitError is called.
@@ -88,6 +102,7 @@ func (h *MockSessionOutputHandler) WaitForRateLimitError() { <-h.rateLimitErrorC
 func (h *MockSessionOutputHandler) AddAssistantMessage(text string, thinking string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.Events = append(h.Events, "assistant")
 	h.AssistantMessages = append(h.AssistantMessages, AssistantMessageRecord{Text: text, Thinking: thinking})
 }
 
@@ -95,6 +110,7 @@ func (h *MockSessionOutputHandler) AddAssistantMessage(text string, thinking str
 func (h *MockSessionOutputHandler) AddToolCall(call *tool.ToolCall) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.Events = append(h.Events, "tool_call")
 	h.ToolCalls = append(h.ToolCalls, call)
 }
 
@@ -102,6 +118,7 @@ func (h *MockSessionOutputHandler) AddToolCall(call *tool.ToolCall) {
 func (h *MockSessionOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.Events = append(h.Events, "tool_result")
 	h.ToolCallResults = append(h.ToolCallResults, result)
 }
 
@@ -109,6 +126,7 @@ func (h *MockSessionOutputHandler) AddToolCallResult(result *tool.ToolResponse) 
 func (h *MockSessionOutputHandler) RunFinished(err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.Events = append(h.Events, "run_finished")
 	h.RunFinishedCalls++
 	h.RunFinishedError = err
 	if !h.runFinishedClosed {
@@ -120,11 +138,41 @@ func (h *MockSessionOutputHandler) RunFinished(err error) {
 // WaitForRunFinished blocks until RunFinished is called.
 func (h *MockSessionOutputHandler) WaitForRunFinished() { <-h.runFinishedCalled }
 
+// WaitForFinished blocks until RunFinished is called, failing test on timeout.
+func (h *MockSessionOutputHandler) WaitForFinished(t *testing.T) {
+	t.Helper()
+	select {
+	case <-h.runFinishedCalled:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for session finish")
+	}
+}
+
+// EventsSnapshot returns a copy of recorded event names in observed order.
+func (h *MockSessionOutputHandler) EventsSnapshot() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	result := make([]string, len(h.Events))
+	copy(result, h.Events)
+    return result
+}
+
+// FinishedError returns error passed to RunFinished.
+func (h *MockSessionOutputHandler) FinishedError() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	return h.RunFinishedError
+}
+
 // Reset clears all recorded output data.
 func (h *MockSessionOutputHandler) Reset() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.UserMessages = make([]string, 0)
 	h.AssistantMessages = make([]AssistantMessageRecord, 0)
+	h.Events = make([]string, 0)
 	h.ToolCalls = make([]*tool.ToolCall, 0)
 	h.ToolCallResults = make([]*tool.ToolResponse, 0)
 	h.StatusMessages = make([]SessionMessageRecord, 0)
