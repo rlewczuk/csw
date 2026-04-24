@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/commands"
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,8 +48,53 @@ func TestResolveRunCommandInvocation_TaskModeUsesCommands(t *testing.T) {
 
 		require.NotNil(t, resolved)
 		assert.Equal(t, "csw/task-critic", resolved.CommandName)
-		assert.Contains(t, resolved.CommandTemplate, "Analyze and edit task")
+		assert.Contains(t, resolved.CommandTemplate, "Analyze and edit current task description")
 		assert.Equal(t, "/csw/task-critic", resolved.Prompt)
 		assert.Empty(t, resolved.ExtraPositionalArgs)
 	})
+}
+
+func TestBuildRunAgentStartupInfoMessages(t *testing.T) {
+	t.Run("builds startup lines without command", func(t *testing.T) {
+		messages := BuildRunAgentStartupInfoMessages(&RunParams{Thinking: "high", RoleName: "developer"}, BuildSystemResult{ModelName: "ollama/qwen3", RoleConfig: conf.AgentRoleConfig{Name: "developer"}})
+
+		require.Len(t, messages, 3)
+		assert.Equal(t, "[INFO] Model: ollama/qwen3", messages[0])
+		assert.Equal(t, "[INFO] Thinking: high", messages[1])
+		assert.Equal(t, "[INFO] Role: developer", messages[2])
+	})
+
+	t.Run("includes command with embedded source", func(t *testing.T) {
+		messages := BuildRunAgentStartupInfoMessages(
+			&RunParams{Thinking: "", RoleName: "", CommandName: "csw/task-critic", CommandPath: "embedded:data/csw/task-critic.md"},
+			BuildSystemResult{ModelName: "ollama/qwen3", RoleConfig: conf.AgentRoleConfig{}},
+		)
+
+		require.Len(t, messages, 4)
+		assert.Equal(t, "[INFO] Model: ollama/qwen3", messages[0])
+		assert.Equal(t, "[INFO] Thinking: -", messages[1])
+		assert.Equal(t, "[INFO] Role: -", messages[2])
+		assert.Equal(t, "[INFO] Command: /csw/task-critic source=embedded", messages[3])
+	})
+}
+
+func TestBuildRunCommandStartupInfoMessage(t *testing.T) {
+	tests := []struct {
+		name        string
+		commandName string
+		commandPath string
+		expected    string
+	}{
+		{name: "empty command name", commandName: "", commandPath: "embedded:data/csw/task-critic.md", expected: ""},
+		{name: "embedded command", commandName: "csw/task-critic", commandPath: "embedded:data/csw/task-critic.md", expected: "[INFO] Command: /csw/task-critic source=embedded"},
+		{name: "local command", commandName: "my/command", commandPath: "/tmp/project/.agents/commands/my/command.md", expected: "[INFO] Command: /my/command source=.agents/commands"},
+		{name: "custom command path", commandName: "my/command", commandPath: "/tmp/project/commands/my/command.md", expected: "[INFO] Command: /my/command source=custom"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := BuildRunCommandStartupInfoMessage(tt.commandName, tt.commandPath)
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
 }

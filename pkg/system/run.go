@@ -34,6 +34,7 @@ type RunParams struct {
 	BashRunTimeoutValue   string
 	Prompt                string
 	CommandName           string
+	CommandPath           string
 	CommandArgs           []string
 	CommandTemplate       string
 	CommandTaskMetadata   *commands.TaskMetadata
@@ -170,6 +171,7 @@ func RunCommand(params *RunParams) error {
 
 		commandTemplate := ""
 		commandName := ""
+		commandPath := ""
 		commandArgs := []string(nil)
 		commandModelOverride := ""
 		commandRoleOverride := ""
@@ -183,6 +185,7 @@ func RunCommand(params *RunParams) error {
 			}
 			commandTemplate = resolvedInvocation.CommandTemplate
 			commandName = resolvedInvocation.CommandName
+			commandPath = resolvedInvocation.CommandPath
 			commandArgs = resolvedInvocation.CommandArgs
 			commandModelOverride = resolvedInvocation.CommandModelOverride
 			commandRoleOverride = resolvedInvocation.CommandRoleOverride
@@ -293,6 +296,7 @@ func RunCommand(params *RunParams) error {
 
 		params.Prompt = prompt
 		params.CommandName = commandName
+		params.CommandPath = commandPath
 		params.CommandArgs = commandArgs
 		params.CommandTemplate = commandTemplate
 		params.CommandTaskMetadata = commandTaskMetadata
@@ -354,6 +358,9 @@ func RunCommand(params *RunParams) error {
 			lspStatus = "started"
 		}
 		_, _ = fmt.Fprintf(stdout, "[INFO] LSP %s (workdir: %s)\n", lspStatus, buildResult.LSPWorkDir)
+	}
+	for _, message := range BuildRunAgentStartupInfoMessages(params, buildResult) {
+		_, _ = fmt.Fprintln(stdout, message)
 	}
 	if strings.TrimSpace(buildResult.ContainerImage) != "" {
 		_, _ = fmt.Fprintln(stdout, BuildContainerStartupInfoMessage(buildResult))
@@ -419,6 +426,7 @@ func resolveTaskFinalStatusForRun(session *core.SweSession, merge bool) (string,
 type resolvedRunCommandInvocation struct {
 	CommandTemplate      string
 	CommandName          string
+	CommandPath          string
 	CommandArgs          []string
 	CommandModelOverride string
 	CommandRoleOverride  string
@@ -446,6 +454,7 @@ func resolveRunCommandInvocation(invocation *commands.Invocation, workDir string
 	result := &resolvedRunCommandInvocation{
 		CommandTemplate:      loadedCommand.Template,
 		CommandName:          loadedCommand.Name,
+		CommandPath:          loadedCommand.Path,
 		CommandArgs:          append([]string(nil), invocation.Arguments...),
 		CommandModelOverride: strings.TrimSpace(loadedCommand.Metadata.Model),
 		CommandRoleOverride:  strings.TrimSpace(loadedCommand.Metadata.Agent),
@@ -512,6 +521,58 @@ func applyRunDefaults(resolver runDefaultsResolver, cmd *cobra.Command, workDir 
 		return fmt.Errorf("applyRunDefaults() [run.go]: --max-threads must be >= 0")
 	}
 	return nil
+}
+
+// BuildRunAgentStartupInfoMessages builds startup info lines for model, thinking, role and command.
+func BuildRunAgentStartupInfoMessages(params *RunParams, buildResult BuildSystemResult) []string {
+	if params == nil {
+		return nil
+	}
+
+	messages := make([]string, 0, 4)
+	messages = append(messages, fmt.Sprintf("[INFO] Model: %s", shared.NullValue(strings.TrimSpace(buildResult.ModelName))))
+	messages = append(messages, fmt.Sprintf("[INFO] Thinking: %s", shared.NullValue(strings.TrimSpace(params.Thinking))))
+
+	roleName := strings.TrimSpace(buildResult.RoleConfig.Name)
+	if roleName == "" {
+		roleName = strings.TrimSpace(params.RoleName)
+	}
+	messages = append(messages, fmt.Sprintf("[INFO] Role: %s", shared.NullValue(roleName)))
+
+	commandLine := BuildRunCommandStartupInfoMessage(params.CommandName, params.CommandPath)
+	if commandLine != "" {
+		messages = append(messages, commandLine)
+	}
+
+	return messages
+}
+
+// BuildRunCommandStartupInfoMessage builds startup info line for detected slash command.
+func BuildRunCommandStartupInfoMessage(commandName string, commandPath string) string {
+	trimmedCommandName := strings.TrimSpace(commandName)
+	if trimmedCommandName == "" {
+		return ""
+	}
+
+	commandSource := shared.NullValue(resolveRunCommandSource(commandPath))
+	return fmt.Sprintf("[INFO] Command: /%s source=%s", trimmedCommandName, commandSource)
+}
+
+func resolveRunCommandSource(commandPath string) string {
+	trimmedPath := strings.TrimSpace(commandPath)
+	if trimmedPath == "" {
+		return ""
+	}
+	if strings.HasPrefix(trimmedPath, "embedded:") {
+		return "embedded"
+	}
+
+	normalizedPath := filepath.ToSlash(trimmedPath)
+	if strings.Contains(normalizedPath, "/.agents/commands/") {
+		return ".agents/commands"
+	}
+
+	return "custom"
 }
 
 func applyCommandRunDefaults(cmd *cobra.Command, defaults *commands.RunDefaultsMetadata, model *string, role *string, worktree *string, merge *bool, logLLMRequests *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string, containerOn *bool, containerOff *bool, containerImage *string, containerMounts *[]string, containerEnv *[]string) (*bool, error) {
