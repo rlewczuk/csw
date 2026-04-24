@@ -14,6 +14,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	taskNewFallbackBranchName = "unnamed"
+	taskNewFallbackDescription = "New Task"
+)
+
 func taskNewCommand() *cobra.Command {
 	var name string
 	var description string
@@ -217,13 +222,14 @@ func resolveTaskCreateParams(ctx context.Context, params taskCreateResolveParams
 			WorktreeBranch: worktreeTemplate,
 		})
 		if err != nil {
-			return core.TaskCreateParams{}, fmt.Errorf("resolveTaskCreateParams() [task.go]: failed to resolve task branch: %w", err)
+			resolvedBranch = taskNewFallbackBranchName
+		} else {
+			resolvedBranch = strings.TrimSpace(generatedBranch)
 		}
-		resolvedBranch = strings.TrimSpace(generatedBranch)
 	}
 
 	if resolvedBranch == "" {
-		return core.TaskCreateParams{}, fmt.Errorf("resolveTaskCreateParams() [task.go]: resolved task branch cannot be empty")
+		resolvedBranch = taskNewFallbackBranchName
 	}
 
 	resolvedName := strings.TrimSpace(params.Name)
@@ -244,9 +250,14 @@ func resolveTaskCreateParams(ctx context.Context, params taskCreateResolveParams
 			ConfigPath:    strings.TrimSpace(params.ConfigPath),
 		})
 		if err != nil {
-			return core.TaskCreateParams{}, err
+			resolvedDescription = taskNewFallbackDescription
+		} else {
+			resolvedDescription = strings.TrimSpace(generatedDescription)
 		}
-		resolvedDescription = strings.TrimSpace(generatedDescription)
+	}
+
+	if resolvedDescription == "" {
+		resolvedDescription = taskNewFallbackDescription
 	}
 
 	return core.TaskCreateParams{

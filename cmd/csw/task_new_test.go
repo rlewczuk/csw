@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -50,6 +51,76 @@ func TestResolveTaskCreateParamsGeneratesBranchAndDescription(t *testing.T) {
 	assert.Equal(t, "feature/generated", resolved.FeatureBranch)
 	assert.Equal(t, "feature/generated", resolved.Name)
 	assert.Equal(t, "generated description", resolved.Description)
+	assert.Equal(t, "do this task", resolved.Prompt)
+}
+
+func TestResolveTaskCreateParamsFallsBackWhenGenerationFails(t *testing.T) {
+	originalDefaults := resolveTaskRunDefaultsFunc
+	originalBranchResolver := resolveTaskWorktreeBranchNameFunc
+	originalDescriptionGenerator := generateTaskDescriptionFunc
+	t.Cleanup(func() {
+		resolveTaskRunDefaultsFunc = originalDefaults
+		resolveTaskWorktreeBranchNameFunc = originalBranchResolver
+		generateTaskDescriptionFunc = originalDescriptionGenerator
+	})
+
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		_ = params
+		return conf.RunDefaultsConfig{Model: "provider/model", Worktree: "feature/%"}, nil
+	}
+
+	resolveTaskWorktreeBranchNameFunc = func(ctx context.Context, params system.ResolveWorktreeBranchNameParams) (string, error) {
+		_ = ctx
+		assert.Equal(t, "do this task", params.Prompt)
+		return "", fmt.Errorf("uncorrectable llm error")
+	}
+
+	generateTaskDescriptionFunc = func(ctx context.Context, params taskCreateResolveParams) (string, error) {
+		_ = ctx
+		assert.Equal(t, taskNewFallbackBranchName, params.Branch)
+		assert.Equal(t, "do this task", params.Prompt)
+		return "", fmt.Errorf("uncorrectable llm error")
+	}
+
+	resolved, err := resolveTaskCreateParams(context.Background(), taskCreateResolveParams{Prompt: "do this task"})
+	require.NoError(t, err)
+	assert.Equal(t, taskNewFallbackBranchName, resolved.FeatureBranch)
+	assert.Equal(t, taskNewFallbackBranchName, resolved.Name)
+	assert.Equal(t, taskNewFallbackDescription, resolved.Description)
+	assert.Equal(t, "do this task", resolved.Prompt)
+}
+
+func TestResolveTaskCreateParamsFallsBackWhenGenerationReturnsEmptyValues(t *testing.T) {
+	originalDefaults := resolveTaskRunDefaultsFunc
+	originalBranchResolver := resolveTaskWorktreeBranchNameFunc
+	originalDescriptionGenerator := generateTaskDescriptionFunc
+	t.Cleanup(func() {
+		resolveTaskRunDefaultsFunc = originalDefaults
+		resolveTaskWorktreeBranchNameFunc = originalBranchResolver
+		generateTaskDescriptionFunc = originalDescriptionGenerator
+	})
+
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		_ = params
+		return conf.RunDefaultsConfig{Model: "provider/model", Worktree: "feature/%"}, nil
+	}
+
+	resolveTaskWorktreeBranchNameFunc = func(ctx context.Context, params system.ResolveWorktreeBranchNameParams) (string, error) {
+		_ = ctx
+		_ = params
+		return "", nil
+	}
+
+	generateTaskDescriptionFunc = func(ctx context.Context, params taskCreateResolveParams) (string, error) {
+		_ = ctx
+		assert.Equal(t, taskNewFallbackBranchName, params.Branch)
+		return "", nil
+	}
+
+	resolved, err := resolveTaskCreateParams(context.Background(), taskCreateResolveParams{Prompt: "do this task"})
+	require.NoError(t, err)
+	assert.Equal(t, taskNewFallbackBranchName, resolved.FeatureBranch)
+	assert.Equal(t, taskNewFallbackDescription, resolved.Description)
 	assert.Equal(t, "do this task", resolved.Prompt)
 }
 
