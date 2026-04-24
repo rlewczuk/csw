@@ -9,8 +9,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/tool"
+)
+
+const (
+	testKimiCompactorSystemPrompt = "compact system prompt"
+	testKimiCompactorPrompt       = "compact user prompt"
+	testKimiCompactorPrefix       = "compact prefix"
 )
 
 type kimiTestChatModel struct {
@@ -57,7 +64,7 @@ func TestKimiCompactorCompactMessages(t *testing.T) {
 			}},
 		}
 
-		compactor := NewKimiCompactor(chatModel, 2)
+		compactor := NewKimiCompactor(chatModel, 2, newKimiCompactorConfig())
 		messages := []*models.ChatMessage{
 			models.NewTextMessage(models.ChatRoleSystem, "system prompt"),
 			models.NewTextMessage(models.ChatRoleUser, "old user"),
@@ -71,7 +78,7 @@ func TestKimiCompactorCompactMessages(t *testing.T) {
 		require.Len(t, got, 3)
 		assert.Equal(t, "keep user", got[0].GetText())
 		assert.Equal(t, models.ChatRoleUser, got[1].Role)
-		assert.Contains(t, got[1].GetText(), kimiCompactorPrefix)
+		assert.Contains(t, got[1].GetText(), testKimiCompactorPrefix)
 		assert.Contains(t, got[1].GetText(), "summary line")
 		assert.NotContains(t, got[1].GetText(), "hidden")
 		assert.Equal(t, "keep assistant", got[2].GetText())
@@ -79,9 +86,9 @@ func TestKimiCompactorCompactMessages(t *testing.T) {
 		require.Equal(t, 1, chatModel.calls)
 		require.Len(t, chatModel.lastMessages, 2)
 		assert.Equal(t, models.ChatRoleSystem, chatModel.lastMessages[0].Role)
-		assert.Equal(t, kimiCompactorSystemPrompt, chatModel.lastMessages[0].GetText())
+		assert.Equal(t, testKimiCompactorSystemPrompt, chatModel.lastMessages[0].GetText())
 		assert.Contains(t, chatModel.lastMessages[1].GetText(), "## Message 1")
-		assert.Contains(t, chatModel.lastMessages[1].GetText(), kimiCompactorPrompt)
+		assert.Contains(t, chatModel.lastMessages[1].GetText(), testKimiCompactorPrompt)
 	})
 
 	t.Run("places first preserved user before summary when preserved starts with assistant", func(t *testing.T) {
@@ -89,7 +96,7 @@ func TestKimiCompactorCompactMessages(t *testing.T) {
 			response: models.NewTextMessage(models.ChatRoleAssistant, "summary"),
 		}
 
-		compactor := NewKimiCompactor(chatModel, 2)
+		compactor := NewKimiCompactor(chatModel, 2, newKimiCompactorConfig())
 		messages := []*models.ChatMessage{
 			models.NewTextMessage(models.ChatRoleSystem, "system prompt"),
 			models.NewTextMessage(models.ChatRoleUser, "old user"),
@@ -101,13 +108,13 @@ func TestKimiCompactorCompactMessages(t *testing.T) {
 
 		require.Len(t, got, 3)
 		assert.Equal(t, "keep user", got[0].GetText())
-		assert.Contains(t, got[1].GetText(), kimiCompactorPrefix)
+		assert.Contains(t, got[1].GetText(), testKimiCompactorPrefix)
 		assert.Equal(t, "keep assistant", got[2].GetText())
 	})
 
 	t.Run("returns original messages when chat model fails", func(t *testing.T) {
 		chatModel := &kimiTestChatModel{err: assert.AnError}
-		compactor := NewKimiCompactor(chatModel, 2)
+		compactor := NewKimiCompactor(chatModel, 2, newKimiCompactorConfig())
 		messages := []*models.ChatMessage{
 			models.NewTextMessage(models.ChatRoleSystem, "system"),
 			models.NewTextMessage(models.ChatRoleUser, "u1"),
@@ -124,7 +131,7 @@ func TestKimiCompactorCompactMessages(t *testing.T) {
 
 	t.Run("skips compaction when not enough user assistant messages", func(t *testing.T) {
 		chatModel := &kimiTestChatModel{}
-		compactor := NewKimiCompactor(chatModel, 3)
+		compactor := NewKimiCompactor(chatModel, 3, newKimiCompactorConfig())
 		messages := []*models.ChatMessage{
 			models.NewTextMessage(models.ChatRoleSystem, "system"),
 			models.NewTextMessage(models.ChatRoleUser, "u1"),
@@ -140,7 +147,7 @@ func TestKimiCompactorCompactMessages(t *testing.T) {
 
 func TestKimiCompactorPrepare(t *testing.T) {
 		t.Run("serializes compacted messages and preserves requested tail", func(t *testing.T) {
-			compactor := &KimiCompactor{nmessages: 2}
+			compactor := &KimiCompactor{nmessages: 2, prompt: testKimiCompactorPrompt}
 			toolCall := compactTestToolCall("c1", "vfsRead", map[string]any{"path": "a"})
 			messages := []*models.ChatMessage{
 				models.NewTextMessage(models.ChatRoleSystem, "system"),
@@ -166,11 +173,11 @@ func TestKimiCompactorPrepare(t *testing.T) {
 		assert.NotContains(t, compactMsg.GetText(), "internal")
 		assert.Contains(t, compactMsg.GetText(), "visible")
 		assert.Contains(t, compactMsg.GetText(), "\"Function\":\"vfsRead\"")
-		assert.True(t, strings.Contains(compactMsg.GetText(), kimiCompactorPrompt))
+			assert.True(t, strings.Contains(compactMsg.GetText(), testKimiCompactorPrompt))
 	})
 
 	t.Run("keeps trailing tool-call message out of compacted sequence", func(t *testing.T) {
-		compactor := &KimiCompactor{nmessages: 2}
+		compactor := &KimiCompactor{nmessages: 2, prompt: testKimiCompactorPrompt}
 		toolCall := compactTestToolCall("c2", "vfsRead", map[string]any{"path": "b"})
 		toolResponse := compactTestToolResponse(toolCall, map[string]any{"content": "ok"})
 		messages := []*models.ChatMessage{
@@ -189,5 +196,33 @@ func TestKimiCompactorPrepare(t *testing.T) {
 		assert.True(t, compactTestHasToolResponse(preserved, "c2"))
 		assert.Contains(t, compactMsg.GetText(), "old assistant")
 		assert.NotContains(t, compactMsg.GetText(), "\"ID\":\"c2\"")
+	})
+}
+
+func newKimiCompactorConfig() *conf.CswConfig {
+	return &conf.CswConfig{
+		AgentConfigFiles: map[string]map[string]string{
+			"compact": {
+				"system.md": testKimiCompactorSystemPrompt,
+				"prompt.md": testKimiCompactorPrompt,
+				"prefix.md": testKimiCompactorPrefix,
+			},
+		},
+	}
+}
+
+func TestLoadKimiCompactorPromptTemplates(t *testing.T) {
+	t.Run("loads compact prompts from config", func(t *testing.T) {
+		systemPrompt, prompt, prefix, err := LoadKimiCompactorPromptTemplates(newKimiCompactorConfig())
+		require.NoError(t, err)
+		assert.Equal(t, testKimiCompactorSystemPrompt, systemPrompt)
+		assert.Equal(t, testKimiCompactorPrompt, prompt)
+		assert.Equal(t, testKimiCompactorPrefix, prefix)
+	})
+
+	t.Run("returns error when config is nil", func(t *testing.T) {
+		_, _, _, err := LoadKimiCompactorPromptTemplates(nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "config cannot be nil")
 	})
 }

@@ -198,7 +198,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		tokenUsage:           params.TokenUsage,
 		contextLength:        params.ContextLength,
 		compactionCount:      params.CompactionCount,
-		compactor:            NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep),
+		compactor:            NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, params.Config),
 		taskManager:          params.TaskManager,
 		taskVCS:              params.TaskVCS,
 		subAgentRunner:       params.SubAgentRunner,
@@ -420,7 +420,7 @@ func (s *SweSession) configureCompactor(chatModel models.ChatModel, compactorPro
 	}
 
 	if kimiCompactor, ok := s.compactor.(*KimiCompactor); ok && kimiCompactor.model == nil {
-		s.compactor = NewKimiCompactor(chatModel, kimiCompactor.nmessages)
+		s.compactor = NewKimiCompactor(chatModel, kimiCompactor.nmessages, s.config)
 	}
 }
 

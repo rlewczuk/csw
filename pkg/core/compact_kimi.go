@@ -6,24 +6,59 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
-)
-
-const (
-	kimiCompactorSystemPrompt = "You are a helpful assistant that compacts conversation context."
-	kimiCompactorPrompt       = "Please compact the conversation above into a concise summary that preserves key decisions, constraints, tool outcomes, and current next steps."
-	kimiCompactorPrefix       = "Previous context has been compacted. Here is the compaction output:"
 )
 
 // KimiCompactor compacts old conversation context using a chat model summary.
 type KimiCompactor struct {
-	model     models.ChatModel
-	nmessages int
+	model        models.ChatModel
+	nmessages    int
+	systemPrompt string
+	prompt       string
+	prefix       string
 }
 
 // NewKimiCompactor creates kimi-style compactor preserving last n user/assistant messages.
-func NewKimiCompactor(model models.ChatModel, nmessages int) ChatCompactor {
-	return &KimiCompactor{model: model, nmessages: nmessages}
+func NewKimiCompactor(model models.ChatModel, nmessages int, config *conf.CswConfig) ChatCompactor {
+	systemPrompt, prompt, prefix, _ := LoadKimiCompactorPromptTemplates(config)
+
+	return &KimiCompactor{
+		model:        model,
+		nmessages:    nmessages,
+		systemPrompt: systemPrompt,
+		prompt:       prompt,
+		prefix:       prefix,
+	}
+}
+
+// LoadKimiCompactorPromptTemplates loads compactor prompts from configuration store.
+func LoadKimiCompactorPromptTemplates(config *conf.CswConfig) (string, string, string, error) {
+	if config == nil {
+		return "", "", "", fmt.Errorf("LoadKimiCompactorPromptTemplates() [compact_kimi.go]: config cannot be nil")
+	}
+
+	compactFiles, ok := config.AgentConfigFiles["compact"]
+	if !ok {
+		return "", "", "", fmt.Errorf("LoadKimiCompactorPromptTemplates() [compact_kimi.go]: failed to read compact/system.md: compact files not found")
+	}
+
+	systemPrompt, ok := compactFiles["system.md"]
+	if !ok {
+		return "", "", "", fmt.Errorf("LoadKimiCompactorPromptTemplates() [compact_kimi.go]: failed to read compact/system.md: file not found")
+	}
+
+	prompt, ok := compactFiles["prompt.md"]
+	if !ok {
+		return "", "", "", fmt.Errorf("LoadKimiCompactorPromptTemplates() [compact_kimi.go]: failed to read compact/prompt.md: file not found")
+	}
+
+	prefix, ok := compactFiles["prefix.md"]
+	if !ok {
+		return "", "", "", fmt.Errorf("LoadKimiCompactorPromptTemplates() [compact_kimi.go]: failed to read compact/prefix.md: file not found")
+	}
+
+	return systemPrompt, prompt, prefix, nil
 }
 
 // CompactMessages compacts messages and preserves the latest configured user/assistant messages.
@@ -36,16 +71,19 @@ func (c *KimiCompactor) CompactMessages(messages []*models.ChatMessage) []*model
 	if c == nil || c.model == nil {
 		return cloneMessages(messages)
 	}
+	if strings.TrimSpace(c.systemPrompt) == "" || strings.TrimSpace(c.prompt) == "" || strings.TrimSpace(c.prefix) == "" {
+		return cloneMessages(messages)
+	}
 
 	summary, err := c.model.Chat(context.Background(), []*models.ChatMessage{
-		models.NewTextMessage(models.ChatRoleSystem, kimiCompactorSystemPrompt),
+		models.NewTextMessage(models.ChatRoleSystem, c.systemPrompt),
 		compactMessage,
 	}, nil, nil)
 	if err != nil || summary == nil {
 		return cloneMessages(messages)
 	}
 
-	parts := []models.ChatMessagePart{{Text: kimiCompactorPrefix}}
+	parts := []models.ChatMessagePart{{Text: c.prefix}}
 	for _, part := range summary.Parts {
 		if part.ReasoningContent != "" {
 			continue
@@ -135,7 +173,7 @@ func (c *KimiCompactor) prepare(messages []*models.ChatMessage) (*models.ChatMes
 		}
 	}
 	builder.WriteString("\n")
-	builder.WriteString(kimiCompactorPrompt)
+	builder.WriteString(c.prompt)
 
 	return models.NewTextMessage(models.ChatRoleUser, builder.String()), toPreserve
 }

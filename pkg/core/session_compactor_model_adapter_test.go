@@ -64,7 +64,7 @@ func (c *testCoreCompactor) CompactMessages(messages []*models.ChatMessage) []*m
 }
 
 func TestSweSessionConfigureCompactor_UsesModelCompactor(t *testing.T) {
-	session := &SweSession{compactor: NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep)}
+	session := &SweSession{compactor: NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, newKimiCompactorConfig())}
 	modelCompactor := &testModelCompactor{compacted: []*models.ChatMessage{models.NewTextMessage(models.ChatRoleUser, "model compacted")}}
 	providerModel := &compactorProviderChatModel{compactor: modelCompactor}
 	fallbackModel := &compactorProviderChatModel{}
@@ -79,7 +79,7 @@ func TestSweSessionConfigureCompactor_UsesModelCompactor(t *testing.T) {
 }
 
 func TestSweSessionConfigureCompactor_UsesDefaultCompactorWhenModelCompactorMissing(t *testing.T) {
-	session := &SweSession{compactor: NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep)}
+	session := &SweSession{config: newKimiCompactorConfig(), compactor: NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, newKimiCompactorConfig())}
 	chatModel := &compactorProviderChatModel{}
 
 	session.configureCompactor(chatModel, &compactorProviderChatModel{})
