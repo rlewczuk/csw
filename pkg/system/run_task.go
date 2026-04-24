@@ -276,19 +276,6 @@ func listAllCurrentTasksForRun(manager *core.TaskManager) ([]*core.Task, error) 
 	return allTasks, nil
 }
 
-func appendTaskPromptVFSAllowPaths(values []string, taskDir string) []string {
-	taskPromptPath := strings.TrimSpace(filepath.Join(strings.TrimSpace(taskDir), "task.md"))
-	if taskPromptPath == "" {
-		return values
-	}
-	for _, existingValue := range values {
-		if strings.TrimSpace(existingValue) == taskPromptPath {
-			return values
-		}
-	}
-	return append(values, taskPromptPath)
-}
-
 func applyCommandTaskMetadata(params *RunParams) error {
 	if params == nil || params.Task == nil || params.CommandTaskMetadata == nil {
 		return nil

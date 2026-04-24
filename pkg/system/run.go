@@ -260,7 +260,6 @@ func RunCommand(params *RunParams) error {
 			if err != nil {
 				return err
 			}
-			params.VFSAllow = appendTaskPromptVFSAllowPaths(params.VFSAllow, taskDir)
 			resolvedTask.TaskDir = taskDir
 			params.Task = cloneRunTask(resolvedTask)
 			params.InitialTask = cloneRunTask(resolvedTask)
