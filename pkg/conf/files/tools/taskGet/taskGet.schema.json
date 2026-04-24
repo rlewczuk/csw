@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Returns task metadata and optionally last session summary.",
+  "description": "Returns task metadata, optionally last session summary, or task prompt content when promptOnly is enabled.",
   "type": "object",
   "properties": {
     "uuid": {
@@ -14,6 +14,18 @@
     "summary": {
       "type": "boolean",
       "description": "If true, include last session summary (metadata and markdown summary text)."
+    },
+    "promptOnly": {
+      "description": "If true/\"yes\", return only task.md content in vfsRead-like content format with line numbers.",
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "enum": ["yes", "true"]
+        }
+      ]
     }
   },
   "required": [],

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"os"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -179,10 +180,31 @@ func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 			return toToolTaskRecord(updated), nil
 		}, s))
 
-		registry.Register("taskGet", tool.NewTaskGetTool(func(_ context.Context, identifier string, fallbackTaskID string, includeSummary bool) (tool.TaskRecord, *tool.TaskSessionSummary, string, error) {
-			taskData, summaryMeta, summaryText, err := s.taskManager.GetTask(TaskLookup{Identifier: strings.TrimSpace(identifier), FallbackTaskID: strings.TrimSpace(fallbackTaskID)}, includeSummary)
+		registry.Register("taskGet", tool.NewTaskGetTool(func(_ context.Context, identifier string, fallbackTaskID string, includeSummary bool, promptOnly bool) (tool.TaskRecord, *tool.TaskSessionSummary, string, string, error) {
+			lookup := TaskLookup{Identifier: strings.TrimSpace(identifier), FallbackTaskID: strings.TrimSpace(fallbackTaskID)}
+			taskDir, taskData, err := s.taskManager.ResolveTask(lookup)
 			if err != nil {
-				return tool.TaskRecord{}, nil, "", err
+				return tool.TaskRecord{}, nil, "", "", err
+			}
+
+			promptText := ""
+			if promptOnly {
+				promptPath := filepath.Join(taskDir, "task.md")
+				promptBytes, readErr := os.ReadFile(promptPath)
+				if readErr != nil {
+					return tool.TaskRecord{}, nil, "", "", fmt.Errorf("SweSession.registerSessionTools() [session_model_role.go]: failed to read task prompt: %w", readErr)
+				}
+				promptText = string(promptBytes)
+			}
+
+			var summaryMeta *TaskSessionSummary
+			summaryText := ""
+			if includeSummary {
+				var getErr error
+				_, summaryMeta, summaryText, getErr = s.taskManager.GetTask(lookup, true)
+				if getErr != nil {
+					return tool.TaskRecord{}, nil, "", "", getErr
+				}
 			}
 
 			var summary *tool.TaskSessionSummary
@@ -196,7 +218,7 @@ func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 				}
 			}
 
-			return toToolTaskRecord(taskData), summary, summaryText, nil
+			return toToolTaskRecord(taskData), summary, summaryText, promptText, nil
 		}, s))
 
 		registry.Register("taskList", tool.NewTaskListTool(func(_ context.Context, identifier string, fallbackTaskID string, recursive bool) ([]tool.TaskRecord, error) {

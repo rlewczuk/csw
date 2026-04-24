@@ -18,21 +18,24 @@ func TestTaskToolRender(t *testing.T) {
 		wantJSONLField map[string]any
 	}{
 		{
-			name: "taskGet includes target status and summary marker",
+			name: "taskGet includes target status summary and prompt marker",
 			tool: NewTaskGetTool(nil, nil),
 			call: &ToolCall{Function: "taskGet", Arguments: NewToolValue(map[string]any{
 				"uuid":    "task-123",
 				"summary": "line one\nline two",
+				"promptOnly": "yes",
+				"content": "    1  line one\n",
 				"task": map[string]any{
 					"status": "open",
 				},
 			})},
-			wantSummary: []string{"taskGet", "uuid=task-123", "+summary"},
-			wantDetails: []string{"status=open", "summary_chars="},
+			wantSummary: []string{"taskGet", "uuid=task-123", "+summary", "+prompt"},
+			wantDetails: []string{"status=open", "summary_chars=", "content_chars="},
 			wantJSONLField: map[string]any{
 				"tool":        "taskGet",
 				"target":      "uuid=task-123",
 				"summary":     true,
+				"prompt_only": true,
 				"task_status": "open",
 			},
 		},

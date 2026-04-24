@@ -8,7 +8,7 @@ import (
 )
 
 // TaskGetFunc gets task details and optional summary.
-type TaskGetFunc func(ctx context.Context, identifier string, fallbackTaskID string, includeSummary bool) (TaskRecord, *TaskSessionSummary, string, error)
+type TaskGetFunc func(ctx context.Context, identifier string, fallbackTaskID string, includeSummary bool, promptOnly bool) (TaskRecord, *TaskSessionSummary, string, string, error)
 
 // TaskGetTool retrieves task details.
 type TaskGetTool struct {
@@ -31,9 +31,15 @@ func (t *TaskGetTool) Execute(args *ToolCall) *ToolResponse {
 	}
 
 	identifier, fallback := resolveTaskIdentifier(args, t.session)
-	taskData, summaryMeta, summaryText, err := t.getTask(context.Background(), identifier, fallback, args.Arguments.Bool("summary"))
+	promptOnly := isPromptOnlyRequested(args)
+	taskData, summaryMeta, summaryText, promptText, err := t.getTask(context.Background(), identifier, fallback, args.Arguments.Bool("summary"), promptOnly)
 	if err != nil {
 		return &ToolResponse{Call: args, Error: err, Done: true}
+	}
+	if promptOnly {
+		var result ToolValue
+		result.Set("content", formatWithLineNumbers(promptText, 0))
+		return &ToolResponse{Call: args, Result: result, Done: true}
 	}
 
 	result := NewToolValue(map[string]any{"task": taskRecordToToolValue(taskData).Raw()})
@@ -50,6 +56,7 @@ func (t *TaskGetTool) Execute(args *ToolCall) *ToolResponse {
 // Render returns human-readable representation.
 func (t *TaskGetTool) Render(call *ToolCall) (string, string, string, map[string]string) {
 	target := taskRenderTarget(call)
+	promptOnly := isPromptOnlyRequested(call)
 	includeSummary := false
 	if call != nil {
 		includeSummary = call.Arguments.Bool("summary")
@@ -66,9 +73,12 @@ func (t *TaskGetTool) Render(call *ToolCall) (string, string, string, map[string
 	if includeSummary {
 		summary = truncateString(summary+" +summary", 128)
 	}
+	if promptOnly {
+		summary = truncateString(summary+" +prompt", 128)
+	}
 
 	details := summary
-	jsonlExtra := map[string]any{"target": target, "summary": includeSummary}
+	jsonlExtra := map[string]any{"target": target, "summary": includeSummary, "prompt_only": promptOnly}
 	if taskStatus := taskRenderStatus(call); taskStatus != "" {
 		details += "\nstatus=" + taskStatus
 		jsonlExtra["task_status"] = taskStatus
@@ -80,7 +90,29 @@ func (t *TaskGetTool) Render(call *ToolCall) (string, string, string, map[string
 			jsonlExtra["summary_chars"] = len(summaryText)
 		}
 	}
+	if promptOnly {
+		content := call.Arguments.String("content")
+		if strings.TrimSpace(content) != "" {
+			details += "\ncontent_chars=" + strconv.Itoa(len(content))
+			jsonlExtra["content_chars"] = len(content)
+		}
+	}
 
 	jsonl := buildToolRenderJSONL("taskGet", call, jsonlExtra)
 	return summary, details, jsonl, map[string]string{}
+}
+
+func isPromptOnlyRequested(call *ToolCall) bool {
+	if call == nil {
+		return false
+	}
+	if value, ok := call.Arguments.BoolOK("promptOnly"); ok {
+		return value
+	}
+	textValue, ok := call.Arguments.StringOK("promptOnly")
+	if !ok {
+		return false
+	}
+	normalized := strings.ToLower(strings.TrimSpace(textValue))
+	return normalized == "true" || normalized == "yes"
 }
