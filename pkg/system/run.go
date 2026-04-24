@@ -37,7 +37,7 @@ type RunParams struct {
 	CommandArgs           []string
 	CommandTemplate       string
 	CommandTaskMetadata   *commands.TaskMetadata
-	ContextData           map[string]string
+	ContextData           map[string]any
 	ModelName             string
 	RoleName              string
 	Task                  *core.Task
@@ -296,7 +296,10 @@ func RunCommand(params *RunParams) error {
 		params.CommandArgs = commandArgs
 		params.CommandTemplate = commandTemplate
 		params.CommandTaskMetadata = commandTaskMetadata
-		params.ContextData = contextData
+		params.ContextData = make(map[string]any, len(contextData))
+		for key, value := range contextData {
+			params.ContextData[key] = value
+		}
 		params.BashRunTimeout = bashRunTimeout
 		params.GitUserName = vcs.ResolveGitIdentity(params.GitUserName, "user.name")
 		params.GitUserEmail = vcs.ResolveGitIdentity(params.GitUserEmail, "user.email")
@@ -337,6 +340,7 @@ func RunCommand(params *RunParams) error {
 	params.WorkDir = buildResult.WorkDir
 	params.ShadowDir = buildResult.ShadowDir
 	params.ModelName = buildResult.ModelName
+	params.ContextData = BuildPromptContextData(params.ContextData, core.AgentState{Info: core.AgentStateCommonInfo{AgentName: "CSW Coding Agent", WorkDir: buildResult.WorkDir, ShadowDir: buildResult.ShadowDir}, Role: buildResult.RoleConfig.Clone(), Task: cloneRunTask(params.Task)})
 	if err := renderCommandPrompt(params, buildResult.WorkDir, buildResult.ShellRunner, buildResult.HostShellRunner); err != nil {
 		return err
 	}
@@ -598,7 +602,6 @@ func parseVFSAllowPaths(values []string) []string {
 	}
 	return r
 }
-
 
 func buildRunSessionOutput(params *RunParams, output stdio.Writer) core.SessionThreadOutput {
 	if params == nil {

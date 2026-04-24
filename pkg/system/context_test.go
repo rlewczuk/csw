@@ -3,6 +3,7 @@ package system
 import (
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -82,4 +83,38 @@ func TestParseRunContextEntries(t *testing.T) {
 			assert.Equal(t, tt.expected, actual)
 		})
 	}
+}
+
+func TestBuildPromptContextData(t *testing.T) {
+	t.Run("includes agent state recursively with struct field names", func(t *testing.T) {
+		contextData := BuildPromptContextData(map[string]string{"NAME": "FromCLI"}, core.AgentState{
+			Info: core.AgentStateCommonInfo{WorkDir: "/workspace", ShadowDir: "/shadow"},
+			Task: &core.Task{TaskDir: "/workspace/.cswdata/tasks/t1", FeatureBranch: "feature/x"},
+		})
+
+		require.NotNil(t, contextData)
+		assert.Equal(t, "FromCLI", contextData["NAME"])
+
+		taskValue, ok := contextData["Task"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "/workspace/.cswdata/tasks/t1", taskValue["TaskDir"])
+		assert.Equal(t, "feature/x", taskValue["FeatureBranch"])
+		_, hasJSONTagName := taskValue["feature_branch"]
+		assert.False(t, hasJSONTagName)
+
+		infoValue, ok := contextData["Info"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "/workspace", infoValue["WorkDir"])
+		assert.NotEmpty(t, infoValue["CurrentTime"])
+	})
+
+	t.Run("cli context keys are overridden by agent state keys", func(t *testing.T) {
+		contextData := BuildPromptContextData(map[string]any{"Task": "override"}, core.AgentState{
+			Task: &core.Task{TaskDir: "/task-dir"},
+		})
+
+		taskValue, ok := contextData["Task"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "/task-dir", taskValue["TaskDir"])
+	})
 }

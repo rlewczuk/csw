@@ -37,8 +37,8 @@ func NullValue(value string) string {
 	return value
 }
 
-// RenderTextWithContext renders prompt as text/template with provided context map.
-func RenderTextWithContext(prompt string, contextData map[string]string) (string, error) {
+// RenderTextWithContext renders prompt as text/template with provided context data.
+func RenderTextWithContext(prompt string, contextData any) (string, error) {
 	tmpl, err := template.New("cli-prompt").Option("missingkey=error").Parse(prompt)
 	if err != nil {
 		return "", fmt.Errorf("RenderTextWithContext() [cli.go]: failed to parse prompt template: %w", err)
