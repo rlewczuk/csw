@@ -15,9 +15,9 @@ func taskArchiveCommand() *cobra.Command {
 	var status string
 
 	command := &cobra.Command{
-		Use:   "archive [name|uuid]",
+		Use:   "archive [name|uuid]...",
 		Short: "Archive tasks",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			manager, _, err := loadTaskManager(cmd)
 			if err != nil {
@@ -42,16 +42,18 @@ func runTaskArchive(manager *core.TaskManager, args []string, status string, out
 	}
 
 	trimmedStatus := strings.TrimSpace(status)
-	if len(args) == 1 && trimmedStatus != "" {
+	if len(args) > 0 && trimmedStatus != "" {
 		return fmt.Errorf("runTaskArchive() [task.go]: task identifier and --status cannot be used together")
 	}
 
-	if len(args) == 1 {
-		archivedTask, archiveErr := manager.ArchiveTask(core.TaskLookup{Identifier: strings.TrimSpace(args[0])})
-		if archiveErr != nil {
-			return archiveErr
+	if len(args) > 0 {
+		for _, rawIdentifier := range args {
+			archivedTask, archiveErr := manager.ArchiveTask(core.TaskLookup{Identifier: strings.TrimSpace(rawIdentifier)})
+			if archiveErr != nil {
+				return archiveErr
+			}
+			_, _ = fmt.Fprintf(output, "Task archived: %s\t%s\n", archivedTask.UUID, archivedTask.Name)
 		}
-		_, _ = fmt.Fprintf(output, "Task archived: %s\t%s\n", archivedTask.UUID, archivedTask.Name)
 		return nil
 	}
 

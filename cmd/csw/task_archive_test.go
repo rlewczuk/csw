@@ -20,7 +20,7 @@ func TestRunTaskArchiveConflictingArguments(t *testing.T) {
 	manager, err := core.NewTaskManager(t.TempDir(), nil)
 	require.NoError(t, err)
 
-	err = runTaskArchive(manager, []string{"task-id"}, "merged", &bytes.Buffer{})
+	err = runTaskArchive(manager, []string{"task-id", "task-id-2"}, "merged", &bytes.Buffer{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "task identifier and --status cannot be used together")
 }
@@ -41,6 +41,28 @@ func TestRunTaskArchiveByIdentifier(t *testing.T) {
 	archivedPath := filepath.Join(baseDir, ".cswdata", "tasks", "archive", created.UUID, "task.yml")
 	_, statErr := os.Stat(archivedPath)
 	require.NoError(t, statErr)
+}
+
+func TestRunTaskArchiveByMultipleIdentifiers(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := core.NewTaskManager(baseDir, nil)
+	require.NoError(t, err)
+
+	firstTask, err := manager.CreateTask(core.TaskCreateParams{Name: "archive-first", Prompt: "prompt"})
+	require.NoError(t, err)
+	secondTask, err := manager.CreateTask(core.TaskCreateParams{Name: "archive-second", Prompt: "prompt"})
+	require.NoError(t, err)
+
+	buffer := &bytes.Buffer{}
+	err = runTaskArchive(manager, []string{firstTask.UUID, secondTask.UUID}, "", buffer)
+	require.NoError(t, err)
+	assert.Contains(t, buffer.String(), "Task archived: "+firstTask.UUID)
+	assert.Contains(t, buffer.String(), "Task archived: "+secondTask.UUID)
+
+	_, firstErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks", "archive", firstTask.UUID, "task.yml"))
+	require.NoError(t, firstErr)
+	_, secondErr := os.Stat(filepath.Join(baseDir, ".cswdata", "tasks", "archive", secondTask.UUID, "task.yml"))
+	require.NoError(t, secondErr)
 }
 
 func TestRunTaskArchiveDefaultStatusMerged(t *testing.T) {

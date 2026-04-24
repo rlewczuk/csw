@@ -131,7 +131,7 @@ func TestTaskCommandArgValidators(t *testing.T) {
 		{name: "merge accepts one argument", command: taskMergeCommand(), args: []string{"task-1"}, expectError: false},
 		{name: "archive accepts no argument", command: taskArchiveCommand(), args: []string{}, expectError: false},
 		{name: "archive accepts one argument", command: taskArchiveCommand(), args: []string{"task-1"}, expectError: false},
-		{name: "archive rejects more than one argument", command: taskArchiveCommand(), args: []string{"task-1", "task-2"}, expectError: true},
+		{name: "archive accepts more than one argument", command: taskArchiveCommand(), args: []string{"task-1", "task-2"}, expectError: false},
 	}
 
 	for _, testCase := range tests {
