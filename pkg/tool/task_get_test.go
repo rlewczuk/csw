@@ -28,24 +28,24 @@ func TestTaskGetToolExecutePromptOnly(t *testing.T) {
 			expectedPromptOnly: true,
 		},
 		{
-			name: "promptOnly string yes",
+			name: "promptOnly string yes treated as false",
 			arguments: map[string]any{
 				"name":       "task-name",
 				"promptOnly": "yes",
 			},
 			expectedIdentifier: "task-name",
 			expectedFallback:   "task-name",
-			expectedPromptOnly: true,
+			expectedPromptOnly: false,
 		},
 		{
-			name: "promptOnly string true with session fallback",
+			name: "promptOnly string true with session fallback treated as false",
 			arguments: map[string]any{
 				"promptOnly": "true",
 			},
 			sessionTaskID:      "session-task-id",
 			expectedIdentifier: "",
 			expectedFallback:   "session-task-id",
-			expectedPromptOnly: true,
+			expectedPromptOnly: false,
 		},
 	}
 
@@ -71,7 +71,13 @@ func TestTaskGetToolExecutePromptOnly(t *testing.T) {
 			assert.Equal(t, tc.expectedIdentifier, capturedIdentifier)
 			assert.Equal(t, tc.expectedFallback, capturedFallback)
 			assert.Equal(t, tc.expectedPromptOnly, capturedPromptOnly)
-			assert.Equal(t, "    1  first line\n    2  second line\n", response.Result.Get("content").AsString())
+			if tc.expectedPromptOnly {
+				assert.Equal(t, "    1  first line\n    2  second line\n", response.Result.Get("content").AsString())
+				assert.False(t, response.Result.Has("task"))
+			} else {
+				assert.Equal(t, "task-uuid", response.Result.Get("task").Get("uuid").AsString())
+				assert.Equal(t, "", response.Result.Get("content").AsString())
+			}
 		})
 	}
 }

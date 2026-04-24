@@ -23,7 +23,7 @@ func TestTaskToolRender(t *testing.T) {
 			call: &ToolCall{Function: "taskGet", Arguments: NewToolValue(map[string]any{
 				"uuid":    "task-123",
 				"summary": "line one\nline two",
-				"promptOnly": "yes",
+				"promptOnly": true,
 				"content": "    1  line one\n",
 				"task": map[string]any{
 					"status": "open",

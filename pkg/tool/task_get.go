@@ -106,13 +106,5 @@ func isPromptOnlyRequested(call *ToolCall) bool {
 	if call == nil {
 		return false
 	}
-	if value, ok := call.Arguments.BoolOK("promptOnly"); ok {
-		return value
-	}
-	textValue, ok := call.Arguments.StringOK("promptOnly")
-	if !ok {
-		return false
-	}
-	normalized := strings.ToLower(strings.TrimSpace(textValue))
-	return normalized == "true" || normalized == "yes"
+	return call.Arguments.Bool("promptOnly")
 }
