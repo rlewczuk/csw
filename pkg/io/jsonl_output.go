@@ -141,12 +141,6 @@ func (o *JsonlSessionOutput) OnRateLimitError(retryAfterSeconds int) {
 	_ = retryAfterSeconds
 }
 
-// ShouldRetryAfterFailure always declines retry prompt in direct jsonl mode.
-func (o *JsonlSessionOutput) ShouldRetryAfterFailure(message string) bool {
-	_ = message
-	return false
-}
-
 func (o *JsonlSessionOutput) writef(format string, args ...any) {
 	o.write(fmt.Sprintf(format, args...))
 }

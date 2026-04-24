@@ -184,5 +184,4 @@ func TestJsonlSessionOutput_NoPanicsOnNilInputs(t *testing.T) {
 		output.OnRateLimitError(3)
 		output.RunFinished(nil)
 	})
-	assert.False(t, output.ShouldRetryAfterFailure("failed"))
 }

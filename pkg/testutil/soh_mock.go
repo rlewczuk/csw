@@ -81,12 +81,6 @@ func (h *MockSessionOutputHandler) AddUserMessage(text string) {
 	_ = text
 }
 
-// ShouldRetryAfterFailure returns false in test mock unless explicitly handled by tests.
-func (h *MockSessionOutputHandler) ShouldRetryAfterFailure(message string) bool {
-	_ = message
-	return false
-}
-
 // WaitForRateLimitError blocks until OnRateLimitError is called.
 func (h *MockSessionOutputHandler) WaitForRateLimitError() { <-h.rateLimitErrorCalled }
 

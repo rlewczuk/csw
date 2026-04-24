@@ -112,12 +112,6 @@ func (o *TextSessionOutput) OnRateLimitError(retryAfterSeconds int) {
 	_ = retryAfterSeconds
 }
 
-// ShouldRetryAfterFailure always declines retry prompt in direct text mode.
-func (o *TextSessionOutput) ShouldRetryAfterFailure(message string) bool {
-	_ = message
-	return false
-}
-
 func buildTextToolOutputLine(result *tool.ToolResponse) (string, bool) {
 	if result == nil || result.Call == nil {
 		return "", false

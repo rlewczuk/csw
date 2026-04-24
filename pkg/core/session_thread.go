@@ -52,9 +52,6 @@ type SessionThreadOutput interface {
 	// retryAfterSeconds is the estimated time in seconds when the request can be retried.
 	// If retryAfterSeconds is 0, exponential backoff should be used.
 	OnRateLimitError(retryAfterSeconds int)
-
-	// ShouldRetryAfterFailure asks output handler whether exhausted transient failure should be retried.
-	ShouldRetryAfterFailure(message string) bool
 }
 
 // SessionFactory creates a new session for a model and output handler.

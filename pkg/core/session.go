@@ -476,13 +476,6 @@ func (s *SweSession) runNonStreamingChat(ctx context.Context, chatModel models.C
 		if s.logger != nil {
 			s.logLLMRequestError("chat_non_streaming_error", err)
 		}
-		if s.outputHandler != nil {
-			if s.outputHandler.ShouldRetryAfterFailure(fmt.Sprintf("LLM API request failed after %d attempts: %v", maxAttempts, err)) {
-				s.outputHandler.ShowMessage("Retry requested by user. Starting another retry cycle.", sessionMessageTypeInfo)
-				attempt = 0
-				continue
-			}
-		}
 
 		return nil, fmt.Errorf("SweSession.runNonStreamingChat() [session.go]: chat request failed: %w", err)
 	}
