@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -125,6 +126,49 @@ func TestResolveTaskRunMerge(t *testing.T) {
 
 			actual := resolveTaskRunMerge(tc.mergeFlagChanged, tc.cliMerge, tc.cliWorktree, resolver, "wd", "shadow", "project", "cfg")
 			assert.Equal(t, tc.expectedMerge, actual)
+		})
+	}
+}
+
+func TestResolveTaskFinalStatusForRun(t *testing.T) {
+	tests := []struct {
+		name                   string
+		sessionUpdatedStatus   bool
+		merge                  bool
+		expectedStatus         string
+		expectedShouldApply    bool
+	}{
+		{
+			name:                "merge without in-session update resolves to merged",
+			merge:               true,
+			expectedStatus:      "merged",
+			expectedShouldApply: true,
+		},
+		{
+			name:                "no merge without in-session update resolves to completed",
+			merge:               false,
+			expectedStatus:      "completed",
+			expectedShouldApply: true,
+		},
+		{
+			name:                 "in-session status update suppresses final status override",
+			sessionUpdatedStatus: true,
+			merge:                true,
+			expectedStatus:       "",
+			expectedShouldApply:  false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			session := core.NewSweSession(&core.SweSessionParams{})
+			if tc.sessionUpdatedStatus {
+				session.SetTaskStatusUpdatedInSession(true)
+			}
+
+			status, shouldApply := resolveTaskFinalStatusForRun(session, tc.merge)
+			assert.Equal(t, tc.expectedStatus, status)
+			assert.Equal(t, tc.expectedShouldApply, shouldApply)
 		})
 	}
 }

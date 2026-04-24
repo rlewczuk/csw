@@ -395,15 +395,25 @@ func RunCommand(params *RunParams) error {
 		return err
 	}
 	if runInTaskMode && taskManager != nil && strings.TrimSpace(taskIdentifier) != "" {
-		finalStatus := core.TaskStatusCompleted
-		if params.Merge {
-			finalStatus = core.TaskStatusMerged
-		}
-		if _, err := taskManager.UpdateTask(core.TaskUpdateParams{Identifier: taskIdentifier, Status: &finalStatus}); err != nil {
-			return err
+		if finalStatus, shouldApply := resolveTaskFinalStatusForRun(session, params.Merge); shouldApply {
+			if _, err := taskManager.UpdateTask(core.TaskUpdateParams{Identifier: taskIdentifier, Status: &finalStatus}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+func resolveTaskFinalStatusForRun(session *core.SweSession, merge bool) (string, bool) {
+	if session != nil && session.TaskStatusUpdatedInSession() {
+		return "", false
+	}
+
+	if merge {
+		return core.TaskStatusMerged, true
+	}
+
+	return core.TaskStatusCompleted, true
 }
 
 type resolvedRunCommandInvocation struct {

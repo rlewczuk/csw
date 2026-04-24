@@ -141,7 +141,7 @@ func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 				value := strings.TrimSpace(params.Description)
 				update.Description = &value
 			}
-			if params.Status != "" {
+			if params.StatusSet {
 				value := strings.TrimSpace(params.Status)
 				update.Status = &value
 			}
@@ -169,6 +169,9 @@ func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 			updated, err := s.taskManager.UpdateTask(update)
 			if err != nil {
 				return tool.TaskRecord{}, err
+			}
+			if params.StatusSet {
+				s.SetTaskStatusUpdatedInSession(true)
 			}
 
 			return toToolTaskRecord(updated), nil

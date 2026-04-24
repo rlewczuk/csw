@@ -49,6 +49,7 @@ func (t *TaskUpdateTool) Execute(args *ToolCall) *ToolResponse {
 		Name:          strings.TrimSpace(args.Arguments.String("name")),
 		Description:   strings.TrimSpace(args.Arguments.String("description")),
 		Status:        strings.TrimSpace(args.Arguments.String("status")),
+		StatusSet:     hasToolArgument(args, "status"),
 		FeatureBranch: strings.TrimSpace(args.Arguments.String("branch")),
 		ParentBranch:  strings.TrimSpace(args.Arguments.String("parent-branch")),
 		Role:          strings.TrimSpace(args.Arguments.String("role")),
@@ -78,4 +79,14 @@ func firstNonEmptyTool(values ...string) string {
 	}
 
 	return ""
+}
+
+func hasToolArgument(args *ToolCall, key string) bool {
+	if args == nil {
+		return false
+	}
+
+	_, ok := args.Arguments.GetOK(key)
+
+	return ok
 }

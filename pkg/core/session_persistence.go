@@ -54,6 +54,7 @@ type persistedSessionState struct {
 	TokenUsage                 models.TokenUsage       `json:"token_usage"`
 	ContextLengthTokens        int                     `json:"context_length_tokens"`
 	ContextCompactionCount     int                     `json:"context_compaction_count"`
+	TaskStatusUpdatedInSession bool                    `json:"task_status_updated_in_session,omitempty"`
 	UsedSubAgentSlugs          []string                `json:"used_subagent_slugs,omitempty"`
 	UpdatedAt                  string                  `json:"updated_at"`
 }
@@ -119,6 +120,7 @@ func (s *SweSession) buildPersistedSessionState() persistedSessionState {
 		TokenUsage:                 s.tokenUsage,
 		ContextLengthTokens:        s.contextLength,
 		ContextCompactionCount:     s.compactionCount,
+		TaskStatusUpdatedInSession: s.taskStatusUpdatedInSession,
 		UpdatedAt:                  time.Now().Format(time.RFC3339Nano),
 	}
 
@@ -298,6 +300,7 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 			TokenUsage:      state.TokenUsage,
 			ContextLength:   state.ContextLengthTokens,
 			CompactionCount: state.ContextCompactionCount,
+			TaskStatusUpdatedInSession: state.TaskStatusUpdatedInSession,
 			UsedSubAgentSlugs: func() map[string]struct{} {
 				result := make(map[string]struct{}, len(state.UsedSubAgentSlugs))
 				for _, slug := range state.UsedSubAgentSlugs {

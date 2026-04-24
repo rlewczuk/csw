@@ -89,6 +89,7 @@ type SweSession struct {
 	compactor       ChatCompactor
 	taskManager     *TaskManager
 	taskVCS         apis.VCS
+	taskStatusUpdatedInSession bool
 
 	subAgentRunner       SubAgentTaskRunner
 	subAgentSlugs        map[string]struct{}
@@ -144,6 +145,7 @@ type SweSessionParams struct {
 	TokenUsage           models.TokenUsage
 	ContextLength        int
 	CompactionCount      int
+	TaskStatusUpdatedInSession bool
 	TaskManager          *TaskManager
 	TaskVCS              apis.VCS
 	SubAgentRunner       SubAgentTaskRunner
@@ -197,12 +199,13 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 			loadedAgentFiles:     make(map[string]struct{}, len(params.LoadedAgentFiles)),
 		tokenUsage:           params.TokenUsage,
 		contextLength:        params.ContextLength,
-		compactionCount:      params.CompactionCount,
-		compactor:            NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, params.Config),
-		taskManager:          params.TaskManager,
-		taskVCS:              params.TaskVCS,
-		subAgentRunner:       params.SubAgentRunner,
-		subAgentSlugs:        make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
+			compactionCount:      params.CompactionCount,
+			compactor:            NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, params.Config),
+			taskManager:          params.TaskManager,
+			taskVCS:              params.TaskVCS,
+			taskStatusUpdatedInSession: params.TaskStatusUpdatedInSession,
+			subAgentRunner:       params.SubAgentRunner,
+			subAgentSlugs:        make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
 	}
 
 	if session.baseVFS == nil {

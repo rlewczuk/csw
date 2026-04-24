@@ -566,6 +566,7 @@ type TaskRecord struct {
 	Name          string
 	Description   string
 	Status        string
+	StatusSet     bool
 	FeatureBranch string
 	ParentBranch  string
 	Role          string
@@ -600,6 +601,8 @@ type TaskRunOutcome struct {
 type TaskSessionRef interface {
 	TaskID() string
 	SetTaskID(taskID string)
+	TaskStatusUpdatedInSession() bool
+	SetTaskStatusUpdatedInSession(updated bool)
 }
 
 // ShortDescription returns the first line of the markdown description

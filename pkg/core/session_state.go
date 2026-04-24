@@ -55,6 +55,25 @@ func (s *SweSession) SetTaskID(taskID string) {
 	s.persistSessionState()
 }
 
+// TaskStatusUpdatedInSession reports whether current session changed task status via taskUpdate.
+func (s *SweSession) TaskStatusUpdatedInSession() bool {
+	if s == nil {
+		return false
+	}
+
+	return s.taskStatusUpdatedInSession
+}
+
+// SetTaskStatusUpdatedInSession marks whether task status was changed via taskUpdate in this session.
+func (s *SweSession) SetTaskStatusUpdatedInSession(updated bool) {
+	if s == nil {
+		return
+	}
+
+	s.taskStatusUpdatedInSession = updated
+	s.persistSessionState()
+}
+
 // ParentID returns the parent session identifier for delegated child sessions.
 func (s *SweSession) ParentID() string {
 	if s == nil {
