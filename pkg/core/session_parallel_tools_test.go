@@ -15,6 +15,113 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type noopSessionOutputHandler struct{}
+
+func (h *noopSessionOutputHandler) ShowMessage(message string, messageType string) {
+	_ = message
+	_ = messageType
+}
+
+func (h *noopSessionOutputHandler) AddUserMessage(text string) {
+	_ = text
+}
+
+func (h *noopSessionOutputHandler) AddAssistantMessage(text string, thinking string) {
+	_ = text
+	_ = thinking
+}
+
+func (h *noopSessionOutputHandler) AddToolCall(call *tool.ToolCall) {
+	_ = call
+}
+
+func (h *noopSessionOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
+	_ = result
+}
+
+func (h *noopSessionOutputHandler) RunFinished(err error) {
+	_ = err
+}
+
+func (h *noopSessionOutputHandler) OnRateLimitError(retryAfterSeconds int) {
+	_ = retryAfterSeconds
+}
+
+type orderedSessionOutputHandler struct {
+	mu       sync.Mutex
+	events   []string
+	finished chan struct{}
+	err      error
+}
+
+func newOrderedSessionOutputHandler() *orderedSessionOutputHandler {
+	return &orderedSessionOutputHandler{
+		events:   make([]string, 0),
+		finished: make(chan struct{}),
+	}
+}
+
+func (h *orderedSessionOutputHandler) ShowMessage(message string, messageType string) {
+	_ = message
+	_ = messageType
+}
+
+func (h *orderedSessionOutputHandler) AddUserMessage(text string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.events = append(h.events, "user:"+text)
+}
+
+func (h *orderedSessionOutputHandler) AddAssistantMessage(text string, thinking string) {
+	_ = text
+	_ = thinking
+}
+
+func (h *orderedSessionOutputHandler) AddToolCall(call *tool.ToolCall) {
+	_ = call
+}
+
+func (h *orderedSessionOutputHandler) AddToolCallResult(result *tool.ToolResponse) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.events = append(h.events, "tool_result")
+	_ = result
+}
+
+func (h *orderedSessionOutputHandler) RunFinished(err error) {
+	h.mu.Lock()
+	h.err = err
+	h.mu.Unlock()
+	close(h.finished)
+}
+
+func (h *orderedSessionOutputHandler) OnRateLimitError(retryAfterSeconds int) {
+	_ = retryAfterSeconds
+}
+
+func (h *orderedSessionOutputHandler) WaitForFinished(t *testing.T) {
+	t.Helper()
+	select {
+	case <-h.finished:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for session finish")
+	}
+}
+
+func (h *orderedSessionOutputHandler) Events() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	result := make([]string, len(h.events))
+	copy(result, h.events)
+	return result
+}
+
+func (h *orderedSessionOutputHandler) FinishedError() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.err
+}
+
 // probeTool is a test double that can be synchronized to verify parallel execution.
 type probeTool struct {
 	started      chan string
@@ -74,6 +181,108 @@ func (t *probeTool) Render(call *tool.ToolCall) (string, string, string, map[str
 
 func (t *probeTool) GetDescription() (string, bool) {
 	return "", false
+}
+
+// blockingTool waits on release channel so tests can enqueue additional prompts before completing.
+type blockingTool struct {
+	release <-chan struct{}
+}
+
+func (t *blockingTool) Execute(args *tool.ToolCall) *tool.ToolResponse {
+	if t.release != nil {
+		<-t.release
+	}
+
+	return &tool.ToolResponse{
+		Call:   args,
+		Done:   true,
+		Result: tool.NewToolValue(map[string]any{"status": "ok"}),
+	}
+}
+
+func (t *blockingTool) Render(call *tool.ToolCall) (string, string, string, map[string]string) {
+	_ = call
+	return "blocking", "blocking", "{}", map[string]string{}
+}
+
+func (t *blockingTool) GetDescription() (string, bool) {
+	return "", false
+}
+
+func TestSessionRun_FlushesQueuedUserPromptsAfterToolResponsesBeforeNextLLMRequest(t *testing.T) {
+	releaseTool := make(chan struct{})
+
+	registry := tool.NewToolRegistry()
+	registry.Register("block", &blockingTool{release: releaseTool})
+
+	mockProvider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model", Model: "test-model"}})
+	mockProvider.SetChatResponse("test-model", &models.MockChatResponse{Response: &models.ChatMessage{
+		Role: models.ChatRoleAssistant,
+		Parts: []models.ChatMessagePart{{
+			ToolCall: &tool.ToolCall{
+				ID:       "call-1",
+				Function: "block",
+				Arguments: tool.NewToolValue(map[string]any{}),
+			},
+		}},
+	}})
+	mockProvider.SetChatResponse("test-model", &models.MockChatResponse{Response: &models.ChatMessage{
+		Role:  models.ChatRoleAssistant,
+		Parts: []models.ChatMessagePart{{Text: "done"}},
+	}})
+	fixture := newSweSystemFixture(t, "You are a test assistant.",
+		withModelProviders(map[string]models.ModelProvider{"mock": mockProvider}),
+		withTools(registry),
+		withoutVFSTools(),
+	)
+
+	handler := newOrderedSessionOutputHandler()
+	thread := NewSessionThread(fixture.system, handler)
+	require.NoError(t, thread.StartSession("mock/test-model"))
+	require.NoError(t, thread.UserPrompt("first prompt"))
+
+	require.Eventually(t, func() bool {
+		return len(mockProvider.RecordedMessages) >= 1
+	}, time.Second, 10*time.Millisecond)
+
+	require.NoError(t, thread.UserPrompt("queued prompt"))
+
+	close(releaseTool)
+
+	handler.WaitForFinished(t)
+	require.NoError(t, handler.FinishedError())
+	require.GreaterOrEqual(t, len(mockProvider.RecordedMessages), 2)
+
+	secondCallMessages := mockProvider.RecordedMessages[1]
+	toolResponseIndex := -1
+	queuedPromptIndex := -1
+	for i, msg := range secondCallMessages {
+		if msg.Role == models.ChatRoleUser && len(msg.GetToolResponses()) > 0 {
+			toolResponseIndex = i
+		}
+		if msg.Role == models.ChatRoleUser && msg.GetText() == "queued prompt" {
+			queuedPromptIndex = i
+		}
+	}
+
+	require.NotEqual(t, -1, toolResponseIndex, "tool response should be present before second LLM call")
+	require.NotEqual(t, -1, queuedPromptIndex, "queued user prompt should be present before second LLM call")
+	assert.Greater(t, queuedPromptIndex, toolResponseIndex, "queued prompt should be appended after tool responses")
+
+	events := handler.Events()
+	toolResultEventIndex := -1
+	queuedEventIndex := -1
+	for i, event := range events {
+		if event == "tool_result" && toolResultEventIndex == -1 {
+			toolResultEventIndex = i
+		}
+		if event == "user:queued prompt" {
+			queuedEventIndex = i
+		}
+	}
+	require.NotEqual(t, -1, toolResultEventIndex, "tool result event should be emitted")
+	require.NotEqual(t, -1, queuedEventIndex, "queued user event should be emitted")
+	assert.Greater(t, queuedEventIndex, toolResultEventIndex, "queued user event should be emitted after tool result")
 }
 
 func TestExecuteToolCalls_ExecutesCallsInParallelAndAggregatesResponses(t *testing.T) {

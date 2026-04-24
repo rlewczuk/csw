@@ -55,6 +55,7 @@ type SweSession struct {
 	LSP           lsp.LSP
 	Tools         *tool.ToolRegistry
 	outputHandler SessionThreadOutput
+	queuedUserPromptDrainer func() []string
 	workDir       string
 	shadowDir     string
 	todoList      []tool.TodoItem
@@ -347,6 +348,8 @@ func (s *SweSession) Run(ctx context.Context) error {
 			}
 		}
 
+		s.flushQueuedUserPrompts()
+
 		if err := s.maybeCompactContext(); err != nil {
 			return err
 		}
@@ -362,17 +365,43 @@ func (s *SweSession) Run(ctx context.Context) error {
 		// Check if there are any tool calls in the response
 		toolCalls := responseMsg.GetToolCalls()
 		if len(toolCalls) == 0 {
-			// No tool calls, we're done
-			break
+			if s.flushQueuedUserPrompts() == 0 {
+				// No tool calls and no queued user prompts, we're done
+				break
+			}
+
+			continue
 		}
 
 		// Execute tool calls
 		if err := s.executeToolCalls(toolCalls); err != nil {
 			return err
 		}
+
+		s.flushQueuedUserPrompts()
 	}
 
 	return nil
+}
+
+func (s *SweSession) flushQueuedUserPrompts() int {
+	if s == nil || s.queuedUserPromptDrainer == nil {
+		return 0
+	}
+
+	prompts := s.queuedUserPromptDrainer()
+	if len(prompts) == 0 {
+		return 0
+	}
+
+	for _, prompt := range prompts {
+		if s.outputHandler != nil {
+			s.outputHandler.AddUserMessage(prompt)
+		}
+		s.appendConversationMessage(models.NewTextMessage(models.ChatRoleUser, prompt), "incoming", "queued_user_prompt")
+	}
+
+	return len(prompts)
 }
 
 func (s *SweSession) configureCompactor(chatModel models.ChatModel, compactorProvider models.ChatModel) {

@@ -81,12 +81,14 @@ type SessionThread struct {
 
 // NewSessionThread creates a new SessionThread with the given system and output handler.
 func NewSessionThread(system SessionFactory, outputHandler SessionThreadOutput) *SessionThread {
-	return &SessionThread{
+	thread := &SessionThread{
 		system:        system,
 		outputHandler: outputHandler,
 		done:          make(chan error, 1),
 		inputQueue:    make([]string, 0),
 	}
+
+	return thread
 }
 
 // NewSessionThreadWithSession creates a new SessionThread with an existing session.
@@ -96,13 +98,18 @@ func NewSessionThreadWithSession(system SessionFactory, session *SweSession, out
 	if session != nil {
 		session.outputHandler = outputHandler
 	}
-	return &SessionThread{
+	thread := &SessionThread{
 		system:        system,
 		session:       session,
 		outputHandler: outputHandler,
 		done:          make(chan error, 1),
 		inputQueue:    make([]string, 0),
 	}
+	if thread.session != nil {
+		thread.session.queuedUserPromptDrainer = thread.makeQueuedUserPromptDrainer()
+	}
+
+	return thread
 }
 
 // Done returns a channel that receives run completion errors.
@@ -336,7 +343,25 @@ func (c *SessionThread) StartSession(model string) error {
 	}
 
 	c.session = session
+	c.session.queuedUserPromptDrainer = c.makeQueuedUserPromptDrainer()
 	return nil
+}
+
+func (c *SessionThread) makeQueuedUserPromptDrainer() func() []string {
+	return func() []string {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		if len(c.inputQueue) == 0 {
+			return nil
+		}
+
+		prompts := make([]string, len(c.inputQueue))
+		copy(prompts, c.inputQueue)
+		c.inputQueue = c.inputQueue[:0]
+
+		return prompts
+	}
 }
 
 // startSessionLocked starts the background session loop.
@@ -420,23 +445,11 @@ func (c *SessionThread) runSessionLoop() {
 			return
 		}
 
-		input := c.inputQueue[0]
-		c.inputQueue = c.inputQueue[1:]
 		c.interruptPending = false
 		c.mu.Unlock()
 
-		// Add user prompt to session (this is safe because we're in the background thread)
-		if c.outputHandler != nil {
-			c.outputHandler.AddUserMessage(input)
-		}
-		err := c.session.UserPrompt(input)
-		if err != nil {
-			c.finishRun(err)
-			return
-		}
-
-		// Run the session
-		err = c.session.Run(ctx)
+		// Run the session (queued user prompts are drained by session loop)
+		err := c.session.Run(ctx)
 
 		// Check if we were interrupted or paused
 		c.mu.Lock()
