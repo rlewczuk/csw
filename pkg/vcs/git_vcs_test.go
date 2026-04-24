@@ -96,18 +96,17 @@ func runTestWithGitVCS(t *testing.T, testFunc func(*testing.T, *GitTestFixture))
 
 // getDefaultBranch returns the default branch name (master or main)
 func getDefaultBranch(t *testing.T, fixture *GitTestFixture) string {
-	// Try master first
-	_, err := fixture.Repo.GetWorktree("master")
-	if err == nil {
-		return "master"
+	t.Helper()
+
+	branch, err := runGitCommand(fixture.Root, "branch", "--show-current")
+	require.NoError(t, err)
+
+	branch = strings.TrimSpace(branch)
+	if branch == "" {
+		t.Fatal("getDefaultBranch() [git_vcs_test.go]: empty current branch")
 	}
-	// Try main
-	_, err = fixture.Repo.GetWorktree("main")
-	if err == nil {
-		return "main"
-	}
-	t.Fatal("Neither master nor main branch found")
-	return ""
+
+	return branch
 }
 
 // runGitCommand executes git with the provided arguments in a repository path.

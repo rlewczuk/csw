@@ -109,10 +109,10 @@ func TestLoadFromDirFallsBackToEmbeddedCommand(t *testing.T) {
 	assert.Equal(t, "embedded:data/csw/task-critic.md", command.Path)
 	assert.Equal(t, "Analyses your task specification for ambiguities, errors and missing parts", command.Metadata.Description)
 	assert.Equal(t, "critic", command.Metadata.Agent)
-	assert.Contains(t, command.Template, "Analyze below task specification for errors, ambiguities and missing parts:")
-	assert.Contains(t, command.Template, "<task-specification>")
-	assert.Contains(t, command.Template, "{{.Task.Prompt}}")
-	assert.Contains(t, command.Template, "</task-specification>")
+	assert.Contains(t, command.Template, "Analyze and edit task in `{{.Task.TaskDir}}/task.md` for errors, ambiguities and missing parts:")
+	assert.Contains(t, command.Template, "Results of analysis should be saved as changes, questions or annotations in `{{.Task.TaskDir}}/task.md` file:")
+	assert.Contains(t, command.Template, "Please DO NOT edit or change any other files in this project, just `task.md`.")
+	assert.Contains(t, command.Template, "At the end use `taskUpdate` tool to change task status:")
 	assert.NotEmpty(t, strings.TrimSpace(command.Template))
 }
 

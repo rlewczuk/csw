@@ -76,8 +76,8 @@ func TestBashRunner_RunCommand(t *testing.T) {
 		},
 		{
 			name:         "command timeout",
-			command:      "sleep 1",
-			timeout:      20 * time.Millisecond,
+			command:      "sleep 0.5",
+			timeout:      5 * time.Millisecond,
 			wantExitCode: 124,
 			wantErr:      true,
 			errContains:  "command timed out",
@@ -179,7 +179,7 @@ func TestBashRunner_LongRunningCommand(t *testing.T) {
 	runner := NewBashRunner(tmpDir, 2*time.Second)
 
 	start := time.Now()
-	output, exitCode, err := runner.RunCommand("sleep 0.05 && echo 'done'")
+	output, exitCode, err := runner.RunCommand("sleep 0.005 && echo 'done'")
 	duration := time.Since(start)
 
 	require.NoError(t, err)
