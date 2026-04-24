@@ -3,12 +3,19 @@ description: Analyses your task specification for ambiguities, errors and missin
 agent: critic
 ---
 
-Analyze below task specification for errors, ambiguities and missing parts:
+Analyze and edit task in `{{.Task.TaskDir}}/task.md` for errors, ambiguities and missing parts:
 
-<task-specification>
-{{.Task.Prompt}}
-</task-specification>
+Results of analysis should be saved as changes, questions or annotations in `{{.Task.TaskDir}}/task.md` file:
+* for obvious changes without ambiguities or questions, you are free to edit relevant portions directly
+  * obvious missing parts can also be added directly
+* for ambiguities or unclear missing parts you can either add annotations or questions
+  * annotations should be clearly marked with `CSW:` prefix
+  * questions should appear in a section at the end of the file
+* look for answered questions in the questions section, apply changes according to answers, and if question/answer is not necessary anymore, remove it from the file
+* look for `TBD`/`TODO` marked comments and try to fill them in; if there are more questions or ambiguities or missing parts for given TBD comment, ask questions or add annotations
 
-Results of analysis should be saved as annotations to `{{.Task.TaskDir}}/task.md` file. 
-Please edit this file and add either inline annotations in relevant places or bottomline comments and questions at the end of this document.
-Please DO NOT edit or change any other files in this project, just this one.
+Please DO NOT edit or change any other files in this project, just `task.md`.
+
+At the end use `taskUpdate` tool to change task status:
+* if there are still ambiguities or questions, change status to `draft`
+* if there are no ambiguities or questions, change status to `created`
