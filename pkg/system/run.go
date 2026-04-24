@@ -178,27 +178,21 @@ func RunCommand(params *RunParams) error {
 		var commandRunDefaults *commands.RunDefaultsMetadata
 		var commandTaskMetadata *commands.TaskMetadata
 		commandNeedsShell := false
-		if invocation != nil && !runInTaskMode {
-			commandsRoot, rootErr := resolveCommandsRootDir(params.WorkDir, params.ShadowDir)
-			if rootErr != nil {
-				return rootErr
+		if invocation != nil {
+			resolvedInvocation, resolveErr := resolveRunCommandInvocation(invocation, params.WorkDir, params.ShadowDir, runInTaskMode)
+			if resolveErr != nil {
+				return fmt.Errorf("RunCommand() [run.go]: %w", resolveErr)
 			}
-			loadedCommand, loadErr := commands.LoadFromDir(filepath.Join(commandsRoot, ".agents", "commands"), invocation.Name)
-			if loadErr != nil {
-				return fmt.Errorf("RunCommand() [run.go]: %w", loadErr)
-			}
-
-			commandTemplate = loadedCommand.Template
-			commandName = loadedCommand.Name
-			commandArgs = invocation.Arguments
-			commandModelOverride = strings.TrimSpace(loadedCommand.Metadata.Model)
-			commandRoleOverride = strings.TrimSpace(loadedCommand.Metadata.Agent)
-			if loadedCommand.Metadata.CSW != nil {
-				commandRunDefaults = loadedCommand.Metadata.CSW.Defaults
-				commandTaskMetadata = loadedCommand.Metadata.CSW.Task
-			}
-			commandNeedsShell = commands.HasDefaultRuntimeShellExpansion(loadedCommand.Template)
-			prompt = loadedCommand.Template
+			commandTemplate = resolvedInvocation.CommandTemplate
+			commandName = resolvedInvocation.CommandName
+			commandArgs = resolvedInvocation.CommandArgs
+			commandModelOverride = resolvedInvocation.CommandModelOverride
+			commandRoleOverride = resolvedInvocation.CommandRoleOverride
+			commandRunDefaults = resolvedInvocation.CommandRunDefaults
+			commandTaskMetadata = resolvedInvocation.CommandTaskMetadata
+			commandNeedsShell = resolvedInvocation.CommandNeedsShell
+			prompt = resolvedInvocation.Prompt
+			extraPositionalArgs = resolvedInvocation.ExtraPositionalArgs
 		}
 
 		contextData, err := ParseRunContextEntries(params.ContextEntries)
@@ -247,10 +241,6 @@ func RunCommand(params *RunParams) error {
 		}
 
 		if runInTaskMode {
-			if invocation != nil {
-				prompt = "/" + strings.TrimSpace(invocation.Name)
-				extraPositionalArgs = append([]string(nil), invocation.Arguments...)
-			}
 			manager := preloadedTaskManager
 			if manager == nil {
 				var loadErr error
@@ -412,6 +402,54 @@ func RunCommand(params *RunParams) error {
 		}
 	}
 	return nil
+}
+
+type resolvedRunCommandInvocation struct {
+	CommandTemplate      string
+	CommandName          string
+	CommandArgs          []string
+	CommandModelOverride string
+	CommandRoleOverride  string
+	CommandRunDefaults   *commands.RunDefaultsMetadata
+	CommandTaskMetadata  *commands.TaskMetadata
+	CommandNeedsShell    bool
+	Prompt               string
+	ExtraPositionalArgs  []string
+}
+
+func resolveRunCommandInvocation(invocation *commands.Invocation, workDir string, shadowDir string, runInTaskMode bool) (*resolvedRunCommandInvocation, error) {
+	if invocation == nil {
+		return nil, fmt.Errorf("resolveRunCommandInvocation() [run.go]: invocation cannot be nil")
+	}
+
+	commandsRoot, rootErr := resolveCommandsRootDir(workDir, shadowDir)
+	if rootErr != nil {
+		return nil, rootErr
+	}
+	loadedCommand, loadErr := commands.LoadFromDir(filepath.Join(commandsRoot, ".agents", "commands"), invocation.Name)
+	if loadErr != nil {
+		return nil, loadErr
+	}
+
+	result := &resolvedRunCommandInvocation{
+		CommandTemplate:      loadedCommand.Template,
+		CommandName:          loadedCommand.Name,
+		CommandArgs:          append([]string(nil), invocation.Arguments...),
+		CommandModelOverride: strings.TrimSpace(loadedCommand.Metadata.Model),
+		CommandRoleOverride:  strings.TrimSpace(loadedCommand.Metadata.Agent),
+		CommandNeedsShell:    commands.HasDefaultRuntimeShellExpansion(loadedCommand.Template),
+		Prompt:               loadedCommand.Template,
+	}
+	if loadedCommand.Metadata.CSW != nil {
+		result.CommandRunDefaults = loadedCommand.Metadata.CSW.Defaults
+		result.CommandTaskMetadata = loadedCommand.Metadata.CSW.Task
+	}
+	if runInTaskMode {
+		result.Prompt = "/" + strings.TrimSpace(invocation.Name)
+		result.ExtraPositionalArgs = append([]string(nil), invocation.Arguments...)
+	}
+
+	return result, nil
 }
 
 func resolveTaskIdentifierFromPosition(manager *core.TaskManager, candidate string) (string, bool, error) {
