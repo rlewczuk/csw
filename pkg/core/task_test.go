@@ -444,11 +444,3 @@ func TestTaskManagerArchiveTasksByStatusArchivesMatchingTasks(t *testing.T) {
 	_, openTaskErr := os.Stat(openTaskPath)
 	require.NoError(t, openTaskErr)
 }
-
-func TestEnsureBranchFromCreatesMissingBranch(t *testing.T) {
-	fake := &fakeVCS{branches: []string{"main"}}
-	err := ensureBranchFrom(fake, "feature/task", "main")
-	require.NoError(t, err)
-	require.Len(t, fake.newBranchCalls, 1)
-	assert.Equal(t, [2]string{"feature/task", "main"}, fake.newBranchCalls[0])
-}

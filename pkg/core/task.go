@@ -1,18 +1,15 @@
 package core
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/apis"
-	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
@@ -506,7 +503,7 @@ func (m *TaskManager) ArchiveTask(lookup TaskLookup) (*Task, error) {
 		return nil, err
 	}
 
-	archivedRoot := m.ArchivedTasksRoot()
+	archivedRoot := filepath.Join(m.TasksRoot(), "archive")
 	relativeDir, err := filepath.Rel(m.TasksRoot(), taskDir)
 	if err != nil {
 		return nil, fmt.Errorf("TaskManager.ArchiveTask() [task.go]: failed to calculate archive path: %w", err)
@@ -555,7 +552,7 @@ func (m *TaskManager) ArchiveTasksByStatus(status string) ([]*Task, error) {
 		return len(candidates[i].dir) < len(candidates[j].dir)
 	})
 
-	archivedRoot := m.ArchivedTasksRoot()
+	archivedRoot := filepath.Join(m.TasksRoot(), "archive")
 	archivedPaths := make([]string, 0, len(candidates))
 	archivedTasks := make([]*Task, 0, len(candidates))
 	for _, item := range candidates {
@@ -590,40 +587,6 @@ func (m *TaskManager) ArchiveTasksByStatus(status string) ([]*Task, error) {
 	}
 
 	return archivedTasks, nil
-}
-
-// ArchivedTasksRoot returns archive directory for task persistence.
-func (m *TaskManager) ArchivedTasksRoot() string {
-	return filepath.Join(m.TasksRoot(), "archive")
-}
-
-func (m *TaskManager) ensureBranches(task *Task, reset bool, vcsRepo apis.VCS) error {
-	if vcsRepo == nil {
-		return fmt.Errorf("TaskManager.ensureBranches() [task.go]: vcs repository is required")
-	}
-	if reset {
-		_ = vcsRepo.DeleteBranch(task.FeatureBranch)
-	}
-	if err := ensureBranchFrom(vcsRepo, task.FeatureBranch, task.ParentBranch); err != nil {
-		return fmt.Errorf("TaskManager.ensureBranches() [task.go]: %w", err)
-	}
-	return nil
-}
-
-func ensureBranchFrom(vcsRepo apis.VCS, branch string, from string) error {
-	branches, err := vcsRepo.ListBranches("")
-	if err != nil {
-		return fmt.Errorf("ensureBranchFrom() [task.go]: failed to list branches: %w", err)
-	}
-	for _, existing := range branches {
-		if strings.TrimSpace(existing) == strings.TrimSpace(branch) {
-			return nil
-		}
-	}
-	if err := vcsRepo.NewBranch(branch, from); err != nil {
-		return fmt.Errorf("ensureBranchFrom() [task.go]: failed to create branch %q from %q: %w", branch, from, err)
-	}
-	return nil
 }
 
 func isTaskStatusSupported(status string) bool {
@@ -687,93 +650,6 @@ func sortTasks(tasks []*Task) {
 		}
 		return left < right
 	})
-}
-
-func (m *TaskManager) resolveTaskPromptOverride(task *Task, params TaskRunParams, taskPrompt string) (string, error) {
-	if task == nil {
-		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: task cannot be nil")
-	}
-	basePrompt := strings.TrimSpace(params.PromptOverride)
-	if basePrompt == "" {
-		return strings.TrimSpace(taskPrompt), nil
-	}
-	taskPromptValue := strings.TrimSpace(taskPrompt)
-
-	contextData := map[string]any{
-		"Task": map[string]any{
-			"UUID":          strings.TrimSpace(task.UUID),
-			"Name":          strings.TrimSpace(task.Name),
-			"Description":   strings.TrimSpace(task.Description),
-			"FeatureBranch": strings.TrimSpace(task.FeatureBranch),
-			"ParentBranch":  strings.TrimSpace(task.ParentBranch),
-			"Role":          strings.TrimSpace(task.Role),
-			"Prompt":        taskPromptValue,
-		},
-	}
-
-	renderedPrompt, err := renderTaskPromptTemplate(basePrompt, contextData)
-	if err != nil {
-		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: failed to render prompt override template: %w", err)
-	}
-	renderedPrompt = strings.TrimSpace(renderedPrompt)
-
-	invocation, isCommandInvocation, parseErr := commands.ParseInvocation(renderedPrompt, append([]string(nil), params.PromptArgs...))
-	if parseErr != nil {
-		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: %w", parseErr)
-	}
-	if !isCommandInvocation {
-		if len(params.PromptArgs) > 0 {
-			return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: prompt override must be a single argument unless using /command invocation")
-		}
-		if strings.TrimSpace(renderedPrompt) == "" {
-			return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: resolved prompt override is empty")
-		}
-		return renderedPrompt, nil
-	}
-
-	if m.config == nil {
-		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: config store is not available for command invocation")
-	}
-	commandsRoot := filepath.Join(strings.TrimSpace(m.baseDir), ".agents", "commands")
-	loadedCommand, loadErr := commands.LoadFromDir(commandsRoot, invocation.Name)
-	if loadErr != nil {
-		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: %w", loadErr)
-	}
-
-	commandTemplate, templateErr := renderTaskPromptTemplate(strings.TrimSpace(loadedCommand.Template), contextData)
-	if templateErr != nil {
-		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: failed to render command template: %w", templateErr)
-	}
-
-	resolvedCommandPrompt := commands.ApplyArguments(commandTemplate, invocation.Arguments)
-	resolvedCommandPrompt, expandErr := commands.ExpandPrompt(resolvedCommandPrompt, strings.TrimSpace(m.baseDir), nil, nil)
-	if expandErr != nil {
-		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: failed to render command /%s: %w", strings.TrimSpace(loadedCommand.Name), expandErr)
-	}
-	resolvedCommandPrompt = strings.TrimSpace(resolvedCommandPrompt)
-	if resolvedCommandPrompt == "" {
-		return "", fmt.Errorf("TaskManager.resolveTaskPromptOverride() [task.go]: rendered command /%s prompt is empty", strings.TrimSpace(loadedCommand.Name))
-	}
-
-	return resolvedCommandPrompt, nil
-}
-
-func renderTaskPromptTemplate(input string, contextData map[string]any) (string, error) {
-	templateText := strings.TrimSpace(input)
-	if templateText == "" {
-		return "", nil
-	}
-	tpl, err := template.New("task-prompt").Option("missingkey=error").Parse(templateText)
-	if err != nil {
-		return "", fmt.Errorf("renderTaskPromptTemplate() [task.go]: failed to parse prompt template: %w", err)
-	}
-
-	var rendered bytes.Buffer
-	if err := tpl.Execute(&rendered, contextData); err != nil {
-		return "", fmt.Errorf("renderTaskPromptTemplate() [task.go]: failed to render prompt template: %w", err)
-	}
-
-	return rendered.String(), nil
 }
 
 func isTaskPathNestedUnder(path string, parent string) bool {

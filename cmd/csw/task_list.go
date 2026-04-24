@@ -78,7 +78,7 @@ func runTaskList(manager *core.TaskManager, args []string, recursive bool, inclu
 	}
 
 	if includeArchived {
-		archivedManager, createErr := core.NewTaskManagerWithTasksDir(manager.TasksRoot(), manager.ArchivedTasksRoot(), nil)
+		archivedManager, createErr := core.NewTaskManagerWithTasksDir(manager.TasksRoot(), filepath.Join(manager.TasksRoot(), "archive"), nil)
 		if createErr != nil {
 			return fmt.Errorf("runTaskList() [task.go]: failed to prepare archived task manager: %w", createErr)
 		}
@@ -91,7 +91,7 @@ func runTaskList(manager *core.TaskManager, args []string, recursive bool, inclu
 			tasks = append(tasks, archivedTasks...)
 		}
 
-		archivedTimes, archivedTimesErr := collectTaskYMLModTimes(manager.ArchivedTasksRoot())
+		archivedTimes, archivedTimesErr := collectTaskYMLModTimes(filepath.Join(manager.TasksRoot(), "archive"))
 		if archivedTimesErr != nil {
 			if !errors.Is(archivedTimesErr, os.ErrNotExist) {
 				return archivedTimesErr
