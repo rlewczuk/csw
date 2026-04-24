@@ -107,6 +107,10 @@ func (c *KimiCompactor) prepare(messages []*models.ChatMessage) (*models.ChatMes
 		return nil, history
 	}
 
+	if preserveStartIndex > 0 && kimiCompactorMessageHasToolCalls(history[preserveStartIndex-1]) {
+		preserveStartIndex--
+	}
+
 	toCompact := history[:preserveStartIndex]
 	toPreserve := history[preserveStartIndex:]
 	if len(toCompact) == 0 {
@@ -156,4 +160,18 @@ func kimiCompactorSerializePart(part models.ChatMessagePart) string {
 	}
 
 	return ""
+}
+
+func kimiCompactorMessageHasToolCalls(message *models.ChatMessage) bool {
+	if message == nil {
+		return false
+	}
+
+	for _, part := range message.Parts {
+		if part.ToolCall != nil {
+			return true
+		}
+	}
+
+	return false
 }

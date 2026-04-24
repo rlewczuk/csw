@@ -139,29 +139,55 @@ func TestKimiCompactorCompactMessages(t *testing.T) {
 }
 
 func TestKimiCompactorPrepare(t *testing.T) {
-	compactor := &KimiCompactor{nmessages: 2}
-	toolCall := compactTestToolCall("c1", "vfsRead", map[string]any{"path": "a"})
-	messages := []*models.ChatMessage{
-		models.NewTextMessage(models.ChatRoleSystem, "system"),
-		{
-			Role: models.ChatRoleAssistant,
-			Parts: []models.ChatMessagePart{
-				{ReasoningContent: "internal"},
-				{ToolCall: toolCall},
-				{Text: "visible"},
-			},
-		},
-		models.NewTextMessage(models.ChatRoleUser, "keep user"),
-		models.NewTextMessage(models.ChatRoleAssistant, "keep assistant"),
-	}
+		t.Run("serializes compacted messages and preserves requested tail", func(t *testing.T) {
+			compactor := &KimiCompactor{nmessages: 2}
+			toolCall := compactTestToolCall("c1", "vfsRead", map[string]any{"path": "a"})
+			messages := []*models.ChatMessage{
+				models.NewTextMessage(models.ChatRoleSystem, "system"),
+				{
+					Role: models.ChatRoleAssistant,
+					Parts: []models.ChatMessagePart{
+						{ReasoningContent: "internal"},
+						{ToolCall: toolCall},
+						{Text: "visible"},
+					},
+				},
+				models.NewTextMessage(models.ChatRoleUser, "middle user"),
+				models.NewTextMessage(models.ChatRoleAssistant, "middle assistant"),
+				models.NewTextMessage(models.ChatRoleUser, "keep user"),
+				models.NewTextMessage(models.ChatRoleAssistant, "keep assistant"),
+			}
 
-	compactMsg, preserved := compactor.prepare(messages)
-	require.NotNil(t, compactMsg)
-	require.Len(t, preserved, 2)
-	assert.Equal(t, "keep user", preserved[0].GetText())
-	assert.Equal(t, "keep assistant", preserved[1].GetText())
-	assert.NotContains(t, compactMsg.GetText(), "internal")
-	assert.Contains(t, compactMsg.GetText(), "visible")
-	assert.Contains(t, compactMsg.GetText(), "\"Function\":\"vfsRead\"")
-	assert.True(t, strings.Contains(compactMsg.GetText(), kimiCompactorPrompt))
+		compactMsg, preserved := compactor.prepare(messages)
+		require.NotNil(t, compactMsg)
+		require.Len(t, preserved, 2)
+		assert.Equal(t, "keep user", preserved[0].GetText())
+		assert.Equal(t, "keep assistant", preserved[1].GetText())
+		assert.NotContains(t, compactMsg.GetText(), "internal")
+		assert.Contains(t, compactMsg.GetText(), "visible")
+		assert.Contains(t, compactMsg.GetText(), "\"Function\":\"vfsRead\"")
+		assert.True(t, strings.Contains(compactMsg.GetText(), kimiCompactorPrompt))
+	})
+
+	t.Run("keeps trailing tool-call message out of compacted sequence", func(t *testing.T) {
+		compactor := &KimiCompactor{nmessages: 2}
+		toolCall := compactTestToolCall("c2", "vfsRead", map[string]any{"path": "b"})
+		toolResponse := compactTestToolResponse(toolCall, map[string]any{"content": "ok"})
+		messages := []*models.ChatMessage{
+			models.NewTextMessage(models.ChatRoleSystem, "system"),
+			models.NewTextMessage(models.ChatRoleUser, "old user"),
+			models.NewTextMessage(models.ChatRoleAssistant, "old assistant"),
+			compactTestMessage(models.ChatRoleAssistant, models.ChatMessagePart{ToolCall: toolCall}),
+			compactTestMessage(models.ChatRoleUser, models.ChatMessagePart{ToolResponse: toolResponse}),
+			models.NewTextMessage(models.ChatRoleAssistant, "keep assistant"),
+		}
+
+		compactMsg, preserved := compactor.prepare(messages)
+		require.NotNil(t, compactMsg)
+		require.Len(t, preserved, 3)
+		assert.True(t, compactTestHasToolCall(preserved, "c2"))
+		assert.True(t, compactTestHasToolResponse(preserved, "c2"))
+		assert.Contains(t, compactMsg.GetText(), "old assistant")
+		assert.NotContains(t, compactMsg.GetText(), "\"ID\":\"c2\"")
+	})
 }
