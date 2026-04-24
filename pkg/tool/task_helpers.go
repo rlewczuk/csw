@@ -5,6 +5,20 @@ import (
 	"strings"
 )
 
+var taskUpdateRenderFields = []struct {
+	argument string
+	label    string
+}{
+	{argument: "name", label: "name"},
+	{argument: "description", label: "description"},
+	{argument: "status", label: "status"},
+	{argument: "branch", label: "branch"},
+	{argument: "parent-branch", label: "parent-branch"},
+	{argument: "role", label: "role"},
+	{argument: "deps", label: "deps"},
+	{argument: "prompt", label: "prompt"},
+}
+
 func resolveTaskIdentifier(args *ToolCall, session TaskSessionRef) (string, string) {
 	if args == nil {
 		return "", ""
@@ -67,4 +81,87 @@ func taskRecordToToolValue(task TaskRecord) ToolValue {
 	value.Set("updated_at", task.UpdatedAt)
 
 	return value
+}
+
+func taskRenderTarget(call *ToolCall) string {
+	if call == nil {
+		return "current-session-task"
+	}
+
+	if uuid := strings.TrimSpace(call.Arguments.String("uuid")); uuid != "" {
+		return "uuid=" + uuid
+	}
+
+	if name := strings.TrimSpace(call.Arguments.String("name")); name != "" {
+		return "name=" + name
+	}
+
+	taskObject, ok := call.Arguments.Get("task").ObjectOK()
+	if ok {
+		if uuidValue, exists := taskObject["uuid"]; exists {
+			uuid := strings.TrimSpace(uuidValue.AsString())
+			if uuid != "" {
+				return "uuid=" + uuid
+			}
+		}
+
+		if nameValue, exists := taskObject["name"]; exists {
+			name := strings.TrimSpace(nameValue.AsString())
+			if name != "" {
+				return "name=" + name
+			}
+		}
+	}
+
+	return "current-session-task"
+}
+
+func taskRenderStatus(call *ToolCall) string {
+	if call == nil {
+		return ""
+	}
+
+	if status := strings.TrimSpace(call.Arguments.String("status")); status != "" {
+		return status
+	}
+
+	taskObject, ok := call.Arguments.Get("task").ObjectOK()
+	if !ok {
+		return ""
+	}
+
+	statusValue, exists := taskObject["status"]
+	if !exists {
+		return ""
+	}
+
+	return strings.TrimSpace(statusValue.AsString())
+}
+
+func taskRenderCount(call *ToolCall, key string) int {
+	if call == nil {
+		return 0
+	}
+
+	items, ok := call.Arguments.Get(key).ArrayOK()
+	if !ok {
+		return 0
+	}
+
+	return len(items)
+}
+
+func taskRenderUpdatedFields(call *ToolCall) []string {
+	if call == nil {
+		return nil
+	}
+
+	updatedFields := make([]string, 0, len(taskUpdateRenderFields))
+	for _, candidate := range taskUpdateRenderFields {
+		if _, ok := call.Arguments.GetOK(candidate.argument); ok {
+			updatedFields = append(updatedFields, candidate.label)
+		}
+	}
+
+	return updatedFields
 }

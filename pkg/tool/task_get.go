@@ -3,6 +3,7 @@ package tool
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -48,7 +49,38 @@ func (t *TaskGetTool) Execute(args *ToolCall) *ToolResponse {
 
 // Render returns human-readable representation.
 func (t *TaskGetTool) Render(call *ToolCall) (string, string, string, map[string]string) {
-	one := truncateString("taskGet", 128)
-	jsonl := buildToolRenderJSONL("taskGet", call, map[string]any{})
-	return one, one, jsonl, map[string]string{}
+	target := taskRenderTarget(call)
+	includeSummary := false
+	if call != nil {
+		includeSummary = call.Arguments.Bool("summary")
+		if !includeSummary {
+			if _, ok := call.Arguments.Get("summary_meta").ObjectOK(); ok {
+				includeSummary = true
+			} else {
+				includeSummary = strings.TrimSpace(call.Arguments.String("summary")) != ""
+			}
+		}
+	}
+
+	summary := truncateString("taskGet "+target, 128)
+	if includeSummary {
+		summary = truncateString(summary+" +summary", 128)
+	}
+
+	details := summary
+	jsonlExtra := map[string]any{"target": target, "summary": includeSummary}
+	if taskStatus := taskRenderStatus(call); taskStatus != "" {
+		details += "\nstatus=" + taskStatus
+		jsonlExtra["task_status"] = taskStatus
+	}
+	if includeSummary {
+		summaryText := strings.TrimSpace(call.Arguments.String("summary"))
+		if summaryText != "" {
+			details += "\nsummary_chars=" + strconv.Itoa(len(summaryText))
+			jsonlExtra["summary_chars"] = len(summaryText)
+		}
+	}
+
+	jsonl := buildToolRenderJSONL("taskGet", call, jsonlExtra)
+	return summary, details, jsonl, map[string]string{}
 }

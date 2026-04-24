@@ -3,6 +3,7 @@ package tool
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -64,7 +65,29 @@ func (t *TaskNewTool) Execute(args *ToolCall) *ToolResponse {
 
 // Render returns human-readable representation.
 func (t *TaskNewTool) Render(call *ToolCall) (string, string, string, map[string]string) {
-	one := truncateString("taskNew", 128)
-	jsonl := buildToolRenderJSONL("taskNew", call, map[string]any{"uuid": call.Arguments.String("uuid")})
-	return one, one, jsonl, map[string]string{}
+	target := taskRenderTarget(call)
+	parent := ""
+	depsCount := 0
+	if call != nil {
+		parent = strings.TrimSpace(call.Arguments.String("parent"))
+		depsCount = taskRenderCount(call, "deps")
+	}
+
+	summary := truncateString("taskNew "+target, 128)
+	details := summary
+	jsonlExtra := map[string]any{"target": target, "deps_count": depsCount}
+	if parent != "" {
+		details += "\nparent=" + parent
+		jsonlExtra["parent"] = parent
+	}
+	if depsCount > 0 {
+		details += "\ndeps=" + strconv.Itoa(depsCount)
+	}
+	if status := taskRenderStatus(call); status != "" {
+		details += "\nstatus=" + status
+		jsonlExtra["task_status"] = status
+	}
+
+	jsonl := buildToolRenderJSONL("taskNew", call, jsonlExtra)
+	return summary, details, jsonl, map[string]string{}
 }

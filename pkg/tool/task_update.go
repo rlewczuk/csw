@@ -3,6 +3,7 @@ package tool
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -66,9 +67,26 @@ func (t *TaskUpdateTool) Execute(args *ToolCall) *ToolResponse {
 
 // Render returns human-readable representation.
 func (t *TaskUpdateTool) Render(call *ToolCall) (string, string, string, map[string]string) {
-	one := truncateString("taskUpdate", 128)
-	jsonl := buildToolRenderJSONL("taskUpdate", call, map[string]any{})
-	return one, one, jsonl, map[string]string{}
+	target := taskRenderTarget(call)
+	updatedFields := taskRenderUpdatedFields(call)
+	summary := "taskUpdate " + target
+	if len(updatedFields) > 0 {
+		summary += " fields=" + strings.Join(updatedFields, ",")
+	}
+	summary = truncateString(summary, 128)
+
+	details := summary
+	jsonlExtra := map[string]any{"target": target, "updated_fields": updatedFields, "updated_count": len(updatedFields)}
+	if status := taskRenderStatus(call); status != "" {
+		details += "\nstatus=" + status
+		jsonlExtra["task_status"] = status
+	}
+	if len(updatedFields) > 0 {
+		details += "\nupdated_count=" + strconv.Itoa(len(updatedFields))
+	}
+
+	jsonl := buildToolRenderJSONL("taskUpdate", call, jsonlExtra)
+	return summary, details, jsonl, map[string]string{}
 }
 
 func firstNonEmptyTool(values ...string) string {

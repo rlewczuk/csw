@@ -39,7 +39,16 @@ func (t *TaskMergeTool) Execute(args *ToolCall) *ToolResponse {
 
 // Render returns human-readable representation.
 func (t *TaskMergeTool) Render(call *ToolCall) (string, string, string, map[string]string) {
-	one := truncateString("taskMerge", 128)
-	jsonl := buildToolRenderJSONL("taskMerge", call, map[string]any{})
-	return one, one, jsonl, map[string]string{}
+	target := taskRenderTarget(call)
+	summary := truncateString("taskMerge "+target, 128)
+
+	details := summary
+	jsonlExtra := map[string]any{"target": target}
+	if status := taskRenderStatus(call); status != "" {
+		details += "\nstatus=" + status
+		jsonlExtra["task_status"] = status
+	}
+
+	jsonl := buildToolRenderJSONL("taskMerge", call, jsonlExtra)
+	return summary, details, jsonl, map[string]string{}
 }

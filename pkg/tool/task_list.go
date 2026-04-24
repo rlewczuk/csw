@@ -3,6 +3,7 @@ package tool
 import (
 	"context"
 	"fmt"
+	"strconv"
 )
 
 // TaskListFunc lists task records.
@@ -44,7 +45,23 @@ func (t *TaskListTool) Execute(args *ToolCall) *ToolResponse {
 
 // Render returns human-readable representation.
 func (t *TaskListTool) Render(call *ToolCall) (string, string, string, map[string]string) {
-	one := truncateString("taskList", 128)
-	jsonl := buildToolRenderJSONL("taskList", call, map[string]any{})
-	return one, one, jsonl, map[string]string{}
+	target := taskRenderTarget(call)
+	recursive := false
+	if call != nil {
+		recursive = call.Arguments.Bool("recursive")
+	}
+	count := taskRenderCount(call, "tasks")
+
+	summary := "taskList " + target
+	if recursive {
+		summary += " recursive"
+	}
+	if count > 0 {
+		summary += formatResultCount(count)
+	}
+	summary = truncateString(summary, 128)
+
+	details := summary + "\nreturned=" + strconv.Itoa(count)
+	jsonl := buildToolRenderJSONL("taskList", call, map[string]any{"target": target, "recursive": recursive, "count": count})
+	return summary, details, jsonl, map[string]string{}
 }
