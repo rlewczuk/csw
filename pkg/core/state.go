@@ -1,8 +1,6 @@
 package core
 
 import (
-	"strings"
-
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
 )
@@ -16,7 +14,6 @@ type AgentStateCommonInfo struct {
 	ContextLengthTokens int
 }
 
-// TODO decide if this is still needed
 type AgentState struct {
 	Info AgentStateCommonInfo
 	Role *conf.AgentRoleConfig
@@ -34,11 +31,4 @@ func (s AgentState) Clone() AgentState {
 	}
 
 	return cloned
-}
-
-// SetHookContextValue sets one hook context field.
-func (s *AgentState) SetHookContextValue(key string, value string) {
-	if s == nil || strings.TrimSpace(key) == "" {
-		return
-	}
 }
