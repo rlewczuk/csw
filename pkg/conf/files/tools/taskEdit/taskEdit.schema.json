@@ -5,11 +5,11 @@
   "properties": {
     "uuid": {
       "type": "string",
-      "description": "Task UUID. Optional if name is provided or current session is already bound to a task."
+      "description": "Task UUID. Optional parameter, use if you look for specific task."
     },
     "name": {
       "type": "string",
-      "description": "Task name/slug. Used when uuid is omitted."
+      "description": "Task name/slug. Optional parameter, use if you look for specific task."
     },
     "oldString": {
       "type": "string",

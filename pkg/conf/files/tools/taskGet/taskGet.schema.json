@@ -5,18 +5,18 @@
   "properties": {
     "uuid": {
       "type": "string",
-      "description": "Task UUID. Optional if name is provided or current session belongs to a task."
+      "description": "Task UUID. Optional, use if you look for specific task."
     },
     "name": {
       "type": "string",
-      "description": "Task name/slug. Used when uuid is not provided."
+      "description": "Task name/slug. Optional parameter, use if you look for specific task."
     },
     "summary": {
       "type": "boolean",
       "description": "If true, include last session summary (metadata and markdown summary text)."
     },
     "promptOnly": {
-      "description": "If true/\"yes\", return only task.md content in vfsRead-like content format with line numbers.",
+      "description": "If true/\"yes\", returns task prompt content.",
       "oneOf": [
         {
           "type": "boolean"
