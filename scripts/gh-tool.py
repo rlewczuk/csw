@@ -47,6 +47,7 @@ from urllib import error, parse, request
 
 
 API_BASE = "https://api.github.com"
+DEFAULT_TMPDIR = ".cswdata/tmp/git"
 
 
 def parse_repo(repo: str) -> tuple[str, str]:
@@ -428,8 +429,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--tmpdir",
-        default="./tmp/gh-tool",
-        help="Directory used for local repository clones (default: ./tmp/gh-tool)",
+        default=DEFAULT_TMPDIR,
+        help=f"Directory used for local repository clones (default: {DEFAULT_TMPDIR})",
     )
 
     sub = parser.add_subparsers(dest="command", required=True)
