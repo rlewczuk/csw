@@ -5,6 +5,7 @@ Package `pkg/vfs` provides filesystem abstractions, local and in-memory VFS impl
 ## Important files
 
 * `access.go` - Access-control VFS wrapper.
+* `access_pattern_test.go` - Access pattern matching and specificity tests.
 * `config.go` - Hide-pattern configuration helpers.
 * `glob.go` - Glob matching and filtering.
 * `grep.go` - Regex file content search.
@@ -56,6 +57,7 @@ Package `pkg/vfs` provides filesystem abstractions, local and in-memory VFS impl
 
 - `local.go`: Local filesystem `VFS` implementation with root-path enforcement and hide-pattern aware traversal.
 - `access.go`: Permission-enforcing VFS wrapper with glob-based rule matching and structured permission errors.
+- `access_pattern_test.go`: Focused tests for glob matching specificity and access pattern resolution.
 - `glob.go`: Glob-rule parser/filter used for hide and include/exclude path matching.
 - `grep.go`: Regex content search over VFS files with optional glob filtering.
 - `patcher.go`: Targeted text patching helper with unified diff output and ambiguity handling.
