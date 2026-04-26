@@ -10,6 +10,7 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `tags.go` - Model tag mappings and lookup registry.
 * `model_chain_factory.go` - Provider/model chain parsing and construction.
 * `retry.go` - Retry wrapper policy and backoff handling.
+* `retry_helpers_test.go` - Retry helper-focused tests for delay calculation, retryability classification, usage-limit detection, and default policy values.
 * `fallback.go` - Multi-provider fallback chat model wrapper.
 * `unstreaming_chat_model.go` - Stream aggregation for sync chat calls.
 * `oauth.go` - OAuth PKCE, token exchange, renewal helpers.
