@@ -10,7 +10,8 @@ Package `pkg/vfs` provides filesystem abstractions, local and in-memory VFS impl
 * `glob.go` - Glob matching and filtering.
 * `grep.go` - Regex file content search.
 * `local.go` - Local filesystem VFS implementation.
-* `mock.go` - In-memory VFS and VCS doubles.
+* `mock.go` - In-memory VFS test double.
+* `mock_vcs.go` - In-memory VCS test double.
 * `patch.go` - Patch parsing for file operations.
 * `patcher.go` - Text patching and unified diff.
 * `shadow.go` - Shadow filesystem routing wrapper.
@@ -65,5 +66,6 @@ Package `pkg/vfs` provides filesystem abstractions, local and in-memory VFS impl
 - `patch.go`: Patch parser for Add/Delete/Update file operations with hunk/chunk structure.
 - `config.go`: Hide-pattern assembly from role config and ignore files (`.cswignore`/`.gitignore`).
 - `shadow.go`: Shadow VFS wrapper that routes configured paths to alternate filesystem.
-- `mock.go`: In-memory `VFS`/`VCS`/repo test doubles for deterministic tests.
+- `mock.go`: In-memory `VFS`/repo test doubles for deterministic tests.
+- `mock_vcs.go`: In-memory `VCS` test double for deterministic tests.
 - `vfs_movefile_test.go`: Focused MoveFile scenarios split from the general VFS test suite.
