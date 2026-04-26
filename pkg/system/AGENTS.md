@@ -10,6 +10,7 @@
 * `context.go` - run context parsing helpers
 * `hooks.go` - hook parsing and runtime config
 * `run.go` - non-TUI run command orchestration and session lifecycle
+* `run_commands.go` - slash-command resolution, command defaults, and run startup command info helpers
 * `run_task.go` - run command task-mode helpers and task metadata persistence
 * `runtime.go` - run session startup flow
 * `system.go` - SweSystem lifecycle and sessions
