@@ -1,12 +1,15 @@
 package main
 
 import (
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/rlewczuk/csw/pkg/system"
 )
+
+const runShadowDirEnvVar = "CSW_SHADOW_DIR"
 
 // RunCommand creates the run command.
 func RunCommand() *cobra.Command {
@@ -55,6 +58,7 @@ func RunCommand() *cobra.Command {
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
+			shadowDir := resolveRunShadowDir(cmd, cliShadowDir)
 			return system.RunCommand(&system.RunParams{
 				Command:               cmd,
 				PositionalArgs:        append([]string(nil), args...),
@@ -68,7 +72,7 @@ func RunCommand() *cobra.Command {
 				ModelName:             cliModel,
 				RoleName:              cliRole,
 				WorkDir:               cliWorkDir,
-				ShadowDir:             cliShadowDir,
+				ShadowDir:             shadowDir,
 				WorktreeBranch:        cliWorktree,
 				GitUserName:           cliGitUser,
 				GitUserEmail:          cliGitEmail,
@@ -133,4 +137,21 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliTaskReset, "reset", false, "Reset task branch before run in task context")
 
 	return cmd
+}
+
+func resolveRunShadowDir(cmd *cobra.Command, cliShadowDir string) string {
+	if cmd != nil && cmd.Flags().Changed("shadow-dir") {
+		return cliShadowDir
+	}
+
+	if strings.TrimSpace(cliShadowDir) != "" {
+		return cliShadowDir
+	}
+
+	shadowDirEnv, ok := os.LookupEnv(runShadowDirEnvVar)
+	if !ok {
+		return ""
+	}
+
+	return strings.TrimSpace(shadowDirEnv)
 }
