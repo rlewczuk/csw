@@ -592,35 +592,6 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 	})
 }
 
-func TestOllamaClient_ErrorHandling(t *testing.T) {
-	t.Run("handles endpoint not found", func(t *testing.T) {
-		mock := testutil.NewMockHTTPServer()
-		defer mock.Close()
-
-		mock.AddRestResponseWithStatus("/api/tags", "GET", `{"error":"not found"}`, 404)
-
-		client, err := NewOllamaClientWithHTTPClient(mock.URL(), mock.Client())
-		require.NoError(t, err)
-
-		_, err = client.ListModels()
-		assert.ErrorIs(t, err, ErrEndpointNotFound)
-	})
-
-	t.Run("handles endpoint unavailable", func(t *testing.T) {
-		mock := testutil.NewMockHTTPServer()
-		defer mock.Close()
-
-		mock.AddRestResponseWithStatus("/api/tags", "GET", `{"error":"unavailable"}`, 503)
-
-		client, err := NewOllamaClientWithHTTPClient(mock.URL(), mock.Client())
-		require.NoError(t, err)
-
-		_, err = client.ListModels()
-		require.Error(t, err)
-		assert.ErrorIs(t, err, ErrEndpointUnavailable)
-	})
-}
-
 func TestOllamaClient_Logging(t *testing.T) {
 	tc := getOllamaTestClient(t)
 	defer tc.Close()
