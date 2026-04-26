@@ -14,10 +14,12 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `unstreaming_chat_model.go` - Stream aggregation for sync chat calls.
 * `oauth.go` - OAuth PKCE, token exchange, renewal helpers.
 * `config_updater.go` - Config update callback implementation.
-* `openai_client.go` - OpenAI-compatible provider client implementation.
+* `openai_client.go` - OpenAI-compatible provider client implementation core (client setup, listing, and sync chat).
+* `openai_client_stream.go` - OpenAI chat streaming implementation and streaming raw-chunk logging helper.
 * `openai_client_tool_calling_test.go` - OpenAI tool-calling tests split from the main OpenAI client test file.
 * `openai_client_reasoning_test.go` - OpenAI reasoning-content tests split from the main OpenAI client test file.
 * `openai_client_logging_test.go` - OpenAI logging and raw request/response callback tests split from the main OpenAI client test file.
+* `openai_client_stream_test.go` - OpenAI streaming chat tests split from the main OpenAI client test file.
 * `openai_client_errors.go` - OpenAI client HTTP/network error mapping and usage-limit retry-after parsing helpers.
 * `openai_client_errors_test.go` - Tests for OpenAI client error handling and rate-limit retry behavior.
 * `openai_client_conversion.go` - OpenAI chat/tool payload conversion and prompt-cache request-stability helpers.
