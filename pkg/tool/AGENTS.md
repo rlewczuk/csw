@@ -11,6 +11,7 @@ Package `pkg/tool` defines tool contracts, registry, permission wrappers, and bu
 * `access.go` - Access control wrapper and role checks.
 * `permissions.go` - Permission query helpers and defaults.
 * `run_bash.go` - Bash tool and command validation.
+* `run_bash_workdir_test.go` - Run-bash workdir resolution and session-workdir behavior tests.
 * `run_bash_limit_test.go` - Run-bash output limit and truncation-focused tests.
 * `todo.go` - Todo tools and item validation.
 * `subagent.go` - Subagent request/response tool adapter.

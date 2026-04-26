@@ -161,40 +161,6 @@ func TestRunBashTool_Execute_DefaultLimit_Applied(t *testing.T) {
 	assert.Equal(t, 1, mockRunner.ExecutionCount())
 }
 
-func TestRunBashTool_Execute_WithLimitAndOtherOptions(t *testing.T) {
-	mockRunner := runner.NewMockRunner()
-	longOutput := "line1\nline2\nline3\nline4\nline5\n"
-	mockRunner.SetResponse("seq 1 5", longOutput, 0, nil)
-
-	privileges := map[string]conf.AccessFlag{
-		".*": conf.AccessAllow,
-	}
-	tool := NewRunBashToolWithSessionWorkdir(mockRunner, privileges, "/project/root")
-
-	args := ToolCall{
-		ID:       "test-id",
-		Function: "runBash",
-		Arguments: NewToolValue(map[string]any{
-			"command": "seq 1 5",
-			"workdir": "subdir",
-			"timeout": int64(30),
-			"limit":   int64(3),
-		}),
-	}
-
-	response := tool.Execute(&args)
-
-	assert.NoError(t, response.Error)
-	assert.True(t, response.Done)
-
-	output := response.Result.String("output")
-	assert.NotContains(t, output, "line1")
-	assert.Contains(t, output, "line3")
-	assert.Contains(t, output, "line4")
-	assert.Contains(t, output, "line5")
-	assert.Equal(t, 1, mockRunner.ExecutionCount())
-}
-
 func TestRunBashTool_Execute_WithLimit_LogsCropping(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 	longOutput := "line1\nline2\nline3\nline4\nline5\n"
