@@ -10,6 +10,7 @@ Package `pkg/core` provides runtime orchestration for agent sessions and tasks. 
 * `session_model_role.go` - Session model/role switching and tool registry selection
 * `session_thread.go` - Thread-safe async session controller
 * `session_agents.go` - Injects AGENTS.md into context
+* `session_core_integ_agent_files_test.go` - Integration tests for AGENTS.md tool-triggered injection flow
 * `session_core_integ_retry_test.go` - Integration tests for SweSession retry behavior
 * `prompt.go` - Prompt fragments and tool info builder
 * `role.go` - Cached agent role registry
