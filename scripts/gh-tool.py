@@ -7,7 +7,8 @@ It is designed to print concise Markdown-like output that is easy for an LLM to
 consume.
 
 Authentication:
-  - Requests are performed with anonymous access (no authorization header).
+  - If GH_API_KEY is set, requests use Authorization: Bearer <GH_API_KEY>.
+  - Otherwise, requests are performed with anonymous access.
 
 Repository handling:
   - Repositories are cloned under --tmpdir and reused across calls.
@@ -37,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -120,6 +122,9 @@ def api_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "gh-tool-script",
     }
+    api_key = os.getenv("GH_API_KEY", "").strip()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     if extra:
         headers.update(extra)
     return headers
