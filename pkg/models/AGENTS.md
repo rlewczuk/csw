@@ -13,6 +13,7 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `retry_helpers_test.go` - Retry helper-focused tests for delay calculation, retryability classification, usage-limit detection, and default policy values.
 * `fallback.go` - Multi-provider fallback chat model wrapper.
 * `unstreaming_chat_model.go` - Stream aggregation for sync chat calls.
+* `unstreaming_chat_model_chat_test.go` - Unstreaming Chat() aggregation behavior tests split from the main Unstreaming test file.
 * `oauth.go` - OAuth PKCE, token exchange, renewal helpers.
 * `config_updater.go` - Config update callback implementation.
 * `openai_client.go` - OpenAI-compatible provider client implementation core (client setup, listing, and sync chat).
