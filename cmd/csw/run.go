@@ -1,15 +1,12 @@
 package main
 
 import (
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/rlewczuk/csw/pkg/system"
 )
-
-const runShadowDirEnvVar = "CSW_SHADOW_DIR"
 
 // RunCommand creates the run command.
 func RunCommand() *cobra.Command {
@@ -18,7 +15,6 @@ func RunCommand() *cobra.Command {
 		cliRole              string
 		cliWorkDir           string
 		cliWorktree          string
-		cliShadowDir         string
 		cliAllowAllPerms     bool
 		cliInteractive       bool
 		cliConfigPath        string
@@ -58,7 +54,6 @@ func RunCommand() *cobra.Command {
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			shadowDir := resolveRunShadowDir(cmd, cliShadowDir)
 			return system.RunCommand(&system.RunParams{
 				Command:               cmd,
 				PositionalArgs:        append([]string(nil), args...),
@@ -104,7 +99,6 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliModel, "model", "", "Model alias or model spec in provider/model format (single or comma-separated fallback list); if not set, uses defaults")
 	cmd.Flags().StringVar(&cliRole, "role", "developer", "Agent role name")
 	cmd.Flags().StringVar(&cliWorkDir, "workdir", "", "Working directory (default: current directory)")
-	cmd.Flags().StringVar(&cliShadowDir, "shadow-dir", "", "Shadow directory for agent files overlay (AGENTS.md, .agents*, .csw*, .cswdata)")
 	cmd.Flags().StringVar(&cliWorktree, "worktree", "", "Create and use a git worktree for this session on a feature branch")
 	cmd.Flags().BoolVar(&cliMerge, "merge", false, "Merge the feature worktree branch into main after commit")
 	cmd.Flags().BoolVar(&cliNoMerge, "no-merge", false, "Disable merging after commit, overriding configured defaults")
@@ -137,21 +131,4 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliTaskReset, "reset", false, "Reset task branch before run in task context")
 
 	return cmd
-}
-
-func resolveRunShadowDir(cmd *cobra.Command, cliShadowDir string) string {
-	if cmd != nil && cmd.Flags().Changed("shadow-dir") {
-		return cliShadowDir
-	}
-
-	if strings.TrimSpace(cliShadowDir) != "" {
-		return cliShadowDir
-	}
-
-	shadowDirEnv, ok := os.LookupEnv(runShadowDirEnvVar)
-	if !ok {
-		return ""
-	}
-
-	return strings.TrimSpace(shadowDirEnv)
 }

@@ -152,6 +152,7 @@ func taskUpdateCommandWithDefaults(use string, short string, defaultEdit bool) *
 			}
 
 			if regenBranch || regenName || regenDescription {
+				resolvedShadowDir := strings.TrimSpace(shadowDir)
 				resolvedCreateParams, resolveErr := resolveTaskCreateParams(cmd.Context(), taskCreateResolveParams{
 					Prompt:        resolvedPrompt,
 					Name:          pickTaskRegenValue(taskData.Name, "", regenName),
@@ -162,7 +163,7 @@ func taskUpdateCommandWithDefaults(use string, short string, defaultEdit bool) *
 					Deps:          append([]string(nil), taskData.Deps...),
 					ModelName:     "",
 					WorkDir:       "",
-					ShadowDir:     "",
+					ShadowDir:     resolvedShadowDir,
 					ProjectConfig: "",
 					ConfigPath:    "",
 				})

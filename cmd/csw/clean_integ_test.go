@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/vcs"
@@ -200,4 +201,18 @@ func TestNullVCS_ListWorktrees(t *testing.T) {
 	worktrees, err := nullVCS.ListWorktrees()
 	require.NoError(t, err)
 	assert.Empty(t, worktrees)
+}
+
+func TestResolveCleanWorktreesRootUsesShadowDir(t *testing.T) {
+	originalShadowDir := shadowDir
+	t.Cleanup(func() {
+		shadowDir = originalShadowDir
+	})
+
+	shadowPath := t.TempDir()
+	shadowDir = shadowPath
+
+	resolved, err := resolveCleanWorktreesRoot(filepath.Join("/tmp", "project"))
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(shadowPath, ".cswdata", "work"), resolved)
 }

@@ -22,14 +22,14 @@ const (
 // GetConfigStore returns a local config store for the specified scope or custom path.
 func GetConfigStore(scope ConfigScope) (*conf.CswConfig, error) {
 	var configDir string
+	configRoot, err := resolveConfigRootFromShadow()
+	if err != nil {
+		return nil, fmt.Errorf("GetConfigStore() [common.go]: failed to resolve config root: %w", err)
+	}
 
 	switch scope {
 	case ConfigScopeLocal:
-		cwd, err := os.Getwd()
-		if err != nil {
-			return nil, fmt.Errorf("GetConfigStore() [common.go]: failed to get current directory: %w", err)
-		}
-		configDir = filepath.Join(cwd, ".csw", "config")
+		configDir = filepath.Join(configRoot, ".csw", "config")
 	case ConfigScopeGlobal:
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
@@ -54,12 +54,17 @@ func GetConfigStore(scope ConfigScope) (*conf.CswConfig, error) {
 
 // GetCompositeConfigStore returns a composite config store that merges configurations.
 func GetCompositeConfigStore() (*conf.CswConfig, error) {
+	configRoot, err := resolveConfigRootFromShadow()
+	if err != nil {
+		return nil, fmt.Errorf("GetCompositeConfigStore() [common.go]: failed to resolve config root: %w", err)
+	}
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("GetCompositeConfigStore() [common.go]: failed to get home directory: %w", err)
 	}
 
-	configPathStr := "@DEFAULTS:" + filepath.Join(homeDir, ".config", "csw") + ":./.csw/config"
+	configPathStr := "@DEFAULTS:" + filepath.Join(homeDir, ".config", "csw") + ":" + filepath.Join(configRoot, ".csw", "config")
 
 	store, err := conf.CswConfigLoad(configPathStr)
 	if err != nil {
@@ -67,6 +72,24 @@ func GetCompositeConfigStore() (*conf.CswConfig, error) {
 	}
 
 	return store, nil
+}
+
+func resolveConfigRootFromShadow() (string, error) {
+	trimmedShadowDir := strings.TrimSpace(shadowDir)
+	if trimmedShadowDir != "" {
+		resolvedShadowDir, err := system.ResolveWorkDir(trimmedShadowDir)
+		if err != nil {
+			return "", fmt.Errorf("resolveConfigRootFromShadow() [common.go]: failed to resolve shadow directory: %w", err)
+		}
+		return resolvedShadowDir, nil
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("resolveConfigRootFromShadow() [common.go]: failed to get current directory: %w", err)
+	}
+
+	return cwd, nil
 }
 
 // BuildConfigPath builds a config path hierarchy string.

@@ -11,6 +11,7 @@ var (
 	configPath     string
 	projectConfig  string
 	roleName       string
+	shadowDir      string
 	lspServer      string
 	saveSessionTo  string
 	saveSession    bool
@@ -23,6 +24,9 @@ func main() {
 		Short: "Codesnort SWE - AI-powered software engineering assistant",
 		Long:  `Codesnort SWE is an AI-powered software engineering assistant that helps you write, review, and maintain code.`,
 		Args:  cobra.MaximumNArgs(1),
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			shadowDir = resolveShadowDir(cmd)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},
@@ -33,6 +37,7 @@ func main() {
 	rootCmd.Flags().StringVar(&configPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
 	rootCmd.Flags().StringVar(&projectConfig, "project-config", "", "Custom project config directory (default: .csw/config)")
 	rootCmd.Flags().StringVar(&roleName, "role", "developer", "Agent role name")
+	rootCmd.PersistentFlags().StringVar(&shadowDir, "shadow-dir", "", "Shadow directory for agent files overlay (AGENTS.md, .agents*, .csw*, .cswdata)")
 	rootCmd.Flags().StringVar(&lspServer, "lsp-server", "gopls", "Path to LSP server binary (empty to disable LSP)")
 	rootCmd.Flags().StringVar(&saveSessionTo, "save-session-to", "", "Save session conversation to specified markdown file")
 	rootCmd.Flags().BoolVar(&saveSession, "save-session", false, "Save session conversation")

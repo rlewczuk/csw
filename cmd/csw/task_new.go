@@ -31,7 +31,6 @@ func taskNewCommand() *cobra.Command {
 	var cliModel string
 	var cliEditor string
 	var cliWorkDir string
-	var cliShadowDir string
 	var cliConfigPath string
 	var cliProjectConfig string
 
@@ -67,8 +66,8 @@ func taskNewCommand() *cobra.Command {
 				}
 
 				configRoot := workDir
-				if strings.TrimSpace(cliShadowDir) != "" {
-					resolvedShadowDir, shadowErr := system.ResolveWorkDir(strings.TrimSpace(cliShadowDir))
+				if strings.TrimSpace(shadowDir) != "" {
+					resolvedShadowDir, shadowErr := system.ResolveWorkDir(strings.TrimSpace(shadowDir))
 					if shadowErr != nil {
 						return "", false, fmt.Errorf("resolveTaskNewPrompt() [task.go]: failed to resolve shadow directory: %w", shadowErr)
 					}
@@ -135,7 +134,7 @@ func taskNewCommand() *cobra.Command {
 				Deps:          append([]string(nil), deps...),
 				ModelName:     strings.TrimSpace(cliModel),
 				WorkDir:       strings.TrimSpace(cliWorkDir),
-				ShadowDir:     strings.TrimSpace(cliShadowDir),
+				ShadowDir:     strings.TrimSpace(shadowDir),
 				ProjectConfig: strings.TrimSpace(cliProjectConfig),
 				ConfigPath:    strings.TrimSpace(cliConfigPath),
 			})
@@ -168,7 +167,6 @@ func taskNewCommand() *cobra.Command {
 	command.Flags().StringVar(&cliModel, "model", "", "Model alias or model spec in provider/model format (single or comma-separated fallback list); if not set, uses defaults")
 	command.Flags().StringVar(&cliEditor, "editor", "", "Editor command used for interactive prompt creation")
 	command.Flags().StringVar(&cliWorkDir, "workdir", "", "Working directory (default: current directory)")
-	command.Flags().StringVar(&cliShadowDir, "shadow-dir", "", "Shadow directory for agent files overlay (AGENTS.md, .agents*, .csw*, .cswdata)")
 	command.Flags().StringVar(&cliConfigPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
 	command.Flags().StringVar(&cliProjectConfig, "project-config", "", "Custom project config directory (default: .csw/config)")
 	command.Flags().StringVar(&parent, "parent", "", "Parent task name or UUID")

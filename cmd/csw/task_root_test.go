@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/system"
@@ -21,20 +24,63 @@ func TestTaskCommandHasTaskDirPersistentFlag(t *testing.T) {
 
 func TestResolveTaskDirPathUsesDefaultWhenUnset(t *testing.T) {
 	originalResolver := resolveTaskRunDefaultsFunc
+	originalShadowDir := shadowDir
 	t.Cleanup(func() {
 		resolveTaskRunDefaultsFunc = originalResolver
+		shadowDir = originalShadowDir
 	})
 
 	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		assert.Equal(t, "shadow/project", params.ShadowDir)
 		_ = params
 		return conf.RunDefaultsConfig{}, nil
 	}
+	shadowDir = "shadow/project"
 
 	command := TaskCommand()
 	rootDir := filepath.Join("/tmp", "project")
 	resolved, err := resolveTaskDirPath(command, rootDir)
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(rootDir, ".cswdata", "tasks"), resolved)
+}
+
+func TestLoadTaskManagerPassesShadowDirectoryToPrepareSessionVFS(t *testing.T) {
+	originalPrepare := prepareTaskSessionVFSFunc
+	originalShadowDir := shadowDir
+	originalProjectConfig := projectConfig
+	originalConfigPath := configPath
+	t.Cleanup(func() {
+		prepareTaskSessionVFSFunc = originalPrepare
+		shadowDir = originalShadowDir
+		projectConfig = originalProjectConfig
+		configPath = originalConfigPath
+	})
+
+	shadowDir = filepath.Join(".", "shadow")
+	require.NoError(t, os.MkdirAll(shadowDir, 0o755))
+	projectConfig = ""
+	configPath = ""
+
+	called := false
+	prepareTaskSessionVFSFunc = func(workDir string, worktreesBaseDir string, worktreeBranch string, hidePatterns []string, gitUserName string, gitUserEmail string, allowedPaths []string) (apis.VCS, apis.VFS, error) {
+		_ = worktreeBranch
+		_ = hidePatterns
+		_ = gitUserName
+		_ = gitUserEmail
+		called = true
+		resolvedShadow, err := system.ResolveWorkDir(shadowDir)
+		require.NoError(t, err)
+		assert.Equal(t, resolvedShadow, worktreesBaseDir)
+		assert.Contains(t, allowedPaths, resolvedShadow)
+		return nil, nil, fmt.Errorf("test expected failure")
+	}
+
+	manager, vcsRepo, err := loadTaskManager(TaskCommand())
+	assert.Nil(t, manager)
+	assert.Nil(t, vcsRepo)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "test expected failure")
+	assert.True(t, called)
 }
 
 func TestResolveTaskDirPathUsesConfigDefaultWhenUnset(t *testing.T) {

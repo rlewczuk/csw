@@ -12,10 +12,10 @@ func TestRunCommandDoesNotExposeTaskFlag(t *testing.T) {
 	assert.Nil(t, command.Flags().Lookup("task"))
 }
 
-func TestResolveRunShadowDir(t *testing.T) {
+func TestResolveShadowDir(t *testing.T) {
 	testCases := []struct {
 		name            string
-		cliShadowDir    string
+		globalShadowDir string
 		envShadowDir    string
 		envSet          bool
 		setShadowFlag   bool
@@ -24,7 +24,7 @@ func TestResolveRunShadowDir(t *testing.T) {
 	}{
 		{
 			name:         "uses CLI value when provided without flag change",
-			cliShadowDir: "cli-shadow",
+			globalShadowDir: "cli-shadow",
 			envShadowDir: "env-shadow",
 			envSet:       true,
 			expected:     "cli-shadow",
@@ -66,10 +66,11 @@ func TestResolveRunShadowDir(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			shadowDir = tc.globalShadowDir
 			if tc.envSet {
-				t.Setenv(runShadowDirEnvVar, tc.envShadowDir)
+				t.Setenv(shadowDirEnvVar, tc.envShadowDir)
 			} else {
-				t.Setenv(runShadowDirEnvVar, "")
+				t.Setenv(shadowDirEnvVar, "")
 			}
 
 			cmd := &cobra.Command{Use: "run"}
@@ -77,14 +78,10 @@ func TestResolveRunShadowDir(t *testing.T) {
 			if tc.setShadowFlag {
 				err := cmd.Flags().Set("shadow-dir", tc.shadowFlagValue)
 				assert.NoError(t, err)
+				shadowDir = tc.shadowFlagValue
 			}
 
-			cliShadowDir := tc.cliShadowDir
-			if tc.setShadowFlag {
-				cliShadowDir = tc.shadowFlagValue
-			}
-
-			resolved := resolveRunShadowDir(cmd, cliShadowDir)
+			resolved := resolveShadowDir(cmd)
 			assert.Equal(t, tc.expected, resolved)
 		})
 	}

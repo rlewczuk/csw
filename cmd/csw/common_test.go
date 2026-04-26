@@ -146,3 +146,17 @@ func TestValidateConfigPaths_MultiplePaths(t *testing.T) {
 	err = system.ValidateConfigPaths(pathList)
 	assert.NoError(t, err)
 }
+
+func TestResolveConfigRootFromShadowUsesShadowDir(t *testing.T) {
+	originalShadowDir := shadowDir
+	t.Cleanup(func() {
+		shadowDir = originalShadowDir
+	})
+
+	shadowPath := t.TempDir()
+	shadowDir = shadowPath
+
+	resolved, err := resolveConfigRootFromShadow()
+	require.NoError(t, err)
+	assert.Equal(t, shadowPath, resolved)
+}

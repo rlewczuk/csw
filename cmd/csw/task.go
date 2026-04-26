@@ -19,6 +19,7 @@ var resolveTaskWorktreeBranchNameFunc = system.ResolveWorktreeBranchName
 var generateTaskDescriptionFunc = generateTaskDescription
 var buildTaskDescriptionSystemFunc = system.BuildSystem
 var newGenerationChatModelFromSpecFunc = core.NewGenerationChatModelFromSpec
+var prepareTaskSessionVFSFunc = system.PrepareSessionVFS
 
 // TaskCommand creates task command with persistent hierarchical task management.
 func TaskCommand() *cobra.Command {
@@ -48,6 +49,20 @@ func loadTaskManager(cmd *cobra.Command) (*core.TaskManager, apis.VCS, error) {
 		return nil, nil, err
 	}
 
+	resolvedShadowDir := strings.TrimSpace(shadowDir)
+	shadowRoot := ""
+	if resolvedShadowDir != "" {
+		shadowRoot, err = system.ResolveWorkDir(resolvedShadowDir)
+		if err != nil {
+			return nil, nil, fmt.Errorf("loadTaskManager() [task.go]: failed to resolve shadow directory: %w", err)
+		}
+	}
+
+	worktreesBaseDir := workDir
+	if shadowRoot != "" {
+		worktreesBaseDir = shadowRoot
+	}
+
 	resolvedTaskDir, err := resolveTaskDirPath(cmd, workDir)
 	if err != nil {
 		return nil, nil, err
@@ -58,7 +73,12 @@ func loadTaskManager(cmd *cobra.Command) (*core.TaskManager, apis.VCS, error) {
 		return nil, nil, err
 	}
 
-	vcsRepo, _, err := system.PrepareSessionVFS(workDir, workDir, "", nil, "", "", nil)
+	allowedPaths := []string(nil)
+	if shadowRoot != "" {
+		allowedPaths = append(allowedPaths, shadowRoot)
+	}
+
+	vcsRepo, _, err := prepareTaskSessionVFSFunc(workDir, worktreesBaseDir, "", nil, "", "", allowedPaths)
 	if err != nil {
 		return nil, nil, fmt.Errorf("loadTaskManager() [task.go]: failed to prepare vcs: %w", err)
 	}
@@ -86,6 +106,7 @@ func resolveTaskDirPath(cmd *cobra.Command, workDir string) (string, error) {
 	if resolvedTaskDir == "" {
 		defaults, defaultsErr := resolveTaskRunDefaultsFunc(system.ResolveRunDefaultsParams{
 			WorkDir:       workDir,
+			ShadowDir:     strings.TrimSpace(shadowDir),
 			ProjectConfig: projectConfig,
 			ConfigPath:    configPath,
 		})

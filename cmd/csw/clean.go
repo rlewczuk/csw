@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/system"
@@ -86,13 +87,30 @@ Currently supports cleaning up worktrees:
 
 // createCleanVCS creates a VCS instance for cleaning worktrees.
 func createCleanVCS(workDir string) (apis.VCS, error) {
+	worktreesRoot, err := resolveCleanWorktreesRoot(workDir)
+	if err != nil {
+		return nil, err
+	}
+
 	// Check if this is a git repository
-	worktreesRoot := workDir + "/.cswdata/work"
 	gitRepo, err := vcs.NewGitRepo(workDir, worktreesRoot, nil, nil, "", "")
 	if err != nil {
 		return nil, fmt.Errorf("createCleanVCS() [clean.go]: not a git repository: %w", err)
 	}
 	return gitRepo, nil
+}
+
+func resolveCleanWorktreesRoot(workDir string) (string, error) {
+	trimmedShadowDir := strings.TrimSpace(shadowDir)
+	if trimmedShadowDir != "" {
+		resolvedShadowDir, err := system.ResolveWorkDir(trimmedShadowDir)
+		if err != nil {
+			return "", fmt.Errorf("resolveCleanWorktreesRoot() [clean.go]: failed to resolve shadow directory: %w", err)
+		}
+		return resolvedShadowDir + "/.cswdata/work", nil
+	}
+
+	return workDir + "/.cswdata/work", nil
 }
 
 // cleanSingleWorktree cleans up a specific worktree.
