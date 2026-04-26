@@ -5,6 +5,7 @@ Package `pkg/tool` defines tool contracts, registry, permission wrappers, and bu
 ## Important files
 
 * `tool.go` - Core tool types and interfaces.
+* `tool_tool_value.go` - ToolValue dynamic value wrapper and JSON conversion helpers.
 * `tool_value_test.go` - ToolValue-focused tests and ToolValue-based compatibility test coverage.
 * `registry.go` - Tool registry and execution orchestration.
 * `access.go` - Access control wrapper and role checks.
