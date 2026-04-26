@@ -1,7 +1,10 @@
 package models
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -261,4 +264,37 @@ func TestOllamaClient_ChatModelStream(t *testing.T) {
 		// Breaking from range should work gracefully
 		assert.True(t, fragmentReceived, "expected to receive at least one fragment")
 	})
+}
+
+func TestOllamaClient_ChatStreamLogging(t *testing.T) {
+	tc := getOllamaTestClient(t)
+	defer tc.Close()
+
+	ctx := context.Background()
+
+	if tc.Mock != nil {
+		tc.Mock.AddStreamingResponse("/api/chat", "POST", true,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Chunk1"},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":"Chunk2"},"done":false}`,
+			`{"model":"devstral-small-2:latest","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}`,
+		)
+	}
+
+	var buf bytes.Buffer
+	handler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})
+	testLogger := slog.New(handler)
+
+	chatModel := tc.Client.ChatModel(testOllamaModelName, &ChatOptions{Temperature: 0.7, Logger: testLogger})
+	messages := []*ChatMessage{{Role: ChatRoleUser, Parts: []ChatMessagePart{{Text: "Test streaming logging"}}}}
+
+	iterator := chatModel.ChatStream(ctx, messages, nil, nil)
+	require.NotNil(t, iterator)
+	for range iterator {
+	}
+
+	logOutput := buf.String()
+	assert.Contains(t, logOutput, "llm_request")
+	assert.Contains(t, logOutput, "llm_response")
+	responseCount := strings.Count(logOutput, `"msg":"llm_response"`)
+	assert.GreaterOrEqual(t, responseCount, 1, "expected at least one response log entry")
 }
