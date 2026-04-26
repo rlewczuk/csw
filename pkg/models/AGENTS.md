@@ -30,7 +30,9 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `anthropic_client_prompt_caching.go` - Anthropic prompt-caching request shaping and tool schema normalization helpers.
 * `anthropic_client_prompt_caching_test.go` - Tests for Anthropic prompt-caching request stability and cache-control breakpoints.
 * `ollama_client.go` - Ollama provider client implementation.
+* `ollama_client_conversion.go` - Ollama chat/tool message and tool schema conversion helpers.
 * `ollama_client_tool_calling_test.go` - Ollama client tool-calling tests split from the main Ollama client test file.
+* `ollama_client_conversion_test.go` - Tests for Ollama conversion helpers and generated tool-call IDs.
 * `ollama_client_raw_request_logging_test.go` - Ollama client raw request/response logging tests split from the main Ollama client test file.
 * `ollama_client_request_options_test.go` - Ollama client request-options tests split from the main Ollama client test file (max tokens, headers, query params).
 * `responses_client.go` - OpenAI Responses provider client implementation core (provider, model listing, shared helpers).
