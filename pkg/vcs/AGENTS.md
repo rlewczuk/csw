@@ -7,6 +7,7 @@ Package `pkg/vcs` provides git-backed and no-op VCS implementations for reposito
 * `git_vcs.go` - Git-backed repository and worktree operations.
 * `git_merge.go` - Git merge helpers and diff utilities.
 * `null_vcs.go` - No-op VCS implementation.
+* `git_vcs_fixture_test.go` - Shared GitVCS test fixture helpers.
 
 ## Important public API objects
 
