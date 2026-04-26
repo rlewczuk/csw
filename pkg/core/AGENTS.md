@@ -19,6 +19,7 @@ Package `pkg/core` provides runtime orchestration for agent sessions and tasks. 
 * `role.go` - Cached agent role registry
 * `hooks_engine.go` - Hook execution and feedback handling
 * `task.go` - Persistent task management backend
+* `task_archive.go` - Task archive helpers for archiving individual tasks and batches by status
 * `task_storage.go` - Task metadata file persistence and task tree scanning helpers
 * `task_summary.go` - Task session summary/output persistence helpers
 * `session_persistence.go` - Session state persistence and restore
@@ -67,6 +68,8 @@ Package `pkg/core` provides runtime orchestration for agent sessions and tasks. 
 * `NewHookEngine()` - Create hook engine
 * `NewTaskManager()` - Create task manager
 * `NewTaskManagerWithTasksDir()` - Create task manager with dir
+* `TaskManager.ArchiveTask()` - Archive single task directory under archive root
+* `TaskManager.ArchiveTasksByStatus()` - Archive matching tasks by status
 * `NewTaskBackendAdapter()` - Create task backend adapter
 * `NewCLITaskSessionRunner()` - Create CLI task runner
 * `CompactMessages()` - Compact chat history messages
