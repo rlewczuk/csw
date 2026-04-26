@@ -22,6 +22,7 @@ Package `pkg/core` provides runtime orchestration for agent sessions and tasks. 
 * `commit_message.go` - LLM-based commit message generation
 * `worktree_branch.go` - LLM-based branch suffix generation
 * `compact.go` - Conversation compaction pipeline
+* `compact_helpers.go` - Conversation compaction helper and utility functions
 * `state.go` - Shared agent state types
 
 ## Important public API objects
