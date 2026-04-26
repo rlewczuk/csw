@@ -24,11 +24,13 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `openai_client_errors_test.go` - Tests for OpenAI client error handling and rate-limit retry behavior.
 * `openai_client_conversion.go` - OpenAI chat/tool payload conversion and prompt-cache request-stability helpers.
 * `openai_client_conversion_test.go` - Tests for OpenAI conversion and request-stability helpers.
-* `anthropic_client.go` - Anthropic provider client implementation.
+* `anthropic_client.go` - Anthropic provider client implementation core (client setup, listing, and sync chat).
+* `anthropic_client_stream.go` - Anthropic chat streaming implementation and streaming raw-chunk logging helper.
 * `anthropic_client_errors.go` - Anthropic client HTTP/network error mapping and rate-limit retry-after parsing helpers.
 * `anthropic_client_errors_test.go` - Tests for Anthropic client error handling and token-limit detection behavior.
 * `anthropic_client_prompt_caching.go` - Anthropic prompt-caching request shaping and tool schema normalization helpers.
 * `anthropic_client_prompt_caching_test.go` - Tests for Anthropic prompt-caching request stability and cache-control breakpoints.
+* `anthropic_client_stream_test.go` - Anthropic streaming chat and raw stream-chunk callback tests split from the main Anthropic client test file.
 * `ollama_client.go` - Ollama provider client implementation.
 * `ollama_client_conversion.go` - Ollama chat/tool message and tool schema conversion helpers.
 * `ollama_client_tool_calling_test.go` - Ollama client tool-calling tests split from the main Ollama client test file.
