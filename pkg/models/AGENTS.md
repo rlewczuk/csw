@@ -37,6 +37,7 @@ Package `pkg/models` provides model/provider abstractions and clients for `pkg/m
 * `ollama_client_tool_calling_test.go` - Ollama client tool-calling tests split from the main Ollama client test file.
 * `ollama_client_conversion_test.go` - Tests for Ollama conversion helpers and generated tool-call IDs.
 * `ollama_client_raw_request_logging_test.go` - Ollama client raw request/response logging tests split from the main Ollama client test file.
+* `ollama_client_stream_test.go` - Ollama streaming chat behavior tests split from the main Ollama client test file.
 * `ollama_client_request_options_test.go` - Ollama client request-options tests split from the main Ollama client test file (max tokens, headers, query params).
 * `ollama_client_errors_test.go` - Tests for Ollama client error handling and endpoint error mapping.
 * `responses_client.go` - OpenAI Responses provider client implementation core (provider, model listing, shared helpers).
