@@ -6,6 +6,7 @@ Package `pkg/lsp` provides a Language Server Protocol client, protocol DTOs, and
 
 * `lsp.go` - Core LSP interface.
 * `client.go` - JSON-RPC stdio LSP client.
+* `client_navigation.go` - Navigation and symbol/query operations for `Client` (definition, references, hover, symbols, call hierarchy).
 * `client_rpc.go` - JSON-RPC transport loop, message I/O, and request/notification handling.
 * `client_integ_test.go` - Core LSP integration tests (init, diagnostics, document updates, hover).
 * `client_integ_call_hierarchy_test.go` - Call hierarchy focused integration tests split from `client_integ_test.go`.
