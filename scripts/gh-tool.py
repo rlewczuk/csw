@@ -7,8 +7,7 @@ It is designed to print concise Markdown-like output that is easy for an LLM to
 consume.
 
 Authentication:
-  - If GH_API_KEY is set, it is used as Bearer token for GitHub API requests.
-  - If GH_API_KEY is not set, requests are performed without authentication.
+  - Requests are performed with anonymous access (no authorization header).
 
 Repository handling:
   - Repositories are cloned under --tmpdir and reused across calls.
@@ -38,7 +37,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -122,9 +120,6 @@ def api_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "gh-tool-script",
     }
-    token = os.environ.get("GH_API_KEY", "").strip()
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
     if extra:
         headers.update(extra)
     return headers
@@ -158,6 +153,11 @@ def fetch_search_items(url: str, limit: int, extra_headers: dict[str, str] | Non
     return items[:limit]
 
 
+def is_rate_limit_error(err: RuntimeError) -> bool:
+    """Return true when error indicates GitHub API rate limiting."""
+    return "rate limit exceeded" in str(err).casefold()
+
+
 def print_header(title: str) -> None:
     """Print Markdown section header."""
     print(f"## {title}")
@@ -187,40 +187,58 @@ def cmd_search(args: argparse.Namespace) -> int:
     print()
 
     if "issues" in kinds:
-        q = parse.quote_plus(f"{query} repo:{owner}/{repo} is:issue")
+        q = parse.quote_plus(f"{query} repo:{owner}/{repo} is:issue in:title,body,comments")
         url = f"{API_BASE}/search/issues?q={q}&sort=updated&order=desc"
-        items = fetch_search_items(url, limit)
         print("### Issues")
-        if not items:
-            print("- No results")
-        for item in items:
-            print(f"- {item.get('html_url', '')}")
+        try:
+            items = fetch_search_items(url, limit)
+            if not items:
+                print("- No results")
+            for item in items:
+                print(f"- {item.get('html_url', '')}")
+        except RuntimeError as err:
+            if is_rate_limit_error(err):
+                print("- Search unavailable: GitHub API rate limit exceeded for anonymous access")
+            else:
+                raise
         print()
 
     if "prs" in kinds:
-        q = parse.quote_plus(f"{query} repo:{owner}/{repo} is:pr")
+        q = parse.quote_plus(f"{query} repo:{owner}/{repo} is:pr in:title,body,comments")
         url = f"{API_BASE}/search/issues?q={q}&sort=updated&order=desc"
-        items = fetch_search_items(url, limit)
         print("### Pull requests")
-        if not items:
-            print("- No results")
-        for item in items:
-            print(f"- {item.get('html_url', '')}")
+        try:
+            items = fetch_search_items(url, limit)
+            if not items:
+                print("- No results")
+            for item in items:
+                print(f"- {item.get('html_url', '')}")
+        except RuntimeError as err:
+            if is_rate_limit_error(err):
+                print("- Search unavailable: GitHub API rate limit exceeded for anonymous access")
+            else:
+                raise
         print()
 
     if "commits" in kinds:
         q = parse.quote_plus(f"{query} repo:{owner}/{repo}")
         url = f"{API_BASE}/search/commits?q={q}&sort=author-date&order=desc"
-        items = fetch_search_items(
-            url,
-            limit,
-            extra_headers={"Accept": "application/vnd.github+json"},
-        )
         print("### Commits")
-        if not items:
-            print("- No results")
-        for item in items:
-            print(f"- {item.get('html_url', '')}")
+        try:
+            items = fetch_search_items(
+                url,
+                limit,
+                extra_headers={"Accept": "application/vnd.github+json"},
+            )
+            if not items:
+                print("- No results")
+            for item in items:
+                print(f"- {item.get('html_url', '')}")
+        except RuntimeError as err:
+            if is_rate_limit_error(err):
+                print("- Search unavailable: GitHub API rate limit exceeded for anonymous access")
+            else:
+                raise
         print()
 
     return 0
@@ -256,94 +274,123 @@ def cmd_get(args: argparse.Namespace) -> int:
 
     if args.issue is not None:
         issue_num = args.issue
-        issue = api_get_json(f"{API_BASE}/repos/{owner}/{repo}/issues/{issue_num}")
-        comments = api_get_json(
-            f"{API_BASE}/repos/{owner}/{repo}/issues/{issue_num}/comments?per_page={min(limit, 100)}"
-        )
-        events = api_get_json(
-            f"{API_BASE}/repos/{owner}/{repo}/issues/{issue_num}/events?per_page={min(limit, 100)}"
-        )
-
-        print(f"### Issue #{issue_num}")
-        print(f"- URL: {issue.get('html_url', '')}")
-        print(f"- Title: {issue.get('title', '')}")
-        print(f"- State: {issue.get('state', '')}")
-        print("- Description:")
-        print("```text")
-        print((issue.get("body") or "").strip())
-        print("```")
-        print()
-
-        if isinstance(comments, list):
-            print_comments(comments, "Issue comments", limit)
-
-        print("### Issue events")
-        if isinstance(events, list) and events:
-            for event in events[:limit]:
-                actor = (event.get("actor") or {}).get("login", "unknown")
-                ev = event.get("event", "")
-                commit_id = event.get("commit_id") or ""
-                print(f"- `{ev}` by `{actor}` {commit_id}".rstrip())
-        else:
-            print("- No events")
-        print()
-
-        sub_url = f"{API_BASE}/repos/{owner}/{repo}/issues/{issue_num}/sub_issues?per_page={min(limit, 100)}"
         try:
-            sub_issues = api_get_json(sub_url)
-            print("### Sub-issues")
-            if isinstance(sub_issues, list) and sub_issues:
-                for sub in sub_issues[:limit]:
-                    print(f"- {sub.get('html_url', '')}")
+            issue = api_get_json(f"{API_BASE}/repos/{owner}/{repo}/issues/{issue_num}")
+            comments = api_get_json(
+                f"{API_BASE}/repos/{owner}/{repo}/issues/{issue_num}/comments?per_page={min(limit, 100)}"
+            )
+            events = api_get_json(
+                f"{API_BASE}/repos/{owner}/{repo}/issues/{issue_num}/events?per_page={min(limit, 100)}"
+            )
+        except RuntimeError as err:
+            if is_rate_limit_error(err):
+                print(f"### Issue #{issue_num}")
+                print("- Details unavailable: GitHub API rate limit exceeded for anonymous access")
+                print()
+                issue = None
+                comments = []
+                events = []
             else:
-                print("- No sub-issues")
+                raise
+
+        if issue is None:
+            pass
+        else:
+            print(f"### Issue #{issue_num}")
+            print(f"- URL: {issue.get('html_url', '')}")
+            print(f"- Title: {issue.get('title', '')}")
+            print(f"- State: {issue.get('state', '')}")
+            print("- Description:")
+            print("```text")
+            print((issue.get("body") or "").strip())
+            print("```")
             print()
-        except RuntimeError:
-            print("### Sub-issues")
-            print("- Not available for this repository or API access level")
+
+            if isinstance(comments, list):
+                print_comments(comments, "Issue comments", limit)
+
+            print("### Issue events")
+            if isinstance(events, list) and events:
+                for event in events[:limit]:
+                    actor = (event.get("actor") or {}).get("login", "unknown")
+                    ev = event.get("event", "")
+                    commit_id = event.get("commit_id") or ""
+                    print(f"- `{ev}` by `{actor}` {commit_id}".rstrip())
+            else:
+                print("- No events")
             print()
+
+            sub_url = f"{API_BASE}/repos/{owner}/{repo}/issues/{issue_num}/sub_issues?per_page={min(limit, 100)}"
+            try:
+                sub_issues = api_get_json(sub_url)
+                print("### Sub-issues")
+                if isinstance(sub_issues, list) and sub_issues:
+                    for sub in sub_issues[:limit]:
+                        print(f"- {sub.get('html_url', '')}")
+                else:
+                    print("- No sub-issues")
+                print()
+            except RuntimeError:
+                print("### Sub-issues")
+                print("- Not available for this repository or API access level")
+                print()
 
     if args.pr is not None:
         pr_num = args.pr
-        pr = api_get_json(f"{API_BASE}/repos/{owner}/{repo}/pulls/{pr_num}")
-        issue_comments = api_get_json(
-            f"{API_BASE}/repos/{owner}/{repo}/issues/{pr_num}/comments?per_page={min(limit, 100)}"
-        )
-        review_comments = api_get_json(
-            f"{API_BASE}/repos/{owner}/{repo}/pulls/{pr_num}/comments?per_page={min(limit, 100)}"
-        )
-        commits = api_get_json(
-            f"{API_BASE}/repos/{owner}/{repo}/pulls/{pr_num}/commits?per_page={min(limit, 100)}"
-        )
+        try:
+            pr = api_get_json(f"{API_BASE}/repos/{owner}/{repo}/pulls/{pr_num}")
+            issue_comments = api_get_json(
+                f"{API_BASE}/repos/{owner}/{repo}/issues/{pr_num}/comments?per_page={min(limit, 100)}"
+            )
+            review_comments = api_get_json(
+                f"{API_BASE}/repos/{owner}/{repo}/pulls/{pr_num}/comments?per_page={min(limit, 100)}"
+            )
+            commits = api_get_json(
+                f"{API_BASE}/repos/{owner}/{repo}/pulls/{pr_num}/commits?per_page={min(limit, 100)}"
+            )
+        except RuntimeError as err:
+            if is_rate_limit_error(err):
+                print(f"### Pull request #{pr_num}")
+                print("- Details unavailable: GitHub API rate limit exceeded for anonymous access")
+                print()
+                pr = None
+                issue_comments = []
+                review_comments = []
+                commits = []
+            else:
+                raise
 
-        print(f"### Pull request #{pr_num}")
-        print(f"- URL: {pr.get('html_url', '')}")
-        print(f"- Title: {pr.get('title', '')}")
-        print(f"- State: {pr.get('state', '')}")
-        print(f"- Base: `{(pr.get('base') or {}).get('ref', '')}`")
-        print(f"- Head: `{(pr.get('head') or {}).get('ref', '')}`")
-        print("- Description:")
-        print("```text")
-        print((pr.get("body") or "").strip())
-        print("```")
-        print()
-
-        if isinstance(issue_comments, list):
-            print_comments(issue_comments, "PR conversation comments", limit)
-        if isinstance(review_comments, list):
-            print_comments(review_comments, "PR review comments", limit)
-
-        print("### PR commits")
-        if isinstance(commits, list) and commits:
-            for commit in commits[:limit]:
-                sha = commit.get("sha", "")
-                html_url = commit.get("html_url", "")
-                message = ((commit.get("commit") or {}).get("message") or "").splitlines()[0]
-                print(f"- `{sha}` {html_url}")
-                print(f"  - {message}")
+        if pr is None:
+            pass
         else:
-            print("- No commits")
-        print()
+            print(f"### Pull request #{pr_num}")
+            print(f"- URL: {pr.get('html_url', '')}")
+            print(f"- Title: {pr.get('title', '')}")
+            print(f"- State: {pr.get('state', '')}")
+            print(f"- Base: `{(pr.get('base') or {}).get('ref', '')}`")
+            print(f"- Head: `{(pr.get('head') or {}).get('ref', '')}`")
+            print("- Description:")
+            print("```text")
+            print((pr.get("body") or "").strip())
+            print("```")
+            print()
+
+            if isinstance(issue_comments, list):
+                print_comments(issue_comments, "PR conversation comments", limit)
+            if isinstance(review_comments, list):
+                print_comments(review_comments, "PR review comments", limit)
+
+            print("### PR commits")
+            if isinstance(commits, list) and commits:
+                for commit in commits[:limit]:
+                    sha = commit.get("sha", "")
+                    html_url = commit.get("html_url", "")
+                    message = ((commit.get("commit") or {}).get("message") or "").splitlines()[0]
+                    print(f"- `{sha}` {html_url}")
+                    print(f"  - {message}")
+            else:
+                print("- No commits")
+            print()
 
     return 0
 
@@ -386,7 +433,13 @@ def cmd_file_history(args: argparse.Namespace) -> int:
         print(f"- https://github.com/{owner}/{repo}/commit/{sha}")
     print()
 
-    commit_comments = api_get_json(f"{API_BASE}/repos/{owner}/{repo}/comments?per_page=100")
+    try:
+        commit_comments = api_get_json(f"{API_BASE}/repos/{owner}/{repo}/comments?per_page=100")
+    except RuntimeError as err:
+        if is_rate_limit_error(err):
+            commit_comments = None
+        else:
+            raise
     print("### Commit comments")
     if isinstance(commit_comments, list):
         matched = [c for c in commit_comments if c.get("commit_id") in set(shas)]
@@ -407,7 +460,14 @@ def cmd_file_history(args: argparse.Namespace) -> int:
         short_sha = sha[:12]
         q = parse.quote_plus(f"{short_sha} repo:{owner}/{repo}")
         url = f"{API_BASE}/search/issues?q={q}&sort=updated&order=desc"
-        items = fetch_search_items(url, limit)
+        try:
+            items = fetch_search_items(url, limit)
+        except RuntimeError as err:
+            if is_rate_limit_error(err):
+                print("- Related search unavailable: GitHub API rate limit exceeded for anonymous access")
+                print()
+                return 0
+            raise
         for item in items:
             html_url = item.get("html_url", "")
             if html_url and html_url not in seen:
