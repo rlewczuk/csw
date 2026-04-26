@@ -33,6 +33,7 @@ Package `pkg/tool` defines tool contracts, registry, permission wrappers, and bu
 * `vfs_list.go` - VFS directory listing tool.
 * `vfs_find.go` - VFS glob search tool.
 * `vfs_grep.go` - VFS content grep tool.
+* `vfs_grep_render_test.go` - VFSGrep render output focused tests.
 * `vfs_helpers.go` - VFS tool helper functions.
 
 ## Important public API objects
