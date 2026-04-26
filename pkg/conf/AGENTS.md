@@ -6,6 +6,7 @@ Package `pkg/conf` defines configuration models and store interfaces.
 
 * `conf.go` - Configuration types and interfaces
 * `merge.go` - Clone and merge helpers
+* `merge_model_provider.go` - Model provider and vendor-family clone/merge helpers
 
 ## Important public API objects
 
