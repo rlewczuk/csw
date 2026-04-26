@@ -5,7 +5,7 @@ agent: build
 Call following command to find big code file to split:
 
 ```
-python3 scripts/bfscan.py 1000 1
+python3 scripts/bfscan.py 750 1
 ```
 
 Script will return file and number of lines in that file. If script returns nothing, there is no big file to split and you can stop here.
