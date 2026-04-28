@@ -67,6 +67,10 @@ func loadRunTaskManager(cmd *cobra.Command, workDir string, shadowDir string, pr
 	if err != nil {
 		return nil, err
 	}
+	resolvedConfigPath, err = ResolveConfigPathForProjectRoot(resolvedConfigPath, resolvedWorkDir)
+	if err != nil {
+		return nil, fmt.Errorf("loadRunTaskManager() [run_task.go]: failed to resolve config path for project root: %w", err)
+	}
 	configStore, err := conf.CswConfigLoad(resolvedConfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("loadRunTaskManager() [run_task.go]: failed to load config: %w", err)

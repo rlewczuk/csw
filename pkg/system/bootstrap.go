@@ -21,8 +21,13 @@ import (
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
-var newCompositeConfigStoreFunc = func(_ string, configPath string) (*conf.CswConfig, error) {
-	return conf.CswConfigLoad(configPath)
+var newCompositeConfigStoreFunc = func(projectRoot string, configPath string) (*conf.CswConfig, error) {
+	resolvedConfigPath, err := ResolveConfigPathForProjectRoot(configPath, projectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("newCompositeConfigStoreFunc() [bootstrap.go]: failed to resolve config path for project root: %w", err)
+	}
+
+	return conf.CswConfigLoad(resolvedConfigPath)
 }
 var resolveModelNameFunc = ResolveModelName
 var createProviderMapFunc = CreateProviderMap

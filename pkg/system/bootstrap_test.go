@@ -246,6 +246,25 @@ func TestResolveWorktreeBranchNameIgnoresBranchNameHook(t *testing.T) {
 	assert.Empty(t, provider.RecordedMessages)
 }
 
+func TestResolveRunDefaultsUsesShadowDirForProjectConfig(t *testing.T) {
+	workDir := t.TempDir()
+	shadowDir := t.TempDir()
+
+	require.NoError(t, os.MkdirAll(filepath.Join(shadowDir, ".csw", "config"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(shadowDir, ".csw", "config", "global.json"), []byte(`{
+		"defaults": {
+			"model": "shadow/provider-model"
+		}
+	}`), 0o644))
+
+	defaults, err := ResolveRunDefaults(ResolveRunDefaultsParams{
+		WorkDir:   workDir,
+		ShadowDir: shadowDir,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "shadow/provider-model", defaults.Model)
+}
+
 
 func initTestGitRepository(t *testing.T) string {
 	t.Helper()

@@ -76,3 +76,22 @@ func TestResolveWorkDir_ReturnsCurrentDirWhenNoProjectMarkerFound(t *testing.T) 
 	require.NoError(t, err)
 	assert.Equal(t, nestedDir, resolved)
 }
+
+func TestResolveConfigPathForProjectRoot(t *testing.T) {
+	t.Run("replaces @PROJ entries with project root", func(t *testing.T) {
+		projectRoot := filepath.Join(t.TempDir(), "shadow")
+		configPath := "@DEFAULTS:~/.config/csw:@PROJ/.csw/config:/custom"
+
+		resolvedConfigPath, err := ResolveConfigPathForProjectRoot(configPath, projectRoot)
+		require.NoError(t, err)
+		assert.Equal(t, "@DEFAULTS:~/.config/csw:"+filepath.Join(projectRoot, ".csw", "config")+":/custom", resolvedConfigPath)
+	})
+
+	t.Run("keeps config path unchanged when project root is empty", func(t *testing.T) {
+		configPath := "@DEFAULTS:@PROJ/.csw/config"
+
+		resolvedConfigPath, err := ResolveConfigPathForProjectRoot(configPath, "")
+		require.NoError(t, err)
+		assert.Equal(t, configPath, resolvedConfigPath)
+	})
+}

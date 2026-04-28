@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // BuildConfigPath builds a config path hierarchy string from base and optional custom paths.
@@ -38,6 +39,27 @@ func BuildConfigPath(projectConfig, customConfigPath string) (string, error) {
 	}
 
 	return configPathStr, nil
+}
+
+// ResolveConfigPathForProjectRoot resolves @PROJ path entries against projectRoot.
+func ResolveConfigPathForProjectRoot(configPath string, projectRoot string) (string, error) {
+	trimmedProjectRoot := strings.TrimSpace(projectRoot)
+	if trimmedProjectRoot == "" {
+		return configPath, nil
+	}
+
+	parts := strings.Split(configPath, ":")
+	for i := range parts {
+		trimmedPart := strings.TrimSpace(parts[i])
+		if !strings.HasPrefix(trimmedPart, "@PROJ/") {
+			continue
+		}
+
+		relativePath := strings.TrimPrefix(trimmedPart, "@PROJ/")
+		parts[i] = filepath.Join(trimmedProjectRoot, relativePath)
+	}
+
+	return strings.Join(parts, ":"), nil
 }
 
 // ValidateConfigPaths validates that all paths in a colon-separated string exist and are directories.
