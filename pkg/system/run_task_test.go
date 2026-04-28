@@ -120,6 +120,18 @@ func TestResolveRunTaskDirPath(t *testing.T) {
 		assert.Equal(t, filepath.Clean(filepath.Join(workDir, ".cswdata/tasks")), resolvedTaskDir)
 	})
 
+	t.Run("falls back to shadow default task directory when shadow dir is set", func(t *testing.T) {
+		workDir := t.TempDir()
+		shadowDir := t.TempDir()
+
+		cmd := &cobra.Command{Use: "run"}
+		cmd.Flags().String("task-dir", "", "")
+
+		resolvedTaskDir, err := resolveRunTaskDirPath(cmd, workDir, shadowDir, "", "")
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Clean(filepath.Join(shadowDir, ".cswdata/tasks")), resolvedTaskDir)
+	})
+
 	t.Run("uses defaults task dir from shadow config", func(t *testing.T) {
 		workDir := t.TempDir()
 		shadowDir := t.TempDir()

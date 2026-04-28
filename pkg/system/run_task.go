@@ -110,7 +110,12 @@ func resolveRunTaskDirPath(cmd *cobra.Command, workDir string, shadowDir string,
 	}
 
 	if resolvedTaskDir == "" {
-		resolvedTaskDir = ".cswdata/tasks"
+		fallbackRootDir := strings.TrimSpace(workDir)
+		trimmedShadowDir := strings.TrimSpace(shadowDir)
+		if trimmedShadowDir != "" {
+			fallbackRootDir = trimmedShadowDir
+		}
+		resolvedTaskDir = filepath.Join(fallbackRootDir, ".cswdata", "tasks")
 	}
 	if !filepath.IsAbs(resolvedTaskDir) {
 		resolvedTaskDir = filepath.Join(workDir, resolvedTaskDir)
