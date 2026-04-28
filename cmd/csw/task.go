@@ -49,7 +49,7 @@ func loadTaskManager(cmd *cobra.Command) (*core.TaskManager, apis.VCS, error) {
 		return nil, nil, err
 	}
 
-	resolvedShadowDir := strings.TrimSpace(shadowDir)
+	resolvedShadowDir := strings.TrimSpace(resolveShadowDir(cmd))
 	shadowRoot := ""
 	if resolvedShadowDir != "" {
 		shadowRoot, err = system.ResolveWorkDir(resolvedShadowDir)
@@ -103,10 +103,11 @@ func resolveTaskDirPath(cmd *cobra.Command, workDir string) (string, error) {
 	}
 
 	resolvedTaskDir := strings.TrimSpace(flagTaskDir)
+	resolvedShadowDir := strings.TrimSpace(resolveShadowDir(cmd))
 	if resolvedTaskDir == "" {
 		defaults, defaultsErr := resolveTaskRunDefaultsFunc(system.ResolveRunDefaultsParams{
 			WorkDir:       workDir,
-			ShadowDir:     strings.TrimSpace(shadowDir),
+			ShadowDir:     resolvedShadowDir,
 			ProjectConfig: projectConfig,
 			ConfigPath:    configPath,
 		})
@@ -117,7 +118,15 @@ func resolveTaskDirPath(cmd *cobra.Command, workDir string) (string, error) {
 	}
 
 	if resolvedTaskDir == "" {
-		resolvedTaskDir = ".cswdata/tasks"
+		if resolvedShadowDir != "" {
+			shadowRoot, shadowErr := system.ResolveWorkDir(resolvedShadowDir)
+			if shadowErr != nil {
+				return "", fmt.Errorf("resolveTaskDirPath() [task.go]: failed to resolve shadow directory: %w", shadowErr)
+			}
+			resolvedTaskDir = filepath.Join(shadowRoot, ".cswdata", "tasks")
+		} else {
+			resolvedTaskDir = ".cswdata/tasks"
+		}
 	}
 	if !filepath.IsAbs(resolvedTaskDir) {
 		resolvedTaskDir = filepath.Join(workDir, resolvedTaskDir)

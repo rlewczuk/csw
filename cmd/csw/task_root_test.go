@@ -36,12 +36,66 @@ func TestResolveTaskDirPathUsesDefaultWhenUnset(t *testing.T) {
 		return conf.RunDefaultsConfig{}, nil
 	}
 	shadowDir = "shadow/project"
+	require.NoError(t, os.MkdirAll(shadowDir, 0o755))
 
 	command := TaskCommand()
 	rootDir := filepath.Join("/tmp", "project")
 	resolved, err := resolveTaskDirPath(command, rootDir)
 	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(rootDir, ".cswdata", "tasks"), resolved)
+	resolvedShadow, shadowResolveErr := system.ResolveWorkDir(shadowDir)
+	require.NoError(t, shadowResolveErr)
+	assert.Equal(t, filepath.Join(resolvedShadow, ".cswdata", "tasks"), resolved)
+}
+
+func TestResolveTaskDirPathUsesShadowDirEnvWhenShadowFlagUnset(t *testing.T) {
+	originalResolver := resolveTaskRunDefaultsFunc
+	originalShadowDir := shadowDir
+	t.Cleanup(func() {
+		resolveTaskRunDefaultsFunc = originalResolver
+		shadowDir = originalShadowDir
+	})
+
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		assert.NotEmpty(t, params.ShadowDir)
+		return conf.RunDefaultsConfig{}, nil
+	}
+
+	shadowDir = ""
+	shadowRoot := t.TempDir()
+	t.Setenv(shadowDirEnvVar, shadowRoot)
+
+	command := TaskCommand()
+	resolved, err := resolveTaskDirPath(command, filepath.Join("/tmp", "project"))
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(shadowRoot, ".cswdata", "tasks"), resolved)
+}
+
+func TestResolveTaskDirPathUsesShadowDirFlagWhenChanged(t *testing.T) {
+	originalResolver := resolveTaskRunDefaultsFunc
+	originalShadowDir := shadowDir
+	t.Cleanup(func() {
+		resolveTaskRunDefaultsFunc = originalResolver
+		shadowDir = originalShadowDir
+	})
+
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		assert.NotEmpty(t, params.ShadowDir)
+		return conf.RunDefaultsConfig{}, nil
+	}
+
+	shadowDir = ""
+	envShadow := t.TempDir()
+	flagShadow := t.TempDir()
+	t.Setenv(shadowDirEnvVar, envShadow)
+
+	command := TaskCommand()
+	command.Flags().String("shadow-dir", "", "")
+	require.NoError(t, command.Flags().Set("shadow-dir", flagShadow))
+	shadowDir = flagShadow
+
+	resolved, err := resolveTaskDirPath(command, filepath.Join("/tmp", "project"))
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(flagShadow, ".cswdata", "tasks"), resolved)
 }
 
 func TestLoadTaskManagerPassesShadowDirectoryToPrepareSessionVFS(t *testing.T) {
