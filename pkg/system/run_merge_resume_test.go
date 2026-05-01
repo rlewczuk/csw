@@ -180,6 +180,53 @@ func TestShouldDisableTaskWorktree(t *testing.T) {
 	}
 }
 
+func TestShouldDisableTaskWorktreeForRun(t *testing.T) {
+	tests := []struct {
+		name     string
+		metadata *commands.TaskMetadata
+		taskData *core.Task
+		expected bool
+	}{
+		{
+			name:     "command metadata can disable worktree",
+			metadata: &commands.TaskMetadata{FeatureBranch: strPtr("")},
+			taskData: &core.Task{FeatureBranch: "feature/task"},
+			expected: true,
+		},
+		{
+			name:     "empty task feature branch disables worktree",
+			metadata: nil,
+			taskData: &core.Task{FeatureBranch: ""},
+			expected: true,
+		},
+		{
+			name:     "blank task feature branch disables worktree",
+			metadata: nil,
+			taskData: &core.Task{FeatureBranch: "   "},
+			expected: true,
+		},
+		{
+			name:     "non-empty task feature branch keeps worktree",
+			metadata: nil,
+			taskData: &core.Task{FeatureBranch: "feature/task"},
+			expected: false,
+		},
+		{
+			name:     "nil task does not disable worktree by itself",
+			metadata: nil,
+			taskData: nil,
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := shouldDisableTaskWorktreeForRun(tc.metadata, tc.taskData)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
 func TestResolveTaskFinalStatusForRun(t *testing.T) {
 	tests := []struct {
 		name                   string
