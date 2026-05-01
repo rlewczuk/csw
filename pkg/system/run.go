@@ -277,7 +277,10 @@ func RunCommand(params *RunParams) error {
 				return updateErr
 			}
 			taskRunMerge := resolveTaskRunMerge(params.Command.Flags().Changed("merge") || params.NoMerge, params.Merge, params.WorktreeBranch, ResolveRunDefaults, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath)
-			if strings.TrimSpace(params.WorktreeBranch) == "" {
+			if shouldDisableTaskWorktree(commandTaskMetadata) {
+				params.WorktreeBranch = ""
+				taskRunMerge = false
+			} else if strings.TrimSpace(params.WorktreeBranch) == "" {
 				params.WorktreeBranch = strings.TrimSpace(params.Task.FeatureBranch)
 			}
 			params.Merge = taskRunMerge
@@ -558,6 +561,15 @@ func resolveTaskRunMerge(mergeFlagChanged bool, cliMerge bool, cliWorktree strin
 	}
 	return cliMerge
 }
+
+func shouldDisableTaskWorktree(taskMetadata *commands.TaskMetadata) bool {
+	if taskMetadata == nil || taskMetadata.FeatureBranch == nil {
+		return false
+	}
+
+	return strings.TrimSpace(*taskMetadata.FeatureBranch) == ""
+}
+
 // PreparePromptWithContext renders prompt with template context data.
 func PreparePromptWithContext(params *RunParams) error {
 	if params == nil {

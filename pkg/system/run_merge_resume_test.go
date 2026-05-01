@@ -3,6 +3,7 @@ package system
 import (
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/stretchr/testify/assert"
@@ -130,6 +131,55 @@ func TestResolveTaskRunMerge(t *testing.T) {
 	}
 }
 
+func TestShouldDisableTaskWorktree(t *testing.T) {
+	tests := []struct {
+		name     string
+		metadata *commands.TaskMetadata
+		expected bool
+	}{
+		{
+			name:     "nil metadata does not disable worktree",
+			metadata: nil,
+			expected: false,
+		},
+		{
+			name: "nil feature branch does not disable worktree",
+			metadata: &commands.TaskMetadata{
+				FeatureBranch: nil,
+			},
+			expected: false,
+		},
+		{
+			name: "empty feature branch disables worktree",
+			metadata: &commands.TaskMetadata{
+				FeatureBranch: strPtr(""),
+			},
+			expected: true,
+		},
+		{
+			name: "blank feature branch disables worktree",
+			metadata: &commands.TaskMetadata{
+				FeatureBranch: strPtr("  \t "),
+			},
+			expected: true,
+		},
+		{
+			name: "non-empty feature branch does not disable worktree",
+			metadata: &commands.TaskMetadata{
+				FeatureBranch: strPtr("feature/task-123"),
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := shouldDisableTaskWorktree(tc.metadata)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
 func TestResolveTaskFinalStatusForRun(t *testing.T) {
 	tests := []struct {
 		name                   string
@@ -171,4 +221,8 @@ func TestResolveTaskFinalStatusForRun(t *testing.T) {
 			assert.Equal(t, tc.expectedShouldApply, shouldApply)
 		})
 	}
+}
+
+func strPtr(value string) *string {
+	return &value
 }
