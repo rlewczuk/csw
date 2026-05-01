@@ -122,6 +122,7 @@ func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
 				Name:          strings.TrimSpace(params.Name),
 				Description:   strings.TrimSpace(params.Description),
 				FeatureBranch: strings.TrimSpace(params.FeatureBranch),
+				NoCommit:      params.NoCommit,
 				ParentBranch:  strings.TrimSpace(params.ParentBranch),
 				Role:          strings.TrimSpace(params.Role),
 				Deps:          append([]string(nil), params.Deps...),

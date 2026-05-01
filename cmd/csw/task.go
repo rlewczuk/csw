@@ -140,6 +140,7 @@ type taskCreateResolveParams struct {
 	Name          string
 	Description   string
 	Branch        string
+	NoCommit      bool
 	ParentBranch  string
 	Role          string
 	ParentTaskID  string

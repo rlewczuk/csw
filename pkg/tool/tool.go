@@ -202,6 +202,7 @@ type TaskRecord struct {
 	Status        string
 	StatusSet     bool
 	FeatureBranch string
+	NoCommit      bool
 	ParentBranch  string
 	Role          string
 	Deps          []string

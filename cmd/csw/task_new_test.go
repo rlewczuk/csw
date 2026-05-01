@@ -124,6 +124,33 @@ func TestResolveTaskCreateParamsFallsBackWhenGenerationReturnsEmptyValues(t *tes
 	assert.Equal(t, "do this task", resolved.Prompt)
 }
 
+func TestResolveTaskCreateParamsNoCommitSetsEmptyFeatureBranch(t *testing.T) {
+	originalDefaults := resolveTaskRunDefaultsFunc
+	originalDescriptionGenerator := generateTaskDescriptionFunc
+	t.Cleanup(func() {
+		resolveTaskRunDefaultsFunc = originalDefaults
+		generateTaskDescriptionFunc = originalDescriptionGenerator
+	})
+
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		_ = params
+		return conf.RunDefaultsConfig{Model: "provider/model", Worktree: "feature/%"}, nil
+	}
+
+	generateTaskDescriptionFunc = func(ctx context.Context, params taskCreateResolveParams) (string, error) {
+		_ = ctx
+		assert.Equal(t, taskNewFallbackBranchName, params.Branch)
+		return "generated description", nil
+	}
+
+	resolved, err := resolveTaskCreateParams(context.Background(), taskCreateResolveParams{Prompt: "do this task", NoCommit: true})
+	require.NoError(t, err)
+	assert.Equal(t, "", resolved.FeatureBranch)
+	assert.True(t, resolved.NoCommit)
+	assert.Equal(t, taskNewFallbackBranchName, resolved.Name)
+	assert.Equal(t, "generated description", resolved.Description)
+}
+
 func TestTaskNewCommandPromptFlagIsOptional(t *testing.T) {
 	command := taskNewCommand()
 	promptFlag := command.Flags().Lookup("prompt")

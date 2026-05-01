@@ -581,6 +581,9 @@ func shouldDisableTaskWorktreeForRun(taskMetadata *commands.TaskMetadata, taskDa
 	if taskData == nil {
 		return false
 	}
+	if taskData.NoCommit {
+		return true
+	}
 
 	return strings.TrimSpace(taskData.FeatureBranch) == ""
 }

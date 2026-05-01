@@ -200,6 +200,12 @@ func TestShouldDisableTaskWorktreeForRun(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "no commit task disables worktree",
+			metadata: nil,
+			taskData: &core.Task{FeatureBranch: "feature/task", NoCommit: true},
+			expected: true,
+		},
+		{
 			name:     "blank task feature branch disables worktree",
 			metadata: nil,
 			taskData: &core.Task{FeatureBranch: "   "},

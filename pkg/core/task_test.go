@@ -115,6 +115,19 @@ func TestTaskManagerCreateTaskDefaultsAndNormalizeDeps(t *testing.T) {
 	assert.Equal(t, []string{"dep-a", "dep-b"}, created.Deps)
 }
 
+func TestTaskManagerCreateTaskNoCommitAndEmptyFeatureBranch(t *testing.T) {
+	baseDir := t.TempDir()
+	manager, err := NewTaskManager(baseDir, nil)
+	require.NoError(t, err)
+
+	created, err := manager.CreateTask(TaskCreateParams{Name: "task", NoCommit: true, FeatureBranch: "", Prompt: "prompt"})
+	require.NoError(t, err)
+	require.NotNil(t, created)
+
+	assert.True(t, created.NoCommit)
+	assert.Equal(t, "", created.FeatureBranch)
+}
+
 func TestTaskManagerCreateTaskAllowsEmptyPrompt(t *testing.T) {
 	baseDir := t.TempDir()
 	manager, err := NewTaskManager(baseDir, nil)

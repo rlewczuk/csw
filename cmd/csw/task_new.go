@@ -33,6 +33,7 @@ func taskNewCommand() *cobra.Command {
 	var cliWorkDir string
 	var cliConfigPath string
 	var cliProjectConfig string
+	var noCommit bool
 
 	command := &cobra.Command{
 		Use:   "new",
@@ -128,6 +129,7 @@ func taskNewCommand() *cobra.Command {
 				Name:          strings.TrimSpace(name),
 				Description:   strings.TrimSpace(description),
 				Branch:        strings.TrimSpace(branch),
+				NoCommit:      noCommit,
 				ParentBranch:  strings.TrimSpace(parentBranch),
 				Role:          strings.TrimSpace(role),
 				ParentTaskID:  strings.TrimSpace(parent),
@@ -170,6 +172,7 @@ func taskNewCommand() *cobra.Command {
 	command.Flags().StringVar(&cliConfigPath, "config-path", "", "Colon-separated list of config directories (optional, added to default hierarchy)")
 	command.Flags().StringVar(&cliProjectConfig, "project-config", "", "Custom project config directory (default: .csw/config)")
 	command.Flags().StringVar(&parent, "parent", "", "Parent task name or UUID")
+	command.Flags().BoolVar(&noCommit, "no-commit", false, "Do not commit task results automatically")
 
 	return command
 }
@@ -201,7 +204,51 @@ func resolveTaskCreateParams(ctx context.Context, params taskCreateResolveParams
 	}
 
 	resolvedBranch := strings.TrimSpace(params.Branch)
+	if params.NoCommit {
+		resolvedBranch = ""
+	}
 	if resolvedBranch == "" {
+		if params.NoCommit {
+			resolvedName := strings.TrimSpace(params.Name)
+			if resolvedName == "" {
+				resolvedName = taskNewFallbackBranchName
+			}
+
+			resolvedDescription := strings.TrimSpace(params.Description)
+			if resolvedDescription == "" {
+				generatedDescription, err := generateTaskDescriptionFunc(ctx, taskCreateResolveParams{
+					Prompt:        resolvedPrompt,
+					Branch:        taskNewFallbackBranchName,
+					Role:          strings.TrimSpace(params.Role),
+					ModelName:     modelName,
+					WorkDir:       workDir,
+					ShadowDir:     strings.TrimSpace(params.ShadowDir),
+					ProjectConfig: strings.TrimSpace(params.ProjectConfig),
+					ConfigPath:    strings.TrimSpace(params.ConfigPath),
+				})
+				if err != nil {
+					resolvedDescription = taskNewFallbackDescription
+				} else {
+					resolvedDescription = strings.TrimSpace(generatedDescription)
+				}
+			}
+			if resolvedDescription == "" {
+				resolvedDescription = taskNewFallbackDescription
+			}
+
+			return core.TaskCreateParams{
+				ParentTaskID:  strings.TrimSpace(params.ParentTaskID),
+				Name:          resolvedName,
+				Description:   resolvedDescription,
+				FeatureBranch: "",
+				NoCommit:      true,
+				ParentBranch:  strings.TrimSpace(params.ParentBranch),
+				Role:          strings.TrimSpace(params.Role),
+				Deps:          append([]string(nil), params.Deps...),
+				Prompt:        resolvedPrompt,
+			}, nil
+		}
+
 		worktreeTemplate := strings.TrimSpace(defaults.Worktree)
 		if worktreeTemplate == "" {
 			worktreeTemplate = "%"
@@ -263,6 +310,7 @@ func resolveTaskCreateParams(ctx context.Context, params taskCreateResolveParams
 		Name:          resolvedName,
 		Description:   resolvedDescription,
 		FeatureBranch: resolvedBranch,
+		NoCommit:      params.NoCommit,
 		ParentBranch:  strings.TrimSpace(params.ParentBranch),
 		Role:          strings.TrimSpace(params.Role),
 		Deps:          append([]string(nil), params.Deps...),

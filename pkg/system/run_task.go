@@ -332,6 +332,9 @@ func applyCommandTaskMetadata(params *RunParams) error {
 	if metadata.FeatureBranch != nil {
 		applyIfUnchanged("FeatureBranch", func() { persistedTask.FeatureBranch = strings.TrimSpace(*metadata.FeatureBranch) })
 	}
+	if metadata.NoCommit != nil {
+		applyIfUnchanged("NoCommit", func() { persistedTask.NoCommit = *metadata.NoCommit })
+	}
 	if metadata.ParentBranch != nil {
 		applyIfUnchanged("ParentBranch", func() { persistedTask.ParentBranch = strings.TrimSpace(*metadata.ParentBranch) })
 	}

@@ -76,6 +76,7 @@ type TaskMetadata struct {
 	Description   *string   `yaml:"description"`
 	Status        *string   `yaml:"status"`
 	FeatureBranch *string   `yaml:"feature_branch"`
+	NoCommit      *bool     `yaml:"no_commit"`
 	ParentBranch  *string   `yaml:"parent_branch"`
 	Role          *string   `yaml:"role"`
 	State         *string   `yaml:"state"`

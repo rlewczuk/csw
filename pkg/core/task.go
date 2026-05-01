@@ -42,6 +42,7 @@ type Task struct {
 	TaskDir       string   `json:"-" yaml:"-"`
 	Status        string   `json:"status" yaml:"status"`
 	FeatureBranch string   `json:"feature_branch" yaml:"feature_branch"`
+	NoCommit      bool     `json:"no_commit,omitempty" yaml:"no_commit,omitempty"`
 	ParentBranch  string   `json:"parent_branch" yaml:"parent_branch"`
 	Role          string   `json:"role,omitempty" yaml:"role,omitempty"`
 	Deps          []string `json:"deps,omitempty" yaml:"deps,omitempty"`
@@ -67,6 +68,7 @@ type TaskCreateParams struct {
 	Name          string
 	Description   string
 	FeatureBranch string
+	NoCommit      bool
 	ParentBranch  string
 	Role          string
 	Deps          []string
@@ -216,6 +218,7 @@ func toToolTaskRecord(taskData *Task) tool.TaskRecord {
 		Description:   taskData.Description,
 		Status:        taskData.Status,
 		FeatureBranch: taskData.FeatureBranch,
+		NoCommit:      taskData.NoCommit,
 		ParentBranch:  taskData.ParentBranch,
 		Role:          taskData.Role,
 		Deps:          append([]string(nil), taskData.Deps...),
@@ -245,7 +248,7 @@ func (m *TaskManager) CreateTask(params TaskCreateParams) (*Task, error) {
 		name = taskID
 	}
 	featureBranch := strings.TrimSpace(params.FeatureBranch)
-	if featureBranch == "" {
+	if featureBranch == "" && !params.NoCommit {
 		featureBranch = name
 	}
 	parentBranch := strings.TrimSpace(params.ParentBranch)
@@ -269,6 +272,7 @@ func (m *TaskManager) CreateTask(params TaskCreateParams) (*Task, error) {
 		TaskDir:       taskDir,
 		Status:        TaskStatusCreated,
 		FeatureBranch: featureBranch,
+		NoCommit:      params.NoCommit,
 		ParentBranch:  parentBranch,
 		Role:          strings.TrimSpace(params.Role),
 		Deps:          normalizeTaskDeps(params.Deps),
