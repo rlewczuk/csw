@@ -320,6 +320,54 @@ func TestSessionRun_FinishToolStopsLoopWithoutExtraLLMCall(t *testing.T) {
 	assert.Equal(t, "success", handler.ToolCallResults[0].Result.Get("status").AsString())
 }
 
+func TestSessionRun_AutoContinueOnNoToolCalls(t *testing.T) {
+	fixture := newSweSystemFixture(t, "You are a helpful assistant.")
+	system := fixture.system
+
+	mockProvider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model", Model: "test-model"}})
+	mockProvider.SetChatResponse("test-model", &models.MockChatResponse{
+		Response: models.NewToolCallMessage(&tool.ToolCall{
+			ID:       "finish-1",
+			Function: "todoRead",
+			Arguments: tool.NewToolValue(map[string]any{}),
+		}),
+	})
+	mockProvider.SetChatResponse("test-model", &models.MockChatResponse{
+		Response: models.NewTextMessage(models.ChatRoleAssistant, "Need to keep going."),
+	})
+	mockProvider.SetChatResponse("test-model", &models.MockChatResponse{
+		Response: models.NewTextMessage(models.ChatRoleAssistant, "Done."),
+	})
+
+	system.ModelProviders = map[string]models.ModelProvider{"mock": mockProvider}
+
+	handler := testutil.NewMockSessionOutputHandler()
+	session, err := system.NewSession("mock/test-model", handler)
+	require.NoError(t, err)
+
+	err = session.UserPrompt("start")
+	require.NoError(t, err)
+
+	err = session.Run(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, mockProvider.RecordedMessages, 3)
+
+	foundAutoContinue := false
+	for _, msg := range mockProvider.RecordedMessages[2] {
+		if msg.Role == models.ChatRoleUser && msg.GetText() == autoContinuePrompt {
+			foundAutoContinue = true
+			break
+		}
+	}
+	assert.True(t, foundAutoContinue)
+
+	require.Len(t, handler.AssistantMessages, 3)
+	assert.Equal(t, "", handler.AssistantMessages[0].Text)
+	assert.Equal(t, "Need to keep going.", handler.AssistantMessages[1].Text)
+	assert.Equal(t, "Done.", handler.AssistantMessages[2].Text)
+}
+
 func TestSessionReasoningContent(t *testing.T) {
 	fixture := newSweSystemFixture(t, "You are a helpful assistant.")
 	system := fixture.system

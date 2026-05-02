@@ -27,6 +27,7 @@ const (
 	defaultKimiCompactorMessagesToKeep = 2
 	defaultMaxToolThreads             = 8
 	toolExecutionStartDelay           = 250 * time.Millisecond
+	autoContinuePrompt                = "Continue"
 	sessionMessageTypeInfo            = "info"
 	sessionMessageTypeWarning         = "warning"
 	sessionMessageTypeError           = "error"
@@ -337,6 +338,7 @@ func (s *SweSession) Run(ctx context.Context) error {
 	var (
 		responseMsg *models.ChatMessage
 		err         error
+		autoContinueEligible bool
 	)
 
 	// Keep processing until the assistant doesn't make any tool calls
@@ -353,6 +355,7 @@ func (s *SweSession) Run(ctx context.Context) error {
 					if err := s.executeToolCalls(toolCalls); err != nil {
 						return err
 					}
+					autoContinueEligible = true
 					if s.consumeFinishRequest() {
 						break
 					}
@@ -378,8 +381,11 @@ func (s *SweSession) Run(ctx context.Context) error {
 		toolCalls := responseMsg.GetToolCalls()
 		if len(toolCalls) == 0 {
 			if s.flushQueuedUserPrompts() == 0 {
-				// No tool calls and no queued user prompts, we're done
-				break
+				if autoContinueEligible && s.shouldAutoContinue() {
+					s.appendConversationMessage(models.NewTextMessage(models.ChatRoleUser, autoContinuePrompt), "incoming", "auto_continue")
+				} else {
+					break
+				}
 			}
 
 			continue
@@ -389,6 +395,7 @@ func (s *SweSession) Run(ctx context.Context) error {
 		if err := s.executeToolCalls(toolCalls); err != nil {
 			return err
 		}
+		autoContinueEligible = true
 		if s.consumeFinishRequest() {
 			break
 		}
@@ -397,6 +404,25 @@ func (s *SweSession) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *SweSession) shouldAutoContinue() bool {
+	if s == nil || len(s.messages) < 2 {
+		return true
+	}
+
+	lastUserIdx := -1
+	for i := len(s.messages) - 1; i >= 0; i-- {
+		if s.messages[i].Role == models.ChatRoleUser {
+			lastUserIdx = i
+			break
+		}
+	}
+	if lastUserIdx == -1 {
+		return true
+	}
+
+	return strings.TrimSpace(s.messages[lastUserIdx].GetText()) != autoContinuePrompt
 }
 
 func (s *SweSession) flushQueuedUserPrompts() int {
