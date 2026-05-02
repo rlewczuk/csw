@@ -286,6 +286,40 @@ func TestSessionRun_EmitsSingleMarkdownChunkForFragmentedResponse(t *testing.T) 
 	assert.Equal(t, "clean.sh && go test", mockHandler.AssistantMessages[0].Text)
 }
 
+func TestSessionRun_FinishToolStopsLoopWithoutExtraLLMCall(t *testing.T) {
+	fixture := newSweSystemFixture(t, "You are a helpful assistant.")
+	system := fixture.system
+
+	mockProvider := models.NewMockProvider([]models.ModelInfo{
+		{Name: "test-model", Model: "test-model"},
+	})
+	mockProvider.SetChatResponse("test-model", &models.MockChatResponse{
+		Response: models.NewToolCallMessage(&tool.ToolCall{
+			ID:       "finish-1",
+			Function: "finish",
+			Arguments: tool.NewToolValue(map[string]any{}),
+		}),
+	})
+
+	system.ModelProviders = map[string]models.ModelProvider{"ollama": mockProvider}
+
+	handler := testutil.NewMockSessionOutputHandler()
+	session, err := system.NewSession("ollama/test-model", handler)
+	require.NoError(t, err)
+
+	err = session.UserPrompt("please finish")
+	require.NoError(t, err)
+
+	err = session.Run(context.Background())
+	require.NoError(t, err)
+
+	assert.Len(t, mockProvider.RecordedMessages, 1)
+	require.Len(t, handler.ToolCalls, 1)
+	assert.Equal(t, "finish", handler.ToolCalls[0].Function)
+	require.Len(t, handler.ToolCallResults, 1)
+	assert.Equal(t, "success", handler.ToolCallResults[0].Result.Get("status").AsString())
+}
+
 func TestSessionReasoningContent(t *testing.T) {
 	fixture := newSweSystemFixture(t, "You are a helpful assistant.")
 	system := fixture.system

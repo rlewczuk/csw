@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/apis"
@@ -94,6 +95,7 @@ type SweSession struct {
 	subAgentRunner       SubAgentTaskRunner
 	subAgentSlugs        map[string]struct{}
 	subAgentSlugsMu      sync.Mutex
+	finishRequested      atomic.Bool
 }
 
 // SweSessionParams stores dependencies and initial values used to create a SweSession.
@@ -339,6 +341,10 @@ func (s *SweSession) Run(ctx context.Context) error {
 
 	// Keep processing until the assistant doesn't make any tool calls
 	for {
+		if s.consumeFinishRequest() {
+			break
+		}
+
 		if len(s.messages) > 0 {
 			lastMsg := s.messages[len(s.messages)-1]
 			if lastMsg.Role == models.ChatRoleAssistant {
@@ -346,6 +352,9 @@ func (s *SweSession) Run(ctx context.Context) error {
 				if len(toolCalls) > 0 {
 					if err := s.executeToolCalls(toolCalls); err != nil {
 						return err
+					}
+					if s.consumeFinishRequest() {
+						break
 					}
 				}
 			}
@@ -379,6 +388,9 @@ func (s *SweSession) Run(ctx context.Context) error {
 		// Execute tool calls
 		if err := s.executeToolCalls(toolCalls); err != nil {
 			return err
+		}
+		if s.consumeFinishRequest() {
+			break
 		}
 
 		s.flushQueuedUserPrompts()

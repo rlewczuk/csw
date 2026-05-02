@@ -112,6 +112,8 @@ func filterToolsForRole(registry *tool.ToolRegistry, role *conf.AgentRoleConfig)
 
 // registerSessionTools registers session-specific tools that need access to the session.
 func (s *SweSession) registerSessionTools(registry *tool.ToolRegistry) {
+	registry.Register("finish", tool.NewFinishTool(s))
+
 	// Register todo tools
 	registry.Register("todoRead", tool.NewTodoReadTool(s))
 	registry.Register("todoWrite", tool.NewTodoWriteTool(s))

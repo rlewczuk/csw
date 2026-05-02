@@ -238,6 +238,24 @@ func TestRegisterWebFetchTool(t *testing.T) {
 	assert.IsType(t, &WebFetchTool{}, registeredTool)
 }
 
+func TestRegisterFinishTool(t *testing.T) {
+	registry := NewToolRegistry()
+	session := &finishSessionMock{}
+
+	registry.Register("finish", NewFinishTool(session))
+
+	response := registry.Execute(&ToolCall{
+		ID:        "finish-1",
+		Function:  "finish",
+		Arguments: NewToolValue(map[string]any{}),
+	})
+
+	require.NotNil(t, response)
+	assert.True(t, session.requested)
+	assert.True(t, response.Done)
+	assert.Equal(t, "success", response.Result.Get("status").AsString())
+}
+
 func TestRegisterRunBashTool_AllowAllPermissionsFalse_UsesProvidedPrivileges(t *testing.T) {
 	registry := NewToolRegistry()
 	mockRunner := runner.NewMockRunner()

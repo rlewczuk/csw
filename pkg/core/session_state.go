@@ -260,6 +260,23 @@ func (s *SweSession) ThinkingLevel() string {
 	return strings.TrimSpace(s.thinking)
 }
 
+// RequestFinish requests graceful session loop completion.
+func (s *SweSession) RequestFinish() {
+	if s == nil {
+		return
+	}
+
+	s.finishRequested.Store(true)
+}
+
+func (s *SweSession) consumeFinishRequest() bool {
+	if s == nil {
+		return false
+	}
+
+	return s.finishRequested.Swap(false)
+}
+
 // UsedRoles returns roles used during this session in first-seen order.
 func (s *SweSession) UsedRoles() []string {
 	if s == nil || len(s.rolesUsed) == 0 {
