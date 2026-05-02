@@ -302,6 +302,16 @@ func (r *containerRunner) RunCommandWithOptionsDetailed(command string, options 
 	return output.String(), "", exitCode, nil
 }
 
+// RunCommandWithOptionsBackgroundDetailed runs command in background mode for up to background duration.
+func (r *containerRunner) RunCommandWithOptionsBackgroundDetailed(command string, options CommandOptions, background time.Duration) (string, string, int, int, bool, error) {
+	if background <= 0 {
+		stdout, stderr, _, err := r.RunCommandWithOptionsDetailed(command, options)
+		return stdout, stderr, 0, 0, true, err
+	}
+	stdout, stderr, exitCode, err := r.RunCommandWithOptionsDetailed(command, options)
+	return stdout, stderr, exitCode, 0, false, err
+}
+
 // Close stops and removes the container.
 // It is safe to call Close multiple times.
 func (r *containerRunner) Close() error {

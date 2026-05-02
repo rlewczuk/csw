@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"sync"
+	"time"
 )
 
 var newContainerRunnerFactory = NewContainerRunner
@@ -103,6 +104,15 @@ func (r *lazyContainerRunner) RunCommandWithOptionsDetailed(command string, opti
 		return "", "", 1, err
 	}
 	return runner.RunCommandWithOptionsDetailed(command, options)
+}
+
+// RunCommandWithOptionsBackgroundDetailed starts the container lazily and executes command with background mode.
+func (r *lazyContainerRunner) RunCommandWithOptionsBackgroundDetailed(command string, options CommandOptions, background time.Duration) (string, string, int, int, bool, error) {
+	runner, err := r.ensureRunner()
+	if err != nil {
+		return "", "", 1, 0, false, err
+	}
+	return runner.RunCommandWithOptionsBackgroundDetailed(command, options, background)
 }
 
 // Close closes underlying container runner if it was started.

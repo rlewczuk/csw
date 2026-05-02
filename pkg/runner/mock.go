@@ -127,6 +127,18 @@ func (m *MockRunner) RunCommandWithOptionsDetailed(command string, options Comma
 	return exec.Output, exec.Stderr, exec.ExitCode, exec.Error
 }
 
+// RunCommandWithOptionsBackgroundDetailed runs command and returns mocked detailed response.
+func (m *MockRunner) RunCommandWithOptionsBackgroundDetailed(command string, options CommandOptions, background time.Duration) (string, string, int, int, bool, error) {
+	stdout, stderr, exitCode, err := m.RunCommandWithOptionsDetailed(command, options)
+	if background == 0 {
+		return stdout, stderr, 0, 12345, true, nil
+	}
+	if background > 0 {
+		return stdout, stderr, exitCode, 12345, false, err
+	}
+	return stdout, stderr, exitCode, 12345, false, err
+}
+
 // GetExecutions returns all recorded command executions.
 func (m *MockRunner) GetExecutions() []CommandExecution {
 	m.mu.Lock()

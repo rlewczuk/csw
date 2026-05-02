@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os/exec"
+	"sync"
 	"time"
 )
 
@@ -95,6 +97,78 @@ func (r *BashRunner) RunCommandWithOptionsDetailed(command string, options Comma
 	}
 
 	return stdout.String(), stderr.String(), exitCode, nil
+}
+
+// RunCommandWithOptionsBackgroundDetailed runs command in background mode and returns partial/full output.
+func (r *BashRunner) RunCommandWithOptionsBackgroundDetailed(command string, options CommandOptions, background time.Duration) (string, string, int, int, bool, error) {
+	if command == "" {
+		return "", "", 1, 0, false, fmt.Errorf("BashRunner.RunCommandWithOptionsBackgroundDetailed() [bash.go]: command cannot be empty")
+	}
+
+	workdir := r.workdir
+	if options.Workdir != "" {
+		workdir = options.Workdir
+	}
+
+	cmd := exec.Command("bash", "-c", command)
+	cmd.Dir = workdir
+
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", "", 1, 0, false, fmt.Errorf("BashRunner.RunCommandWithOptionsBackgroundDetailed() [bash.go]: stdout pipe failed: %w", err)
+	}
+
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return "", "", 1, 0, false, fmt.Errorf("BashRunner.RunCommandWithOptionsBackgroundDetailed() [bash.go]: stderr pipe failed: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return "", "", 127, 0, false, fmt.Errorf("BashRunner.RunCommandWithOptionsBackgroundDetailed() [bash.go]: command start failed: %w", err)
+	}
+
+	pid := 0
+	if cmd.Process != nil {
+		pid = cmd.Process.Pid
+	}
+
+	var stdoutBuf bytes.Buffer
+	var stderrBuf bytes.Buffer
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, _ = io.Copy(&stdoutBuf, stdoutPipe)
+	}()
+	go func() {
+		defer wg.Done()
+		_, _ = io.Copy(&stderrBuf, stderrPipe)
+	}()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	if background <= 0 {
+		return stdoutBuf.String(), stderrBuf.String(), 0, pid, true, nil
+	}
+
+	select {
+	case waitErr := <-done:
+		wg.Wait()
+		exitCode := 0
+		if waitErr != nil {
+			if exitErr, ok := waitErr.(*exec.ExitError); ok {
+				exitCode = exitErr.ExitCode()
+				return stdoutBuf.String(), stderrBuf.String(), exitCode, pid, false, nil
+			}
+			return stdoutBuf.String(), stderrBuf.String(), 127, pid, false, fmt.Errorf("BashRunner.RunCommandWithOptionsBackgroundDetailed() [bash.go]: %w", waitErr)
+		}
+		return stdoutBuf.String(), stderrBuf.String(), exitCode, pid, false, nil
+	case <-time.After(background):
+		return stdoutBuf.String(), stderrBuf.String(), 0, pid, true, nil
+	}
 }
 
 var _ CommandRunner = (*BashRunner)(nil)

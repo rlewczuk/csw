@@ -330,6 +330,86 @@ func TestRunBashTool_Execute_WithInvalidTimeout(t *testing.T) {
 	assert.Equal(t, 0, mockRunner.ExecutionCount())
 }
 
+func TestRunBashTool_Execute_WithInvalidBackground(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashTool(mockRunner, privileges)
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command":    "echo test",
+			"background": int64(-1),
+		}),
+	}
+
+	response := tool.Execute(&args)
+
+	assert.Error(t, response.Error)
+	assert.Contains(t, response.Error.Error(), "background must be non-negative")
+	assert.True(t, response.Done)
+	assert.Equal(t, 0, mockRunner.ExecutionCount())
+}
+
+func TestRunBashTool_Execute_BackgroundZero(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetResponse("echo test", "test\n", 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashTool(mockRunner, privileges)
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command":    "echo test",
+			"background": int64(0),
+		}),
+	}
+
+	response := tool.Execute(&args)
+
+	assert.NoError(t, response.Error)
+	assert.True(t, response.Done)
+	assert.Equal(t, int64(12345), response.Result.Int("pid"))
+	assert.Equal(t, true, response.Result.Bool("running"))
+	assert.Equal(t, "running", response.Result.String("status"))
+}
+
+func TestRunBashTool_Execute_BackgroundWaitFinished(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetResponse("echo test", "test\n", 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashTool(mockRunner, privileges)
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command":    "echo test",
+			"background": int64(2),
+		}),
+	}
+
+	response := tool.Execute(&args)
+
+	assert.NoError(t, response.Error)
+	assert.True(t, response.Done)
+	assert.Equal(t, "test\n", response.Result.String("output"))
+	assert.Equal(t, int64(12345), response.Result.Int("pid"))
+	assert.Equal(t, false, response.Result.Bool("running"))
+	assert.Equal(t, "finished", response.Result.String("status"))
+}
+
 func TestRunBashTool_Render(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 	tool := NewRunBashTool(mockRunner, nil)

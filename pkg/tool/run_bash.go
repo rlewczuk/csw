@@ -134,6 +134,18 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 		limit = int(limitArg)
 	}
 
+	background := -1
+	if backgroundArg, ok := args.Arguments.IntOK("background"); ok {
+		if backgroundArg < 0 {
+			return &ToolResponse{
+				Call:  args,
+				Error: fmt.Errorf("RunBashTool.Execute() [run.go]: background must be non-negative, got %d", backgroundArg),
+				Done:  true,
+			}
+		}
+		background = int(backgroundArg)
+	}
+
 	// Check permissions for absolute workdir
 	if needsPermission {
 		// Check if explicit access is granted
@@ -176,7 +188,7 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 		return NewPermissionDeniedResponse(args, fmt.Sprintf("running command denied: %s", command))
 	case conf.AccessAllow:
 		// Execute the command
-		return t.executeCommand(args, command, resolvedWorkdir, timeout, limit)
+		return t.executeCommand(args, command, resolvedWorkdir, timeout, limit, background)
 	default:
 		return NewPermissionDeniedResponse(args, fmt.Sprintf("running command denied: %s", command))
 	}
@@ -234,9 +246,11 @@ func countWildcards(pattern string) int {
 }
 
 // executeCommand executes the command using the runner.
-func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir string, timeout time.Duration, limit int) *ToolResponse {
+func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir string, timeout time.Duration, limit int, background int) *ToolResponse {
 	var stdout, stderr string
 	var exitCode int
+	var pid int
+	var stillRunning bool
 	var err error
 
 	// Use detailed method to get separate stdout and stderr
@@ -244,7 +258,11 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 		Workdir: workdir,
 		Timeout: timeout,
 	}
-	stdout, stderr, exitCode, err = t.runner.RunCommandWithOptionsDetailed(command, options)
+	if background >= 0 {
+		stdout, stderr, exitCode, pid, stillRunning, err = t.runner.RunCommandWithOptionsBackgroundDetailed(command, options, time.Duration(background)*time.Second)
+	} else {
+		stdout, stderr, exitCode, err = t.runner.RunCommandWithOptionsDetailed(command, options)
+	}
 
 	// Combine stdout and stderr for output field
 	output := stdout
@@ -282,6 +300,27 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 			Call:  args,
 			Error: fmt.Errorf("RunBashTool.executeCommand() [run.go]: %w", err),
 			Done:  true,
+		}
+	}
+
+	if background >= 0 {
+		var result ToolValue
+		result.Set("output", output)
+		result.Set("stdout", stdout)
+		result.Set("stderr", stderr)
+		result.Set("exit_code", exitCode)
+		result.Set("pid", pid)
+		result.Set("running", stillRunning)
+		if stillRunning {
+			result.Set("status", "running")
+		} else {
+			result.Set("status", "finished")
+		}
+
+		return &ToolResponse{
+			Call:   args,
+			Result: result,
+			Done:   true,
 		}
 	}
 

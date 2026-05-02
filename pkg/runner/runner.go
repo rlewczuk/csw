@@ -23,6 +23,8 @@ type CommandRunner interface {
 	RunCommandWithOptions(command string, options CommandOptions) (string, int, error)
 	// RunCommandWithOptionsDetailed runs the given command with options and returns stdout, stderr, exit code, and error separately.
 	RunCommandWithOptionsDetailed(command string, options CommandOptions) (stdout string, stderr string, exitCode int, err error)
+	// RunCommandWithOptionsBackgroundDetailed runs the given command in background mode.
+	RunCommandWithOptionsBackgroundDetailed(command string, options CommandOptions, background time.Duration) (stdout string, stderr string, exitCode int, pid int, running bool, err error)
 }
 
 // ContainerConfig contains configuration for the ContainerRunner runner.

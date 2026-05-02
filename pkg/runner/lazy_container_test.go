@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,15 @@ func (s *stubContainerRunner) RunCommandWithOptionsDetailed(command string, opti
 	s.runCalls++
 	_ = options
 	return "ok:" + command, "", 0, nil
+}
+
+func (s *stubContainerRunner) RunCommandWithOptionsBackgroundDetailed(command string, options CommandOptions, background time.Duration) (string, string, int, int, bool, error) {
+	s.runCalls++
+	_ = options
+	if background == 0 {
+		return "ok:" + command, "", 0, 12345, true, nil
+	}
+	return "ok:" + command, "", 0, 12345, false, nil
 }
 
 func (s *stubContainerRunner) Close() error {
