@@ -264,14 +264,14 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 		return false
 	})
 	if err != nil {
-		return nil, fmt.Errorf("convertFromResponsesStreamBody() [responses_client_response_conversion.go]: failed to scan stream body: %w", err)
+		return nil, &NetworkError{Message: fmt.Sprintf("convertFromResponsesStreamBody() [responses_client_response_conversion.go]: failed to scan stream body: %v", err), IsRetryable: true}
 	}
 	if streamEventErr != nil {
 		return nil, streamEventErr
 	}
 
 	if len(result.Parts) == 0 {
-		return nil, fmt.Errorf("convertFromResponsesStreamBody() [responses_client_response_conversion.go]: no usable output items in response")
+		return nil, &NetworkError{Message: "convertFromResponsesStreamBody() [responses_client_response_conversion.go]: no usable output items in response", IsRetryable: true}
 	}
 
 	var finalUsage TokenUsage
@@ -311,7 +311,7 @@ func convertFromResponsesStreamBody(bodyBytes []byte) (*ChatMessage, error) {
 		return false
 	})
 	if err != nil {
-		return nil, fmt.Errorf("convertFromResponsesStreamBody() [responses_client_response_conversion.go]: failed to scan stream body: %w", err)
+		return nil, &NetworkError{Message: fmt.Sprintf("convertFromResponsesStreamBody() [responses_client_response_conversion.go]: failed to scan stream body: %v", err), IsRetryable: true}
 	}
 	if finalUsage.TotalTokens > 0 {
 		usageCopy := finalUsage
