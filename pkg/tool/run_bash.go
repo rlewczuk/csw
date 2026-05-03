@@ -3,6 +3,7 @@ package tool
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -10,6 +11,12 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/runner"
+)
+
+const (
+	defaultRunBashMaxOutputBytes = 2048
+	runBashWorktmpDir            = ".cswdata/worktmp"
+	runBashOutputTempPattern     = "runbash-output-*.txt"
 )
 
 // RunCommandError represents a permission error for running commands.
@@ -134,6 +141,18 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 		limit = int(limitArg)
 	}
 
+	maxOutput := defaultRunBashMaxOutputBytes
+	if maxOutputArg, ok := args.Arguments.IntOK("max_output"); ok {
+		if maxOutputArg < 0 {
+			return &ToolResponse{
+				Call:  args,
+				Error: fmt.Errorf("RunBashTool.Execute() [run.go]: max_output must be non-negative, got %d", maxOutputArg),
+				Done:  true,
+			}
+		}
+		maxOutput = int(maxOutputArg)
+	}
+
 	background := -1
 	if backgroundArg, ok := args.Arguments.IntOK("background"); ok {
 		if backgroundArg < 0 {
@@ -188,7 +207,7 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 		return NewPermissionDeniedResponse(args, fmt.Sprintf("running command denied: %s", command))
 	case conf.AccessAllow:
 		// Execute the command
-		return t.executeCommand(args, command, resolvedWorkdir, timeout, limit, background)
+		return t.executeCommand(args, command, resolvedWorkdir, timeout, limit, maxOutput, background)
 	default:
 		return NewPermissionDeniedResponse(args, fmt.Sprintf("running command denied: %s", command))
 	}
@@ -246,7 +265,7 @@ func countWildcards(pattern string) int {
 }
 
 // executeCommand executes the command using the runner.
-func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir string, timeout time.Duration, limit int, background int) *ToolResponse {
+func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir string, timeout time.Duration, limit int, maxOutput int, background int) *ToolResponse {
 	var stdout, stderr string
 	var exitCode int
 	var pid int
@@ -304,6 +323,15 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 	}
 
 	if background >= 0 {
+		output, stdout, stderr, spillErr := t.safeguardOutput(output, stdout, stderr, maxOutput, workdir)
+		if spillErr != nil {
+			return &ToolResponse{
+				Call:  args,
+				Error: fmt.Errorf("RunBashTool.executeCommand() [run.go]: %w", spillErr),
+				Done:  true,
+			}
+		}
+
 		var result ToolValue
 		result.Set("output", output)
 		result.Set("stdout", stdout)
@@ -334,6 +362,15 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 	}
 
 	// Return the output, stderr, and exit code
+	output, stdout, stderr, spillErr := t.safeguardOutput(output, stdout, stderr, maxOutput, workdir)
+	if spillErr != nil {
+		return &ToolResponse{
+			Call:  args,
+			Error: fmt.Errorf("RunBashTool.executeCommand() [run.go]: %w", spillErr),
+			Done:  true,
+		}
+	}
+
 	var result ToolValue
 	result.Set("output", output)
 	result.Set("stdout", stdout)
@@ -353,6 +390,47 @@ func isTimeoutError(err error) bool {
 	}
 
 	return strings.Contains(strings.ToLower(err.Error()), "timed out")
+}
+
+func (t *RunBashTool) safeguardOutput(output string, stdout string, stderr string, maxOutput int, workdir string) (string, string, string, error) {
+	if maxOutput <= 0 || len([]byte(output)) <= maxOutput {
+		return output, stdout, stderr, nil
+	}
+
+	path, err := t.saveLargeOutput(output, workdir)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	message := fmt.Sprintf("Output was too big (%d bytes; max_output=%d bytes). It was saved instead of returned in full. It should be grepped or processed with tools/scripts, or only partially read rather than read in its entirety.\nSaved full output to temporary file: %s", len([]byte(output)), maxOutput, path)
+	return message, message, "", nil
+}
+
+func (t *RunBashTool) saveLargeOutput(output string, workdir string) (string, error) {
+	baseDir := workdir
+	if baseDir == "" {
+		baseDir = t.sessionWorkdir
+	}
+	if baseDir == "" {
+		baseDir = "."
+	}
+
+	tempDir := filepath.Join(baseDir, runBashWorktmpDir)
+	if err := os.MkdirAll(tempDir, 0o755); err != nil {
+		return "", fmt.Errorf("RunBashTool.saveLargeOutput() [run.go]: failed to create worktmp directory: %w", err)
+	}
+
+	tempFile, err := os.CreateTemp(tempDir, runBashOutputTempPattern)
+	if err != nil {
+		return "", fmt.Errorf("RunBashTool.saveLargeOutput() [run.go]: failed to create output file: %w", err)
+	}
+	defer tempFile.Close()
+
+	if _, err := tempFile.WriteString(output); err != nil {
+		return "", fmt.Errorf("RunBashTool.saveLargeOutput() [run.go]: failed to write output file: %w", err)
+	}
+
+	return tempFile.Name(), nil
 }
 
 // cropOutputToLastLines crops output to at most maxLines from the end.
@@ -445,7 +523,7 @@ func (t *RunBashTool) Render(call *ToolCall) (string, string, string, map[string
 	}
 
 	jsonl := buildToolRenderJSONL("runBash", call, map[string]any{
-		"command": command,
+		"command":   command,
 		"exit_code": exitCode,
 		"stderr":    stderr,
 		"output":    output,
