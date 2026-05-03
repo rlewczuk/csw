@@ -48,6 +48,9 @@ func TestRunBashTool_Execute_WithMaxOutput_SavesLargeOutputToWorktmp(t *testing.
 
 	spilledPath := extractRunBashSpilledPath(t, output)
 	assert.True(t, strings.HasPrefix(spilledPath, filepath.Join(sessionWorkdir, ".cswdata", "worktmp")))
+	assert.Equal(t, filepath.Base(spilledPath), response.Result.String("output_file"))
+	assert.True(t, response.Result.Bool("max_output_triggered"))
+	assert.Equal(t, int64(64), response.Result.Int("max_output"))
 
 	content, err := os.ReadFile(spilledPath)
 	require.NoError(t, err)
@@ -80,6 +83,9 @@ func TestRunBashTool_Execute_WithMaxOutput_DefaultSavesLargeOutput(t *testing.T)
 	assert.Contains(t, output, "Output was too big")
 
 	spilledPath := extractRunBashSpilledPath(t, output)
+	assert.Equal(t, filepath.Base(spilledPath), response.Result.String("output_file"))
+	assert.True(t, response.Result.Bool("max_output_triggered"))
+	assert.Equal(t, int64(0), response.Result.Int("max_output"))
 	content, err := os.ReadFile(spilledPath)
 	require.NoError(t, err)
 	assert.Equal(t, largeOutput, string(content))

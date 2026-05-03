@@ -1,6 +1,7 @@
 package tool
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -461,6 +462,79 @@ func TestRunBashTool_Render(t *testing.T) {
 			assert.Contains(t, details, tt.wantInDetails, "Details should contain expected text")
 		})
 	}
+}
+
+func TestRunBashTool_Render_OutputMetadata(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	tool := NewRunBashTool(mockRunner, nil)
+
+	args := &ToolCall{
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command":             "long metadata command that must keep metadata readable in short form",
+			"output":              "abcdef",
+			"stdout":              "abcdef",
+			"exit_code":           int64(0),
+			"max_output":          int64(64),
+			"max_output_triggered": true,
+			"output_file":         "/work/.cswdata/worktmp/runbash-output-123.txt",
+		}),
+	}
+
+	summary, details, jsonlLine, meta := tool.Render(args)
+
+	assert.Contains(t, summary, "output: 6 bytes")
+	assert.Contains(t, summary, "max_output: 64 bytes")
+	assert.Contains(t, summary, "max_output limit triggered")
+	assert.Contains(t, summary, "file: runbash-output-123.txt")
+	assert.Contains(t, details, "Output metadata: 6 bytes returned; max_output: 64 bytes; max_output limit triggered; file: runbash-output-123.txt")
+	assert.Equal(t, "6", meta["output_bytes"])
+	assert.Equal(t, "64", meta["max_output"])
+	assert.Equal(t, "true", meta["max_output_triggered"])
+	assert.Equal(t, "runbash-output-123.txt", meta["output_file"])
+
+	var jsonl map[string]any
+	require.NoError(t, json.Unmarshal([]byte(jsonlLine), &jsonl))
+	assert.Equal(t, float64(6), jsonl["output_bytes"])
+	assert.Equal(t, float64(64), jsonl["max_output"])
+	assert.Equal(t, true, jsonl["max_output_triggered"])
+	assert.Equal(t, "runbash-output-123.txt", jsonl["output_file"])
+}
+
+func TestRunBashTool_Render_DefaultMaxOutputMetadata(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	tool := NewRunBashTool(mockRunner, nil)
+
+	args := &ToolCall{
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command":             "default limit spill",
+			"output":              "Output was too big (2049 bytes; max_output=2048 bytes).\nSaved full output to temporary file: /work/.cswdata/worktmp/runbash-output-456.txt",
+			"stdout":              "Output was too big (2049 bytes; max_output=2048 bytes).\nSaved full output to temporary file: /work/.cswdata/worktmp/runbash-output-456.txt",
+			"exit_code":           int64(0),
+			"max_output_triggered": true,
+			"output_file":         "/work/.cswdata/worktmp/runbash-output-456.txt",
+		}),
+	}
+
+	summary, details, jsonlLine, meta := tool.Render(args)
+
+	assert.Contains(t, summary, "output: 138 bytes")
+	assert.NotContains(t, summary, "max_output:")
+	assert.Contains(t, summary, "max_output limit triggered")
+	assert.Contains(t, summary, "file: runbash-output-456.txt")
+	assert.Contains(t, details, "Output metadata: 138 bytes returned; max_output limit triggered; file: runbash-output-456.txt")
+	assert.Equal(t, "138", meta["output_bytes"])
+	assert.NotContains(t, meta, "max_output")
+	assert.Equal(t, "true", meta["max_output_triggered"])
+	assert.Equal(t, "runbash-output-456.txt", meta["output_file"])
+
+	var jsonl map[string]any
+	require.NoError(t, json.Unmarshal([]byte(jsonlLine), &jsonl))
+	assert.Equal(t, float64(138), jsonl["output_bytes"])
+	assert.NotContains(t, jsonl, "max_output")
+	assert.Equal(t, true, jsonl["max_output_triggered"])
+	assert.Equal(t, "runbash-output-456.txt", jsonl["output_file"])
 }
 
 func TestRunBashTool_Render_WithError(t *testing.T) {

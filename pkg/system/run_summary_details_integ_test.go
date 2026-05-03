@@ -44,7 +44,7 @@ func TestCLISummaryIncludesDetailedSessionInfo(t *testing.T) {
 	)
 
 	mockServer.AddStreamingResponse("/api/chat", "POST", true,
-		`{"model":"test-model","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"Done."},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"Done.","tool_calls":[{"function":{"name":"finish","arguments":{}}}]},"done":false}`,
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
@@ -73,7 +73,8 @@ func TestCLISummaryIncludesDetailedSessionInfo(t *testing.T) {
 	assert.Contains(t, summary, "LSP server: /not/used/lsp")
 	assert.Contains(t, summary, "Container image: -")
 	assert.Contains(t, summary, "Roles used: developer")
-	assert.Contains(t, summary, "Tools used: vfsWrite")
+	assert.Contains(t, summary, "Tools used:")
+	assert.Contains(t, summary, "vfsWrite")
 	assert.Contains(t, summary, "Edited files:")
 	assert.Contains(t, summary, "- test.txt (+2/-1)")
 	assert.Contains(t, summary, "Session ID: "+sessionID)
