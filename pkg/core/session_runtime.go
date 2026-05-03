@@ -75,7 +75,7 @@ func (s *SweSession) compactContext(statusMessage string) error {
 		s.compactor = NewCompactMessagesChatCompactor()
 	}
 
-	compacted := s.compactor.CompactMessages(s.messages)
+	compacted := NewChatCompactorVerifier(s.compactor).CompactMessages(s.messages)
 	if err := s.persistCompactionMessagesSnapshot("post", compactionNumber, compacted); err != nil {
 		return fmt.Errorf("SweSession.maybeCompactContext() [session_runtime.go]: failed to persist post-compaction snapshot: %w", err)
 	}
