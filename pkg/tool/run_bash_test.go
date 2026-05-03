@@ -343,7 +343,7 @@ func TestRunBashTool_Execute_WithInvalidBackground(t *testing.T) {
 		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command":    "echo test",
-			"background": int64(-1),
+			"background": int64(-2),
 		}),
 	}
 
@@ -353,6 +353,33 @@ func TestRunBashTool_Execute_WithInvalidBackground(t *testing.T) {
 	assert.Contains(t, response.Error.Error(), "background must be non-negative")
 	assert.True(t, response.Done)
 	assert.Equal(t, 0, mockRunner.ExecutionCount())
+}
+
+func TestRunBashTool_Execute_BackgroundMinusOne(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	mockRunner.SetResponse("echo test", "test\n", 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashTool(mockRunner, privileges)
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command":    "echo test",
+			"background": int64(-1),
+		}),
+	}
+
+	response := tool.Execute(&args)
+
+	assert.NoError(t, response.Error)
+	assert.True(t, response.Done)
+	assert.Equal(t, "test\n", response.Result.String("output"))
+	assert.Equal(t, int64(0), response.Result.Int("exit_code"))
+	assert.Equal(t, 1, mockRunner.ExecutionCount())
 }
 
 func TestRunBashTool_Execute_BackgroundZero(t *testing.T) {

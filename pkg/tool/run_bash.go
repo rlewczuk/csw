@@ -142,7 +142,7 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 
 	background := -1
 	if backgroundArg, ok := args.Arguments.IntOK("background"); ok {
-		if backgroundArg < 0 {
+		if backgroundArg < -1 {
 			return &ToolResponse{
 				Call:  args,
 				Error: fmt.Errorf("RunBashTool.Execute() [run.go]: background must be non-negative, got %d", backgroundArg),
