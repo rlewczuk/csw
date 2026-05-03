@@ -19,10 +19,6 @@
       "type": "integer",
       "description": "Background wait time in seconds. If set to N\u003e0, wait up to N seconds then return with current output, PID, and whether process is still running. If set to 0, return immediately with PID and running status."
     },
-    "limit": {
-      "type": "integer",
-      "description": "Maximum number of lines to return in the output. If not specified, default is 500 lines. Use 0 for no limit."
-    },
     "max_output": {
       "type": "integer",
       "description": "Maximum output size in bytes before saving output to a temporary file in .cswdata/worktmp/. If not specified, default is 2048 bytes. Use 0 for no safeguard."

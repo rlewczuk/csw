@@ -290,7 +290,6 @@ func TestRunBashTool_Execute_TimeoutErrorIncludesPartialOutput(t *testing.T) {
 		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
 			"command": "sleep 10",
-			"limit":   int64(2),
 		}),
 	}
 
@@ -299,9 +298,9 @@ func TestRunBashTool_Execute_TimeoutErrorIncludesPartialOutput(t *testing.T) {
 	assert.Error(t, response.Error)
 	assert.Contains(t, response.Error.Error(), "command terminated due to timeout")
 	assert.Contains(t, response.Error.Error(), "Partial output:")
+	assert.Contains(t, response.Error.Error(), "line1")
 	assert.Contains(t, response.Error.Error(), "line2")
 	assert.Contains(t, response.Error.Error(), "line3")
-	assert.NotContains(t, response.Error.Error(), "line1")
 	assert.True(t, response.Done)
 }
 

@@ -204,7 +204,7 @@ func TestRunBashTool_Execute_WithoutSessionWorkdir_NoWorkdirSpecified(t *testing
 	assert.Equal(t, "", exec.Workdir)
 }
 
-func TestRunBashTool_Execute_WithLimitAndOtherOptions(t *testing.T) {
+func TestRunBashTool_Execute_WithWorkdirTimeoutAndOutput(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 	longOutput := "line1\nline2\nline3\nline4\nline5\n"
 	mockRunner.SetResponse("seq 1 5", longOutput, 0, nil)
@@ -221,7 +221,6 @@ func TestRunBashTool_Execute_WithLimitAndOtherOptions(t *testing.T) {
 			"command": "seq 1 5",
 			"workdir": "subdir",
 			"timeout": int64(30),
-			"limit":   int64(3),
 		}),
 	}
 
@@ -231,7 +230,7 @@ func TestRunBashTool_Execute_WithLimitAndOtherOptions(t *testing.T) {
 	assert.True(t, response.Done)
 
 	output := response.Result.String("output")
-	assert.NotContains(t, output, "line1")
+	assert.Contains(t, output, "line1")
 	assert.Contains(t, output, "line3")
 	assert.Contains(t, output, "line4")
 	assert.Contains(t, output, "line5")

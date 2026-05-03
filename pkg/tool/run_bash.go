@@ -128,19 +128,6 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 		timeout = time.Duration(timeoutSecs) * time.Second
 	}
 
-	// Parse optional limit argument (default: 500 lines, 0 means no limit)
-	limit := 500
-	if limitArg, ok := args.Arguments.IntOK("limit"); ok {
-		if limitArg < 0 {
-			return &ToolResponse{
-				Call:  args,
-				Error: fmt.Errorf("RunBashTool.Execute() [run.go]: limit must be non-negative, got %d", limitArg),
-				Done:  true,
-			}
-		}
-		limit = int(limitArg)
-	}
-
 	maxOutput := defaultRunBashMaxOutputBytes
 	if maxOutputArg, ok := args.Arguments.IntOK("max_output"); ok {
 		if maxOutputArg < 0 {
@@ -207,7 +194,7 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 		return NewPermissionDeniedResponse(args, fmt.Sprintf("running command denied: %s", command))
 	case conf.AccessAllow:
 		// Execute the command
-		return t.executeCommand(args, command, resolvedWorkdir, timeout, limit, maxOutput, background)
+		return t.executeCommand(args, command, resolvedWorkdir, timeout, maxOutput, background)
 	default:
 		return NewPermissionDeniedResponse(args, fmt.Sprintf("running command denied: %s", command))
 	}
@@ -265,7 +252,7 @@ func countWildcards(pattern string) int {
 }
 
 // executeCommand executes the command using the runner.
-func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir string, timeout time.Duration, limit int, maxOutput int, background int) *ToolResponse {
+func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir string, timeout time.Duration, maxOutput int, background int) *ToolResponse {
 	var stdout, stderr string
 	var exitCode int
 	var pid int
@@ -294,14 +281,6 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 
 	if err != nil {
 		if isTimeoutError(err) {
-			if limit > 0 {
-				croppedOutput, cropped := cropOutputToLastLines(output, limit)
-				output = croppedOutput
-				if cropped && t.logger != nil {
-					t.logger.Info("runBash_output_cropped", "command", command, "limit", limit)
-				}
-			}
-
 			errMessage := fmt.Sprintf("command terminated due to timeout: %v", err)
 			if output != "" {
 				errMessage = fmt.Sprintf("%s\nPartial output:\n%s", errMessage, output)
@@ -349,15 +328,6 @@ func (t *RunBashTool) executeCommand(args *ToolCall, command string, workdir str
 			Call:   args,
 			Result: result,
 			Done:   true,
-		}
-	}
-
-	// Apply line limit if specified (limit > 0)
-	if limit > 0 {
-		croppedOutput, cropped := cropOutputToLastLines(output, limit)
-		output = croppedOutput
-		if cropped && t.logger != nil {
-			t.logger.Info("runBash_output_cropped", "command", command, "limit", limit)
 		}
 	}
 
@@ -431,33 +401,6 @@ func (t *RunBashTool) saveLargeOutput(output string, workdir string) (string, er
 	}
 
 	return tempFile.Name(), nil
-}
-
-// cropOutputToLastLines crops output to at most maxLines from the end.
-// It returns the cropped output and true when cropping happened.
-func cropOutputToLastLines(output string, maxLines int) (string, bool) {
-	if maxLines <= 0 || output == "" {
-		return output, false
-	}
-
-	hasTrailingNewline := strings.HasSuffix(output, "\n")
-	normalized := strings.TrimSuffix(output, "\n")
-	if normalized == "" {
-		return output, false
-	}
-
-	lines := strings.Split(normalized, "\n")
-	if len(lines) <= maxLines {
-		return output, false
-	}
-
-	last := lines[len(lines)-maxLines:]
-	cropped := strings.Join(last, "\n")
-	if hasTrailingNewline {
-		cropped += "\n"
-	}
-
-	return cropped, true
 }
 
 // Render returns a string representation of the tool call.
