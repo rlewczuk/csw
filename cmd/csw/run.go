@@ -31,6 +31,7 @@ func RunCommand() *cobra.Command {
 		cliCommitMessage     string
 		cliMerge             bool
 		cliNoMerge           bool
+		cliNoCommit          bool
 		cliContainerImage    string
 		cliContainerOn       bool
 		cliContainerOff      bool
@@ -48,7 +49,7 @@ func RunCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "run [<task-uuid-or-branch>|--last|--next] [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--merge|--no-merge] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [\"prompt\"] [command-args...]",
+		Use:   "run [<task-uuid-or-branch>|--last|--next] [--model <model>] [--role <role>] [--workdir <dir>] [--shadow-dir <path>] [--worktree <feature-branch-name>] [--merge|--no-merge] [--no-commit] [--container-image <image>] [--container-enabled|--container-disabled] [--container-mount <host_path>:<container_path>] [--container-env <key>=<value>] [--commit-message <template>] [--allow-all-permissions] [--interactive] [--save-session-to <file>] [--save-session] [\"prompt\"] [command-args...]",
 		Short: "Start a run chat session with an agent",
 		Long:  "Start a standard terminal session (no TUI) with a given model and role. The session can be non-interactive or lightly interactive.",
 		Args:  cobra.ArbitraryArgs,
@@ -72,6 +73,7 @@ func RunCommand() *cobra.Command {
 				GitUserName:           cliGitUser,
 				GitUserEmail:          cliGitEmail,
 				Merge:                 cliMerge,
+				NoCommit:              cliNoCommit,
 				ContainerEnabled:      cliContainerOn,
 				ContainerDisabled:     cliContainerOff,
 				ContainerImage:        cliContainerImage,
@@ -102,6 +104,7 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliWorktree, "worktree", "", "Create and use a git worktree for this session on a feature branch")
 	cmd.Flags().BoolVar(&cliMerge, "merge", false, "Merge the feature worktree branch into main after commit")
 	cmd.Flags().BoolVar(&cliNoMerge, "no-merge", false, "Disable merging after commit, overriding configured defaults")
+	cmd.Flags().BoolVar(&cliNoCommit, "no-commit", false, "Work directly in the project directory without creating a worktree or committing changes")
 	cmd.Flags().StringVar(&cliContainerImage, "container-image", "", "Container image for running bash commands in container mode")
 	cmd.Flags().BoolVar(&cliContainerOn, "container-enabled", false, "Enable running bash commands in container mode")
 	cmd.Flags().BoolVar(&cliContainerOff, "container-disabled", false, "Disable running bash commands in container mode")

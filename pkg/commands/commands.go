@@ -49,6 +49,7 @@ type RunDefaultsMetadata struct {
 	Model               *string            `yaml:"model"`
 	Worktree            *string            `yaml:"worktree"`
 	Merge               *bool              `yaml:"merge"`
+	NoCommit            *bool              `yaml:"no-commit"`
 	LogLLMRequests      *bool              `yaml:"log-llm-requests"`
 	Thinking            *string            `yaml:"thinking"`
 	LSPServer           *string            `yaml:"lsp-server"`

@@ -6,6 +6,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,6 +25,21 @@ func TestValidateMergeCLIParams(t *testing.T) {
 			},
 			expectError:    true,
 			errorSubstring: "--merge requires --worktree",
+		},
+		{
+			name: "merge with no commit is rejected",
+			params: &RunParams{
+				Merge:    true,
+				NoCommit: true,
+			},
+			expectError:    true,
+			errorSubstring: "--merge cannot be used with --no-commit",
+		},
+		{
+			name: "no commit without worktree is allowed",
+			params: &RunParams{
+				NoCommit: true,
+			},
 		},
 		{
 			name: "merge with worktree is allowed",
@@ -235,11 +251,11 @@ func TestShouldDisableTaskWorktreeForRun(t *testing.T) {
 
 func TestResolveTaskFinalStatusForRun(t *testing.T) {
 	tests := []struct {
-		name                   string
-		sessionUpdatedStatus   bool
-		merge                  bool
-		expectedStatus         string
-		expectedShouldApply    bool
+		name                 string
+		sessionUpdatedStatus bool
+		merge                bool
+		expectedStatus       string
+		expectedShouldApply  bool
 	}{
 		{
 			name:                "merge without in-session update resolves to merged",
@@ -272,6 +288,79 @@ func TestResolveTaskFinalStatusForRun(t *testing.T) {
 			status, shouldApply := resolveTaskFinalStatusForRun(session, tc.merge)
 			assert.Equal(t, tc.expectedStatus, status)
 			assert.Equal(t, tc.expectedShouldApply, shouldApply)
+		})
+	}
+}
+
+func TestApplyRunDefaultsNoCommit(t *testing.T) {
+	tests := []struct {
+		name                string
+		defaultsNoCommit    bool
+		noCommitFlagChanged bool
+		initialNoCommit     bool
+		initialWorktree     string
+		initialMerge        bool
+		expectedNoCommit    bool
+		expectedWorktree    string
+		expectedMerge       bool
+	}{
+		{
+			name:             "default no commit clears default worktree and merge",
+			defaultsNoCommit: true,
+			initialWorktree:  "feature/default",
+			initialMerge:     true,
+			expectedNoCommit: true,
+		},
+		{
+			name:                "explicit no commit clears explicit worktree and merge",
+			initialNoCommit:     true,
+			noCommitFlagChanged: true,
+			initialWorktree:     "feature/cli",
+			initialMerge:        true,
+			expectedNoCommit:    true,
+		},
+		{
+			name:             "default false keeps worktree and merge",
+			defaultsNoCommit: false,
+			initialWorktree:  "feature/default",
+			initialMerge:     true,
+			expectedWorktree: "feature/default",
+			expectedMerge:    true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := &cobra.Command{Use: "run"}
+			cmd.Flags().Bool("no-commit", false, "")
+			if tc.noCommitFlagChanged {
+				require.NoError(t, cmd.Flags().Set("no-commit", "true"))
+			}
+
+			model := ""
+			worktree := tc.initialWorktree
+			merge := tc.initialMerge
+			logLLMRequests := false
+			logLLMRequestsRaw := false
+			thinking := ""
+			lspServer := ""
+			gitUser := ""
+			gitEmail := ""
+			maxThreads := 0
+			shadowDir := ""
+			allowAllPerms := false
+			vfsAllow := []string(nil)
+			noCommit := tc.initialNoCommit
+			resolver := runDefaultsResolver(func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+				_ = params
+				return conf.RunDefaultsConfig{NoCommit: tc.defaultsNoCommit}, nil
+			})
+
+			err := applyRunDefaults(resolver, cmd, "wd", "shadow", "project", "cfg", &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedNoCommit, noCommit)
+			assert.Equal(t, tc.expectedWorktree, worktree)
+			assert.Equal(t, tc.expectedMerge, merge)
 		})
 	}
 }

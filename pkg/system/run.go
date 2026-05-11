@@ -48,6 +48,7 @@ type RunParams struct {
 	GitUserName           string
 	GitUserEmail          string
 	Merge                 bool
+	NoCommit              bool
 	ContainerEnabled      bool
 	ContainerDisabled     bool
 	ContainerImage        string
@@ -209,17 +210,21 @@ func RunCommand(params *RunParams) error {
 			return err
 		}
 
-		if err := applyRunDefaults(ResolveRunDefaults, params.Command, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath, &params.ModelName, &params.WorktreeBranch, &params.Merge, &params.LogLLMRequests, &params.LogLLMRequestsRaw, &params.Thinking, &params.LSPServer, &params.GitUserName, &params.GitUserEmail, &params.MaxThreads, &params.ShadowDir, &params.AllowAllPerms, &params.VFSAllow); err != nil {
+		if err := applyRunDefaults(ResolveRunDefaults, params.Command, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath, &params.ModelName, &params.WorktreeBranch, &params.Merge, &params.LogLLMRequests, &params.LogLLMRequestsRaw, &params.Thinking, &params.LSPServer, &params.GitUserName, &params.GitUserEmail, &params.MaxThreads, &params.ShadowDir, &params.AllowAllPerms, &params.VFSAllow, &params.NoCommit); err != nil {
 			return err
 		}
 
 		containerOn := params.ContainerEnabled
 		containerOff := params.ContainerDisabled
-		commandContainerEnabled, err := applyCommandRunDefaults(params.Command, commandRunDefaults, &params.ModelName, &params.RoleName, &params.WorktreeBranch, &params.Merge, &params.LogLLMRequests, &params.Thinking, &params.LSPServer, &params.GitUserName, &params.GitUserEmail, &params.MaxThreads, &params.ShadowDir, &params.AllowAllPerms, &params.VFSAllow, &containerOn, &containerOff, &params.ContainerImage, &params.ContainerMounts, &params.ContainerEnv)
+		commandContainerEnabled, err := applyCommandRunDefaults(params.Command, commandRunDefaults, &params.ModelName, &params.RoleName, &params.WorktreeBranch, &params.Merge, &params.LogLLMRequests, &params.Thinking, &params.LSPServer, &params.GitUserName, &params.GitUserEmail, &params.MaxThreads, &params.ShadowDir, &params.AllowAllPerms, &params.VFSAllow, &params.NoCommit, &containerOn, &containerOff, &params.ContainerImage, &params.ContainerMounts, &params.ContainerEnv)
 		if err != nil {
 			return err
 		}
 		if params.NoMerge {
+			params.Merge = false
+		}
+		if params.NoCommit {
+			params.WorktreeBranch = ""
 			params.Merge = false
 		}
 		params.LogLLMRequests = params.LogLLMRequests || params.LogLLMRequestsRaw
@@ -281,7 +286,7 @@ func RunCommand(params *RunParams) error {
 			if params.Task != nil {
 				taskFeatureBranch = strings.TrimSpace(params.Task.FeatureBranch)
 			}
-			if shouldDisableTaskWorktreeForRun(commandTaskMetadata, params.Task) {
+			if shouldDisableTaskWorktreeForRun(commandTaskMetadata, params.Task) || params.NoCommit {
 				params.WorktreeBranch = ""
 				taskRunMerge = false
 			} else if strings.TrimSpace(params.WorktreeBranch) == "" {
@@ -315,6 +320,11 @@ func RunCommand(params *RunParams) error {
 		params.ContainerEnabled = containerRequested
 		params.ContainerDisabled = containerDisabledChanged && containerOff
 		params.VFSAllow = parseVFSAllowPaths(params.VFSAllow)
+	}
+
+	if params.NoCommit {
+		params.WorktreeBranch = ""
+		params.Merge = false
 	}
 
 	if params.BashRunTimeout <= 0 {
@@ -428,7 +438,7 @@ func resolveTaskFinalStatusForRun(session *core.SweSession, merge bool) (string,
 	return core.TaskStatusCompleted, true
 }
 
-func applyRunDefaults(resolver runDefaultsResolver, cmd *cobra.Command, workDir string, shadowDir string, projectConfig string, configPath string, model *string, worktree *string, merge *bool, logLLMRequests *bool, logLLMRequestsRaw *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string) error {
+func applyRunDefaults(resolver runDefaultsResolver, cmd *cobra.Command, workDir string, shadowDir string, projectConfig string, configPath string, model *string, worktree *string, merge *bool, logLLMRequests *bool, logLLMRequestsRaw *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string, noCommit *bool) error {
 	defaults, err := resolver(ResolveRunDefaultsParams{WorkDir: workDir, ShadowDir: shadowDir, ProjectConfig: projectConfig, ConfigPath: configPath})
 	if err != nil {
 		return fmt.Errorf("applyRunDefaults() [run.go]: failed to resolve run defaults: %w", err)
@@ -439,7 +449,14 @@ func applyRunDefaults(resolver runDefaultsResolver, cmd *cobra.Command, workDir 
 	if !cmd.Flags().Changed("worktree") && defaults.Worktree != "" {
 		*worktree = defaults.Worktree
 	}
-	if !cmd.Flags().Changed("merge") && defaults.Merge {
+	if !cmd.Flags().Changed("no-commit") && defaults.NoCommit {
+		*noCommit = true
+	}
+	if *noCommit {
+		*worktree = ""
+		*merge = false
+	}
+	if !*noCommit && !cmd.Flags().Changed("merge") && defaults.Merge {
 		*merge = true
 	}
 	if !cmd.Flags().Changed("log-llm-requests") && defaults.LogLLMRequests {
@@ -540,6 +557,9 @@ func buildRunStdinSessionInput(params *RunParams, thread core.SessionThreadInput
 func validateMergeRunParams(params *RunParams) error {
 	if params == nil {
 		return fmt.Errorf("validateMergeRunParams() [run.go]: params cannot be nil")
+	}
+	if params.Merge && params.NoCommit {
+		return fmt.Errorf("RunCommand() [run.go]: --merge cannot be used with --no-commit")
 	}
 	if params.Merge && strings.TrimSpace(params.WorktreeBranch) == "" {
 		return fmt.Errorf("RunCommand() [run.go]: --merge requires --worktree")

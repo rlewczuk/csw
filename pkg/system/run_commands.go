@@ -113,7 +113,7 @@ func resolveRunCommandSource(commandPath string) string {
 	return "custom"
 }
 
-func applyCommandRunDefaults(cmd *cobra.Command, defaults *commands.RunDefaultsMetadata, model *string, role *string, worktree *string, merge *bool, logLLMRequests *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string, containerOn *bool, containerOff *bool, containerImage *string, containerMounts *[]string, containerEnv *[]string) (*bool, error) {
+func applyCommandRunDefaults(cmd *cobra.Command, defaults *commands.RunDefaultsMetadata, model *string, role *string, worktree *string, merge *bool, logLLMRequests *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string, noCommit *bool, containerOn *bool, containerOff *bool, containerImage *string, containerMounts *[]string, containerEnv *[]string) (*bool, error) {
 	if defaults == nil {
 		return nil, nil
 	}
@@ -126,7 +126,14 @@ func applyCommandRunDefaults(cmd *cobra.Command, defaults *commands.RunDefaultsM
 	if !cmd.Flags().Changed("worktree") && defaults.Worktree != nil {
 		*worktree = strings.TrimSpace(*defaults.Worktree)
 	}
-	if !cmd.Flags().Changed("merge") && defaults.Merge != nil {
+	if !cmd.Flags().Changed("no-commit") && defaults.NoCommit != nil {
+		*noCommit = *defaults.NoCommit
+	}
+	if *noCommit {
+		*worktree = ""
+		*merge = false
+	}
+	if !*noCommit && !cmd.Flags().Changed("merge") && defaults.Merge != nil {
 		*merge = *defaults.Merge
 	}
 	if !cmd.Flags().Changed("log-llm-requests") && defaults.LogLLMRequests != nil {
