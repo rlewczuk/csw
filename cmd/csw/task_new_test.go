@@ -132,23 +132,44 @@ func TestResolveTaskCreateParamsNoCommitSetsEmptyFeatureBranch(t *testing.T) {
 		generateTaskDescriptionFunc = originalDescriptionGenerator
 	})
 
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
-		_ = params
-		return conf.RunDefaultsConfig{Model: "provider/model", Worktree: "feature/%"}, nil
+	tests := []struct {
+		name     string
+		params   taskCreateResolveParams
+		defaults conf.RunDefaultsConfig
+	}{
+		{
+			name:     "cli flag",
+			params:   taskCreateResolveParams{Prompt: "do this task", NoCommit: true},
+			defaults: conf.RunDefaultsConfig{Model: "provider/model", Worktree: "feature/%"},
+		},
+		{
+			name:     "run default",
+			params:   taskCreateResolveParams{Prompt: "do this task"},
+			defaults: conf.RunDefaultsConfig{Model: "provider/model", Worktree: "feature/%", NoCommit: true},
+		},
 	}
 
-	generateTaskDescriptionFunc = func(ctx context.Context, params taskCreateResolveParams) (string, error) {
-		_ = ctx
-		assert.Equal(t, taskNewFallbackBranchName, params.Branch)
-		return "generated description", nil
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+				_ = params
+				return tt.defaults, nil
+			}
 
-	resolved, err := resolveTaskCreateParams(context.Background(), taskCreateResolveParams{Prompt: "do this task", NoCommit: true})
-	require.NoError(t, err)
-	assert.Equal(t, "", resolved.FeatureBranch)
-	assert.True(t, resolved.NoCommit)
-	assert.Equal(t, taskNewFallbackBranchName, resolved.Name)
-	assert.Equal(t, "generated description", resolved.Description)
+			generateTaskDescriptionFunc = func(ctx context.Context, params taskCreateResolveParams) (string, error) {
+				_ = ctx
+				assert.Equal(t, taskNewFallbackBranchName, params.Branch)
+				return "generated description", nil
+			}
+
+			resolved, err := resolveTaskCreateParams(context.Background(), tt.params)
+			require.NoError(t, err)
+			assert.Equal(t, "", resolved.FeatureBranch)
+			assert.True(t, resolved.NoCommit)
+			assert.Equal(t, taskNewFallbackBranchName, resolved.Name)
+			assert.Equal(t, "generated description", resolved.Description)
+		})
+	}
 }
 
 func TestTaskNewCommandPromptFlagIsOptional(t *testing.T) {

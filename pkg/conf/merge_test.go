@@ -97,29 +97,31 @@ func TestContainerConfig_Merge(t *testing.T) {
 
 func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 	base := RunDefaultsConfig{
-		DefaultProvider: "provider1",
-		DefaultRole:     "role1",
-		Container:       &ContainerConfig{Image: "image1", Mounts: []string{"/a:/b"}, Env: []string{"A=1"}},
-		Model:           "provider1/model",
-		Worktree:        "feature/one",
-		Merge:           false,
-		LogLLMRequests:  false,
+		DefaultProvider:   "provider1",
+		DefaultRole:       "role1",
+		Container:         &ContainerConfig{Image: "image1", Mounts: []string{"/a:/b"}, Env: []string{"A=1"}},
+		Model:             "provider1/model",
+		Worktree:          "feature/one",
+		Merge:             false,
+		NoCommit:          false,
+		LogLLMRequests:    false,
 		LogLLMRequestsRaw: false,
-		Thinking:        "medium",
-		LSPServer:       "first",
-		GitUserName:     "Base User",
-		GitUserEmail:    "base@example.com",
-		MaxThreads:      4,
-		TaskDir:         ".cswdata/tasks",
-		ShadowDir:       "shadow/base",
-		VFSAllow:        []string{"/base/allow"},
+		Thinking:          "medium",
+		LSPServer:         "first",
+		GitUserName:       "Base User",
+		GitUserEmail:      "base@example.com",
+		MaxThreads:        4,
+		TaskDir:           ".cswdata/tasks",
+		ShadowDir:         "shadow/base",
+		VFSAllow:          []string{"/base/allow"},
 	}
-		override := RunDefaultsConfig{
+	override := RunDefaultsConfig{
 		DefaultProvider:     "provider2",
 		DefaultRole:         "role2",
 		Container:           &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
 		Model:               "provider2/model",
 		Merge:               true,
+		NoCommit:            true,
 		LogLLMRequests:      true,
 		LogLLMRequestsRaw:   true,
 		LSPServer:           "second",
@@ -141,6 +143,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		Model:               "provider2/model",
 		Worktree:            "feature/one",
 		Merge:               true,
+		NoCommit:            true,
 		LogLLMRequests:      true,
 		LogLLMRequestsRaw:   true,
 		Thinking:            "medium",
@@ -368,15 +371,15 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 		assert.Equal(t, "/a", cfg.Defaults.VFSAllow[0])
 	})
 
-		t.Run("agent role clone is deep copy", func(t *testing.T) {
-			cfg := &AgentRoleConfig{
-				VFSPrivileges:   map[string]FileAccess{"/": {Read: AccessAllow}},
-				ToolsAccess:     map[string]AccessFlag{"vfsRead": AccessAllow},
-				RunPrivileges:   map[string]AccessFlag{".*": AccessAsk},
-				PromptFragments: map[string]string{"a": "1"},
-				ToolFragments:   map[string]string{"x": "1"},
-				HiddenPatterns:  []string{".git/"},
-			}
+	t.Run("agent role clone is deep copy", func(t *testing.T) {
+		cfg := &AgentRoleConfig{
+			VFSPrivileges:   map[string]FileAccess{"/": {Read: AccessAllow}},
+			ToolsAccess:     map[string]AccessFlag{"vfsRead": AccessAllow},
+			RunPrivileges:   map[string]AccessFlag{".*": AccessAsk},
+			PromptFragments: map[string]string{"a": "1"},
+			ToolFragments:   map[string]string{"x": "1"},
+			HiddenPatterns:  []string{".git/"},
+		}
 
 		clone := cfg.Clone()
 		require.NotNil(t, clone)
@@ -384,17 +387,17 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 		clone.VFSPrivileges["/"] = FileAccess{Read: AccessDeny}
 		clone.ToolsAccess["vfsRead"] = AccessDeny
 		clone.RunPrivileges[".*"] = AccessDeny
-			clone.PromptFragments["a"] = "2"
-			clone.ToolFragments["x"] = "2"
-			clone.HiddenPatterns[0] = "tmp/"
+		clone.PromptFragments["a"] = "2"
+		clone.ToolFragments["x"] = "2"
+		clone.HiddenPatterns[0] = "tmp/"
 
 		assert.Equal(t, AccessAllow, cfg.VFSPrivileges["/"].Read)
 		assert.Equal(t, AccessAllow, cfg.ToolsAccess["vfsRead"])
 		assert.Equal(t, AccessAsk, cfg.RunPrivileges[".*"])
-			assert.Equal(t, "1", cfg.PromptFragments["a"])
-			assert.Equal(t, "1", cfg.ToolFragments["x"])
-			assert.Equal(t, ".git/", cfg.HiddenPatterns[0])
-		})
+		assert.Equal(t, "1", cfg.PromptFragments["a"])
+		assert.Equal(t, "1", cfg.ToolFragments["x"])
+		assert.Equal(t, ".git/", cfg.HiddenPatterns[0])
+	})
 
 	t.Run("tool selection clone is deep copy", func(t *testing.T) {
 		cfg := ToolSelectionConfig{

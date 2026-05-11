@@ -110,6 +110,9 @@ mergeOtherFields:
 	if override.Merge {
 		c.Merge = true
 	}
+	if override.NoCommit {
+		c.NoCommit = true
+	}
 	if override.LogLLMRequests {
 		c.LogLLMRequests = true
 	}

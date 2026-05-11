@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	taskNewFallbackBranchName = "unnamed"
+	taskNewFallbackBranchName  = "unnamed"
 	taskNewFallbackDescription = "New Task"
 )
 
@@ -204,11 +204,11 @@ func resolveTaskCreateParams(ctx context.Context, params taskCreateResolveParams
 	}
 
 	resolvedBranch := strings.TrimSpace(params.Branch)
-	if params.NoCommit {
+	if params.NoCommit || defaults.NoCommit {
 		resolvedBranch = ""
 	}
 	if resolvedBranch == "" {
-		if params.NoCommit {
+		if params.NoCommit || defaults.NoCommit {
 			resolvedName := strings.TrimSpace(params.Name)
 			if resolvedName == "" {
 				resolvedName = taskNewFallbackBranchName

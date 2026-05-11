@@ -193,6 +193,8 @@ type RunDefaultsConfig struct {
 	Worktree string `json:"worktree,omitempty"`
 	// Merge is the default --merge value.
 	Merge bool `json:"merge,omitempty"`
+	// NoCommit is the default --no-commit value.
+	NoCommit bool `json:"no-commit,omitempty"`
 	// LogLLMRequests is the default --log-llm-requests value.
 	LogLLMRequests bool `json:"log-llm-requests,omitempty"`
 	// LogLLMRequestsRaw is the default --log-llm-requests-raw value.
