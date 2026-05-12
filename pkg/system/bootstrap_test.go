@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/vcs"
@@ -265,6 +267,82 @@ func TestResolveRunDefaultsUsesShadowDirForProjectConfig(t *testing.T) {
 	assert.Equal(t, "shadow/provider-model", defaults.Model)
 }
 
+func TestResolveRunDefaultsReturnsConfiguredWorkdir(t *testing.T) {
+	workDir := t.TempDir()
+	shadowDir := t.TempDir()
+	configuredWorkDir := filepath.Join(workDir, "project")
+
+	require.NoError(t, os.MkdirAll(filepath.Join(shadowDir, ".csw", "config"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(shadowDir, ".csw", "config", "global.json"), []byte(`{
+		"defaults": {
+			"workdir": "`+configuredWorkDir+`"
+		}
+	}`), 0o644))
+
+	defaults, err := ResolveRunDefaults(ResolveRunDefaultsParams{
+		WorkDir:   workDir,
+		ShadowDir: shadowDir,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, configuredWorkDir, defaults.Workdir)
+}
+
+func TestApplyRunDefaultsSetsWorkdirWhenFlagUnchanged(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.Flags().String("workdir", "", "")
+	workDir := ""
+	model := ""
+	worktree := ""
+	merge := false
+	logLLMRequests := false
+	logLLMRequestsRaw := false
+	thinking := ""
+	lspServer := ""
+	gitUser := ""
+	gitEmail := ""
+	maxThreads := 0
+	shadowDir := ""
+	allowAllPerms := false
+	vfsAllow := []string(nil)
+	noCommit := false
+	resolver := func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		return conf.RunDefaultsConfig{Workdir: "/configured/workdir"}, nil
+	}
+
+	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit)
+
+	require.NoError(t, err)
+	assert.Equal(t, "/configured/workdir", workDir)
+}
+
+func TestApplyRunDefaultsKeepsChangedWorkdirFlag(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.Flags().String("workdir", "", "")
+	require.NoError(t, cmd.Flags().Set("workdir", "/cli/workdir"))
+	workDir := "/cli/workdir"
+	model := ""
+	worktree := ""
+	merge := false
+	logLLMRequests := false
+	logLLMRequestsRaw := false
+	thinking := ""
+	lspServer := ""
+	gitUser := ""
+	gitEmail := ""
+	maxThreads := 0
+	shadowDir := ""
+	allowAllPerms := false
+	vfsAllow := []string(nil)
+	noCommit := false
+	resolver := func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		return conf.RunDefaultsConfig{Workdir: "/configured/workdir"}, nil
+	}
+
+	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit)
+
+	require.NoError(t, err)
+	assert.Equal(t, "/cli/workdir", workDir)
+}
 
 func initTestGitRepository(t *testing.T) string {
 	t.Helper()

@@ -337,6 +337,7 @@ func TestApplyRunDefaultsNoCommit(t *testing.T) {
 				require.NoError(t, cmd.Flags().Set("no-commit", "true"))
 			}
 
+			workDir := "wd"
 			model := ""
 			worktree := tc.initialWorktree
 			merge := tc.initialMerge
@@ -356,7 +357,7 @@ func TestApplyRunDefaultsNoCommit(t *testing.T) {
 				return conf.RunDefaultsConfig{NoCommit: tc.defaultsNoCommit}, nil
 			})
 
-			err := applyRunDefaults(resolver, cmd, "wd", "shadow", "project", "cfg", &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit)
+			err := applyRunDefaults(resolver, cmd, workDir, "shadow", "project", "cfg", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedNoCommit, noCommit)
 			assert.Equal(t, tc.expectedWorktree, worktree)

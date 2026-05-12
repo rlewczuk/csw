@@ -210,7 +210,7 @@ func RunCommand(params *RunParams) error {
 			return err
 		}
 
-		if err := applyRunDefaults(ResolveRunDefaults, params.Command, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath, &params.ModelName, &params.WorktreeBranch, &params.Merge, &params.LogLLMRequests, &params.LogLLMRequestsRaw, &params.Thinking, &params.LSPServer, &params.GitUserName, &params.GitUserEmail, &params.MaxThreads, &params.ShadowDir, &params.AllowAllPerms, &params.VFSAllow, &params.NoCommit); err != nil {
+		if err := applyRunDefaults(ResolveRunDefaults, params.Command, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath, &params.WorkDir, &params.ModelName, &params.WorktreeBranch, &params.Merge, &params.LogLLMRequests, &params.LogLLMRequestsRaw, &params.Thinking, &params.LSPServer, &params.GitUserName, &params.GitUserEmail, &params.MaxThreads, &params.ShadowDir, &params.AllowAllPerms, &params.VFSAllow, &params.NoCommit); err != nil {
 			return err
 		}
 
@@ -438,10 +438,13 @@ func resolveTaskFinalStatusForRun(session *core.SweSession, merge bool) (string,
 	return core.TaskStatusCompleted, true
 }
 
-func applyRunDefaults(resolver runDefaultsResolver, cmd *cobra.Command, workDir string, shadowDir string, projectConfig string, configPath string, model *string, worktree *string, merge *bool, logLLMRequests *bool, logLLMRequestsRaw *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string, noCommit *bool) error {
+func applyRunDefaults(resolver runDefaultsResolver, cmd *cobra.Command, workDir string, shadowDir string, projectConfig string, configPath string, workDirOut *string, model *string, worktree *string, merge *bool, logLLMRequests *bool, logLLMRequestsRaw *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string, noCommit *bool) error {
 	defaults, err := resolver(ResolveRunDefaultsParams{WorkDir: workDir, ShadowDir: shadowDir, ProjectConfig: projectConfig, ConfigPath: configPath})
 	if err != nil {
 		return fmt.Errorf("applyRunDefaults() [run.go]: failed to resolve run defaults: %w", err)
+	}
+	if !cmd.Flags().Changed("workdir") && defaults.Workdir != "" {
+		*workDirOut = defaults.Workdir
 	}
 	if !cmd.Flags().Changed("model") && defaults.Model != "" {
 		*model = defaults.Model

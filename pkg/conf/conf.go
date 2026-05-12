@@ -189,6 +189,8 @@ type RunDefaultsConfig struct {
 	Container *ContainerConfig `json:"container,omitempty"`
 	// Model is the default --model value.
 	Model string `json:"model,omitempty"`
+	// Workdir is the default --workdir value.
+	Workdir string `json:"workdir,omitempty"`
 	// Worktree is the default --worktree value.
 	Worktree string `json:"worktree,omitempty"`
 	// Merge is the default --merge value.

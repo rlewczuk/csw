@@ -104,6 +104,9 @@ mergeOtherFields:
 	if override.Model != "" {
 		c.Model = override.Model
 	}
+	if override.Workdir != "" {
+		c.Workdir = override.Workdir
+	}
 	if override.Worktree != "" {
 		c.Worktree = override.Worktree
 	}

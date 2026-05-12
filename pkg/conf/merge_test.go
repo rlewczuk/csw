@@ -101,6 +101,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		DefaultRole:       "role1",
 		Container:         &ContainerConfig{Image: "image1", Mounts: []string{"/a:/b"}, Env: []string{"A=1"}},
 		Model:             "provider1/model",
+		Workdir:           "/base/workdir",
 		Worktree:          "feature/one",
 		Merge:             false,
 		NoCommit:          false,
@@ -120,6 +121,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		DefaultRole:         "role2",
 		Container:           &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
 		Model:               "provider2/model",
+		Workdir:             "/override/workdir",
 		Merge:               true,
 		NoCommit:            true,
 		LogLLMRequests:      true,
@@ -141,6 +143,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		DefaultRole:         "role2",
 		Container:           &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
 		Model:               "provider2/model",
+		Workdir:             "/override/workdir",
 		Worktree:            "feature/one",
 		Merge:               true,
 		NoCommit:            true,
@@ -156,6 +159,15 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		AllowAllPermissions: true,
 		VFSAllow:            []string{"/override/allow1", "/override/allow2"},
 	}, base)
+}
+
+func TestCLIDefaultsConfig_MergeFrom_EmptyWorkdirKeepsBase(t *testing.T) {
+	base := RunDefaultsConfig{Workdir: "/base/workdir"}
+	override := RunDefaultsConfig{}
+
+	base.MergeFrom(override)
+
+	assert.Equal(t, "/base/workdir", base.Workdir)
 }
 
 func TestCLIDefaultsConfig_MergeFrom_GitIdentity(t *testing.T) {
