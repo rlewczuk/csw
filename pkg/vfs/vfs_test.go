@@ -126,6 +126,82 @@ func TestReadFile(t *testing.T) {
 	})
 }
 
+func TestLocalVFSErrorIncludesPathContext(t *testing.T) {
+	fixture := setupFixture(t)
+	defer fixture.Cleanup()
+
+	localVFS, ok := fixture.VFS.(*LocalVFS)
+	require.True(t, ok)
+
+	testCases := []struct {
+		name     string
+		path     string
+		wantPath string
+		run      func(string) error
+	}{
+		{
+			name:     "ReadFile",
+			path:     "missing.txt",
+			wantPath: filepath.Join(localVFS.root, "missing.txt"),
+			run: func(path string) error {
+				_, err := localVFS.ReadFile(path)
+				return err
+			},
+		},
+		{
+			name:     "DeleteFile",
+			path:     "missing.txt",
+			wantPath: filepath.Join(localVFS.root, "missing.txt"),
+			run: func(path string) error {
+				return localVFS.DeleteFile(path, false, false)
+			},
+		},
+		{
+			name:     "ListFiles",
+			path:     "missing-dir",
+			wantPath: filepath.Join(localVFS.root, "missing-dir"),
+			run: func(path string) error {
+				_, err := localVFS.ListFiles(path, false)
+				return err
+			},
+		},
+		{
+			name:     "MoveFileSource",
+			path:     "missing-source.txt",
+			wantPath: filepath.Join(localVFS.root, "missing-source.txt"),
+			run: func(path string) error {
+				return localVFS.MoveFile(path, "target.txt")
+			},
+		},
+		{
+			name:     "ReadFileAllowedAbsolutePath",
+			path:     filepath.Join(t.TempDir(), "missing.txt"),
+			wantPath: "",
+			run: func(path string) error {
+				allowedVFS, err := NewLocalVFS(fixture.Root, nil, []string{filepath.Dir(path)})
+				require.NoError(t, err)
+				_, err = allowedVFS.ReadFile(path)
+				return err
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			wantPath := testCase.wantPath
+			if wantPath == "" {
+				wantPath = testCase.path
+			}
+
+			err := testCase.run(testCase.path)
+
+			require.ErrorIs(t, err, apis.ErrFileNotFound)
+			assert.Contains(t, err.Error(), "path="+wantPath)
+			assert.Contains(t, err.Error(), "base="+localVFS.root)
+		})
+	}
+}
+
 func TestWriteFile(t *testing.T) {
 	t.Run("WriteNewFile", func(t *testing.T) {
 		runTestWithBothVFS(t, func(t *testing.T, fixture *TestFixture) {
