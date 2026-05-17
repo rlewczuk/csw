@@ -58,13 +58,23 @@ func runTaskArchive(manager *core.TaskManager, args []string, status string, out
 	}
 
 	if trimmedStatus == "" {
-		trimmedStatus = core.TaskStatusMerged
+		archivedTasks, archiveErr := manager.ArchiveCompletedTasks()
+		if archiveErr != nil {
+			return archiveErr
+		}
+		writeArchivedTasks(output, archivedTasks)
+		return nil
 	}
 	archivedTasks, archiveErr := manager.ArchiveTasksByStatus(trimmedStatus)
 	if archiveErr != nil {
 		return archiveErr
 	}
+	writeArchivedTasks(output, archivedTasks)
 
+	return nil
+}
+
+func writeArchivedTasks(output io.Writer, archivedTasks []*core.Task) {
 	sort.Slice(archivedTasks, func(i, j int) bool {
 		if archivedTasks[i] == nil || archivedTasks[j] == nil {
 			return i < j
@@ -80,6 +90,4 @@ func runTaskArchive(manager *core.TaskManager, args []string, status string, out
 		}
 		_, _ = fmt.Fprintf(output, "Task archived: %s\t%s\n", archivedTask.UUID, archivedTask.Name)
 	}
-
-	return nil
 }

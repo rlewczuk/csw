@@ -34,6 +34,17 @@ func (m *TaskManager) ArchiveTask(lookup TaskLookup) (*Task, error) {
 	return cloneTask(task), nil
 }
 
+// ArchiveCompletedTasks moves merged tasks and completed tasks without feature branch to archive root.
+func (m *TaskManager) ArchiveCompletedTasks() ([]*Task, error) {
+	return m.archiveTasksMatching(func(task *Task) bool {
+		if task == nil {
+			return false
+		}
+		status := strings.TrimSpace(task.Status)
+		return status == TaskStatusMerged || (status == TaskStatusCompleted && strings.TrimSpace(task.FeatureBranch) == "")
+	})
+}
+
 // ArchiveTasksByStatus moves all tasks with provided status to archive root.
 func (m *TaskManager) ArchiveTasksByStatus(status string) ([]*Task, error) {
 	trimmedStatus := strings.TrimSpace(status)
@@ -41,6 +52,12 @@ func (m *TaskManager) ArchiveTasksByStatus(status string) ([]*Task, error) {
 		return nil, fmt.Errorf("TaskManager.ArchiveTasksByStatus() [task_archive.go]: status cannot be empty")
 	}
 
+	return m.archiveTasksMatching(func(task *Task) bool {
+		return task != nil && strings.TrimSpace(task.Status) == trimmedStatus
+	})
+}
+
+func (m *TaskManager) archiveTasksMatching(matches func(*Task) bool) ([]*Task, error) {
 	allTasks, err := m.loadAllTasks()
 	if err != nil {
 		return nil, err
@@ -48,12 +65,10 @@ func (m *TaskManager) ArchiveTasksByStatus(status string) ([]*Task, error) {
 
 	candidates := make([]taskWithPath, 0, len(allTasks))
 	for _, item := range allTasks {
-		if item.task == nil {
+		if !matches(item.task) {
 			continue
 		}
-		if strings.TrimSpace(item.task.Status) == trimmedStatus {
-			candidates = append(candidates, item)
-		}
+		candidates = append(candidates, item)
 	}
 
 	if len(candidates) == 0 {
@@ -81,17 +96,17 @@ func (m *TaskManager) ArchiveTasksByStatus(status string) ([]*Task, error) {
 
 		relativeDir, relErr := filepath.Rel(m.TasksRoot(), item.dir)
 		if relErr != nil {
-			return nil, fmt.Errorf("TaskManager.ArchiveTasksByStatus() [task_archive.go]: failed to calculate archive path: %w", relErr)
+			return nil, fmt.Errorf("TaskManager.archiveTasksMatching() [task_archive.go]: failed to calculate archive path: %w", relErr)
 		}
 		if strings.HasPrefix(relativeDir, "..") {
-			return nil, fmt.Errorf("TaskManager.ArchiveTasksByStatus() [task_archive.go]: task path %q is outside of tasks root %q", item.dir, m.TasksRoot())
+			return nil, fmt.Errorf("TaskManager.archiveTasksMatching() [task_archive.go]: task path %q is outside of tasks root %q", item.dir, m.TasksRoot())
 		}
 		destinationDir := filepath.Join(archivedRoot, relativeDir)
 		if err := os.MkdirAll(filepath.Dir(destinationDir), 0755); err != nil {
-			return nil, fmt.Errorf("TaskManager.ArchiveTasksByStatus() [task_archive.go]: failed to create archive parent directory: %w", err)
+			return nil, fmt.Errorf("TaskManager.archiveTasksMatching() [task_archive.go]: failed to create archive parent directory: %w", err)
 		}
 		if err := os.Rename(item.dir, destinationDir); err != nil {
-			return nil, fmt.Errorf("TaskManager.ArchiveTasksByStatus() [task_archive.go]: failed to move task to archive: %w", err)
+			return nil, fmt.Errorf("TaskManager.archiveTasksMatching() [task_archive.go]: failed to move task to archive: %w", err)
 		}
 
 		archivedPaths = append(archivedPaths, item.dir)
