@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/spf13/cobra"
@@ -93,6 +94,50 @@ func TestResolveTaskRunIdentifierForRun(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, "", identifier)
 	})
+
+	t.Run("skips completed task for --next", func(t *testing.T) {
+		manager, err := core.NewTaskManager(t.TempDir(), nil)
+		require.NoError(t, err)
+
+		completedTask, err := manager.CreateTask(core.TaskCreateParams{Name: "task-completed", Prompt: "completed prompt"})
+		require.NoError(t, err)
+		completedStatus := core.TaskStatusCompleted
+		_, err = manager.UpdateTask(core.TaskUpdateParams{Identifier: completedTask.UUID, Status: &completedStatus})
+		require.NoError(t, err)
+
+		time.Sleep(time.Millisecond)
+
+		openTask, err := manager.CreateTask(core.TaskCreateParams{Name: "task-open", Prompt: "open prompt"})
+		require.NoError(t, err)
+		openStatus := core.TaskStatusOpen
+		_, err = manager.UpdateTask(core.TaskUpdateParams{Identifier: openTask.UUID, Status: &openStatus})
+		require.NoError(t, err)
+
+		identifier, err := resolveTaskRunIdentifierForRun(manager, "", false, true)
+		require.NoError(t, err)
+		assert.Equal(t, openTask.UUID, identifier)
+	})
+}
+
+func TestIsUnfinishedTaskForRun(t *testing.T) {
+	testCases := []struct {
+		name     string
+		status   string
+		expected bool
+	}{
+		{name: "open", status: core.TaskStatusOpen, expected: true},
+		{name: "created", status: core.TaskStatusCreated, expected: true},
+		{name: "completed", status: core.TaskStatusCompleted, expected: false},
+		{name: "merged", status: core.TaskStatusMerged, expected: false},
+		{name: "running", status: core.TaskStatusRunning, expected: false},
+		{name: "draft", status: core.TaskStatusDraft, expected: false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			assert.Equal(t, testCase.expected, isUnfinishedTaskForRun(&core.Task{Status: testCase.status}))
+		})
+	}
 }
 
 func TestResolveRunTaskDirPath(t *testing.T) {

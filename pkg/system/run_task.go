@@ -251,7 +251,7 @@ func isUnfinishedTaskForRun(taskData *core.Task) bool {
 	}
 
 	status := strings.TrimSpace(taskData.Status)
-	if status == core.TaskStatusMerged || status == core.TaskStatusRunning || status == core.TaskStatusDraft {
+	if status == core.TaskStatusMerged || status == core.TaskStatusCompleted || status == core.TaskStatusRunning || status == core.TaskStatusDraft {
 		return false
 	}
 
