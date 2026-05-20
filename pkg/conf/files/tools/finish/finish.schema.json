@@ -2,7 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Finishes current session loop normally.",
   "type": "object",
-  "properties": {},
-  "required": [],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "Mandatory LLM-generated session summary describing what was done in this session, including completed work and notable results. This is shown to the user and persisted in summary.json."
+    }
+  },
+  "required": ["summary"],
   "additionalProperties": false
 }

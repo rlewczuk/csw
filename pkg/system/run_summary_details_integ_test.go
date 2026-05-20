@@ -44,7 +44,7 @@ func TestCLISummaryIncludesDetailedSessionInfo(t *testing.T) {
 	)
 
 	mockServer.AddStreamingResponse("/api/chat", "POST", true,
-		`{"model":"test-model","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"Done.","tool_calls":[{"function":{"name":"finish","arguments":{}}}]},"done":false}`,
+		`{"model":"test-model","created_at":"2024-01-01T00:00:02Z","message":{"role":"assistant","content":"Done.","tool_calls":[{"function":{"name":"finish","arguments":{"summary":"Updated test.txt and verified session details."}}}]},"done":false}`,
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
@@ -68,6 +68,7 @@ func TestCLISummaryIncludesDetailedSessionInfo(t *testing.T) {
 	require.NoError(t, err)
 	summary := string(summaryBytes)
 
+	assert.Contains(t, summary, "Updated test.txt and verified session details.")
 	assert.Contains(t, summary, "Model: ollama/test-model")
 	assert.Contains(t, summary, "Thinking: high")
 	assert.Contains(t, summary, "LSP server: /not/used/lsp")
@@ -86,6 +87,7 @@ func TestCLISummaryIncludesDetailedSessionInfo(t *testing.T) {
 	var jsonSummary map[string]any
 	require.NoError(t, json.Unmarshal(jsonBytes, &jsonSummary))
 	assert.NotEmpty(t, jsonSummary["base_commit_id"])
+	assert.Equal(t, "Updated test.txt and verified session details.", jsonSummary["summary"])
 	assert.Nil(t, jsonSummary["head_commit_id"])
 	assert.Equal(t, "ollama/test-model", jsonSummary["model_used"])
 	assert.Equal(t, "high", jsonSummary["thinking_level"])

@@ -247,11 +247,12 @@ func TestRegisterFinishTool(t *testing.T) {
 	response := registry.Execute(&ToolCall{
 		ID:        "finish-1",
 		Function:  "finish",
-		Arguments: NewToolValue(map[string]any{}),
+		Arguments: NewToolValue(map[string]any{"summary": "Registry finish summary."}),
 	})
 
 	require.NotNil(t, response)
 	assert.True(t, session.requested)
+	assert.Equal(t, "Registry finish summary.", session.summary)
 	assert.True(t, response.Done)
 	assert.Equal(t, "success", response.Result.Get("status").AsString())
 }

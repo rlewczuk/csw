@@ -21,16 +21,16 @@ import (
 )
 
 const (
-	defaultLLMRetryMaxAttempts        = 10
-	defaultLLMRetryMaxBackoffSeconds  = 60
-	defaultContextCompactionThreshold = 0.95
+	defaultLLMRetryMaxAttempts         = 10
+	defaultLLMRetryMaxBackoffSeconds   = 60
+	defaultContextCompactionThreshold  = 0.95
 	defaultKimiCompactorMessagesToKeep = 2
-	defaultMaxToolThreads             = 8
-	toolExecutionStartDelay           = 250 * time.Millisecond
-	autoContinuePrompt                = "Continue"
-	sessionMessageTypeInfo            = "info"
-	sessionMessageTypeWarning         = "warning"
-	sessionMessageTypeError           = "error"
+	defaultMaxToolThreads              = 8
+	toolExecutionStartDelay            = 250 * time.Millisecond
+	autoContinuePrompt                 = "Continue"
+	sessionMessageTypeInfo             = "info"
+	sessionMessageTypeWarning          = "warning"
+	sessionMessageTypeError            = "error"
 )
 
 // SubAgentTaskRunner executes delegated child-session tasks.
@@ -39,64 +39,66 @@ type SubAgentTaskRunner interface {
 }
 
 type SweSession struct {
-	id            string
-	parentID      string
-	taskID        string
-	task          *Task
-	slug          string
-	provider      models.ModelProvider
-	providerName  string
-	model         string
-	modelSpec     string
-	rolesUsed     []string
-	toolsUsed     []string
-	messages      []*models.ChatMessage
-	role          *conf.AgentRoleConfig
-	VFS           apis.VFS
-	baseVFS       apis.VFS
-	LSP           lsp.LSP
-	Tools         *tool.ToolRegistry
-	outputHandler SessionThreadOutput
+	id                      string
+	parentID                string
+	taskID                  string
+	task                    *Task
+	slug                    string
+	provider                models.ModelProvider
+	providerName            string
+	model                   string
+	modelSpec               string
+	rolesUsed               []string
+	toolsUsed               []string
+	messages                []*models.ChatMessage
+	role                    *conf.AgentRoleConfig
+	VFS                     apis.VFS
+	baseVFS                 apis.VFS
+	LSP                     lsp.LSP
+	Tools                   *tool.ToolRegistry
+	outputHandler           SessionThreadOutput
 	queuedUserPromptDrainer func() []string
-	workDir       string
-	shadowDir     string
-	todoList      []tool.TodoItem
-	todoMu        sync.Mutex
-	logger        *slog.Logger
-	llmLogger     *slog.Logger
+	workDir                 string
+	shadowDir               string
+	todoList                []tool.TodoItem
+	todoMu                  sync.Mutex
+	logger                  *slog.Logger
+	llmLogger               *slog.Logger
 
-	modelProviders  map[string]models.ModelProvider
-	modelAliases    map[string][]string
-	modelTags       *models.ModelTagRegistry
-	toolSelection   conf.ToolSelectionConfig
-	promptGenerator PromptGenerator
-	roles           *AgentRoleRegistry
-	config          *conf.CswConfig
-	systemTools     *tool.ToolRegistry
-	logBaseDir      string
-	thinking        string
-	maxToolThreads  int
-	toolStartDelay  time.Duration
+	modelProviders         map[string]models.ModelProvider
+	modelAliases           map[string][]string
+	modelTags              *models.ModelTagRegistry
+	toolSelection          conf.ToolSelectionConfig
+	promptGenerator        PromptGenerator
+	roles                  *AgentRoleRegistry
+	config                 *conf.CswConfig
+	systemTools            *tool.ToolRegistry
+	logBaseDir             string
+	thinking               string
+	maxToolThreads         int
+	toolStartDelay         time.Duration
 	llmRetryPolicyOverride *models.RetryPolicy
-	allowAllPerms   bool
+	allowAllPerms          bool
 
 	// pendingToolResponses stores tool responses that were executed before a permission query
 	// so they can be sent together after permissions are granted
 	pendingToolResponses []*tool.ToolResponse
 	// loadedAgentFiles keeps track of AGENTS.md files already injected into context.
-	loadedAgentFiles map[string]struct{}
-	tokenUsage       models.TokenUsage
-	contextLength    int
-	compactionCount int
-	compactor       ChatCompactor
-	taskManager     *TaskManager
-	taskVCS         apis.VCS
+	loadedAgentFiles           map[string]struct{}
+	tokenUsage                 models.TokenUsage
+	contextLength              int
+	compactionCount            int
+	compactor                  ChatCompactor
+	taskManager                *TaskManager
+	taskVCS                    apis.VCS
 	taskStatusUpdatedInSession bool
 
-	subAgentRunner       SubAgentTaskRunner
-	subAgentSlugs        map[string]struct{}
-	subAgentSlugsMu      sync.Mutex
-	finishRequested      atomic.Bool
+	subAgentRunner  SubAgentTaskRunner
+	subAgentSlugs   map[string]struct{}
+	subAgentSlugsMu sync.Mutex
+	finishRequested atomic.Bool
+	finishSummary   string
+	finishSummaryMu sync.Mutex
 }
 
 // SweSessionParams stores dependencies and initial values used to create a SweSession.
@@ -144,15 +146,16 @@ type SweSessionParams struct {
 	ToolsUsed        []string
 	LoadedAgentFiles map[string]struct{}
 
-	PendingToolResponses []*tool.ToolResponse
-	TokenUsage           models.TokenUsage
-	ContextLength        int
-	CompactionCount      int
+	PendingToolResponses       []*tool.ToolResponse
+	TokenUsage                 models.TokenUsage
+	ContextLength              int
+	CompactionCount            int
 	TaskStatusUpdatedInSession bool
-	TaskManager          *TaskManager
-	TaskVCS              apis.VCS
-	SubAgentRunner       SubAgentTaskRunner
-	UsedSubAgentSlugs    map[string]struct{}
+	TaskManager                *TaskManager
+	TaskVCS                    apis.VCS
+	SubAgentRunner             SubAgentTaskRunner
+	UsedSubAgentSlugs          map[string]struct{}
+	FinishSummary              string
 }
 
 // NewSweSession creates a new SweSession from provided parameters.
@@ -198,17 +201,18 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		maxToolThreads:  params.MaxToolThreads,
 		allowAllPerms:   params.AllowAllPermissions,
 
-			pendingToolResponses: make([]*tool.ToolResponse, 0, len(params.PendingToolResponses)),
-			loadedAgentFiles:     make(map[string]struct{}, len(params.LoadedAgentFiles)),
-		tokenUsage:           params.TokenUsage,
-		contextLength:        params.ContextLength,
-			compactionCount:      params.CompactionCount,
-			compactor:            NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, params.Config),
-			taskManager:          params.TaskManager,
-			taskVCS:              params.TaskVCS,
-			taskStatusUpdatedInSession: params.TaskStatusUpdatedInSession,
-			subAgentRunner:       params.SubAgentRunner,
-			subAgentSlugs:        make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
+		pendingToolResponses:       make([]*tool.ToolResponse, 0, len(params.PendingToolResponses)),
+		loadedAgentFiles:           make(map[string]struct{}, len(params.LoadedAgentFiles)),
+		tokenUsage:                 params.TokenUsage,
+		contextLength:              params.ContextLength,
+		compactionCount:            params.CompactionCount,
+		compactor:                  NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, params.Config),
+		taskManager:                params.TaskManager,
+		taskVCS:                    params.TaskVCS,
+		taskStatusUpdatedInSession: params.TaskStatusUpdatedInSession,
+		subAgentRunner:             params.SubAgentRunner,
+		subAgentSlugs:              make(map[string]struct{}, len(params.UsedSubAgentSlugs)),
+		finishSummary:              strings.TrimSpace(params.FinishSummary),
 	}
 
 	if session.baseVFS == nil {
@@ -336,8 +340,8 @@ func (s *SweSession) Run(ctx context.Context) error {
 	}
 
 	var (
-		responseMsg *models.ChatMessage
-		err         error
+		responseMsg          *models.ChatMessage
+		err                  error
 		autoContinueEligible bool
 	)
 

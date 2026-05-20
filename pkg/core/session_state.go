@@ -261,12 +261,35 @@ func (s *SweSession) ThinkingLevel() string {
 }
 
 // RequestFinish requests graceful session loop completion.
-func (s *SweSession) RequestFinish() {
+func (s *SweSession) RequestFinish(summary string) {
 	if s == nil {
 		return
 	}
 
+	s.SetFinishSummary(summary)
 	s.finishRequested.Store(true)
+}
+
+// FinishSummary returns the LLM-generated final session summary.
+func (s *SweSession) FinishSummary() string {
+	if s == nil {
+		return ""
+	}
+
+	s.finishSummaryMu.Lock()
+	defer s.finishSummaryMu.Unlock()
+	return s.finishSummary
+}
+
+// SetFinishSummary stores the LLM-generated final session summary.
+func (s *SweSession) SetFinishSummary(summary string) {
+	if s == nil {
+		return
+	}
+
+	s.finishSummaryMu.Lock()
+	s.finishSummary = strings.TrimSpace(summary)
+	s.finishSummaryMu.Unlock()
 }
 
 func (s *SweSession) consumeFinishRequest() bool {

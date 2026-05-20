@@ -28,6 +28,7 @@ type SessionSummaryBuildResult struct {
 
 // SessionSummaryJSON is a JSON representation of completed session summary details.
 type SessionSummaryJSON struct {
+	Summary          string                `json:"summary"`
 	BaseCommitID     string                `json:"base_commit_id,omitempty"`
 	HeadCommitID     string                `json:"head_commit_id,omitempty"`
 	EditedFiles      []string              `json:"edited_files"`
@@ -73,6 +74,7 @@ func BuildSessionSummaryJSON(session *SweSession, buildResult SessionSummaryBuil
 	duration := endTime.Sub(startTime)
 
 	return SessionSummaryJSON{
+		Summary:          session.FinishSummary(),
 		BaseCommitID:     strings.TrimSpace(baseCommitID),
 		HeadCommitID:     strings.TrimSpace(headCommitID),
 		EditedFiles:      vcs.CollectEditedFiles(buildResult.WorkDirRoot, buildResult.WorkDir, baseCommitID, headCommitID),
@@ -177,6 +179,9 @@ func BuildSessionSummaryMessage(duration time.Duration, session *SweSession, bui
 	)
 
 	lines := []string{primary}
+	if finishSummary := session.FinishSummary(); finishSummary != "" {
+		lines = append(lines, "", "Session summary:", finishSummary)
+	}
 	lines = append(lines, fmt.Sprintf("Model: %s", shared.NullValue(session.ModelWithProvider())))
 	lines = append(lines, fmt.Sprintf("Thinking: %s", shared.NullValue(session.ThinkingLevel())))
 	lines = append(lines, fmt.Sprintf("LSP server: %s", shared.NullValue(strings.TrimSpace(buildResult.LSPServer))))
@@ -215,7 +220,10 @@ func SaveSessionSummaryMarkdown(logsDir string, session *SweSession, sessionInfo
 
 // BuildSessionSummaryMarkdown builds markdown content containing summary and session details.
 func BuildSessionSummaryMarkdown(session *SweSession, sessionInfo string) string {
-	summary := strings.TrimSpace(LastAssistantMessageText(session))
+	summary := strings.TrimSpace(session.FinishSummary())
+	if summary == "" {
+		summary = strings.TrimSpace(LastAssistantMessageText(session))
+	}
 
 	var builder strings.Builder
 	builder.WriteString("# Summary\n\n")

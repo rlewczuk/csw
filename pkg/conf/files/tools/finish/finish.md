@@ -5,4 +5,6 @@ and finalization flow runs as in normal completion (same behavior as when assist
 returns message without tool calls).
 
 Usage:
-- This tool takes no parameters. Leave input empty.
+- You must provide the `summary` field.
+- `summary` must contain the LLM-generated final session summary: describe what was done in this session, including completed work, important changes, validation performed, and any notable remaining information.
+- The provided summary is displayed on the console with session information and persisted to `summary.json`.

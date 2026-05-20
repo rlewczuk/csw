@@ -295,9 +295,9 @@ func TestSessionRun_FinishToolStopsLoopWithoutExtraLLMCall(t *testing.T) {
 	})
 	mockProvider.SetChatResponse("test-model", &models.MockChatResponse{
 		Response: models.NewToolCallMessage(&tool.ToolCall{
-			ID:       "finish-1",
-			Function: "finish",
-			Arguments: tool.NewToolValue(map[string]any{}),
+			ID:        "finish-1",
+			Function:  "finish",
+			Arguments: tool.NewToolValue(map[string]any{"summary": "Finished the session."}),
 		}),
 	})
 
@@ -327,8 +327,8 @@ func TestSessionRun_AutoContinueOnNoToolCalls(t *testing.T) {
 	mockProvider := models.NewMockProvider([]models.ModelInfo{{Name: "test-model", Model: "test-model"}})
 	mockProvider.SetChatResponse("test-model", &models.MockChatResponse{
 		Response: models.NewToolCallMessage(&tool.ToolCall{
-			ID:       "finish-1",
-			Function: "todoRead",
+			ID:        "finish-1",
+			Function:  "todoRead",
 			Arguments: tool.NewToolValue(map[string]any{}),
 		}),
 	})

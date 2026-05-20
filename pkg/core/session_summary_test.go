@@ -97,10 +97,11 @@ func TestEmitSessionSummary(t *testing.T) {
 }
 
 func TestBuildSessionSummaryMessage(t *testing.T) {
-	t.Run("includes token and context stats", func(t *testing.T) {
-		session := &SweSession{}
+	t.Run("includes LLM generated summary and session stats", func(t *testing.T) {
+		session := &SweSession{finishSummary: "Implemented summary support."}
 		summary := BuildSessionSummaryMessage(5*time.Second, session, SessionSummaryBuildResult{})
 
+		assert.Contains(t, summary, "Session summary:\nImplemented summary support.")
 		assert.Contains(t, summary, "Session completed in 5s | tokens(input=0[cached=0,noncached=0], output=0, total=0) | context=0")
 		assert.Contains(t, summary, "Model: -")
 		assert.Contains(t, summary, "Thinking: -")
@@ -154,6 +155,21 @@ func TestFormatEditedFilesSummaryIncludesUntrackedFiles(t *testing.T) {
 	summary := FormatEditedFilesSummary(repoDir, repoDir)
 	assert.NotEqual(t, "-", summary)
 	assert.Contains(t, summary, "new.txt (new file)")
+}
+
+func TestBuildSessionSummaryJSONIncludesLLMSummary(t *testing.T) {
+	session := &SweSession{finishSummary: "Implemented finish summaries."}
+
+	summary := BuildSessionSummaryJSON(
+		session,
+		SessionSummaryBuildResult{},
+		time.Unix(10, 0),
+		time.Unix(15, 0),
+		"",
+		"",
+	)
+
+	assert.Equal(t, "Implemented finish summaries.", summary.Summary)
 }
 
 type summaryMessageCapture struct {

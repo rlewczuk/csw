@@ -56,6 +56,7 @@ type persistedSessionState struct {
 	ContextCompactionCount     int                     `json:"context_compaction_count"`
 	TaskStatusUpdatedInSession bool                    `json:"task_status_updated_in_session,omitempty"`
 	UsedSubAgentSlugs          []string                `json:"used_subagent_slugs,omitempty"`
+	FinishSummary              string                  `json:"finish_summary,omitempty"`
 	UpdatedAt                  string                  `json:"updated_at"`
 }
 
@@ -121,6 +122,7 @@ func (s *SweSession) buildPersistedSessionState() persistedSessionState {
 		ContextLengthTokens:        s.contextLength,
 		ContextCompactionCount:     s.compactionCount,
 		TaskStatusUpdatedInSession: s.taskStatusUpdatedInSession,
+		FinishSummary:              s.FinishSummary(),
 		UpdatedAt:                  time.Now().Format(time.RFC3339Nano),
 	}
 
@@ -294,13 +296,14 @@ func RestoreSessionFromPersistedState(params *SweSessionParams, state persistedS
 
 				return params.Thinking
 			}(),
-			Logger:          params.Logger,
-			LLMLogger:       params.LLMLogger,
-			TodoList:        state.TodoList,
-			TokenUsage:      state.TokenUsage,
-			ContextLength:   state.ContextLengthTokens,
-			CompactionCount: state.ContextCompactionCount,
+			Logger:                     params.Logger,
+			LLMLogger:                  params.LLMLogger,
+			TodoList:                   state.TodoList,
+			TokenUsage:                 state.TokenUsage,
+			ContextLength:              state.ContextLengthTokens,
+			CompactionCount:            state.ContextCompactionCount,
 			TaskStatusUpdatedInSession: state.TaskStatusUpdatedInSession,
+			FinishSummary:              state.FinishSummary,
 			UsedSubAgentSlugs: func() map[string]struct{} {
 				result := make(map[string]struct{}, len(state.UsedSubAgentSlugs))
 				for _, slug := range state.UsedSubAgentSlugs {
