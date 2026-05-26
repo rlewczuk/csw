@@ -268,6 +268,7 @@ func TestRegisterRunBashTool_AllowAllPermissionsFalse_UsesProvidedPrivileges(t *
 		"/project",
 		0,
 		false,
+		DefaultRunBashMaxOutputBytes,
 	)
 
 	response := registry.Execute(&ToolCall{
@@ -294,6 +295,7 @@ func TestRegisterRunBashTool_AllowAllPermissionsTrue_AllowsAllCommands(t *testin
 		"/project",
 		0,
 		true,
+		DefaultRunBashMaxOutputBytes,
 	)
 
 	response := registry.Execute(&ToolCall{

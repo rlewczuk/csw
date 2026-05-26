@@ -60,6 +60,7 @@ type RunDefaultsMetadata struct {
 	ShadowDir           *string            `yaml:"shadow-dir"`
 	AllowAllPermissions *bool              `yaml:"allow-all-permissions"`
 	VFSAllow            *[]string          `yaml:"vfs-allow"`
+	RunBashMax          *int               `yaml:"run-bash-max"`
 }
 
 // ContainerMetadata mirrors conf.ContainerConfig with pointer fields.

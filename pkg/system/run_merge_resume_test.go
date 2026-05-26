@@ -333,6 +333,7 @@ func TestApplyRunDefaultsNoCommit(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := &cobra.Command{Use: "run"}
 			cmd.Flags().Bool("no-commit", false, "")
+			cmd.Flags().Int("run-bash-max", 0, "")
 			if tc.noCommitFlagChanged {
 				require.NoError(t, cmd.Flags().Set("no-commit", "true"))
 			}
@@ -352,12 +353,13 @@ func TestApplyRunDefaultsNoCommit(t *testing.T) {
 			allowAllPerms := false
 			vfsAllow := []string(nil)
 			noCommit := tc.initialNoCommit
+			runBashMaxOutput := (*int)(nil)
 			resolver := runDefaultsResolver(func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 				_ = params
 				return conf.RunDefaultsConfig{NoCommit: tc.defaultsNoCommit}, nil
 			})
 
-			err := applyRunDefaults(resolver, cmd, workDir, "shadow", "project", "cfg", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit)
+			err := applyRunDefaults(resolver, cmd, workDir, "shadow", "project", "cfg", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedNoCommit, noCommit)
 			assert.Equal(t, tc.expectedWorktree, worktree)

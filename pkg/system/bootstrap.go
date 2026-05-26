@@ -106,6 +106,8 @@ type BuildSystemParams struct {
 	AllowedPaths []string
 	// MaxToolThreads overrides max parallel tool executions. When <=0, value from config is used.
 	MaxToolThreads int
+	// RunBashMaxOutput overrides default runBash output limit in bytes. When nil, value from config is used.
+	RunBashMaxOutput *int
 	// AllowAllPermissions forces all tool permission checks to allow mode for this run.
 	AllowAllPermissions bool
 }
@@ -336,7 +338,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	}
 
 	globalConfig := configStore.GlobalConfig
- 	if globalConfig == nil {
+	if globalConfig == nil {
 		globalConfig = &conf.GlobalConfig{}
 	}
 
@@ -532,7 +534,19 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		})
 	}
 
-	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, effectiveWorkDir, params.BashRunTimeout, params.AllowAllPermissions)
+	runBashMaxOutput := tool.DefaultRunBashMaxOutputBytes
+	if globalConfig.Defaults.RunBashMax != nil {
+		runBashMaxOutput = *globalConfig.Defaults.RunBashMax
+	}
+	if params.RunBashMaxOutput != nil {
+		runBashMaxOutput = *params.RunBashMaxOutput
+	}
+	if runBashMaxOutput < 0 {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: --run-bash-max must be >= 0")
+	}
+
+	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, effectiveWorkDir, params.BashRunTimeout, params.AllowAllPermissions, runBashMaxOutput)
 	tool.RegisterWebFetchTool(toolRegistry, nil)
 	tool.RegisterSkillTool(toolRegistry, configRoot)
 

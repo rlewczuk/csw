@@ -115,6 +115,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		TaskDir:           ".cswdata/tasks",
 		ShadowDir:         "shadow/base",
 		VFSAllow:          []string{"/base/allow"},
+		RunBashMax:        intPtr(256),
 	}
 	override := RunDefaultsConfig{
 		DefaultProvider:     "provider2",
@@ -134,6 +135,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		ShadowDir:           "shadow/override",
 		AllowAllPermissions: true,
 		VFSAllow:            []string{"/override/allow1", "/override/allow2"},
+		RunBashMax:          intPtr(0),
 	}
 
 	base.MergeFrom(override)
@@ -158,6 +160,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		ShadowDir:           "shadow/override",
 		AllowAllPermissions: true,
 		VFSAllow:            []string{"/override/allow1", "/override/allow2"},
+		RunBashMax:          intPtr(0),
 	}, base)
 }
 
@@ -231,6 +234,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 			TaskDir:         ".cswdata/tasks",
 			ShadowDir:       "shadow/base",
 			VFSAllow:        []string{"/base/allow"},
+			RunBashMax:      intPtr(128),
 		},
 		ShadowPaths: []string{"AGENTS.md"},
 	}
@@ -259,6 +263,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 			ShadowDir:           "shadow/override",
 			AllowAllPermissions: true,
 			VFSAllow:            []string{"/override/allow"},
+			RunBashMax:          intPtr(0),
 		},
 		ShadowPaths: []string{".cswdata/**", ".agents/**"},
 	}
@@ -276,7 +281,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 	assert.Equal(t, 12, base.Defaults.MaxThreads)
 	require.NotNil(t, base.Defaults.Container)
 	assert.Equal(t, ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, *base.Defaults.Container)
-	assert.Equal(t, RunDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, LogLLMRequestsRaw: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks", ShadowDir: "shadow/override", AllowAllPermissions: true, VFSAllow: []string{"/override/allow"}}, base.Defaults)
+	assert.Equal(t, RunDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, LogLLMRequestsRaw: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks", ShadowDir: "shadow/override", AllowAllPermissions: true, VFSAllow: []string{"/override/allow"}, RunBashMax: intPtr(0)}, base.Defaults)
 	assert.Equal(t, []string{".cswdata/**", ".agents/**"}, base.ShadowPaths)
 }
 
@@ -431,6 +436,10 @@ func TestGlobalConfig_Merge_NilOverride(t *testing.T) {
 	base := &GlobalConfig{Defaults: RunDefaultsConfig{DefaultProvider: "provider"}}
 	base.Merge(nil)
 	assert.Equal(t, "provider", base.Defaults.DefaultProvider)
+}
+
+func intPtr(value int) *int {
+	return &value
 }
 
 func TestAgentRoleConfig_Merge_NilOverride(t *testing.T) {

@@ -32,6 +32,15 @@ func TestBuildSystemParamsMaxToolThreads(t *testing.T) {
 	assert.Equal(t, 9, params.MaxToolThreads)
 }
 
+func TestBuildSystemParamsRunBashMaxOutput(t *testing.T) {
+	runBashMaxOutput := 256
+	params := BuildSystemParams{
+		RunBashMaxOutput: &runBashMaxOutput,
+	}
+	require.NotNil(t, params.RunBashMaxOutput)
+	assert.Equal(t, 256, *params.RunBashMaxOutput)
+}
+
 func TestBuildSystemParamsAllowAllPermissions(t *testing.T) {
 	params := BuildSystemParams{
 		AllowAllPermissions: true,
@@ -290,6 +299,7 @@ func TestResolveRunDefaultsReturnsConfiguredWorkdir(t *testing.T) {
 func TestApplyRunDefaultsSetsWorkdirWhenFlagUnchanged(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.Flags().String("workdir", "", "")
+	cmd.Flags().Int("run-bash-max", 0, "")
 	workDir := ""
 	model := ""
 	worktree := ""
@@ -305,11 +315,12 @@ func TestApplyRunDefaultsSetsWorkdirWhenFlagUnchanged(t *testing.T) {
 	allowAllPerms := false
 	vfsAllow := []string(nil)
 	noCommit := false
+	runBashMaxOutput := (*int)(nil)
 	resolver := func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 		return conf.RunDefaultsConfig{Workdir: "/configured/workdir"}, nil
 	}
 
-	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit)
+	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput)
 
 	require.NoError(t, err)
 	assert.Equal(t, "/configured/workdir", workDir)
@@ -318,6 +329,7 @@ func TestApplyRunDefaultsSetsWorkdirWhenFlagUnchanged(t *testing.T) {
 func TestApplyRunDefaultsKeepsChangedWorkdirFlag(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.Flags().String("workdir", "", "")
+	cmd.Flags().Int("run-bash-max", 0, "")
 	require.NoError(t, cmd.Flags().Set("workdir", "/cli/workdir"))
 	workDir := "/cli/workdir"
 	model := ""
@@ -334,14 +346,79 @@ func TestApplyRunDefaultsKeepsChangedWorkdirFlag(t *testing.T) {
 	allowAllPerms := false
 	vfsAllow := []string(nil)
 	noCommit := false
+	runBashMaxOutput := (*int)(nil)
 	resolver := func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 		return conf.RunDefaultsConfig{Workdir: "/configured/workdir"}, nil
 	}
 
-	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit)
+	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput)
 
 	require.NoError(t, err)
 	assert.Equal(t, "/cli/workdir", workDir)
+}
+
+func TestApplyRunDefaultsSetsRunBashMaxWhenFlagUnchanged(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.Flags().Int("run-bash-max", 0, "")
+	workDir := ""
+	model := ""
+	worktree := ""
+	merge := false
+	logLLMRequests := false
+	logLLMRequestsRaw := false
+	thinking := ""
+	lspServer := ""
+	gitUser := ""
+	gitEmail := ""
+	maxThreads := 0
+	shadowDir := ""
+	allowAllPerms := false
+	vfsAllow := []string(nil)
+	noCommit := false
+	runBashMaxOutput := (*int)(nil)
+	configuredRunBashMax := 512
+	resolver := func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		return conf.RunDefaultsConfig{RunBashMax: &configuredRunBashMax}, nil
+	}
+
+	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput)
+
+	require.NoError(t, err)
+	require.NotNil(t, runBashMaxOutput)
+	assert.Equal(t, 512, *runBashMaxOutput)
+}
+
+func TestApplyRunDefaultsKeepsChangedRunBashMaxFlag(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.Flags().Int("run-bash-max", 0, "")
+	require.NoError(t, cmd.Flags().Set("run-bash-max", "128"))
+	workDir := ""
+	model := ""
+	worktree := ""
+	merge := false
+	logLLMRequests := false
+	logLLMRequestsRaw := false
+	thinking := ""
+	lspServer := ""
+	gitUser := ""
+	gitEmail := ""
+	maxThreads := 0
+	shadowDir := ""
+	allowAllPerms := false
+	vfsAllow := []string(nil)
+	noCommit := false
+	cliRunBashMax := 128
+	runBashMaxOutput := &cliRunBashMax
+	configuredRunBashMax := 512
+	resolver := func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		return conf.RunDefaultsConfig{RunBashMax: &configuredRunBashMax}, nil
+	}
+
+	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput)
+
+	require.NoError(t, err)
+	require.NotNil(t, runBashMaxOutput)
+	assert.Equal(t, 128, *runBashMaxOutput)
 }
 
 func initTestGitRepository(t *testing.T) string {

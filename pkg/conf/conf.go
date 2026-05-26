@@ -219,6 +219,8 @@ type RunDefaultsConfig struct {
 	AllowAllPermissions bool `json:"allow-all-permissions,omitempty"`
 	// VFSAllow is the default --vfs-allow value.
 	VFSAllow []string `json:"vfs-allow,omitempty"`
+	// RunBashMax is the default --run-bash-max value in bytes; 0 disables output limiting.
+	RunBashMax *int `json:"run-bash-max,omitempty"`
 }
 
 // ModelProviderConfig represents common configuration for model providers.

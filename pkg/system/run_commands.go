@@ -113,7 +113,7 @@ func resolveRunCommandSource(commandPath string) string {
 	return "custom"
 }
 
-func applyCommandRunDefaults(cmd *cobra.Command, defaults *commands.RunDefaultsMetadata, model *string, role *string, worktree *string, merge *bool, logLLMRequests *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string, noCommit *bool, containerOn *bool, containerOff *bool, containerImage *string, containerMounts *[]string, containerEnv *[]string) (*bool, error) {
+func applyCommandRunDefaults(cmd *cobra.Command, defaults *commands.RunDefaultsMetadata, model *string, role *string, worktree *string, merge *bool, logLLMRequests *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string, noCommit *bool, containerOn *bool, containerOff *bool, containerImage *string, containerMounts *[]string, containerEnv *[]string, runBashMaxOutput **int) (*bool, error) {
 	if defaults == nil {
 		return nil, nil
 	}
@@ -163,6 +163,10 @@ func applyCommandRunDefaults(cmd *cobra.Command, defaults *commands.RunDefaultsM
 	if !cmd.Flags().Changed("vfs-allow") && defaults.VFSAllow != nil {
 		*vfsAllow = append([]string(nil), *defaults.VFSAllow...)
 	}
+	if !cmd.Flags().Changed("run-bash-max") && defaults.RunBashMax != nil {
+		value := *defaults.RunBashMax
+		*runBashMaxOutput = &value
+	}
 	var commandContainerEnabled *bool
 	if defaults.Container != nil {
 		if !cmd.Flags().Changed("container-image") && defaults.Container.Image != nil {
@@ -183,6 +187,9 @@ func applyCommandRunDefaults(cmd *cobra.Command, defaults *commands.RunDefaultsM
 	}
 	if *maxThreads < 0 {
 		return commandContainerEnabled, fmt.Errorf("applyCommandRunDefaults() [run_commands.go]: --max-threads must be >= 0")
+	}
+	if *runBashMaxOutput != nil && **runBashMaxOutput < 0 {
+		return commandContainerEnabled, fmt.Errorf("applyCommandRunDefaults() [run_commands.go]: --run-bash-max must be >= 0")
 	}
 	return commandContainerEnabled, nil
 }

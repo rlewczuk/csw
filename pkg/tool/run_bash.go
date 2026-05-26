@@ -14,7 +14,9 @@ import (
 )
 
 const (
-	defaultRunBashMaxOutputBytes = 2048
+	// DefaultRunBashMaxOutputBytes is the default runBash output limit in bytes.
+	DefaultRunBashMaxOutputBytes = 2048
+	defaultRunBashMaxOutputBytes = DefaultRunBashMaxOutputBytes
 	runBashWorktmpDir            = ".cswdata/worktmp"
 	runBashOutputTempPattern     = "runbash-output-*.txt"
 )
@@ -32,11 +34,12 @@ func (e *RunCommandError) Error() string {
 
 // RunBashTool implements the runBash tool for executing bash commands.
 type RunBashTool struct {
-	runner         runner.CommandRunner
-	privileges     map[string]conf.AccessFlag
-	sessionWorkdir string
-	defaultTimeout time.Duration
-	logger         *slog.Logger
+	runner           runner.CommandRunner
+	privileges       map[string]conf.AccessFlag
+	sessionWorkdir   string
+	defaultTimeout   time.Duration
+	defaultMaxOutput int
+	logger           *slog.Logger
 }
 
 func (t *RunBashTool) GetDescription() (string, bool) {
@@ -52,10 +55,22 @@ func NewRunBashTool(r runner.CommandRunner, privileges map[string]conf.AccessFla
 		timeout = defaultTimeout[0]
 	}
 
+	return NewRunBashToolWithDefaults(r, privileges, "", timeout, defaultRunBashMaxOutputBytes)
+}
+
+// NewRunBashToolWithDefaults creates a new RunBashTool instance with default timeout and output limit.
+// maxOutput defines the default maximum output bytes; 0 disables output limiting.
+func NewRunBashToolWithDefaults(r runner.CommandRunner, privileges map[string]conf.AccessFlag, sessionWorkdir string, defaultTimeout time.Duration, maxOutput int) *RunBashTool {
+	if maxOutput < 0 {
+		maxOutput = defaultRunBashMaxOutputBytes
+	}
+
 	return &RunBashTool{
-		runner:         r,
-		privileges:     privileges,
-		defaultTimeout: timeout,
+		runner:           r,
+		privileges:       privileges,
+		sessionWorkdir:   sessionWorkdir,
+		defaultTimeout:   defaultTimeout,
+		defaultMaxOutput: maxOutput,
 	}
 }
 
@@ -69,12 +84,7 @@ func NewRunBashToolWithSessionWorkdir(r runner.CommandRunner, privileges map[str
 		timeout = defaultTimeout[0]
 	}
 
-	return &RunBashTool{
-		runner:         r,
-		privileges:     privileges,
-		sessionWorkdir: sessionWorkdir,
-		defaultTimeout: timeout,
-	}
+	return NewRunBashToolWithDefaults(r, privileges, sessionWorkdir, timeout, defaultRunBashMaxOutputBytes)
 }
 
 // SetLogger sets the logger for the tool.
@@ -128,7 +138,7 @@ func (t *RunBashTool) Execute(args *ToolCall) *ToolResponse {
 		timeout = time.Duration(timeoutSecs) * time.Second
 	}
 
-	maxOutput := defaultRunBashMaxOutputBytes
+	maxOutput := t.defaultMaxOutput
 	if maxOutputArg, ok := args.Arguments.IntOK("max_output"); ok {
 		if maxOutputArg < 0 {
 			return &ToolResponse{
@@ -370,7 +380,7 @@ func setRunBashOutputMetadata(result *ToolValue, output string, maxOutput int, a
 	}
 
 	result.Set("output_bytes", len([]byte(output)))
-	if _, ok := args.IntOK("max_output"); ok && maxOutput != defaultRunBashMaxOutputBytes {
+	if _, ok := args.IntOK("max_output"); ok {
 		result.Set("max_output", maxOutput)
 	}
 	if outputFile != "" {

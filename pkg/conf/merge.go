@@ -149,6 +149,10 @@ mergeOtherFields:
 	if len(override.VFSAllow) > 0 {
 		c.VFSAllow = append([]string(nil), override.VFSAllow...)
 	}
+	if override.RunBashMax != nil {
+		value := *override.RunBashMax
+		c.RunBashMax = &value
+	}
 }
 
 // Clone returns a deep copy of GlobalConfig.
@@ -172,6 +176,10 @@ func (c *GlobalConfig) Clone() *GlobalConfig {
 	}
 	if len(c.Defaults.VFSAllow) > 0 {
 		cloned.Defaults.VFSAllow = append([]string(nil), c.Defaults.VFSAllow...)
+	}
+	if c.Defaults.RunBashMax != nil {
+		value := *c.Defaults.RunBashMax
+		cloned.Defaults.RunBashMax = &value
 	}
 	copy(cloned.ModelTags, c.ModelTags)
 

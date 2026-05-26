@@ -38,6 +38,7 @@ func RunCommand() *cobra.Command {
 		cliContainerMount    []string
 		cliContainerEnv      []string
 		cliBashRunTimeout    string
+		cliRunBashMax        int
 		cliMaxThreads        int
 		cliOutputFormat      string
 		cliVFSAllow          []string
@@ -55,6 +56,7 @@ func RunCommand() *cobra.Command {
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
+			runBashMaxOutput := cliRunBashMax
 			return system.RunCommand(&system.RunParams{
 				Command:               cmd,
 				PositionalArgs:        append([]string(nil), args...),
@@ -65,6 +67,7 @@ func RunCommand() *cobra.Command {
 				TaskReset:             cliTaskReset,
 				NoMerge:               cliNoMerge,
 				BashRunTimeoutValue:   cliBashRunTimeout,
+				RunBashMaxOutput:      &runBashMaxOutput,
 				ModelName:             cliModel,
 				RoleName:              cliRole,
 				WorkDir:               cliWorkDir,
@@ -125,6 +128,7 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cliGitUser, "git-user", "", "Git user name for git operations (default: from git config)")
 	cmd.Flags().StringVar(&cliGitEmail, "git-email", "", "Git user email for git operations (default: from git config)")
 	cmd.Flags().StringVar(&cliBashRunTimeout, "bash-run-timeout", "120", "Default runBash command timeout (duration; plain number means seconds)")
+	cmd.Flags().IntVar(&cliRunBashMax, "run-bash-max", 2048, "Default runBash output limit in bytes (0 disables limit)")
 	cmd.Flags().IntVar(&cliMaxThreads, "max-threads", 0, "Maximum number of tool calls executed in parallel")
 	cmd.Flags().StringVar(&cliOutputFormat, "output-format", "short", "Console output format: short, full, jsonl")
 	cmd.Flags().StringArrayVar(&cliVFSAllow, "vfs-allow", nil, "Additional path to allow VFS access outside of worktree (repeatable, or use ':' separated list)")

@@ -91,6 +91,62 @@ func TestRunBashTool_Execute_WithMaxOutput_DefaultSavesLargeOutput(t *testing.T)
 	assert.Equal(t, largeOutput, string(content))
 }
 
+func TestRunBashTool_Execute_WithConfiguredDefaultMaxOutput_SavesLargeOutput(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	largeOutput := strings.Repeat("abcdef", 20)
+	mockRunner.SetResponse("configured default large output", largeOutput, 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	sessionWorkdir := t.TempDir()
+	tool := NewRunBashToolWithDefaults(mockRunner, privileges, sessionWorkdir, 0, 64)
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "configured default large output",
+		}),
+	}
+
+	response := tool.Execute(&args)
+
+	require.NoError(t, response.Error)
+	output := response.Result.String("output")
+	assert.Contains(t, output, "Output was too big")
+	assert.True(t, response.Result.Bool("max_output_triggered"))
+
+	spilledPath := extractRunBashSpilledPath(t, output)
+	content, err := os.ReadFile(spilledPath)
+	require.NoError(t, err)
+	assert.Equal(t, largeOutput, string(content))
+}
+
+func TestRunBashTool_Execute_WithConfiguredDefaultMaxOutputZero_NoSafeguard(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	largeOutput := strings.Repeat("abcdef", 20)
+	mockRunner.SetResponse("configured default no limit", largeOutput, 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	tool := NewRunBashToolWithDefaults(mockRunner, privileges, t.TempDir(), 0, 0)
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command": "configured default no limit",
+		}),
+	}
+
+	response := tool.Execute(&args)
+
+	require.NoError(t, response.Error)
+	assert.Equal(t, largeOutput, response.Result.String("output"))
+}
+
 func TestRunBashTool_Execute_WithMaxOutputZero_NoSafeguard(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 	largeOutput := strings.Repeat("abcdef", 20)
