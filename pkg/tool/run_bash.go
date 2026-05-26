@@ -37,6 +37,7 @@ type RunBashTool struct {
 	runner           runner.CommandRunner
 	privileges       map[string]conf.AccessFlag
 	sessionWorkdir   string
+	outputWorkdir    string
 	defaultTimeout   time.Duration
 	defaultMaxOutput int
 	logger           *slog.Logger
@@ -61,6 +62,12 @@ func NewRunBashTool(r runner.CommandRunner, privileges map[string]conf.AccessFla
 // NewRunBashToolWithDefaults creates a new RunBashTool instance with default timeout and output limit.
 // maxOutput defines the default maximum output bytes; 0 disables output limiting.
 func NewRunBashToolWithDefaults(r runner.CommandRunner, privileges map[string]conf.AccessFlag, sessionWorkdir string, defaultTimeout time.Duration, maxOutput int) *RunBashTool {
+	return NewRunBashToolWithOutputWorkdir(r, privileges, sessionWorkdir, "", defaultTimeout, maxOutput)
+}
+
+// NewRunBashToolWithOutputWorkdir creates a new RunBashTool instance with a dedicated output spill directory root.
+// outputWorkdir is used as the base directory for oversized output files when set.
+func NewRunBashToolWithOutputWorkdir(r runner.CommandRunner, privileges map[string]conf.AccessFlag, sessionWorkdir string, outputWorkdir string, defaultTimeout time.Duration, maxOutput int) *RunBashTool {
 	if maxOutput < 0 {
 		maxOutput = defaultRunBashMaxOutputBytes
 	}
@@ -69,6 +76,7 @@ func NewRunBashToolWithDefaults(r runner.CommandRunner, privileges map[string]co
 		runner:           r,
 		privileges:       privileges,
 		sessionWorkdir:   sessionWorkdir,
+		outputWorkdir:    outputWorkdir,
 		defaultTimeout:   defaultTimeout,
 		defaultMaxOutput: maxOutput,
 	}
@@ -404,7 +412,10 @@ func (t *RunBashTool) safeguardOutput(output string, stdout string, stderr strin
 }
 
 func (t *RunBashTool) saveLargeOutput(output string, workdir string) (string, error) {
-	baseDir := workdir
+	baseDir := t.outputWorkdir
+	if baseDir == "" {
+		baseDir = workdir
+	}
 	if baseDir == "" {
 		baseDir = t.sessionWorkdir
 	}

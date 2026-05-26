@@ -546,7 +546,11 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: --run-bash-max must be >= 0")
 	}
 
-	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, effectiveWorkDir, params.BashRunTimeout, params.AllowAllPermissions, runBashMaxOutput)
+	runBashOutputWorkdir := ""
+	if shadowDir != "" {
+		runBashOutputWorkdir = shadowDir
+	}
+	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, effectiveWorkDir, params.BashRunTimeout, params.AllowAllPermissions, runBashMaxOutput, runBashOutputWorkdir)
 	tool.RegisterWebFetchTool(toolRegistry, nil)
 	tool.RegisterSkillTool(toolRegistry, configRoot)
 

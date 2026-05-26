@@ -172,6 +172,7 @@ func RegisterRunBashTool(
 	defaultTimeout time.Duration,
 	allowAllPermissions bool,
 	defaultMaxOutput int,
+	outputWorkdir ...string,
 ) {
 	effectivePrivileges := privileges
 	if allowAllPermissions {
@@ -180,7 +181,12 @@ func RegisterRunBashTool(
 		}
 	}
 
-	registry.Register("runBash", NewRunBashToolWithDefaults(r, effectivePrivileges, sessionWorkdir, defaultTimeout, defaultMaxOutput))
+	effectiveOutputWorkdir := ""
+	if len(outputWorkdir) > 0 {
+		effectiveOutputWorkdir = outputWorkdir[0]
+	}
+
+	registry.Register("runBash", NewRunBashToolWithOutputWorkdir(r, effectivePrivileges, sessionWorkdir, effectiveOutputWorkdir, defaultTimeout, defaultMaxOutput))
 }
 
 // RegisterWebFetchTool registers the webFetch tool with optional custom HTTP client.

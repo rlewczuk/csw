@@ -91,6 +91,46 @@ func TestRunBashTool_Execute_WithMaxOutput_DefaultSavesLargeOutput(t *testing.T)
 	assert.Equal(t, largeOutput, string(content))
 }
 
+func TestRunBashTool_Execute_WithOutputWorkdir_SavesLargeOutputToOutputWorkdir(t *testing.T) {
+	mockRunner := runner.NewMockRunner()
+	largeOutput := strings.Repeat("shadow-output", 20)
+	mockRunner.SetResponse("large shadow output", largeOutput, 0, nil)
+
+	privileges := map[string]conf.AccessFlag{
+		".*": conf.AccessAllow,
+	}
+	sessionWorkdir := t.TempDir()
+	shadowWorkdir := t.TempDir()
+	commandWorkdir := filepath.Join(sessionWorkdir, "command")
+	require.NoError(t, os.MkdirAll(commandWorkdir, 0o755))
+	tool := NewRunBashToolWithOutputWorkdir(mockRunner, privileges, sessionWorkdir, shadowWorkdir, 0, 64)
+
+	args := ToolCall{
+		ID:       "test-id",
+		Function: "runBash",
+		Arguments: NewToolValue(map[string]any{
+			"command":    "large shadow output",
+			"workdir":    "command",
+			"max_output": int64(64),
+		}),
+	}
+
+	response := tool.Execute(&args)
+
+	require.NoError(t, response.Error)
+	output := response.Result.String("output")
+	assert.Contains(t, output, "Output was too big")
+
+	spilledPath := extractRunBashSpilledPath(t, output)
+	assert.True(t, strings.HasPrefix(spilledPath, filepath.Join(shadowWorkdir, ".cswdata", "worktmp")))
+	assert.False(t, strings.HasPrefix(spilledPath, filepath.Join(sessionWorkdir, ".cswdata", "worktmp")))
+	assert.False(t, strings.HasPrefix(spilledPath, filepath.Join(commandWorkdir, ".cswdata", "worktmp")))
+
+	content, err := os.ReadFile(spilledPath)
+	require.NoError(t, err)
+	assert.Equal(t, largeOutput, string(content))
+}
+
 func TestRunBashTool_Execute_WithConfiguredDefaultMaxOutput_SavesLargeOutput(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 	largeOutput := strings.Repeat("abcdef", 20)
