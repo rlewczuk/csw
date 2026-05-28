@@ -113,18 +113,14 @@ func (c *OpenAIClient) checkStatusCodeWithBody(resp *http.Response, bodyBytes []
 		// Try to parse error response
 		var errResp OpenaiErrorResponse
 		if err := json.Unmarshal(bodyBytes, &errResp); err == nil && errResp.Error != nil {
-			// Check for context length errors
-			if strings.Contains(strings.ToLower(errResp.Error.Message), "context length") ||
-				strings.Contains(strings.ToLower(errResp.Error.Message), "too many tokens") ||
-				strings.Contains(strings.ToLower(errResp.Error.Message), "maximum context length") {
+			if isOpenAIContextOverflowError(errResp.Error.Message, errResp.Error.Type) {
 				return fmt.Errorf("%w: %s", ErrTooManyInputTokens, errResp.Error.Message)
 			}
 			return fmt.Errorf("bad request: %s", errResp.Error.Message)
 		}
 
 		// Fallback to raw body
-		if strings.Contains(strings.ToLower(bodyStr), "context length") ||
-			strings.Contains(strings.ToLower(bodyStr), "too many tokens") {
+		if isOpenAIContextOverflowError(bodyStr, "") {
 			return fmt.Errorf("%w: %s", ErrTooManyInputTokens, bodyStr)
 		}
 		return fmt.Errorf("bad request: %s", bodyStr)
@@ -140,6 +136,18 @@ func (c *OpenAIClient) checkStatusCodeWithBody(resp *http.Response, bodyBytes []
 		}
 		return fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(bodyBytes))
 	}
+}
+
+// isOpenAIContextOverflowError returns true when an OpenAI protocol error indicates input context overflow.
+func isOpenAIContextOverflowError(message string, errorType string) bool {
+	message = strings.ToLower(message)
+	errorType = strings.ToLower(strings.TrimSpace(errorType))
+
+	return strings.Contains(message, "context length") ||
+		strings.Contains(message, "too many tokens") ||
+		strings.Contains(message, "maximum context length") ||
+		strings.Contains(message, "exceeds the available context size") ||
+		errorType == "exceed_context_size_error"
 }
 
 // handleRateLimitError handles rate limit (429) errors and extracts retry information.

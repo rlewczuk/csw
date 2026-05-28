@@ -40,6 +40,28 @@ func TestOpenAIClient_ErrorHandling(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrEndpointUnavailable)
 	})
+
+	t.Run("handles llama server context overflow bad request", func(t *testing.T) {
+		mock := testutil.NewMockHTTPServer()
+		defer mock.Close()
+
+		client, err := NewOpenAIClient(&conf.ModelProviderConfig{
+			URL:    mock.URL(),
+			APIKey: "test-key",
+		})
+		require.NoError(t, err)
+
+		body := `{"error":{"code":400,"message":"request (213639 tokens) exceeds the available context size (196608 tokens), try increasing it","n_ctx":196608,"n_prompt_tokens":213639,"type":"exceed_context_size_error"}}`
+		mock.AddRestResponseWithStatus("/chat/completions", "POST", body, http.StatusBadRequest)
+
+		chatModel := client.ChatModel("test-model", nil)
+		messages := []*ChatMessage{NewTextMessage(ChatRoleUser, "Hello")}
+
+		_, err = chatModel.Chat(context.Background(), messages, nil, nil)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrTooManyInputTokens)
+		assert.Contains(t, err.Error(), "exceeds the available context size")
+	})
 }
 
 func TestOpenAIClient_RateLimitError(t *testing.T) {
