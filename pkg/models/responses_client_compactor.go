@@ -23,6 +23,11 @@ func (m *ResponsesChatModel) Compactor() ChatCompator {
 	return &ResponsesChatCompactor{chatModel: m}
 }
 
+// Description returns compactor name for display and logging.
+func (c *ResponsesChatCompactor) Description() string {
+	return "responses-api"
+}
+
 // CompactMessages compacts chat history using POST /v1/responses/compact endpoint.
 func (c *ResponsesChatCompactor) CompactMessages(messages []*ChatMessage) ([]*ChatMessage, error) {
 	if c == nil || c.chatModel == nil || c.chatModel.client == nil {

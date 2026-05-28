@@ -8,6 +8,18 @@ type modelChatCompactorAdapter struct {
 	fallback       ChatCompactor
 }
 
+// Description returns model compactor name for display and logging.
+func (c *modelChatCompactorAdapter) Description() string {
+	if c == nil || c.modelCompactor == nil {
+		if c != nil && c.fallback != nil {
+			return c.fallback.Description()
+		}
+		return "model-chat-compactor"
+	}
+
+	return c.modelCompactor.Description()
+}
+
 // CompactMessages compacts messages with model compactor and falls back on failure.
 func (c *modelChatCompactorAdapter) CompactMessages(messages []*models.ChatMessage) []*models.ChatMessage {
 	if c == nil || c.modelCompactor == nil {

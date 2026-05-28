@@ -212,6 +212,9 @@ func (m *ChatMessage) GetToolResponses() []*tool.ToolResponse {
 
 // ChatCompator compacts chat message history before sending it to a model.
 type ChatCompator interface {
+	// Description returns compactor name for display and logging.
+	Description() string
+
 	// CompactMessages compacts provided message history and returns compacted messages.
 	CompactMessages(messages []*ChatMessage) ([]*ChatMessage, error)
 }

@@ -33,6 +33,11 @@ func NewKimiCompactor(model models.ChatModel, nmessages int, config *conf.CswCon
 	}
 }
 
+// Description returns compactor name for display and logging.
+func (c *KimiCompactor) Description() string {
+	return "kimi"
+}
+
 // LoadKimiCompactorPromptTemplates loads compactor prompts from configuration store.
 func LoadKimiCompactorPromptTemplates(config *conf.CswConfig) (string, string, string, error) {
 	if config == nil {

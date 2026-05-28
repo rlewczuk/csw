@@ -63,16 +63,20 @@ func (s *SweSession) maybeCompactContext() error {
 
 func (s *SweSession) compactContext(statusMessage string) error {
 	compactionNumber := s.compactionCount + 1
+	if s.compactor == nil {
+		s.compactor = NewCompactMessagesChatCompactor()
+	}
+
+	compactorDescription := s.compactor.Description()
 	if s.outputHandler != nil && strings.TrimSpace(statusMessage) != "" {
-		s.outputHandler.ShowMessage(statusMessage, sessionMessageTypeInfo)
+		s.outputHandler.ShowMessage(fmt.Sprintf("%s (compactor: %s)", statusMessage, compactorDescription), sessionMessageTypeInfo)
+	}
+	if s.logger != nil {
+		s.logger.Info("context_compaction_triggered", "compaction_number", compactionNumber, "compactor", compactorDescription)
 	}
 
 	if err := s.persistCompactionMessagesSnapshot("pre", compactionNumber, s.messages); err != nil {
 		return fmt.Errorf("SweSession.maybeCompactContext() [session_runtime.go]: failed to persist pre-compaction snapshot: %w", err)
-	}
-
-	if s.compactor == nil {
-		s.compactor = NewCompactMessagesChatCompactor()
 	}
 
 	compacted := NewChatCompactorVerifier(s.compactor).CompactMessages(s.messages)

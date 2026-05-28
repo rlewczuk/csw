@@ -16,6 +16,15 @@ func NewChatCompactorVerifier(wrapped ChatCompactor) ChatCompactor {
 	return &ChatCompactorVerifier{wrapped: wrapped}
 }
 
+// Description returns wrapped compactor name for display and logging.
+func (c *ChatCompactorVerifier) Description() string {
+	if c == nil || c.wrapped == nil {
+		return "chat-compactor-verifier"
+	}
+
+	return c.wrapped.Description()
+}
+
 // CompactMessages compacts messages with wrapped compactor and removes unmatched tool parts.
 func (c *ChatCompactorVerifier) CompactMessages(messages []*models.ChatMessage) []*models.ChatMessage {
 	if c == nil || c.wrapped == nil {

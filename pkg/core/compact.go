@@ -17,6 +17,9 @@ const (
 
 // ChatCompactor compacts chat message history.
 type ChatCompactor interface {
+	// Description returns compactor name for display and logging.
+	Description() string
+
 	// CompactMessages compacts provided message history.
 	CompactMessages(messages []*models.ChatMessage) []*models.ChatMessage
 }
@@ -27,6 +30,11 @@ type CompactMessagesChatCompactor struct{}
 // NewCompactMessagesChatCompactor creates default ChatCompactor implementation.
 func NewCompactMessagesChatCompactor() ChatCompactor {
 	return &CompactMessagesChatCompactor{}
+}
+
+// Description returns compactor name for display and logging.
+func (c *CompactMessagesChatCompactor) Description() string {
+	return "compact-messages"
 }
 
 // CompactMessages compacts provided message history using CompactMessages function.

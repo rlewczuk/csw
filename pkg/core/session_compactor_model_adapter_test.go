@@ -39,8 +39,17 @@ func (m *compactorProviderChatModel) Compactor() models.ChatCompator {
 }
 
 type testModelCompactor struct {
-	compacted []*models.ChatMessage
-	err       error
+	description string
+	compacted   []*models.ChatMessage
+	err         error
+}
+
+func (c *testModelCompactor) Description() string {
+	if c.description != "" {
+		return c.description
+	}
+
+	return "test-model-compactor"
 }
 
 func (c *testModelCompactor) CompactMessages(messages []*models.ChatMessage) ([]*models.ChatMessage, error) {
@@ -63,6 +72,10 @@ func (c *testCoreCompactor) CompactMessages(messages []*models.ChatMessage) []*m
 	return c.compacted
 }
 
+func (c *testCoreCompactor) Description() string {
+	return "test-core-compactor"
+}
+
 func TestSweSessionConfigureCompactor_UsesModelCompactor(t *testing.T) {
 	session := &SweSession{compactor: NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, newKimiCompactorConfig())}
 	modelCompactor := &testModelCompactor{compacted: []*models.ChatMessage{models.NewTextMessage(models.ChatRoleUser, "model compacted")}}
@@ -73,6 +86,7 @@ func TestSweSessionConfigureCompactor_UsesModelCompactor(t *testing.T) {
 
 	adapter, ok := session.compactor.(*modelChatCompactorAdapter)
 	require.True(t, ok)
+	assert.Equal(t, "test-model-compactor", adapter.Description())
 	result := adapter.CompactMessages([]*models.ChatMessage{models.NewTextMessage(models.ChatRoleUser, "input")})
 	require.Len(t, result, 1)
 	assert.Equal(t, "model compacted", result[0].GetText())

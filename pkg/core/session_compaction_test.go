@@ -28,9 +28,9 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 
 		handler := testutil.NewMockSessionOutputHandler()
 		session := &SweSession{
-			id:         "session-1",
-			logBaseDir: tmpDir,
-			config:      configStore,
+			id:            "session-1",
+			logBaseDir:    tmpDir,
+			config:        configStore,
 			provider:      provider,
 			contextLength: 96,
 			messages: []*models.ChatMessage{
@@ -46,6 +46,7 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 		assert.Equal(t, 1, session.compactionCount)
 		require.NotEmpty(t, handler.StatusMessages)
 		assert.Contains(t, handler.StatusMessages[0].Message, "Compacting messages")
+		assert.Contains(t, handler.StatusMessages[0].Message, "compactor: compact-messages")
 
 		prePath := filepath.Join(tmpDir, "sessions", "session-1", "messages-pre-1.jsonl")
 		postPath := filepath.Join(tmpDir, "sessions", "session-1", "messages-post-1.jsonl")
@@ -69,9 +70,9 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 
 		handler := testutil.NewMockSessionOutputHandler()
 		session := &SweSession{
-			id:          "session-2",
-			logBaseDir:  tmpDir,
-			config:      configStore,
+			id:            "session-2",
+			logBaseDir:    tmpDir,
+			config:        configStore,
 			provider:      provider,
 			contextLength: 94,
 			messages: []*models.ChatMessage{
@@ -96,7 +97,7 @@ func TestSweSessionMaybeCompactContext(t *testing.T) {
 		provider.Config = &conf.ModelProviderConfig{ContextLengthLimit: 100}
 
 		session := &SweSession{
-			config:      configStore,
+			config:        configStore,
 			provider:      provider,
 			contextLength: 96,
 			messages: []*models.ChatMessage{
@@ -188,6 +189,7 @@ func TestSweSessionRunNonStreamingChat_CompactsOnTokenLimitError(t *testing.T) {
 		require.NotEmpty(t, handler.StatusMessages)
 		assert.Contains(t, handler.StatusMessages[0].Message, "too large")
 		assert.Contains(t, handler.StatusMessages[1].Message, "Context exceeded model input token limit")
+		assert.Contains(t, handler.StatusMessages[1].Message, "compactor: compact-messages")
 	})
 
 	t.Run("returns error after reaching max attempts", func(t *testing.T) {
@@ -227,10 +229,10 @@ func TestSweSessionRunNonStreamingChat_UsageLimitWait(t *testing.T) {
 		configStore := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{LLMRetryMaxAttempts: 2, LLMRetryMaxBackoffSeconds: 30}}
 
 		session := &SweSession{
-			messages: []*models.ChatMessage{models.NewTextMessage(models.ChatRoleUser, "hello")},
+			messages:      []*models.ChatMessage{models.NewTextMessage(models.ChatRoleUser, "hello")},
 			outputHandler: handler,
-			provider: provider,
-			config:      configStore,
+			provider:      provider,
+			config:        configStore,
 			llmRetryPolicyOverride: &models.RetryPolicy{
 				InitialDelay: time.Millisecond,
 				MaxRetries:   1,
