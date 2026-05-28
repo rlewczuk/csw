@@ -3,6 +3,7 @@ package vfs
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -73,6 +74,9 @@ func (g *grepFilter) Search() ([]GrepMatch, error) {
 	// Get all files recursively
 	files, err := g.vfs.ListFiles(g.rootDir, true)
 	if err != nil {
+		if errors.Is(err, apis.ErrNotADir) {
+			return g.searchFile(g.rootDir)
+		}
 		return nil, fmt.Errorf("grepFilter.Search() [grep.go]: %w", err)
 	}
 
@@ -87,31 +91,37 @@ func (g *grepFilter) Search() ([]GrepMatch, error) {
 			relPath = filePath
 		}
 
-		// Apply glob filter if provided
-		if g.globFilter != nil {
-			if !g.globFilter.Matches(relPath) {
-				continue
-			}
-		}
-
-		// Try to read the file (skip directories)
-		content, err := g.vfs.ReadFile(relPath)
+		fileMatches, err := g.searchFile(relPath)
 		if err != nil {
-			// Skip if it's a directory or unreadable
 			continue
 		}
-
-		// Search for matches in the file
-		lineNumbers := g.searchInContent(content)
-		if len(lineNumbers) > 0 {
-			matches = append(matches, GrepMatch{
-				Path:  relPath,
-				Lines: lineNumbers,
-			})
-		}
+		matches = append(matches, fileMatches...)
 	}
 
 	return matches, nil
+}
+
+// searchFile searches a single file and returns its grep match when the pattern is found.
+func (g *grepFilter) searchFile(path string) ([]GrepMatch, error) {
+	relPath := path
+	if g.globFilter != nil && !g.globFilter.Matches(relPath) {
+		return nil, nil
+	}
+
+	content, err := g.vfs.ReadFile(relPath)
+	if err != nil {
+		return nil, fmt.Errorf("grepFilter.searchFile() [grep.go]: %w", err)
+	}
+
+	lineNumbers := g.searchInContent(content)
+	if len(lineNumbers) == 0 {
+		return nil, nil
+	}
+
+	return []GrepMatch{{
+		Path:  relPath,
+		Lines: lineNumbers,
+	}}, nil
 }
 
 // searchInContent searches for the pattern in the given content and returns line numbers (1-based).

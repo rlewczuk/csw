@@ -154,6 +154,25 @@ func TestGrepFilter_WithRootDirectory(t *testing.T) {
 	assert.False(t, paths["other/file4.txt"])
 }
 
+func TestGrepFilter_WithRootFile(t *testing.T) {
+	vfs := NewMockVFS()
+
+	err := vfs.WriteFile("target.txt", []byte("hello world\nno match\nhello again"))
+	require.NoError(t, err)
+	err = vfs.WriteFile("other.txt", []byte("hello other"))
+	require.NoError(t, err)
+
+	grep, err := NewGrepFilter("hello", vfs, "target.txt", nil)
+	require.NoError(t, err)
+
+	matches, err := grep.Search()
+	require.NoError(t, err)
+
+	require.Len(t, matches, 1)
+	assert.Equal(t, "target.txt", matches[0].Path)
+	assert.Equal(t, []int{1, 3}, matches[0].Lines)
+}
+
 func TestGrepFilter_WithGlobFilter(t *testing.T) {
 	vfs := NewMockVFS()
 
