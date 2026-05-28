@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -63,8 +64,8 @@ func LoadKimiCompactorPromptTemplates(config *conf.CswConfig) (string, string, s
 
 // CompactMessages compacts messages and preserves the latest configured user/assistant messages.
 func (c *KimiCompactor) CompactMessages(messages []*models.ChatMessage) []*models.ChatMessage {
-	compactMessage, preserved := c.prepare(messages)
-	if compactMessage == nil {
+	toCompact, preserved := c.prepareMessages(messages)
+	if len(toCompact) == 0 {
 		return preserved
 	}
 
@@ -75,14 +76,58 @@ func (c *KimiCompactor) CompactMessages(messages []*models.ChatMessage) []*model
 		return cloneMessages(messages)
 	}
 
+	compacted, ok := c.compactChunks(toCompact)
+	if !ok {
+		return cloneMessages(messages)
+	}
+
+	return c.mergeCompactedWithPreserved(compacted, preserved)
+}
+
+func (c *KimiCompactor) compactChunks(messages []*models.ChatMessage) ([]*models.ChatMessage, bool) {
+	compactMessage := c.prepareChunk(messages)
+	if compactMessage == nil {
+		return nil, false
+	}
+
 	summary, err := c.model.Chat(context.Background(), []*models.ChatMessage{
 		models.NewTextMessage(models.ChatRoleSystem, c.systemPrompt),
 		compactMessage,
 	}, nil, nil)
-	if err != nil || summary == nil {
-		return cloneMessages(messages)
+	if err != nil {
+		if !errors.Is(err, models.ErrTooManyInputTokens) || len(messages) < 2 {
+			return nil, false
+		}
+
+		first, second := splitKimiCompactorMessages(messages)
+		if len(first) == 0 || len(second) == 0 {
+			return nil, false
+		}
+
+		firstCompacted, ok := c.compactChunks(first)
+		if !ok {
+			return nil, false
+		}
+
+		secondCompacted, ok := c.compactChunks(second)
+		if !ok {
+			return nil, false
+		}
+
+		result := make([]*models.ChatMessage, 0, len(firstCompacted)+len(secondCompacted))
+		result = append(result, firstCompacted...)
+		result = append(result, secondCompacted...)
+
+		return result, true
+	}
+	if summary == nil {
+		return nil, false
 	}
 
+	return []*models.ChatMessage{c.summaryMessage(summary)}, true
+}
+
+func (c *KimiCompactor) summaryMessage(summary *models.ChatMessage) *models.ChatMessage {
 	parts := []models.ChatMessagePart{{Text: c.prefix}}
 	for _, part := range summary.Parts {
 		if part.ReasoningContent != "" {
@@ -97,8 +142,11 @@ func (c *KimiCompactor) CompactMessages(messages []*models.ChatMessage) []*model
 		parts = append(parts, models.ChatMessagePart{Text: serialized})
 	}
 
-	compacted := &models.ChatMessage{Role: models.ChatRoleUser, Parts: parts}
-	result := make([]*models.ChatMessage, 0, len(preserved)+1)
+	return &models.ChatMessage{Role: models.ChatRoleUser, Parts: parts}
+}
+
+func (c *KimiCompactor) mergeCompactedWithPreserved(compacted []*models.ChatMessage, preserved []*models.ChatMessage) []*models.ChatMessage {
+	result := make([]*models.ChatMessage, 0, len(preserved)+len(compacted))
 
 	firstUserIndex := -1
 	for index, message := range preserved {
@@ -110,20 +158,29 @@ func (c *KimiCompactor) CompactMessages(messages []*models.ChatMessage) []*model
 
 	if firstUserIndex >= 0 {
 		result = append(result, preserved[firstUserIndex])
-		result = append(result, compacted)
+		result = append(result, compacted...)
 		result = append(result, preserved[:firstUserIndex]...)
 		result = append(result, preserved[firstUserIndex+1:]...)
 
 		return result
 	}
 
-	result = append(result, compacted)
+	result = append(result, compacted...)
 	result = append(result, preserved...)
 
 	return result
 }
 
 func (c *KimiCompactor) prepare(messages []*models.ChatMessage) (*models.ChatMessage, []*models.ChatMessage) {
+	toCompact, toPreserve := c.prepareMessages(messages)
+	if len(toCompact) == 0 {
+		return nil, toPreserve
+	}
+
+	return c.prepareChunk(toCompact), toPreserve
+}
+
+func (c *KimiCompactor) prepareMessages(messages []*models.ChatMessage) ([]*models.ChatMessage, []*models.ChatMessage) {
 	history := cloneMessages(messages)
 	if len(history) == 0 || c == nil || c.nmessages <= 0 {
 		return nil, history
@@ -155,8 +212,16 @@ func (c *KimiCompactor) prepare(messages []*models.ChatMessage) (*models.ChatMes
 		return nil, toPreserve
 	}
 
+	return toCompact, toPreserve
+}
+
+func (c *KimiCompactor) prepareChunk(messages []*models.ChatMessage) *models.ChatMessage {
+	if len(messages) == 0 || c == nil {
+		return nil
+	}
+
 	var builder strings.Builder
-	for i, msg := range toCompact {
+	for i, msg := range messages {
 		builder.WriteString(fmt.Sprintf("## Message %d\nRole: %s\nContent:\n", i+1, msg.Role))
 		for _, part := range msg.Parts {
 			if part.ReasoningContent != "" {
@@ -175,7 +240,7 @@ func (c *KimiCompactor) prepare(messages []*models.ChatMessage) (*models.ChatMes
 	builder.WriteString("\n")
 	builder.WriteString(c.prompt)
 
-	return models.NewTextMessage(models.ChatRoleUser, builder.String()), toPreserve
+	return models.NewTextMessage(models.ChatRoleUser, builder.String())
 }
 
 func kimiCompactorSerializePart(part models.ChatMessagePart) string {
@@ -212,4 +277,20 @@ func kimiCompactorMessageHasToolCalls(message *models.ChatMessage) bool {
 	}
 
 	return false
+}
+
+func splitKimiCompactorMessages(messages []*models.ChatMessage) ([]*models.ChatMessage, []*models.ChatMessage) {
+	if len(messages) < 2 {
+		return cloneMessages(messages), nil
+	}
+
+	mid := len(messages) / 2
+	if mid <= 0 {
+		mid = 1
+	}
+	if mid >= len(messages) {
+		mid = len(messages) - 1
+	}
+
+	return cloneMessages(messages[:mid]), cloneMessages(messages[mid:])
 }

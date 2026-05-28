@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"iter"
 	"strings"
 	"testing"
@@ -22,8 +23,11 @@ const (
 
 type kimiTestChatModel struct {
 	response     *models.ChatMessage
+	responses    []*models.ChatMessage
 	err          error
+	errs         []error
 	calls        int
+	allMessages  [][]*models.ChatMessage
 	lastMessages []*models.ChatMessage
 }
 
@@ -33,8 +37,21 @@ func (m *kimiTestChatModel) Chat(ctx context.Context, messages []*models.ChatMes
 	_ = tools
 	m.calls++
 	m.lastMessages = cloneMessages(messages)
+	m.allMessages = append(m.allMessages, cloneMessages(messages))
+	if len(m.errs) > 0 {
+		err := m.errs[0]
+		m.errs = m.errs[1:]
+		if err != nil {
+			return nil, err
+		}
+	}
 	if m.err != nil {
 		return nil, m.err
+	}
+	if len(m.responses) > 0 {
+		response := m.responses[0]
+		m.responses = m.responses[1:]
+		return response, nil
 	}
 
 	return m.response, nil
@@ -129,6 +146,48 @@ func TestKimiCompactorCompactMessages(t *testing.T) {
 		assert.Equal(t, "u2", got[3].GetText())
 	})
 
+	t.Run("splits compacted history when summary request exceeds context", func(t *testing.T) {
+		chatModel := &kimiTestChatModel{
+			errs: []error{
+				fmt.Errorf("%w: request too large", models.ErrTooManyInputTokens),
+				nil,
+				nil,
+			},
+			responses: []*models.ChatMessage{
+				models.NewTextMessage(models.ChatRoleAssistant, "summary first half"),
+				models.NewTextMessage(models.ChatRoleAssistant, "summary second half"),
+			},
+		}
+
+		compactor := NewKimiCompactor(chatModel, 2, newKimiCompactorConfig())
+		messages := []*models.ChatMessage{
+			models.NewTextMessage(models.ChatRoleSystem, "system"),
+			models.NewTextMessage(models.ChatRoleUser, "old user 1"),
+			models.NewTextMessage(models.ChatRoleAssistant, "old assistant 1"),
+			models.NewTextMessage(models.ChatRoleUser, "old user 2"),
+			models.NewTextMessage(models.ChatRoleAssistant, "old assistant 2"),
+			models.NewTextMessage(models.ChatRoleUser, "keep user"),
+			models.NewTextMessage(models.ChatRoleAssistant, "keep assistant"),
+		}
+
+		got := compactor.CompactMessages(messages)
+
+		require.Len(t, got, 4)
+		assert.Equal(t, "keep user", got[0].GetText())
+		assert.Contains(t, got[1].GetText(), testKimiCompactorPrefix)
+		assert.Contains(t, got[1].GetText(), "summary first half")
+		assert.Contains(t, got[2].GetText(), testKimiCompactorPrefix)
+		assert.Contains(t, got[2].GetText(), "summary second half")
+		assert.Equal(t, "keep assistant", got[3].GetText())
+
+		require.Equal(t, 3, chatModel.calls)
+		require.Len(t, chatModel.allMessages, 3)
+		assert.Contains(t, chatModel.allMessages[1][1].GetText(), "old user 1")
+		assert.NotContains(t, chatModel.allMessages[1][1].GetText(), "old user 2")
+		assert.Contains(t, chatModel.allMessages[2][1].GetText(), "old user 2")
+		assert.NotContains(t, chatModel.allMessages[2][1].GetText(), "old user 1")
+	})
+
 	t.Run("skips compaction when not enough user assistant messages", func(t *testing.T) {
 		chatModel := &kimiTestChatModel{}
 		compactor := NewKimiCompactor(chatModel, 3, newKimiCompactorConfig())
@@ -146,24 +205,24 @@ func TestKimiCompactorCompactMessages(t *testing.T) {
 }
 
 func TestKimiCompactorPrepare(t *testing.T) {
-		t.Run("serializes compacted messages and preserves requested tail", func(t *testing.T) {
-			compactor := &KimiCompactor{nmessages: 2, prompt: testKimiCompactorPrompt}
-			toolCall := compactTestToolCall("c1", "vfsRead", map[string]any{"path": "a"})
-			messages := []*models.ChatMessage{
-				models.NewTextMessage(models.ChatRoleSystem, "system"),
-				{
-					Role: models.ChatRoleAssistant,
-					Parts: []models.ChatMessagePart{
-						{ReasoningContent: "internal"},
-						{ToolCall: toolCall},
-						{Text: "visible"},
-					},
+	t.Run("serializes compacted messages and preserves requested tail", func(t *testing.T) {
+		compactor := &KimiCompactor{nmessages: 2, prompt: testKimiCompactorPrompt}
+		toolCall := compactTestToolCall("c1", "vfsRead", map[string]any{"path": "a"})
+		messages := []*models.ChatMessage{
+			models.NewTextMessage(models.ChatRoleSystem, "system"),
+			{
+				Role: models.ChatRoleAssistant,
+				Parts: []models.ChatMessagePart{
+					{ReasoningContent: "internal"},
+					{ToolCall: toolCall},
+					{Text: "visible"},
 				},
-				models.NewTextMessage(models.ChatRoleUser, "middle user"),
-				models.NewTextMessage(models.ChatRoleAssistant, "middle assistant"),
-				models.NewTextMessage(models.ChatRoleUser, "keep user"),
-				models.NewTextMessage(models.ChatRoleAssistant, "keep assistant"),
-			}
+			},
+			models.NewTextMessage(models.ChatRoleUser, "middle user"),
+			models.NewTextMessage(models.ChatRoleAssistant, "middle assistant"),
+			models.NewTextMessage(models.ChatRoleUser, "keep user"),
+			models.NewTextMessage(models.ChatRoleAssistant, "keep assistant"),
+		}
 
 		compactMsg, preserved := compactor.prepare(messages)
 		require.NotNil(t, compactMsg)
@@ -173,7 +232,7 @@ func TestKimiCompactorPrepare(t *testing.T) {
 		assert.NotContains(t, compactMsg.GetText(), "internal")
 		assert.Contains(t, compactMsg.GetText(), "visible")
 		assert.Contains(t, compactMsg.GetText(), "\"Function\":\"vfsRead\"")
-			assert.True(t, strings.Contains(compactMsg.GetText(), testKimiCompactorPrompt))
+		assert.True(t, strings.Contains(compactMsg.GetText(), testKimiCompactorPrompt))
 	})
 
 	t.Run("keeps trailing tool-call message out of compacted sequence", func(t *testing.T) {
