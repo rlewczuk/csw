@@ -116,6 +116,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		ShadowDir:         "shadow/base",
 		VFSAllow:          []string{"/base/allow"},
 		RunBashMax:        intPtr(256),
+		VfsReadLimit:      intPtr(384),
 	}
 	override := RunDefaultsConfig{
 		DefaultProvider:     "provider2",
@@ -136,6 +137,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		AllowAllPermissions: true,
 		VFSAllow:            []string{"/override/allow1", "/override/allow2"},
 		RunBashMax:          intPtr(0),
+		VfsReadLimit:        intPtr(128),
 	}
 
 	base.MergeFrom(override)
@@ -161,6 +163,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		AllowAllPermissions: true,
 		VFSAllow:            []string{"/override/allow1", "/override/allow2"},
 		RunBashMax:          intPtr(0),
+		VfsReadLimit:        intPtr(128),
 	}, base)
 }
 
@@ -235,6 +238,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 			ShadowDir:       "shadow/base",
 			VFSAllow:        []string{"/base/allow"},
 			RunBashMax:      intPtr(128),
+			VfsReadLimit:    intPtr(384),
 		},
 		ShadowPaths: []string{"AGENTS.md"},
 	}
@@ -264,6 +268,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 			AllowAllPermissions: true,
 			VFSAllow:            []string{"/override/allow"},
 			RunBashMax:          intPtr(0),
+			VfsReadLimit:        intPtr(256),
 		},
 		ShadowPaths: []string{".cswdata/**", ".agents/**"},
 	}
@@ -281,7 +286,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 	assert.Equal(t, 12, base.Defaults.MaxThreads)
 	require.NotNil(t, base.Defaults.Container)
 	assert.Equal(t, ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, *base.Defaults.Container)
-	assert.Equal(t, RunDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, LogLLMRequestsRaw: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks", ShadowDir: "shadow/override", AllowAllPermissions: true, VFSAllow: []string{"/override/allow"}, RunBashMax: intPtr(0)}, base.Defaults)
+	assert.Equal(t, RunDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, LogLLMRequestsRaw: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks", ShadowDir: "shadow/override", AllowAllPermissions: true, VFSAllow: []string{"/override/allow"}, RunBashMax: intPtr(0), VfsReadLimit: intPtr(256)}, base.Defaults)
 	assert.Equal(t, []string{".cswdata/**", ".agents/**"}, base.ShadowPaths)
 }
 
@@ -367,7 +372,7 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 				Default: map[string]bool{"runBash": true},
 				Tags:    map[string]map[string]bool{"safe": {"vfsRead": true}},
 			},
-			Defaults: RunDefaultsConfig{Container: &ContainerConfig{Mounts: []string{"a"}, Env: []string{"A=1"}}, VFSAllow: []string{"/a", "/b"}},
+			Defaults: RunDefaultsConfig{Container: &ContainerConfig{Mounts: []string{"a"}, Env: []string{"A=1"}}, VFSAllow: []string{"/a", "/b"}, RunBashMax: intPtr(512), VfsReadLimit: intPtr(384)},
 		}
 
 		clone := cfg.Clone()
@@ -380,12 +385,18 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 		require.NotNil(t, cfg.Defaults.Container)
 		clone.Defaults.Container.Mounts[0] = "b"
 		clone.Defaults.VFSAllow[0] = "/changed"
+		*clone.Defaults.RunBashMax = 128
+		*clone.Defaults.VfsReadLimit = 64
 
 		assert.Equal(t, "all", cfg.ModelTags[0].Tag)
 		assert.True(t, cfg.ToolSelection.Default["runBash"])
 		assert.True(t, cfg.ToolSelection.Tags["safe"]["vfsRead"])
 		assert.Equal(t, "a", cfg.Defaults.Container.Mounts[0])
 		assert.Equal(t, "/a", cfg.Defaults.VFSAllow[0])
+		require.NotNil(t, cfg.Defaults.RunBashMax)
+		require.NotNil(t, cfg.Defaults.VfsReadLimit)
+		assert.Equal(t, 512, *cfg.Defaults.RunBashMax)
+		assert.Equal(t, 384, *cfg.Defaults.VfsReadLimit)
 	})
 
 	t.Run("agent role clone is deep copy", func(t *testing.T) {

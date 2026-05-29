@@ -7,10 +7,14 @@ import (
 	"github.com/rlewczuk/csw/pkg/vfs"
 )
 
+// DefaultVFSReadLimitLines is the default number of lines returned by vfsRead.
+const DefaultVFSReadLimitLines int64 = 384
+
 // VFSReadTool implements the vfsRead tool.
 type VFSReadTool struct {
-	vfs         apis.VFS
-	lineNumbers bool
+	vfs          apis.VFS
+	lineNumbers  bool
+	defaultLimit int64
 }
 
 func (t *VFSReadTool) GetDescription() (string, bool) {
@@ -20,7 +24,12 @@ func (t *VFSReadTool) GetDescription() (string, bool) {
 // NewVFSReadTool creates a new VFSReadTool instance.
 // If lineNumbers is true, the tool will format content with line numbers (cat -n style).
 func NewVFSReadTool(v apis.VFS, lineNumbers bool) *VFSReadTool {
-	return &VFSReadTool{vfs: v, lineNumbers: lineNumbers}
+	return NewVFSReadToolWithDefaultLimit(v, lineNumbers, DefaultVFSReadLimitLines)
+}
+
+// NewVFSReadToolWithDefaultLimit creates a new VFSReadTool instance with a custom default line limit.
+func NewVFSReadToolWithDefaultLimit(v apis.VFS, lineNumbers bool, defaultLimit int64) *VFSReadTool {
+	return &VFSReadTool{vfs: v, lineNumbers: lineNumbers, defaultLimit: defaultLimit}
 }
 
 // Execute executes the tool with the given arguments and returns the response.
@@ -34,8 +43,8 @@ func (t *VFSReadTool) Execute(args *ToolCall) *ToolResponse {
 		}
 	}
 
-	// Get limit parameter, default to 2000 if not provided
-	limit := int64(2000)
+	// Get limit parameter, default to configured limit if not provided
+	limit := t.defaultLimit
 	if args.Arguments.Has("limit") {
 		if l, ok := args.Arguments.IntOK("limit"); ok {
 			limit = l

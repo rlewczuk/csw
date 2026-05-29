@@ -108,6 +108,8 @@ type BuildSystemParams struct {
 	MaxToolThreads int
 	// RunBashMaxOutput overrides default runBash output limit in bytes. When nil, value from config is used.
 	RunBashMaxOutput *int
+	// VFSReadLimit overrides default vfsRead output limit in lines. When nil, value from config is used.
+	VFSReadLimit *int
 	// AllowAllPermissions forces all tool permission checks to allow mode for this run.
 	AllowAllPermissions bool
 }
@@ -449,8 +451,20 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		}
 	}
 
+	vfsReadLimit := int(tool.DefaultVFSReadLimitLines)
+	if globalConfig.Defaults.VfsReadLimit != nil {
+		vfsReadLimit = *globalConfig.Defaults.VfsReadLimit
+	}
+	if params.VFSReadLimit != nil {
+		vfsReadLimit = *params.VFSReadLimit
+	}
+	if vfsReadLimit < 0 {
+		logging.FlushLogs()
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: --vfs-read-limit must be >= 0")
+	}
+
 	toolRegistry := tool.NewToolRegistry()
-	tool.RegisterVFSTools(toolRegistry, toolVFS, lspClient, nil)
+	tool.RegisterVFSTools(toolRegistry, toolVFS, lspClient, nil, vfsReadLimit)
 
 	taskManager, err := core.NewTaskManagerWithTasksDir(workDir, ".cswdata/tasks", configStore)
 	if err != nil {

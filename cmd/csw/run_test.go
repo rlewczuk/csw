@@ -12,6 +12,13 @@ func TestRunCommandDoesNotExposeTaskFlag(t *testing.T) {
 	assert.Nil(t, command.Flags().Lookup("task"))
 }
 
+func TestRunCommandExposesVFSReadLimitFlag(t *testing.T) {
+	command := RunCommand()
+	flag := command.Flags().Lookup("vfs-read-limit")
+	assert.NotNil(t, flag)
+	assert.Equal(t, "384", flag.DefValue)
+}
+
 func TestResolveShadowDir(t *testing.T) {
 	testCases := []struct {
 		name            string
@@ -23,11 +30,11 @@ func TestResolveShadowDir(t *testing.T) {
 		expected        string
 	}{
 		{
-			name:         "uses CLI value when provided without flag change",
+			name:            "uses CLI value when provided without flag change",
 			globalShadowDir: "cli-shadow",
-			envShadowDir: "env-shadow",
-			envSet:       true,
-			expected:     "cli-shadow",
+			envShadowDir:    "env-shadow",
+			envSet:          true,
+			expected:        "cli-shadow",
 		},
 		{
 			name:         "uses env value when CLI value empty",

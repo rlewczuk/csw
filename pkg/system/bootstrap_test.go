@@ -41,6 +41,15 @@ func TestBuildSystemParamsRunBashMaxOutput(t *testing.T) {
 	assert.Equal(t, 256, *params.RunBashMaxOutput)
 }
 
+func TestBuildSystemParamsVFSReadLimit(t *testing.T) {
+	vfsReadLimit := 128
+	params := BuildSystemParams{
+		VFSReadLimit: &vfsReadLimit,
+	}
+	require.NotNil(t, params.VFSReadLimit)
+	assert.Equal(t, 128, *params.VFSReadLimit)
+}
+
 func TestBuildSystemParamsAllowAllPermissions(t *testing.T) {
 	params := BuildSystemParams{
 		AllowAllPermissions: true,
@@ -316,11 +325,12 @@ func TestApplyRunDefaultsSetsWorkdirWhenFlagUnchanged(t *testing.T) {
 	vfsAllow := []string(nil)
 	noCommit := false
 	runBashMaxOutput := (*int)(nil)
+	vfsReadLimit := (*int)(nil)
 	resolver := func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 		return conf.RunDefaultsConfig{Workdir: "/configured/workdir"}, nil
 	}
 
-	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput)
+	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput, &vfsReadLimit)
 
 	require.NoError(t, err)
 	assert.Equal(t, "/configured/workdir", workDir)
@@ -347,11 +357,12 @@ func TestApplyRunDefaultsKeepsChangedWorkdirFlag(t *testing.T) {
 	vfsAllow := []string(nil)
 	noCommit := false
 	runBashMaxOutput := (*int)(nil)
+	vfsReadLimit := (*int)(nil)
 	resolver := func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 		return conf.RunDefaultsConfig{Workdir: "/configured/workdir"}, nil
 	}
 
-	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput)
+	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput, &vfsReadLimit)
 
 	require.NoError(t, err)
 	assert.Equal(t, "/cli/workdir", workDir)
@@ -376,16 +387,85 @@ func TestApplyRunDefaultsSetsRunBashMaxWhenFlagUnchanged(t *testing.T) {
 	vfsAllow := []string(nil)
 	noCommit := false
 	runBashMaxOutput := (*int)(nil)
+	vfsReadLimit := (*int)(nil)
 	configuredRunBashMax := 512
 	resolver := func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 		return conf.RunDefaultsConfig{RunBashMax: &configuredRunBashMax}, nil
 	}
 
-	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput)
+	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput, &vfsReadLimit)
 
 	require.NoError(t, err)
 	require.NotNil(t, runBashMaxOutput)
 	assert.Equal(t, 512, *runBashMaxOutput)
+}
+
+func TestApplyRunDefaultsSetsVFSReadLimitWhenFlagUnchanged(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.Flags().Int("run-bash-max", 0, "")
+	cmd.Flags().Int("vfs-read-limit", 0, "")
+	workDir := ""
+	model := ""
+	worktree := ""
+	merge := false
+	logLLMRequests := false
+	logLLMRequestsRaw := false
+	thinking := ""
+	lspServer := ""
+	gitUser := ""
+	gitEmail := ""
+	maxThreads := 0
+	shadowDir := ""
+	allowAllPerms := false
+	vfsAllow := []string(nil)
+	noCommit := false
+	runBashMaxOutput := (*int)(nil)
+	vfsReadLimit := (*int)(nil)
+	configuredVFSReadLimit := 256
+	resolver := func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		return conf.RunDefaultsConfig{VfsReadLimit: &configuredVFSReadLimit}, nil
+	}
+
+	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput, &vfsReadLimit)
+
+	require.NoError(t, err)
+	require.NotNil(t, vfsReadLimit)
+	assert.Equal(t, 256, *vfsReadLimit)
+}
+
+func TestApplyRunDefaultsKeepsChangedVFSReadLimitFlag(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.Flags().Int("run-bash-max", 0, "")
+	cmd.Flags().Int("vfs-read-limit", 0, "")
+	require.NoError(t, cmd.Flags().Set("vfs-read-limit", "128"))
+	workDir := ""
+	model := ""
+	worktree := ""
+	merge := false
+	logLLMRequests := false
+	logLLMRequestsRaw := false
+	thinking := ""
+	lspServer := ""
+	gitUser := ""
+	gitEmail := ""
+	maxThreads := 0
+	shadowDir := ""
+	allowAllPerms := false
+	vfsAllow := []string(nil)
+	noCommit := false
+	runBashMaxOutput := (*int)(nil)
+	cliVFSReadLimit := 128
+	vfsReadLimit := &cliVFSReadLimit
+	configuredVFSReadLimit := 256
+	resolver := func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+		return conf.RunDefaultsConfig{VfsReadLimit: &configuredVFSReadLimit}, nil
+	}
+
+	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput, &vfsReadLimit)
+
+	require.NoError(t, err)
+	require.NotNil(t, vfsReadLimit)
+	assert.Equal(t, 128, *vfsReadLimit)
 }
 
 func TestApplyRunDefaultsKeepsChangedRunBashMaxFlag(t *testing.T) {
@@ -409,12 +489,13 @@ func TestApplyRunDefaultsKeepsChangedRunBashMaxFlag(t *testing.T) {
 	noCommit := false
 	cliRunBashMax := 128
 	runBashMaxOutput := &cliRunBashMax
+	vfsReadLimit := (*int)(nil)
 	configuredRunBashMax := 512
 	resolver := func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
 		return conf.RunDefaultsConfig{RunBashMax: &configuredRunBashMax}, nil
 	}
 
-	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput)
+	err := applyRunDefaults(resolver, cmd, workDir, "", "", "", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput, &vfsReadLimit)
 
 	require.NoError(t, err)
 	require.NotNil(t, runBashMaxOutput)

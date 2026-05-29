@@ -69,6 +69,7 @@ type RunParams struct {
 	ModelOverridden       bool
 	BashRunTimeout        time.Duration
 	RunBashMaxOutput      *int
+	VFSReadLimit          *int
 	MaxThreads            int
 	AllowAllPermissions   bool
 	OutputFormat          string
@@ -211,7 +212,7 @@ func RunCommand(params *RunParams) error {
 			return err
 		}
 
-		if err := applyRunDefaults(ResolveRunDefaults, params.Command, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath, &params.WorkDir, &params.ModelName, &params.WorktreeBranch, &params.Merge, &params.LogLLMRequests, &params.LogLLMRequestsRaw, &params.Thinking, &params.LSPServer, &params.GitUserName, &params.GitUserEmail, &params.MaxThreads, &params.ShadowDir, &params.AllowAllPerms, &params.VFSAllow, &params.NoCommit, &params.RunBashMaxOutput); err != nil {
+		if err := applyRunDefaults(ResolveRunDefaults, params.Command, params.WorkDir, params.ShadowDir, params.ProjectConfig, params.ConfigPath, &params.WorkDir, &params.ModelName, &params.WorktreeBranch, &params.Merge, &params.LogLLMRequests, &params.LogLLMRequestsRaw, &params.Thinking, &params.LSPServer, &params.GitUserName, &params.GitUserEmail, &params.MaxThreads, &params.ShadowDir, &params.AllowAllPerms, &params.VFSAllow, &params.NoCommit, &params.RunBashMaxOutput, &params.VFSReadLimit); err != nil {
 			return err
 		}
 
@@ -350,7 +351,7 @@ func RunCommand(params *RunParams) error {
 		_, _ = fmt.Fprintf(stdout, "[INFO] Worktree branch: %s\n", params.WorktreeBranch)
 	}
 
-	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{WorkDir: params.WorkDir, ShadowDir: params.ShadowDir, ConfigPath: params.ConfigPath, ProjectConfig: params.ProjectConfig, ModelName: params.ModelName, RoleName: params.RoleName, WorktreeBranch: params.WorktreeBranch, GitUserName: params.GitUserName, GitUserEmail: params.GitUserEmail, ContainerEnabled: params.ContainerEnabled, ContainerDisabled: params.ContainerDisabled, ContainerImage: params.ContainerImage, ContainerMounts: params.ContainerMounts, ContainerEnv: params.ContainerEnv, LSPServer: params.LSPServer, LogLLMRequests: params.LogLLMRequests, LogLLMRequestsRaw: params.LogLLMRequestsRaw, NoRefresh: params.NoRefresh, Thinking: params.Thinking, BashRunTimeout: params.BashRunTimeout, AllowedPaths: params.VFSAllow, MaxToolThreads: params.MaxThreads, RunBashMaxOutput: params.RunBashMaxOutput, AllowAllPermissions: params.AllowAllPerms})
+	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{WorkDir: params.WorkDir, ShadowDir: params.ShadowDir, ConfigPath: params.ConfigPath, ProjectConfig: params.ProjectConfig, ModelName: params.ModelName, RoleName: params.RoleName, WorktreeBranch: params.WorktreeBranch, GitUserName: params.GitUserName, GitUserEmail: params.GitUserEmail, ContainerEnabled: params.ContainerEnabled, ContainerDisabled: params.ContainerDisabled, ContainerImage: params.ContainerImage, ContainerMounts: params.ContainerMounts, ContainerEnv: params.ContainerEnv, LSPServer: params.LSPServer, LogLLMRequests: params.LogLLMRequests, LogLLMRequestsRaw: params.LogLLMRequestsRaw, NoRefresh: params.NoRefresh, Thinking: params.Thinking, BashRunTimeout: params.BashRunTimeout, AllowedPaths: params.VFSAllow, MaxToolThreads: params.MaxThreads, RunBashMaxOutput: params.RunBashMaxOutput, VFSReadLimit: params.VFSReadLimit, AllowAllPermissions: params.AllowAllPerms})
 	if err != nil {
 		return err
 	}
@@ -439,7 +440,7 @@ func resolveTaskFinalStatusForRun(session *core.SweSession, merge bool) (string,
 	return core.TaskStatusCompleted, true
 }
 
-func applyRunDefaults(resolver runDefaultsResolver, cmd *cobra.Command, workDir string, shadowDir string, projectConfig string, configPath string, workDirOut *string, model *string, worktree *string, merge *bool, logLLMRequests *bool, logLLMRequestsRaw *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string, noCommit *bool, runBashMaxOutput **int) error {
+func applyRunDefaults(resolver runDefaultsResolver, cmd *cobra.Command, workDir string, shadowDir string, projectConfig string, configPath string, workDirOut *string, model *string, worktree *string, merge *bool, logLLMRequests *bool, logLLMRequestsRaw *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string, noCommit *bool, runBashMaxOutput **int, vfsReadLimit **int) error {
 	defaults, err := resolver(ResolveRunDefaultsParams{WorkDir: workDir, ShadowDir: shadowDir, ProjectConfig: projectConfig, ConfigPath: configPath})
 	if err != nil {
 		return fmt.Errorf("applyRunDefaults() [run.go]: failed to resolve run defaults: %w", err)
@@ -497,11 +498,18 @@ func applyRunDefaults(resolver runDefaultsResolver, cmd *cobra.Command, workDir 
 		value := *defaults.RunBashMax
 		*runBashMaxOutput = &value
 	}
+	if !cmd.Flags().Changed("vfs-read-limit") && defaults.VfsReadLimit != nil {
+		value := *defaults.VfsReadLimit
+		*vfsReadLimit = &value
+	}
 	if *maxThreads < 0 {
 		return fmt.Errorf("applyRunDefaults() [run.go]: --max-threads must be >= 0")
 	}
 	if *runBashMaxOutput != nil && **runBashMaxOutput < 0 {
 		return fmt.Errorf("applyRunDefaults() [run.go]: --run-bash-max must be >= 0")
+	}
+	if *vfsReadLimit != nil && **vfsReadLimit < 0 {
+		return fmt.Errorf("applyRunDefaults() [run.go]: --vfs-read-limit must be >= 0")
 	}
 	return nil
 }

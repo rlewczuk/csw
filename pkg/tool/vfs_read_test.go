@@ -13,6 +13,53 @@ import (
 )
 
 func TestVFSReadTool(t *testing.T) {
+	t.Run("should apply default limit", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		content := strings.Join([]string{"line1", "line2", "line3", "line4", "line5"}, "\n")
+		err := mockVFS.WriteFile("test.txt", []byte(content))
+		require.NoError(t, err)
+
+		tool := NewVFSReadToolWithDefaultLimit(mockVFS, false, 3)
+
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsRead",
+			Arguments: NewToolValue(map[string]any{
+				"path": "test.txt",
+			}),
+		})
+
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Equal(t, "line1\nline2\nline3\n", response.Result.Get("content").AsString())
+	})
+
+	t.Run("should use package default limit", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		lines := make([]string, DefaultVFSReadLimitLines+1)
+		for i := range lines {
+			lines[i] = fmt.Sprintf("line%d", i+1)
+		}
+		err := mockVFS.WriteFile("test.txt", []byte(strings.Join(lines, "\n")))
+		require.NoError(t, err)
+
+		tool := NewVFSReadTool(mockVFS, false)
+
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsRead",
+			Arguments: NewToolValue(map[string]any{
+				"path": "test.txt",
+			}),
+		})
+
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.NoError(t, response.Error)
+		assert.True(t, response.Done)
+		assert.Equal(t, strings.Join(lines[:DefaultVFSReadLimitLines], "\n")+"\n", response.Result.Get("content").AsString())
+	})
+
 	t.Run("should read file successfully", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
@@ -208,12 +255,12 @@ func TestVFSReadTool(t *testing.T) {
 		assert.Equal(t, "line1\nline2\n", response.Result.Get("content").AsString())
 	})
 
-	t.Run("should use default limit of 2000 when not provided", func(t *testing.T) {
+	t.Run("should use default limit when not provided", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
-		// Create content with more than 2000 lines
+		// Create content with more than the default limit.
 		var lines []string
-		for i := 1; i <= 2500; i++ {
+		for i := 1; i <= int(DefaultVFSReadLimitLines)+1; i++ {
 			lines = append(lines, fmt.Sprintf("line%d", i))
 		}
 		content := ""
@@ -247,7 +294,7 @@ func TestVFSReadTool(t *testing.T) {
 				resultLines++
 			}
 		}
-		assert.Equal(t, 2000, resultLines)
+		assert.Equal(t, int(DefaultVFSReadLimitLines), resultLines)
 	})
 
 	t.Run("should handle empty file", func(t *testing.T) {

@@ -153,6 +153,10 @@ mergeOtherFields:
 		value := *override.RunBashMax
 		c.RunBashMax = &value
 	}
+	if override.VfsReadLimit != nil {
+		value := *override.VfsReadLimit
+		c.VfsReadLimit = &value
+	}
 }
 
 // Clone returns a deep copy of GlobalConfig.
@@ -180,6 +184,10 @@ func (c *GlobalConfig) Clone() *GlobalConfig {
 	if c.Defaults.RunBashMax != nil {
 		value := *c.Defaults.RunBashMax
 		cloned.Defaults.RunBashMax = &value
+	}
+	if c.Defaults.VfsReadLimit != nil {
+		value := *c.Defaults.VfsReadLimit
+		cloned.Defaults.VfsReadLimit = &value
 	}
 	copy(cloned.ModelTags, c.ModelTags)
 

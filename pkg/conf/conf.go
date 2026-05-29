@@ -221,6 +221,8 @@ type RunDefaultsConfig struct {
 	VFSAllow []string `json:"vfs-allow,omitempty"`
 	// RunBashMax is the default --run-bash-max value in bytes; 0 disables output limiting.
 	RunBashMax *int `json:"run-bash-max,omitempty"`
+	// VfsReadLimit is the default --vfs-read-limit value in lines; 0 disables output limiting.
+	VfsReadLimit *int `json:"vfs-read-limit,omitempty"`
 }
 
 // ModelProviderConfig represents common configuration for model providers.

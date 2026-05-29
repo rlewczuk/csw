@@ -135,8 +135,12 @@ func (r *ToolRegistry) Execute(args *ToolCall) *ToolResponse {
 // Line numbers are enabled by default for the vfsRead tool.
 // lspClient is optional and can be nil.
 // logger is optional and can be nil.
-func RegisterVFSTools(registry *ToolRegistry, vfsImpl apis.VFS, lspClient lsp.LSP, logger *slog.Logger) {
-	registry.Register("vfsRead", NewVFSReadTool(vfsImpl, true))
+func RegisterVFSTools(registry *ToolRegistry, vfsImpl apis.VFS, lspClient lsp.LSP, logger *slog.Logger, defaultReadLimit ...int) {
+	readLimit := int(DefaultVFSReadLimitLines)
+	if len(defaultReadLimit) > 0 {
+		readLimit = defaultReadLimit[0]
+	}
+	registry.Register("vfsRead", NewVFSReadToolWithDefaultLimit(vfsImpl, true, int64(readLimit)))
 
 	writeTool := NewVFSWriteTool(vfsImpl, lspClient)
 	if logger != nil {
