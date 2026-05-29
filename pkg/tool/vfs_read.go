@@ -51,11 +51,19 @@ func (t *VFSReadTool) Execute(args *ToolCall) *ToolResponse {
 		}
 	}
 
-	// Get offset parameter, default to 0 if not provided
-	offset := int64(0)
-	if args.Arguments.Has("offset") {
-		if o, ok := args.Arguments.IntOK("offset"); ok {
-			offset = o
+	if !args.Arguments.Has("offset") {
+		return &ToolResponse{
+			Call:  args,
+			Error: fmt.Errorf("VFSReadTool.Execute() [vfs_read.go]: missing required argument: offset"),
+			Done:  true,
+		}
+	}
+	offset, ok := args.Arguments.IntOK("offset")
+	if !ok {
+		return &ToolResponse{
+			Call:  args,
+			Error: fmt.Errorf("VFSReadTool.Execute() [vfs_read.go]: invalid argument: offset must be an integer"),
+			Done:  true,
 		}
 	}
 

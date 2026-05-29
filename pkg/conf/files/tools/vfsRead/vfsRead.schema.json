@@ -11,11 +11,11 @@
       "type": "integer",
       "description": "The maximum number of lines to read. Defaults to 384 if not provided."
     },
-    "offset": {
-      "type": "integer",
-      "description": "The number of lines to skip before reading. Defaults to 0 if not provided."
-    }
-  },
-  "required": ["path"],
+      "offset": {
+        "type": "integer",
+        "description": "The number of lines to skip before reading. This parameter is required. Use 0 to read from the beginning."
+      }
+    },
+    "required": ["path", "offset"],
   "additionalProperties": false
 }

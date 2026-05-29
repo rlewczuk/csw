@@ -390,7 +390,8 @@ func TestSessionReasoningContent(t *testing.T) {
 						ID:       "read-call-1",
 						Function: "vfsRead",
 						Arguments: tool.NewToolValue(map[string]any{
-							"path": "test.txt",
+							"path":   "test.txt",
+							"offset": 0,
 						}),
 					}},
 				},

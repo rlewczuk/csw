@@ -95,7 +95,8 @@ func TestExecuteToolCalls_AppendsAgentInstructionsAfterToolResponse(t *testing.T
 		ID:       "vfsRead:0",
 		Function: "vfsRead",
 		Arguments: tool.NewToolValue(map[string]any{
-			"path": "pkg/foo/test.go",
+			"path":   "pkg/foo/test.go",
+			"offset": 0,
 		}),
 	}
 	session.messages = append(session.messages, models.NewToolCallMessage(call))

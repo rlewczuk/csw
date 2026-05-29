@@ -62,7 +62,8 @@ func TestSessionAdditionalAgentFiles(t *testing.T) {
 				ID:       "read-1",
 				Function: "vfsRead",
 				Arguments: tool.NewToolValue(map[string]any{
-					"path": "src/a.txt",
+					"path":   "src/a.txt",
+					"offset": 0,
 				}),
 			}}},
 		}})
@@ -72,7 +73,8 @@ func TestSessionAdditionalAgentFiles(t *testing.T) {
 				ID:       "read-2",
 				Function: "vfsRead",
 				Arguments: tool.NewToolValue(map[string]any{
-					"path": "src/b.txt",
+					"path":   "src/b.txt",
+					"offset": 0,
 				}),
 			}}},
 		}})
@@ -159,7 +161,8 @@ func TestSessionAdditionalAgentFiles(t *testing.T) {
 				ID:       "read-root",
 				Function: "vfsRead",
 				Arguments: tool.NewToolValue(map[string]any{
-					"path": "main.go",
+					"path":   "main.go",
+					"offset": 0,
 				}),
 			}}},
 		}})

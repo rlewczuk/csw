@@ -347,7 +347,8 @@ func TestToolRegistry_VFSIntegration(t *testing.T) {
 		ID:       "read-id",
 		Function: "vfsRead",
 		Arguments: NewToolValue(map[string]any{
-			"path": "test.txt",
+			"path":   "test.txt",
+			"offset": 0,
 		}),
 	}
 

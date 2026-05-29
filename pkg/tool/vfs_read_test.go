@@ -25,7 +25,8 @@ func TestVFSReadTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path": "test.txt",
+				"path":   "test.txt",
+				"offset": 0,
 			}),
 		})
 
@@ -50,7 +51,8 @@ func TestVFSReadTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path": "test.txt",
+				"path":   "test.txt",
+				"offset": 0,
 			}),
 		})
 
@@ -73,7 +75,8 @@ func TestVFSReadTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path": "test.txt",
+				"path":   "test.txt",
+				"offset": 0,
 			}),
 		})
 
@@ -103,6 +106,25 @@ func TestVFSReadTool(t *testing.T) {
 		assert.Equal(t, 0, response.Result.Len())
 	})
 
+	t.Run("should return error for missing offset argument", func(t *testing.T) {
+		mockVFS := vfs.NewMockVFS()
+		tool := NewVFSReadTool(mockVFS, false)
+
+		response := tool.Execute(&ToolCall{
+			ID:       "test-id",
+			Function: "vfsRead",
+			Arguments: NewToolValue(map[string]any{
+				"path": "test.txt",
+			}),
+		})
+
+		assert.Equal(t, "test-id", response.Call.ID)
+		assert.Error(t, response.Error)
+		assert.ErrorContains(t, response.Error, "missing required argument: offset")
+		assert.True(t, response.Done)
+		assert.Equal(t, 0, response.Result.Len())
+	})
+
 	t.Run("should return error for non-existent file", func(t *testing.T) {
 		// Setup
 		mockVFS := vfs.NewMockVFS()
@@ -113,7 +135,8 @@ func TestVFSReadTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path": "nonexistent.txt",
+				"path":   "nonexistent.txt",
+				"offset": 0,
 			}),
 		})
 
@@ -140,6 +163,7 @@ func TestVFSReadTool(t *testing.T) {
 			Arguments: NewToolValue(map[string]any{
 				"path":  "test.txt",
 				"limit": 3,
+				"offset": 0,
 			}),
 		})
 
@@ -245,6 +269,7 @@ func TestVFSReadTool(t *testing.T) {
 			Arguments: NewToolValue(map[string]any{
 				"path":  "test.txt",
 				"limit": 2,
+				"offset": 0,
 			}),
 		})
 
@@ -277,7 +302,8 @@ func TestVFSReadTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path": "test.txt",
+				"path":   "test.txt",
+				"offset": 0,
 			}),
 		})
 
@@ -337,7 +363,8 @@ func TestVFSReadTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path": "test.txt",
+				"path":   "test.txt",
+				"offset": 0,
 			}),
 		})
 
@@ -394,7 +421,8 @@ func TestVFSReadTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path": "test.txt",
+				"path":   "test.txt",
+				"offset": 0,
 			}),
 		})
 
@@ -424,7 +452,8 @@ func TestVFSReadToolPermissions(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path": "test.txt",
+				"path":   "test.txt",
+				"offset": 0,
 			}),
 		})
 
@@ -454,7 +483,8 @@ func TestVFSReadToolPermissions(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path": "test.txt",
+				"path":   "test.txt",
+				"offset": 0,
 			}),
 		})
 
@@ -480,7 +510,8 @@ func TestVFSReadToolPermissions(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path": "test.txt",
+				"path":   "test.txt",
+				"offset": 0,
 			}),
 		})
 
@@ -613,7 +644,8 @@ func TestVFSReadToolRender(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path": "test.txt",
+				"path":   "test.txt",
+				"offset": 0,
 			}),
 		})
 		require.NoError(t, response.Error)
@@ -625,6 +657,7 @@ func TestVFSReadToolRender(t *testing.T) {
 			Function: response.Call.Function,
 			Arguments: NewToolValue(map[string]any{
 				"path":    "test.txt",
+				"offset":  0,
 				"content": response.Result.Get("content").AsString(),
 			}),
 		}
@@ -652,7 +685,8 @@ func TestVFSReadToolRender(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path": "test.txt",
+				"path":   "test.txt",
+				"offset": 0,
 			}),
 		})
 		require.NoError(t, response.Error)

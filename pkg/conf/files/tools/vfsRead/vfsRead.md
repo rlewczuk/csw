@@ -3,8 +3,8 @@ Assume this tool is able to read all files on the machine. If the User provides 
 
 Usage:
 - The `path` parameter must be an absolute path, not a relative path
-- By default, it reads up to 384 lines starting from the beginning of the file
-- If you want to read specific part of the file, please provide `offset` parameter that will be used to skip lines at the beginning of the file
+- By default, it reads up to 384 lines
+- The `offset` parameter is required and specifies how many lines to skip before reading. Use `0` to read from the beginning of the file
 - Any lines longer than 2000 characters will be truncated
 - Results are returned using cat -n format, with line numbers starting at 1
 - If you read a file that exists but has empty contents you will receive a system reminder warning in place of file contents.
