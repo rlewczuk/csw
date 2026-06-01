@@ -191,7 +191,7 @@ func runCommand(params *runExecution) error {
 		commandArgs := []string(nil)
 		commandModelOverride := ""
 		commandRoleOverride := ""
-		var commandRunDefaults *commands.RunDefaultsMetadata
+		var commandRunDefaults *conf.RunDefaultsConfig
 		var commandTaskMetadata *commands.TaskMetadata
 		commandNeedsShell := false
 		if invocation != nil {

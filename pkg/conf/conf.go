@@ -170,59 +170,59 @@ type ToolSelectionConfig struct {
 // ContainerConfig defines default container execution settings.
 type ContainerConfig struct {
 	// Mounts defines additional volume mappings in host_path:container_path format.
-	Mounts []string `json:"mounts,omitempty"`
+	Mounts []string `json:"mounts,omitempty" yaml:"mounts,omitempty"`
 	// Env defines additional environment variables in KEY=VALUE format.
-	Env []string `json:"env,omitempty"`
+	Env []string `json:"env,omitempty" yaml:"env,omitempty"`
 	// Image is the default container image used when container mode is enabled.
-	Image string `json:"image,omitempty"`
+	Image string `json:"image,omitempty" yaml:"image,omitempty"`
 	// Enabled enables container mode for all commands by default.
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 }
 
 // RunDefaultsConfig defines default values for the cli command flags.
 type RunDefaultsConfig struct {
 	// DefaultProvider is the default model provider to use.
-	DefaultProvider string `json:"default-provider,omitempty"`
+	DefaultProvider string `json:"default-provider,omitempty" yaml:"default-provider,omitempty"`
 	// DefaultRole is the default agent role to use.
-	DefaultRole string `json:"default-role,omitempty"`
+	DefaultRole string `json:"default-role,omitempty" yaml:"default-role,omitempty"`
 	// Container defines default container execution settings.
-	Container *ContainerConfig `json:"container,omitempty"`
+	Container *ContainerConfig `json:"container,omitempty" yaml:"container,omitempty"`
 	// Model is the default --model value.
-	Model string `json:"model,omitempty"`
+	Model string `json:"model,omitempty" yaml:"model,omitempty"`
 	// Workdir is the default --workdir value.
-	Workdir string `json:"workdir,omitempty"`
+	Workdir string `json:"workdir,omitempty" yaml:"workdir,omitempty"`
 	// Worktree is the default --worktree value.
-	Worktree string `json:"worktree,omitempty"`
+	Worktree string `json:"worktree,omitempty" yaml:"worktree,omitempty"`
 	// Merge is the default --merge value.
-	Merge bool `json:"merge,omitempty"`
+	Merge bool `json:"merge,omitempty" yaml:"merge,omitempty"`
 	// NoCommit is the default --no-commit value.
-	NoCommit bool `json:"no-commit,omitempty"`
+	NoCommit bool `json:"no-commit,omitempty" yaml:"no-commit,omitempty"`
 	// LogLLMRequests is the default --log-llm-requests value.
-	LogLLMRequests bool `json:"log-llm-requests,omitempty"`
+	LogLLMRequests bool `json:"log-llm-requests,omitempty" yaml:"log-llm-requests,omitempty"`
 	// LogLLMRequestsRaw is the default --log-llm-requests-raw value.
-	LogLLMRequestsRaw bool `json:"log-llm-requests-raw,omitempty"`
+	LogLLMRequestsRaw bool `json:"log-llm-requests-raw,omitempty" yaml:"log-llm-requests-raw,omitempty"`
 	// Thinking is the default --thinking value.
-	Thinking string `json:"thinking,omitempty"`
+	Thinking string `json:"thinking,omitempty" yaml:"thinking,omitempty"`
 	// LSPServer is the default --lsp-server value.
-	LSPServer string `json:"lsp-server,omitempty"`
+	LSPServer string `json:"lsp-server,omitempty" yaml:"lsp-server,omitempty"`
 	// GitUserName is the default --git-user value for git operations.
-	GitUserName string `json:"git-user,omitempty"`
+	GitUserName string `json:"git-user,omitempty" yaml:"git-user,omitempty"`
 	// GitUserEmail is the default --git-email value for git operations.
-	GitUserEmail string `json:"git-email,omitempty"`
+	GitUserEmail string `json:"git-email,omitempty" yaml:"git-email,omitempty"`
 	// MaxThreads is the default --max-threads value.
-	MaxThreads int `json:"max-threads,omitempty"`
+	MaxThreads int `json:"max-threads,omitempty" yaml:"max-threads,omitempty"`
 	// TaskDir is the default task directory used by task commands.
-	TaskDir string `json:"task-dir,omitempty"`
+	TaskDir string `json:"task-dir,omitempty" yaml:"task-dir,omitempty"`
 	// ShadowDir is the default --shadow-dir value.
-	ShadowDir string `json:"shadow-dir,omitempty"`
+	ShadowDir string `json:"shadow-dir,omitempty" yaml:"shadow-dir,omitempty"`
 	// AllowAllPermissions is the default --allow-all-permissions value.
-	AllowAllPermissions bool `json:"allow-all-permissions,omitempty"`
+	AllowAllPermissions bool `json:"allow-all-permissions,omitempty" yaml:"allow-all-permissions,omitempty"`
 	// VFSAllow is the default --vfs-allow value.
-	VFSAllow []string `json:"vfs-allow,omitempty"`
+	VFSAllow []string `json:"vfs-allow,omitempty" yaml:"vfs-allow,omitempty"`
 	// RunBashMax is the default --run-bash-max value in bytes; 0 disables output limiting.
-	RunBashMax *int `json:"run-bash-max,omitempty"`
+	RunBashMax *int `json:"run-bash-max,omitempty" yaml:"run-bash-max,omitempty"`
 	// VfsReadLimit is the default --vfs-read-limit value in lines; 0 disables output limiting.
-	VfsReadLimit *int `json:"vfs-read-limit,omitempty"`
+	VfsReadLimit *int `json:"vfs-read-limit,omitempty" yaml:"vfs-read-limit,omitempty"`
 	// Role is the selected runtime agent role.
 	Role string `json:"-"`
 	// NoMerge disables merging after commit for this run.

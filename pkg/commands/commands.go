@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"gopkg.in/yaml.v3"
 )
@@ -37,38 +38,8 @@ type Metadata struct {
 
 // CSWMetadata describes csw-specific command frontmatter fields.
 type CSWMetadata struct {
-	Defaults *RunDefaultsMetadata `yaml:"defaults"`
-	Task     *TaskMetadata        `yaml:"task"`
-}
-
-// RunDefaultsMetadata mirrors conf.RunDefaultsConfig with pointer fields.
-type RunDefaultsMetadata struct {
-	DefaultProvider     *string            `yaml:"default-provider"`
-	DefaultRole         *string            `yaml:"default-role"`
-	Container           *ContainerMetadata `yaml:"container"`
-	Model               *string            `yaml:"model"`
-	Worktree            *string            `yaml:"worktree"`
-	Merge               *bool              `yaml:"merge"`
-	NoCommit            *bool              `yaml:"no-commit"`
-	LogLLMRequests      *bool              `yaml:"log-llm-requests"`
-	Thinking            *string            `yaml:"thinking"`
-	LSPServer           *string            `yaml:"lsp-server"`
-	GitUserName         *string            `yaml:"git-user"`
-	GitUserEmail        *string            `yaml:"git-email"`
-	MaxThreads          *int               `yaml:"max-threads"`
-	TaskDir             *string            `yaml:"task-dir"`
-	ShadowDir           *string            `yaml:"shadow-dir"`
-	AllowAllPermissions *bool              `yaml:"allow-all-permissions"`
-	VFSAllow            *[]string          `yaml:"vfs-allow"`
-	RunBashMax          *int               `yaml:"run-bash-max"`
-}
-
-// ContainerMetadata mirrors conf.ContainerConfig with pointer fields.
-type ContainerMetadata struct {
-	Mounts  *[]string `yaml:"mounts"`
-	Env     *[]string `yaml:"env"`
-	Image   *string   `yaml:"image"`
-	Enabled *bool     `yaml:"enabled"`
+	Defaults *conf.RunDefaultsConfig `yaml:"defaults"`
+	Task     *TaskMetadata           `yaml:"task"`
 }
 
 // TaskMetadata mirrors core.Task with pointer fields.

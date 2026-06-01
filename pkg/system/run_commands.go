@@ -18,7 +18,7 @@ type resolvedRunCommandInvocation struct {
 	CommandArgs          []string
 	CommandModelOverride string
 	CommandRoleOverride  string
-	CommandRunDefaults   *commands.RunDefaultsMetadata
+	CommandRunDefaults   *conf.RunDefaultsConfig
 	CommandTaskMetadata  *commands.TaskMetadata
 	CommandNeedsShell    bool
 	Prompt               string
@@ -113,7 +113,7 @@ func resolveRunCommandSource(commandPath string) string {
 	return "custom"
 }
 
-func applyCommandRunDefaults(commandDefaults *commands.RunDefaultsMetadata, defaults *conf.RunDefaultsConfig, containerOn *bool, containerOff *bool) (*bool, error) {
+func applyCommandRunDefaults(commandDefaults *conf.RunDefaultsConfig, defaults *conf.RunDefaultsConfig, containerOn *bool, containerOff *bool) (*bool, error) {
 	if commandDefaults == nil {
 		return nil, nil
 	}
@@ -126,72 +126,85 @@ func applyCommandRunDefaults(commandDefaults *commands.RunDefaultsMetadata, defa
 	if defaults.Container == nil {
 		defaults.Container = &conf.ContainerConfig{}
 	}
-	if commandDefaults.Model != nil {
-		defaults.Model = strings.TrimSpace(*commandDefaults.Model)
+	if strings.TrimSpace(commandDefaults.DefaultProvider) != "" {
+		defaults.DefaultProvider = strings.TrimSpace(commandDefaults.DefaultProvider)
 	}
-	if commandDefaults.DefaultRole != nil {
-		defaults.Role = strings.TrimSpace(*commandDefaults.DefaultRole)
+	if strings.TrimSpace(commandDefaults.Model) != "" {
+		defaults.Model = strings.TrimSpace(commandDefaults.Model)
 	}
-	if commandDefaults.Worktree != nil {
-		defaults.Worktree = strings.TrimSpace(*commandDefaults.Worktree)
+	if strings.TrimSpace(commandDefaults.DefaultRole) != "" {
+		defaults.Role = strings.TrimSpace(commandDefaults.DefaultRole)
 	}
-	if commandDefaults.NoCommit != nil {
-		defaults.NoCommit = *commandDefaults.NoCommit
+	if strings.TrimSpace(commandDefaults.Workdir) != "" {
+		defaults.Workdir = strings.TrimSpace(commandDefaults.Workdir)
+	}
+	if strings.TrimSpace(commandDefaults.Worktree) != "" {
+		defaults.Worktree = strings.TrimSpace(commandDefaults.Worktree)
+	}
+	if commandDefaults.NoCommit {
+		defaults.NoCommit = true
 	}
 	if defaults.NoCommit {
 		defaults.Worktree = ""
 		defaults.Merge = false
 	}
-	if !defaults.NoCommit && commandDefaults.Merge != nil {
-		defaults.Merge = *commandDefaults.Merge
+	if !defaults.NoCommit && commandDefaults.Merge {
+		defaults.Merge = true
 	}
-	if commandDefaults.LogLLMRequests != nil {
-		defaults.LogLLMRequests = *commandDefaults.LogLLMRequests
+	if commandDefaults.LogLLMRequests {
+		defaults.LogLLMRequests = true
 	}
-	if commandDefaults.Thinking != nil {
-		defaults.Thinking = strings.TrimSpace(*commandDefaults.Thinking)
+	if strings.TrimSpace(commandDefaults.Thinking) != "" {
+		defaults.Thinking = strings.TrimSpace(commandDefaults.Thinking)
 	}
-	if commandDefaults.LSPServer != nil {
-		defaults.LSPServer = strings.TrimSpace(*commandDefaults.LSPServer)
+	if strings.TrimSpace(commandDefaults.LSPServer) != "" {
+		defaults.LSPServer = strings.TrimSpace(commandDefaults.LSPServer)
 	}
-	if commandDefaults.GitUserName != nil {
-		defaults.GitUserName = strings.TrimSpace(*commandDefaults.GitUserName)
+	if strings.TrimSpace(commandDefaults.GitUserName) != "" {
+		defaults.GitUserName = strings.TrimSpace(commandDefaults.GitUserName)
 	}
-	if commandDefaults.GitUserEmail != nil {
-		defaults.GitUserEmail = strings.TrimSpace(*commandDefaults.GitUserEmail)
+	if strings.TrimSpace(commandDefaults.GitUserEmail) != "" {
+		defaults.GitUserEmail = strings.TrimSpace(commandDefaults.GitUserEmail)
 	}
-	if commandDefaults.MaxThreads != nil {
-		defaults.MaxThreads = *commandDefaults.MaxThreads
+	if commandDefaults.MaxThreads != 0 {
+		defaults.MaxThreads = commandDefaults.MaxThreads
 	}
-	if commandDefaults.ShadowDir != nil {
-		defaults.ShadowDir = strings.TrimSpace(*commandDefaults.ShadowDir)
+	if strings.TrimSpace(commandDefaults.TaskDir) != "" {
+		defaults.TaskDir = strings.TrimSpace(commandDefaults.TaskDir)
 	}
-	if commandDefaults.AllowAllPermissions != nil {
-		defaults.AllowAllPermissions = *commandDefaults.AllowAllPermissions
+	if strings.TrimSpace(commandDefaults.ShadowDir) != "" {
+		defaults.ShadowDir = strings.TrimSpace(commandDefaults.ShadowDir)
 	}
-	if commandDefaults.VFSAllow != nil {
-		defaults.VFSAllow = append([]string(nil), *commandDefaults.VFSAllow...)
+	if commandDefaults.AllowAllPermissions {
+		defaults.AllowAllPermissions = true
 	}
-	if commandDefaults.RunBashMax != nil {
+	if len(commandDefaults.VFSAllow) > 0 {
+		defaults.VFSAllow = append([]string(nil), commandDefaults.VFSAllow...)
+	}
+	if commandDefaults.RunBashMax != nil && *commandDefaults.RunBashMax != 0 {
 		value := *commandDefaults.RunBashMax
 		defaults.RunBashMax = &value
 	}
+	if commandDefaults.VfsReadLimit != nil && *commandDefaults.VfsReadLimit != 0 {
+		value := *commandDefaults.VfsReadLimit
+		defaults.VfsReadLimit = &value
+	}
 	var commandContainerEnabled *bool
 	if commandDefaults.Container != nil {
-		if commandDefaults.Container.Image != nil {
-			defaults.Container.Image = strings.TrimSpace(*commandDefaults.Container.Image)
+		if strings.TrimSpace(commandDefaults.Container.Image) != "" {
+			defaults.Container.Image = strings.TrimSpace(commandDefaults.Container.Image)
 		}
-		if commandDefaults.Container.Mounts != nil {
-			defaults.Container.Mounts = append([]string(nil), *commandDefaults.Container.Mounts...)
+		if len(commandDefaults.Container.Mounts) > 0 {
+			defaults.Container.Mounts = append([]string(nil), commandDefaults.Container.Mounts...)
 		}
-		if commandDefaults.Container.Env != nil {
-			defaults.Container.Env = append([]string(nil), *commandDefaults.Container.Env...)
+		if len(commandDefaults.Container.Env) > 0 {
+			defaults.Container.Env = append([]string(nil), commandDefaults.Container.Env...)
 		}
-		if commandDefaults.Container.Enabled != nil {
-			enabledValue := *commandDefaults.Container.Enabled
+		if commandDefaults.Container.Enabled {
+			enabledValue := true
 			commandContainerEnabled = &enabledValue
-			*containerOn = enabledValue
-			*containerOff = !enabledValue
+			*containerOn = true
+			*containerOff = false
 		}
 	}
 	if defaults.MaxThreads < 0 {
@@ -199,6 +212,9 @@ func applyCommandRunDefaults(commandDefaults *commands.RunDefaultsMetadata, defa
 	}
 	if defaults.RunBashMax != nil && *defaults.RunBashMax < 0 {
 		return commandContainerEnabled, fmt.Errorf("applyCommandRunDefaults() [run_commands.go]: --run-bash-max must be >= 0")
+	}
+	if defaults.VfsReadLimit != nil && *defaults.VfsReadLimit < 0 {
+		return commandContainerEnabled, fmt.Errorf("applyCommandRunDefaults() [run_commands.go]: --vfs-read-limit must be >= 0")
 	}
 	return commandContainerEnabled, nil
 }
