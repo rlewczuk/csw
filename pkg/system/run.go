@@ -17,13 +17,11 @@ import (
 	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/vcs"
-	"github.com/spf13/cobra"
 )
 
 const defaultBashRunTimeout = 120 * time.Second
 
 type runExecution struct {
-	Command               *cobra.Command
 	config                *conf.GlobalConfig
 	stdin                 stdio.Reader
 	stdout                stdio.Writer
@@ -89,7 +87,7 @@ func RunCommand(globalConfig *conf.GlobalConfig) error {
 	if globalConfig.Defaults.Role == "" {
 		globalConfig.Defaults.Role = globalConfig.Defaults.DefaultRole
 	}
-	exec := &runExecution{Command: &cobra.Command{}, config: globalConfig, stdin: os.Stdin, stdout: os.Stdout, stderr: os.Stderr}
+	exec := &runExecution{config: globalConfig, stdin: os.Stdin, stdout: os.Stdout, stderr: os.Stderr}
 	return runCommand(exec)
 }
 
@@ -230,7 +228,7 @@ func runCommand(params *runExecution) error {
 
 		containerOn := defaults.Container != nil && defaults.Container.Enabled
 		containerOff := defaults.ContainerDisabled
-		commandContainerEnabled, err := applyCommandRunDefaults(params.Command, commandRunDefaults, &defaults.Model, &defaults.Role, &defaults.Worktree, &defaults.Merge, &defaults.LogLLMRequests, &defaults.Thinking, &defaults.LSPServer, &defaults.GitUserName, &defaults.GitUserEmail, &defaults.MaxThreads, &defaults.ShadowDir, &defaults.AllowAllPermissions, &defaults.VFSAllow, &defaults.NoCommit, &containerOn, &containerOff, &defaults.Container.Image, &defaults.Container.Mounts, &defaults.Container.Env, &defaults.RunBashMax)
+		commandContainerEnabled, err := applyCommandRunDefaults(commandRunDefaults, &defaults.Model, &defaults.Role, &defaults.Worktree, &defaults.Merge, &defaults.LogLLMRequests, &defaults.Thinking, &defaults.LSPServer, &defaults.GitUserName, &defaults.GitUserEmail, &defaults.MaxThreads, &defaults.ShadowDir, &defaults.AllowAllPermissions, &defaults.VFSAllow, &defaults.NoCommit, &containerOn, &containerOff, &defaults.Container.Image, &defaults.Container.Mounts, &defaults.Container.Env, &defaults.RunBashMax)
 		if err != nil {
 			return err
 		}
@@ -488,9 +486,6 @@ func resolveTaskFinalStatusForRun(session *core.SweSession, merge bool) (string,
 	return core.TaskStatusCompleted, true
 }
 
-func isThinkingFlagChanged(cmd *cobra.Command) bool {
-	return cmd != nil && cmd.Flags().Changed("thinking")
-}
 func parseBashRunTimeout(value string) (time.Duration, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {

@@ -8,7 +8,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/shared"
-	"github.com/spf13/cobra"
 )
 
 type resolvedRunCommandInvocation struct {
@@ -113,72 +112,72 @@ func resolveRunCommandSource(commandPath string) string {
 	return "custom"
 }
 
-func applyCommandRunDefaults(cmd *cobra.Command, defaults *commands.RunDefaultsMetadata, model *string, role *string, worktree *string, merge *bool, logLLMRequests *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string, noCommit *bool, containerOn *bool, containerOff *bool, containerImage *string, containerMounts *[]string, containerEnv *[]string, runBashMaxOutput **int) (*bool, error) {
+func applyCommandRunDefaults(defaults *commands.RunDefaultsMetadata, model *string, role *string, worktree *string, merge *bool, logLLMRequests *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string, noCommit *bool, containerOn *bool, containerOff *bool, containerImage *string, containerMounts *[]string, containerEnv *[]string, runBashMaxOutput **int) (*bool, error) {
 	if defaults == nil {
 		return nil, nil
 	}
-	if !cmd.Flags().Changed("model") && defaults.Model != nil {
+	if defaults.Model != nil {
 		*model = strings.TrimSpace(*defaults.Model)
 	}
-	if !cmd.Flags().Changed("role") && defaults.DefaultRole != nil {
+	if defaults.DefaultRole != nil {
 		*role = strings.TrimSpace(*defaults.DefaultRole)
 	}
-	if !cmd.Flags().Changed("worktree") && defaults.Worktree != nil {
+	if defaults.Worktree != nil {
 		*worktree = strings.TrimSpace(*defaults.Worktree)
 	}
-	if !cmd.Flags().Changed("no-commit") && defaults.NoCommit != nil {
+	if defaults.NoCommit != nil {
 		*noCommit = *defaults.NoCommit
 	}
 	if *noCommit {
 		*worktree = ""
 		*merge = false
 	}
-	if !*noCommit && !cmd.Flags().Changed("merge") && defaults.Merge != nil {
+	if !*noCommit && defaults.Merge != nil {
 		*merge = *defaults.Merge
 	}
-	if !cmd.Flags().Changed("log-llm-requests") && defaults.LogLLMRequests != nil {
+	if defaults.LogLLMRequests != nil {
 		*logLLMRequests = *defaults.LogLLMRequests
 	}
-	if !isThinkingFlagChanged(cmd) && defaults.Thinking != nil {
+	if defaults.Thinking != nil {
 		*thinking = strings.TrimSpace(*defaults.Thinking)
 	}
-	if !cmd.Flags().Changed("lsp-server") && defaults.LSPServer != nil {
+	if defaults.LSPServer != nil {
 		*lspServer = strings.TrimSpace(*defaults.LSPServer)
 	}
-	if !cmd.Flags().Changed("git-user") && defaults.GitUserName != nil {
+	if defaults.GitUserName != nil {
 		*gitUser = strings.TrimSpace(*defaults.GitUserName)
 	}
-	if !cmd.Flags().Changed("git-email") && defaults.GitUserEmail != nil {
+	if defaults.GitUserEmail != nil {
 		*gitEmail = strings.TrimSpace(*defaults.GitUserEmail)
 	}
-	if !cmd.Flags().Changed("max-threads") && defaults.MaxThreads != nil {
+	if defaults.MaxThreads != nil {
 		*maxThreads = *defaults.MaxThreads
 	}
-	if !cmd.Flags().Changed("shadow-dir") && defaults.ShadowDir != nil {
+	if defaults.ShadowDir != nil {
 		*shadowDirOut = strings.TrimSpace(*defaults.ShadowDir)
 	}
-	if !cmd.Flags().Changed("allow-all-permissions") && defaults.AllowAllPermissions != nil {
+	if defaults.AllowAllPermissions != nil {
 		*allowAllPerms = *defaults.AllowAllPermissions
 	}
-	if !cmd.Flags().Changed("vfs-allow") && defaults.VFSAllow != nil {
+	if defaults.VFSAllow != nil {
 		*vfsAllow = append([]string(nil), *defaults.VFSAllow...)
 	}
-	if !cmd.Flags().Changed("run-bash-max") && defaults.RunBashMax != nil {
+	if defaults.RunBashMax != nil {
 		value := *defaults.RunBashMax
 		*runBashMaxOutput = &value
 	}
 	var commandContainerEnabled *bool
 	if defaults.Container != nil {
-		if !cmd.Flags().Changed("container-image") && defaults.Container.Image != nil {
+		if defaults.Container.Image != nil {
 			*containerImage = strings.TrimSpace(*defaults.Container.Image)
 		}
-		if !cmd.Flags().Changed("container-mount") && defaults.Container.Mounts != nil {
+		if defaults.Container.Mounts != nil {
 			*containerMounts = append([]string(nil), *defaults.Container.Mounts...)
 		}
-		if !cmd.Flags().Changed("container-env") && defaults.Container.Env != nil {
+		if defaults.Container.Env != nil {
 			*containerEnv = append([]string(nil), *defaults.Container.Env...)
 		}
-		if defaults.Container.Enabled != nil && !cmd.Flags().Changed("container-enabled") && !cmd.Flags().Changed("container-disabled") {
+		if defaults.Container.Enabled != nil {
 			enabledValue := *defaults.Container.Enabled
 			commandContainerEnabled = &enabledValue
 			*containerOn = enabledValue
