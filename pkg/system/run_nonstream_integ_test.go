@@ -30,7 +30,7 @@ func TestCLINonStreamingAssistantMessageNotDuplicated(t *testing.T) {
 				{ToolCall: &tool.ToolCall{
 					ID:        "call-1",
 					Function:  "vfsRead",
-					Arguments: tool.NewToolValue(map[string]any{"path": "notes.txt"}),
+					Arguments: tool.NewToolValue(map[string]any{"path": "notes.txt", "offset": 0}),
 				}},
 			},
 		},

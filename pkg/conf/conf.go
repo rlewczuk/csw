@@ -223,6 +223,48 @@ type RunDefaultsConfig struct {
 	RunBashMax *int `json:"run-bash-max,omitempty"`
 	// VfsReadLimit is the default --vfs-read-limit value in lines; 0 disables output limiting.
 	VfsReadLimit *int `json:"vfs-read-limit,omitempty"`
+	// Role is the selected runtime agent role.
+	Role string `json:"-"`
+	// NoMerge disables merging after commit for this run.
+	NoMerge bool `json:"-"`
+	// BashRunTimeout is the selected runBash timeout flag value.
+	BashRunTimeout string `json:"-"`
+	// CommitMessageTemplate is the selected commit message template.
+	CommitMessageTemplate string `json:"-"`
+	// ConfigPath is the selected additional config path.
+	ConfigPath string `json:"-"`
+	// ProjectConfig is the selected project config path.
+	ProjectConfig string `json:"-"`
+	// Interactive enables interactive stdin handling.
+	Interactive bool `json:"-"`
+	// ContainerEnabled enables container mode for this run.
+	ContainerEnabled bool `json:"-"`
+	// SaveSessionTo is the selected session markdown output path.
+	SaveSessionTo string `json:"-"`
+	// SaveSession enables default session markdown output.
+	SaveSession bool `json:"-"`
+	// NoRefresh disables OAuth token refresh for this run.
+	NoRefresh bool `json:"-"`
+	// ContainerDisabled disables container mode for this run.
+	ContainerDisabled bool `json:"-"`
+	// OutputFormat is the selected console output format.
+	OutputFormat string `json:"-"`
+	// ContextEntries contains selected prompt template context entries.
+	ContextEntries []string `json:"-"`
+	// TaskIdentifier is the selected task identifier for task-mode runs.
+	TaskIdentifier string `json:"-"`
+	// TaskNext selects the oldest unfinished task for task-mode runs.
+	TaskNext bool `json:"-"`
+	// TaskLast selects the latest unfinished task for task-mode runs.
+	TaskLast bool `json:"-"`
+	// TaskReset resets the task branch before a task-mode run.
+	TaskReset bool `json:"-"`
+	// PositionalArgs contains run command positional arguments.
+	PositionalArgs []string `json:"-"`
+	// ModelOverridden reports whether --model was explicitly selected for this run.
+	ModelOverridden bool `json:"-"`
+	// RoleOverridden reports whether --role was explicitly selected for this run.
+	RoleOverridden bool `json:"-"`
 }
 
 // ModelProviderConfig represents common configuration for model providers.

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/rlewczuk/csw/pkg/testutil/cfg"
 	"github.com/stretchr/testify/assert"
@@ -43,16 +44,16 @@ func TestCLIContainerModeRunBashBusybox(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := RunCommand(&RunParams{
-		Prompt:           "Run a shell command",
-		ModelName:        "ollama/test-model",
-		RoleName:         "developer",
-		WorkDir:          tmpProjectDir,
-		AllowAllPerms:    true,
-		ContainerEnabled: true,
-		ContainerImage:   "busybox:latest",
-		ConfigPath:       filepath.Join(tmpProjectDir, ".csw", "config"),
-	})
+	err := RunCommand(&conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
+		PositionalArgs:      []string{"Run a shell command"},
+		Model:               "ollama/test-model",
+		Role:                "developer",
+		Workdir:             tmpProjectDir,
+		AllowAllPermissions: true,
+		ContainerEnabled:    true,
+		Container:           &conf.ContainerConfig{Image: "busybox:latest"},
+		ConfigPath:          filepath.Join(tmpProjectDir, ".csw", "config"),
+	}})
 	require.NoError(t, err)
 
 	requests := mockServer.GetRequests()
@@ -113,14 +114,14 @@ func TestCLIContainerModeFromGlobalConfig(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := RunCommand(&RunParams{
-		Prompt:        "Run a shell command",
-		ModelName:     "ollama/test-model",
-		RoleName:      "developer",
-		WorkDir:       tmpProjectDir,
-		AllowAllPerms: true,
-		ConfigPath:    filepath.Join(tmpProjectDir, ".csw", "config"),
-	})
+	err := RunCommand(&conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
+		PositionalArgs:      []string{"Run a shell command"},
+		Model:               "ollama/test-model",
+		Role:                "developer",
+		Workdir:             tmpProjectDir,
+		AllowAllPermissions: true,
+		ConfigPath:          filepath.Join(tmpProjectDir, ".csw", "config"),
+	}})
 	require.NoError(t, err)
 
 	requests := mockServer.GetRequests()
@@ -172,18 +173,16 @@ func TestCLIContainerModeWithAdditionalMountAndEnv(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := RunCommand(&RunParams{
-		Prompt:           "Run a shell command",
-		ModelName:        "ollama/test-model",
-		RoleName:         "developer",
-		WorkDir:          tmpProjectDir,
-		AllowAllPerms:    true,
-		ContainerEnabled: true,
-		ContainerImage:   "busybox:latest",
-		ContainerMounts:  []string{extraMountDir + ":/mnt/extra"},
-		ContainerEnv:     []string{"EXTRA_ENV=from_env"},
-		ConfigPath:       filepath.Join(tmpProjectDir, ".csw", "config"),
-	})
+	err := RunCommand(&conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
+		PositionalArgs:      []string{"Run a shell command"},
+		Model:               "ollama/test-model",
+		Role:                "developer",
+		Workdir:             tmpProjectDir,
+		AllowAllPermissions: true,
+		ContainerEnabled:    true,
+		Container:           &conf.ContainerConfig{Image: "busybox:latest", Mounts: []string{extraMountDir + ":/mnt/extra"}, Env: []string{"EXTRA_ENV=from_env"}},
+		ConfigPath:          filepath.Join(tmpProjectDir, ".csw", "config"),
+	}})
 	require.NoError(t, err)
 
 	requests := mockServer.GetRequests()

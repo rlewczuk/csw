@@ -16,7 +16,7 @@ func TestRenderCommandPromptFileReference(t *testing.T) {
 	workDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(workDir, "file.txt"), []byte("abc"), 0644))
 
-	params := &RunParams{CommandName: "review", CommandTemplate: "Read @file.txt", CommandArgs: []string{}}
+	params := &runExecution{CommandName: "review", CommandTemplate: "Read @file.txt", CommandArgs: []string{}}
 	err := renderCommandPrompt(params, workDir, runner.NewMockRunner(), runner.NewMockRunner())
 	require.NoError(t, err)
 	assert.Equal(t, "Read abc", params.Prompt)
@@ -56,7 +56,7 @@ func TestResolveRunCommandInvocation_TaskModeUsesCommands(t *testing.T) {
 
 func TestBuildRunAgentStartupInfoMessages(t *testing.T) {
 	t.Run("builds startup lines without command", func(t *testing.T) {
-		messages := BuildRunAgentStartupInfoMessages(&RunParams{Thinking: "high", RoleName: "developer"}, BuildSystemResult{ModelName: "ollama/qwen3", RoleConfig: conf.AgentRoleConfig{Name: "developer"}})
+		messages := BuildRunAgentStartupInfoMessages(&runExecution{Thinking: "high", RoleName: "developer"}, BuildSystemResult{ModelName: "ollama/qwen3", RoleConfig: conf.AgentRoleConfig{Name: "developer"}})
 
 		require.Len(t, messages, 3)
 		assert.Equal(t, "[INFO] Model: ollama/qwen3", messages[0])
@@ -66,7 +66,7 @@ func TestBuildRunAgentStartupInfoMessages(t *testing.T) {
 
 	t.Run("includes command with embedded source", func(t *testing.T) {
 		messages := BuildRunAgentStartupInfoMessages(
-			&RunParams{Thinking: "", RoleName: "", CommandName: "csw/task-critic", CommandPath: "embedded:data/csw/task-critic.md"},
+			&runExecution{Thinking: "", RoleName: "", CommandName: "csw/task-critic", CommandPath: "embedded:data/csw/task-critic.md"},
 			BuildSystemResult{ModelName: "ollama/qwen3", RoleConfig: conf.AgentRoleConfig{}},
 		)
 

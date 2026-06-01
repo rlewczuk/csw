@@ -6,7 +6,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,13 +13,13 @@ import (
 func TestValidateMergeCLIParams(t *testing.T) {
 	tests := []struct {
 		name           string
-		params         *RunParams
+		params         *runExecution
 		expectError    bool
 		errorSubstring string
 	}{
 		{
 			name: "merge without worktree is rejected",
-			params: &RunParams{
+			params: &runExecution{
 				Merge: true,
 			},
 			expectError:    true,
@@ -28,7 +27,7 @@ func TestValidateMergeCLIParams(t *testing.T) {
 		},
 		{
 			name: "merge with no commit is rejected",
-			params: &RunParams{
+			params: &runExecution{
 				Merge:    true,
 				NoCommit: true,
 			},
@@ -37,20 +36,20 @@ func TestValidateMergeCLIParams(t *testing.T) {
 		},
 		{
 			name: "no commit without worktree is allowed",
-			params: &RunParams{
+			params: &runExecution{
 				NoCommit: true,
 			},
 		},
 		{
 			name: "merge with worktree is allowed",
-			params: &RunParams{
+			params: &runExecution{
 				Merge:          true,
 				WorktreeBranch: "feature/test",
 			},
 		},
 		{
 			name: "non merge without worktree is allowed",
-			params: &RunParams{
+			params: &runExecution{
 				Merge: false,
 			},
 		},
@@ -64,7 +63,7 @@ func TestValidateMergeCLIParams(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateMergeRunParams(tc.params)
+			err := validateMergeRunExecution(tc.params)
 			if tc.expectError {
 				require.Error(t, err)
 				if tc.errorSubstring != "" {
@@ -84,64 +83,41 @@ func TestResolveTaskRunMerge(t *testing.T) {
 		mergeFlagChanged bool
 		cliMerge         bool
 		cliWorktree      string
-		defaultsMerge    bool
-		resolverErr      bool
 		expectedMerge    bool
 	}{
 		{
 			name:             "explicit merge flag true has priority",
 			mergeFlagChanged: true,
 			cliMerge:         true,
-			defaultsMerge:    false,
 			expectedMerge:    true,
 		},
 		{
 			name:             "explicit merge flag false has priority",
 			mergeFlagChanged: true,
 			cliMerge:         false,
-			defaultsMerge:    true,
 			expectedMerge:    false,
 		},
 		{
-			name:          "defaults merge true enables merge for task run",
+			name:          "merge value is already resolved before task run",
 			cliMerge:      false,
-			defaultsMerge: true,
-			expectedMerge: true,
+			expectedMerge: false,
 		},
 		{
 			name:          "defaults merge false keeps merge disabled",
 			cliMerge:      false,
-			defaultsMerge: false,
 			expectedMerge: false,
 		},
 		{
 			name:          "explicit worktree skips defaults",
 			cliMerge:      false,
 			cliWorktree:   "feature/cli",
-			defaultsMerge: true,
-			expectedMerge: false,
-		},
-		{
-			name:          "resolver error falls back to cli merge",
-			cliMerge:      false,
-			resolverErr:   true,
-			defaultsMerge: true,
 			expectedMerge: false,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			resolver := runDefaultsResolver(func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
-				_ = params
-				if tc.resolverErr {
-					return conf.RunDefaultsConfig{}, assert.AnError
-				}
-
-				return conf.RunDefaultsConfig{Merge: tc.defaultsMerge}, nil
-			})
-
-			actual := resolveTaskRunMerge(tc.mergeFlagChanged, tc.cliMerge, tc.cliWorktree, resolver, "wd", "shadow", "project", "cfg")
+			actual := resolveTaskRunMerge(tc.mergeFlagChanged, tc.cliMerge, tc.cliWorktree)
 			assert.Equal(t, tc.expectedMerge, actual)
 		})
 	}
@@ -292,7 +268,7 @@ func TestResolveTaskFinalStatusForRun(t *testing.T) {
 	}
 }
 
-func TestApplyRunDefaultsNoCommit(t *testing.T) {
+func TestRunDefaultsNoCommit(t *testing.T) {
 	tests := []struct {
 		name                string
 		defaultsNoCommit    bool
@@ -331,41 +307,15 @@ func TestApplyRunDefaultsNoCommit(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := &cobra.Command{Use: "run"}
-			cmd.Flags().Bool("no-commit", false, "")
-			cmd.Flags().Int("run-bash-max", 0, "")
-			cmd.Flags().Int("vfs-read-limit", 0, "")
-			if tc.noCommitFlagChanged {
-				require.NoError(t, cmd.Flags().Set("no-commit", "true"))
+			defaults := conf.RunDefaultsConfig{Worktree: tc.initialWorktree, Merge: tc.initialMerge, NoCommit: tc.initialNoCommit || tc.defaultsNoCommit}
+			if defaults.NoCommit {
+				defaults.Worktree = ""
+				defaults.Merge = false
 			}
 
-			workDir := "wd"
-			model := ""
-			worktree := tc.initialWorktree
-			merge := tc.initialMerge
-			logLLMRequests := false
-			logLLMRequestsRaw := false
-			thinking := ""
-			lspServer := ""
-			gitUser := ""
-			gitEmail := ""
-			maxThreads := 0
-			shadowDir := ""
-			allowAllPerms := false
-			vfsAllow := []string(nil)
-			noCommit := tc.initialNoCommit
-			runBashMaxOutput := (*int)(nil)
-			vfsReadLimit := (*int)(nil)
-			resolver := runDefaultsResolver(func(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
-				_ = params
-				return conf.RunDefaultsConfig{NoCommit: tc.defaultsNoCommit}, nil
-			})
-
-			err := applyRunDefaults(resolver, cmd, workDir, "shadow", "project", "cfg", &workDir, &model, &worktree, &merge, &logLLMRequests, &logLLMRequestsRaw, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &runBashMaxOutput, &vfsReadLimit)
-			require.NoError(t, err)
-			assert.Equal(t, tc.expectedNoCommit, noCommit)
-			assert.Equal(t, tc.expectedWorktree, worktree)
-			assert.Equal(t, tc.expectedMerge, merge)
+			assert.Equal(t, tc.expectedNoCommit, defaults.NoCommit)
+			assert.Equal(t, tc.expectedWorktree, defaults.Worktree)
+			assert.Equal(t, tc.expectedMerge, defaults.Merge)
 		})
 	}
 }

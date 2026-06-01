@@ -100,16 +100,16 @@ func TestAgentRoleIntegration(t *testing.T) {
 		})
 		registry := NewAgentRoleRegistry(mockStore)
 
-			system := &SweSystem{
-				ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
-				ModelTags:            models.NewModelTagRegistry(),
-				Tools:                tools,
-				VFS:                  mockVFS,
-				Roles:                registry,
-				Config:               mockStore,
-				SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-				WorkDir:              ".",
-			}
+		system := &SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+			ModelTags:            models.NewModelTagRegistry(),
+			Tools:                tools,
+			VFS:                  mockVFS,
+			Roles:                registry,
+			Config:               mockStore,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
+		}
 
 		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
@@ -130,17 +130,17 @@ func TestAgentRoleIntegration(t *testing.T) {
 		})
 		registry := NewAgentRoleRegistry(mockStore)
 
-			system := &SweSystem{
-				ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
-				ModelTags:            models.NewModelTagRegistry(),
-				PromptGenerator:      &testPromptGenerator{prompt: "You are an experienced software tester."},
-				Tools:                tools,
-				VFS:                  mockVFS,
-				Roles:                registry,
-				Config:               mockStore,
-				SessionLoggerFactory: logging.NewTestLoggerFactory(t),
-				WorkDir:              ".",
-			}
+		system := &SweSystem{
+			ModelProviders:       map[string]models.ModelProvider{"mock": mockProvider},
+			ModelTags:            models.NewModelTagRegistry(),
+			PromptGenerator:      &testPromptGenerator{prompt: "You are an experienced software tester."},
+			Tools:                tools,
+			VFS:                  mockVFS,
+			Roles:                registry,
+			Config:               mockStore,
+			SessionLoggerFactory: logging.NewTestLoggerFactory(t),
+			WorkDir:              ".",
+		}
 
 		session, err := system.NewSession("mock/test-model", nil)
 		require.NoError(t, err)
@@ -252,7 +252,7 @@ func TestAgentRoleIntegration(t *testing.T) {
 		assert.Contains(t, writeResponse.Error.Error(), "access denied")
 
 		mockVFS.WriteFile("existing.txt", []byte("content"))
-		readArgs := tool.NewToolValue(map[string]interface{}{"path": "existing.txt"})
+		readArgs := tool.NewToolValue(map[string]interface{}{"path": "existing.txt", "offset": 0})
 		readResponse := session.Tools.Execute(&tool.ToolCall{
 			Function:  "vfsRead",
 			Arguments: readArgs,
