@@ -61,26 +61,9 @@ func TestApplyCommandRunDefaults(t *testing.T) {
 	strSlicePtr := func(value []string) *[]string { return &value }
 
 	t.Run("applies command defaults without cobra flags", func(t *testing.T) {
-		model := ""
-		role := ""
-		worktree := ""
-		merge := false
-		logLLMRequests := false
-		thinking := ""
-		lspServer := ""
-		gitUser := ""
-		gitEmail := ""
-		maxThreads := 0
-		shadowDir := ""
-		allowAllPerms := false
-		vfsAllow := []string(nil)
-		noCommit := false
+		defaults := &conf.RunDefaultsConfig{Container: &conf.ContainerConfig{}}
 		containerOn := false
 		containerOff := true
-		containerImage := ""
-		containerMounts := []string(nil)
-		containerEnv := []string(nil)
-		var runBashMax *int
 
 		commandContainerEnabled, err := applyCommandRunDefaults(
 			&commands.RunDefaultsMetadata{
@@ -105,48 +88,48 @@ func TestApplyCommandRunDefaults(t *testing.T) {
 					Enabled: boolPtr(true),
 				},
 			},
-			&model, &role, &worktree, &merge, &logLLMRequests, &thinking, &lspServer, &gitUser, &gitEmail, &maxThreads, &shadowDir, &allowAllPerms, &vfsAllow, &noCommit, &containerOn, &containerOff, &containerImage, &containerMounts, &containerEnv, &runBashMax,
+			defaults, &containerOn, &containerOff,
 		)
 
 		require.NoError(t, err)
 		require.NotNil(t, commandContainerEnabled)
 		assert.True(t, *commandContainerEnabled)
-		assert.Equal(t, "qwen", model)
-		assert.Equal(t, "developer", role)
-		assert.Equal(t, "feature-branch", worktree)
-		assert.True(t, merge)
-		assert.True(t, logLLMRequests)
-		assert.Equal(t, "high", thinking)
-		assert.Equal(t, "gopls", lspServer)
-		assert.Equal(t, "User", gitUser)
-		assert.Equal(t, "user@example.com", gitEmail)
-		assert.Equal(t, 3, maxThreads)
-		assert.Equal(t, ".shadow", shadowDir)
-		assert.True(t, allowAllPerms)
-		assert.Equal(t, []string{"/one", "/two"}, vfsAllow)
-		require.NotNil(t, runBashMax)
-		assert.Equal(t, 2048, *runBashMax)
+		assert.Equal(t, "qwen", defaults.Model)
+		assert.Equal(t, "developer", defaults.Role)
+		assert.Equal(t, "feature-branch", defaults.Worktree)
+		assert.True(t, defaults.Merge)
+		assert.True(t, defaults.LogLLMRequests)
+		assert.Equal(t, "high", defaults.Thinking)
+		assert.Equal(t, "gopls", defaults.LSPServer)
+		assert.Equal(t, "User", defaults.GitUserName)
+		assert.Equal(t, "user@example.com", defaults.GitUserEmail)
+		assert.Equal(t, 3, defaults.MaxThreads)
+		assert.Equal(t, ".shadow", defaults.ShadowDir)
+		assert.True(t, defaults.AllowAllPermissions)
+		assert.Equal(t, []string{"/one", "/two"}, defaults.VFSAllow)
+		require.NotNil(t, defaults.RunBashMax)
+		assert.Equal(t, 2048, *defaults.RunBashMax)
 		assert.True(t, containerOn)
 		assert.False(t, containerOff)
-		assert.Equal(t, "golang:latest", containerImage)
-		assert.Equal(t, []string{"src:/src"}, containerMounts)
-		assert.Equal(t, []string{"GOFLAGS=-mod=mod"}, containerEnv)
+		assert.Equal(t, "golang:latest", defaults.Container.Image)
+		assert.Equal(t, []string{"src:/src"}, defaults.Container.Mounts)
+		assert.Equal(t, []string{"GOFLAGS=-mod=mod"}, defaults.Container.Env)
 	})
 
 	t.Run("no commit disables worktree and merge", func(t *testing.T) {
-		worktree := "feature"
-		merge := true
-		noCommit := false
+		defaults := &conf.RunDefaultsConfig{Worktree: "feature", Merge: true, Container: &conf.ContainerConfig{}}
+		containerOn := false
+		containerOff := false
 
 		_, err := applyCommandRunDefaults(
 			&commands.RunDefaultsMetadata{NoCommit: boolPtr(true), Worktree: strPtr("command-feature"), Merge: boolPtr(true)},
-			new(string), new(string), &worktree, &merge, new(bool), new(string), new(string), new(string), new(string), new(int), new(string), new(bool), &[]string{}, &noCommit, new(bool), new(bool), new(string), &[]string{}, &[]string{}, new(*int),
+			defaults, &containerOn, &containerOff,
 		)
 
 		require.NoError(t, err)
-		assert.True(t, noCommit)
-		assert.Empty(t, worktree)
-		assert.False(t, merge)
+		assert.True(t, defaults.NoCommit)
+		assert.Empty(t, defaults.Worktree)
+		assert.False(t, defaults.Merge)
 	})
 }
 

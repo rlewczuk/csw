@@ -228,7 +228,7 @@ func runCommand(params *runExecution) error {
 
 		containerOn := defaults.Container != nil && defaults.Container.Enabled
 		containerOff := defaults.ContainerDisabled
-		commandContainerEnabled, err := applyCommandRunDefaults(commandRunDefaults, &defaults.Model, &defaults.Role, &defaults.Worktree, &defaults.Merge, &defaults.LogLLMRequests, &defaults.Thinking, &defaults.LSPServer, &defaults.GitUserName, &defaults.GitUserEmail, &defaults.MaxThreads, &defaults.ShadowDir, &defaults.AllowAllPermissions, &defaults.VFSAllow, &defaults.NoCommit, &containerOn, &containerOff, &defaults.Container.Image, &defaults.Container.Mounts, &defaults.Container.Env, &defaults.RunBashMax)
+		commandContainerEnabled, err := applyCommandRunDefaults(commandRunDefaults, defaults, &containerOn, &containerOff)
 		if err != nil {
 			return err
 		}

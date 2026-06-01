@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rlewczuk/csw/pkg/commands"
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/shared"
 )
@@ -112,82 +113,91 @@ func resolveRunCommandSource(commandPath string) string {
 	return "custom"
 }
 
-func applyCommandRunDefaults(defaults *commands.RunDefaultsMetadata, model *string, role *string, worktree *string, merge *bool, logLLMRequests *bool, thinking *string, lspServer *string, gitUser *string, gitEmail *string, maxThreads *int, shadowDirOut *string, allowAllPerms *bool, vfsAllow *[]string, noCommit *bool, containerOn *bool, containerOff *bool, containerImage *string, containerMounts *[]string, containerEnv *[]string, runBashMaxOutput **int) (*bool, error) {
-	if defaults == nil {
+func applyCommandRunDefaults(commandDefaults *commands.RunDefaultsMetadata, defaults *conf.RunDefaultsConfig, containerOn *bool, containerOff *bool) (*bool, error) {
+	if commandDefaults == nil {
 		return nil, nil
 	}
-	if defaults.Model != nil {
-		*model = strings.TrimSpace(*defaults.Model)
+	if defaults == nil {
+		return nil, fmt.Errorf("applyCommandRunDefaults() [run_commands.go]: defaults cannot be nil")
 	}
-	if defaults.DefaultRole != nil {
-		*role = strings.TrimSpace(*defaults.DefaultRole)
+	if containerOn == nil || containerOff == nil {
+		return nil, fmt.Errorf("applyCommandRunDefaults() [run_commands.go]: container flags cannot be nil")
 	}
-	if defaults.Worktree != nil {
-		*worktree = strings.TrimSpace(*defaults.Worktree)
+	if defaults.Container == nil {
+		defaults.Container = &conf.ContainerConfig{}
 	}
-	if defaults.NoCommit != nil {
-		*noCommit = *defaults.NoCommit
+	if commandDefaults.Model != nil {
+		defaults.Model = strings.TrimSpace(*commandDefaults.Model)
 	}
-	if *noCommit {
-		*worktree = ""
-		*merge = false
+	if commandDefaults.DefaultRole != nil {
+		defaults.Role = strings.TrimSpace(*commandDefaults.DefaultRole)
 	}
-	if !*noCommit && defaults.Merge != nil {
-		*merge = *defaults.Merge
+	if commandDefaults.Worktree != nil {
+		defaults.Worktree = strings.TrimSpace(*commandDefaults.Worktree)
 	}
-	if defaults.LogLLMRequests != nil {
-		*logLLMRequests = *defaults.LogLLMRequests
+	if commandDefaults.NoCommit != nil {
+		defaults.NoCommit = *commandDefaults.NoCommit
 	}
-	if defaults.Thinking != nil {
-		*thinking = strings.TrimSpace(*defaults.Thinking)
+	if defaults.NoCommit {
+		defaults.Worktree = ""
+		defaults.Merge = false
 	}
-	if defaults.LSPServer != nil {
-		*lspServer = strings.TrimSpace(*defaults.LSPServer)
+	if !defaults.NoCommit && commandDefaults.Merge != nil {
+		defaults.Merge = *commandDefaults.Merge
 	}
-	if defaults.GitUserName != nil {
-		*gitUser = strings.TrimSpace(*defaults.GitUserName)
+	if commandDefaults.LogLLMRequests != nil {
+		defaults.LogLLMRequests = *commandDefaults.LogLLMRequests
 	}
-	if defaults.GitUserEmail != nil {
-		*gitEmail = strings.TrimSpace(*defaults.GitUserEmail)
+	if commandDefaults.Thinking != nil {
+		defaults.Thinking = strings.TrimSpace(*commandDefaults.Thinking)
 	}
-	if defaults.MaxThreads != nil {
-		*maxThreads = *defaults.MaxThreads
+	if commandDefaults.LSPServer != nil {
+		defaults.LSPServer = strings.TrimSpace(*commandDefaults.LSPServer)
 	}
-	if defaults.ShadowDir != nil {
-		*shadowDirOut = strings.TrimSpace(*defaults.ShadowDir)
+	if commandDefaults.GitUserName != nil {
+		defaults.GitUserName = strings.TrimSpace(*commandDefaults.GitUserName)
 	}
-	if defaults.AllowAllPermissions != nil {
-		*allowAllPerms = *defaults.AllowAllPermissions
+	if commandDefaults.GitUserEmail != nil {
+		defaults.GitUserEmail = strings.TrimSpace(*commandDefaults.GitUserEmail)
 	}
-	if defaults.VFSAllow != nil {
-		*vfsAllow = append([]string(nil), *defaults.VFSAllow...)
+	if commandDefaults.MaxThreads != nil {
+		defaults.MaxThreads = *commandDefaults.MaxThreads
 	}
-	if defaults.RunBashMax != nil {
-		value := *defaults.RunBashMax
-		*runBashMaxOutput = &value
+	if commandDefaults.ShadowDir != nil {
+		defaults.ShadowDir = strings.TrimSpace(*commandDefaults.ShadowDir)
+	}
+	if commandDefaults.AllowAllPermissions != nil {
+		defaults.AllowAllPermissions = *commandDefaults.AllowAllPermissions
+	}
+	if commandDefaults.VFSAllow != nil {
+		defaults.VFSAllow = append([]string(nil), *commandDefaults.VFSAllow...)
+	}
+	if commandDefaults.RunBashMax != nil {
+		value := *commandDefaults.RunBashMax
+		defaults.RunBashMax = &value
 	}
 	var commandContainerEnabled *bool
-	if defaults.Container != nil {
-		if defaults.Container.Image != nil {
-			*containerImage = strings.TrimSpace(*defaults.Container.Image)
+	if commandDefaults.Container != nil {
+		if commandDefaults.Container.Image != nil {
+			defaults.Container.Image = strings.TrimSpace(*commandDefaults.Container.Image)
 		}
-		if defaults.Container.Mounts != nil {
-			*containerMounts = append([]string(nil), *defaults.Container.Mounts...)
+		if commandDefaults.Container.Mounts != nil {
+			defaults.Container.Mounts = append([]string(nil), *commandDefaults.Container.Mounts...)
 		}
-		if defaults.Container.Env != nil {
-			*containerEnv = append([]string(nil), *defaults.Container.Env...)
+		if commandDefaults.Container.Env != nil {
+			defaults.Container.Env = append([]string(nil), *commandDefaults.Container.Env...)
 		}
-		if defaults.Container.Enabled != nil {
-			enabledValue := *defaults.Container.Enabled
+		if commandDefaults.Container.Enabled != nil {
+			enabledValue := *commandDefaults.Container.Enabled
 			commandContainerEnabled = &enabledValue
 			*containerOn = enabledValue
 			*containerOff = !enabledValue
 		}
 	}
-	if *maxThreads < 0 {
+	if defaults.MaxThreads < 0 {
 		return commandContainerEnabled, fmt.Errorf("applyCommandRunDefaults() [run_commands.go]: --max-threads must be >= 0")
 	}
-	if *runBashMaxOutput != nil && **runBashMaxOutput < 0 {
+	if defaults.RunBashMax != nil && *defaults.RunBashMax < 0 {
 		return commandContainerEnabled, fmt.Errorf("applyCommandRunDefaults() [run_commands.go]: --run-bash-max must be >= 0")
 	}
 	return commandContainerEnabled, nil
