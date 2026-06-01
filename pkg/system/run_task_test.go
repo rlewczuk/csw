@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/rlewczuk/csw/pkg/core"
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -143,11 +142,8 @@ func TestIsUnfinishedTaskForRun(t *testing.T) {
 func TestResolveRunTaskDirPath(t *testing.T) {
 	t.Run("uses task-dir flag value when present", func(t *testing.T) {
 		workDir := t.TempDir()
-		cmd := &cobra.Command{Use: "run"}
-		cmd.Flags().String("task-dir", "", "")
-		require.NoError(t, cmd.Flags().Set("task-dir", "custom/tasks"))
 
-		resolvedTaskDir, err := resolveRunTaskDirPath(cmd, workDir, "", "", "")
+		resolvedTaskDir, err := resolveRunTaskDirPath("custom/tasks", workDir, "", "", "")
 		require.NoError(t, err)
 		assert.Equal(t, filepath.Clean(filepath.Join(workDir, "custom/tasks")), resolvedTaskDir)
 	})
@@ -157,10 +153,7 @@ func TestResolveRunTaskDirPath(t *testing.T) {
 		projectConfigDir := filepath.Join(workDir, "project-config")
 		require.NoError(t, os.MkdirAll(projectConfigDir, 0o755))
 
-		cmd := &cobra.Command{Use: "run"}
-		cmd.Flags().String("task-dir", "", "")
-
-		resolvedTaskDir, err := resolveRunTaskDirPath(cmd, workDir, "", projectConfigDir, "")
+		resolvedTaskDir, err := resolveRunTaskDirPath("", workDir, "", projectConfigDir, "")
 		require.NoError(t, err)
 		assert.Equal(t, filepath.Clean(filepath.Join(workDir, ".cswdata/tasks")), resolvedTaskDir)
 	})
@@ -169,10 +162,7 @@ func TestResolveRunTaskDirPath(t *testing.T) {
 		workDir := t.TempDir()
 		shadowDir := t.TempDir()
 
-		cmd := &cobra.Command{Use: "run"}
-		cmd.Flags().String("task-dir", "", "")
-
-		resolvedTaskDir, err := resolveRunTaskDirPath(cmd, workDir, shadowDir, "", "")
+		resolvedTaskDir, err := resolveRunTaskDirPath("", workDir, shadowDir, "", "")
 		require.NoError(t, err)
 		assert.Equal(t, filepath.Clean(filepath.Join(shadowDir, ".cswdata/tasks")), resolvedTaskDir)
 	})
@@ -187,10 +177,7 @@ func TestResolveRunTaskDirPath(t *testing.T) {
 			}
 		}`), 0o644))
 
-		cmd := &cobra.Command{Use: "run"}
-		cmd.Flags().String("task-dir", "", "")
-
-		resolvedTaskDir, err := resolveRunTaskDirPath(cmd, workDir, shadowDir, "", "")
+		resolvedTaskDir, err := resolveRunTaskDirPath("", workDir, shadowDir, "", "")
 		require.NoError(t, err)
 		assert.Equal(t, filepath.Clean(filepath.Join(workDir, ".cswdata/tasks-shadow")), resolvedTaskDir)
 	})

@@ -134,7 +134,7 @@ func runCommand(params *runExecution) error {
 				return err
 			}
 			if !recognized {
-				loadedManager, loadErr := loadRunTaskManager(params.Command, defaults.Workdir, defaults.ShadowDir, defaults.ProjectConfig, defaults.ConfigPath)
+				loadedManager, loadErr := loadRunTaskManager(defaults.TaskDir, defaults.Workdir, defaults.ShadowDir, defaults.ProjectConfig, defaults.ConfigPath)
 				if loadErr != nil {
 					return loadErr
 				}
@@ -256,7 +256,7 @@ func runCommand(params *runExecution) error {
 			manager := preloadedTaskManager
 			if manager == nil {
 				var loadErr error
-				manager, loadErr = loadRunTaskManager(params.Command, defaults.Workdir, defaults.ShadowDir, defaults.ProjectConfig, defaults.ConfigPath)
+				manager, loadErr = loadRunTaskManager(defaults.TaskDir, defaults.Workdir, defaults.ShadowDir, defaults.ProjectConfig, defaults.ConfigPath)
 				if loadErr != nil {
 					return loadErr
 				}

@@ -10,7 +10,6 @@ import (
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/shared"
-	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
 
@@ -49,16 +48,12 @@ func resolveTaskIdentifierFromPosition(manager *core.TaskManager, candidate stri
 	return matchedUUID, true, nil
 }
 
-func loadRunTaskManager(cmd *cobra.Command, workDir string, shadowDir string, projectConfig string, configPath string) (*core.TaskManager, error) {
-	if cmd == nil {
-		return nil, fmt.Errorf("loadRunTaskManager() [run_task.go]: command cannot be nil")
-	}
-
+func loadRunTaskManager(taskDir string, workDir string, shadowDir string, projectConfig string, configPath string) (*core.TaskManager, error) {
 	resolvedWorkDir, err := ResolveWorkDir(workDir)
 	if err != nil {
 		return nil, err
 	}
-	resolvedTaskDir, err := resolveRunTaskDirPath(cmd, resolvedWorkDir, shadowDir, projectConfig, configPath)
+	resolvedTaskDir, err := resolveRunTaskDirPath(taskDir, resolvedWorkDir, shadowDir, projectConfig, configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -84,18 +79,8 @@ func loadRunTaskManager(cmd *cobra.Command, workDir string, shadowDir string, pr
 	return taskManager, nil
 }
 
-func resolveRunTaskDirPath(cmd *cobra.Command, workDir string, shadowDir string, projectConfig string, configPath string) (string, error) {
-	if cmd == nil {
-		return "", fmt.Errorf("resolveRunTaskDirPath() [run_task.go]: command cannot be nil")
-	}
-
-	flagTaskDir := ""
-	flag := cmd.Flag("task-dir")
-	if flag != nil {
-		flagTaskDir = strings.TrimSpace(flag.Value.String())
-	}
-
-	resolvedTaskDir := strings.TrimSpace(flagTaskDir)
+func resolveRunTaskDirPath(taskDir string, workDir string, shadowDir string, projectConfig string, configPath string) (string, error) {
+	resolvedTaskDir := strings.TrimSpace(taskDir)
 	if resolvedTaskDir == "" {
 		defaults, defaultsErr := ResolveRunDefaults(ResolveRunDefaultsParams{
 			WorkDir:       workDir,
