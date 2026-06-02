@@ -370,6 +370,9 @@ func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runE
 		resolvedTask.TaskDir = taskDir
 		params.Task = cloneRunTask(resolvedTask)
 		params.InitialTask = cloneRunTask(resolvedTask)
+		if !defaults.RoleOverridden && strings.TrimSpace(resolvedTask.Role) != "" {
+			defaults.Role = strings.TrimSpace(resolvedTask.Role)
+		}
 		if prompt == "" {
 			taskPromptBytes, readErr := os.ReadFile(filepath.Join(taskDir, "task.md"))
 			if readErr != nil {

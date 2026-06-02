@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -116,6 +117,56 @@ func TestResolveTaskRunIdentifierForRun(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, openTask.UUID, identifier)
 	})
+}
+
+func TestPopulateRunExecutionParamsUsesTaskRoleWhenRunRoleNotOverridden(t *testing.T) {
+	testCases := []struct {
+		name           string
+		configuredRole string
+		roleOverridden bool
+		expectedRole   string
+	}{
+		{
+			name:           "uses task role over configured default role",
+			configuredRole: "developer",
+			expectedRole:   "explorer",
+		},
+		{
+			name:           "keeps explicit run role over task role",
+			configuredRole: "reviewer",
+			roleOverridden: true,
+			expectedRole:   "reviewer",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			workDir := t.TempDir()
+			manager, err := core.NewTaskManager(workDir, nil)
+			require.NoError(t, err)
+
+			taskData, err := manager.CreateTask(core.TaskCreateParams{
+				Name:   "task-with-role",
+				Role:   "explorer",
+				Prompt: "task prompt",
+			})
+			require.NoError(t, err)
+
+			runParams := &RunExecution{
+				Config: &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
+					Role:           testCase.configuredRole,
+					RoleOverridden: testCase.roleOverridden,
+					Workdir:        workDir,
+					NoCommit:       true,
+					PositionalArgs: []string{taskData.UUID},
+				}},
+			}
+
+			_, err = populateRunExecutionParams(runParams, nil)
+			require.NoError(t, err)
+			assert.Equal(t, testCase.expectedRole, runParams.Config.Defaults.Role)
+		})
+	}
 }
 
 func TestIsUnfinishedTaskForRun(t *testing.T) {
