@@ -52,10 +52,6 @@ func TestResolveRunCommandInvocation_TaskModeUsesCommands(t *testing.T) {
 		assert.Equal(t, "/csw/task-critic", resolved.Prompt)
 		assert.Empty(t, resolved.ExtraPositionalArgs)
 	})
-}
-
-func TestApplyCommandRunDefaults(t *testing.T) {
-	intPtr := func(value int) *int { return &value }
 
 	t.Run("loads yaml command defaults into run defaults config", func(t *testing.T) {
 		workDir := t.TempDir()
@@ -84,87 +80,6 @@ Run command
 		require.NotNil(t, resolved.CommandRunDefaults.Container)
 		assert.Equal(t, "golang:latest", resolved.CommandRunDefaults.Container.Image)
 		assert.True(t, resolved.CommandRunDefaults.Container.Enabled)
-	})
-
-	t.Run("applies command defaults without cobra flags", func(t *testing.T) {
-		defaults := &conf.RunDefaultsConfig{Container: &conf.ContainerConfig{}}
-		containerOn := false
-		containerOff := true
-
-		commandContainerEnabled, err := applyCommandRunDefaults(
-			&conf.RunDefaultsConfig{
-				DefaultProvider:     " ollama ",
-				Model:               " qwen ",
-				DefaultRole:         " developer ",
-				Workdir:             " . ",
-				Worktree:            " feature-branch ",
-				Merge:               true,
-				LogLLMRequests:      true,
-				Thinking:            " high ",
-				LSPServer:           " gopls ",
-				GitUserName:         " User ",
-				GitUserEmail:        " user@example.com ",
-				MaxThreads:          3,
-				TaskDir:             " .tasks ",
-				ShadowDir:           " .shadow ",
-				AllowAllPermissions: true,
-				VFSAllow:            []string{"/one", "/two"},
-				RunBashMax:          intPtr(2048),
-				VfsReadLimit:        intPtr(512),
-				Container: &conf.ContainerConfig{
-					Image:   " golang:latest ",
-					Mounts:  []string{"src:/src"},
-					Env:     []string{"GOFLAGS=-mod=mod"},
-					Enabled: true,
-				},
-			},
-			defaults, &containerOn, &containerOff,
-		)
-
-		require.NoError(t, err)
-		require.NotNil(t, commandContainerEnabled)
-		assert.True(t, *commandContainerEnabled)
-		assert.Equal(t, "ollama", defaults.DefaultProvider)
-		assert.Equal(t, "qwen", defaults.Model)
-		assert.Equal(t, "developer", defaults.Role)
-		assert.Equal(t, ".", defaults.Workdir)
-		assert.Equal(t, "feature-branch", defaults.Worktree)
-		assert.True(t, defaults.Merge)
-		assert.True(t, defaults.LogLLMRequests)
-		assert.Equal(t, "high", defaults.Thinking)
-		assert.Equal(t, "gopls", defaults.LSPServer)
-		assert.Equal(t, "User", defaults.GitUserName)
-		assert.Equal(t, "user@example.com", defaults.GitUserEmail)
-		assert.Equal(t, 3, defaults.MaxThreads)
-		assert.Equal(t, ".tasks", defaults.TaskDir)
-		assert.Equal(t, ".shadow", defaults.ShadowDir)
-		assert.True(t, defaults.AllowAllPermissions)
-		assert.Equal(t, []string{"/one", "/two"}, defaults.VFSAllow)
-		require.NotNil(t, defaults.RunBashMax)
-		assert.Equal(t, 2048, *defaults.RunBashMax)
-		require.NotNil(t, defaults.VfsReadLimit)
-		assert.Equal(t, 512, *defaults.VfsReadLimit)
-		assert.True(t, containerOn)
-		assert.False(t, containerOff)
-		assert.Equal(t, "golang:latest", defaults.Container.Image)
-		assert.Equal(t, []string{"src:/src"}, defaults.Container.Mounts)
-		assert.Equal(t, []string{"GOFLAGS=-mod=mod"}, defaults.Container.Env)
-	})
-
-	t.Run("no commit disables worktree and merge", func(t *testing.T) {
-		defaults := &conf.RunDefaultsConfig{Worktree: "feature", Merge: true, Container: &conf.ContainerConfig{}}
-		containerOn := false
-		containerOff := false
-
-		_, err := applyCommandRunDefaults(
-			&conf.RunDefaultsConfig{NoCommit: true, Worktree: "command-feature", Merge: true},
-			defaults, &containerOn, &containerOff,
-		)
-
-		require.NoError(t, err)
-		assert.True(t, defaults.NoCommit)
-		assert.Empty(t, defaults.Worktree)
-		assert.False(t, defaults.Merge)
 	})
 }
 

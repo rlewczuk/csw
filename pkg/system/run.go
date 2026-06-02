@@ -228,9 +228,31 @@ func runCommand(params *runExecution) error {
 
 		containerOn := defaults.Container != nil && defaults.Container.Enabled
 		containerOff := defaults.ContainerDisabled
-		commandContainerEnabled, err := applyCommandRunDefaults(commandRunDefaults, defaults, &containerOn, &containerOff)
-		if err != nil {
-			return err
+		var commandContainerEnabled *bool
+		if commandRunDefaults != nil {
+			if defaults.Container == nil {
+				defaults.Container = &conf.ContainerConfig{}
+			}
+			defaults.MergeFrom(*commandRunDefaults)
+			if defaults.NoCommit {
+				defaults.Worktree = ""
+				defaults.Merge = false
+			}
+			if commandRunDefaults.Container != nil && commandRunDefaults.Container.Enabled {
+				enabledValue := true
+				commandContainerEnabled = &enabledValue
+				containerOn = true
+				containerOff = false
+			}
+			if defaults.MaxThreads < 0 {
+				return fmt.Errorf("RunCommand() [run.go]: --max-threads must be >= 0")
+			}
+			if defaults.RunBashMax != nil && *defaults.RunBashMax < 0 {
+				return fmt.Errorf("RunCommand() [run.go]: --run-bash-max must be >= 0")
+			}
+			if defaults.VfsReadLimit != nil && *defaults.VfsReadLimit < 0 {
+				return fmt.Errorf("RunCommand() [run.go]: --vfs-read-limit must be >= 0")
+			}
 		}
 		if defaults.NoMerge {
 			defaults.Merge = false
