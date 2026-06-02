@@ -44,19 +44,7 @@ func RunCommand(params *RunExecution) error {
 	if params == nil || params.Config == nil {
 		return fmt.Errorf("RunCommand() [run.go]: params cannot be nil")
 	}
-	if params.Config.Defaults.Role == "" {
-		params.Config.Defaults.Role = params.Config.Defaults.DefaultRole
-	}
-	defaults := &params.Config.Defaults
-	if defaults.Container == nil {
-		defaults.Container = &conf.ContainerConfig{}
-	}
-	if defaults.ContainerEnabled {
-		defaults.Container.Enabled = true
-	}
 
-	startTime := time.Now()
-	ctx := context.Background()
 	var stdin stdio.Reader = os.Stdin
 	var stdout stdio.Writer = os.Stdout
 	var stderr stdio.Writer = os.Stderr
@@ -70,239 +58,14 @@ func RunCommand(params *RunExecution) error {
 		stderr = params.Stderr
 	}
 
-	var taskManager *core.TaskManager
-	var preloadedTaskManager *core.TaskManager
-	taskIdentifier := ""
-	runInTaskMode := false
-
-	{
-		positionalArgs := append([]string(nil), defaults.PositionalArgs...)
-		effectiveTaskIdentifier := strings.TrimSpace(defaults.TaskIdentifier)
-		if effectiveTaskIdentifier == "" && !defaults.TaskLast && !defaults.TaskNext && len(positionalArgs) > 0 {
-			resolvedIdentifier, recognized, err := resolveTaskIdentifierFromPosition(nil, positionalArgs[0])
-			if err != nil {
-				return err
-			}
-			if !recognized {
-				loadedManager, loadErr := loadRunTaskManager(defaults.TaskDir, defaults.Workdir, defaults.ShadowDir, defaults.ProjectConfig, defaults.ConfigPath)
-				if loadErr != nil {
-					return loadErr
-				}
-				preloadedTaskManager = loadedManager
-				resolvedIdentifier, recognized, err = resolveTaskIdentifierFromPosition(loadedManager, positionalArgs[0])
-				if err != nil {
-					return err
-				}
-			}
-			if recognized {
-				effectiveTaskIdentifier = resolvedIdentifier
-				positionalArgs = positionalArgs[1:]
-			}
-		}
-		defaults.TaskIdentifier = effectiveTaskIdentifier
-
-		prompt := ""
-		extraPositionalArgs := []string(nil)
-		if len(positionalArgs) >= 1 {
-			prompt = positionalArgs[0]
-			extraPositionalArgs = positionalArgs[1:]
-		}
-
-		if prompt != "" && strings.HasPrefix(prompt, "@") {
-			promptFile := strings.TrimPrefix(prompt, "@")
-			data, err := os.ReadFile(promptFile)
-			if err != nil {
-				return fmt.Errorf("RunCommand() [run.go]: failed to read prompt file: %w", err)
-			}
-			prompt = string(data)
-		} else if prompt == "-" {
-			data, err := stdio.ReadAll(stdin)
-			if err != nil {
-				return fmt.Errorf("RunCommand() [run.go]: failed to read prompt from stdin: %w", err)
-			}
-			prompt = string(data)
-		}
-
-		if prompt != "" {
-			prompt = strings.TrimSpace(prompt)
-		}
-
-		runInTaskMode = strings.TrimSpace(effectiveTaskIdentifier) != "" || defaults.TaskLast || defaults.TaskNext
-
-		invocation, isCommandInvocation, err := commands.ParseInvocation(prompt, extraPositionalArgs)
-		if err != nil {
-			return fmt.Errorf("RunCommand() [run.go]: %w", err)
-		}
-		if !isCommandInvocation && len(extraPositionalArgs) > 0 {
-			return fmt.Errorf("RunCommand() [run.go]: prompt must be a single argument unless using /command invocation")
-		}
-
-		commandTemplate := ""
-		commandName := ""
-		commandPath := ""
-		commandArgs := []string(nil)
-		commandModelOverride := ""
-		commandRoleOverride := ""
-		var commandRunDefaults *conf.RunDefaultsConfig
-		var commandTaskMetadata *commands.TaskMetadata
-		commandNeedsShell := false
-		if invocation != nil {
-			resolvedInvocation, resolveErr := resolveRunCommandInvocation(invocation, defaults.Workdir, defaults.ShadowDir, runInTaskMode)
-			if resolveErr != nil {
-				return fmt.Errorf("RunCommand() [run.go]: %w", resolveErr)
-			}
-			commandTemplate = resolvedInvocation.CommandTemplate
-			commandName = resolvedInvocation.CommandName
-			commandPath = resolvedInvocation.CommandPath
-			commandArgs = resolvedInvocation.CommandArgs
-			commandModelOverride = resolvedInvocation.CommandModelOverride
-			commandRoleOverride = resolvedInvocation.CommandRoleOverride
-			commandRunDefaults = resolvedInvocation.CommandRunDefaults
-			commandTaskMetadata = resolvedInvocation.CommandTaskMetadata
-			commandNeedsShell = resolvedInvocation.CommandNeedsShell
-			prompt = resolvedInvocation.Prompt
-			extraPositionalArgs = resolvedInvocation.ExtraPositionalArgs
-		}
-
-		contextData, err := ParseRunContextEntries(defaults.ContextEntries)
-		if err != nil {
-			return err
-		}
-
-		if prompt == "" && !runInTaskMode {
-			return fmt.Errorf("RunCommand() [run.go]: prompt cannot be empty")
-		}
-
-		bashRunTimeout, err := parseBashRunTimeout(defaults.BashRunTimeout)
-		if err != nil {
-			return err
-		}
-
-		containerOn := defaults.Container != nil && defaults.Container.Enabled
-		containerOff := defaults.ContainerDisabled
-		var commandContainerEnabled *bool
-		if commandRunDefaults != nil {
-			if defaults.Container == nil {
-				defaults.Container = &conf.ContainerConfig{}
-			}
-			defaults.MergeFrom(*commandRunDefaults)
-			if defaults.NoCommit {
-				defaults.Worktree = ""
-				defaults.Merge = false
-			}
-			if commandRunDefaults.Container != nil && commandRunDefaults.Container.Enabled {
-				enabledValue := true
-				commandContainerEnabled = &enabledValue
-				containerOn = true
-				containerOff = false
-			}
-			if defaults.MaxThreads < 0 {
-				return fmt.Errorf("RunCommand() [run.go]: --max-threads must be >= 0")
-			}
-			if defaults.RunBashMax != nil && *defaults.RunBashMax < 0 {
-				return fmt.Errorf("RunCommand() [run.go]: --run-bash-max must be >= 0")
-			}
-			if defaults.VfsReadLimit != nil && *defaults.VfsReadLimit < 0 {
-				return fmt.Errorf("RunCommand() [run.go]: --vfs-read-limit must be >= 0")
-			}
-		}
-		if defaults.NoMerge {
-			defaults.Merge = false
-		}
-		if defaults.NoCommit {
-			defaults.Worktree = ""
-			defaults.Merge = false
-		}
-		defaults.LogLLMRequests = defaults.LogLLMRequests || defaults.LogLLMRequestsRaw
-
-		if invocation != nil {
-			if !defaults.ModelOverridden && commandModelOverride != "" {
-				defaults.Model = commandModelOverride
-			}
-			if !defaults.RoleOverridden && commandRoleOverride != "" {
-				defaults.Role = commandRoleOverride
-			}
-		}
-
-		if runInTaskMode {
-			manager := preloadedTaskManager
-			if manager == nil {
-				var loadErr error
-				manager, loadErr = loadRunTaskManager(defaults.TaskDir, defaults.Workdir, defaults.ShadowDir, defaults.ProjectConfig, defaults.ConfigPath)
-				if loadErr != nil {
-					return loadErr
-				}
-			}
-			taskManager = manager
-			identifier, err := resolveTaskRunIdentifierForRun(manager, effectiveTaskIdentifier, defaults.TaskLast, defaults.TaskNext)
-			if err != nil {
-				return err
-			}
-			taskIdentifier = identifier
-			taskDir, resolvedTask, err := manager.ResolveTask(core.TaskLookup{Identifier: identifier})
-			if err != nil {
-				return err
-			}
-			resolvedTask.TaskDir = taskDir
-			params.Task = cloneRunTask(resolvedTask)
-			params.InitialTask = cloneRunTask(resolvedTask)
-			if prompt == "" {
-				taskPromptBytes, readErr := os.ReadFile(filepath.Join(taskDir, "task.md"))
-				if readErr != nil {
-					return fmt.Errorf("RunCommand() [run.go]: failed to read task prompt: %w", readErr)
-				}
-				prompt = strings.TrimSpace(string(taskPromptBytes))
-			}
-			if prompt == "" {
-				return fmt.Errorf("RunCommand() [run.go]: prompt cannot be empty")
-			}
-			runningStatus := core.TaskStatusRunning
-			if _, updateErr := manager.UpdateTask(core.TaskUpdateParams{Identifier: identifier, Status: &runningStatus}); updateErr != nil {
-				return updateErr
-			}
-			taskRunMerge := resolveTaskRunMerge(defaults.NoMerge, defaults.Merge, defaults.Worktree)
-			taskFeatureBranch := ""
-			if params.Task != nil {
-				taskFeatureBranch = strings.TrimSpace(params.Task.FeatureBranch)
-			}
-			if shouldDisableTaskWorktreeForRun(commandTaskMetadata, params.Task) || defaults.NoCommit {
-				defaults.Worktree = ""
-				taskRunMerge = false
-			} else if strings.TrimSpace(defaults.Worktree) == "" {
-				defaults.Worktree = taskFeatureBranch
-			}
-			defaults.Merge = taskRunMerge
-			_ = defaults.TaskReset
-		}
-
-		containerRequested := containerOn || (defaults.Container != nil && (len(defaults.Container.Mounts) > 0 || len(defaults.Container.Env) > 0))
-		if !defaults.ContainerDisabled && commandContainerEnabled != nil {
-			containerRequested = *commandContainerEnabled
-		}
-		if !defaults.ContainerDisabled && invocation != nil && commandNeedsShell {
-			containerRequested = true
-		}
-
-		params.Prompt = prompt
-		params.CommandName = commandName
-		params.CommandPath = commandPath
-		params.CommandArgs = commandArgs
-		params.CommandTemplate = commandTemplate
-		params.CommandTaskMetadata = commandTaskMetadata
-		params.ContextData = make(map[string]any, len(contextData))
-		for key, value := range contextData {
-			params.ContextData[key] = value
-		}
-		params.BashRunTimeout = bashRunTimeout
-		defaults.GitUserName = vcs.ResolveGitIdentity(defaults.GitUserName, "user.name")
-		defaults.GitUserEmail = vcs.ResolveGitIdentity(defaults.GitUserEmail, "user.email")
-		if defaults.Container == nil {
-			defaults.Container = &conf.ContainerConfig{}
-		}
-		defaults.Container.Enabled = containerRequested
-		defaults.ContainerDisabled = containerOff
-		defaults.VFSAllow = parseVFSAllowPaths(defaults.VFSAllow)
+	prep, err := populateRunExecutionParams(params, stdin)
+	if err != nil {
+		return err
 	}
+
+	startTime := time.Now()
+	ctx := context.Background()
+	defaults := &params.Config.Defaults
 
 	if defaults.NoCommit {
 		defaults.Worktree = ""
@@ -398,14 +161,277 @@ func RunCommand(params *RunExecution) error {
 	if err := applyCommandTaskMetadata(params); err != nil {
 		return err
 	}
-	if runInTaskMode && taskManager != nil && strings.TrimSpace(taskIdentifier) != "" {
+	if prep.runInTaskMode && prep.taskManager != nil && strings.TrimSpace(prep.taskIdentifier) != "" {
 		if finalStatus, shouldApply := resolveTaskFinalStatusForRun(session, defaults.Merge); shouldApply {
-			if _, err := taskManager.UpdateTask(core.TaskUpdateParams{Identifier: taskIdentifier, Status: &finalStatus}); err != nil {
+			if _, err := prep.taskManager.UpdateTask(core.TaskUpdateParams{Identifier: prep.taskIdentifier, Status: &finalStatus}); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// runExecutionPrepResult holds values resolved by populateRunExecutionParams
+// that are required by the rest of RunCommand.
+type runExecutionPrepResult struct {
+	taskManager    *core.TaskManager
+	taskIdentifier string
+	runInTaskMode  bool
+}
+
+// populateRunExecutionParams resolves prompt, command invocation, context,
+// container settings, and task data for a non-TUI run session. It mutates
+// both params and its embedded defaults, and returns the task state required
+// by the rest of RunCommand.
+func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runExecutionPrepResult, error) {
+	if params.Config.Defaults.Role == "" {
+		params.Config.Defaults.Role = params.Config.Defaults.DefaultRole
+	}
+	defaults := &params.Config.Defaults
+	if defaults.Container == nil {
+		defaults.Container = &conf.ContainerConfig{}
+	}
+	if defaults.ContainerEnabled {
+		defaults.Container.Enabled = true
+	}
+
+	var preloadedTaskManager *core.TaskManager
+	var taskManager *core.TaskManager
+	taskIdentifier := ""
+	runInTaskMode := false
+
+	positionalArgs := append([]string(nil), defaults.PositionalArgs...)
+	effectiveTaskIdentifier := strings.TrimSpace(defaults.TaskIdentifier)
+	if effectiveTaskIdentifier == "" && !defaults.TaskLast && !defaults.TaskNext && len(positionalArgs) > 0 {
+		resolvedIdentifier, recognized, err := resolveTaskIdentifierFromPosition(nil, positionalArgs[0])
+		if err != nil {
+			return nil, err
+		}
+		if !recognized {
+			loadedManager, loadErr := loadRunTaskManager(defaults.TaskDir, defaults.Workdir, defaults.ShadowDir, defaults.ProjectConfig, defaults.ConfigPath)
+			if loadErr != nil {
+				return nil, loadErr
+			}
+			preloadedTaskManager = loadedManager
+			resolvedIdentifier, recognized, err = resolveTaskIdentifierFromPosition(loadedManager, positionalArgs[0])
+			if err != nil {
+				return nil, err
+			}
+		}
+		if recognized {
+			effectiveTaskIdentifier = resolvedIdentifier
+			positionalArgs = positionalArgs[1:]
+		}
+	}
+	defaults.TaskIdentifier = effectiveTaskIdentifier
+
+	prompt := ""
+	extraPositionalArgs := []string(nil)
+	if len(positionalArgs) >= 1 {
+		prompt = positionalArgs[0]
+		extraPositionalArgs = positionalArgs[1:]
+	}
+
+	if prompt != "" && strings.HasPrefix(prompt, "@") {
+		promptFile := strings.TrimPrefix(prompt, "@")
+		data, err := os.ReadFile(promptFile)
+		if err != nil {
+			return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: failed to read prompt file: %w", err)
+		}
+		prompt = string(data)
+	} else if prompt == "-" {
+		data, err := stdio.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: failed to read prompt from stdin: %w", err)
+		}
+		prompt = string(data)
+	}
+
+	if prompt != "" {
+		prompt = strings.TrimSpace(prompt)
+	}
+
+	runInTaskMode = strings.TrimSpace(effectiveTaskIdentifier) != "" || defaults.TaskLast || defaults.TaskNext
+
+	invocation, isCommandInvocation, err := commands.ParseInvocation(prompt, extraPositionalArgs)
+	if err != nil {
+		return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: %w", err)
+	}
+	if !isCommandInvocation && len(extraPositionalArgs) > 0 {
+		return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: prompt must be a single argument unless using /command invocation")
+	}
+
+	commandTemplate := ""
+	commandName := ""
+	commandPath := ""
+	commandArgs := []string(nil)
+	commandModelOverride := ""
+	commandRoleOverride := ""
+	var commandRunDefaults *conf.RunDefaultsConfig
+	var commandTaskMetadata *commands.TaskMetadata
+	commandNeedsShell := false
+	if invocation != nil {
+		resolvedInvocation, resolveErr := resolveRunCommandInvocation(invocation, defaults.Workdir, defaults.ShadowDir, runInTaskMode)
+		if resolveErr != nil {
+			return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: %w", resolveErr)
+		}
+		commandTemplate = resolvedInvocation.CommandTemplate
+		commandName = resolvedInvocation.CommandName
+		commandPath = resolvedInvocation.CommandPath
+		commandArgs = resolvedInvocation.CommandArgs
+		commandModelOverride = resolvedInvocation.CommandModelOverride
+		commandRoleOverride = resolvedInvocation.CommandRoleOverride
+		commandRunDefaults = resolvedInvocation.CommandRunDefaults
+		commandTaskMetadata = resolvedInvocation.CommandTaskMetadata
+		commandNeedsShell = resolvedInvocation.CommandNeedsShell
+		prompt = resolvedInvocation.Prompt
+		extraPositionalArgs = resolvedInvocation.ExtraPositionalArgs
+	}
+
+	contextData, err := ParseRunContextEntries(defaults.ContextEntries)
+	if err != nil {
+		return nil, err
+	}
+
+	if prompt == "" && !runInTaskMode {
+		return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: prompt cannot be empty")
+	}
+
+	bashRunTimeout, err := parseBashRunTimeout(defaults.BashRunTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	containerOn := defaults.Container != nil && defaults.Container.Enabled
+	containerOff := defaults.ContainerDisabled
+	var commandContainerEnabled *bool
+	if commandRunDefaults != nil {
+		if defaults.Container == nil {
+			defaults.Container = &conf.ContainerConfig{}
+		}
+		defaults.MergeFrom(*commandRunDefaults)
+		if defaults.NoCommit {
+			defaults.Worktree = ""
+			defaults.Merge = false
+		}
+		if commandRunDefaults.Container != nil && commandRunDefaults.Container.Enabled {
+			enabledValue := true
+			commandContainerEnabled = &enabledValue
+			containerOn = true
+			containerOff = false
+		}
+		if defaults.MaxThreads < 0 {
+			return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: --max-threads must be >= 0")
+		}
+		if defaults.RunBashMax != nil && *defaults.RunBashMax < 0 {
+			return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: --run-bash-max must be >= 0")
+		}
+		if defaults.VfsReadLimit != nil && *defaults.VfsReadLimit < 0 {
+			return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: --vfs-read-limit must be >= 0")
+		}
+	}
+	if defaults.NoMerge {
+		defaults.Merge = false
+	}
+	if defaults.NoCommit {
+		defaults.Worktree = ""
+		defaults.Merge = false
+	}
+	defaults.LogLLMRequests = defaults.LogLLMRequests || defaults.LogLLMRequestsRaw
+
+	if invocation != nil {
+		if !defaults.ModelOverridden && commandModelOverride != "" {
+			defaults.Model = commandModelOverride
+		}
+		if !defaults.RoleOverridden && commandRoleOverride != "" {
+			defaults.Role = commandRoleOverride
+		}
+	}
+
+	if runInTaskMode {
+		manager := preloadedTaskManager
+		if manager == nil {
+			var loadErr error
+			manager, loadErr = loadRunTaskManager(defaults.TaskDir, defaults.Workdir, defaults.ShadowDir, defaults.ProjectConfig, defaults.ConfigPath)
+			if loadErr != nil {
+				return nil, loadErr
+			}
+		}
+		taskManager = manager
+		identifier, err := resolveTaskRunIdentifierForRun(manager, effectiveTaskIdentifier, defaults.TaskLast, defaults.TaskNext)
+		if err != nil {
+			return nil, err
+		}
+		taskIdentifier = identifier
+		taskDir, resolvedTask, err := manager.ResolveTask(core.TaskLookup{Identifier: identifier})
+		if err != nil {
+			return nil, err
+		}
+		resolvedTask.TaskDir = taskDir
+		params.Task = cloneRunTask(resolvedTask)
+		params.InitialTask = cloneRunTask(resolvedTask)
+		if prompt == "" {
+			taskPromptBytes, readErr := os.ReadFile(filepath.Join(taskDir, "task.md"))
+			if readErr != nil {
+				return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: failed to read task prompt: %w", readErr)
+			}
+			prompt = strings.TrimSpace(string(taskPromptBytes))
+		}
+		if prompt == "" {
+			return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: prompt cannot be empty")
+		}
+		runningStatus := core.TaskStatusRunning
+		if _, updateErr := manager.UpdateTask(core.TaskUpdateParams{Identifier: identifier, Status: &runningStatus}); updateErr != nil {
+			return nil, updateErr
+		}
+		taskRunMerge := resolveTaskRunMerge(defaults.NoMerge, defaults.Merge, defaults.Worktree)
+		taskFeatureBranch := ""
+		if params.Task != nil {
+			taskFeatureBranch = strings.TrimSpace(params.Task.FeatureBranch)
+		}
+		if shouldDisableTaskWorktreeForRun(commandTaskMetadata, params.Task) || defaults.NoCommit {
+			defaults.Worktree = ""
+			taskRunMerge = false
+		} else if strings.TrimSpace(defaults.Worktree) == "" {
+			defaults.Worktree = taskFeatureBranch
+		}
+		defaults.Merge = taskRunMerge
+		_ = defaults.TaskReset
+	}
+
+	containerRequested := containerOn || (defaults.Container != nil && (len(defaults.Container.Mounts) > 0 || len(defaults.Container.Env) > 0))
+	if !defaults.ContainerDisabled && commandContainerEnabled != nil {
+		containerRequested = *commandContainerEnabled
+	}
+	if !defaults.ContainerDisabled && invocation != nil && commandNeedsShell {
+		containerRequested = true
+	}
+
+	params.Prompt = prompt
+	params.CommandName = commandName
+	params.CommandPath = commandPath
+	params.CommandArgs = commandArgs
+	params.CommandTemplate = commandTemplate
+	params.CommandTaskMetadata = commandTaskMetadata
+	params.ContextData = make(map[string]any, len(contextData))
+	for key, value := range contextData {
+		params.ContextData[key] = value
+	}
+	params.BashRunTimeout = bashRunTimeout
+	defaults.GitUserName = vcs.ResolveGitIdentity(defaults.GitUserName, "user.name")
+	defaults.GitUserEmail = vcs.ResolveGitIdentity(defaults.GitUserEmail, "user.email")
+	if defaults.Container == nil {
+		defaults.Container = &conf.ContainerConfig{}
+	}
+	defaults.Container.Enabled = containerRequested
+	defaults.ContainerDisabled = containerOff
+	defaults.VFSAllow = parseVFSAllowPaths(defaults.VFSAllow)
+
+	return &runExecutionPrepResult{
+		taskManager:    taskManager,
+		taskIdentifier: taskIdentifier,
+		runInTaskMode:  runInTaskMode,
+	}, nil
 }
 
 func resolveTaskFinalStatusForRun(session *core.SweSession, merge bool) (string, bool) {
