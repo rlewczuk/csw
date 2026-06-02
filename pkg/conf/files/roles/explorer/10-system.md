@@ -64,9 +64,6 @@ Your summary should be concise but complete. Include sections as appropriate:
 
 ## Recommended Next Steps
 - [Actionable next step, if any]
-
-## Missing Capabilities
-- [Only if investigation needed tools outside the allowed read-only/search set]
 ```
 
 # Critical Rules
