@@ -26,17 +26,6 @@ type runExecution struct {
 	stdin                 stdio.Reader
 	stdout                stdio.Writer
 	stderr                stdio.Writer
-	prompt                string
-	commandName           string
-	commandPath           string
-	commandArgs           []string
-	commandTemplate       string
-	commandTaskMetadata   *commands.TaskMetadata
-	contextData           map[string]any
-	task                  *core.Task
-	initialTask           *core.Task
-	modelOverridden       bool
-	bashRunTimeout        time.Duration
 	Prompt                string
 	CommandName           string
 	CommandPath           string
@@ -292,8 +281,8 @@ func runCommand(params *runExecution) error {
 				return err
 			}
 			resolvedTask.TaskDir = taskDir
-			params.task = cloneRunTask(resolvedTask)
-			params.initialTask = cloneRunTask(resolvedTask)
+			params.Task = cloneRunTask(resolvedTask)
+			params.InitialTask = cloneRunTask(resolvedTask)
 			if prompt == "" {
 				taskPromptBytes, readErr := os.ReadFile(filepath.Join(taskDir, "task.md"))
 				if readErr != nil {
@@ -310,10 +299,10 @@ func runCommand(params *runExecution) error {
 			}
 			taskRunMerge := resolveTaskRunMerge(defaults.NoMerge, defaults.Merge, defaults.Worktree)
 			taskFeatureBranch := ""
-			if params.task != nil {
-				taskFeatureBranch = strings.TrimSpace(params.task.FeatureBranch)
+			if params.Task != nil {
+				taskFeatureBranch = strings.TrimSpace(params.Task.FeatureBranch)
 			}
-			if shouldDisableTaskWorktreeForRun(commandTaskMetadata, params.task) || defaults.NoCommit {
+			if shouldDisableTaskWorktreeForRun(commandTaskMetadata, params.Task) || defaults.NoCommit {
 				defaults.Worktree = ""
 				taskRunMerge = false
 			} else if strings.TrimSpace(defaults.Worktree) == "" {
@@ -331,17 +320,17 @@ func runCommand(params *runExecution) error {
 			containerRequested = true
 		}
 
-		params.prompt = prompt
-		params.commandName = commandName
-		params.commandPath = commandPath
-		params.commandArgs = commandArgs
-		params.commandTemplate = commandTemplate
-		params.commandTaskMetadata = commandTaskMetadata
-		params.contextData = make(map[string]any, len(contextData))
+		params.Prompt = prompt
+		params.CommandName = commandName
+		params.CommandPath = commandPath
+		params.CommandArgs = commandArgs
+		params.CommandTemplate = commandTemplate
+		params.CommandTaskMetadata = commandTaskMetadata
+		params.ContextData = make(map[string]any, len(contextData))
 		for key, value := range contextData {
-			params.contextData[key] = value
+			params.ContextData[key] = value
 		}
-		params.bashRunTimeout = bashRunTimeout
+		params.BashRunTimeout = bashRunTimeout
 		defaults.GitUserName = vcs.ResolveGitIdentity(defaults.GitUserName, "user.name")
 		defaults.GitUserEmail = vcs.ResolveGitIdentity(defaults.GitUserEmail, "user.email")
 		if defaults.Container == nil {
@@ -357,8 +346,8 @@ func runCommand(params *runExecution) error {
 		defaults.Merge = false
 	}
 
-	if params.bashRunTimeout <= 0 {
-		params.bashRunTimeout = defaultBashRunTimeout
+	if params.BashRunTimeout <= 0 {
+		params.BashRunTimeout = defaultBashRunTimeout
 	}
 	if strings.TrimSpace(defaults.OutputFormat) == "" {
 		defaults.OutputFormat = "short"
@@ -366,15 +355,6 @@ func runCommand(params *runExecution) error {
 	if defaults.OutputFormat != "short" && defaults.OutputFormat != "full" && defaults.OutputFormat != "jsonl" {
 		return fmt.Errorf("RunCommand() [run.go]: invalid --output-format %q (allowed: short, full, jsonl)", defaults.OutputFormat)
 	}
-	params.Prompt = params.prompt
-	params.CommandName = params.commandName
-	params.CommandPath = params.commandPath
-	params.CommandArgs = params.commandArgs
-	params.CommandTemplate = params.commandTemplate
-	params.CommandTaskMetadata = params.commandTaskMetadata
-	params.ContextData = params.contextData
-	params.Task = params.task
-	params.InitialTask = params.initialTask
 	params.WorkDir = defaults.Workdir
 	params.ShadowDir = defaults.ShadowDir
 	params.WorktreeBranch = defaults.Worktree
@@ -398,7 +378,6 @@ func runCommand(params *runExecution) error {
 	params.ModelName = defaults.Model
 	params.RoleName = defaults.Role
 	params.ModelOverridden = defaults.ModelOverridden
-	params.BashRunTimeout = params.bashRunTimeout
 	params.RunBashMaxOutput = defaults.RunBashMax
 	params.VFSReadLimit = defaults.VfsReadLimit
 	params.MaxThreads = defaults.MaxThreads
