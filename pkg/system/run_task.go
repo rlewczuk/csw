@@ -270,7 +270,7 @@ func listAllCurrentTasksForRun(manager *core.TaskManager) ([]*core.Task, error) 
 	return allTasks, nil
 }
 
-func applyCommandTaskMetadata(params *runExecution) error {
+func applyCommandTaskMetadata(params *RunExecution) error {
 	if params == nil || params.Task == nil || params.CommandTaskMetadata == nil {
 		return nil
 	}

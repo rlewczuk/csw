@@ -36,14 +36,14 @@ func TestCLISavesSummaryMarkdown(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := RunCommand(&conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
+	err := RunCommand(&RunExecution{Config: &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
 		PositionalArgs:      []string{"Do the task"},
 		Model:               "ollama/test-model",
 		Role:                "developer",
 		Workdir:             tmpProjectDir,
 		AllowAllPermissions: true,
 		ConfigPath:          filepath.Join(tmpProjectDir, ".csw", "config"),
-	}})
+	}}})
 	require.NoError(t, err)
 
 	sessionsDir := filepath.Join(tmpProjectDir, ".cswdata", "logs", "sessions")

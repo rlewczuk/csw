@@ -44,7 +44,7 @@ func TestCLIContainerModeRunBashBusybox(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := RunCommand(&conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
+	err := RunCommand(&RunExecution{Config: &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
 		PositionalArgs:      []string{"Run a shell command"},
 		Model:               "ollama/test-model",
 		Role:                "developer",
@@ -53,7 +53,7 @@ func TestCLIContainerModeRunBashBusybox(t *testing.T) {
 		ContainerEnabled:    true,
 		Container:           &conf.ContainerConfig{Image: "busybox:latest"},
 		ConfigPath:          filepath.Join(tmpProjectDir, ".csw", "config"),
-	}})
+	}}})
 	require.NoError(t, err)
 
 	requests := mockServer.GetRequests()
@@ -114,14 +114,14 @@ func TestCLIContainerModeFromGlobalConfig(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := RunCommand(&conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
+	err := RunCommand(&RunExecution{Config: &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
 		PositionalArgs:      []string{"Run a shell command"},
 		Model:               "ollama/test-model",
 		Role:                "developer",
 		Workdir:             tmpProjectDir,
 		AllowAllPermissions: true,
 		ConfigPath:          filepath.Join(tmpProjectDir, ".csw", "config"),
-	}})
+	}}})
 	require.NoError(t, err)
 
 	requests := mockServer.GetRequests()
@@ -173,7 +173,7 @@ func TestCLIContainerModeWithAdditionalMountAndEnv(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := RunCommand(&conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
+	err := RunCommand(&RunExecution{Config: &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
 		PositionalArgs:      []string{"Run a shell command"},
 		Model:               "ollama/test-model",
 		Role:                "developer",
@@ -182,7 +182,7 @@ func TestCLIContainerModeWithAdditionalMountAndEnv(t *testing.T) {
 		ContainerEnabled:    true,
 		Container:           &conf.ContainerConfig{Image: "busybox:latest", Mounts: []string{extraMountDir + ":/mnt/extra"}, Env: []string{"EXTRA_ENV=from_env"}},
 		ConfigPath:          filepath.Join(tmpProjectDir, ".csw", "config"),
-	}})
+	}}})
 	require.NoError(t, err)
 
 	requests := mockServer.GetRequests()

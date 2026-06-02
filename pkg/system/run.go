@@ -21,11 +21,12 @@ import (
 
 const defaultBashRunTimeout = 120 * time.Second
 
-type runExecution struct {
-	config              *conf.GlobalConfig
-	stdin               stdio.Reader
-	stdout              stdio.Writer
-	stderr              stdio.Writer
+// RunExecution contains parameters and runtime state for a non-TUI run session.
+type RunExecution struct {
+	Config              *conf.GlobalConfig
+	Stdin               stdio.Reader
+	Stdout              stdio.Writer
+	Stderr              stdio.Writer
 	Prompt              string
 	CommandName         string
 	CommandPath         string
@@ -38,23 +39,15 @@ type runExecution struct {
 	BashRunTimeout      time.Duration
 }
 
-// RunCommand runs a non-TUI agent session with the provided global config.
-func RunCommand(globalConfig *conf.GlobalConfig) error {
-	if globalConfig == nil {
-		return fmt.Errorf("RunCommand() [run.go]: config cannot be nil")
+// RunCommand runs a non-TUI agent session with the provided execution params.
+func RunCommand(params *RunExecution) error {
+	if params == nil || params.Config == nil {
+		return fmt.Errorf("RunCommand() [run.go]: params cannot be nil")
 	}
-	if globalConfig.Defaults.Role == "" {
-		globalConfig.Defaults.Role = globalConfig.Defaults.DefaultRole
+	if params.Config.Defaults.Role == "" {
+		params.Config.Defaults.Role = params.Config.Defaults.DefaultRole
 	}
-	exec := &runExecution{config: globalConfig, stdin: os.Stdin, stdout: os.Stdout, stderr: os.Stderr}
-	return runCommand(exec)
-}
-
-func runCommand(params *runExecution) error {
-	if params == nil || params.config == nil {
-		return fmt.Errorf("runCommand() [run.go]: params cannot be nil")
-	}
-	defaults := &params.config.Defaults
+	defaults := &params.Config.Defaults
 	if defaults.Container == nil {
 		defaults.Container = &conf.ContainerConfig{}
 	}
@@ -67,14 +60,14 @@ func runCommand(params *runExecution) error {
 	var stdin stdio.Reader = os.Stdin
 	var stdout stdio.Writer = os.Stdout
 	var stderr stdio.Writer = os.Stderr
-	if params.stdin != nil {
-		stdin = params.stdin
+	if params.Stdin != nil {
+		stdin = params.Stdin
 	}
-	if params.stdout != nil {
-		stdout = params.stdout
+	if params.Stdout != nil {
+		stdout = params.Stdout
 	}
-	if params.stderr != nil {
-		stderr = params.stderr
+	if params.Stderr != nil {
+		stderr = params.Stderr
 	}
 
 	var taskManager *core.TaskManager
@@ -456,11 +449,11 @@ func parseVFSAllowPaths(values []string) []string {
 	return r
 }
 
-func buildRunSessionOutput(params *runExecution, output stdio.Writer) core.SessionThreadOutput {
+func buildRunSessionOutput(params *RunExecution, output stdio.Writer) core.SessionThreadOutput {
 	if params == nil {
 		return sessionio.NewTextSessionOutput(output)
 	}
-	defaults := &params.config.Defaults
+	defaults := &params.Config.Defaults
 	if strings.TrimSpace(defaults.OutputFormat) == "jsonl" {
 		return sessionio.NewJsonlSessionOutput(output)
 	}
@@ -475,20 +468,20 @@ func buildSummaryMessageFunc(output core.SessionThreadOutput) func(string, share
 
 type runSessionInput interface{ StartReadingInput() }
 
-func buildRunStdinSessionInput(params *runExecution, thread core.SessionThreadInput, input stdio.Reader) runSessionInput {
+func buildRunStdinSessionInput(params *RunExecution, thread core.SessionThreadInput, input stdio.Reader) runSessionInput {
 	if params == nil || thread == nil || input == nil {
 		return nil
 	}
-	if params.config.Defaults.OutputFormat == "jsonl" {
+	if params.Config.Defaults.OutputFormat == "jsonl" {
 		return sessionio.NewJsonlSessionInput(input, thread)
 	}
 	return sessionio.NewTextSessionInput(input, thread)
 }
-func validateMergeRunExecution(params *runExecution) error {
+func validateMergeRunExecution(params *RunExecution) error {
 	if params == nil {
 		return fmt.Errorf("validateMergeRunExecution() [run.go]: params cannot be nil")
 	}
-	defaults := &params.config.Defaults
+	defaults := &params.Config.Defaults
 	if defaults.Merge && defaults.NoCommit {
 		return fmt.Errorf("RunCommand() [run.go]: --merge cannot be used with --no-commit")
 	}
@@ -530,7 +523,7 @@ func shouldDisableTaskWorktreeForRun(taskMetadata *commands.TaskMetadata, taskDa
 }
 
 // PreparePromptWithContext renders prompt with template context data.
-func PreparePromptWithContext(params *runExecution) error {
+func PreparePromptWithContext(params *RunExecution) error {
 	if params == nil {
 		return fmt.Errorf("PreparePromptWithContext() [run.go]: params is nil")
 	}

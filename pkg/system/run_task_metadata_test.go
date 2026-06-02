@@ -24,7 +24,7 @@ func TestApplyCommandTaskMetadataAppliesValuesWhenTaskUnchanged(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "task.yml"), bytesData, 0644))
 
-	params := &runExecution{
+	params := &RunExecution{
 		Task:        &core.Task{TaskDir: taskDir},
 		InitialTask: cloneRunTask(initialTask),
 		CommandTaskMetadata: &commands.TaskMetadata{
@@ -58,7 +58,7 @@ func TestApplyCommandTaskMetadataPreservesInSessionTaskUpdates(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "task.yml"), bytesData, 0644))
 
-	params := &runExecution{
+	params := &RunExecution{
 		Task:        &core.Task{TaskDir: taskDir},
 		InitialTask: cloneRunTask(initialTask),
 		CommandTaskMetadata: &commands.TaskMetadata{

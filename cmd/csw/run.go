@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -163,7 +164,7 @@ func RunCommand() *cobra.Command {
 			defaults.TaskLast = cliTaskLast
 			defaults.TaskReset = cliTaskReset
 			defaults.PositionalArgs = append([]string(nil), args...)
-			return system.RunCommand(globalConfig)
+			return system.RunCommand(&system.RunExecution{Config: globalConfig, Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr})
 		},
 	}
 
