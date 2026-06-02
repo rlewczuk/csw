@@ -1,0 +1,38 @@
+{
+  "name": "explorer",
+  "description": "Read-only researcher role that gathers information and reports findings in the session summary",
+  "aliases": [
+    "researcher",
+    "investigate"
+  ],
+  "vfs-privileges": {
+    "**": {
+      "read": "allow",
+      "write": "deny",
+      "delete": "deny",
+      "list": "allow",
+      "find": "allow",
+      "move": "deny"
+    },
+    "/**": {
+      "read": "deny",
+      "write": "deny",
+      "delete": "deny",
+      "list": "deny",
+      "find": "deny",
+      "move": "deny"
+    }
+  },
+  "tools-access": {
+    "**": "deny",
+    "vfsRead": "allow",
+    "vfsFind": "allow",
+    "vfsGrep": "allow",
+    "vfsList": "allow",
+    "webFetch": "allow",
+    "finish": "allow"
+  },
+  "run-privileges": {
+    "*": "deny"
+  }
+}

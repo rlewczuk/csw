@@ -164,15 +164,25 @@ func TestCswConfigLoad(t *testing.T) {
 		require.Equal(t, "review-prompt", cfg.AgentConfigFiles["review"]["prompt.md"])
 	})
 
-	t.Run("loads defaults marker", func(t *testing.T) {
-		t.Parallel()
+		t.Run("loads defaults marker", func(t *testing.T) {
+			t.Parallel()
 
-		cfg, err := CswConfigLoad("@DEFAULTS")
+			cfg, err := CswConfigLoad("@DEFAULTS")
 
-		require.NoError(t, err)
-		require.NotNil(t, cfg)
-		require.NotNil(t, cfg.GlobalConfig)
-	})
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
+			require.NotNil(t, cfg.GlobalConfig)
+			require.Contains(t, cfg.AgentRoleConfigs, "explorer")
+			explorerRole := cfg.AgentRoleConfigs["explorer"]
+			require.Equal(t, AccessDeny, explorerRole.ToolsAccess["**"])
+			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsRead"])
+			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsFind"])
+			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsGrep"])
+			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsList"])
+			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["webFetch"])
+			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["finish"])
+			require.Equal(t, AccessDeny, explorerRole.RunPrivileges["*"])
+		})
 
 	t.Run("loads embedded defaults and allows later override", func(t *testing.T) {
 		t.Parallel()
