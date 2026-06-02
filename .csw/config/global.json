@@ -11,7 +11,8 @@
     "allow-all-permissions": true,
     "worktree": "%",
     "vfs-allow": [
-      "/home/rlew/codesnort/src/csw/_local/files"
+      "/home/rlew/codesnort/src/csw/_local/files",
+      "/home/rlew/codesnort/src-swe"
     ],
     "container": {
       "image": "golang:1.25-trixie",
