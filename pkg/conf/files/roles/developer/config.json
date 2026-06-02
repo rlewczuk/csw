@@ -24,7 +24,8 @@
     }
   },
   "tools-access": {
-    "**": "allow"
+    "**": "allow",
+    "task*": "deny"
   },
   "run-privileges": {
     "rm*": "deny",
