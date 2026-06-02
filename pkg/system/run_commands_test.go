@@ -85,7 +85,7 @@ Run command
 
 func TestBuildRunAgentStartupInfoMessages(t *testing.T) {
 	t.Run("builds startup lines without command", func(t *testing.T) {
-		messages := BuildRunAgentStartupInfoMessages(&runExecution{Thinking: "high", RoleName: "developer"}, BuildSystemResult{ModelName: "ollama/qwen3", RoleConfig: conf.AgentRoleConfig{Name: "developer"}})
+		messages := BuildRunAgentStartupInfoMessages(newRunExecutionForTest(conf.RunDefaultsConfig{Thinking: "high", Role: "developer"}), BuildSystemResult{ModelName: "ollama/qwen3", RoleConfig: conf.AgentRoleConfig{Name: "developer"}})
 
 		require.Len(t, messages, 3)
 		assert.Equal(t, "[INFO] Model: ollama/qwen3", messages[0])
@@ -95,7 +95,7 @@ func TestBuildRunAgentStartupInfoMessages(t *testing.T) {
 
 	t.Run("includes command with embedded source", func(t *testing.T) {
 		messages := BuildRunAgentStartupInfoMessages(
-			&runExecution{Thinking: "", RoleName: "", CommandName: "csw/task-critic", CommandPath: "embedded:data/csw/task-critic.md"},
+			&runExecution{config: &conf.GlobalConfig{}, CommandName: "csw/task-critic", CommandPath: "embedded:data/csw/task-critic.md"},
 			BuildSystemResult{ModelName: "ollama/qwen3", RoleConfig: conf.AgentRoleConfig{}},
 		)
 

@@ -66,14 +66,15 @@ func BuildRunAgentStartupInfoMessages(params *runExecution, buildResult BuildSys
 	if params == nil {
 		return nil
 	}
+	defaults := &params.config.Defaults
 
 	messages := make([]string, 0, 4)
 	messages = append(messages, fmt.Sprintf("[INFO] Model: %s", shared.NullValue(strings.TrimSpace(buildResult.ModelName))))
-	messages = append(messages, fmt.Sprintf("[INFO] Thinking: %s", shared.NullValue(strings.TrimSpace(params.Thinking))))
+	messages = append(messages, fmt.Sprintf("[INFO] Thinking: %s", shared.NullValue(strings.TrimSpace(defaults.Thinking))))
 
 	roleName := strings.TrimSpace(buildResult.RoleConfig.Name)
 	if roleName == "" {
-		roleName = strings.TrimSpace(params.RoleName)
+		roleName = strings.TrimSpace(defaults.Role)
 	}
 	messages = append(messages, fmt.Sprintf("[INFO] Role: %s", shared.NullValue(roleName)))
 

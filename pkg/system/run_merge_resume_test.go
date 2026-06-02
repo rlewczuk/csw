@@ -18,40 +18,28 @@ func TestValidateMergeCLIParams(t *testing.T) {
 		errorSubstring string
 	}{
 		{
-			name: "merge without worktree is rejected",
-			params: &runExecution{
-				Merge: true,
-			},
+			name:           "merge without worktree is rejected",
+			params:         newRunExecutionForTest(conf.RunDefaultsConfig{Merge: true}),
 			expectError:    true,
 			errorSubstring: "--merge requires --worktree",
 		},
 		{
-			name: "merge with no commit is rejected",
-			params: &runExecution{
-				Merge:    true,
-				NoCommit: true,
-			},
+			name:           "merge with no commit is rejected",
+			params:         newRunExecutionForTest(conf.RunDefaultsConfig{Merge: true, NoCommit: true}),
 			expectError:    true,
 			errorSubstring: "--merge cannot be used with --no-commit",
 		},
 		{
-			name: "no commit without worktree is allowed",
-			params: &runExecution{
-				NoCommit: true,
-			},
+			name:   "no commit without worktree is allowed",
+			params: newRunExecutionForTest(conf.RunDefaultsConfig{NoCommit: true}),
 		},
 		{
-			name: "merge with worktree is allowed",
-			params: &runExecution{
-				Merge:          true,
-				WorktreeBranch: "feature/test",
-			},
+			name:   "merge with worktree is allowed",
+			params: newRunExecutionForTest(conf.RunDefaultsConfig{Merge: true, Worktree: "feature/test"}),
 		},
 		{
-			name: "non merge without worktree is allowed",
-			params: &runExecution{
-				Merge: false,
-			},
+			name:   "non merge without worktree is allowed",
+			params: newRunExecutionForTest(conf.RunDefaultsConfig{Merge: false}),
 		},
 		{
 			name:           "nil params are rejected",

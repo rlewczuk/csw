@@ -22,50 +22,20 @@ import (
 const defaultBashRunTimeout = 120 * time.Second
 
 type runExecution struct {
-	config                *conf.GlobalConfig
-	stdin                 stdio.Reader
-	stdout                stdio.Writer
-	stderr                stdio.Writer
-	Prompt                string
-	CommandName           string
-	CommandPath           string
-	CommandArgs           []string
-	CommandTemplate       string
-	CommandTaskMetadata   *commands.TaskMetadata
-	ContextData           map[string]any
-	Task                  *core.Task
-	InitialTask           *core.Task
-	WorkDir               string
-	ShadowDir             string
-	WorktreeBranch        string
-	GitUserName           string
-	GitUserEmail          string
-	Merge                 bool
-	NoCommit              bool
-	ContainerEnabled      bool
-	ContainerDisabled     bool
-	ContainerImage        string
-	ContainerMounts       []string
-	ContainerEnv          []string
-	ConfigPath            string
-	ProjectConfig         string
-	AllowAllPerms         bool
-	LogLLMRequests        bool
-	LogLLMRequestsRaw     bool
-	NoRefresh             bool
-	Interactive           bool
-	LSPServer             string
-	Thinking              string
-	ModelName             string
-	RoleName              string
-	ModelOverridden       bool
-	BashRunTimeout        time.Duration
-	RunBashMaxOutput      *int
-	VFSReadLimit          *int
-	MaxThreads            int
-	OutputFormat          string
-	VFSAllow              []string
-	CommitMessageTemplate string
+	config              *conf.GlobalConfig
+	stdin               stdio.Reader
+	stdout              stdio.Writer
+	stderr              stdio.Writer
+	Prompt              string
+	CommandName         string
+	CommandPath         string
+	CommandArgs         []string
+	CommandTemplate     string
+	CommandTaskMetadata *commands.TaskMetadata
+	ContextData         map[string]any
+	Task                *core.Task
+	InitialTask         *core.Task
+	BashRunTimeout      time.Duration
 }
 
 // RunCommand runs a non-TUI agent session with the provided global config.
@@ -355,59 +325,29 @@ func runCommand(params *runExecution) error {
 	if defaults.OutputFormat != "short" && defaults.OutputFormat != "full" && defaults.OutputFormat != "jsonl" {
 		return fmt.Errorf("RunCommand() [run.go]: invalid --output-format %q (allowed: short, full, jsonl)", defaults.OutputFormat)
 	}
-	params.WorkDir = defaults.Workdir
-	params.ShadowDir = defaults.ShadowDir
-	params.WorktreeBranch = defaults.Worktree
-	params.GitUserName = defaults.GitUserName
-	params.GitUserEmail = defaults.GitUserEmail
-	params.Merge = defaults.Merge
-	params.NoCommit = defaults.NoCommit
-	params.ContainerEnabled = defaults.Container.Enabled
-	params.ContainerDisabled = defaults.ContainerDisabled
-	params.ContainerImage = defaults.Container.Image
-	params.ContainerMounts = defaults.Container.Mounts
-	params.ContainerEnv = defaults.Container.Env
-	params.ConfigPath = defaults.ConfigPath
-	params.ProjectConfig = defaults.ProjectConfig
-	params.AllowAllPerms = defaults.AllowAllPermissions
-	params.LogLLMRequests = defaults.LogLLMRequests
-	params.LogLLMRequestsRaw = defaults.LogLLMRequestsRaw
-	params.NoRefresh = defaults.NoRefresh
-	params.LSPServer = defaults.LSPServer
-	params.Thinking = defaults.Thinking
-	params.ModelName = defaults.Model
-	params.RoleName = defaults.Role
-	params.ModelOverridden = defaults.ModelOverridden
-	params.RunBashMaxOutput = defaults.RunBashMax
-	params.VFSReadLimit = defaults.VfsReadLimit
-	params.MaxThreads = defaults.MaxThreads
-	params.OutputFormat = defaults.OutputFormat
-	params.VFSAllow = defaults.VFSAllow
-	params.CommitMessageTemplate = defaults.CommitMessageTemplate
-
 	if err := validateMergeRunExecution(params); err != nil {
 		return err
 	}
 
-	resolvedWorktreeBranch, err := ResolveWorktreeBranchName(ctx, ResolveWorktreeBranchNameParams{Prompt: params.Prompt, ModelName: params.ModelName, WorkDir: params.WorkDir, ShadowDir: params.ShadowDir, ProjectConfig: params.ProjectConfig, ConfigPath: params.ConfigPath, WorktreeBranch: params.WorktreeBranch})
+	resolvedWorktreeBranch, err := ResolveWorktreeBranchName(ctx, ResolveWorktreeBranchNameParams{Prompt: params.Prompt, ModelName: defaults.Model, WorkDir: defaults.Workdir, ShadowDir: defaults.ShadowDir, ProjectConfig: defaults.ProjectConfig, ConfigPath: defaults.ConfigPath, WorktreeBranch: defaults.Worktree})
 	if err != nil {
 		return fmt.Errorf("RunCommand() [run.go]: failed to resolve worktree branch: %w", err)
 	}
-	params.WorktreeBranch = resolvedWorktreeBranch
-	if params.WorktreeBranch != "" {
-		_, _ = fmt.Fprintf(stdout, "[INFO] Worktree branch: %s\n", params.WorktreeBranch)
+	defaults.Worktree = resolvedWorktreeBranch
+	if defaults.Worktree != "" {
+		_, _ = fmt.Fprintf(stdout, "[INFO] Worktree branch: %s\n", defaults.Worktree)
 	}
 
-	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{WorkDir: params.WorkDir, ShadowDir: params.ShadowDir, ConfigPath: params.ConfigPath, ProjectConfig: params.ProjectConfig, ModelName: params.ModelName, RoleName: params.RoleName, WorktreeBranch: params.WorktreeBranch, GitUserName: params.GitUserName, GitUserEmail: params.GitUserEmail, ContainerEnabled: params.ContainerEnabled, ContainerDisabled: params.ContainerDisabled, ContainerImage: params.ContainerImage, ContainerMounts: params.ContainerMounts, ContainerEnv: params.ContainerEnv, LSPServer: params.LSPServer, LogLLMRequests: params.LogLLMRequests, LogLLMRequestsRaw: params.LogLLMRequestsRaw, NoRefresh: params.NoRefresh, Thinking: params.Thinking, BashRunTimeout: params.BashRunTimeout, AllowedPaths: params.VFSAllow, MaxToolThreads: params.MaxThreads, RunBashMaxOutput: params.RunBashMaxOutput, VFSReadLimit: params.VFSReadLimit, AllowAllPermissions: params.AllowAllPerms})
+	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{WorkDir: defaults.Workdir, ShadowDir: defaults.ShadowDir, ConfigPath: defaults.ConfigPath, ProjectConfig: defaults.ProjectConfig, ModelName: defaults.Model, RoleName: defaults.Role, WorktreeBranch: defaults.Worktree, GitUserName: defaults.GitUserName, GitUserEmail: defaults.GitUserEmail, ContainerEnabled: defaults.Container.Enabled, ContainerDisabled: defaults.ContainerDisabled, ContainerImage: defaults.Container.Image, ContainerMounts: defaults.Container.Mounts, ContainerEnv: defaults.Container.Env, LSPServer: defaults.LSPServer, LogLLMRequests: defaults.LogLLMRequests, LogLLMRequestsRaw: defaults.LogLLMRequestsRaw, NoRefresh: defaults.NoRefresh, Thinking: defaults.Thinking, BashRunTimeout: params.BashRunTimeout, AllowedPaths: defaults.VFSAllow, MaxToolThreads: defaults.MaxThreads, RunBashMaxOutput: defaults.RunBashMax, VFSReadLimit: defaults.VfsReadLimit, AllowAllPermissions: defaults.AllowAllPermissions})
 	if err != nil {
 		return err
 	}
 	defer buildResult.Cleanup()
 	defer logging.FlushLogs()
 
-	params.WorkDir = buildResult.WorkDir
-	params.ShadowDir = buildResult.ShadowDir
-	params.ModelName = buildResult.ModelName
+	defaults.Workdir = buildResult.WorkDir
+	defaults.ShadowDir = buildResult.ShadowDir
+	defaults.Model = buildResult.ModelName
 	params.ContextData = BuildPromptContextData(params.ContextData, core.AgentState{Info: core.AgentStateCommonInfo{AgentName: "CSW Coding Agent", WorkDir: buildResult.WorkDir, ShadowDir: buildResult.ShadowDir}, Role: buildResult.RoleConfig.Clone(), Task: cloneRunTask(params.Task)})
 	if err := renderCommandPrompt(params, buildResult.WorkDir, buildResult.ShellRunner, buildResult.HostShellRunner); err != nil {
 		return err
@@ -416,7 +356,7 @@ func runCommand(params *runExecution) error {
 		return err
 	}
 
-	if params.LSPServer != "" {
+	if defaults.LSPServer != "" {
 		lspStatus := "disabled"
 		if buildResult.LSPStarted {
 			lspStatus = "started"
@@ -433,7 +373,7 @@ func runCommand(params *runExecution) error {
 	sessionOutput := buildRunSessionOutput(params, stdout)
 	runtimeResult, err := func(sweSystem *SweSystem, params StartRunSessionParams) (StartRunSessionResult, error) {
 		return sweSystem.StartRunSession(params)
-	}(sweSystem, StartRunSessionParams{ModelName: params.ModelName, RoleName: params.RoleName, Task: params.Task, Thinking: params.Thinking, ModelOverridden: params.ModelOverridden, Prompt: params.Prompt, OutputHandler: sessionOutput})
+	}(sweSystem, StartRunSessionParams{ModelName: defaults.Model, RoleName: defaults.Role, Task: params.Task, Thinking: defaults.Thinking, ModelOverridden: defaults.ModelOverridden, Prompt: params.Prompt, OutputHandler: sessionOutput})
 	if err != nil {
 		return fmt.Errorf("RunCommand() [run.go]: failed to start run session runtime: %w", err)
 	}
@@ -453,7 +393,7 @@ func runCommand(params *runExecution) error {
 		sessionRunErr = ctx.Err()
 	}
 
-	finalizeResult, finalizeErr := FinalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, params.Merge, params.CommitMessageTemplate, sweSystem, session, stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt)
+	finalizeResult, finalizeErr := FinalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, defaults.Merge, defaults.CommitMessageTemplate, sweSystem, session, stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt)
 	if finalizeErr != nil {
 		sessionRunErr = finalizeErr
 	}
@@ -466,7 +406,7 @@ func runCommand(params *runExecution) error {
 		return err
 	}
 	if runInTaskMode && taskManager != nil && strings.TrimSpace(taskIdentifier) != "" {
-		if finalStatus, shouldApply := resolveTaskFinalStatusForRun(session, params.Merge); shouldApply {
+		if finalStatus, shouldApply := resolveTaskFinalStatusForRun(session, defaults.Merge); shouldApply {
 			if _, err := taskManager.UpdateTask(core.TaskUpdateParams{Identifier: taskIdentifier, Status: &finalStatus}); err != nil {
 				return err
 			}
@@ -520,10 +460,11 @@ func buildRunSessionOutput(params *runExecution, output stdio.Writer) core.Sessi
 	if params == nil {
 		return sessionio.NewTextSessionOutput(output)
 	}
-	if strings.TrimSpace(params.OutputFormat) == "jsonl" {
+	defaults := &params.config.Defaults
+	if strings.TrimSpace(defaults.OutputFormat) == "jsonl" {
 		return sessionio.NewJsonlSessionOutput(output)
 	}
-	return sessionio.NewTextSessionOutputWithSlug(output, params.WorktreeBranch)
+	return sessionio.NewTextSessionOutputWithSlug(output, defaults.Worktree)
 }
 func buildSummaryMessageFunc(output core.SessionThreadOutput) func(string, shared.MessageType) {
 	if output == nil {
@@ -538,7 +479,7 @@ func buildRunStdinSessionInput(params *runExecution, thread core.SessionThreadIn
 	if params == nil || thread == nil || input == nil {
 		return nil
 	}
-	if params.OutputFormat == "jsonl" {
+	if params.config.Defaults.OutputFormat == "jsonl" {
 		return sessionio.NewJsonlSessionInput(input, thread)
 	}
 	return sessionio.NewTextSessionInput(input, thread)
@@ -547,10 +488,11 @@ func validateMergeRunExecution(params *runExecution) error {
 	if params == nil {
 		return fmt.Errorf("validateMergeRunExecution() [run.go]: params cannot be nil")
 	}
-	if params.Merge && params.NoCommit {
+	defaults := &params.config.Defaults
+	if defaults.Merge && defaults.NoCommit {
 		return fmt.Errorf("RunCommand() [run.go]: --merge cannot be used with --no-commit")
 	}
-	if params.Merge && strings.TrimSpace(params.WorktreeBranch) == "" {
+	if defaults.Merge && strings.TrimSpace(defaults.Worktree) == "" {
 		return fmt.Errorf("RunCommand() [run.go]: --merge requires --worktree")
 	}
 	return nil
