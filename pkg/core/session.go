@@ -27,7 +27,7 @@ const (
 	defaultKimiCompactorMessagesToKeep = 2
 	defaultMaxToolThreads              = 8
 	toolExecutionStartDelay            = 250 * time.Millisecond
-	autoContinuePrompt                 = "Continue"
+	autoContinuePrompt                 = "Please continue. If you think your task is finished, please call `finish` tool. Remember to add summary of task you did (or report user requested) and pass it as `summary` parameter to `finish` tool call. If you think your task is not finished, just continue."
 	sessionMessageTypeInfo             = "info"
 	sessionMessageTypeWarning          = "warning"
 	sessionMessageTypeError            = "error"

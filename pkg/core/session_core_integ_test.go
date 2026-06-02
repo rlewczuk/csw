@@ -357,6 +357,9 @@ func TestSessionRun_AutoContinueOnNoToolCalls(t *testing.T) {
 	for _, msg := range mockProvider.RecordedMessages[2] {
 		if msg.Role == models.ChatRoleUser && msg.GetText() == autoContinuePrompt {
 			foundAutoContinue = true
+			assert.Contains(t, msg.GetText(), "please call `finish` tool")
+			assert.Contains(t, msg.GetText(), "`summary` parameter")
+			assert.Contains(t, msg.GetText(), "just continue")
 			break
 		}
 	}
