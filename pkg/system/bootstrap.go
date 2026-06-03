@@ -531,6 +531,7 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, error) {
 		TaskVCS:             selectedVCS,
 		LogBaseDir:          logsDir,
 		WorkDir:             effectiveWorkDir,
+		WorkDirRoot:         workDir,
 		ShadowDir:           shadowDir,
 		LogLLMRequests:      parameters.LogLLMRequests,
 		LogLLMRequestsRaw:   parameters.LogLLMRequestsRaw,
@@ -545,7 +546,6 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, error) {
 	}
 
 	configStore.Runtime = conf.RuntimeConfig{
-		WorkDirRoot:      workDir,
 		ProviderRegistry: providerRegistry,
 		LogsDir:          logsDir,
 		VCS:              selectedVCS,

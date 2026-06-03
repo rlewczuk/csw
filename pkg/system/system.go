@@ -48,6 +48,7 @@ type SweSystem struct {
 	LogBaseDir           string
 	SessionLoggerFactory SessionLoggerFactory
 	WorkDir              string
+	WorkDirRoot          string
 	ShadowDir            string
 	LogLLMRequests       bool
 	LogLLMRequestsRaw    bool

@@ -201,7 +201,7 @@ func TestFinalizeWorktreeSessionUsesDetectedBaseBranch(t *testing.T) {
 	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge into detected base branch", true)
 	sweSystem.Config.GlobalConfig.Parameters.Worktree = "feature/detect-base"
 	sweSystem.Config.GlobalConfig.Parameters.Merge = true
-	sweSystem.Config.Runtime.WorkDirRoot = "/repo"
+	sweSystem.WorkDirRoot = "/repo"
 
 	originalRunGit := vcs.RunGitCommand
 	defer func() {
@@ -228,7 +228,7 @@ func TestFinalizeWorktreeSessionMergeStashesAndRestoresLocalChanges(t *testing.T
 	repoDir := t.TempDir()
 	sweSystem.Config.GlobalConfig.Parameters.Worktree = "feature/stash-ok"
 	sweSystem.Config.GlobalConfig.Parameters.Merge = true
-	sweSystem.Config.Runtime.WorkDirRoot = repoDir
+	sweSystem.WorkDirRoot = repoDir
 
 	originalRunGit := vcs.RunGitCommand
 	defer func() {
@@ -356,7 +356,7 @@ func TestFinalizeWorktreeSessionMergeUnstashConflictRestoresCleanStateAndKeepsSt
 	repoDir := t.TempDir()
 	sweSystem.Config.GlobalConfig.Parameters.Worktree = "feature/stash-conflict"
 	sweSystem.Config.GlobalConfig.Parameters.Merge = true
-	sweSystem.Config.Runtime.WorkDirRoot = repoDir
+	sweSystem.WorkDirRoot = repoDir
 
 	originalRunGit := vcs.RunGitCommand
 	defer func() {

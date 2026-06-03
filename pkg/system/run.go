@@ -129,7 +129,7 @@ func RunCommand(params *core.RunExecution) error {
 		sessionInput.StartReadingInput()
 	}
 
-	baseCommitID := vcs.ResolveGitCommitID(vcs.ChooseGitDiffDir(runtimeConfig.WorkDirRoot, parameters.Workdir), "HEAD")
+	baseCommitID := vcs.ResolveGitCommitID(vcs.ChooseGitDiffDir(sweSystem.WorkDirRoot, parameters.Workdir), "HEAD")
 	var sessionRunErr error
 	select {
 	case err := <-runtimeResult.Done:
@@ -150,7 +150,7 @@ func RunCommand(params *core.RunExecution) error {
 	if parameters.Container != nil && parameters.Container.Enabled {
 		containerImage = parameters.Container.Image
 	}
-	if err := core.EmitSessionSummary(startTime, endTime, session, core.SessionSummaryBuildResult{LogsDir: runtimeConfig.LogsDir, WorkDirRoot: runtimeConfig.WorkDirRoot, WorkDir: parameters.Workdir, LSPServer: parameters.LSPServer, ContainerImage: containerImage}, buildSummaryMessageFunc(sessionOutput), sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
+	if err := core.EmitSessionSummary(startTime, endTime, session, core.SessionSummaryBuildResult{LogsDir: runtimeConfig.LogsDir, WorkDirRoot: sweSystem.WorkDirRoot, WorkDir: parameters.Workdir, LSPServer: parameters.LSPServer, ContainerImage: containerImage}, buildSummaryMessageFunc(sessionOutput), sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
 		return err
 	}
 	if err := applyCommandTaskMetadata(params); err != nil {

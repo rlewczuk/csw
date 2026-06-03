@@ -37,7 +37,7 @@ func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, sweSystem *Sw
 			commitMessageTemplate = sweSystem.Config.GlobalConfig.Parameters.CommitMessageTemplate
 			worktreeDir = sweSystem.Config.GlobalConfig.Parameters.Workdir
 		}
-		repoDir = sweSystem.Config.Runtime.WorkDirRoot
+		repoDir = sweSystem.WorkDirRoot
 	}
 
 	result := WorktreeFinalizeResult{}
