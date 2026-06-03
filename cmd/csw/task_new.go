@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"iter"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,8 +12,10 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
+	"github.com/rlewczuk/csw/pkg/logging"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/system"
+	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/spf13/cobra"
 )
 
@@ -337,10 +341,38 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 	parameters.Model = strings.TrimSpace(params.ModelName)
 	parameters.Role = strings.TrimSpace(pickTaskRoleName(params.Role))
 
+	logRoot := strings.TrimSpace(params.WorkDir)
+	if strings.TrimSpace(params.ShadowDir) != "" {
+		logRoot = strings.TrimSpace(params.ShadowDir)
+	}
+	if logRoot == "" {
+		logRoot, err = system.ResolveWorkDir("")
+		if err != nil {
+			return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to resolve log root: %w", err)
+		}
+	}
+	if err := logging.SetLogsDirectory(filepath.Join(logRoot, ".cswdata"), true); err != nil {
+		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to initialize task description logging: %w", err)
+	}
+	logger := logging.GetGlobalLogger()
+	logger.Info("task_description_generation_configured",
+		"model", strings.TrimSpace(parameters.Model),
+		"branch", strings.TrimSpace(params.Branch),
+		"role", strings.TrimSpace(parameters.Role),
+		"work_dir", strings.TrimSpace(params.WorkDir),
+		"shadow_dir", strings.TrimSpace(params.ShadowDir),
+	)
+
 	sweSystem, err := buildTaskDescriptionSystemFunc(configStore)
 	if err != nil {
+		logger.Error("task_description_generation_system_build_failed", "error", err.Error())
+		_ = logging.FlushLogs()
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to build system: %w", err)
 	}
+	if err := logging.SetLogsDirectory(filepath.Join(logRoot, ".cswdata"), true); err != nil {
+		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to restore task description logging: %w", err)
+	}
+	logger = logging.GetGlobalLogger()
 	runtimeConfig := configStore.Runtime
 	if runtimeConfig.Cleanup != nil {
 		defer runtimeConfig.Cleanup()
@@ -348,12 +380,16 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 
 	modelRefs, err := models.ExpandProviderModelChain(strings.TrimSpace(parameters.Model), sweSystem.ModelAliases)
 	if err != nil || len(modelRefs) == 0 {
+		logger.Error("task_description_generation_model_parse_failed", "error", fmt.Sprintf("%v", err))
+		_ = logging.FlushLogs()
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to parse resolved model name: %w", err)
 	}
 
 	providerName := strings.TrimSpace(modelRefs[0].Provider)
 	provider, found := sweSystem.ModelProviders[providerName]
 	if !found {
+		logger.Error("task_description_generation_provider_not_found", "provider", providerName)
+		_ = logging.FlushLogs()
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: provider not found: %s", providerName)
 	}
 
@@ -368,15 +404,88 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 		nil,
 	)
 	if err != nil {
+		logger.Error("task_description_generation_chat_model_create_failed", "error", err.Error())
+		_ = logging.FlushLogs()
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to create chat model chain: %w", err)
+	}
+	logger.Info("task_description_generation_start",
+		"model", strings.TrimSpace(parameters.Model),
+		"provider", providerName,
+		"branch", strings.TrimSpace(params.Branch),
+		"role", strings.TrimSpace(parameters.Role),
+	)
+	chatModel = &taskDescriptionLoggingChatModel{
+		delegate: chatModel,
+		logger:   logger,
+		model:    strings.TrimSpace(parameters.Model),
+		provider: providerName,
+		branch:   strings.TrimSpace(params.Branch),
 	}
 
 	generatedDescription, err := core.GenerateCommitMessage(ctx, chatModel, sweSystem.Config, strings.TrimSpace(params.Prompt), strings.TrimSpace(params.Branch), "")
 	if err != nil {
+		logger.Error("task_description_generation_failed", "error", err.Error())
+		_ = logging.FlushLogs()
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to generate description: %w", err)
 	}
 
-	return strings.TrimSpace(generatedDescription), nil
+	trimmedDescription := strings.TrimSpace(generatedDescription)
+	logger.Info("task_description_generation_complete", "description", trimmedDescription)
+	_ = logging.FlushLogs()
+	return trimmedDescription, nil
+}
+
+// taskDescriptionLoggingChatModel logs task-description LLM prompts and responses.
+type taskDescriptionLoggingChatModel struct {
+	delegate models.ChatModel
+	logger   *slog.Logger
+	model    string
+	provider string
+	branch   string
+}
+
+func (m *taskDescriptionLoggingChatModel) Compactor() models.ChatCompator {
+	return m.delegate.Compactor()
+}
+
+func (m *taskDescriptionLoggingChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) (*models.ChatMessage, error) {
+	if m.logger != nil {
+		m.logger.Info("task_description_llm_prompt",
+			"provider", m.provider,
+			"model", m.model,
+			"branch", m.branch,
+			"messages", messages,
+		)
+	}
+
+	response, err := m.delegate.Chat(ctx, messages, options, tools)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("task_description_llm_response_error",
+				"provider", m.provider,
+				"model", m.model,
+				"branch", m.branch,
+				"error", err.Error(),
+			)
+		}
+		return nil, err
+	}
+
+	if m.logger != nil {
+		m.logger.Info("task_description_llm_response",
+			"provider", m.provider,
+			"model", m.model,
+			"branch", m.branch,
+			"response", response,
+			"response_text", response.GetText(),
+		)
+	}
+
+	return response, nil
+}
+
+func (m *taskDescriptionLoggingChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) iter.Seq[*models.ChatMessage] {
+	return m.delegate.ChatStream(ctx, messages, options, tools)
 }
 
 func pickTaskRoleName(roleName string) string {
