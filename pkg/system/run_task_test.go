@@ -162,7 +162,7 @@ func TestPopulateRunExecutionParamsUsesTaskRoleWhenRunRoleNotOverridden(t *testi
 
 			_, err = populateRunExecutionParams(runParams, nil)
 			require.NoError(t, err)
-			assert.Equal(t, testCase.expectedRole, runParameters(runParams).Role)
+			assert.Equal(t, testCase.expectedRole, runParams.Config.GlobalConfig.Parameters.Role)
 		})
 	}
 }

@@ -21,20 +21,12 @@ import (
 
 const defaultBashRunTimeout = 120 * time.Second
 
-func runParameters(params *core.RunExecution) *conf.RunParameters {
-	if params == nil || params.Config == nil {
-		return nil
-	}
-	globalConfig := params.Config.GlobalConfig
-	if globalConfig == nil {
-		return nil
-	}
-	return &globalConfig.Parameters
-}
-
 // RunCommand runs a non-TUI agent session with the provided execution params.
+//
+// The caller must pass a non-nil params with a non-nil Config field; the
+// function does not guard against nil Config and will panic in that case.
 func RunCommand(params *core.RunExecution) error {
-	if params == nil || runParameters(params) == nil {
+	if params == nil {
 		return fmt.Errorf("RunCommand() [run.go]: params cannot be nil")
 	}
 
@@ -58,7 +50,7 @@ func RunCommand(params *core.RunExecution) error {
 
 	startTime := time.Now()
 	ctx := context.Background()
-	parameters := runParameters(params)
+	parameters := &params.Config.GlobalConfig.Parameters
 
 	if parameters.NoCommit {
 		parameters.Worktree = ""
@@ -178,10 +170,7 @@ type runExecutionPrepResult struct {
 // both params and its embedded parameters, and returns the task state required
 // by the rest of RunCommand.
 func populateRunExecutionParams(params *core.RunExecution, stdin stdio.Reader) (*runExecutionPrepResult, error) {
-	parameters := runParameters(params)
-	if parameters == nil {
-		return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: params config cannot be nil")
-	}
+	parameters := &params.Config.GlobalConfig.Parameters
 	if parameters.Role == "" {
 		parameters.Role = parameters.DefaultRole
 	}
@@ -479,10 +468,7 @@ func buildRunSessionOutput(params *core.RunExecution, output stdio.Writer) core.
 	if params == nil {
 		return sessionio.NewTextSessionOutput(output)
 	}
-	parameters := runParameters(params)
-	if parameters == nil {
-		return sessionio.NewTextSessionOutput(output)
-	}
+	parameters := &params.Config.GlobalConfig.Parameters
 	if strings.TrimSpace(parameters.OutputFormat) == "jsonl" {
 		return sessionio.NewJsonlSessionOutput(output)
 	}
@@ -501,8 +487,8 @@ func buildRunStdinSessionInput(params *core.RunExecution, thread core.SessionThr
 	if params == nil || thread == nil || input == nil {
 		return nil
 	}
-	parameters := runParameters(params)
-	if parameters != nil && parameters.OutputFormat == "jsonl" {
+	parameters := &params.Config.GlobalConfig.Parameters
+	if parameters.OutputFormat == "jsonl" {
 		return sessionio.NewJsonlSessionInput(input, thread)
 	}
 	return sessionio.NewTextSessionInput(input, thread)
@@ -511,10 +497,7 @@ func validateMergeRunExecution(params *core.RunExecution) error {
 	if params == nil {
 		return fmt.Errorf("validateMergeRunExecution() [run.go]: params cannot be nil")
 	}
-	parameters := runParameters(params)
-	if parameters == nil {
-		return fmt.Errorf("validateMergeRunExecution() [run.go]: params config cannot be nil")
-	}
+	parameters := &params.Config.GlobalConfig.Parameters
 	if parameters.Merge && parameters.NoCommit {
 		return fmt.Errorf("RunCommand() [run.go]: --merge cannot be used with --no-commit")
 	}
