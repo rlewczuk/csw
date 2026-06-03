@@ -131,7 +131,6 @@ type SweSessionParams struct {
 	ID           string
 	ParentID     string
 	TaskID       string
-	Task         *Task
 	Slug         string
 	Provider     models.ModelProvider
 	ProviderName string
@@ -149,7 +148,6 @@ type SweSessionParams struct {
 	ToolSelection   conf.ToolSelectionConfig
 	PromptGenerator PromptGenerator
 	Roles           *AgentRoleRegistry
-	Config          *conf.CswConfig
 
 	OutputHandler  SessionThreadOutput
 	WorkDir        string
@@ -189,9 +187,6 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		params = &SweSessionParams{}
 	}
 	execution := params.Execution
-	if execution == nil && (params.Config != nil || params.Task != nil) {
-		execution = &RunExecution{Config: params.Config, Task: cloneTask(params.Task)}
-	}
 
 	session := &SweSession{
 		Execution:       execution,
@@ -234,7 +229,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		tokenUsage:                 params.TokenUsage,
 		contextLength:              params.ContextLength,
 		compactionCount:            params.CompactionCount,
-		compactor:                  NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, executionConfig(execution, params.Config)),
+		compactor:                  NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, executionConfig(execution, nil)),
 		taskManager:                params.TaskManager,
 		taskVCS:                    params.TaskVCS,
 		taskStatusUpdatedInSession: params.TaskStatusUpdatedInSession,

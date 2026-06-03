@@ -15,7 +15,7 @@ func TestSweSessionGetStateTaskNilWhenMissing(t *testing.T) {
 }
 
 func TestSweSessionGetStateTaskIncludesTaskMetadata(t *testing.T) {
-	session := NewSweSession(&SweSessionParams{Task: &Task{UUID: "task-uuid", Name: "task-name", TaskDir: ".cswdata/tasks/task-uuid", Deps: []string{"dep-1"}}})
+	session := NewSweSession(&SweSessionParams{Execution: &RunExecution{Task: &Task{UUID: "task-uuid", Name: "task-name", TaskDir: ".cswdata/tasks/task-uuid", Deps: []string{"dep-1"}}}})
 
 	state := session.GetState()
 	require.NotNil(t, state.Task)

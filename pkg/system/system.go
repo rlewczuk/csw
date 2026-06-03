@@ -62,6 +62,16 @@ func (s *SweSystem) NewSession(model string, outputHandler core.SessionThreadOut
 }
 
 func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.SessionThreadOutput, parentID string, slug string, thinking string, roleName string, task *core.Task, execution *core.RunExecution) (*core.SweSession, error) {
+	if execution == nil {
+		execution = &core.RunExecution{Config: s.Config}
+	}
+	if execution.Config == nil {
+		execution.Config = s.Config
+	}
+	if execution.Task == nil && task != nil {
+		execution.Task = task
+	}
+
 	modelRefs, err := models.ExpandProviderModelChain(model, s.ModelAliases)
 	if err != nil || len(modelRefs) == 0 {
 		return nil, fmt.Errorf("SweSystem.NewSession() [system.go]: invalid model format, expected provider/model, comma-separated provider/model list, or model alias, got '%s'", model)
@@ -111,7 +121,6 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 		Execution:           execution,
 		ID:                  sessionID,
 		ParentID:            strings.TrimSpace(parentID),
-		Task:                task,
 		Slug:                strings.TrimSpace(slug),
 		ModelSpec:           modelSpec,
 		Provider:            provider,
@@ -127,7 +136,6 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 		ToolSelection:       s.ToolSelection,
 		PromptGenerator:     s.PromptGenerator,
 		Roles:               s.Roles,
-		Config:              s.Config,
 		OutputHandler:       outputHandler,
 		WorkDir:             s.WorkDir,
 		ShadowDir:           s.ShadowDir,
@@ -305,6 +313,7 @@ func (s *SweSystem) createSessionLoggers(sessionID string) (*slog.Logger, *slog.
 
 func (s *SweSystem) buildSessionParams() *core.SweSessionParams {
 	return &core.SweSessionParams{
+		Execution:           &core.RunExecution{Config: s.Config},
 		VFS:                 s.VFS,
 		BaseVFS:             s.VFS,
 		LSP:                 s.LSP,
@@ -315,7 +324,6 @@ func (s *SweSystem) buildSessionParams() *core.SweSessionParams {
 		ToolSelection:       s.ToolSelection,
 		PromptGenerator:     s.PromptGenerator,
 		Roles:               s.Roles,
-		Config:              s.Config,
 		LogBaseDir:          s.LogBaseDir,
 		ShadowDir:           s.ShadowDir,
 		Thinking:            s.Thinking,
