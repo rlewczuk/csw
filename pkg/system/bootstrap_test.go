@@ -60,6 +60,42 @@ func TestPrepareSessionVFSWithMissingBranchCreatesBranchAndWorktree(t *testing.T
 	assert.Equal(t, filepath.Join(repoDir, ".cswdata", "work", "feature", "missing"), selectedVFS.WorktreePath())
 }
 
+func TestBuildSystemUpdatesWorkingConfig(t *testing.T) {
+	workDir := t.TempDir()
+	configStore := &conf.CswConfig{
+		GlobalConfig: &conf.GlobalConfig{Parameters: conf.RunParameters{
+			Model:   "mock/test-model",
+			Role:    "developer",
+			Workdir: workDir,
+		}},
+		ModelProviderConfigs: map[string]*conf.ModelProviderConfig{
+			"mock": {Name: "mock", Type: "openai", URL: "http://example.com", ModelTags: []conf.ModelTagMapping{}},
+		},
+		AgentRoleConfigs: map[string]*conf.AgentRoleConfig{
+			"developer": {Name: "developer"},
+		},
+	}
+
+	sweSystem, err := BuildSystem(configStore)
+	require.NoError(t, err)
+	require.NotNil(t, sweSystem)
+	t.Cleanup(func() {
+		if configStore.Runtime.Cleanup != nil {
+			configStore.Runtime.Cleanup()
+		}
+	})
+
+	assert.Same(t, configStore, sweSystem.Config)
+	assert.Equal(t, workDir, configStore.GlobalConfig.Parameters.Workdir)
+	assert.Equal(t, "mock/test-model", configStore.GlobalConfig.Parameters.Model)
+	assert.Equal(t, workDir, configStore.Runtime.WorkDir)
+	assert.Equal(t, workDir, configStore.Runtime.WorkDirRoot)
+	assert.Equal(t, "mock/test-model", configStore.Runtime.ModelName)
+	assert.Equal(t, conf.AgentRoleConfig{Name: "developer"}, configStore.Runtime.RoleConfig)
+	require.NotNil(t, configStore.Runtime.ShellRunner)
+	require.NotNil(t, configStore.Runtime.HostShellRunner)
+}
+
 func TestResolveWorktreeBranchName(t *testing.T) {
 	tests := []struct {
 		name           string

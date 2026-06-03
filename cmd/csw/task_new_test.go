@@ -232,13 +232,14 @@ func TestGenerateTaskDescriptionUsesRetryAndFallbackChain(t *testing.T) {
 				},
 			}
 
-			buildTaskDescriptionSystemFunc = func(config *conf.CswConfig) (*system.SweSystem, system.BuildSystemResult, error) {
-				_ = config
+			buildTaskDescriptionSystemFunc = func(config *conf.CswConfig) (*system.SweSystem, error) {
+				config.GlobalConfig.Parameters.Model = tt.modelSpec
+				config.Runtime.Cleanup = func() {}
 				return &system.SweSystem{
 					ModelProviders: map[string]models.ModelProvider{"mock": primary, "mockb": backup},
 					ModelAliases:   map[string][]string{},
 					Config:         configStore,
-				}, system.BuildSystemResult{ModelName: tt.modelSpec, Cleanup: func() {}}, nil
+				}, nil
 			}
 
 			newGenerationChatModelFromSpecFunc = func(

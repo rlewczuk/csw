@@ -337,13 +337,16 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 	parameters.Model = strings.TrimSpace(params.ModelName)
 	parameters.Role = strings.TrimSpace(pickTaskRoleName(params.Role))
 
-	sweSystem, buildResult, err := buildTaskDescriptionSystemFunc(configStore)
+	sweSystem, err := buildTaskDescriptionSystemFunc(configStore)
 	if err != nil {
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to build system: %w", err)
 	}
-	defer buildResult.Cleanup()
+	runtimeConfig := configStore.Runtime
+	if runtimeConfig.Cleanup != nil {
+		defer runtimeConfig.Cleanup()
+	}
 
-	modelRefs, err := models.ExpandProviderModelChain(strings.TrimSpace(buildResult.ModelName), sweSystem.ModelAliases)
+	modelRefs, err := models.ExpandProviderModelChain(strings.TrimSpace(parameters.Model), sweSystem.ModelAliases)
 	if err != nil || len(modelRefs) == 0 {
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to parse resolved model name: %w", err)
 	}
@@ -355,7 +358,7 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 	}
 
 	chatModel, err := newGenerationChatModelFromSpecFunc(
-		strings.TrimSpace(buildResult.ModelName),
+		strings.TrimSpace(parameters.Model),
 		sweSystem.ModelProviders,
 		nil,
 		sweSystem.Config,
