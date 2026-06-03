@@ -16,52 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuildSystemParamsThinking(t *testing.T) {
-	params := BuildSystemParams{
-		Thinking: "high",
-	}
-	assert.Equal(t, "high", params.Thinking)
-}
-
-func TestBuildSystemParamsMaxToolThreads(t *testing.T) {
-	params := BuildSystemParams{
-		MaxToolThreads: 9,
-	}
-	assert.Equal(t, 9, params.MaxToolThreads)
-}
-
-func TestBuildSystemParamsRunBashMaxOutput(t *testing.T) {
-	runBashMaxOutput := 256
-	params := BuildSystemParams{
-		RunBashMaxOutput: &runBashMaxOutput,
-	}
-	require.NotNil(t, params.RunBashMaxOutput)
-	assert.Equal(t, 256, *params.RunBashMaxOutput)
-}
-
-func TestBuildSystemParamsVFSReadLimit(t *testing.T) {
-	vfsReadLimit := 128
-	params := BuildSystemParams{
-		VFSReadLimit: &vfsReadLimit,
-	}
-	require.NotNil(t, params.VFSReadLimit)
-	assert.Equal(t, 128, *params.VFSReadLimit)
-}
-
-func TestBuildSystemParamsAllowAllPermissions(t *testing.T) {
-	params := BuildSystemParams{
-		AllowAllPermissions: true,
-	}
-	assert.True(t, params.AllowAllPermissions)
-}
-
-func TestBuildSystemParamsNoRefresh(t *testing.T) {
-	params := BuildSystemParams{
-		NoRefresh: true,
-	}
-	assert.True(t, params.NoRefresh)
-}
-
 func TestPrepareSessionVFSWithoutWorktree(t *testing.T) {
 	tmpDir := t.TempDir()
 

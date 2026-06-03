@@ -133,18 +133,18 @@ func TestResolveTaskCreateParamsNoCommitSetsEmptyFeatureBranch(t *testing.T) {
 	})
 
 	tests := []struct {
-		name     string
-		params   taskCreateResolveParams
+		name       string
+		params     taskCreateResolveParams
 		parameters conf.RunParameters
 	}{
 		{
-			name:     "cli flag",
-			params:   taskCreateResolveParams{Prompt: "do this task", NoCommit: true},
+			name:       "cli flag",
+			params:     taskCreateResolveParams{Prompt: "do this task", NoCommit: true},
 			parameters: conf.RunParameters{Model: "provider/model", Worktree: "feature/%"},
 		},
 		{
-			name:     "run default",
-			params:   taskCreateResolveParams{Prompt: "do this task"},
+			name:       "run default",
+			params:     taskCreateResolveParams{Prompt: "do this task"},
 			parameters: conf.RunParameters{Model: "provider/model", Worktree: "feature/%", NoCommit: true},
 		},
 	}
@@ -232,8 +232,8 @@ func TestGenerateTaskDescriptionUsesRetryAndFallbackChain(t *testing.T) {
 				},
 			}
 
-			buildTaskDescriptionSystemFunc = func(params system.BuildSystemParams) (*system.SweSystem, system.BuildSystemResult, error) {
-				_ = params
+			buildTaskDescriptionSystemFunc = func(config *conf.CswConfig) (*system.SweSystem, system.BuildSystemResult, error) {
+				_ = config
 				return &system.SweSystem{
 					ModelProviders: map[string]models.ModelProvider{"mock": primary, "mockb": backup},
 					ModelAliases:   map[string][]string{},

@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/rlewczuk/csw/pkg/apis"
 	"github.com/rlewczuk/csw/pkg/conf"
@@ -72,46 +71,6 @@ func SetGenerateWorktreeBranchNameFuncForTest(fn func(ctx context.Context, model
 // GenerateWorktreeBranchNameFuncForTest returns current branch name generator.
 func GenerateWorktreeBranchNameFuncForTest() func(ctx context.Context, modelProviders map[string]models.ModelProvider, configStore *conf.CswConfig, model string, inputPrompt string) (string, error) {
 	return generateWorktreeBranchNameFunc
-}
-
-// BuildSystemParams contains inputs for constructing a SweSystem.
-type BuildSystemParams struct {
-	WorkDir           string
-	ShadowDir         string
-	ConfigPath        string
-	ProjectConfig     string
-	ModelName         string
-	RoleName          string
-	WorktreeBranch    string
-	GitUserName       string
-	GitUserEmail      string
-	ContainerEnabled  bool
-	ContainerDisabled bool
-	ContainerImage    string
-	ContainerMounts   []string
-	ContainerEnv      []string
-	LSPServer         string
-	LogLLMRequests    bool
-	LogLLMRequestsRaw bool
-	NoRefresh         bool
-	// Thinking controls the thinking/reasoning mode for LLM requests.
-	// Values like "low", "medium", "high", "xhigh" for effort-based thinking,
-	// or "true"/"false" for boolean thinking modes.
-	Thinking string
-	// BashRunTimeout sets default timeout for runBash tool command execution.
-	BashRunTimeout time.Duration
-	// AllowedPaths specifies additional absolute paths outside of workDir that VFS can access.
-	// Paths must be absolute. When accessing files via allowedPaths, the path must be absolute
-	// and point within one of these directories.
-	AllowedPaths []string
-	// MaxToolThreads overrides max parallel tool executions. When <=0, value from config is used.
-	MaxToolThreads int
-	// RunBashMaxOutput overrides default runBash output limit in bytes. When nil, value from config is used.
-	RunBashMaxOutput *int
-	// VFSReadLimit overrides default vfsRead output limit in lines. When nil, value from config is used.
-	VFSReadLimit *int
-	// AllowAllPermissions forces all tool permission checks to allow mode for this run.
-	AllowAllPermissions bool
 }
 
 // BuildSystemResult contains outputs from building a SweSystem.
@@ -301,17 +260,30 @@ func PrepareSessionVFS(workDir string, worktreesBaseDir string, worktreeBranch s
 }
 
 // BuildSystem builds a SweSystem and related setup for CLI and TUI.
-func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error) {
+func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, error) {
 	var result BuildSystemResult
+	if configStore == nil {
+		configStore = &conf.CswConfig{}
+	}
+	globalConfig := configStore.GlobalConfig
+	if globalConfig == nil {
+		globalConfig = &conf.GlobalConfig{}
+		configStore.GlobalConfig = globalConfig
+	}
+	parameters := globalConfig.Parameters
+	bashRunTimeout, err := parseBashRunTimeout(parameters.BashRunTimeout)
+	if err != nil {
+		return nil, result, err
+	}
 
-	workDir, err := ResolveWorkDir(params.WorkDir)
+	workDir, err := ResolveWorkDir(parameters.Workdir)
 	if err != nil {
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 
 	shadowDir := ""
-	if strings.TrimSpace(params.ShadowDir) != "" {
-		shadowDir, err = ResolveWorkDir(params.ShadowDir)
+	if strings.TrimSpace(parameters.ShadowDir) != "" {
+		shadowDir, err = ResolveWorkDir(parameters.ShadowDir)
 		if err != nil {
 			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve shadow directory: %w", err)
 		}
@@ -327,23 +299,6 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to initialize logging: %w", err)
 	}
 
-	configPathStr, err := BuildConfigPath(params.ProjectConfig, params.ConfigPath)
-	if err != nil {
-		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
-	}
-
-	configStore, err := newCompositeConfigStoreFunc(configRoot, configPathStr)
-	if err != nil {
-		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create config store: %w", err)
-	}
-
-	globalConfig := configStore.GlobalConfig
-	if globalConfig == nil {
-		globalConfig = &conf.GlobalConfig{}
-	}
-
 	shadowPatterns := append([]string(nil), globalConfig.ShadowPaths...)
 	if len(shadowPatterns) == 0 {
 		shadowPatterns = vfs.DefaultShadowPatterns()
@@ -355,7 +310,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: no model providers found in config")
 	}
 
-	modelName, err := ResolveModelName(params.ModelName, configStore, providerRegistry)
+	modelName, err := ResolveModelName(parameters.Model, configStore, providerRegistry)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
@@ -366,7 +321,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
-	if params.NoRefresh {
+	if parameters.NoRefresh {
 		applyDisableRefreshToProviders(modelProviders)
 	}
 
@@ -382,13 +337,13 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: no roles found in config")
 	}
 
-	roleConfig, ok := roleRegistry.Get(params.RoleName)
+	roleConfig, ok := roleRegistry.Get(parameters.Role)
 	if !ok {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: role not found: %s (available: %v)", params.RoleName, roleRegistry.List())
+		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: role not found: %s (available: %v)", parameters.Role, roleRegistry.List())
 	}
 
-	if strings.TrimSpace(params.ModelName) == "" {
+	if strings.TrimSpace(parameters.Model) == "" {
 		if strings.TrimSpace(roleConfig.Model) != "" {
 			modelName, err = ResolveModelSpec(roleConfig.Model, configStore)
 			if err != nil {
@@ -404,12 +359,12 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to build hide patterns: %w", err)
 	}
 
-	allowedPaths := append([]string(nil), params.AllowedPaths...)
+	allowedPaths := append([]string(nil), parameters.VFSAllow...)
 	if shadowDir != "" {
 		allowedPaths = append(allowedPaths, shadowDir)
 	}
 
-	selectedVCS, selectedVFS, err := PrepareSessionVFS(workDir, configRoot, params.WorktreeBranch, hidePatterns, params.GitUserName, params.GitUserEmail, allowedPaths)
+	selectedVCS, selectedVFS, err := PrepareSessionVFS(workDir, configRoot, parameters.Worktree, hidePatterns, parameters.GitUserName, parameters.GitUserEmail, allowedPaths)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
@@ -433,20 +388,20 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	}
 
 	var lspClient lsp.LSP
-	if params.LSPServer != "" {
+	if parameters.LSPServer != "" {
 		logger := logging.GetGlobalLogger()
-		logger.Debug("lsp_initialization", "enabled", true, "server", params.LSPServer)
-		if _, err := os.Stat(params.LSPServer); err != nil {
-			logger.Warn("LSP server binary not found, continuing without LSP", "server", params.LSPServer, "error", err)
+		logger.Debug("lsp_initialization", "enabled", true, "server", parameters.LSPServer)
+		if _, err := os.Stat(parameters.LSPServer); err != nil {
+			logger.Warn("LSP server binary not found, continuing without LSP", "server", parameters.LSPServer, "error", err)
 		} else {
-			client, err := lsp.NewClient(params.LSPServer, effectiveWorkDir)
+			client, err := lsp.NewClient(parameters.LSPServer, effectiveWorkDir)
 			if err != nil {
 				logger.Warn("failed to create LSP client, continuing without LSP", "error", err)
 			} else if err := client.Init(false); err != nil {
 				logger.Warn("failed to initialize LSP client, continuing without LSP", "error", err)
 			} else {
 				lspClient = client
-				logger.Debug("lsp_initialized", "server", params.LSPServer)
+				logger.Debug("lsp_initialized", "server", parameters.LSPServer)
 			}
 		}
 	}
@@ -455,8 +410,8 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	if globalConfig.Parameters.VfsReadLimit != nil {
 		vfsReadLimit = *globalConfig.Parameters.VfsReadLimit
 	}
-	if params.VFSReadLimit != nil {
-		vfsReadLimit = *params.VFSReadLimit
+	if parameters.VfsReadLimit != nil {
+		vfsReadLimit = *parameters.VfsReadLimit
 	}
 	if vfsReadLimit < 0 {
 		logging.FlushLogs()
@@ -472,7 +427,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create task manager: %w", err)
 	}
 
-	bashRunner := runner.CommandRunner(runner.NewBashRunner(effectiveWorkDir, params.BashRunTimeout))
+	bashRunner := runner.CommandRunner(runner.NewBashRunner(effectiveWorkDir, bashRunTimeout))
 	cleanupFns := make([]func(), 0)
 	cleanupOnError := true
 	defer func() {
@@ -484,7 +439,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		}
 	}()
 
-	containerRuntimeConfig, err := ResolveContainerRuntimeConfig(globalConfig, params, effectiveWorkDir, shadowDir)
+	containerRuntimeConfig, err := ResolveContainerRuntimeConfig(globalConfig, parameters, effectiveWorkDir, shadowDir)
 	if err != nil {
 		logging.FlushLogs()
 		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve container config: %w", err)
@@ -552,8 +507,8 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	if globalConfig.Parameters.RunBashMax != nil {
 		runBashMaxOutput = *globalConfig.Parameters.RunBashMax
 	}
-	if params.RunBashMaxOutput != nil {
-		runBashMaxOutput = *params.RunBashMaxOutput
+	if parameters.RunBashMax != nil {
+		runBashMaxOutput = *parameters.RunBashMax
 	}
 	if runBashMaxOutput < 0 {
 		logging.FlushLogs()
@@ -564,7 +519,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	if shadowDir != "" {
 		runBashOutputWorkdir = shadowDir
 	}
-	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, effectiveWorkDir, params.BashRunTimeout, params.AllowAllPermissions, runBashMaxOutput, runBashOutputWorkdir)
+	tool.RegisterRunBashTool(toolRegistry, bashRunner, roleConfig.RunPrivileges, effectiveWorkDir, bashRunTimeout, parameters.AllowAllPermissions, runBashMaxOutput, runBashOutputWorkdir)
 	tool.RegisterWebFetchTool(toolRegistry, nil)
 	tool.RegisterSkillTool(toolRegistry, configRoot)
 
@@ -603,13 +558,13 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		LogBaseDir:          logsDir,
 		WorkDir:             effectiveWorkDir,
 		ShadowDir:           shadowDir,
-		LogLLMRequests:      params.LogLLMRequests,
-		LogLLMRequestsRaw:   params.LogLLMRequestsRaw,
-		Thinking:            params.Thinking,
-		AllowAllPermissions: params.AllowAllPermissions,
+		LogLLMRequests:      parameters.LogLLMRequests,
+		LogLLMRequestsRaw:   parameters.LogLLMRequestsRaw,
+		Thinking:            parameters.Thinking,
+		AllowAllPermissions: parameters.AllowAllPermissions,
 		MaxToolThreads: func() int {
-			if params.MaxToolThreads > 0 {
-				return params.MaxToolThreads
+			if parameters.MaxThreads > 0 {
+				return parameters.MaxThreads
 			}
 			return globalConfig.Parameters.MaxThreads
 		}(),
@@ -625,10 +580,10 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 		ProviderRegistry: providerRegistry,
 		LogsDir:          logsDir,
 		VCS:              selectedVCS,
-		WorktreeBranch:   params.WorktreeBranch,
-		LSPServer:        params.LSPServer,
+		WorktreeBranch:   parameters.Worktree,
+		LSPServer:        parameters.LSPServer,
 		ShellRunner:      bashRunner,
-		HostShellRunner:  runner.NewBashRunner(effectiveWorkDir, params.BashRunTimeout),
+		HostShellRunner:  runner.NewBashRunner(effectiveWorkDir, bashRunTimeout),
 		ContainerImage:   containerRuntimeConfig.Image,
 		LSPStarted:       lspClient != nil,
 		LSPWorkDir:       effectiveWorkDir,

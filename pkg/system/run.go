@@ -87,7 +87,8 @@ func RunCommand(params *core.RunExecution) error {
 		_, _ = fmt.Fprintf(stdout, "[INFO] Worktree branch: %s\n", parameters.Worktree)
 	}
 
-	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{WorkDir: parameters.Workdir, ShadowDir: parameters.ShadowDir, ConfigPath: parameters.ConfigPath, ProjectConfig: parameters.ProjectConfig, ModelName: parameters.Model, RoleName: parameters.Role, WorktreeBranch: parameters.Worktree, GitUserName: parameters.GitUserName, GitUserEmail: parameters.GitUserEmail, ContainerEnabled: parameters.Container.Enabled, ContainerDisabled: parameters.ContainerDisabled, ContainerImage: parameters.Container.Image, ContainerMounts: parameters.Container.Mounts, ContainerEnv: parameters.Container.Env, LSPServer: parameters.LSPServer, LogLLMRequests: parameters.LogLLMRequests, LogLLMRequestsRaw: parameters.LogLLMRequestsRaw, NoRefresh: parameters.NoRefresh, Thinking: parameters.Thinking, BashRunTimeout: params.BashRunTimeout, AllowedPaths: parameters.VFSAllow, MaxToolThreads: parameters.MaxThreads, RunBashMaxOutput: parameters.RunBashMax, VFSReadLimit: parameters.VfsReadLimit, AllowAllPermissions: parameters.AllowAllPermissions})
+	parameters.BashRunTimeout = params.BashRunTimeout.String()
+	sweSystem, buildResult, err := BuildSystem(params.Config)
 	if err != nil {
 		return err
 	}

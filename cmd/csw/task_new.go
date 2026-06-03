@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/system"
@@ -319,16 +320,24 @@ func resolveTaskCreateParams(ctx context.Context, params taskCreateResolveParams
 }
 
 func generateTaskDescription(ctx context.Context, params taskCreateResolveParams) (string, error) {
-	buildParams := system.BuildSystemParams{
-		WorkDir:       strings.TrimSpace(params.WorkDir),
-		ShadowDir:     strings.TrimSpace(params.ShadowDir),
-		ConfigPath:    strings.TrimSpace(params.ConfigPath),
-		ProjectConfig: strings.TrimSpace(params.ProjectConfig),
-		ModelName:     strings.TrimSpace(params.ModelName),
-		RoleName:      strings.TrimSpace(pickTaskRoleName(params.Role)),
+	configPath, err := system.BuildConfigPath(strings.TrimSpace(params.ProjectConfig), strings.TrimSpace(params.ConfigPath))
+	if err != nil {
+		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to build config path: %w", err)
 	}
+	configStore, err := conf.CswConfigLoad(configPath)
+	if err != nil {
+		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to load config: %w", err)
+	}
+	if configStore.GlobalConfig == nil {
+		configStore.GlobalConfig = &conf.GlobalConfig{}
+	}
+	parameters := &configStore.GlobalConfig.Parameters
+	parameters.Workdir = strings.TrimSpace(params.WorkDir)
+	parameters.ShadowDir = strings.TrimSpace(params.ShadowDir)
+	parameters.Model = strings.TrimSpace(params.ModelName)
+	parameters.Role = strings.TrimSpace(pickTaskRoleName(params.Role))
 
-	sweSystem, buildResult, err := buildTaskDescriptionSystemFunc(buildParams)
+	sweSystem, buildResult, err := buildTaskDescriptionSystemFunc(configStore)
 	if err != nil {
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to build system: %w", err)
 	}

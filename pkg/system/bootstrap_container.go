@@ -36,18 +36,21 @@ type containerRuntimeConfig struct {
 }
 
 // ResolveContainerRuntimeConfig resolves effective container runtime setup.
-func ResolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params BuildSystemParams, effectiveWorkDir string, shadowDir string) (containerRuntimeConfig, error) {
+func ResolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, parameters conf.RunParameters, effectiveWorkDir string, shadowDir string) (containerRuntimeConfig, error) {
 	var runtimeConfig containerRuntimeConfig
 	containerParameters := conf.ContainerConfig{}
 	if globalConfig != nil && globalConfig.Parameters.Container != nil {
 		containerParameters = globalConfig.Parameters.Container.Clone()
 	}
+	if parameters.Container != nil {
+		containerParameters = parameters.Container.Clone()
+	}
 
 	runtimeConfig.Enabled = containerParameters.Enabled
-	if params.ContainerEnabled {
+	if parameters.ContainerEnabled {
 		runtimeConfig.Enabled = true
 	}
-	if params.ContainerDisabled {
+	if parameters.ContainerDisabled {
 		runtimeConfig.Enabled = false
 	}
 
@@ -55,7 +58,10 @@ func ResolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params Build
 		return runtimeConfig, nil
 	}
 
-	runtimeConfig.Image = strings.TrimSpace(params.ContainerImage)
+	runtimeConfig.Image = ""
+	if parameters.Container != nil {
+		runtimeConfig.Image = strings.TrimSpace(parameters.Container.Image)
+	}
 	if runtimeConfig.Image == "" {
 		runtimeConfig.Image = strings.TrimSpace(containerParameters.Image)
 	}
@@ -63,9 +69,8 @@ func ResolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params Build
 		return runtimeConfig, fmt.Errorf("ResolveContainerRuntimeConfig() [bootstrap_container.go]: container image is required when container mode is enabled")
 	}
 
-	mountSpecs := make([]string, 0, len(containerParameters.Mounts)+len(params.ContainerMounts))
+	mountSpecs := make([]string, 0, len(containerParameters.Mounts))
 	mountSpecs = append(mountSpecs, containerParameters.Mounts...)
-	mountSpecs = append(mountSpecs, params.ContainerMounts...)
 	runtimeConfig.Mounts = map[string]string{effectiveWorkDir: effectiveWorkDir}
 	if strings.TrimSpace(shadowDir) != "" {
 		runtimeConfig.Mounts[shadowDir] = shadowDir
@@ -87,9 +92,8 @@ func ResolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, params Build
 		runtimeConfig.Mounts[containerPath] = hostPath
 	}
 
-	envSpecs := make([]string, 0, len(containerParameters.Env)+len(params.ContainerEnv))
+	envSpecs := make([]string, 0, len(containerParameters.Env))
 	envSpecs = append(envSpecs, containerParameters.Env...)
-	envSpecs = append(envSpecs, params.ContainerEnv...)
 	if len(envSpecs) > 0 {
 		runtimeConfig.Env = make(map[string]string, len(envSpecs))
 		for _, envSpec := range envSpecs {
