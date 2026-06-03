@@ -187,6 +187,10 @@ func TestCswConfigLoad(t *testing.T) {
 			require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskEdit"])
 			require.Equal(t, AccessDeny, plannerRole.RunPrivileges["*"])
 			explorerRole := cfg.AgentRoleConfigs["explorer"]
+			require.Contains(t, explorerRole.Description, "codebase")
+			require.Contains(t, explorerRole.PromptFragments["10-system"], "Local Codebase Investigation")
+			require.Contains(t, explorerRole.PromptFragments["10-system"], "vfsGrep")
+			require.Contains(t, explorerRole.PromptFragments["10-system"], "absolute paths")
 			require.Equal(t, AccessDeny, explorerRole.ToolsAccess["**"])
 			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsRead"])
 			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsFind"])

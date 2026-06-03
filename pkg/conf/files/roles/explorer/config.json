@@ -1,6 +1,6 @@
 {
   "name": "explorer",
-  "description": "Read-only researcher role that gathers information and reports findings in the session summary",
+  "description": "Read-only researcher and codebase exploration specialist that searches local project files and reports findings in the session summary",
   "aliases": [
     "researcher",
     "investigate"
