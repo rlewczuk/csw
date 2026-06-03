@@ -57,19 +57,9 @@ type RunExecution struct {
 	BashRunTimeout      time.Duration
 }
 
-// NewRunExecution creates run execution parameters with complete CSW configuration.
+// NewRunExecution creates run execution parameters with provided CSW configuration.
 func NewRunExecution(config *conf.CswConfig, stdin stdio.Reader, stdout stdio.Writer, stderr stdio.Writer) *RunExecution {
-	return &RunExecution{Config: normalizeRunExecutionConfig(config), Stdin: stdin, Stdout: stdout, Stderr: stderr}
-}
-
-func normalizeRunExecutionConfig(config *conf.CswConfig) *conf.CswConfig {
-	if config == nil {
-		config = &conf.CswConfig{}
-	}
-	if config.GlobalConfig == nil {
-		config.GlobalConfig = &conf.GlobalConfig{}
-	}
-	return config
+	return &RunExecution{Config: config, Stdin: stdin, Stdout: stdout, Stderr: stderr}
 }
 
 type SweSession struct {
