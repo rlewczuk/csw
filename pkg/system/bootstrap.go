@@ -547,7 +547,6 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, error) {
 
 	configStore.Runtime = conf.RuntimeConfig{
 		ProviderRegistry: providerRegistry,
-		LogsDir:          logsDir,
 		VCS:              selectedVCS,
 		ShellRunner:      bashRunner,
 		HostShellRunner:  runner.NewBashRunner(effectiveWorkDir, bashRunTimeout),

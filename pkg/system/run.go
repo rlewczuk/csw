@@ -150,7 +150,12 @@ func RunCommand(params *core.RunExecution) error {
 	if parameters.Container != nil && parameters.Container.Enabled {
 		containerImage = parameters.Container.Image
 	}
-	if err := core.EmitSessionSummary(startTime, endTime, session, core.SessionSummaryBuildResult{LogsDir: runtimeConfig.LogsDir, WorkDirRoot: sweSystem.WorkDirRoot, WorkDir: parameters.Workdir, LSPServer: parameters.LSPServer, ContainerImage: containerImage}, buildSummaryMessageFunc(sessionOutput), sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
+	logsDirRoot := sweSystem.WorkDirRoot
+	if strings.TrimSpace(parameters.ShadowDir) != "" {
+		logsDirRoot = parameters.ShadowDir
+	}
+	logsDir := filepath.Join(logsDirRoot, ".cswdata", "logs")
+	if err := core.EmitSessionSummary(startTime, endTime, session, core.SessionSummaryBuildResult{LogsDir: logsDir, WorkDirRoot: sweSystem.WorkDirRoot, WorkDir: parameters.Workdir, LSPServer: parameters.LSPServer, ContainerImage: containerImage}, buildSummaryMessageFunc(sessionOutput), sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
 		return err
 	}
 	if err := applyCommandTaskMetadata(params); err != nil {

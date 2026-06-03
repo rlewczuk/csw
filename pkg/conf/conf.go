@@ -428,7 +428,6 @@ type CswConfig struct {
 // RuntimeConfig contains data resolved while building the runtime system.
 type RuntimeConfig struct {
 	ProviderRegistry  any
-	LogsDir           string
 	VCS               apis.VCS
 	ShellRunner       runner.CommandRunner
 	HostShellRunner   runner.CommandRunner
