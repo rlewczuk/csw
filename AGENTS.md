@@ -2,7 +2,7 @@
 
 ## Build & Test Commands
 - Build: `go build ./cmd/csw`
-- Test all: `go test ./...`
+- Test all: `./test_all.sh`
 - Test single package: `go test ./test -v`
 - Test single function: `go test ./test -v -run TestAgentCoreInitialization`
 - Run main: `go run ./cmd/csw`
