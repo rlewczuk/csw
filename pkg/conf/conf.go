@@ -6,6 +6,9 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/rlewczuk/csw/pkg/apis"
+	"github.com/rlewczuk/csw/pkg/runner"
 )
 
 type AccessFlag string
@@ -417,4 +420,31 @@ type CswConfig struct {
 	// ModelAliases contains model alias definitions keyed by alias name.
 	// Each alias maps to one or more provider/model combinations for flexible model selection.
 	ModelAliases map[string]ModelAliasValue `json:"model-aliases,omitempty"`
+
+	// Runtime contains data resolved while building the runtime system.
+	Runtime RuntimeConfig `json:"-"`
+}
+
+// RuntimeConfig contains data resolved while building the runtime system.
+type RuntimeConfig struct {
+	WorkDir               string
+	WorkDirRoot           string
+	ShadowDir             string
+	RoleConfig            AgentRoleConfig
+	ModelName             string
+	ProviderRegistry      any
+	LogsDir               string
+	VCS                   apis.VCS
+	WorktreeBranch        string
+	LSPServer             string
+	ShellRunner           runner.CommandRunner
+	HostShellRunner       runner.CommandRunner
+	ContainerImage        string
+	ContainerImageName    string
+	ContainerImageTag     string
+	ContainerImageVersion string
+	ContainerIdentity     runner.ContainerIdentity
+	LSPStarted            bool
+	LSPWorkDir            string
+	Cleanup               func()
 }

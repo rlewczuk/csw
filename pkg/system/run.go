@@ -77,6 +77,10 @@ func RunCommand(params *core.RunExecution) error {
 	if err := validateMergeRunExecution(params); err != nil {
 		return err
 	}
+	if err := mergeRunExecutionConfig(params.Config, parameters); err != nil {
+		return err
+	}
+	parameters = runParameters(params)
 
 	resolvedWorktreeBranch, err := ResolveWorktreeBranchName(ctx, ResolveWorktreeBranchNameParams{Prompt: params.Prompt, ModelName: parameters.Model, WorkDir: parameters.Workdir, ShadowDir: parameters.ShadowDir, ProjectConfig: parameters.ProjectConfig, ConfigPath: parameters.ConfigPath, WorktreeBranch: parameters.Worktree})
 	if err != nil {
@@ -88,18 +92,18 @@ func RunCommand(params *core.RunExecution) error {
 	}
 
 	parameters.BashRunTimeout = params.BashRunTimeout.String()
-	sweSystem, buildResult, err := BuildSystem(params.Config)
+	sweSystem, err := BuildSystem(params.Config)
 	if err != nil {
 		return err
 	}
-	defer buildResult.Cleanup()
+	runtimeConfig := params.Config.Runtime
+	if runtimeConfig.Cleanup != nil {
+		defer runtimeConfig.Cleanup()
+	}
 	defer logging.FlushLogs()
 
-	parameters.Workdir = buildResult.WorkDir
-	parameters.ShadowDir = buildResult.ShadowDir
-	parameters.Model = buildResult.ModelName
-	params.ContextData = BuildPromptContextData(params.ContextData, core.AgentState{Info: core.AgentStateCommonInfo{AgentName: "CSW Coding Agent", WorkDir: buildResult.WorkDir, ShadowDir: buildResult.ShadowDir}, Role: buildResult.RoleConfig.Clone(), Task: cloneRunTask(params.Task), Config: params.Config})
-	if err := renderCommandPrompt(params, buildResult.WorkDir, buildResult.ShellRunner, buildResult.HostShellRunner); err != nil {
+	params.ContextData = BuildPromptContextData(params.ContextData, core.AgentState{Info: core.AgentStateCommonInfo{AgentName: "CSW Coding Agent", WorkDir: parameters.Workdir, ShadowDir: parameters.ShadowDir}, Role: runtimeConfig.RoleConfig.Clone(), Task: cloneRunTask(params.Task), Config: params.Config})
+	if err := renderCommandPrompt(params, parameters.Workdir, runtimeConfig.ShellRunner, runtimeConfig.HostShellRunner); err != nil {
 		return err
 	}
 	if err := PreparePromptWithContext(params); err != nil {
@@ -108,16 +112,16 @@ func RunCommand(params *core.RunExecution) error {
 
 	if parameters.LSPServer != "" {
 		lspStatus := "disabled"
-		if buildResult.LSPStarted {
+		if runtimeConfig.LSPStarted {
 			lspStatus = "started"
 		}
-		_, _ = fmt.Fprintf(stdout, "[INFO] LSP %s (workdir: %s)\n", lspStatus, buildResult.LSPWorkDir)
+		_, _ = fmt.Fprintf(stdout, "[INFO] LSP %s (workdir: %s)\n", lspStatus, runtimeConfig.LSPWorkDir)
 	}
-	for _, message := range BuildRunAgentStartupInfoMessages(params, buildResult) {
+	for _, message := range BuildRunAgentStartupInfoMessages(params) {
 		_, _ = fmt.Fprintln(stdout, message)
 	}
-	if strings.TrimSpace(buildResult.ContainerImage) != "" {
-		_, _ = fmt.Fprintln(stdout, BuildContainerStartupInfoMessage(buildResult))
+	if strings.TrimSpace(runtimeConfig.ContainerImage) != "" {
+		_, _ = fmt.Fprintln(stdout, BuildContainerStartupInfoMessage(params.Config))
 	}
 
 	sessionOutput := buildRunSessionOutput(params, stdout)
@@ -132,7 +136,7 @@ func RunCommand(params *core.RunExecution) error {
 		sessionInput.StartReadingInput()
 	}
 
-	baseCommitID := vcs.ResolveGitCommitID(vcs.ChooseGitDiffDir(buildResult.WorkDirRoot, buildResult.WorkDir), "HEAD")
+	baseCommitID := vcs.ResolveGitCommitID(vcs.ChooseGitDiffDir(runtimeConfig.WorkDirRoot, runtimeConfig.WorkDir), "HEAD")
 	var sessionRunErr error
 	select {
 	case err := <-runtimeResult.Done:
@@ -143,13 +147,13 @@ func RunCommand(params *core.RunExecution) error {
 		sessionRunErr = ctx.Err()
 	}
 
-	finalizeResult, finalizeErr := FinalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, parameters.Merge, parameters.CommitMessageTemplate, sweSystem, session, stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt)
+	finalizeResult, finalizeErr := FinalizeWorktreeSession(ctx, runtimeConfig.VCS, runtimeConfig.WorktreeBranch, parameters.Merge, parameters.CommitMessageTemplate, sweSystem, session, stderr, runtimeConfig.WorkDirRoot, runtimeConfig.WorkDir, params.Prompt)
 	if finalizeErr != nil {
 		sessionRunErr = finalizeErr
 	}
 	endTime := time.Now()
 
-	if err := core.EmitSessionSummary(startTime, endTime, session, core.SessionSummaryBuildResult{LogsDir: buildResult.LogsDir, WorkDirRoot: buildResult.WorkDirRoot, WorkDir: buildResult.WorkDir, LSPServer: buildResult.LSPServer, ContainerImage: buildResult.ContainerImage}, buildSummaryMessageFunc(sessionOutput), sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
+	if err := core.EmitSessionSummary(startTime, endTime, session, core.SessionSummaryBuildResult{LogsDir: runtimeConfig.LogsDir, WorkDirRoot: runtimeConfig.WorkDirRoot, WorkDir: runtimeConfig.WorkDir, LSPServer: runtimeConfig.LSPServer, ContainerImage: runtimeConfig.ContainerImage}, buildSummaryMessageFunc(sessionOutput), sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
 		return err
 	}
 	if err := applyCommandTaskMetadata(params); err != nil {
@@ -161,6 +165,64 @@ func RunCommand(params *core.RunExecution) error {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+func mergeRunExecutionConfig(configStore *conf.CswConfig, parameters *conf.RunParameters) error {
+	if configStore == nil || parameters == nil {
+		return nil
+	}
+	configPath, err := BuildConfigPath(parameters.ProjectConfig, parameters.ConfigPath)
+	if err != nil {
+		return fmt.Errorf("mergeRunExecutionConfig() [run.go]: failed to build config path: %w", err)
+	}
+	loadedConfig, err := conf.CswConfigLoad(configPath)
+	if err != nil {
+		return fmt.Errorf("mergeRunExecutionConfig() [run.go]: failed to load config: %w", err)
+	}
+	if loadedConfig.GlobalConfig != nil && loadedConfig.GlobalConfig.Parameters.Container != nil && parameters.Container != nil {
+		loadedConfig.GlobalConfig.Parameters.Container.Merge(*parameters.Container)
+		parameters.Container = nil
+	}
+	if loadedConfig.GlobalConfig != nil {
+		loadedConfig.GlobalConfig.Parameters.MergeFrom(*parameters)
+		loadedConfig.GlobalConfig.Parameters.Role = parameters.Role
+		loadedConfig.GlobalConfig.Parameters.NoMerge = parameters.NoMerge
+		loadedConfig.GlobalConfig.Parameters.BashRunTimeout = parameters.BashRunTimeout
+		loadedConfig.GlobalConfig.Parameters.CommitMessageTemplate = parameters.CommitMessageTemplate
+		loadedConfig.GlobalConfig.Parameters.ConfigPath = parameters.ConfigPath
+		loadedConfig.GlobalConfig.Parameters.ProjectConfig = parameters.ProjectConfig
+		loadedConfig.GlobalConfig.Parameters.Interactive = parameters.Interactive
+		loadedConfig.GlobalConfig.Parameters.ContainerEnabled = parameters.ContainerEnabled
+		loadedConfig.GlobalConfig.Parameters.SaveSessionTo = parameters.SaveSessionTo
+		loadedConfig.GlobalConfig.Parameters.SaveSession = parameters.SaveSession
+		loadedConfig.GlobalConfig.Parameters.NoRefresh = parameters.NoRefresh
+		loadedConfig.GlobalConfig.Parameters.ContainerDisabled = parameters.ContainerDisabled
+		loadedConfig.GlobalConfig.Parameters.OutputFormat = parameters.OutputFormat
+		loadedConfig.GlobalConfig.Parameters.ContextEntries = append([]string(nil), parameters.ContextEntries...)
+		loadedConfig.GlobalConfig.Parameters.TaskIdentifier = parameters.TaskIdentifier
+		loadedConfig.GlobalConfig.Parameters.TaskNext = parameters.TaskNext
+		loadedConfig.GlobalConfig.Parameters.TaskLast = parameters.TaskLast
+		loadedConfig.GlobalConfig.Parameters.TaskReset = parameters.TaskReset
+		loadedConfig.GlobalConfig.Parameters.PositionalArgs = append([]string(nil), parameters.PositionalArgs...)
+		loadedConfig.GlobalConfig.Parameters.ModelOverridden = parameters.ModelOverridden
+		loadedConfig.GlobalConfig.Parameters.RoleOverridden = parameters.RoleOverridden
+	}
+	if loadedConfig.ModelProviderConfigs != nil {
+		configStore.ModelProviderConfigs = loadedConfig.ModelProviderConfigs
+	}
+	if loadedConfig.AgentRoleConfigs != nil {
+		configStore.AgentRoleConfigs = loadedConfig.AgentRoleConfigs
+	}
+	if loadedConfig.AgentConfigFiles != nil {
+		configStore.AgentConfigFiles = loadedConfig.AgentConfigFiles
+	}
+	if loadedConfig.ModelAliases != nil {
+		configStore.ModelAliases = loadedConfig.ModelAliases
+	}
+	if loadedConfig.GlobalConfig != nil {
+		configStore.GlobalConfig = loadedConfig.GlobalConfig
 	}
 	return nil
 }
@@ -572,7 +634,8 @@ func PreparePromptWithContext(params *core.RunExecution) error {
 }
 
 // BuildContainerStartupInfoMessage builds container runtime info line.
-func BuildContainerStartupInfoMessage(buildResult BuildSystemResult) string {
-	identity := buildResult.ContainerIdentity
-	return fmt.Sprintf("[INFO] Container: image=%s tag=%s version=%s user=%s(uid=%d) group=%s(gid=%d)", shared.NullValue(strings.TrimSpace(buildResult.ContainerImageName)), shared.NullValue(strings.TrimSpace(buildResult.ContainerImageTag)), shared.NullValue(strings.TrimSpace(buildResult.ContainerImageVersion)), shared.NullValue(strings.TrimSpace(identity.UserName)), identity.UID, shared.NullValue(strings.TrimSpace(identity.GroupName)), identity.GID)
+func BuildContainerStartupInfoMessage(configStore *conf.CswConfig) string {
+	runtimeConfig := configStore.Runtime
+	identity := runtimeConfig.ContainerIdentity
+	return fmt.Sprintf("[INFO] Container: image=%s tag=%s version=%s user=%s(uid=%d) group=%s(gid=%d)", shared.NullValue(strings.TrimSpace(runtimeConfig.ContainerImageName)), shared.NullValue(strings.TrimSpace(runtimeConfig.ContainerImageTag)), shared.NullValue(strings.TrimSpace(runtimeConfig.ContainerImageVersion)), shared.NullValue(strings.TrimSpace(identity.UserName)), identity.UID, shared.NullValue(strings.TrimSpace(identity.GroupName)), identity.GID)
 }

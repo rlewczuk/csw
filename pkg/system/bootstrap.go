@@ -73,31 +73,6 @@ func GenerateWorktreeBranchNameFuncForTest() func(ctx context.Context, modelProv
 	return generateWorktreeBranchNameFunc
 }
 
-// BuildSystemResult contains outputs from building a SweSystem.
-type BuildSystemResult struct {
-	WorkDir               string
-	WorkDirRoot           string
-	ShadowDir             string
-	RoleConfig            conf.AgentRoleConfig
-	ModelName             string
-	ConfigStore           *conf.CswConfig
-	ProviderRegistry      *models.ProviderRegistry
-	LogsDir               string
-	VCS                   apis.VCS
-	WorktreeBranch        string
-	LSPServer             string
-	ShellRunner           runner.CommandRunner
-	HostShellRunner       runner.CommandRunner
-	ContainerImage        string
-	ContainerImageName    string
-	ContainerImageTag     string
-	ContainerImageVersion string
-	ContainerIdentity     runner.ContainerIdentity
-	LSPStarted            bool
-	LSPWorkDir            string
-	Cleanup               func()
-}
-
 // ResolveRunDefaultsParams contains inputs for resolving run command parameters.
 type ResolveRunDefaultsParams struct {
 	WorkDir       string
@@ -260,8 +235,7 @@ func PrepareSessionVFS(workDir string, worktreesBaseDir string, worktreeBranch s
 }
 
 // BuildSystem builds a SweSystem and related setup for CLI and TUI.
-func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, error) {
-	var result BuildSystemResult
+func BuildSystem(configStore *conf.CswConfig) (*SweSystem, error) {
 	if configStore == nil {
 		configStore = &conf.CswConfig{}
 	}
@@ -273,19 +247,19 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 	parameters := globalConfig.Parameters
 	bashRunTimeout, err := parseBashRunTimeout(parameters.BashRunTimeout)
 	if err != nil {
-		return nil, result, err
+		return nil, err
 	}
 
 	workDir, err := ResolveWorkDir(parameters.Workdir)
 	if err != nil {
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 
 	shadowDir := ""
 	if strings.TrimSpace(parameters.ShadowDir) != "" {
 		shadowDir, err = ResolveWorkDir(parameters.ShadowDir)
 		if err != nil {
-			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve shadow directory: %w", err)
+			return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve shadow directory: %w", err)
 		}
 	}
 
@@ -296,7 +270,7 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 
 	logsDir := filepath.Join(configRoot, ".cswdata", "logs")
 	if err := logging.SetLogsDirectory(logsDir, true); err != nil {
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to initialize logging: %w", err)
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to initialize logging: %w", err)
 	}
 
 	shadowPatterns := append([]string(nil), globalConfig.ShadowPaths...)
@@ -307,19 +281,19 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 	providerRegistry := models.NewProviderRegistry(configStore)
 	if len(providerRegistry.List()) == 0 {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: no model providers found in config")
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: no model providers found in config")
 	}
 
 	modelName, err := ResolveModelName(parameters.Model, configStore, providerRegistry)
 	if err != nil {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 
 	modelProviders, err := CreateProviderMap(providerRegistry)
 	if err != nil {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 	if parameters.NoRefresh {
 		applyDisableRefreshToProviders(modelProviders)
@@ -328,19 +302,19 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 	modelAliases, err := models.NormalizeModelAliasMap(configStore.ModelAliases)
 	if err != nil {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to normalize model aliases: %w", err)
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to normalize model aliases: %w", err)
 	}
 
 	roleRegistry := core.NewAgentRoleRegistry(configStore)
 	if len(roleRegistry.List()) == 0 {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: no roles found in config")
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: no roles found in config")
 	}
 
 	roleConfig, ok := roleRegistry.Get(parameters.Role)
 	if !ok {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: role not found: %s (available: %v)", parameters.Role, roleRegistry.List())
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: role not found: %s (available: %v)", parameters.Role, roleRegistry.List())
 	}
 
 	if strings.TrimSpace(parameters.Model) == "" {
@@ -348,7 +322,7 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 			modelName, err = ResolveModelSpec(roleConfig.Model, configStore)
 			if err != nil {
 				logging.FlushLogs()
-				return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve role model: %w", err)
+				return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve role model: %w", err)
 			}
 		}
 	}
@@ -356,7 +330,7 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 	hidePatterns, err := vfs.BuildHidePatterns(workDir, roleConfig.HiddenPatterns)
 	if err != nil {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to build hide patterns: %w", err)
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to build hide patterns: %w", err)
 	}
 
 	allowedPaths := append([]string(nil), parameters.VFSAllow...)
@@ -367,7 +341,7 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 	selectedVCS, selectedVFS, err := PrepareSessionVFS(workDir, configRoot, parameters.Worktree, hidePatterns, parameters.GitUserName, parameters.GitUserEmail, allowedPaths)
 	if err != nil {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 
 	effectiveWorkDir := selectedVFS.WorktreePath()
@@ -377,12 +351,12 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 		shadowLocalVFS, shadowErr := vfs.NewLocalVFS(shadowDir, hidePatterns, allowedPaths)
 		if shadowErr != nil {
 			logging.FlushLogs()
-			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create shadow local VFS: %w", shadowErr)
+			return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create shadow local VFS: %w", shadowErr)
 		}
 		shadowOverlay, overlayErr := vfs.NewShadowVFS(selectedVFS, shadowLocalVFS, shadowPatterns)
 		if overlayErr != nil {
 			logging.FlushLogs()
-			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create shadow VFS overlay: %w", overlayErr)
+			return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create shadow VFS overlay: %w", overlayErr)
 		}
 		toolVFS = shadowOverlay
 	}
@@ -415,7 +389,7 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 	}
 	if vfsReadLimit < 0 {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: --vfs-read-limit must be >= 0")
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: --vfs-read-limit must be >= 0")
 	}
 
 	toolRegistry := tool.NewToolRegistry()
@@ -424,7 +398,7 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 	taskManager, err := core.NewTaskManagerWithTasksDir(workDir, ".cswdata/tasks", configStore)
 	if err != nil {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create task manager: %w", err)
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create task manager: %w", err)
 	}
 
 	bashRunner := runner.CommandRunner(runner.NewBashRunner(effectiveWorkDir, bashRunTimeout))
@@ -442,7 +416,7 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 	containerRuntimeConfig, err := ResolveContainerRuntimeConfig(globalConfig, parameters, effectiveWorkDir, shadowDir)
 	if err != nil {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve container config: %w", err)
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve container config: %w", err)
 	}
 
 	if containerRuntimeConfig.Enabled {
@@ -450,7 +424,7 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 		containerUser, err := resolveCurrentUserIdentity()
 		if err != nil {
 			logging.FlushLogs()
-			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve current user identity: %w", err)
+			return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to resolve current user identity: %w", err)
 		}
 
 		gitAuthorName, gitAuthorEmail := ResolveContainerGitAuthorIdentity()
@@ -479,7 +453,7 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 		})
 		if err != nil {
 			logging.FlushLogs()
-			return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create lazy container runner: %w", err)
+			return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create lazy container runner: %w", err)
 		}
 		containerImageInfo := containerRunner.ImageInfo()
 		containerIdentity := containerRunner.Identity()
@@ -512,7 +486,7 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 	}
 	if runBashMaxOutput < 0 {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: --run-bash-max must be >= 0")
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: --run-bash-max must be >= 0")
 	}
 
 	runBashOutputWorkdir := ""
@@ -525,20 +499,20 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 
 	if err := tool.RegisterCustomTools(toolRegistry, configStore, configRoot, bashRunner); err != nil {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to register custom tools: %w", err)
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to register custom tools: %w", err)
 	}
 
 	basePromptGenerator, err := core.NewConfPromptGenerator(configStore, toolVFS)
 	if err != nil {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create prompt generator: %w", err)
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: failed to create prompt generator: %w", err)
 	}
 	promptGenerator := basePromptGenerator
 
 	modelTagRegistry, err := CreateModelTagRegistry(configStore, providerRegistry)
 	if err != nil {
 		logging.FlushLogs()
-		return nil, result, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
+		return nil, fmt.Errorf("BuildSystem() [bootstrap.go]: %w", err)
 	}
 
 	sweSystem := &SweSystem{
@@ -570,13 +544,12 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 		}(),
 	}
 
-	result = BuildSystemResult{
+	configStore.Runtime = conf.RuntimeConfig{
 		WorkDir:          effectiveWorkDir,
 		WorkDirRoot:      workDir,
 		ShadowDir:        shadowDir,
 		RoleConfig:       roleConfig,
 		ModelName:        modelName,
-		ConfigStore:      configStore,
 		ProviderRegistry: providerRegistry,
 		LogsDir:          logsDir,
 		VCS:              selectedVCS,
@@ -593,16 +566,19 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, BuildSystemResult, er
 			}
 		},
 	}
+	parameters.Workdir = effectiveWorkDir
+	parameters.ShadowDir = shadowDir
+	parameters.Model = modelName
 	if containerRuntimeConfig.Enabled {
 		containerImageInfo := parseContainerImageInfo(containerRuntimeConfig.Image)
-		result.ContainerImageName = containerImageInfo.Name
-		result.ContainerImageTag = containerImageInfo.Tag
-		result.ContainerImageVersion = containerImageInfo.Version
+		configStore.Runtime.ContainerImageName = containerImageInfo.Name
+		configStore.Runtime.ContainerImageTag = containerImageInfo.Tag
+		configStore.Runtime.ContainerImageVersion = containerImageInfo.Version
 		if containerRunner, ok := bashRunner.(runner.ContainerRunner); ok {
-			result.ContainerIdentity = containerRunner.Identity()
+			configStore.Runtime.ContainerIdentity = containerRunner.Identity()
 		}
 	}
 	cleanupOnError = false
 
-	return sweSystem, result, nil
+	return sweSystem, nil
 }

@@ -43,7 +43,7 @@ func ResolveContainerRuntimeConfig(globalConfig *conf.GlobalConfig, parameters c
 		containerParameters = globalConfig.Parameters.Container.Clone()
 	}
 	if parameters.Container != nil {
-		containerParameters = parameters.Container.Clone()
+		containerParameters.Merge(parameters.Container.Clone())
 	}
 
 	runtimeConfig.Enabled = containerParameters.Enabled
