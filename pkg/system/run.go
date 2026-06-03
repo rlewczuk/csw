@@ -31,15 +31,11 @@ func normalizeRunConfig(config *conf.CswConfig) *conf.CswConfig {
 	return config
 }
 
-func runGlobalConfig(params *core.RunExecution) *conf.GlobalConfig {
+func runParameters(params *core.RunExecution) *conf.RunParameters {
 	if params == nil || params.Config == nil {
 		return nil
 	}
-	return params.Config.GlobalConfig
-}
-
-func runParameters(params *core.RunExecution) *conf.RunParameters {
-	globalConfig := runGlobalConfig(params)
+	globalConfig := params.Config.GlobalConfig
 	if globalConfig == nil {
 		return nil
 	}
