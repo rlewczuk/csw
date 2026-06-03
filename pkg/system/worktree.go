@@ -27,7 +27,19 @@ type WorktreeFinalizeResult struct {
 	HeadCommitID string
 }
 
-func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, worktreeBranch string, merge bool, commitMessageTemplate string, sweSystem *SweSystem, session *core.SweSession, stderr io.Writer, repoDir string, worktreeDir string, originalPrompt string) (WorktreeFinalizeResult, error) {
+func FinalizeWorktreeSession(ctx context.Context, gitVcs apis.VCS, sweSystem *SweSystem, session *core.SweSession, stderr io.Writer, originalPrompt string) (WorktreeFinalizeResult, error) {
+	var worktreeBranch, commitMessageTemplate, repoDir, worktreeDir string
+	var merge bool
+	if sweSystem != nil && sweSystem.Config != nil {
+		if sweSystem.Config.GlobalConfig != nil {
+			worktreeBranch = sweSystem.Config.GlobalConfig.Parameters.Worktree
+			merge = sweSystem.Config.GlobalConfig.Parameters.Merge
+			commitMessageTemplate = sweSystem.Config.GlobalConfig.Parameters.CommitMessageTemplate
+			worktreeDir = sweSystem.Config.GlobalConfig.Parameters.Workdir
+		}
+		repoDir = sweSystem.Config.Runtime.WorkDirRoot
+	}
+
 	result := WorktreeFinalizeResult{}
 	if worktreeBranch == "" || gitVcs == nil {
 		return result, nil

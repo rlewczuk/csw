@@ -140,7 +140,7 @@ func RunCommand(params *core.RunExecution) error {
 		sessionRunErr = ctx.Err()
 	}
 
-	finalizeResult, finalizeErr := FinalizeWorktreeSession(ctx, runtimeConfig.VCS, parameters.Worktree, parameters.Merge, parameters.CommitMessageTemplate, sweSystem, session, stderr, runtimeConfig.WorkDirRoot, parameters.Workdir, params.Prompt)
+	finalizeResult, finalizeErr := FinalizeWorktreeSession(ctx, runtimeConfig.VCS, sweSystem, session, stderr, params.Prompt)
 	if finalizeErr != nil {
 		sessionRunErr = finalizeErr
 	}

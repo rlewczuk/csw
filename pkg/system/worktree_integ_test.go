@@ -149,8 +149,12 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 				mockVCS.SetMergeError(tt.mergeErr)
 			}
 
+			system.Config.GlobalConfig.Parameters.Worktree = tt.worktreeBranch
+			system.Config.GlobalConfig.Parameters.Merge = tt.merge
+			system.Config.GlobalConfig.Parameters.CommitMessageTemplate = tt.customTemplate
+
 			var stderr bytes.Buffer
-			_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, tt.worktreeBranch, tt.merge, tt.customTemplate, system, session, &stderr, "", "", "")
+			_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, system, session, &stderr, "")
 
 			commitCalls := mockVCS.GetCommitCalls()
 			if tt.expectCommit {
@@ -195,6 +199,9 @@ func TestFinalizeWorktreeSession(t *testing.T) {
 
 func TestFinalizeWorktreeSessionUsesDetectedBaseBranch(t *testing.T) {
 	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge into detected base branch", true)
+	sweSystem.Config.GlobalConfig.Parameters.Worktree = "feature/detect-base"
+	sweSystem.Config.GlobalConfig.Parameters.Merge = true
+	sweSystem.Config.Runtime.WorkDirRoot = "/repo"
 
 	originalRunGit := vcs.RunGitCommand
 	defer func() {
@@ -208,7 +215,7 @@ func TestFinalizeWorktreeSessionUsesDetectedBaseBranch(t *testing.T) {
 		return "", nil
 	}
 
-	_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, "feature/detect-base", true, "", sweSystem, session, &bytes.Buffer{}, "/repo", "", "")
+	_, _ = FinalizeWorktreeSession(context.Background(), mockVCS, sweSystem, session, &bytes.Buffer{}, "")
 
 	mergeCalls := mockVCS.GetMergeCalls()
 	require.Len(t, mergeCalls, 1)
@@ -219,6 +226,9 @@ func TestFinalizeWorktreeSessionUsesDetectedBaseBranch(t *testing.T) {
 func TestFinalizeWorktreeSessionMergeStashesAndRestoresLocalChanges(t *testing.T) {
 	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge with local changes", true)
 	repoDir := t.TempDir()
+	sweSystem.Config.GlobalConfig.Parameters.Worktree = "feature/stash-ok"
+	sweSystem.Config.GlobalConfig.Parameters.Merge = true
+	sweSystem.Config.Runtime.WorkDirRoot = repoDir
 
 	originalRunGit := vcs.RunGitCommand
 	defer func() {
@@ -246,7 +256,7 @@ func TestFinalizeWorktreeSessionMergeStashesAndRestoresLocalChanges(t *testing.T
 	}
 
 	var stderr bytes.Buffer
-	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/stash-ok", true, "", sweSystem, session, &stderr, repoDir, "", "")
+	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, sweSystem, session, &stderr, "")
 	require.NoError(t, err)
 
 	assert.Contains(t, commands, fmt.Sprintf("%s::status --porcelain", repoDir))
@@ -291,9 +301,10 @@ func TestFinalizeWorktreeSessionRetriesCommitMessageGenerationOnTemporaryError(t
 		sweSystem.Config = &conf.CswConfig{}
 	}
 	sweSystem.Config.GlobalConfig = &conf.GlobalConfig{LLMRetryMaxAttempts: 2}
+	sweSystem.Config.GlobalConfig.Parameters.Worktree = "feature/retry-finalize"
 
 	var stderr bytes.Buffer
-	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/retry-finalize", false, "", sweSystem, session, &stderr, "", "", "")
+	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, sweSystem, session, &stderr, "")
 	require.NoError(t, err)
 
 	commitCalls := mockVCS.GetCommitCalls()
@@ -323,13 +334,14 @@ func TestFinalizeWorktreeSessionUsesFallbackModelForCommitMessageGeneration(t *t
 			},
 		},
 	}
+	sweSystem.Config.GlobalConfig.Parameters.Worktree = "feature/fallback-finalize"
 
 	session, err := sweSystem.NewSession("p1/test-model,p2/backup-model", nil)
 	require.NoError(t, err)
 	mockVCS := vfs.NewMockVCS(vfs.NewMockVFS())
 
 	var stderr bytes.Buffer
-	_, finalizeErr := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/fallback-finalize", false, "", sweSystem, session, &stderr, "", "", "")
+	_, finalizeErr := FinalizeWorktreeSession(context.Background(), mockVCS, sweSystem, session, &stderr, "")
 	require.NoError(t, finalizeErr)
 
 	commitCalls := mockVCS.GetCommitCalls()
@@ -342,6 +354,9 @@ func TestFinalizeWorktreeSessionUsesFallbackModelForCommitMessageGeneration(t *t
 func TestFinalizeWorktreeSessionMergeUnstashConflictRestoresCleanStateAndKeepsStash(t *testing.T) {
 	sweSystem, session, mockVCS := newFinalizeWorktreeFixture(t, "merge with local changes", true)
 	repoDir := t.TempDir()
+	sweSystem.Config.GlobalConfig.Parameters.Worktree = "feature/stash-conflict"
+	sweSystem.Config.GlobalConfig.Parameters.Merge = true
+	sweSystem.Config.Runtime.WorkDirRoot = repoDir
 
 	originalRunGit := vcs.RunGitCommand
 	defer func() {
@@ -373,7 +388,7 @@ func TestFinalizeWorktreeSessionMergeUnstashConflictRestoresCleanStateAndKeepsSt
 	}
 
 	var stderr bytes.Buffer
-	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, "feature/stash-conflict", true, "", sweSystem, session, &stderr, repoDir, "", "")
+	_, err := FinalizeWorktreeSession(context.Background(), mockVCS, sweSystem, session, &stderr, "")
 	require.NoError(t, err)
 
 	assert.Contains(t, commands, fmt.Sprintf("%s::status --porcelain", repoDir))
@@ -395,12 +410,15 @@ func newFinalizeWorktreeFixture(t *testing.T, llmMessage string, includeSystemTe
 		Response: models.NewTextMessage(models.ChatRoleAssistant, llmMessage),
 	})
 
-	configStore := &conf.CswConfig{AgentConfigFiles: map[string]map[string]string{
-		"commit": {
-			"prompt.md":  "{{- range .Messages }}{{ . }}\n{{- end }}",
-			"message.md": "[{{ .Branch }}] {{ .Message }}",
+	configStore := &conf.CswConfig{
+		GlobalConfig: &conf.GlobalConfig{},
+		AgentConfigFiles: map[string]map[string]string{
+			"commit": {
+				"prompt.md":  "{{- range .Messages }}{{ . }}\n{{- end }}",
+				"message.md": "[{{ .Branch }}] {{ .Message }}",
+			},
 		},
-	}}
+	}
 	if includeSystemTemplate {
 		configStore.AgentConfigFiles["commit"]["system.md"] = "system prompt"
 	}
