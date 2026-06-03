@@ -49,7 +49,7 @@ func TestCLISummaryIncludesDetailedSessionInfo(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := RunCommand(&RunExecution{Config: &conf.GlobalConfig{Parameters: conf.RunParameters{
+	err := RunCommand(NewRunExecution(&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: conf.RunParameters{
 		PositionalArgs:      []string{"Edit test.txt"},
 		Model:               "ollama/test-model",
 		Role:                "developer",
@@ -59,7 +59,7 @@ func TestCLISummaryIncludesDetailedSessionInfo(t *testing.T) {
 		Thinking:            "high",
 		LSPServer:           "/not/used/lsp",
 		Container:           &conf.ContainerConfig{Image: "alpine:3.20"},
-	}}})
+	}}}, nil, nil, nil))
 	require.NoError(t, err)
 
 	sessionsDir := filepath.Join(tmpProjectDir, ".cswdata", "logs", "sessions")

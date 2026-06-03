@@ -95,7 +95,7 @@ func TestBuildRunAgentStartupInfoMessages(t *testing.T) {
 
 	t.Run("includes command with embedded source", func(t *testing.T) {
 		messages := BuildRunAgentStartupInfoMessages(
-			&RunExecution{Config: &conf.GlobalConfig{}, CommandName: "csw/task-critic", CommandPath: "embedded:data/csw/task-critic.md"},
+			&RunExecution{config: &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{}}, CommandName: "csw/task-critic", CommandPath: "embedded:data/csw/task-critic.md"},
 			BuildSystemResult{ModelName: "ollama/qwen3", RoleConfig: conf.AgentRoleConfig{}},
 		)
 

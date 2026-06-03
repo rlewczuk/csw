@@ -15,9 +15,10 @@ type AgentStateCommonInfo struct {
 }
 
 type AgentState struct {
-	Info AgentStateCommonInfo
-	Role *conf.AgentRoleConfig
-	Task *Task
+	Info   AgentStateCommonInfo
+	Role   *conf.AgentRoleConfig
+	Task   *Task
+	Config *conf.CswConfig
 }
 
 // Clone returns a deep copy of AgentState.
@@ -29,6 +30,7 @@ func (s AgentState) Clone() AgentState {
 	if s.Task != nil {
 		cloned.Task = cloneTask(s.Task)
 	}
+	cloned.Config = s.Config
 
 	return cloned
 }

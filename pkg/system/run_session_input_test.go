@@ -32,7 +32,7 @@ func (d *cliSessionInputThreadDouble) PermissionResponse(queryID string, respons
 var _ core.SessionThreadInput = (*cliSessionInputThreadDouble)(nil)
 
 func newRunExecutionForTest(defaults conf.RunParameters) *RunExecution {
-	return &RunExecution{Config: &conf.GlobalConfig{Parameters: defaults}}
+	return NewRunExecution(&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: defaults}}, nil, nil, nil)
 }
 
 func TestBuildRunStdinSessionInput(t *testing.T) {

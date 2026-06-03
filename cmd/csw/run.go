@@ -72,6 +72,7 @@ func RunCommand() *cobra.Command {
 			globalConfig := cswConfig.GlobalConfig
 			if globalConfig == nil {
 				globalConfig = &conf.GlobalConfig{}
+				cswConfig.GlobalConfig = globalConfig
 			}
 			parameters := &globalConfig.Parameters
 			if cmd.Flags().Changed("model") {
@@ -164,7 +165,7 @@ func RunCommand() *cobra.Command {
 			parameters.TaskLast = cliTaskLast
 			parameters.TaskReset = cliTaskReset
 			parameters.PositionalArgs = append([]string(nil), args...)
-			return system.RunCommand(&system.RunExecution{Config: globalConfig, Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr})
+			return system.RunCommand(system.NewRunExecution(cswConfig, os.Stdin, os.Stdout, os.Stderr))
 		},
 	}
 

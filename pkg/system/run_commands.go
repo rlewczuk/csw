@@ -67,7 +67,10 @@ func BuildRunAgentStartupInfoMessages(params *RunExecution, buildResult BuildSys
 	if params == nil {
 		return nil
 	}
-	parameters := &params.Config.Parameters
+	parameters := runParameters(params)
+	if parameters == nil {
+		return nil
+	}
 
 	messages := make([]string, 0, 4)
 	messages = append(messages, fmt.Sprintf("[INFO] Model: %s", shared.NullValue(strings.TrimSpace(buildResult.ModelName))))

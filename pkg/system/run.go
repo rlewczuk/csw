@@ -23,7 +23,7 @@ const defaultBashRunTimeout = 120 * time.Second
 
 // RunExecution contains parameters and runtime state for a non-TUI run session.
 type RunExecution struct {
-	Config              *conf.GlobalConfig
+	config              *conf.CswConfig
 	Stdin               stdio.Reader
 	Stdout              stdio.Writer
 	Stderr              stdio.Writer
@@ -39,11 +39,42 @@ type RunExecution struct {
 	BashRunTimeout      time.Duration
 }
 
+// NewRunExecution creates run execution parameters with complete CSW configuration.
+func NewRunExecution(config *conf.CswConfig, stdin stdio.Reader, stdout stdio.Writer, stderr stdio.Writer) *RunExecution {
+	return &RunExecution{config: normalizeRunConfig(config), Stdin: stdin, Stdout: stdout, Stderr: stderr}
+}
+
+func normalizeRunConfig(config *conf.CswConfig) *conf.CswConfig {
+	if config == nil {
+		config = &conf.CswConfig{}
+	}
+	if config.GlobalConfig == nil {
+		config.GlobalConfig = &conf.GlobalConfig{}
+	}
+	return config
+}
+
+func runGlobalConfig(params *RunExecution) *conf.GlobalConfig {
+	if params == nil || params.config == nil {
+		return nil
+	}
+	return params.config.GlobalConfig
+}
+
+func runParameters(params *RunExecution) *conf.RunParameters {
+	globalConfig := runGlobalConfig(params)
+	if globalConfig == nil {
+		return nil
+	}
+	return &globalConfig.Parameters
+}
+
 // RunCommand runs a non-TUI agent session with the provided execution params.
 func RunCommand(params *RunExecution) error {
-	if params == nil || params.Config == nil {
+	if params == nil || runParameters(params) == nil {
 		return fmt.Errorf("RunCommand() [run.go]: params cannot be nil")
 	}
+	params.config = normalizeRunConfig(params.config)
 
 	var stdin stdio.Reader = os.Stdin
 	var stdout stdio.Writer = os.Stdout
@@ -65,7 +96,7 @@ func RunCommand(params *RunExecution) error {
 
 	startTime := time.Now()
 	ctx := context.Background()
-	parameters := &params.Config.Parameters
+	parameters := runParameters(params)
 
 	if parameters.NoCommit {
 		parameters.Worktree = ""
@@ -104,7 +135,7 @@ func RunCommand(params *RunExecution) error {
 	parameters.Workdir = buildResult.WorkDir
 	parameters.ShadowDir = buildResult.ShadowDir
 	parameters.Model = buildResult.ModelName
-	params.ContextData = BuildPromptContextData(params.ContextData, core.AgentState{Info: core.AgentStateCommonInfo{AgentName: "CSW Coding Agent", WorkDir: buildResult.WorkDir, ShadowDir: buildResult.ShadowDir}, Role: buildResult.RoleConfig.Clone(), Task: cloneRunTask(params.Task)})
+	params.ContextData = BuildPromptContextData(params.ContextData, core.AgentState{Info: core.AgentStateCommonInfo{AgentName: "CSW Coding Agent", WorkDir: buildResult.WorkDir, ShadowDir: buildResult.ShadowDir}, Role: buildResult.RoleConfig.Clone(), Task: cloneRunTask(params.Task), Config: params.config})
 	if err := renderCommandPrompt(params, buildResult.WorkDir, buildResult.ShellRunner, buildResult.HostShellRunner); err != nil {
 		return err
 	}
@@ -184,10 +215,13 @@ type runExecutionPrepResult struct {
 // both params and its embedded parameters, and returns the task state required
 // by the rest of RunCommand.
 func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runExecutionPrepResult, error) {
-	if params.Config.Parameters.Role == "" {
-		params.Config.Parameters.Role = params.Config.Parameters.DefaultRole
+	parameters := runParameters(params)
+	if parameters == nil {
+		return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: params config cannot be nil")
 	}
-	parameters := &params.Config.Parameters
+	if parameters.Role == "" {
+		parameters.Role = parameters.DefaultRole
+	}
 	if parameters.Container == nil {
 		parameters.Container = &conf.ContainerConfig{}
 	}
@@ -482,7 +516,10 @@ func buildRunSessionOutput(params *RunExecution, output stdio.Writer) core.Sessi
 	if params == nil {
 		return sessionio.NewTextSessionOutput(output)
 	}
-	parameters := &params.Config.Parameters
+	parameters := runParameters(params)
+	if parameters == nil {
+		return sessionio.NewTextSessionOutput(output)
+	}
 	if strings.TrimSpace(parameters.OutputFormat) == "jsonl" {
 		return sessionio.NewJsonlSessionOutput(output)
 	}
@@ -501,7 +538,8 @@ func buildRunStdinSessionInput(params *RunExecution, thread core.SessionThreadIn
 	if params == nil || thread == nil || input == nil {
 		return nil
 	}
-	if params.Config.Parameters.OutputFormat == "jsonl" {
+	parameters := runParameters(params)
+	if parameters != nil && parameters.OutputFormat == "jsonl" {
 		return sessionio.NewJsonlSessionInput(input, thread)
 	}
 	return sessionio.NewTextSessionInput(input, thread)
@@ -510,7 +548,10 @@ func validateMergeRunExecution(params *RunExecution) error {
 	if params == nil {
 		return fmt.Errorf("validateMergeRunExecution() [run.go]: params cannot be nil")
 	}
-	parameters := &params.Config.Parameters
+	parameters := runParameters(params)
+	if parameters == nil {
+		return fmt.Errorf("validateMergeRunExecution() [run.go]: params config cannot be nil")
+	}
 	if parameters.Merge && parameters.NoCommit {
 		return fmt.Errorf("RunCommand() [run.go]: --merge cannot be used with --no-commit")
 	}

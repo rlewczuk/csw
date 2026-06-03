@@ -152,19 +152,17 @@ func TestPopulateRunExecutionParamsUsesTaskRoleWhenRunRoleNotOverridden(t *testi
 			})
 			require.NoError(t, err)
 
-			runParams := &RunExecution{
-				Config: &conf.GlobalConfig{Parameters: conf.RunParameters{
-					Role:           testCase.configuredRole,
-					RoleOverridden: testCase.roleOverridden,
-					Workdir:        workDir,
-					NoCommit:       true,
-					PositionalArgs: []string{taskData.UUID},
-				}},
-			}
+			runParams := NewRunExecution(&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: conf.RunParameters{
+				Role:           testCase.configuredRole,
+				RoleOverridden: testCase.roleOverridden,
+				Workdir:        workDir,
+				NoCommit:       true,
+				PositionalArgs: []string{taskData.UUID},
+			}}}, nil, nil, nil)
 
 			_, err = populateRunExecutionParams(runParams, nil)
 			require.NoError(t, err)
-			assert.Equal(t, testCase.expectedRole, runParams.Config.Parameters.Role)
+			assert.Equal(t, testCase.expectedRole, runParameters(runParams).Role)
 		})
 	}
 }
