@@ -32,7 +32,7 @@ type RunExecution struct {
 	CommandPath         string
 	CommandArgs         []string
 	CommandTemplate     string
-	CommandTaskMetadata *commands.TaskMetadata
+	CommandTaskMetadata *core.Task
 	ContextData         map[string]any
 	Task                *core.Task
 	InitialTask         *core.Task
@@ -268,7 +268,7 @@ func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runE
 	commandModelOverride := ""
 	commandRoleOverride := ""
 	var commandRunDefaults *conf.RunDefaultsConfig
-	var commandTaskMetadata *commands.TaskMetadata
+	var commandTaskMetadata *core.Task
 	commandNeedsShell := false
 	if invocation != nil {
 		resolvedInvocation, resolveErr := resolveRunCommandInvocation(invocation, defaults.Workdir, defaults.ShadowDir, runInTaskMode)
@@ -529,15 +529,15 @@ func resolveTaskRunMerge(mergeFlagChanged bool, cliMerge bool, cliWorktree strin
 	return cliMerge
 }
 
-func shouldDisableTaskWorktree(taskMetadata *commands.TaskMetadata) bool {
-	if taskMetadata == nil || taskMetadata.FeatureBranch == nil {
+func shouldDisableTaskWorktree(taskMetadata *core.Task) bool {
+	if taskMetadata == nil || taskMetadata.FieldsPresent&core.TaskFieldFeatureBranch == 0 {
 		return false
 	}
 
-	return strings.TrimSpace(*taskMetadata.FeatureBranch) == ""
+	return strings.TrimSpace(taskMetadata.FeatureBranch) == ""
 }
 
-func shouldDisableTaskWorktreeForRun(taskMetadata *commands.TaskMetadata, taskData *core.Task) bool {
+func shouldDisableTaskWorktreeForRun(taskMetadata *core.Task, taskData *core.Task) bool {
 	if shouldDisableTaskWorktree(taskMetadata) {
 		return true
 	}

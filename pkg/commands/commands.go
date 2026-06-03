@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"gopkg.in/yaml.v3"
 )
@@ -39,26 +40,7 @@ type Metadata struct {
 // CSWMetadata describes csw-specific command frontmatter fields.
 type CSWMetadata struct {
 	Defaults *conf.RunDefaultsConfig `yaml:"defaults"`
-	Task     *TaskMetadata           `yaml:"task"`
-}
-
-// TaskMetadata mirrors core.Task with pointer fields.
-type TaskMetadata struct {
-	UUID          *string   `yaml:"uuid"`
-	Name          *string   `yaml:"name"`
-	Description   *string   `yaml:"description"`
-	Status        *string   `yaml:"status"`
-	FeatureBranch *string   `yaml:"feature_branch"`
-	NoCommit      *bool     `yaml:"no_commit"`
-	ParentBranch  *string   `yaml:"parent_branch"`
-	Role          *string   `yaml:"role"`
-	State         *string   `yaml:"state"`
-	Deps          *[]string `yaml:"deps"`
-	SessionIDs    *[]string `yaml:"session_ids"`
-	SubtaskIDs    *[]string `yaml:"subtask_ids"`
-	ParentTaskID  *string   `yaml:"parent_task_id"`
-	CreatedAt     *string   `yaml:"created_at"`
-	UpdatedAt     *string   `yaml:"updated_at"`
+	Task     *core.Task              `yaml:"task"`
 }
 
 // Command stores loaded command definition.

@@ -13,6 +13,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/tool"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -34,6 +35,37 @@ const (
 	TaskStatusFailed = "failed"
 )
 
+const (
+	// TaskFieldUUID indicates that task UUID field is present.
+	TaskFieldUUID uint32 = 1 << iota
+	// TaskFieldName indicates that task name field is present.
+	TaskFieldName
+	// TaskFieldDescription indicates that task description field is present.
+	TaskFieldDescription
+	// TaskFieldStatus indicates that task status field is present.
+	TaskFieldStatus
+	// TaskFieldFeatureBranch indicates that task feature branch field is present.
+	TaskFieldFeatureBranch
+	// TaskFieldNoCommit indicates that task no-commit field is present.
+	TaskFieldNoCommit
+	// TaskFieldParentBranch indicates that task parent branch field is present.
+	TaskFieldParentBranch
+	// TaskFieldRole indicates that task role field is present.
+	TaskFieldRole
+	// TaskFieldDeps indicates that task deps field is present.
+	TaskFieldDeps
+	// TaskFieldSessionIDs indicates that task session IDs field is present.
+	TaskFieldSessionIDs
+	// TaskFieldSubtaskIDs indicates that task subtask IDs field is present.
+	TaskFieldSubtaskIDs
+	// TaskFieldParentTaskID indicates that task parent task ID field is present.
+	TaskFieldParentTaskID
+	// TaskFieldCreatedAt indicates that task created-at field is present.
+	TaskFieldCreatedAt
+	// TaskFieldUpdatedAt indicates that task updated-at field is present.
+	TaskFieldUpdatedAt
+)
+
 // Task stores persistent task metadata.
 type Task struct {
 	UUID          string   `json:"uuid" yaml:"uuid"`
@@ -51,6 +83,63 @@ type Task struct {
 	ParentTaskID  string   `json:"parent_task_id,omitempty" yaml:"parent_task_id,omitempty"`
 	CreatedAt     string   `json:"created_at,omitempty" yaml:"created_at,omitempty"`
 	UpdatedAt     string   `json:"updated_at,omitempty" yaml:"updated_at,omitempty"`
+	FieldsPresent uint32   `json:"-" yaml:"-"`
+}
+
+// UnmarshalYAML decodes task metadata and records which YAML fields were present.
+func (t *Task) UnmarshalYAML(value *yaml.Node) error {
+	type rawTask Task
+	var decoded rawTask
+	if err := value.Decode(&decoded); err != nil {
+		return fmt.Errorf("Task.UnmarshalYAML() [task.go]: failed to decode task metadata: %w", err)
+	}
+
+	decoded.FieldsPresent = taskFieldsPresentFromYAML(value)
+	*t = Task(decoded)
+	return nil
+}
+
+func taskFieldsPresentFromYAML(value *yaml.Node) uint32 {
+	if value == nil || value.Kind != yaml.MappingNode {
+		return 0
+	}
+
+	var fields uint32
+	for i := 0; i+1 < len(value.Content); i += 2 {
+		key := strings.TrimSpace(value.Content[i].Value)
+		switch key {
+		case "uuid":
+			fields |= TaskFieldUUID
+		case "name":
+			fields |= TaskFieldName
+		case "description":
+			fields |= TaskFieldDescription
+		case "status":
+			fields |= TaskFieldStatus
+		case "feature_branch":
+			fields |= TaskFieldFeatureBranch
+		case "no_commit":
+			fields |= TaskFieldNoCommit
+		case "parent_branch":
+			fields |= TaskFieldParentBranch
+		case "role":
+			fields |= TaskFieldRole
+		case "deps":
+			fields |= TaskFieldDeps
+		case "session_ids":
+			fields |= TaskFieldSessionIDs
+		case "subtask_ids":
+			fields |= TaskFieldSubtaskIDs
+		case "parent_task_id":
+			fields |= TaskFieldParentTaskID
+		case "created_at":
+			fields |= TaskFieldCreatedAt
+		case "updated_at":
+			fields |= TaskFieldUpdatedAt
+		}
+	}
+
+	return fields
 }
 
 // TaskSessionSummary stores persisted session summary metadata.
@@ -499,7 +588,6 @@ func (m *TaskManager) MergeTask(lookup TaskLookup, vcsRepo apis.VCS) (*Task, err
 
 	return task, nil
 }
-
 
 func isTaskStatusSupported(status string) bool {
 	trimmed := strings.TrimSpace(status)

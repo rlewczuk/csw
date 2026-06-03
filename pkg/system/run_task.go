@@ -302,47 +302,47 @@ func applyCommandTaskMetadata(params *RunExecution) error {
 		}
 	}
 	metadata := params.CommandTaskMetadata
-	if metadata.UUID != nil {
-		applyIfUnchanged("UUID", func() { persistedTask.UUID = strings.TrimSpace(*metadata.UUID) })
+	if metadata.FieldsPresent&core.TaskFieldUUID != 0 {
+		applyIfUnchanged("UUID", func() { persistedTask.UUID = strings.TrimSpace(metadata.UUID) })
 	}
-	if metadata.Name != nil {
-		applyIfUnchanged("Name", func() { persistedTask.Name = strings.TrimSpace(*metadata.Name) })
+	if metadata.FieldsPresent&core.TaskFieldName != 0 {
+		applyIfUnchanged("Name", func() { persistedTask.Name = strings.TrimSpace(metadata.Name) })
 	}
-	if metadata.Description != nil {
-		applyIfUnchanged("Description", func() { persistedTask.Description = strings.TrimSpace(*metadata.Description) })
+	if metadata.FieldsPresent&core.TaskFieldDescription != 0 {
+		applyIfUnchanged("Description", func() { persistedTask.Description = strings.TrimSpace(metadata.Description) })
 	}
-	if metadata.Status != nil {
-		applyIfUnchanged("Status", func() { persistedTask.Status = strings.TrimSpace(*metadata.Status) })
+	if metadata.FieldsPresent&core.TaskFieldStatus != 0 {
+		applyIfUnchanged("Status", func() { persistedTask.Status = strings.TrimSpace(metadata.Status) })
 	}
-	if metadata.FeatureBranch != nil {
-		applyIfUnchanged("FeatureBranch", func() { persistedTask.FeatureBranch = strings.TrimSpace(*metadata.FeatureBranch) })
+	if metadata.FieldsPresent&core.TaskFieldFeatureBranch != 0 {
+		applyIfUnchanged("FeatureBranch", func() { persistedTask.FeatureBranch = strings.TrimSpace(metadata.FeatureBranch) })
 	}
-	if metadata.NoCommit != nil {
-		applyIfUnchanged("NoCommit", func() { persistedTask.NoCommit = *metadata.NoCommit })
+	if metadata.FieldsPresent&core.TaskFieldNoCommit != 0 {
+		applyIfUnchanged("NoCommit", func() { persistedTask.NoCommit = metadata.NoCommit })
 	}
-	if metadata.ParentBranch != nil {
-		applyIfUnchanged("ParentBranch", func() { persistedTask.ParentBranch = strings.TrimSpace(*metadata.ParentBranch) })
+	if metadata.FieldsPresent&core.TaskFieldParentBranch != 0 {
+		applyIfUnchanged("ParentBranch", func() { persistedTask.ParentBranch = strings.TrimSpace(metadata.ParentBranch) })
 	}
-	if metadata.Role != nil {
-		applyIfUnchanged("Role", func() { persistedTask.Role = strings.TrimSpace(*metadata.Role) })
+	if metadata.FieldsPresent&core.TaskFieldRole != 0 {
+		applyIfUnchanged("Role", func() { persistedTask.Role = strings.TrimSpace(metadata.Role) })
 	}
-	if metadata.Deps != nil {
-		applyIfUnchanged("Deps", func() { persistedTask.Deps = append([]string(nil), (*metadata.Deps)...) })
+	if metadata.FieldsPresent&core.TaskFieldDeps != 0 {
+		applyIfUnchanged("Deps", func() { persistedTask.Deps = append([]string(nil), metadata.Deps...) })
 	}
-	if metadata.SessionIDs != nil {
-		applyIfUnchanged("SessionIDs", func() { persistedTask.SessionIDs = append([]string(nil), (*metadata.SessionIDs)...) })
+	if metadata.FieldsPresent&core.TaskFieldSessionIDs != 0 {
+		applyIfUnchanged("SessionIDs", func() { persistedTask.SessionIDs = append([]string(nil), metadata.SessionIDs...) })
 	}
-	if metadata.SubtaskIDs != nil {
-		applyIfUnchanged("SubtaskIDs", func() { persistedTask.SubtaskIDs = append([]string(nil), (*metadata.SubtaskIDs)...) })
+	if metadata.FieldsPresent&core.TaskFieldSubtaskIDs != 0 {
+		applyIfUnchanged("SubtaskIDs", func() { persistedTask.SubtaskIDs = append([]string(nil), metadata.SubtaskIDs...) })
 	}
-	if metadata.ParentTaskID != nil {
-		applyIfUnchanged("ParentTaskID", func() { persistedTask.ParentTaskID = strings.TrimSpace(*metadata.ParentTaskID) })
+	if metadata.FieldsPresent&core.TaskFieldParentTaskID != 0 {
+		applyIfUnchanged("ParentTaskID", func() { persistedTask.ParentTaskID = strings.TrimSpace(metadata.ParentTaskID) })
 	}
-	if metadata.CreatedAt != nil {
-		applyIfUnchanged("CreatedAt", func() { persistedTask.CreatedAt = strings.TrimSpace(*metadata.CreatedAt) })
+	if metadata.FieldsPresent&core.TaskFieldCreatedAt != 0 {
+		applyIfUnchanged("CreatedAt", func() { persistedTask.CreatedAt = strings.TrimSpace(metadata.CreatedAt) })
 	}
-	if metadata.UpdatedAt != nil {
-		applyIfUnchanged("UpdatedAt", func() { persistedTask.UpdatedAt = strings.TrimSpace(*metadata.UpdatedAt) })
+	if metadata.FieldsPresent&core.TaskFieldUpdatedAt != 0 {
+		applyIfUnchanged("UpdatedAt", func() { persistedTask.UpdatedAt = strings.TrimSpace(metadata.UpdatedAt) })
 	}
 	updatedBytes, err := yaml.Marshal(&persistedTask)
 	if err != nil {

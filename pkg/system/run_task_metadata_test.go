@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,9 +26,10 @@ func TestApplyCommandTaskMetadataAppliesValuesWhenTaskUnchanged(t *testing.T) {
 	params := &RunExecution{
 		Task:        &core.Task{TaskDir: taskDir},
 		InitialTask: cloneRunTask(initialTask),
-		CommandTaskMetadata: &commands.TaskMetadata{
-			Status: statusPtr(core.TaskStatusMerged),
-			Role:   statusPtr("reviewer"),
+		CommandTaskMetadata: &core.Task{
+			Status:        core.TaskStatusMerged,
+			Role:          "reviewer",
+			FieldsPresent: core.TaskFieldStatus | core.TaskFieldRole,
 		},
 	}
 
@@ -61,9 +61,10 @@ func TestApplyCommandTaskMetadataPreservesInSessionTaskUpdates(t *testing.T) {
 	params := &RunExecution{
 		Task:        &core.Task{TaskDir: taskDir},
 		InitialTask: cloneRunTask(initialTask),
-		CommandTaskMetadata: &commands.TaskMetadata{
-			Status: statusPtr(core.TaskStatusMerged),
-			Role:   statusPtr("reviewer"),
+		CommandTaskMetadata: &core.Task{
+			Status:        core.TaskStatusMerged,
+			Role:          "reviewer",
+			FieldsPresent: core.TaskFieldStatus | core.TaskFieldRole,
 		},
 	}
 
@@ -75,8 +76,4 @@ func TestApplyCommandTaskMetadataPreservesInSessionTaskUpdates(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal(updatedBytes, &updated))
 	assert.Equal(t, core.TaskStatusRunning, updated.Status)
 	assert.Equal(t, "reviewer", updated.Role)
-}
-
-func statusPtr(value string) *string {
-	return &value
 }

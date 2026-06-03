@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -77,10 +78,9 @@ func TestLoadFromDirParsesCSWMetadata(t *testing.T) {
 	assert.Equal(t, 0, command.Metadata.CSW.Defaults.MaxThreads)
 	assert.Equal(t, "", command.Metadata.CSW.Defaults.Model)
 	require.NotNil(t, command.Metadata.CSW.Task)
-	require.NotNil(t, command.Metadata.CSW.Task.Status)
-	assert.Equal(t, "merged", *command.Metadata.CSW.Task.Status)
-	require.NotNil(t, command.Metadata.CSW.Task.Role)
-	assert.Equal(t, "", *command.Metadata.CSW.Task.Role)
+	assert.Equal(t, "merged", command.Metadata.CSW.Task.Status)
+	assert.Equal(t, "", command.Metadata.CSW.Task.Role)
+	assert.Equal(t, core.TaskFieldStatus|core.TaskFieldRole, command.Metadata.CSW.Task.FieldsPresent)
 }
 
 func TestLoadFromDirHierarchical(t *testing.T) {

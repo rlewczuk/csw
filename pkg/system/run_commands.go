@@ -7,6 +7,7 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/rlewczuk/csw/pkg/shared"
 )
@@ -19,7 +20,7 @@ type resolvedRunCommandInvocation struct {
 	CommandModelOverride string
 	CommandRoleOverride  string
 	CommandRunDefaults   *conf.RunDefaultsConfig
-	CommandTaskMetadata  *commands.TaskMetadata
+	CommandTaskMetadata  *core.Task
 	CommandNeedsShell    bool
 	Prompt               string
 	ExtraPositionalArgs  []string

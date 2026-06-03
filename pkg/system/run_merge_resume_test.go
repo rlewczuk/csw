@@ -3,7 +3,6 @@ package system
 import (
 	"testing"
 
-	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/conf"
 	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/stretchr/testify/assert"
@@ -114,7 +113,7 @@ func TestResolveTaskRunMerge(t *testing.T) {
 func TestShouldDisableTaskWorktree(t *testing.T) {
 	tests := []struct {
 		name     string
-		metadata *commands.TaskMetadata
+		metadata *core.Task
 		expected bool
 	}{
 		{
@@ -123,30 +122,30 @@ func TestShouldDisableTaskWorktree(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "nil feature branch does not disable worktree",
-			metadata: &commands.TaskMetadata{
-				FeatureBranch: nil,
-			},
+			name:     "missing feature branch does not disable worktree",
+			metadata: &core.Task{},
 			expected: false,
 		},
 		{
 			name: "empty feature branch disables worktree",
-			metadata: &commands.TaskMetadata{
-				FeatureBranch: strPtr(""),
+			metadata: &core.Task{
+				FieldsPresent: core.TaskFieldFeatureBranch,
 			},
 			expected: true,
 		},
 		{
 			name: "blank feature branch disables worktree",
-			metadata: &commands.TaskMetadata{
-				FeatureBranch: strPtr("  \t "),
+			metadata: &core.Task{
+				FeatureBranch: "  \t ",
+				FieldsPresent: core.TaskFieldFeatureBranch,
 			},
 			expected: true,
 		},
 		{
 			name: "non-empty feature branch does not disable worktree",
-			metadata: &commands.TaskMetadata{
-				FeatureBranch: strPtr("feature/task-123"),
+			metadata: &core.Task{
+				FeatureBranch: "feature/task-123",
+				FieldsPresent: core.TaskFieldFeatureBranch,
 			},
 			expected: false,
 		},
@@ -163,13 +162,13 @@ func TestShouldDisableTaskWorktree(t *testing.T) {
 func TestShouldDisableTaskWorktreeForRun(t *testing.T) {
 	tests := []struct {
 		name     string
-		metadata *commands.TaskMetadata
+		metadata *core.Task
 		taskData *core.Task
 		expected bool
 	}{
 		{
 			name:     "command metadata can disable worktree",
-			metadata: &commands.TaskMetadata{FeatureBranch: strPtr("")},
+			metadata: &core.Task{FieldsPresent: core.TaskFieldFeatureBranch},
 			taskData: &core.Task{FeatureBranch: "feature/task"},
 			expected: true,
 		},
@@ -306,8 +305,4 @@ func TestRunDefaultsNoCommit(t *testing.T) {
 			assert.Equal(t, tc.expectedMerge, defaults.Merge)
 		})
 	}
-}
-
-func strPtr(value string) *string {
-	return &value
 }
