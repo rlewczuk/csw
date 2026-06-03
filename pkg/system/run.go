@@ -21,16 +21,6 @@ import (
 
 const defaultBashRunTimeout = 120 * time.Second
 
-func normalizeRunConfig(config *conf.CswConfig) *conf.CswConfig {
-	if config == nil {
-		config = &conf.CswConfig{}
-	}
-	if config.GlobalConfig == nil {
-		config.GlobalConfig = &conf.GlobalConfig{}
-	}
-	return config
-}
-
 func runParameters(params *core.RunExecution) *conf.RunParameters {
 	if params == nil || params.Config == nil {
 		return nil
@@ -47,7 +37,6 @@ func RunCommand(params *core.RunExecution) error {
 	if params == nil || runParameters(params) == nil {
 		return fmt.Errorf("RunCommand() [run.go]: params cannot be nil")
 	}
-	params.Config = normalizeRunConfig(params.Config)
 
 	var stdin stdio.Reader = os.Stdin
 	var stdout stdio.Writer = os.Stdout
