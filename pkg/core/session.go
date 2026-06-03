@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	stdio "io"
 	"log/slog"
 	"strings"
 	"sync"
@@ -36,6 +37,39 @@ const (
 // SubAgentTaskRunner executes delegated child-session tasks.
 type SubAgentTaskRunner interface {
 	ExecuteSubAgentTask(parent *SweSession, request tool.SubAgentTaskRequest) (tool.SubAgentTaskResult, error)
+}
+
+// RunExecution contains parameters and runtime state for a non-TUI run session.
+type RunExecution struct {
+	Config              *conf.CswConfig
+	Stdin               stdio.Reader
+	Stdout              stdio.Writer
+	Stderr              stdio.Writer
+	Prompt              string
+	CommandName         string
+	CommandPath         string
+	CommandArgs         []string
+	CommandTemplate     string
+	CommandTaskMetadata *Task
+	ContextData         map[string]any
+	Task                *Task
+	InitialTask         *Task
+	BashRunTimeout      time.Duration
+}
+
+// NewRunExecution creates run execution parameters with complete CSW configuration.
+func NewRunExecution(config *conf.CswConfig, stdin stdio.Reader, stdout stdio.Writer, stderr stdio.Writer) *RunExecution {
+	return &RunExecution{Config: normalizeRunExecutionConfig(config), Stdin: stdin, Stdout: stdout, Stderr: stderr}
+}
+
+func normalizeRunExecutionConfig(config *conf.CswConfig) *conf.CswConfig {
+	if config == nil {
+		config = &conf.CswConfig{}
+	}
+	if config.GlobalConfig == nil {
+		config.GlobalConfig = &conf.GlobalConfig{}
+	}
+	return config
 }
 
 type SweSession struct {

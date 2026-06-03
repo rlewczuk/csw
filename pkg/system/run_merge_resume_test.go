@@ -12,7 +12,7 @@ import (
 func TestValidateMergeCLIParams(t *testing.T) {
 	tests := []struct {
 		name           string
-		params         *RunExecution
+		params         *core.RunExecution
 		expectError    bool
 		errorSubstring string
 	}{

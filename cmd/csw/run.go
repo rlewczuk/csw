@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/system"
 )
 
@@ -165,7 +166,7 @@ func RunCommand() *cobra.Command {
 			parameters.TaskLast = cliTaskLast
 			parameters.TaskReset = cliTaskReset
 			parameters.PositionalArgs = append([]string(nil), args...)
-			return system.RunCommand(system.NewRunExecution(cswConfig, os.Stdin, os.Stdout, os.Stderr))
+			return system.RunCommand(core.NewRunExecution(cswConfig, os.Stdin, os.Stdout, os.Stderr))
 		},
 	}
 

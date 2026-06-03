@@ -31,8 +31,8 @@ func (d *cliSessionInputThreadDouble) PermissionResponse(queryID string, respons
 
 var _ core.SessionThreadInput = (*cliSessionInputThreadDouble)(nil)
 
-func newRunExecutionForTest(defaults conf.RunParameters) *RunExecution {
-	return NewRunExecution(&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: defaults}}, nil, nil, nil)
+func newRunExecutionForTest(defaults conf.RunParameters) *core.RunExecution {
+	return core.NewRunExecution(&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: defaults}}, nil, nil, nil)
 }
 
 func TestBuildRunStdinSessionInput(t *testing.T) {
@@ -41,7 +41,7 @@ func TestBuildRunStdinSessionInput(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		params      *RunExecution
+		params      *core.RunExecution
 		input       stdio.Reader
 		expectedNil bool
 		expected    any
@@ -105,7 +105,7 @@ func TestBuildRunStdinSessionInput(t *testing.T) {
 func TestBuildCLISessionOutput(t *testing.T) {
 	tests := []struct {
 		name     string
-		params   *RunExecution
+		params   *core.RunExecution
 		expected any
 	}{
 		{

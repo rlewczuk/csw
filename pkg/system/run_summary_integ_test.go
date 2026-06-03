@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +37,7 @@ func TestCLISavesSummaryMarkdown(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:01Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := RunCommand(NewRunExecution(&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: conf.RunParameters{
+	err := RunCommand(core.NewRunExecution(&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: conf.RunParameters{
 		PositionalArgs:      []string{"Do the task"},
 		Model:               "ollama/test-model",
 		Role:                "developer",

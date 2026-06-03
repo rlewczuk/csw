@@ -7,6 +7,7 @@ import (
 
 	"github.com/rlewczuk/csw/pkg/commands"
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +17,7 @@ func TestRenderCommandPromptFileReference(t *testing.T) {
 	workDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(workDir, "file.txt"), []byte("abc"), 0644))
 
-	params := &RunExecution{CommandName: "review", CommandTemplate: "Read @file.txt", CommandArgs: []string{}}
+	params := &core.RunExecution{CommandName: "review", CommandTemplate: "Read @file.txt", CommandArgs: []string{}}
 	err := renderCommandPrompt(params, workDir, runner.NewMockRunner(), runner.NewMockRunner())
 	require.NoError(t, err)
 	assert.Equal(t, "Read abc", params.Prompt)
@@ -95,7 +96,7 @@ func TestBuildRunAgentStartupInfoMessages(t *testing.T) {
 
 	t.Run("includes command with embedded source", func(t *testing.T) {
 		messages := BuildRunAgentStartupInfoMessages(
-			&RunExecution{config: &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{}}, CommandName: "csw/task-critic", CommandPath: "embedded:data/csw/task-critic.md"},
+			&core.RunExecution{Config: &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{}}, CommandName: "csw/task-critic", CommandPath: "embedded:data/csw/task-critic.md"},
 			BuildSystemResult{ModelName: "ollama/qwen3", RoleConfig: conf.AgentRoleConfig{}},
 		)
 

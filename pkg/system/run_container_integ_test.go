@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/rlewczuk/csw/pkg/conf"
+	"github.com/rlewczuk/csw/pkg/core"
 	"github.com/rlewczuk/csw/pkg/testutil"
 	"github.com/rlewczuk/csw/pkg/testutil/cfg"
 	"github.com/stretchr/testify/assert"
@@ -44,7 +45,7 @@ func TestCLIContainerModeRunBashBusybox(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := RunCommand(NewRunExecution(&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: conf.RunParameters{
+	err := RunCommand(core.NewRunExecution(&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: conf.RunParameters{
 		PositionalArgs:      []string{"Run a shell command"},
 		Model:               "ollama/test-model",
 		Role:                "developer",
@@ -114,7 +115,7 @@ func TestCLIContainerModeFromGlobalConfig(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := RunCommand(NewRunExecution(&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: conf.RunParameters{
+	err := RunCommand(core.NewRunExecution(&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: conf.RunParameters{
 		PositionalArgs:      []string{"Run a shell command"},
 		Model:               "ollama/test-model",
 		Role:                "developer",
@@ -173,7 +174,7 @@ func TestCLIContainerModeWithAdditionalMountAndEnv(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := RunCommand(NewRunExecution(&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: conf.RunParameters{
+	err := RunCommand(core.NewRunExecution(&conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: conf.RunParameters{
 		PositionalArgs:      []string{"Run a shell command"},
 		Model:               "ollama/test-model",
 		Role:                "developer",

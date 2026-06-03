@@ -11,13 +11,13 @@ import (
 func TestPreparePromptWithContext(t *testing.T) {
 	tests := []struct {
 		name           string
-		params         *RunExecution
+		params         *core.RunExecution
 		expectedPrompt string
 		expectError    string
 	}{
 		{
 			name: "template rendering uses context data",
-			params: &RunExecution{
+			params: &core.RunExecution{
 				Prompt:      "Hello {{.NAME}}",
 				ContextData: map[string]any{"NAME": "FromContext"},
 			},
@@ -25,7 +25,7 @@ func TestPreparePromptWithContext(t *testing.T) {
 		},
 		{
 			name: "prompt still renders from context",
-			params: &RunExecution{
+			params: &core.RunExecution{
 				Prompt:      "Hello {{.NAME}}",
 				ContextData: map[string]any{"NAME": "FromCLI"},
 			},
@@ -33,7 +33,7 @@ func TestPreparePromptWithContext(t *testing.T) {
 		},
 		{
 			name: "template renders nested agent state fields",
-			params: &RunExecution{
+			params: &core.RunExecution{
 				Prompt: "Task file: {{.Task.TaskDir}}; WorkDir: {{.Info.WorkDir}}",
 				ContextData: BuildPromptContextData(nil, core.AgentState{
 					Info: core.AgentStateCommonInfo{WorkDir: "/workspace/project"},
@@ -44,7 +44,7 @@ func TestPreparePromptWithContext(t *testing.T) {
 		},
 		{
 			name: "template uses struct field names instead of json tags",
-			params: &RunExecution{
+			params: &core.RunExecution{
 				Prompt: "{{.Task.TaskDir}} / {{.Task.FeatureBranch}}",
 				ContextData: BuildPromptContextData(nil, core.AgentState{
 					Task: &core.Task{TaskDir: "/tmp/task", FeatureBranch: "feature/test"},
@@ -59,7 +59,7 @@ func TestPreparePromptWithContext(t *testing.T) {
 		},
 		{
 			name: "empty prompt is allowed",
-			params: &RunExecution{
+			params: &core.RunExecution{
 				Prompt:      "",
 				ContextData: map[string]any{"NAME": "Ignored"},
 			},

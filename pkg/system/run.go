@@ -21,29 +21,6 @@ import (
 
 const defaultBashRunTimeout = 120 * time.Second
 
-// RunExecution contains parameters and runtime state for a non-TUI run session.
-type RunExecution struct {
-	config              *conf.CswConfig
-	Stdin               stdio.Reader
-	Stdout              stdio.Writer
-	Stderr              stdio.Writer
-	Prompt              string
-	CommandName         string
-	CommandPath         string
-	CommandArgs         []string
-	CommandTemplate     string
-	CommandTaskMetadata *core.Task
-	ContextData         map[string]any
-	Task                *core.Task
-	InitialTask         *core.Task
-	BashRunTimeout      time.Duration
-}
-
-// NewRunExecution creates run execution parameters with complete CSW configuration.
-func NewRunExecution(config *conf.CswConfig, stdin stdio.Reader, stdout stdio.Writer, stderr stdio.Writer) *RunExecution {
-	return &RunExecution{config: normalizeRunConfig(config), Stdin: stdin, Stdout: stdout, Stderr: stderr}
-}
-
 func normalizeRunConfig(config *conf.CswConfig) *conf.CswConfig {
 	if config == nil {
 		config = &conf.CswConfig{}
@@ -54,14 +31,14 @@ func normalizeRunConfig(config *conf.CswConfig) *conf.CswConfig {
 	return config
 }
 
-func runGlobalConfig(params *RunExecution) *conf.GlobalConfig {
-	if params == nil || params.config == nil {
+func runGlobalConfig(params *core.RunExecution) *conf.GlobalConfig {
+	if params == nil || params.Config == nil {
 		return nil
 	}
-	return params.config.GlobalConfig
+	return params.Config.GlobalConfig
 }
 
-func runParameters(params *RunExecution) *conf.RunParameters {
+func runParameters(params *core.RunExecution) *conf.RunParameters {
 	globalConfig := runGlobalConfig(params)
 	if globalConfig == nil {
 		return nil
@@ -70,11 +47,11 @@ func runParameters(params *RunExecution) *conf.RunParameters {
 }
 
 // RunCommand runs a non-TUI agent session with the provided execution params.
-func RunCommand(params *RunExecution) error {
+func RunCommand(params *core.RunExecution) error {
 	if params == nil || runParameters(params) == nil {
 		return fmt.Errorf("RunCommand() [run.go]: params cannot be nil")
 	}
-	params.config = normalizeRunConfig(params.config)
+	params.Config = normalizeRunConfig(params.Config)
 
 	var stdin stdio.Reader = os.Stdin
 	var stdout stdio.Writer = os.Stdout
@@ -135,7 +112,7 @@ func RunCommand(params *RunExecution) error {
 	parameters.Workdir = buildResult.WorkDir
 	parameters.ShadowDir = buildResult.ShadowDir
 	parameters.Model = buildResult.ModelName
-	params.ContextData = BuildPromptContextData(params.ContextData, core.AgentState{Info: core.AgentStateCommonInfo{AgentName: "CSW Coding Agent", WorkDir: buildResult.WorkDir, ShadowDir: buildResult.ShadowDir}, Role: buildResult.RoleConfig.Clone(), Task: cloneRunTask(params.Task), Config: params.config})
+	params.ContextData = BuildPromptContextData(params.ContextData, core.AgentState{Info: core.AgentStateCommonInfo{AgentName: "CSW Coding Agent", WorkDir: buildResult.WorkDir, ShadowDir: buildResult.ShadowDir}, Role: buildResult.RoleConfig.Clone(), Task: cloneRunTask(params.Task), Config: params.Config})
 	if err := renderCommandPrompt(params, buildResult.WorkDir, buildResult.ShellRunner, buildResult.HostShellRunner); err != nil {
 		return err
 	}
@@ -214,7 +191,7 @@ type runExecutionPrepResult struct {
 // container settings, and task data for a non-TUI run session. It mutates
 // both params and its embedded parameters, and returns the task state required
 // by the rest of RunCommand.
-func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runExecutionPrepResult, error) {
+func populateRunExecutionParams(params *core.RunExecution, stdin stdio.Reader) (*runExecutionPrepResult, error) {
 	parameters := runParameters(params)
 	if parameters == nil {
 		return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: params config cannot be nil")
@@ -512,7 +489,7 @@ func parseVFSAllowPaths(values []string) []string {
 	return r
 }
 
-func buildRunSessionOutput(params *RunExecution, output stdio.Writer) core.SessionThreadOutput {
+func buildRunSessionOutput(params *core.RunExecution, output stdio.Writer) core.SessionThreadOutput {
 	if params == nil {
 		return sessionio.NewTextSessionOutput(output)
 	}
@@ -534,7 +511,7 @@ func buildSummaryMessageFunc(output core.SessionThreadOutput) func(string, share
 
 type runSessionInput interface{ StartReadingInput() }
 
-func buildRunStdinSessionInput(params *RunExecution, thread core.SessionThreadInput, input stdio.Reader) runSessionInput {
+func buildRunStdinSessionInput(params *core.RunExecution, thread core.SessionThreadInput, input stdio.Reader) runSessionInput {
 	if params == nil || thread == nil || input == nil {
 		return nil
 	}
@@ -544,7 +521,7 @@ func buildRunStdinSessionInput(params *RunExecution, thread core.SessionThreadIn
 	}
 	return sessionio.NewTextSessionInput(input, thread)
 }
-func validateMergeRunExecution(params *RunExecution) error {
+func validateMergeRunExecution(params *core.RunExecution) error {
 	if params == nil {
 		return fmt.Errorf("validateMergeRunExecution() [run.go]: params cannot be nil")
 	}
@@ -593,7 +570,7 @@ func shouldDisableTaskWorktreeForRun(taskMetadata *core.Task, taskData *core.Tas
 }
 
 // PreparePromptWithContext renders prompt with template context data.
-func PreparePromptWithContext(params *RunExecution) error {
+func PreparePromptWithContext(params *core.RunExecution) error {
 	if params == nil {
 		return fmt.Errorf("PreparePromptWithContext() [run.go]: params is nil")
 	}

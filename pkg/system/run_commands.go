@@ -63,7 +63,7 @@ func resolveRunCommandInvocation(invocation *commands.Invocation, workDir string
 }
 
 // BuildRunAgentStartupInfoMessages builds startup info lines for model, thinking, role and command.
-func BuildRunAgentStartupInfoMessages(params *RunExecution, buildResult BuildSystemResult) []string {
+func BuildRunAgentStartupInfoMessages(params *core.RunExecution, buildResult BuildSystemResult) []string {
 	if params == nil {
 		return nil
 	}
@@ -133,7 +133,7 @@ func resolveCommandsRootDir(workDir string, shadowDir string) (string, error) {
 	return resolvedWorkDir, nil
 }
 
-func renderCommandPrompt(params *RunExecution, workDir string, shellRunner runner.CommandRunner, hostShellRunner runner.CommandRunner) error {
+func renderCommandPrompt(params *core.RunExecution, workDir string, shellRunner runner.CommandRunner, hostShellRunner runner.CommandRunner) error {
 	if params == nil {
 		return fmt.Errorf("renderCommandPrompt() [run_commands.go]: params is nil")
 	}
