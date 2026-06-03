@@ -94,7 +94,8 @@ func RunCommand(params *core.RunExecution) error {
 	}
 	defer logging.FlushLogs()
 
-	params.ContextData = BuildPromptContextData(params.ContextData, core.AgentState{Info: core.AgentStateCommonInfo{AgentName: "CSW Coding Agent", WorkDir: parameters.Workdir, ShadowDir: parameters.ShadowDir}, Role: runtimeConfig.RoleConfig.Clone(), Task: cloneRunTask(params.Task), Config: params.Config})
+	roleConfig, _ := core.NewAgentRoleRegistry(params.Config).Get(parameters.Role)
+	params.ContextData = BuildPromptContextData(params.ContextData, core.AgentState{Info: core.AgentStateCommonInfo{AgentName: "CSW Coding Agent", WorkDir: parameters.Workdir, ShadowDir: parameters.ShadowDir}, Role: roleConfig.Clone(), Task: cloneRunTask(params.Task), Config: params.Config})
 	if err := renderCommandPrompt(params, parameters.Workdir, runtimeConfig.ShellRunner, runtimeConfig.HostShellRunner); err != nil {
 		return err
 	}
@@ -107,12 +108,12 @@ func RunCommand(params *core.RunExecution) error {
 		if runtimeConfig.LSPStarted {
 			lspStatus = "started"
 		}
-		_, _ = fmt.Fprintf(stdout, "[INFO] LSP %s (workdir: %s)\n", lspStatus, runtimeConfig.LSPWorkDir)
+		_, _ = fmt.Fprintf(stdout, "[INFO] LSP %s (workdir: %s)\n", lspStatus, parameters.Workdir)
 	}
 	for _, message := range BuildRunAgentStartupInfoMessages(params) {
 		_, _ = fmt.Fprintln(stdout, message)
 	}
-	if strings.TrimSpace(runtimeConfig.ContainerImage) != "" {
+	if parameters.Container != nil && parameters.Container.Enabled && strings.TrimSpace(parameters.Container.Image) != "" {
 		_, _ = fmt.Fprintln(stdout, BuildContainerStartupInfoMessage(params.Config))
 	}
 
@@ -128,7 +129,7 @@ func RunCommand(params *core.RunExecution) error {
 		sessionInput.StartReadingInput()
 	}
 
-	baseCommitID := vcs.ResolveGitCommitID(vcs.ChooseGitDiffDir(runtimeConfig.WorkDirRoot, runtimeConfig.WorkDir), "HEAD")
+	baseCommitID := vcs.ResolveGitCommitID(vcs.ChooseGitDiffDir(runtimeConfig.WorkDirRoot, parameters.Workdir), "HEAD")
 	var sessionRunErr error
 	select {
 	case err := <-runtimeResult.Done:
@@ -139,13 +140,17 @@ func RunCommand(params *core.RunExecution) error {
 		sessionRunErr = ctx.Err()
 	}
 
-	finalizeResult, finalizeErr := FinalizeWorktreeSession(ctx, runtimeConfig.VCS, runtimeConfig.WorktreeBranch, parameters.Merge, parameters.CommitMessageTemplate, sweSystem, session, stderr, runtimeConfig.WorkDirRoot, runtimeConfig.WorkDir, params.Prompt)
+	finalizeResult, finalizeErr := FinalizeWorktreeSession(ctx, runtimeConfig.VCS, parameters.Worktree, parameters.Merge, parameters.CommitMessageTemplate, sweSystem, session, stderr, runtimeConfig.WorkDirRoot, parameters.Workdir, params.Prompt)
 	if finalizeErr != nil {
 		sessionRunErr = finalizeErr
 	}
 	endTime := time.Now()
 
-	if err := core.EmitSessionSummary(startTime, endTime, session, core.SessionSummaryBuildResult{LogsDir: runtimeConfig.LogsDir, WorkDirRoot: runtimeConfig.WorkDirRoot, WorkDir: runtimeConfig.WorkDir, LSPServer: runtimeConfig.LSPServer, ContainerImage: runtimeConfig.ContainerImage}, buildSummaryMessageFunc(sessionOutput), sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
+	containerImage := ""
+	if parameters.Container != nil && parameters.Container.Enabled {
+		containerImage = parameters.Container.Image
+	}
+	if err := core.EmitSessionSummary(startTime, endTime, session, core.SessionSummaryBuildResult{LogsDir: runtimeConfig.LogsDir, WorkDirRoot: runtimeConfig.WorkDirRoot, WorkDir: parameters.Workdir, LSPServer: parameters.LSPServer, ContainerImage: containerImage}, buildSummaryMessageFunc(sessionOutput), sessionRunErr, baseCommitID, finalizeResult.HeadCommitID); err != nil {
 		return err
 	}
 	if err := applyCommandTaskMetadata(params); err != nil {
@@ -620,5 +625,10 @@ func PreparePromptWithContext(params *core.RunExecution) error {
 func BuildContainerStartupInfoMessage(configStore *conf.CswConfig) string {
 	runtimeConfig := configStore.Runtime
 	identity := runtimeConfig.ContainerIdentity
-	return fmt.Sprintf("[INFO] Container: image=%s tag=%s version=%s user=%s(uid=%d) group=%s(gid=%d)", shared.NullValue(strings.TrimSpace(runtimeConfig.ContainerImageName)), shared.NullValue(strings.TrimSpace(runtimeConfig.ContainerImageTag)), shared.NullValue(strings.TrimSpace(runtimeConfig.ContainerImageVersion)), shared.NullValue(strings.TrimSpace(identity.UserName)), identity.UID, shared.NullValue(strings.TrimSpace(identity.GroupName)), identity.GID)
+	containerImage := ""
+	if configStore.GlobalConfig != nil && configStore.GlobalConfig.Parameters.Container != nil {
+		containerImage = configStore.GlobalConfig.Parameters.Container.Image
+	}
+	containerImageInfo := parseContainerImageInfo(containerImage)
+	return fmt.Sprintf("[INFO] Container: image=%s tag=%s version=%s user=%s(uid=%d) group=%s(gid=%d)", shared.NullValue(strings.TrimSpace(containerImageInfo.Name)), shared.NullValue(strings.TrimSpace(containerImageInfo.Tag)), shared.NullValue(strings.TrimSpace(containerImageInfo.Version)), shared.NullValue(strings.TrimSpace(identity.UserName)), identity.UID, shared.NullValue(strings.TrimSpace(identity.GroupName)), identity.GID)
 }

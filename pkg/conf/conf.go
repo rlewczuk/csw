@@ -427,24 +427,13 @@ type CswConfig struct {
 
 // RuntimeConfig contains data resolved while building the runtime system.
 type RuntimeConfig struct {
-	WorkDir               string
 	WorkDirRoot           string
-	ShadowDir             string
-	RoleConfig            AgentRoleConfig
-	ModelName             string
 	ProviderRegistry      any
 	LogsDir               string
 	VCS                   apis.VCS
-	WorktreeBranch        string
-	LSPServer             string
 	ShellRunner           runner.CommandRunner
 	HostShellRunner       runner.CommandRunner
-	ContainerImage        string
-	ContainerImageName    string
-	ContainerImageTag     string
-	ContainerImageVersion string
 	ContainerIdentity     runner.ContainerIdentity
 	LSPStarted            bool
-	LSPWorkDir            string
 	Cleanup               func()
 }

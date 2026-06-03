@@ -545,21 +545,13 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, error) {
 	}
 
 	configStore.Runtime = conf.RuntimeConfig{
-		WorkDir:          effectiveWorkDir,
 		WorkDirRoot:      workDir,
-		ShadowDir:        shadowDir,
-		RoleConfig:       roleConfig,
-		ModelName:        modelName,
 		ProviderRegistry: providerRegistry,
 		LogsDir:          logsDir,
 		VCS:              selectedVCS,
-		WorktreeBranch:   parameters.Worktree,
-		LSPServer:        parameters.LSPServer,
 		ShellRunner:      bashRunner,
 		HostShellRunner:  runner.NewBashRunner(effectiveWorkDir, bashRunTimeout),
-		ContainerImage:   containerRuntimeConfig.Image,
 		LSPStarted:       lspClient != nil,
-		LSPWorkDir:       effectiveWorkDir,
 		Cleanup: func() {
 			for _, cleanupFn := range cleanupFns {
 				cleanupFn()
@@ -570,10 +562,11 @@ func BuildSystem(configStore *conf.CswConfig) (*SweSystem, error) {
 	parameters.ShadowDir = shadowDir
 	parameters.Model = modelName
 	if containerRuntimeConfig.Enabled {
-		containerImageInfo := parseContainerImageInfo(containerRuntimeConfig.Image)
-		configStore.Runtime.ContainerImageName = containerImageInfo.Name
-		configStore.Runtime.ContainerImageTag = containerImageInfo.Tag
-		configStore.Runtime.ContainerImageVersion = containerImageInfo.Version
+		if parameters.Container == nil {
+			parameters.Container = &conf.ContainerConfig{}
+		}
+		parameters.Container.Enabled = true
+		parameters.Container.Image = containerRuntimeConfig.Image
 		if containerRunner, ok := bashRunner.(runner.ContainerRunner); ok {
 			configStore.Runtime.ContainerIdentity = containerRunner.Identity()
 		}

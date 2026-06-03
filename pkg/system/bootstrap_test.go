@@ -88,10 +88,10 @@ func TestBuildSystemUpdatesWorkingConfig(t *testing.T) {
 	assert.Same(t, configStore, sweSystem.Config)
 	assert.Equal(t, workDir, configStore.GlobalConfig.Parameters.Workdir)
 	assert.Equal(t, "mock/test-model", configStore.GlobalConfig.Parameters.Model)
-	assert.Equal(t, workDir, configStore.Runtime.WorkDir)
+	assert.Equal(t, workDir, configStore.GlobalConfig.Parameters.Workdir)
 	assert.Equal(t, workDir, configStore.Runtime.WorkDirRoot)
-	assert.Equal(t, "mock/test-model", configStore.Runtime.ModelName)
-	assert.Equal(t, conf.AgentRoleConfig{Name: "developer"}, configStore.Runtime.RoleConfig)
+	assert.Equal(t, "mock/test-model", configStore.GlobalConfig.Parameters.Model)
+	assert.Equal(t, conf.AgentRoleConfig{Name: "developer"}, *configStore.AgentRoleConfigs["developer"])
 	require.NotNil(t, configStore.Runtime.ShellRunner)
 	require.NotNil(t, configStore.Runtime.HostShellRunner)
 }

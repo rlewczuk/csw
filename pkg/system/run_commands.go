@@ -68,13 +68,16 @@ func BuildRunAgentStartupInfoMessages(params *core.RunExecution) []string {
 		return nil
 	}
 	parameters := &params.Config.GlobalConfig.Parameters
-	runtimeConfig := params.Config.Runtime
 
 	messages := make([]string, 0, 4)
-	messages = append(messages, fmt.Sprintf("[INFO] Model: %s", shared.NullValue(strings.TrimSpace(runtimeConfig.ModelName))))
+	messages = append(messages, fmt.Sprintf("[INFO] Model: %s", shared.NullValue(strings.TrimSpace(parameters.Model))))
 	messages = append(messages, fmt.Sprintf("[INFO] Thinking: %s", shared.NullValue(strings.TrimSpace(parameters.Thinking))))
 
-	roleName := strings.TrimSpace(runtimeConfig.RoleConfig.Name)
+	roleConfig, roleFound := core.NewAgentRoleRegistry(params.Config).Get(parameters.Role)
+	roleName := ""
+	if roleFound {
+		roleName = strings.TrimSpace(roleConfig.Name)
+	}
 	if roleName == "" {
 		roleName = strings.TrimSpace(parameters.Role)
 	}
