@@ -26,7 +26,7 @@ func TestNewSweSessionKeepsProvidedRunExecutionReference(t *testing.T) {
 
 	require.NotNil(t, session)
 	assert.Same(t, execution, session.Execution)
-	assert.Same(t, config, session.config())
+	assert.Same(t, config, session.configValue())
 	assert.Same(t, task, session.task())
 	assert.Equal(t, task, session.GetState().Task)
 }

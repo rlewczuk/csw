@@ -64,6 +64,7 @@ func NewRunExecution(config *conf.CswConfig, stdin stdio.Reader, stdout stdio.Wr
 
 type SweSession struct {
 	Execution               *RunExecution
+	config                  *conf.CswConfig
 	id                      string
 	parentID                string
 	taskID                  string
@@ -127,6 +128,7 @@ type SweSession struct {
 // SweSessionParams stores dependencies and initial values used to create a SweSession.
 type SweSessionParams struct {
 	Execution *RunExecution
+	Config    *conf.CswConfig
 
 	ID           string
 	ParentID     string
@@ -190,6 +192,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 
 	session := &SweSession{
 		Execution:       execution,
+		config:          params.Config,
 		id:              params.ID,
 		parentID:        strings.TrimSpace(params.ParentID),
 		taskID:          strings.TrimSpace(params.TaskID),
@@ -229,7 +232,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		tokenUsage:                 params.TokenUsage,
 		contextLength:              params.ContextLength,
 		compactionCount:            params.CompactionCount,
-		compactor:                  NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, executionConfig(execution, nil)),
+		compactor:                  NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, executionConfig(execution, params.Config)),
 		taskManager:                params.TaskManager,
 		taskVCS:                    params.TaskVCS,
 		taskStatusUpdatedInSession: params.TaskStatusUpdatedInSession,
@@ -311,7 +314,7 @@ func (s *SweSession) Run(ctx context.Context) error {
 		s.ModelWithProvider(),
 		providerMap,
 		chatOptions,
-		s.config(),
+		s.configValue(),
 		s.provider,
 		s.modelAliases,
 		s.llmRetryPolicyOverride,
@@ -488,7 +491,7 @@ func (s *SweSession) configureCompactor(chatModel models.ChatModel, compactorPro
 	}
 
 	if kimiCompactor, ok := s.compactor.(*KimiCompactor); ok && kimiCompactor.model == nil {
-		s.compactor = NewKimiCompactor(chatModel, kimiCompactor.nmessages, s.config())
+		s.compactor = NewKimiCompactor(chatModel, kimiCompactor.nmessages, s.configValue())
 	}
 }
 

@@ -35,12 +35,12 @@ func executionConfig(execution *RunExecution, fallback *conf.CswConfig) *conf.Cs
 	return fallback
 }
 
-func (s *SweSession) config() *conf.CswConfig {
+func (s *SweSession) configValue() *conf.CswConfig {
 	if s == nil {
 		return nil
 	}
 
-	return executionConfig(s.Execution, nil)
+	return executionConfig(s.Execution, s.config)
 }
 
 func (s *SweSession) task() *Task {
