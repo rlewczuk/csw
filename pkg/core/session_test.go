@@ -16,3 +16,17 @@ func TestNewRunExecutionKeepsProvidedConfigReference(t *testing.T) {
 	require.NotNil(t, execution)
 	assert.Same(t, config, execution.Config)
 }
+
+func TestNewSweSessionKeepsProvidedRunExecutionReference(t *testing.T) {
+	config := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{}}
+	task := &Task{UUID: "task-id", Name: "task name"}
+	execution := &RunExecution{Config: config, Task: task}
+
+	session := NewSweSession(&SweSessionParams{Execution: execution})
+
+	require.NotNil(t, session)
+	assert.Same(t, execution, session.Execution)
+	assert.Same(t, config, session.config())
+	assert.Same(t, task, session.task())
+	assert.Equal(t, task, session.GetState().Task)
+}

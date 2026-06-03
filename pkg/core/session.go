@@ -63,10 +63,10 @@ func NewRunExecution(config *conf.CswConfig, stdin stdio.Reader, stdout stdio.Wr
 }
 
 type SweSession struct {
+	Execution               *RunExecution
 	id                      string
 	parentID                string
 	taskID                  string
-	task                    *Task
 	slug                    string
 	provider                models.ModelProvider
 	providerName            string
@@ -95,7 +95,6 @@ type SweSession struct {
 	toolSelection          conf.ToolSelectionConfig
 	promptGenerator        PromptGenerator
 	roles                  *AgentRoleRegistry
-	config                 *conf.CswConfig
 	systemTools            *tool.ToolRegistry
 	logBaseDir             string
 	thinking               string
@@ -127,6 +126,8 @@ type SweSession struct {
 
 // SweSessionParams stores dependencies and initial values used to create a SweSession.
 type SweSessionParams struct {
+	Execution *RunExecution
+
 	ID           string
 	ParentID     string
 	TaskID       string
@@ -187,12 +188,16 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 	if params == nil {
 		params = &SweSessionParams{}
 	}
+	execution := params.Execution
+	if execution == nil && (params.Config != nil || params.Task != nil) {
+		execution = &RunExecution{Config: params.Config, Task: cloneTask(params.Task)}
+	}
 
 	session := &SweSession{
+		Execution:       execution,
 		id:              params.ID,
 		parentID:        strings.TrimSpace(params.ParentID),
 		taskID:          strings.TrimSpace(params.TaskID),
-		task:            cloneTask(params.Task),
 		slug:            strings.TrimSpace(params.Slug),
 		provider:        params.Provider,
 		providerName:    params.ProviderName,
@@ -218,7 +223,6 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		toolSelection:   params.ToolSelection,
 		promptGenerator: params.PromptGenerator,
 		roles:           params.Roles,
-		config:          params.Config,
 		systemTools:     params.SystemTools,
 		logBaseDir:      params.LogBaseDir,
 		thinking:        params.Thinking,
@@ -230,7 +234,7 @@ func NewSweSession(params *SweSessionParams) *SweSession {
 		tokenUsage:                 params.TokenUsage,
 		contextLength:              params.ContextLength,
 		compactionCount:            params.CompactionCount,
-		compactor:                  NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, params.Config),
+		compactor:                  NewKimiCompactor(nil, defaultKimiCompactorMessagesToKeep, executionConfig(execution, params.Config)),
 		taskManager:                params.TaskManager,
 		taskVCS:                    params.TaskVCS,
 		taskStatusUpdatedInSession: params.TaskStatusUpdatedInSession,
@@ -312,7 +316,7 @@ func (s *SweSession) Run(ctx context.Context) error {
 		s.ModelWithProvider(),
 		providerMap,
 		chatOptions,
-		s.config,
+		s.config(),
 		s.provider,
 		s.modelAliases,
 		s.llmRetryPolicyOverride,
@@ -489,7 +493,7 @@ func (s *SweSession) configureCompactor(chatModel models.ChatModel, compactorPro
 	}
 
 	if kimiCompactor, ok := s.compactor.(*KimiCompactor); ok && kimiCompactor.model == nil {
-		s.compactor = NewKimiCompactor(chatModel, kimiCompactor.nmessages, s.config)
+		s.compactor = NewKimiCompactor(chatModel, kimiCompactor.nmessages, s.config())
 	}
 }
 

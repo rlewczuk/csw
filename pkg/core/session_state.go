@@ -27,6 +27,30 @@ func appendUniqueString(values []string, value string) []string {
 	return append(values, trimmed)
 }
 
+func executionConfig(execution *RunExecution, fallback *conf.CswConfig) *conf.CswConfig {
+	if execution != nil && execution.Config != nil {
+		return execution.Config
+	}
+
+	return fallback
+}
+
+func (s *SweSession) config() *conf.CswConfig {
+	if s == nil {
+		return nil
+	}
+
+	return executionConfig(s.Execution, nil)
+}
+
+func (s *SweSession) task() *Task {
+	if s == nil || s.Execution == nil {
+		return nil
+	}
+
+	return s.Execution.Task
+}
+
 func (s *SweSession) ChatMessages() []*models.ChatMessage {
 	return s.messages
 }
@@ -213,7 +237,7 @@ func (s *SweSession) GetState() AgentState {
 			ContextLengthTokens: s.contextLength,
 		},
 		Role: s.role.Clone(),
-		Task: cloneTask(s.task),
+		Task: cloneTask(s.task()),
 	}
 }
 

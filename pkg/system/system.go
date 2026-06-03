@@ -58,10 +58,10 @@ type SweSystem struct {
 
 // NewSession creates a new session for selected model.
 func (s *SweSystem) NewSession(model string, outputHandler core.SessionThreadOutput) (*core.SweSession, error) {
-	return s.newSessionWithOptions(model, outputHandler, "", "", "", "", nil)
+	return s.newSessionWithOptions(model, outputHandler, "", "", "", "", nil, nil)
 }
 
-func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.SessionThreadOutput, parentID string, slug string, thinking string, roleName string, task *core.Task) (*core.SweSession, error) {
+func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.SessionThreadOutput, parentID string, slug string, thinking string, roleName string, task *core.Task, execution *core.RunExecution) (*core.SweSession, error) {
 	modelRefs, err := models.ExpandProviderModelChain(model, s.ModelAliases)
 	if err != nil || len(modelRefs) == 0 {
 		return nil, fmt.Errorf("SweSystem.NewSession() [system.go]: invalid model format, expected provider/model, comma-separated provider/model list, or model alias, got '%s'", model)
@@ -108,6 +108,7 @@ func (s *SweSystem) newSessionWithOptions(model string, outputHandler core.Sessi
 	}
 
 	session := core.NewSweSession(&core.SweSessionParams{
+		Execution:           execution,
 		ID:                  sessionID,
 		ParentID:            strings.TrimSpace(parentID),
 		Task:                task,
@@ -244,7 +245,7 @@ func (s *SweSystem) ExecuteSubAgentTask(parent *core.SweSession, request tool.Su
 		thinking = strings.TrimSpace(parent.ThinkingLevel())
 	}
 	childOutput := parent.OutputHandler()
-	child, err := s.newSessionWithOptions(modelName, childOutput, parent.ID(), resolvedSlug, thinking, resolvedRoleName, nil)
+	child, err := s.newSessionWithOptions(modelName, childOutput, parent.ID(), resolvedSlug, thinking, resolvedRoleName, nil, nil)
 	if err != nil {
 		return tool.SubAgentTaskResult{}, fmt.Errorf("SweSystem.ExecuteSubAgentTask() [system.go]: failed to create child session: %w", err)
 	}

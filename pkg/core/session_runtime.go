@@ -92,8 +92,8 @@ func (s *SweSession) compactContext(statusMessage string) error {
 }
 
 func (s *SweSession) contextCompactionThreshold() float64 {
-	if s.config != nil && s.config.GlobalConfig != nil {
-		globalConfig := s.config.GlobalConfig
+	if config := s.config(); config != nil && config.GlobalConfig != nil {
+		globalConfig := config.GlobalConfig
 		if globalConfig.ContextCompactionThreshold > 0 && globalConfig.ContextCompactionThreshold <= 1 {
 			return globalConfig.ContextCompactionThreshold
 		}
@@ -136,8 +136,8 @@ func (s *SweSession) persistCompactionMessagesSnapshot(phase string, compactionN
 // llmRetryMaxAttempts returns the maximum number of retries for rate limit/network errors.
 // Returns default value from models.DefaultMaxRetries if not configured.
 func (s *SweSession) llmRetryMaxAttempts() int {
-	if s.config != nil && s.config.GlobalConfig != nil {
-		globalConfig := s.config.GlobalConfig
+	if config := s.config(); config != nil && config.GlobalConfig != nil {
+		globalConfig := config.GlobalConfig
 		if globalConfig.LLMRetryMaxAttempts > 0 {
 			return globalConfig.LLMRetryMaxAttempts
 		}
@@ -157,8 +157,8 @@ func (s *SweSession) llmRetryMaxAttempts() int {
 
 // llmRetryMaxBackoffSeconds returns the maximum backoff in seconds for temporary failures.
 func (s *SweSession) llmRetryMaxBackoffSeconds() int {
-	if s.config != nil && s.config.GlobalConfig != nil {
-		globalConfig := s.config.GlobalConfig
+	if config := s.config(); config != nil && config.GlobalConfig != nil {
+		globalConfig := config.GlobalConfig
 		if globalConfig.LLMRetryMaxBackoffSeconds > 0 {
 			return globalConfig.LLMRetryMaxBackoffSeconds
 		}
@@ -210,8 +210,8 @@ func (s *SweSession) maxToolThreadsLimit() int {
 		return s.maxToolThreads
 	}
 
-	if s.config != nil && s.config.GlobalConfig != nil {
-		globalConfig := s.config.GlobalConfig
+	if config := s.config(); config != nil && config.GlobalConfig != nil {
+		globalConfig := config.GlobalConfig
 		if globalConfig.Parameters.MaxThreads > 0 {
 			return globalConfig.Parameters.MaxThreads
 		}

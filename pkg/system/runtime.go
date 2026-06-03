@@ -9,6 +9,7 @@ import (
 
 // StartRunSessionParams defines parameters for creating and starting run session runtime.
 type StartRunSessionParams struct {
+	Execution       *core.RunExecution
 	ModelName       string
 	RoleName        string
 	Task            *core.Task
@@ -39,7 +40,7 @@ func (s *SweSystem) StartRunSession(params StartRunSessionParams) (StartRunSessi
 		}
 	}
 
-	session, err := s.newSessionWithOptions(modelName, nil, "", "", params.Thinking, params.RoleName, params.Task)
+	session, err := s.newSessionWithOptions(modelName, nil, "", "", params.Thinking, params.RoleName, params.Task, params.Execution)
 	if err != nil {
 		return result, fmt.Errorf("SweSystem.StartRunSession() [runtime.go]: failed to create session: %w", err)
 	}

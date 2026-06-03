@@ -119,7 +119,7 @@ func RunCommand(params *core.RunExecution) error {
 	sessionOutput := buildRunSessionOutput(params, stdout)
 	runtimeResult, err := func(sweSystem *SweSystem, params StartRunSessionParams) (StartRunSessionResult, error) {
 		return sweSystem.StartRunSession(params)
-	}(sweSystem, StartRunSessionParams{ModelName: parameters.Model, RoleName: parameters.Role, Task: params.Task, Thinking: parameters.Thinking, ModelOverridden: parameters.ModelOverridden, Prompt: params.Prompt, OutputHandler: sessionOutput})
+	}(sweSystem, StartRunSessionParams{Execution: params, ModelName: parameters.Model, RoleName: parameters.Role, Task: params.Task, Thinking: parameters.Thinking, ModelOverridden: parameters.ModelOverridden, Prompt: params.Prompt, OutputHandler: sessionOutput})
 	if err != nil {
 		return fmt.Errorf("RunCommand() [run.go]: failed to start run session runtime: %w", err)
 	}
