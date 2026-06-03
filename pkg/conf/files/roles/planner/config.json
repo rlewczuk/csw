@@ -1,0 +1,45 @@
+{
+  "name": "planner",
+  "description": "Planning role that analyzes tasks, enriches task specifications, and splits complex work into implementation-ready subtasks",
+  "aliases": [
+    "plan"
+  ],
+  "model": "openai/gpt-5.5",
+  "vfs-privileges": {
+    "**": {
+      "read": "allow",
+      "write": "deny",
+      "delete": "deny",
+      "list": "allow",
+      "find": "allow",
+      "move": "deny"
+    },
+    "/**": {
+      "read": "deny",
+      "write": "deny",
+      "delete": "deny",
+      "list": "deny",
+      "find": "deny",
+      "move": "deny"
+    }
+  },
+  "tools-access": {
+    "**": "deny",
+    "todoRead": "allow",
+    "todoWrite": "allow",
+    "taskGet": "allow",
+    "taskList": "allow",
+    "taskNew": "allow",
+    "taskUpdate": "allow",
+    "taskEdit": "allow",
+    "vfsRead": "allow",
+    "vfsFind": "allow",
+    "vfsGrep": "allow",
+    "vfsList": "allow",
+    "webFetch": "allow",
+    "finish": "allow"
+  },
+  "run-privileges": {
+    "*": "deny"
+  }
+}

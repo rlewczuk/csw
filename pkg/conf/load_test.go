@@ -174,9 +174,18 @@ func TestCswConfigLoad(t *testing.T) {
 			require.NotNil(t, cfg.GlobalConfig)
 			require.Contains(t, cfg.AgentRoleConfigs, "explorer")
 			require.Contains(t, cfg.AgentRoleConfigs, "developer")
+			require.Contains(t, cfg.AgentRoleConfigs, "planner")
 			developerRole := cfg.AgentRoleConfigs["developer"]
 			require.Equal(t, AccessAllow, developerRole.ToolsAccess["**"])
 			require.Equal(t, AccessDeny, developerRole.ToolsAccess["task*"])
+			plannerRole := cfg.AgentRoleConfigs["planner"]
+			require.Equal(t, AccessDeny, plannerRole.ToolsAccess["**"])
+			require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskGet"])
+			require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskList"])
+			require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskNew"])
+			require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskUpdate"])
+			require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskEdit"])
+			require.Equal(t, AccessDeny, plannerRole.RunPrivileges["*"])
 			explorerRole := cfg.AgentRoleConfigs["explorer"]
 			require.Equal(t, AccessDeny, explorerRole.ToolsAccess["**"])
 			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsRead"])
