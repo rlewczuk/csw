@@ -96,7 +96,7 @@ func TestContainerConfig_Merge(t *testing.T) {
 }
 
 func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
-	base := RunDefaultsConfig{
+	base := RunParameters{
 		DefaultProvider:   "provider1",
 		DefaultRole:       "role1",
 		Container:         &ContainerConfig{Image: "image1", Mounts: []string{"/a:/b"}, Env: []string{"A=1"}},
@@ -118,7 +118,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 		RunBashMax:        intPtr(256),
 		VfsReadLimit:      intPtr(384),
 	}
-	override := RunDefaultsConfig{
+	override := RunParameters{
 		DefaultProvider:     "provider2",
 		DefaultRole:         "role2",
 		Container:           &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
@@ -142,7 +142,7 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 
 	base.MergeFrom(override)
 
-	assert.Equal(t, RunDefaultsConfig{
+	assert.Equal(t, RunParameters{
 		DefaultProvider:     "provider2",
 		DefaultRole:         "role2",
 		Container:           &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}},
@@ -168,8 +168,8 @@ func TestCLIDefaultsConfig_MergeFrom(t *testing.T) {
 }
 
 func TestCLIDefaultsConfig_MergeFrom_EmptyWorkdirKeepsBase(t *testing.T) {
-	base := RunDefaultsConfig{Workdir: "/base/workdir"}
-	override := RunDefaultsConfig{}
+	base := RunParameters{Workdir: "/base/workdir"}
+	override := RunParameters{}
 
 	base.MergeFrom(override)
 
@@ -179,29 +179,29 @@ func TestCLIDefaultsConfig_MergeFrom_EmptyWorkdirKeepsBase(t *testing.T) {
 func TestCLIDefaultsConfig_MergeFrom_GitIdentity(t *testing.T) {
 	tests := []struct {
 		name          string
-		base          RunDefaultsConfig
-		override      RunDefaultsConfig
+		base          RunParameters
+		override      RunParameters
 		expectedName  string
 		expectedEmail string
 	}{
 		{
 			name:          "override sets git identity",
-			base:          RunDefaultsConfig{},
-			override:      RunDefaultsConfig{GitUserName: "New User", GitUserEmail: "new@example.com"},
+			base:          RunParameters{},
+			override:      RunParameters{GitUserName: "New User", GitUserEmail: "new@example.com"},
 			expectedName:  "New User",
 			expectedEmail: "new@example.com",
 		},
 		{
 			name:          "empty override keeps base git identity",
-			base:          RunDefaultsConfig{GitUserName: "Base User", GitUserEmail: "base@example.com"},
-			override:      RunDefaultsConfig{},
+			base:          RunParameters{GitUserName: "Base User", GitUserEmail: "base@example.com"},
+			override:      RunParameters{},
 			expectedName:  "Base User",
 			expectedEmail: "base@example.com",
 		},
 		{
 			name:          "partial override only updates provided fields",
-			base:          RunDefaultsConfig{GitUserName: "Base User", GitUserEmail: "base@example.com"},
-			override:      RunDefaultsConfig{GitUserName: "New User"},
+			base:          RunParameters{GitUserName: "Base User", GitUserEmail: "base@example.com"},
+			override:      RunParameters{GitUserName: "New User"},
 			expectedName:  "New User",
 			expectedEmail: "base@example.com",
 		},
@@ -226,7 +226,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 		ContextCompactionThreshold: 0.7,
 		LLMRetryMaxAttempts:        5,
 		LLMRetryMaxBackoffSeconds:  30,
-		Defaults: RunDefaultsConfig{
+		Parameters: RunParameters{
 			DefaultProvider: "provider1",
 			DefaultRole:     "role1",
 			MaxThreads:      3,
@@ -252,7 +252,7 @@ func TestGlobalConfig_Merge(t *testing.T) {
 		ContextCompactionThreshold: 0.95,
 		LLMRetryMaxAttempts:        10,
 		LLMRetryMaxBackoffSeconds:  60,
-		Defaults: RunDefaultsConfig{
+		Parameters: RunParameters{
 			DefaultProvider:     "provider2",
 			DefaultRole:         "role2",
 			MaxThreads:          12,
@@ -279,21 +279,21 @@ func TestGlobalConfig_Merge(t *testing.T) {
 	assert.Equal(t, map[string]bool{"runBash": true, "vfsEdit": false}, base.ToolSelection.Default)
 	assert.Equal(t, map[string]bool{"vfsDelete": false, "runBash": false}, base.ToolSelection.Tags["safe"])
 	assert.Equal(t, 0.95, base.ContextCompactionThreshold)
-	assert.Equal(t, "provider2", base.Defaults.DefaultProvider)
-	assert.Equal(t, "role2", base.Defaults.DefaultRole)
+	assert.Equal(t, "provider2", base.Parameters.DefaultProvider)
+	assert.Equal(t, "role2", base.Parameters.DefaultRole)
 	assert.Equal(t, 10, base.LLMRetryMaxAttempts)
 	assert.Equal(t, 60, base.LLMRetryMaxBackoffSeconds)
-	assert.Equal(t, 12, base.Defaults.MaxThreads)
-	require.NotNil(t, base.Defaults.Container)
-	assert.Equal(t, ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, *base.Defaults.Container)
-	assert.Equal(t, RunDefaultsConfig{DefaultProvider: "provider2", DefaultRole: "role2", MaxThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, LogLLMRequestsRaw: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks", ShadowDir: "shadow/override", AllowAllPermissions: true, VFSAllow: []string{"/override/allow"}, RunBashMax: intPtr(0), VfsReadLimit: intPtr(256)}, base.Defaults)
+	assert.Equal(t, 12, base.Parameters.MaxThreads)
+	require.NotNil(t, base.Parameters.Container)
+	assert.Equal(t, ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, *base.Parameters.Container)
+	assert.Equal(t, RunParameters{DefaultProvider: "provider2", DefaultRole: "role2", MaxThreads: 12, Container: &ContainerConfig{Enabled: true, Image: "image2", Mounts: []string{"/c:/d"}, Env: []string{"B=2"}}, Model: "m2", Worktree: "w1", Merge: true, LogLLMRequests: true, LogLLMRequestsRaw: true, Thinking: "high", LSPServer: "lsp2", TaskDir: "custom/tasks", ShadowDir: "shadow/override", AllowAllPermissions: true, VFSAllow: []string{"/override/allow"}, RunBashMax: intPtr(0), VfsReadLimit: intPtr(256)}, base.Parameters)
 	assert.Equal(t, []string{".cswdata/**", ".agents/**"}, base.ShadowPaths)
 }
 
 func TestGlobalConfig_Merge_ContainerFalseDoesNotOverride(t *testing.T) {
 	base := &GlobalConfig{}
 	require.NoError(t, json.Unmarshal([]byte(`{
-		"defaults": {
+		"parameters": {
 			"container": {
 			"enabled": true,
 			"image": "base-image",
@@ -305,7 +305,7 @@ func TestGlobalConfig_Merge_ContainerFalseDoesNotOverride(t *testing.T) {
 
 	override := &GlobalConfig{}
 	require.NoError(t, json.Unmarshal([]byte(`{
-		"defaults": {
+		"parameters": {
 			"container": {
 			"enabled": false
 			}
@@ -314,11 +314,11 @@ func TestGlobalConfig_Merge_ContainerFalseDoesNotOverride(t *testing.T) {
 
 	base.Merge(override)
 
-	require.NotNil(t, base.Defaults.Container)
-	assert.True(t, base.Defaults.Container.Enabled)
-	assert.Equal(t, "base-image", base.Defaults.Container.Image)
-	assert.Equal(t, []string{"A=1"}, base.Defaults.Container.Env)
-	assert.Equal(t, []string{"/a:/b"}, base.Defaults.Container.Mounts)
+	require.NotNil(t, base.Parameters.Container)
+	assert.True(t, base.Parameters.Container.Enabled)
+	assert.Equal(t, "base-image", base.Parameters.Container.Image)
+	assert.Equal(t, []string{"A=1"}, base.Parameters.Container.Env)
+	assert.Equal(t, []string{"/a:/b"}, base.Parameters.Container.Mounts)
 }
 
 func TestAgentRoleConfig_Merge(t *testing.T) {
@@ -372,7 +372,7 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 				Default: map[string]bool{"runBash": true},
 				Tags:    map[string]map[string]bool{"safe": {"vfsRead": true}},
 			},
-			Defaults: RunDefaultsConfig{Container: &ContainerConfig{Mounts: []string{"a"}, Env: []string{"A=1"}}, VFSAllow: []string{"/a", "/b"}, RunBashMax: intPtr(512), VfsReadLimit: intPtr(384)},
+			Parameters: RunParameters{Container: &ContainerConfig{Mounts: []string{"a"}, Env: []string{"A=1"}}, VFSAllow: []string{"/a", "/b"}, RunBashMax: intPtr(512), VfsReadLimit: intPtr(384)},
 		}
 
 		clone := cfg.Clone()
@@ -381,22 +381,22 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 		clone.ModelTags[0].Tag = "changed"
 		clone.ToolSelection.Default["runBash"] = false
 		clone.ToolSelection.Tags["safe"]["vfsRead"] = false
-		require.NotNil(t, clone.Defaults.Container)
-		require.NotNil(t, cfg.Defaults.Container)
-		clone.Defaults.Container.Mounts[0] = "b"
-		clone.Defaults.VFSAllow[0] = "/changed"
-		*clone.Defaults.RunBashMax = 128
-		*clone.Defaults.VfsReadLimit = 64
+		require.NotNil(t, clone.Parameters.Container)
+		require.NotNil(t, cfg.Parameters.Container)
+		clone.Parameters.Container.Mounts[0] = "b"
+		clone.Parameters.VFSAllow[0] = "/changed"
+		*clone.Parameters.RunBashMax = 128
+		*clone.Parameters.VfsReadLimit = 64
 
 		assert.Equal(t, "all", cfg.ModelTags[0].Tag)
 		assert.True(t, cfg.ToolSelection.Default["runBash"])
 		assert.True(t, cfg.ToolSelection.Tags["safe"]["vfsRead"])
-		assert.Equal(t, "a", cfg.Defaults.Container.Mounts[0])
-		assert.Equal(t, "/a", cfg.Defaults.VFSAllow[0])
-		require.NotNil(t, cfg.Defaults.RunBashMax)
-		require.NotNil(t, cfg.Defaults.VfsReadLimit)
-		assert.Equal(t, 512, *cfg.Defaults.RunBashMax)
-		assert.Equal(t, 384, *cfg.Defaults.VfsReadLimit)
+		assert.Equal(t, "a", cfg.Parameters.Container.Mounts[0])
+		assert.Equal(t, "/a", cfg.Parameters.VFSAllow[0])
+		require.NotNil(t, cfg.Parameters.RunBashMax)
+		require.NotNil(t, cfg.Parameters.VfsReadLimit)
+		assert.Equal(t, 512, *cfg.Parameters.RunBashMax)
+		assert.Equal(t, 384, *cfg.Parameters.VfsReadLimit)
 	})
 
 	t.Run("agent role clone is deep copy", func(t *testing.T) {
@@ -444,9 +444,9 @@ func TestConfigCloneMethods_DeepCopy(t *testing.T) {
 }
 
 func TestGlobalConfig_Merge_NilOverride(t *testing.T) {
-	base := &GlobalConfig{Defaults: RunDefaultsConfig{DefaultProvider: "provider"}}
+	base := &GlobalConfig{Parameters: RunParameters{DefaultProvider: "provider"}}
 	base.Merge(nil)
-	assert.Equal(t, "provider", base.Defaults.DefaultProvider)
+	assert.Equal(t, "provider", base.Parameters.DefaultProvider)
 }
 
 func intPtr(value int) *int {

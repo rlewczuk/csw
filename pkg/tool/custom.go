@@ -70,10 +70,10 @@ func RegisterCustomTools(registry *ToolRegistry, config *conf.CswConfig, workdir
 		return fmt.Errorf("RegisterCustomTools() [custom.go]: commandRunner cannot be nil")
 	}
 
- 	roleConfigs := config.AgentRoleConfigs
- 	if roleConfigs == nil {
- 		return nil
- 	}
+	roleConfigs := config.AgentRoleConfigs
+	if roleConfigs == nil {
+		return nil
+	}
 
 	allRole, ok := roleConfigs["all"]
 	if !ok || allRole == nil || len(allRole.ToolFragments) == 0 {

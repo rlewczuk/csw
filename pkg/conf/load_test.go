@@ -19,7 +19,7 @@ func TestCswConfigLoad(t *testing.T) {
 		require.NoError(t, os.MkdirAll(firstDir, 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(firstDir, "global.json"), []byte(`{
 			"llm-retry-max-attempts": 11,
-			"defaults": {
+			"parameters": {
 				"default-provider": "prov-a",
 				"model": "prov-a/model-a"
 			}
@@ -29,7 +29,7 @@ func TestCswConfigLoad(t *testing.T) {
 		require.NoError(t, os.MkdirAll(secondDir, 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(secondDir, "global.json"), []byte(`{
 			"llm-retry-max-attempts": 22,
-			"defaults": {
+			"parameters": {
 				"model": "prov-b/model-b"
 			}
 		}`), 0o644))
@@ -40,8 +40,8 @@ func TestCswConfigLoad(t *testing.T) {
 		require.NotNil(t, cfg)
 		require.NotNil(t, cfg.GlobalConfig)
 		require.Equal(t, 22, cfg.GlobalConfig.LLMRetryMaxAttempts)
-		require.Equal(t, "prov-a", cfg.GlobalConfig.Defaults.DefaultProvider)
-		require.Equal(t, "prov-b/model-b", cfg.GlobalConfig.Defaults.Model)
+		require.Equal(t, "prov-a", cfg.GlobalConfig.Parameters.DefaultProvider)
+		require.Equal(t, "prov-b/model-b", cfg.GlobalConfig.Parameters.Model)
 		require.Empty(t, cfg.AgentRoleConfigs)
 		require.Empty(t, cfg.ModelProviderConfigs)
 		require.Empty(t, cfg.AgentConfigFiles)
@@ -164,42 +164,42 @@ func TestCswConfigLoad(t *testing.T) {
 		require.Equal(t, "review-prompt", cfg.AgentConfigFiles["review"]["prompt.md"])
 	})
 
-		t.Run("loads defaults marker", func(t *testing.T) {
-			t.Parallel()
+	t.Run("loads defaults marker", func(t *testing.T) {
+		t.Parallel()
 
-			cfg, err := CswConfigLoad("@DEFAULTS")
+		cfg, err := CswConfigLoad("@DEFAULTS")
 
-			require.NoError(t, err)
-			require.NotNil(t, cfg)
-			require.NotNil(t, cfg.GlobalConfig)
-			require.Contains(t, cfg.AgentRoleConfigs, "explorer")
-			require.Contains(t, cfg.AgentRoleConfigs, "developer")
-			require.Contains(t, cfg.AgentRoleConfigs, "planner")
-			developerRole := cfg.AgentRoleConfigs["developer"]
-			require.Equal(t, AccessAllow, developerRole.ToolsAccess["**"])
-			require.Equal(t, AccessDeny, developerRole.ToolsAccess["task*"])
-			plannerRole := cfg.AgentRoleConfigs["planner"]
-			require.Equal(t, AccessDeny, plannerRole.ToolsAccess["**"])
-			require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskGet"])
-			require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskList"])
-			require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskNew"])
-			require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskUpdate"])
-			require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskEdit"])
-			require.Equal(t, AccessDeny, plannerRole.RunPrivileges["*"])
-			explorerRole := cfg.AgentRoleConfigs["explorer"]
-			require.Contains(t, explorerRole.Description, "codebase")
-			require.Contains(t, explorerRole.PromptFragments["10-system"], "Local Codebase Investigation")
-			require.Contains(t, explorerRole.PromptFragments["10-system"], "vfsGrep")
-			require.Contains(t, explorerRole.PromptFragments["10-system"], "absolute paths")
-			require.Equal(t, AccessDeny, explorerRole.ToolsAccess["**"])
-			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsRead"])
-			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsFind"])
-			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsGrep"])
-			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsList"])
-			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["webFetch"])
-			require.Equal(t, AccessAllow, explorerRole.ToolsAccess["finish"])
-			require.Equal(t, AccessDeny, explorerRole.RunPrivileges["*"])
-		})
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+		require.NotNil(t, cfg.GlobalConfig)
+		require.Contains(t, cfg.AgentRoleConfigs, "explorer")
+		require.Contains(t, cfg.AgentRoleConfigs, "developer")
+		require.Contains(t, cfg.AgentRoleConfigs, "planner")
+		developerRole := cfg.AgentRoleConfigs["developer"]
+		require.Equal(t, AccessAllow, developerRole.ToolsAccess["**"])
+		require.Equal(t, AccessDeny, developerRole.ToolsAccess["task*"])
+		plannerRole := cfg.AgentRoleConfigs["planner"]
+		require.Equal(t, AccessDeny, plannerRole.ToolsAccess["**"])
+		require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskGet"])
+		require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskList"])
+		require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskNew"])
+		require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskUpdate"])
+		require.Equal(t, AccessAllow, plannerRole.ToolsAccess["taskEdit"])
+		require.Equal(t, AccessDeny, plannerRole.RunPrivileges["*"])
+		explorerRole := cfg.AgentRoleConfigs["explorer"]
+		require.Contains(t, explorerRole.Description, "codebase")
+		require.Contains(t, explorerRole.PromptFragments["10-system"], "Local Codebase Investigation")
+		require.Contains(t, explorerRole.PromptFragments["10-system"], "vfsGrep")
+		require.Contains(t, explorerRole.PromptFragments["10-system"], "absolute paths")
+		require.Equal(t, AccessDeny, explorerRole.ToolsAccess["**"])
+		require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsRead"])
+		require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsFind"])
+		require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsGrep"])
+		require.Equal(t, AccessAllow, explorerRole.ToolsAccess["vfsList"])
+		require.Equal(t, AccessAllow, explorerRole.ToolsAccess["webFetch"])
+		require.Equal(t, AccessAllow, explorerRole.ToolsAccess["finish"])
+		require.Equal(t, AccessDeny, explorerRole.RunPrivileges["*"])
+	})
 
 	t.Run("loads embedded defaults and allows later override", func(t *testing.T) {
 		t.Parallel()
@@ -229,9 +229,9 @@ func TestParseConfigLoadPath(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name  string
-		path  string
-		want  []string
+		name string
+		path string
+		want []string
 	}{
 		{
 			name: "defaults for empty path",

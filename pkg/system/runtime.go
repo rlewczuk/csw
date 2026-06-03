@@ -9,13 +9,13 @@ import (
 
 // StartRunSessionParams defines parameters for creating and starting run session runtime.
 type StartRunSessionParams struct {
-	ModelName              string
-	RoleName               string
-	Task                   *core.Task
-	Thinking               string
-	ModelOverridden        bool
-	Prompt                 string
-	OutputHandler          core.SessionThreadOutput
+	ModelName       string
+	RoleName        string
+	Task            *core.Task
+	Thinking        string
+	ModelOverridden bool
+	Prompt          string
+	OutputHandler   core.SessionThreadOutput
 }
 
 // StartRunSessionResult contains initialized run runtime components.

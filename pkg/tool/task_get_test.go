@@ -10,11 +10,11 @@ import (
 
 func TestTaskGetToolExecutePromptOnly(t *testing.T) {
 	tests := []struct {
-		name              string
-		arguments         map[string]any
-		sessionTaskID     string
+		name               string
+		arguments          map[string]any
+		sessionTaskID      string
 		expectedIdentifier string
-		expectedFallback  string
+		expectedFallback   string
 		expectedPromptOnly bool
 	}{
 		{

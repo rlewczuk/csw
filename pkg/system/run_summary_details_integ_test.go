@@ -49,7 +49,7 @@ func TestCLISummaryIncludesDetailedSessionInfo(t *testing.T) {
 		`{"model":"test-model","created_at":"2024-01-01T00:00:03Z","message":{"role":"assistant"},"done":true,"done_reason":"stop"}`,
 	)
 
-	err := RunCommand(&RunExecution{Config: &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
+	err := RunCommand(&RunExecution{Config: &conf.GlobalConfig{Parameters: conf.RunParameters{
 		PositionalArgs:      []string{"Edit test.txt"},
 		Model:               "ollama/test-model",
 		Role:                "developer",

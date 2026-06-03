@@ -89,7 +89,7 @@ func resolveRunTaskDirPath(taskDir string, workDir string, shadowDir string, pro
 			ConfigPath:    configPath,
 		})
 		if defaultsErr != nil {
-			return "", fmt.Errorf("resolveRunTaskDirPath() [run_task.go]: failed to resolve CLI defaults: %w", defaultsErr)
+			return "", fmt.Errorf("resolveRunTaskDirPath() [run_task.go]: failed to resolve CLI parameters: %w", defaultsErr)
 		}
 		resolvedTaskDir = strings.TrimSpace(defaults.TaskDir)
 	}

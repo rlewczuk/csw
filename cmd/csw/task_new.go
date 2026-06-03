@@ -195,7 +195,7 @@ func resolveTaskCreateParams(ctx context.Context, params taskCreateResolveParams
 		ConfigPath:    strings.TrimSpace(params.ConfigPath),
 	})
 	if err != nil {
-		return core.TaskCreateParams{}, fmt.Errorf("resolveTaskCreateParams() [task.go]: failed to resolve CLI defaults: %w", err)
+		return core.TaskCreateParams{}, fmt.Errorf("resolveTaskCreateParams() [task.go]: failed to resolve CLI parameters: %w", err)
 	}
 
 	modelName := strings.TrimSpace(params.ModelName)

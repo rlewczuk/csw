@@ -194,10 +194,10 @@ func TestSessionThreadInterruptFlow(t *testing.T) {
 		output := testutil.NewMockSessionOutputHandler()
 		cancelled := false
 		controller := &SessionThread{
-			outputHandler: output,
-			done:          make(chan error, 1),
+			outputHandler:  output,
+			done:           make(chan error, 1),
 			sessionRunning: true,
-			inputQueue: []string{"queued-1", "queued-2"},
+			inputQueue:     []string{"queued-1", "queued-2"},
 			cancelFunc: func() {
 				cancelled = true
 			},

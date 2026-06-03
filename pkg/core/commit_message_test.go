@@ -13,14 +13,14 @@ import (
 
 func TestGenerateCommitMessage(t *testing.T) {
 	tests := []struct {
-		name              string
-		userPrompt        string
-		branch            string
-		customTemplate    string
-		llmResponse       string
-		expected          string
-		expectedMsgCount  int
-		expectedContains  []string
+		name             string
+		userPrompt       string
+		branch           string
+		customTemplate   string
+		llmResponse      string
+		expected         string
+		expectedMsgCount int
+		expectedContains []string
 	}{
 		{
 			name:             "uses default message template and limits to ten words",
@@ -32,14 +32,14 @@ func TestGenerateCommitMessage(t *testing.T) {
 			expectedContains: []string{"Implement commit message generator"},
 		},
 		{
-			name:              "uses custom message template",
-			userPrompt:        "Add tests and integrate into worktree commit flow",
-			branch:            "feature/custom",
-			customTemplate:    "branch={{ .Branch }} msg={{ .Message }}",
-			llmResponse:       "add custom commit template option",
-			expected:          "branch=feature/custom msg=add custom commit template option",
-			expectedMsgCount:  2,
-			expectedContains:  []string{"Add tests and integrate into worktree commit flow"},
+			name:             "uses custom message template",
+			userPrompt:       "Add tests and integrate into worktree commit flow",
+			branch:           "feature/custom",
+			customTemplate:   "branch={{ .Branch }} msg={{ .Message }}",
+			llmResponse:      "add custom commit template option",
+			expected:         "branch=feature/custom msg=add custom commit template option",
+			expectedMsgCount: 2,
+			expectedContains: []string{"Add tests and integrate into worktree commit flow"},
 		},
 	}
 
@@ -134,7 +134,7 @@ func TestGenerateCommitMessageUsesRetryAndFallbackChatModelChain(t *testing.T) {
 				primary.RateLimitErrorCount = &rateLimitCount
 				primary.SetChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "retry commit description")})
 			},
-			retryPolicy: &models.RetryPolicy{InitialDelay: time.Millisecond, MaxRetries: 1, MaxDelay: time.Millisecond},
+			retryPolicy:     &models.RetryPolicy{InitialDelay: time.Millisecond, MaxRetries: 1, MaxDelay: time.Millisecond},
 			maxDuration:     50 * time.Millisecond,
 			expectPrimary:   2,
 			expectSecondary: 0,

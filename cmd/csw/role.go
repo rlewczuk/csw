@@ -118,14 +118,14 @@ func roleGetDefaultCommand() *cobra.Command {
 			}
 
 			if useJSON {
-				result := map[string]string{"default_role": globalConfig.Defaults.DefaultRole}
+				result := map[string]string{"default_role": globalConfig.Parameters.DefaultRole}
 				return outputJSON(result)
 			}
 
-			if globalConfig.Defaults.DefaultRole == "" {
+			if globalConfig.Parameters.DefaultRole == "" {
 				fmt.Println("No default role set")
 			} else {
-				fmt.Printf("Default role: %s\n", globalConfig.Defaults.DefaultRole)
+				fmt.Printf("Default role: %s\n", globalConfig.Parameters.DefaultRole)
 			}
 			return nil
 		},

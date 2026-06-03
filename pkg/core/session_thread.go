@@ -67,16 +67,16 @@ type SessionThread struct {
 	outputHandler SessionThreadOutput
 	done          chan error
 
-	mu                     sync.Mutex
-	session                *SweSession
-	sessionRunning         bool
-	backgroundCtx          context.Context
-	cancelFunc             context.CancelFunc
-	inputQueue             []string
-	interruptPending       bool
-	paused                 bool
-	suspended              bool
-	resumePending          bool
+	mu               sync.Mutex
+	session          *SweSession
+	sessionRunning   bool
+	backgroundCtx    context.Context
+	cancelFunc       context.CancelFunc
+	inputQueue       []string
+	interruptPending bool
+	paused           bool
+	suspended        bool
+	resumePending    bool
 }
 
 // NewSessionThread creates a new SessionThread with the given system and output handler.

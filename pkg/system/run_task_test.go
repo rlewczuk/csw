@@ -153,7 +153,7 @@ func TestPopulateRunExecutionParamsUsesTaskRoleWhenRunRoleNotOverridden(t *testi
 			require.NoError(t, err)
 
 			runParams := &RunExecution{
-				Config: &conf.GlobalConfig{Defaults: conf.RunDefaultsConfig{
+				Config: &conf.GlobalConfig{Parameters: conf.RunParameters{
 					Role:           testCase.configuredRole,
 					RoleOverridden: testCase.roleOverridden,
 					Workdir:        workDir,
@@ -164,7 +164,7 @@ func TestPopulateRunExecutionParamsUsesTaskRoleWhenRunRoleNotOverridden(t *testi
 
 			_, err = populateRunExecutionParams(runParams, nil)
 			require.NoError(t, err)
-			assert.Equal(t, testCase.expectedRole, runParams.Config.Defaults.Role)
+			assert.Equal(t, testCase.expectedRole, runParams.Config.Parameters.Role)
 		})
 	}
 }
@@ -223,7 +223,7 @@ func TestResolveRunTaskDirPath(t *testing.T) {
 		shadowDir := t.TempDir()
 		require.NoError(t, os.MkdirAll(filepath.Join(shadowDir, ".csw", "config"), 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(shadowDir, ".csw", "config", "global.json"), []byte(`{
-			"defaults": {
+			"parameters": {
 				"task-dir": ".cswdata/tasks-shadow"
 			}
 		}`), 0o644))

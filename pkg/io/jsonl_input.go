@@ -19,9 +19,9 @@ type JsonlSessionInput struct {
 }
 
 type jsonlSessionInputLine struct {
-	Type     string `json:"type"`
-	Action   string `json:"action"`
-	Input    string `json:"input"`
+	Type   string `json:"type"`
+	Action string `json:"action"`
+	Input  string `json:"input"`
 }
 
 // NewJsonlSessionInput creates a JSONL input adapter for session thread input callbacks.

@@ -139,7 +139,7 @@ type BuildSystemResult struct {
 	Cleanup               func()
 }
 
-// ResolveRunDefaultsParams contains inputs for resolving run command defaults.
+// ResolveRunDefaultsParams contains inputs for resolving run command parameters.
 type ResolveRunDefaultsParams struct {
 	WorkDir       string
 	ShadowDir     string
@@ -158,40 +158,40 @@ type ResolveWorktreeBranchNameParams struct {
 	WorktreeBranch string
 }
 
-// ResolveRunDefaults resolves run command defaults from effective global config.
-func ResolveRunDefaults(params ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
-	var defaults conf.RunDefaultsConfig
+// ResolveRunDefaults resolves run command parameters from effective global config.
+func ResolveRunDefaults(params ResolveRunDefaultsParams) (conf.RunParameters, error) {
+	var parameters conf.RunParameters
 
 	resolvedWorkDir, err := ResolveWorkDir(params.WorkDir)
 	if err != nil {
-		return defaults, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to resolve work directory: %w", err)
+		return parameters, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to resolve work directory: %w", err)
 	}
 
 	configPathStr, err := BuildConfigPath(params.ProjectConfig, params.ConfigPath)
 	if err != nil {
-		return defaults, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to build config path: %w", err)
+		return parameters, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to build config path: %w", err)
 	}
 
 	configRoot := resolvedWorkDir
 	if strings.TrimSpace(params.ShadowDir) != "" {
 		resolvedShadowDir, shadowErr := ResolveWorkDir(params.ShadowDir)
 		if shadowErr != nil {
-			return defaults, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to resolve shadow directory: %w", shadowErr)
+			return parameters, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to resolve shadow directory: %w", shadowErr)
 		}
 		configRoot = resolvedShadowDir
 	}
 
 	configStore, err := newCompositeConfigStoreFunc(configRoot, configPathStr)
 	if err != nil {
-		return defaults, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to create config store: %w", err)
+		return parameters, fmt.Errorf("ResolveRunDefaults() [bootstrap.go]: failed to create config store: %w", err)
 	}
 
 	globalConfig := configStore.GlobalConfig
 	if globalConfig == nil {
-		return defaults, nil
+		return parameters, nil
 	}
 
-	return globalConfig.Defaults, nil
+	return globalConfig.Parameters, nil
 }
 
 // ResolveWorktreeBranchName resolves a worktree branch placeholder that ends with '%'.
@@ -452,8 +452,8 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	}
 
 	vfsReadLimit := int(tool.DefaultVFSReadLimitLines)
-	if globalConfig.Defaults.VfsReadLimit != nil {
-		vfsReadLimit = *globalConfig.Defaults.VfsReadLimit
+	if globalConfig.Parameters.VfsReadLimit != nil {
+		vfsReadLimit = *globalConfig.Parameters.VfsReadLimit
 	}
 	if params.VFSReadLimit != nil {
 		vfsReadLimit = *params.VFSReadLimit
@@ -549,8 +549,8 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 	}
 
 	runBashMaxOutput := tool.DefaultRunBashMaxOutputBytes
-	if globalConfig.Defaults.RunBashMax != nil {
-		runBashMaxOutput = *globalConfig.Defaults.RunBashMax
+	if globalConfig.Parameters.RunBashMax != nil {
+		runBashMaxOutput = *globalConfig.Parameters.RunBashMax
 	}
 	if params.RunBashMaxOutput != nil {
 		runBashMaxOutput = *params.RunBashMaxOutput
@@ -611,7 +611,7 @@ func BuildSystem(params BuildSystemParams) (*SweSystem, BuildSystemResult, error
 			if params.MaxToolThreads > 0 {
 				return params.MaxToolThreads
 			}
-			return globalConfig.Defaults.MaxThreads
+			return globalConfig.Parameters.MaxThreads
 		}(),
 	}
 

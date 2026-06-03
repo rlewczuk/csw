@@ -539,7 +539,7 @@ func newMockConfigStoreWithFragments() *conf.CswConfig {
 				"50-tools-write-anthropic": "# Write Tool Instructions (Anthropic)\n\nUse write tool with Anthropic.",
 			},
 		},
- 	}}
+	}}
 
 	return store
 }

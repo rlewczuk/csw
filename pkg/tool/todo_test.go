@@ -415,7 +415,7 @@ func TestTodoIntegration(t *testing.T) {
 }
 
 func TestTodoWriteTool_Render(t *testing.T) {
-		t.Run("should render empty todo list", func(t *testing.T) {
+	t.Run("should render empty todo list", func(t *testing.T) {
 		mockSession := NewMockTodoSession()
 		tool := NewTodoWriteTool(mockSession)
 		call := &ToolCall{ID: "test-id", Function: "todoWrite", Arguments: NewToolValue(map[string]any{})}

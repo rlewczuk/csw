@@ -197,15 +197,15 @@ Provider setup, OAuth flow, file reference, and provider command reference moved
 - [docs/PROVIDERS.md](PROVIDERS.md)
 - [docs/JETBRAINS.md](JETBRAINS.md) (JetBrains-specific setup)
 
-### Configure defaults for CLI options
+### Configure parameters for CLI options
 
-Set defaults in `global.json` (or `global.yml`):
+Set parameters in `global.json` (or `global.yml`):
 
 ```json
 {
   "default_provider": "openai-codex",
   "default_role": "developer",
-  "defaults": {
+  "parameters": {
     "model": "openai-codex/gpt-5-codex",
     "worktree": "feature/%",
     "merge": false,
@@ -218,14 +218,14 @@ Set defaults in `global.json` (or `global.yml`):
 
 `worktree` values ending with `%` are expanded to an auto-generated branch suffix from the prompt.
 
-Supported CLI defaults:
+Supported CLI parameters:
 
-- `defaults.model`
-- `defaults.worktree`
-- `defaults.merge`
-- `defaults.log-llm-requests`
-- `defaults.thinking`
-- `defaults.lsp-server`
+- `parameters.model`
+- `parameters.worktree`
+- `parameters.merge`
+- `parameters.log-llm-requests`
+- `parameters.thinking`
+- `parameters.lsp-server`
 
 ### Roles
 

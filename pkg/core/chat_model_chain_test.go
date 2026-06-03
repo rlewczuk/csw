@@ -46,7 +46,7 @@ func TestDefaultLLMRetryPolicy(t *testing.T) {
 			config: &conf.CswConfig{},
 			provider: &models.MockClient{
 				Config: &conf.ModelProviderConfig{
-					MaxRetries:             2,
+					MaxRetries:            2,
 					RateLimitBackoffScale: 3,
 				},
 			},

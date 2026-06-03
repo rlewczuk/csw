@@ -272,7 +272,7 @@ func (m *MockChatModel) Chat(ctx context.Context, messages []*ChatMessage, optio
 
 	if result == nil {
 		result = &ChatMessage{
-			Role: ChatRoleAssistant,
+			Role:  ChatRoleAssistant,
 			Parts: []ChatMessagePart{{Text: ""}},
 		}
 	}

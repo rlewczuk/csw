@@ -25,9 +25,9 @@ func TestResolveTaskCreateParamsGeneratesBranchAndDescription(t *testing.T) {
 		generateTaskDescriptionFunc = originalDescriptionGenerator
 	})
 
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunParameters, error) {
 		_ = params
-		return conf.RunDefaultsConfig{Model: "provider/model", Worktree: "feature/%"}, nil
+		return conf.RunParameters{Model: "provider/model", Worktree: "feature/%"}, nil
 	}
 
 	resolveTaskWorktreeBranchNameFunc = func(ctx context.Context, params system.ResolveWorktreeBranchNameParams) (string, error) {
@@ -64,9 +64,9 @@ func TestResolveTaskCreateParamsFallsBackWhenGenerationFails(t *testing.T) {
 		generateTaskDescriptionFunc = originalDescriptionGenerator
 	})
 
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunParameters, error) {
 		_ = params
-		return conf.RunDefaultsConfig{Model: "provider/model", Worktree: "feature/%"}, nil
+		return conf.RunParameters{Model: "provider/model", Worktree: "feature/%"}, nil
 	}
 
 	resolveTaskWorktreeBranchNameFunc = func(ctx context.Context, params system.ResolveWorktreeBranchNameParams) (string, error) {
@@ -100,9 +100,9 @@ func TestResolveTaskCreateParamsFallsBackWhenGenerationReturnsEmptyValues(t *tes
 		generateTaskDescriptionFunc = originalDescriptionGenerator
 	})
 
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunParameters, error) {
 		_ = params
-		return conf.RunDefaultsConfig{Model: "provider/model", Worktree: "feature/%"}, nil
+		return conf.RunParameters{Model: "provider/model", Worktree: "feature/%"}, nil
 	}
 
 	resolveTaskWorktreeBranchNameFunc = func(ctx context.Context, params system.ResolveWorktreeBranchNameParams) (string, error) {
@@ -135,25 +135,25 @@ func TestResolveTaskCreateParamsNoCommitSetsEmptyFeatureBranch(t *testing.T) {
 	tests := []struct {
 		name     string
 		params   taskCreateResolveParams
-		defaults conf.RunDefaultsConfig
+		parameters conf.RunParameters
 	}{
 		{
 			name:     "cli flag",
 			params:   taskCreateResolveParams{Prompt: "do this task", NoCommit: true},
-			defaults: conf.RunDefaultsConfig{Model: "provider/model", Worktree: "feature/%"},
+			parameters: conf.RunParameters{Model: "provider/model", Worktree: "feature/%"},
 		},
 		{
 			name:     "run default",
 			params:   taskCreateResolveParams{Prompt: "do this task"},
-			defaults: conf.RunDefaultsConfig{Model: "provider/model", Worktree: "feature/%", NoCommit: true},
+			parameters: conf.RunParameters{Model: "provider/model", Worktree: "feature/%", NoCommit: true},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+			resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunParameters, error) {
 				_ = params
-				return tt.defaults, nil
+				return tt.parameters, nil
 			}
 
 			generateTaskDescriptionFunc = func(ctx context.Context, params taskCreateResolveParams) (string, error) {

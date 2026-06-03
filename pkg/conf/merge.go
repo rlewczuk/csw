@@ -79,8 +79,8 @@ func (c *ContainerConfig) Merge(override ContainerConfig) {
 	}
 }
 
-// MergeFrom merges overrides into RunDefaultsConfig.
-func (c *RunDefaultsConfig) MergeFrom(override RunDefaultsConfig) {
+// MergeFrom merges overrides into RunParameters.
+func (c *RunParameters) MergeFrom(override RunParameters) {
 	if override.DefaultProvider != "" {
 		c.DefaultProvider = override.DefaultProvider
 	}
@@ -171,23 +171,23 @@ func (c *GlobalConfig) Clone() *GlobalConfig {
 		ContextCompactionThreshold: c.ContextCompactionThreshold,
 		LLMRetryMaxAttempts:        c.LLMRetryMaxAttempts,
 		LLMRetryMaxBackoffSeconds:  c.LLMRetryMaxBackoffSeconds,
-		Defaults:                   c.Defaults,
+		Parameters:                 c.Parameters,
 		ShadowPaths:                append([]string(nil), c.ShadowPaths...),
 	}
-	if c.Defaults.Container != nil {
-		containerCopy := c.Defaults.Container.Clone()
-		cloned.Defaults.Container = &containerCopy
+	if c.Parameters.Container != nil {
+		containerCopy := c.Parameters.Container.Clone()
+		cloned.Parameters.Container = &containerCopy
 	}
-	if len(c.Defaults.VFSAllow) > 0 {
-		cloned.Defaults.VFSAllow = append([]string(nil), c.Defaults.VFSAllow...)
+	if len(c.Parameters.VFSAllow) > 0 {
+		cloned.Parameters.VFSAllow = append([]string(nil), c.Parameters.VFSAllow...)
 	}
-	if c.Defaults.RunBashMax != nil {
-		value := *c.Defaults.RunBashMax
-		cloned.Defaults.RunBashMax = &value
+	if c.Parameters.RunBashMax != nil {
+		value := *c.Parameters.RunBashMax
+		cloned.Parameters.RunBashMax = &value
 	}
-	if c.Defaults.VfsReadLimit != nil {
-		value := *c.Defaults.VfsReadLimit
-		cloned.Defaults.VfsReadLimit = &value
+	if c.Parameters.VfsReadLimit != nil {
+		value := *c.Parameters.VfsReadLimit
+		cloned.Parameters.VfsReadLimit = &value
 	}
 	copy(cloned.ModelTags, c.ModelTags)
 
@@ -213,7 +213,7 @@ func (c *GlobalConfig) Merge(override *GlobalConfig) {
 		c.LLMRetryMaxBackoffSeconds = override.LLMRetryMaxBackoffSeconds
 	}
 
-	c.Defaults.MergeFrom(override.Defaults)
+	c.Parameters.MergeFrom(override.Parameters)
 	if len(override.ShadowPaths) > 0 {
 		c.ShadowPaths = append([]string(nil), override.ShadowPaths...)
 	}

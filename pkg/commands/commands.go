@@ -39,8 +39,8 @@ type Metadata struct {
 
 // CSWMetadata describes csw-specific command frontmatter fields.
 type CSWMetadata struct {
-	Defaults *conf.RunDefaultsConfig `yaml:"defaults"`
-	Task     *core.Task              `yaml:"task"`
+	Parameters *conf.RunParameters `yaml:"parameters"`
+	Task       *core.Task          `yaml:"task"`
 }
 
 // Command stores loaded command definition.

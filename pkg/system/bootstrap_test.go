@@ -270,7 +270,7 @@ func TestResolveRunDefaultsUsesShadowDirForProjectConfig(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(filepath.Join(shadowDir, ".csw", "config"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(shadowDir, ".csw", "config", "global.json"), []byte(`{
-		"defaults": {
+		"parameters": {
 			"model": "shadow/provider-model"
 		}
 	}`), 0o644))
@@ -290,7 +290,7 @@ func TestResolveRunDefaultsReturnsConfiguredWorkdir(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(filepath.Join(shadowDir, ".csw", "config"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(shadowDir, ".csw", "config", "global.json"), []byte(`{
-		"defaults": {
+		"parameters": {
 			"workdir": "`+configuredWorkDir+`"
 		}
 	}`), 0o644))

@@ -289,7 +289,6 @@ func TestResponsesClient_MaxTokens(t *testing.T) {
 	})
 }
 
-
 func TestResponsesClient_StreamLogging(t *testing.T) {
 	tc := getResponsesTestClient(t)
 	defer tc.Close()

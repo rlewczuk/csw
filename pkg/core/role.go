@@ -10,10 +10,10 @@ import (
 // AgentRoleRegistry manages agent role configurations loaded from a CswConfig.
 // It caches loaded roles for quick lookup.
 type AgentRoleRegistry struct {
-	config       *conf.CswConfig
-	mu           sync.RWMutex
-	cache        map[string]conf.AgentRoleConfig
-	loaded       bool
+	config *conf.CswConfig
+	mu     sync.RWMutex
+	cache  map[string]conf.AgentRoleConfig
+	loaded bool
 }
 
 func normalizeRoleLookupName(name string) string {
@@ -27,9 +27,9 @@ func NewAgentRoleRegistry(config *conf.CswConfig) *AgentRoleRegistry {
 	}
 
 	return &AgentRoleRegistry{
-		config:       config,
-		cache:        make(map[string]conf.AgentRoleConfig),
-		loaded:       false,
+		config: config,
+		cache:  make(map[string]conf.AgentRoleConfig),
+		loaded: false,
 	}
 }
 

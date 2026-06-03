@@ -16,8 +16,8 @@ Package `pkg/conf` defines configuration models and store interfaces.
 * `ModelProviderConfig` - Model provider configuration
 * `AgentRoleConfig` - Agent role configuration
 * `ToolSelectionConfig` - Tool selection rules
-* `ContainerConfig` - Container defaults configuration
-* `RunDefaultsConfig` - CLI run defaults configuration
+* `ContainerConfig` - Container parameters configuration
+* `RunParameters` - CLI run parameters configuration
 * `MCPServerConfig` - MCP server configuration
 * `HookConfig` - Hook configuration model
 * `ModelAliasValue` - Model alias value container

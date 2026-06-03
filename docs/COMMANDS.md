@@ -65,10 +65,10 @@ If the rendered prompt is empty, command execution fails.
 
 ### Behavior with `--model` and `--role`
 
-Command metadata may define model/agent defaults (see format below).
+Command metadata may define model/agent parameters (see format below).
 
 - If CLI flags `--model` or `--role` are provided, **CLI flags win**.
-- If not provided, command metadata can override defaults.
+- If not provided, command metadata can override parameters.
 
 ### Examples
 

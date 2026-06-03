@@ -83,7 +83,6 @@ func TestRunBashTool_Execute_DeniedCommand(t *testing.T) {
 	assert.Equal(t, 0, mockRunner.ExecutionCount())
 }
 
-
 func TestRunBashTool_Execute_CommandWithNonZeroExitCode(t *testing.T) {
 	mockRunner := runner.NewMockRunner()
 	mockRunner.SetResponse("exit 42", "", 42, nil)
@@ -498,13 +497,13 @@ func TestRunBashTool_Render_OutputMetadata(t *testing.T) {
 	args := &ToolCall{
 		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
-			"command":             "long metadata command that must keep metadata readable in short form",
-			"output":              "abcdef",
-			"stdout":              "abcdef",
-			"exit_code":           int64(0),
-			"max_output":          int64(64),
+			"command":              "long metadata command that must keep metadata readable in short form",
+			"output":               "abcdef",
+			"stdout":               "abcdef",
+			"exit_code":            int64(0),
+			"max_output":           int64(64),
 			"max_output_triggered": true,
-			"output_file":         "/work/.cswdata/worktmp/runbash-output-123.txt",
+			"output_file":          "/work/.cswdata/worktmp/runbash-output-123.txt",
 		}),
 	}
 
@@ -535,12 +534,12 @@ func TestRunBashTool_Render_DefaultMaxOutputMetadata(t *testing.T) {
 	args := &ToolCall{
 		Function: "runBash",
 		Arguments: NewToolValue(map[string]any{
-			"command":             "default limit spill",
-			"output":              "Output was too big (2049 bytes; max_output=2048 bytes).\nSaved full output to temporary file: /work/.cswdata/worktmp/runbash-output-456.txt",
-			"stdout":              "Output was too big (2049 bytes; max_output=2048 bytes).\nSaved full output to temporary file: /work/.cswdata/worktmp/runbash-output-456.txt",
-			"exit_code":           int64(0),
+			"command":              "default limit spill",
+			"output":               "Output was too big (2049 bytes; max_output=2048 bytes).\nSaved full output to temporary file: /work/.cswdata/worktmp/runbash-output-456.txt",
+			"stdout":               "Output was too big (2049 bytes; max_output=2048 bytes).\nSaved full output to temporary file: /work/.cswdata/worktmp/runbash-output-456.txt",
+			"exit_code":            int64(0),
 			"max_output_triggered": true,
-			"output_file":         "/work/.cswdata/worktmp/runbash-output-456.txt",
+			"output_file":          "/work/.cswdata/worktmp/runbash-output-456.txt",
 		}),
 	}
 
@@ -569,10 +568,10 @@ func TestRunBashTool_Render_WithError(t *testing.T) {
 	tool := NewRunBashTool(mockRunner, nil)
 
 	tests := []struct {
-		name            string
-		args            *ToolCall
-		wantInSummary   string
-		wantInDetails   string
+		name             string
+		args             *ToolCall
+		wantInSummary    string
+		wantInDetails    string
 		wantNotInDetails string
 	}{
 		{
@@ -617,8 +616,8 @@ func TestRunBashTool_Render_WithError(t *testing.T) {
 				Function:  "runBash",
 				Arguments: NewToolValue(map[string]any{"command": "echo hello", "exit_code": int64(0), "output": "hello"}),
 			},
-			wantInSummary: "bash: echo hello",
-			wantInDetails: "echo hello\n\nhello",
+			wantInSummary:    "bash: echo hello",
+			wantInDetails:    "echo hello\n\nhello",
 			wantNotInDetails: "ERROR:",
 		},
 		{

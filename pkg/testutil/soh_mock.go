@@ -57,14 +57,14 @@ type MockSessionOutputHandler struct {
 // NewMockSessionOutputHandler creates a new MockSessionOutputHandler.
 func NewMockSessionOutputHandler() *MockSessionOutputHandler {
 	return &MockSessionOutputHandler{
-		UserMessages:          make([]string, 0),
-		AssistantMessages:     make([]AssistantMessageRecord, 0),
-		Events:                make([]string, 0),
-		ToolCalls:             make([]*tool.ToolCall, 0),
-		ToolCallResults:       make([]*tool.ToolResponse, 0),
-		StatusMessages:        make([]SessionMessageRecord, 0),
-		rateLimitErrorCalled:  make(chan struct{}, 10),
-		runFinishedCalled:     make(chan struct{}),
+		UserMessages:         make([]string, 0),
+		AssistantMessages:    make([]AssistantMessageRecord, 0),
+		Events:               make([]string, 0),
+		ToolCalls:            make([]*tool.ToolCall, 0),
+		ToolCallResults:      make([]*tool.ToolResponse, 0),
+		StatusMessages:       make([]SessionMessageRecord, 0),
+		rateLimitErrorCalled: make(chan struct{}, 10),
+		runFinishedCalled:    make(chan struct{}),
 	}
 }
 
@@ -155,7 +155,7 @@ func (h *MockSessionOutputHandler) EventsSnapshot() []string {
 
 	result := make([]string, len(h.Events))
 	copy(result, h.Events)
-    return result
+	return result
 }
 
 // FinishedError returns error passed to RunFinished.

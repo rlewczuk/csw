@@ -53,13 +53,13 @@ func TestResolveRunCommandInvocation_TaskModeUsesCommands(t *testing.T) {
 		assert.Empty(t, resolved.ExtraPositionalArgs)
 	})
 
-	t.Run("loads yaml command defaults into run defaults config", func(t *testing.T) {
+	t.Run("loads yaml command parameters into run parameters config", func(t *testing.T) {
 		workDir := t.TempDir()
-		commandPath := filepath.Join(workDir, ".agents", "commands", "defaults.md")
+		commandPath := filepath.Join(workDir, ".agents", "commands", "parameters.md")
 		require.NoError(t, os.MkdirAll(filepath.Dir(commandPath), 0o755))
 		require.NoError(t, os.WriteFile(commandPath, []byte(`---
 csw:
-  defaults:
+  parameters:
     default-provider: ollama
     default-role: developer
     model: qwen
@@ -70,22 +70,22 @@ csw:
 Run command
 `), 0o644))
 
-		resolved, err := resolveRunCommandInvocation(&commands.Invocation{Name: "defaults"}, workDir, "", false)
+		resolved, err := resolveRunCommandInvocation(&commands.Invocation{Name: "parameters"}, workDir, "", false)
 		require.NoError(t, err)
 
-		require.NotNil(t, resolved.CommandRunDefaults)
-		assert.Equal(t, "ollama", resolved.CommandRunDefaults.DefaultProvider)
-		assert.Equal(t, "developer", resolved.CommandRunDefaults.DefaultRole)
-		assert.Equal(t, "qwen", resolved.CommandRunDefaults.Model)
-		require.NotNil(t, resolved.CommandRunDefaults.Container)
-		assert.Equal(t, "golang:latest", resolved.CommandRunDefaults.Container.Image)
-		assert.True(t, resolved.CommandRunDefaults.Container.Enabled)
+		require.NotNil(t, resolved.CommandRunParameters)
+		assert.Equal(t, "ollama", resolved.CommandRunParameters.DefaultProvider)
+		assert.Equal(t, "developer", resolved.CommandRunParameters.DefaultRole)
+		assert.Equal(t, "qwen", resolved.CommandRunParameters.Model)
+		require.NotNil(t, resolved.CommandRunParameters.Container)
+		assert.Equal(t, "golang:latest", resolved.CommandRunParameters.Container.Image)
+		assert.True(t, resolved.CommandRunParameters.Container.Enabled)
 	})
 }
 
 func TestBuildRunAgentStartupInfoMessages(t *testing.T) {
 	t.Run("builds startup lines without command", func(t *testing.T) {
-		messages := BuildRunAgentStartupInfoMessages(newRunExecutionForTest(conf.RunDefaultsConfig{Thinking: "high", Role: "developer"}), BuildSystemResult{ModelName: "ollama/qwen3", RoleConfig: conf.AgentRoleConfig{Name: "developer"}})
+		messages := BuildRunAgentStartupInfoMessages(newRunExecutionForTest(conf.RunParameters{Thinking: "high", Role: "developer"}), BuildSystemResult{ModelName: "ollama/qwen3", RoleConfig: conf.AgentRoleConfig{Name: "developer"}})
 
 		require.Len(t, messages, 3)
 		assert.Equal(t, "[INFO] Model: ollama/qwen3", messages[0])

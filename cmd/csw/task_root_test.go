@@ -30,10 +30,10 @@ func TestResolveTaskDirPathUsesDefaultWhenUnset(t *testing.T) {
 		shadowDir = originalShadowDir
 	})
 
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunParameters, error) {
 		assert.Equal(t, "shadow/project", params.ShadowDir)
 		_ = params
-		return conf.RunDefaultsConfig{}, nil
+		return conf.RunParameters{}, nil
 	}
 	shadowDir = "shadow/project"
 	require.NoError(t, os.MkdirAll(shadowDir, 0o755))
@@ -55,9 +55,9 @@ func TestResolveTaskDirPathUsesShadowDirEnvWhenShadowFlagUnset(t *testing.T) {
 		shadowDir = originalShadowDir
 	})
 
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunParameters, error) {
 		assert.NotEmpty(t, params.ShadowDir)
-		return conf.RunDefaultsConfig{}, nil
+		return conf.RunParameters{}, nil
 	}
 
 	shadowDir = ""
@@ -78,9 +78,9 @@ func TestResolveTaskDirPathUsesShadowDirFlagWhenChanged(t *testing.T) {
 		shadowDir = originalShadowDir
 	})
 
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunParameters, error) {
 		assert.NotEmpty(t, params.ShadowDir)
-		return conf.RunDefaultsConfig{}, nil
+		return conf.RunParameters{}, nil
 	}
 
 	shadowDir = ""
@@ -143,9 +143,9 @@ func TestResolveTaskDirPathUsesConfigDefaultWhenUnset(t *testing.T) {
 		resolveTaskRunDefaultsFunc = originalResolver
 	})
 
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunParameters, error) {
 		_ = params
-		return conf.RunDefaultsConfig{TaskDir: "custom/tasks"}, nil
+		return conf.RunParameters{TaskDir: "custom/tasks"}, nil
 	}
 
 	command := TaskCommand()
@@ -161,9 +161,9 @@ func TestResolveTaskDirPathPrefersFlagOverConfigAndMakesRelativeAbsolute(t *test
 		resolveTaskRunDefaultsFunc = originalResolver
 	})
 
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunParameters, error) {
 		_ = params
-		return conf.RunDefaultsConfig{TaskDir: "from-config"}, nil
+		return conf.RunParameters{TaskDir: "from-config"}, nil
 	}
 
 	command := TaskCommand()
@@ -181,9 +181,9 @@ func TestResolveTaskDirPathReadsTaskDirFromSubcommandPersistentFlag(t *testing.T
 		resolveTaskRunDefaultsFunc = originalResolver
 	})
 
-	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunDefaultsConfig, error) {
+	resolveTaskRunDefaultsFunc = func(params system.ResolveRunDefaultsParams) (conf.RunParameters, error) {
 		_ = params
-		return conf.RunDefaultsConfig{TaskDir: "from-config"}, nil
+		return conf.RunParameters{TaskDir: "from-config"}, nil
 	}
 
 	command := TaskCommand()

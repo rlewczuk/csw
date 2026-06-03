@@ -21,10 +21,10 @@ func TestTaskToolRender(t *testing.T) {
 			name: "taskGet includes target status summary and prompt marker",
 			tool: NewTaskGetTool(nil, nil),
 			call: &ToolCall{Function: "taskGet", Arguments: NewToolValue(map[string]any{
-				"uuid":    "task-123",
-				"summary": "line one\nline two",
+				"uuid":       "task-123",
+				"summary":    "line one\nline two",
 				"promptOnly": true,
-				"content": "    1  line one\n",
+				"content":    "    1  line one\n",
 				"task": map[string]any{
 					"status": "open",
 				},

@@ -111,8 +111,8 @@ func TestConvertAnthropicMessage_PreservesReasoningAcrossToolRoundtrip(t *testin
 				},
 				{
 					ToolCall: &tool.ToolCall{
-						ID:       "tool_1",
-						Function: "vfsRead",
+						ID:        "tool_1",
+						Function:  "vfsRead",
 						Arguments: tool.NewToolValue(map[string]interface{}{"path": "pkg/models/anthropic_client.go"}),
 					},
 				},

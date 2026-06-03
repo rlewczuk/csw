@@ -336,10 +336,10 @@ func (s *SweSystem) buildSessionParams() *SweSessionParams {
 func (s *SweSystem) resolveDefaultRole() (string, error) {
 	if s.Config != nil && s.Config.GlobalConfig != nil {
 		globalConfig := s.Config.GlobalConfig
-		if globalConfig.Defaults.DefaultRole != "" {
+		if globalConfig.Parameters.DefaultRole != "" {
 			if s.Roles != nil {
-				if _, ok := s.Roles.Get(globalConfig.Defaults.DefaultRole); ok {
-					return globalConfig.Defaults.DefaultRole, nil
+				if _, ok := s.Roles.Get(globalConfig.Parameters.DefaultRole); ok {
+					return globalConfig.Parameters.DefaultRole, nil
 				}
 			}
 		}

@@ -179,8 +179,8 @@ type ContainerConfig struct {
 	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 }
 
-// RunDefaultsConfig defines default values for the cli command flags.
-type RunDefaultsConfig struct {
+// RunParameters defines parameters for the cli command flags.
+type RunParameters struct {
 	// DefaultProvider is the default model provider to use.
 	DefaultProvider string `json:"default-provider,omitempty" yaml:"default-provider,omitempty"`
 	// DefaultRole is the default agent role to use.
@@ -387,8 +387,8 @@ type GlobalConfig struct {
 	// LLMRetryMaxBackoffSeconds caps exponential backoff delay in seconds.
 	// Defaults to 60 when unset or invalid.
 	LLMRetryMaxBackoffSeconds int `json:"llm-retry-max-backoff-seconds,omitempty"`
-	// Defaults defines default values for cli command flags.
-	Defaults RunDefaultsConfig `json:"defaults,omitempty"`
+	// Parameters defines parameters for cli command flags.
+	Parameters RunParameters `json:"parameters,omitempty"`
 	// ShadowPaths defines glob patterns redirected to shadow directory when --shadow-dir is enabled.
 	ShadowPaths []string `json:"shadow-paths,omitempty"`
 }

@@ -19,7 +19,7 @@ type resolvedRunCommandInvocation struct {
 	CommandArgs          []string
 	CommandModelOverride string
 	CommandRoleOverride  string
-	CommandRunDefaults   *conf.RunDefaultsConfig
+	CommandRunParameters *conf.RunParameters
 	CommandTaskMetadata  *core.Task
 	CommandNeedsShell    bool
 	Prompt               string
@@ -51,7 +51,7 @@ func resolveRunCommandInvocation(invocation *commands.Invocation, workDir string
 		Prompt:               loadedCommand.Template,
 	}
 	if loadedCommand.Metadata.CSW != nil {
-		result.CommandRunDefaults = loadedCommand.Metadata.CSW.Defaults
+		result.CommandRunParameters = loadedCommand.Metadata.CSW.Parameters
 		result.CommandTaskMetadata = loadedCommand.Metadata.CSW.Task
 	}
 	if runInTaskMode {
@@ -67,15 +67,15 @@ func BuildRunAgentStartupInfoMessages(params *RunExecution, buildResult BuildSys
 	if params == nil {
 		return nil
 	}
-	defaults := &params.Config.Defaults
+	parameters := &params.Config.Parameters
 
 	messages := make([]string, 0, 4)
 	messages = append(messages, fmt.Sprintf("[INFO] Model: %s", shared.NullValue(strings.TrimSpace(buildResult.ModelName))))
-	messages = append(messages, fmt.Sprintf("[INFO] Thinking: %s", shared.NullValue(strings.TrimSpace(defaults.Thinking))))
+	messages = append(messages, fmt.Sprintf("[INFO] Thinking: %s", shared.NullValue(strings.TrimSpace(parameters.Thinking))))
 
 	roleName := strings.TrimSpace(buildResult.RoleConfig.Name)
 	if roleName == "" {
-		roleName = strings.TrimSpace(defaults.Role)
+		roleName = strings.TrimSpace(parameters.Role)
 	}
 	messages = append(messages, fmt.Sprintf("[INFO] Role: %s", shared.NullValue(roleName)))
 

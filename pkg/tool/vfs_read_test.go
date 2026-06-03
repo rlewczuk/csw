@@ -161,8 +161,8 @@ func TestVFSReadTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path":  "test.txt",
-				"limit": 3,
+				"path":   "test.txt",
+				"limit":  3,
 				"offset": 0,
 			}),
 		})
@@ -267,8 +267,8 @@ func TestVFSReadTool(t *testing.T) {
 			ID:       "test-id",
 			Function: "vfsRead",
 			Arguments: NewToolValue(map[string]any{
-				"path":  "test.txt",
-				"limit": 2,
+				"path":   "test.txt",
+				"limit":  2,
 				"offset": 0,
 			}),
 		})

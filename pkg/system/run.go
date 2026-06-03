@@ -65,45 +65,45 @@ func RunCommand(params *RunExecution) error {
 
 	startTime := time.Now()
 	ctx := context.Background()
-	defaults := &params.Config.Defaults
+	parameters := &params.Config.Parameters
 
-	if defaults.NoCommit {
-		defaults.Worktree = ""
-		defaults.Merge = false
+	if parameters.NoCommit {
+		parameters.Worktree = ""
+		parameters.Merge = false
 	}
 
 	if params.BashRunTimeout <= 0 {
 		params.BashRunTimeout = defaultBashRunTimeout
 	}
-	if strings.TrimSpace(defaults.OutputFormat) == "" {
-		defaults.OutputFormat = "short"
+	if strings.TrimSpace(parameters.OutputFormat) == "" {
+		parameters.OutputFormat = "short"
 	}
-	if defaults.OutputFormat != "short" && defaults.OutputFormat != "full" && defaults.OutputFormat != "jsonl" {
-		return fmt.Errorf("RunCommand() [run.go]: invalid --output-format %q (allowed: short, full, jsonl)", defaults.OutputFormat)
+	if parameters.OutputFormat != "short" && parameters.OutputFormat != "full" && parameters.OutputFormat != "jsonl" {
+		return fmt.Errorf("RunCommand() [run.go]: invalid --output-format %q (allowed: short, full, jsonl)", parameters.OutputFormat)
 	}
 	if err := validateMergeRunExecution(params); err != nil {
 		return err
 	}
 
-	resolvedWorktreeBranch, err := ResolveWorktreeBranchName(ctx, ResolveWorktreeBranchNameParams{Prompt: params.Prompt, ModelName: defaults.Model, WorkDir: defaults.Workdir, ShadowDir: defaults.ShadowDir, ProjectConfig: defaults.ProjectConfig, ConfigPath: defaults.ConfigPath, WorktreeBranch: defaults.Worktree})
+	resolvedWorktreeBranch, err := ResolveWorktreeBranchName(ctx, ResolveWorktreeBranchNameParams{Prompt: params.Prompt, ModelName: parameters.Model, WorkDir: parameters.Workdir, ShadowDir: parameters.ShadowDir, ProjectConfig: parameters.ProjectConfig, ConfigPath: parameters.ConfigPath, WorktreeBranch: parameters.Worktree})
 	if err != nil {
 		return fmt.Errorf("RunCommand() [run.go]: failed to resolve worktree branch: %w", err)
 	}
-	defaults.Worktree = resolvedWorktreeBranch
-	if defaults.Worktree != "" {
-		_, _ = fmt.Fprintf(stdout, "[INFO] Worktree branch: %s\n", defaults.Worktree)
+	parameters.Worktree = resolvedWorktreeBranch
+	if parameters.Worktree != "" {
+		_, _ = fmt.Fprintf(stdout, "[INFO] Worktree branch: %s\n", parameters.Worktree)
 	}
 
-	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{WorkDir: defaults.Workdir, ShadowDir: defaults.ShadowDir, ConfigPath: defaults.ConfigPath, ProjectConfig: defaults.ProjectConfig, ModelName: defaults.Model, RoleName: defaults.Role, WorktreeBranch: defaults.Worktree, GitUserName: defaults.GitUserName, GitUserEmail: defaults.GitUserEmail, ContainerEnabled: defaults.Container.Enabled, ContainerDisabled: defaults.ContainerDisabled, ContainerImage: defaults.Container.Image, ContainerMounts: defaults.Container.Mounts, ContainerEnv: defaults.Container.Env, LSPServer: defaults.LSPServer, LogLLMRequests: defaults.LogLLMRequests, LogLLMRequestsRaw: defaults.LogLLMRequestsRaw, NoRefresh: defaults.NoRefresh, Thinking: defaults.Thinking, BashRunTimeout: params.BashRunTimeout, AllowedPaths: defaults.VFSAllow, MaxToolThreads: defaults.MaxThreads, RunBashMaxOutput: defaults.RunBashMax, VFSReadLimit: defaults.VfsReadLimit, AllowAllPermissions: defaults.AllowAllPermissions})
+	sweSystem, buildResult, err := BuildSystem(BuildSystemParams{WorkDir: parameters.Workdir, ShadowDir: parameters.ShadowDir, ConfigPath: parameters.ConfigPath, ProjectConfig: parameters.ProjectConfig, ModelName: parameters.Model, RoleName: parameters.Role, WorktreeBranch: parameters.Worktree, GitUserName: parameters.GitUserName, GitUserEmail: parameters.GitUserEmail, ContainerEnabled: parameters.Container.Enabled, ContainerDisabled: parameters.ContainerDisabled, ContainerImage: parameters.Container.Image, ContainerMounts: parameters.Container.Mounts, ContainerEnv: parameters.Container.Env, LSPServer: parameters.LSPServer, LogLLMRequests: parameters.LogLLMRequests, LogLLMRequestsRaw: parameters.LogLLMRequestsRaw, NoRefresh: parameters.NoRefresh, Thinking: parameters.Thinking, BashRunTimeout: params.BashRunTimeout, AllowedPaths: parameters.VFSAllow, MaxToolThreads: parameters.MaxThreads, RunBashMaxOutput: parameters.RunBashMax, VFSReadLimit: parameters.VfsReadLimit, AllowAllPermissions: parameters.AllowAllPermissions})
 	if err != nil {
 		return err
 	}
 	defer buildResult.Cleanup()
 	defer logging.FlushLogs()
 
-	defaults.Workdir = buildResult.WorkDir
-	defaults.ShadowDir = buildResult.ShadowDir
-	defaults.Model = buildResult.ModelName
+	parameters.Workdir = buildResult.WorkDir
+	parameters.ShadowDir = buildResult.ShadowDir
+	parameters.Model = buildResult.ModelName
 	params.ContextData = BuildPromptContextData(params.ContextData, core.AgentState{Info: core.AgentStateCommonInfo{AgentName: "CSW Coding Agent", WorkDir: buildResult.WorkDir, ShadowDir: buildResult.ShadowDir}, Role: buildResult.RoleConfig.Clone(), Task: cloneRunTask(params.Task)})
 	if err := renderCommandPrompt(params, buildResult.WorkDir, buildResult.ShellRunner, buildResult.HostShellRunner); err != nil {
 		return err
@@ -112,7 +112,7 @@ func RunCommand(params *RunExecution) error {
 		return err
 	}
 
-	if defaults.LSPServer != "" {
+	if parameters.LSPServer != "" {
 		lspStatus := "disabled"
 		if buildResult.LSPStarted {
 			lspStatus = "started"
@@ -129,7 +129,7 @@ func RunCommand(params *RunExecution) error {
 	sessionOutput := buildRunSessionOutput(params, stdout)
 	runtimeResult, err := func(sweSystem *SweSystem, params StartRunSessionParams) (StartRunSessionResult, error) {
 		return sweSystem.StartRunSession(params)
-	}(sweSystem, StartRunSessionParams{ModelName: defaults.Model, RoleName: defaults.Role, Task: params.Task, Thinking: defaults.Thinking, ModelOverridden: defaults.ModelOverridden, Prompt: params.Prompt, OutputHandler: sessionOutput})
+	}(sweSystem, StartRunSessionParams{ModelName: parameters.Model, RoleName: parameters.Role, Task: params.Task, Thinking: parameters.Thinking, ModelOverridden: parameters.ModelOverridden, Prompt: params.Prompt, OutputHandler: sessionOutput})
 	if err != nil {
 		return fmt.Errorf("RunCommand() [run.go]: failed to start run session runtime: %w", err)
 	}
@@ -149,7 +149,7 @@ func RunCommand(params *RunExecution) error {
 		sessionRunErr = ctx.Err()
 	}
 
-	finalizeResult, finalizeErr := FinalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, defaults.Merge, defaults.CommitMessageTemplate, sweSystem, session, stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt)
+	finalizeResult, finalizeErr := FinalizeWorktreeSession(ctx, buildResult.VCS, buildResult.WorktreeBranch, parameters.Merge, parameters.CommitMessageTemplate, sweSystem, session, stderr, buildResult.WorkDirRoot, buildResult.WorkDir, params.Prompt)
 	if finalizeErr != nil {
 		sessionRunErr = finalizeErr
 	}
@@ -162,7 +162,7 @@ func RunCommand(params *RunExecution) error {
 		return err
 	}
 	if prep.runInTaskMode && prep.taskManager != nil && strings.TrimSpace(prep.taskIdentifier) != "" {
-		if finalStatus, shouldApply := resolveTaskFinalStatusForRun(session, defaults.Merge); shouldApply {
+		if finalStatus, shouldApply := resolveTaskFinalStatusForRun(session, parameters.Merge); shouldApply {
 			if _, err := prep.taskManager.UpdateTask(core.TaskUpdateParams{Identifier: prep.taskIdentifier, Status: &finalStatus}); err != nil {
 				return err
 			}
@@ -181,18 +181,18 @@ type runExecutionPrepResult struct {
 
 // populateRunExecutionParams resolves prompt, command invocation, context,
 // container settings, and task data for a non-TUI run session. It mutates
-// both params and its embedded defaults, and returns the task state required
+// both params and its embedded parameters, and returns the task state required
 // by the rest of RunCommand.
 func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runExecutionPrepResult, error) {
-	if params.Config.Defaults.Role == "" {
-		params.Config.Defaults.Role = params.Config.Defaults.DefaultRole
+	if params.Config.Parameters.Role == "" {
+		params.Config.Parameters.Role = params.Config.Parameters.DefaultRole
 	}
-	defaults := &params.Config.Defaults
-	if defaults.Container == nil {
-		defaults.Container = &conf.ContainerConfig{}
+	parameters := &params.Config.Parameters
+	if parameters.Container == nil {
+		parameters.Container = &conf.ContainerConfig{}
 	}
-	if defaults.ContainerEnabled {
-		defaults.Container.Enabled = true
+	if parameters.ContainerEnabled {
+		parameters.Container.Enabled = true
 	}
 
 	var preloadedTaskManager *core.TaskManager
@@ -200,15 +200,15 @@ func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runE
 	taskIdentifier := ""
 	runInTaskMode := false
 
-	positionalArgs := append([]string(nil), defaults.PositionalArgs...)
-	effectiveTaskIdentifier := strings.TrimSpace(defaults.TaskIdentifier)
-	if effectiveTaskIdentifier == "" && !defaults.TaskLast && !defaults.TaskNext && len(positionalArgs) > 0 {
+	positionalArgs := append([]string(nil), parameters.PositionalArgs...)
+	effectiveTaskIdentifier := strings.TrimSpace(parameters.TaskIdentifier)
+	if effectiveTaskIdentifier == "" && !parameters.TaskLast && !parameters.TaskNext && len(positionalArgs) > 0 {
 		resolvedIdentifier, recognized, err := resolveTaskIdentifierFromPosition(nil, positionalArgs[0])
 		if err != nil {
 			return nil, err
 		}
 		if !recognized {
-			loadedManager, loadErr := loadRunTaskManager(defaults.TaskDir, defaults.Workdir, defaults.ShadowDir, defaults.ProjectConfig, defaults.ConfigPath)
+			loadedManager, loadErr := loadRunTaskManager(parameters.TaskDir, parameters.Workdir, parameters.ShadowDir, parameters.ProjectConfig, parameters.ConfigPath)
 			if loadErr != nil {
 				return nil, loadErr
 			}
@@ -223,7 +223,7 @@ func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runE
 			positionalArgs = positionalArgs[1:]
 		}
 	}
-	defaults.TaskIdentifier = effectiveTaskIdentifier
+	parameters.TaskIdentifier = effectiveTaskIdentifier
 
 	prompt := ""
 	extraPositionalArgs := []string(nil)
@@ -251,7 +251,7 @@ func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runE
 		prompt = strings.TrimSpace(prompt)
 	}
 
-	runInTaskMode = strings.TrimSpace(effectiveTaskIdentifier) != "" || defaults.TaskLast || defaults.TaskNext
+	runInTaskMode = strings.TrimSpace(effectiveTaskIdentifier) != "" || parameters.TaskLast || parameters.TaskNext
 
 	invocation, isCommandInvocation, err := commands.ParseInvocation(prompt, extraPositionalArgs)
 	if err != nil {
@@ -267,11 +267,11 @@ func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runE
 	commandArgs := []string(nil)
 	commandModelOverride := ""
 	commandRoleOverride := ""
-	var commandRunDefaults *conf.RunDefaultsConfig
+	var commandRunParameters *conf.RunParameters
 	var commandTaskMetadata *core.Task
 	commandNeedsShell := false
 	if invocation != nil {
-		resolvedInvocation, resolveErr := resolveRunCommandInvocation(invocation, defaults.Workdir, defaults.ShadowDir, runInTaskMode)
+		resolvedInvocation, resolveErr := resolveRunCommandInvocation(invocation, parameters.Workdir, parameters.ShadowDir, runInTaskMode)
 		if resolveErr != nil {
 			return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: %w", resolveErr)
 		}
@@ -281,14 +281,14 @@ func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runE
 		commandArgs = resolvedInvocation.CommandArgs
 		commandModelOverride = resolvedInvocation.CommandModelOverride
 		commandRoleOverride = resolvedInvocation.CommandRoleOverride
-		commandRunDefaults = resolvedInvocation.CommandRunDefaults
+		commandRunParameters = resolvedInvocation.CommandRunParameters
 		commandTaskMetadata = resolvedInvocation.CommandTaskMetadata
 		commandNeedsShell = resolvedInvocation.CommandNeedsShell
 		prompt = resolvedInvocation.Prompt
 		extraPositionalArgs = resolvedInvocation.ExtraPositionalArgs
 	}
 
-	contextData, err := ParseRunContextEntries(defaults.ContextEntries)
+	contextData, err := ParseRunContextEntries(parameters.ContextEntries)
 	if err != nil {
 		return nil, err
 	}
@@ -297,54 +297,54 @@ func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runE
 		return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: prompt cannot be empty")
 	}
 
-	bashRunTimeout, err := parseBashRunTimeout(defaults.BashRunTimeout)
+	bashRunTimeout, err := parseBashRunTimeout(parameters.BashRunTimeout)
 	if err != nil {
 		return nil, err
 	}
 
-	containerOn := defaults.Container != nil && defaults.Container.Enabled
-	containerOff := defaults.ContainerDisabled
+	containerOn := parameters.Container != nil && parameters.Container.Enabled
+	containerOff := parameters.ContainerDisabled
 	var commandContainerEnabled *bool
-	if commandRunDefaults != nil {
-		if defaults.Container == nil {
-			defaults.Container = &conf.ContainerConfig{}
+	if commandRunParameters != nil {
+		if parameters.Container == nil {
+			parameters.Container = &conf.ContainerConfig{}
 		}
-		defaults.MergeFrom(*commandRunDefaults)
-		if defaults.NoCommit {
-			defaults.Worktree = ""
-			defaults.Merge = false
+		parameters.MergeFrom(*commandRunParameters)
+		if parameters.NoCommit {
+			parameters.Worktree = ""
+			parameters.Merge = false
 		}
-		if commandRunDefaults.Container != nil && commandRunDefaults.Container.Enabled {
+		if commandRunParameters.Container != nil && commandRunParameters.Container.Enabled {
 			enabledValue := true
 			commandContainerEnabled = &enabledValue
 			containerOn = true
 			containerOff = false
 		}
-		if defaults.MaxThreads < 0 {
+		if parameters.MaxThreads < 0 {
 			return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: --max-threads must be >= 0")
 		}
-		if defaults.RunBashMax != nil && *defaults.RunBashMax < 0 {
+		if parameters.RunBashMax != nil && *parameters.RunBashMax < 0 {
 			return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: --run-bash-max must be >= 0")
 		}
-		if defaults.VfsReadLimit != nil && *defaults.VfsReadLimit < 0 {
+		if parameters.VfsReadLimit != nil && *parameters.VfsReadLimit < 0 {
 			return nil, fmt.Errorf("populateRunExecutionParams() [run.go]: --vfs-read-limit must be >= 0")
 		}
 	}
-	if defaults.NoMerge {
-		defaults.Merge = false
+	if parameters.NoMerge {
+		parameters.Merge = false
 	}
-	if defaults.NoCommit {
-		defaults.Worktree = ""
-		defaults.Merge = false
+	if parameters.NoCommit {
+		parameters.Worktree = ""
+		parameters.Merge = false
 	}
-	defaults.LogLLMRequests = defaults.LogLLMRequests || defaults.LogLLMRequestsRaw
+	parameters.LogLLMRequests = parameters.LogLLMRequests || parameters.LogLLMRequestsRaw
 
 	if invocation != nil {
-		if !defaults.ModelOverridden && commandModelOverride != "" {
-			defaults.Model = commandModelOverride
+		if !parameters.ModelOverridden && commandModelOverride != "" {
+			parameters.Model = commandModelOverride
 		}
-		if !defaults.RoleOverridden && commandRoleOverride != "" {
-			defaults.Role = commandRoleOverride
+		if !parameters.RoleOverridden && commandRoleOverride != "" {
+			parameters.Role = commandRoleOverride
 		}
 	}
 
@@ -352,13 +352,13 @@ func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runE
 		manager := preloadedTaskManager
 		if manager == nil {
 			var loadErr error
-			manager, loadErr = loadRunTaskManager(defaults.TaskDir, defaults.Workdir, defaults.ShadowDir, defaults.ProjectConfig, defaults.ConfigPath)
+			manager, loadErr = loadRunTaskManager(parameters.TaskDir, parameters.Workdir, parameters.ShadowDir, parameters.ProjectConfig, parameters.ConfigPath)
 			if loadErr != nil {
 				return nil, loadErr
 			}
 		}
 		taskManager = manager
-		identifier, err := resolveTaskRunIdentifierForRun(manager, effectiveTaskIdentifier, defaults.TaskLast, defaults.TaskNext)
+		identifier, err := resolveTaskRunIdentifierForRun(manager, effectiveTaskIdentifier, parameters.TaskLast, parameters.TaskNext)
 		if err != nil {
 			return nil, err
 		}
@@ -370,8 +370,8 @@ func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runE
 		resolvedTask.TaskDir = taskDir
 		params.Task = cloneRunTask(resolvedTask)
 		params.InitialTask = cloneRunTask(resolvedTask)
-		if !defaults.RoleOverridden && strings.TrimSpace(resolvedTask.Role) != "" {
-			defaults.Role = strings.TrimSpace(resolvedTask.Role)
+		if !parameters.RoleOverridden && strings.TrimSpace(resolvedTask.Role) != "" {
+			parameters.Role = strings.TrimSpace(resolvedTask.Role)
 		}
 		if prompt == "" {
 			taskPromptBytes, readErr := os.ReadFile(filepath.Join(taskDir, "task.md"))
@@ -387,26 +387,26 @@ func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runE
 		if _, updateErr := manager.UpdateTask(core.TaskUpdateParams{Identifier: identifier, Status: &runningStatus}); updateErr != nil {
 			return nil, updateErr
 		}
-		taskRunMerge := resolveTaskRunMerge(defaults.NoMerge, defaults.Merge, defaults.Worktree)
+		taskRunMerge := resolveTaskRunMerge(parameters.NoMerge, parameters.Merge, parameters.Worktree)
 		taskFeatureBranch := ""
 		if params.Task != nil {
 			taskFeatureBranch = strings.TrimSpace(params.Task.FeatureBranch)
 		}
-		if shouldDisableTaskWorktreeForRun(commandTaskMetadata, params.Task) || defaults.NoCommit {
-			defaults.Worktree = ""
+		if shouldDisableTaskWorktreeForRun(commandTaskMetadata, params.Task) || parameters.NoCommit {
+			parameters.Worktree = ""
 			taskRunMerge = false
-		} else if strings.TrimSpace(defaults.Worktree) == "" {
-			defaults.Worktree = taskFeatureBranch
+		} else if strings.TrimSpace(parameters.Worktree) == "" {
+			parameters.Worktree = taskFeatureBranch
 		}
-		defaults.Merge = taskRunMerge
-		_ = defaults.TaskReset
+		parameters.Merge = taskRunMerge
+		_ = parameters.TaskReset
 	}
 
-	containerRequested := containerOn || (defaults.Container != nil && (len(defaults.Container.Mounts) > 0 || len(defaults.Container.Env) > 0))
-	if !defaults.ContainerDisabled && commandContainerEnabled != nil {
+	containerRequested := containerOn || (parameters.Container != nil && (len(parameters.Container.Mounts) > 0 || len(parameters.Container.Env) > 0))
+	if !parameters.ContainerDisabled && commandContainerEnabled != nil {
 		containerRequested = *commandContainerEnabled
 	}
-	if !defaults.ContainerDisabled && invocation != nil && commandNeedsShell {
+	if !parameters.ContainerDisabled && invocation != nil && commandNeedsShell {
 		containerRequested = true
 	}
 
@@ -421,14 +421,14 @@ func populateRunExecutionParams(params *RunExecution, stdin stdio.Reader) (*runE
 		params.ContextData[key] = value
 	}
 	params.BashRunTimeout = bashRunTimeout
-	defaults.GitUserName = vcs.ResolveGitIdentity(defaults.GitUserName, "user.name")
-	defaults.GitUserEmail = vcs.ResolveGitIdentity(defaults.GitUserEmail, "user.email")
-	if defaults.Container == nil {
-		defaults.Container = &conf.ContainerConfig{}
+	parameters.GitUserName = vcs.ResolveGitIdentity(parameters.GitUserName, "user.name")
+	parameters.GitUserEmail = vcs.ResolveGitIdentity(parameters.GitUserEmail, "user.email")
+	if parameters.Container == nil {
+		parameters.Container = &conf.ContainerConfig{}
 	}
-	defaults.Container.Enabled = containerRequested
-	defaults.ContainerDisabled = containerOff
-	defaults.VFSAllow = parseVFSAllowPaths(defaults.VFSAllow)
+	parameters.Container.Enabled = containerRequested
+	parameters.ContainerDisabled = containerOff
+	parameters.VFSAllow = parseVFSAllowPaths(parameters.VFSAllow)
 
 	return &runExecutionPrepResult{
 		taskManager:    taskManager,
@@ -482,11 +482,11 @@ func buildRunSessionOutput(params *RunExecution, output stdio.Writer) core.Sessi
 	if params == nil {
 		return sessionio.NewTextSessionOutput(output)
 	}
-	defaults := &params.Config.Defaults
-	if strings.TrimSpace(defaults.OutputFormat) == "jsonl" {
+	parameters := &params.Config.Parameters
+	if strings.TrimSpace(parameters.OutputFormat) == "jsonl" {
 		return sessionio.NewJsonlSessionOutput(output)
 	}
-	return sessionio.NewTextSessionOutputWithSlug(output, defaults.Worktree)
+	return sessionio.NewTextSessionOutputWithSlug(output, parameters.Worktree)
 }
 func buildSummaryMessageFunc(output core.SessionThreadOutput) func(string, shared.MessageType) {
 	if output == nil {
@@ -501,7 +501,7 @@ func buildRunStdinSessionInput(params *RunExecution, thread core.SessionThreadIn
 	if params == nil || thread == nil || input == nil {
 		return nil
 	}
-	if params.Config.Defaults.OutputFormat == "jsonl" {
+	if params.Config.Parameters.OutputFormat == "jsonl" {
 		return sessionio.NewJsonlSessionInput(input, thread)
 	}
 	return sessionio.NewTextSessionInput(input, thread)
@@ -510,11 +510,11 @@ func validateMergeRunExecution(params *RunExecution) error {
 	if params == nil {
 		return fmt.Errorf("validateMergeRunExecution() [run.go]: params cannot be nil")
 	}
-	defaults := &params.Config.Defaults
-	if defaults.Merge && defaults.NoCommit {
+	parameters := &params.Config.Parameters
+	if parameters.Merge && parameters.NoCommit {
 		return fmt.Errorf("RunCommand() [run.go]: --merge cannot be used with --no-commit")
 	}
-	if defaults.Merge && strings.TrimSpace(defaults.Worktree) == "" {
+	if parameters.Merge && strings.TrimSpace(parameters.Worktree) == "" {
 		return fmt.Errorf("RunCommand() [run.go]: --merge requires --worktree")
 	}
 	return nil

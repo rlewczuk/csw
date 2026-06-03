@@ -110,7 +110,7 @@ func TestFallbackChatModel_Chat_PersistsSelectedModelAfterTemporaryFailure(t *te
 
 func TestFallbackChatModel_Chat_RateLimitSwitchesWithoutDelay(t *testing.T) {
 	m1 := &fallbackTestModel{
-		name: "m1",
+		name:    "m1",
 		results: []fallbackTestResult{{err: &RateLimitError{RetryAfterSeconds: 12, Message: "m1 rate limit"}}},
 	}
 	m2 := &fallbackTestModel{
@@ -144,11 +144,11 @@ func TestFallbackChatModel_Chat_RateLimitSwitchesWithoutDelay(t *testing.T) {
 
 func TestFallbackChatModel_Chat_CyclesWhenLastModelFails(t *testing.T) {
 	m1 := &fallbackTestModel{
-		name: "m1",
+		name:    "m1",
 		results: []fallbackTestResult{{response: NewTextMessage(ChatRoleAssistant, "m1-success")}},
 	}
 	m2 := &fallbackTestModel{
-		name: "m2",
+		name:    "m2",
 		results: []fallbackTestResult{{err: &RateLimitError{RetryAfterSeconds: 8, Message: "m2 rate limit"}}},
 	}
 

@@ -10,10 +10,10 @@ import (
 // ProviderRegistry manages a collection of model providers.
 // It loads provider configurations from a CswConfig and caches the created providers.
 type ProviderRegistry struct {
-	mu          sync.RWMutex
-	config      *conf.CswConfig
-	providers   map[string]ModelProvider
-	loaded      bool
+	mu        sync.RWMutex
+	config    *conf.CswConfig
+	providers map[string]ModelProvider
+	loaded    bool
 }
 
 // NewProviderRegistry creates a new provider registry that uses the given CswConfig.
@@ -24,9 +24,9 @@ func NewProviderRegistry(config *conf.CswConfig) *ProviderRegistry {
 	}
 
 	return &ProviderRegistry{
-		config:      config,
-		providers:   make(map[string]ModelProvider),
-		loaded:      false,
+		config:    config,
+		providers: make(map[string]ModelProvider),
+		loaded:    false,
 	}
 }
 

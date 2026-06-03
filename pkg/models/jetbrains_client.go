@@ -21,7 +21,7 @@ const (
 	jetbrainsAuthenticateJWTHeader      string = "grazie-authenticate-jwt"
 	jetbrainsFallbackBrowserTokenHeader string = "x-jetbrains-bearer"
 	// jetbrainsChatStreamPath is the observed private JetBrains AI streaming endpoint.
-	jetbrainsChatStreamPath             string = "/user/v5/llm/chat/stream/v8"
+	jetbrainsChatStreamPath string = "/user/v5/llm/chat/stream/v8"
 )
 
 // NewJetBrainsClient creates a new JetBrains AI client.

@@ -113,8 +113,8 @@ func ResolveModelName(modelName string, configStore *conf.CswConfig, providerReg
 		return ResolveModelSpec(modelName, configStore)
 	}
 
-	if configStore != nil && configStore.GlobalConfig != nil && configStore.GlobalConfig.Defaults.DefaultProvider != "" {
-		return configStore.GlobalConfig.Defaults.DefaultProvider + "/default", nil
+	if configStore != nil && configStore.GlobalConfig != nil && configStore.GlobalConfig.Parameters.DefaultProvider != "" {
+		return configStore.GlobalConfig.Parameters.DefaultProvider + "/default", nil
 	}
 
 	providers := providerRegistry.List()

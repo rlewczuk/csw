@@ -18,27 +18,27 @@ func TestValidateMergeCLIParams(t *testing.T) {
 	}{
 		{
 			name:           "merge without worktree is rejected",
-			params:         newRunExecutionForTest(conf.RunDefaultsConfig{Merge: true}),
+			params:         newRunExecutionForTest(conf.RunParameters{Merge: true}),
 			expectError:    true,
 			errorSubstring: "--merge requires --worktree",
 		},
 		{
 			name:           "merge with no commit is rejected",
-			params:         newRunExecutionForTest(conf.RunDefaultsConfig{Merge: true, NoCommit: true}),
+			params:         newRunExecutionForTest(conf.RunParameters{Merge: true, NoCommit: true}),
 			expectError:    true,
 			errorSubstring: "--merge cannot be used with --no-commit",
 		},
 		{
 			name:   "no commit without worktree is allowed",
-			params: newRunExecutionForTest(conf.RunDefaultsConfig{NoCommit: true}),
+			params: newRunExecutionForTest(conf.RunParameters{NoCommit: true}),
 		},
 		{
 			name:   "merge with worktree is allowed",
-			params: newRunExecutionForTest(conf.RunDefaultsConfig{Merge: true, Worktree: "feature/test"}),
+			params: newRunExecutionForTest(conf.RunParameters{Merge: true, Worktree: "feature/test"}),
 		},
 		{
 			name:   "non merge without worktree is allowed",
-			params: newRunExecutionForTest(conf.RunDefaultsConfig{Merge: false}),
+			params: newRunExecutionForTest(conf.RunParameters{Merge: false}),
 		},
 		{
 			name:           "nil params are rejected",
@@ -294,7 +294,7 @@ func TestRunDefaultsNoCommit(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			defaults := conf.RunDefaultsConfig{Worktree: tc.initialWorktree, Merge: tc.initialMerge, NoCommit: tc.initialNoCommit || tc.defaultsNoCommit}
+			defaults := conf.RunParameters{Worktree: tc.initialWorktree, Merge: tc.initialMerge, NoCommit: tc.initialNoCommit || tc.defaultsNoCommit}
 			if defaults.NoCommit {
 				defaults.Worktree = ""
 				defaults.Merge = false

@@ -2,23 +2,23 @@ package models
 
 // AnthropicMessagesRequest represents the request structure for POST /v1/messages endpoint
 type AnthropicMessagesRequest struct {
-	Model            string                  `json:"model"`                    // Required: model name
-	Messages         []AnthropicMessageParam `json:"messages"`                 // Required: messages of the conversation
-	MaxTokens        int                     `json:"max_tokens"`               // Required: maximum number of tokens to generate
-	Temperature      float64                 `json:"temperature,omitempty"`    // Optional: 0.0 to 1.0
-	TopP             float64                 `json:"top_p,omitempty"`          // Optional: 0.0 to 1.0
-	TopK             int                     `json:"top_k,omitempty"`          // Optional: top-k sampling
-	Stream           bool                    `json:"stream,omitempty"`         // Optional: if true, returns streaming response
-	System           interface{}             `json:"system,omitempty"`         // Optional: system prompt (string or array of content blocks)
-	StopSeq          []string                `json:"stop_sequences,omitempty"` // Optional: stop sequences
-	Tools            []AnthropicTool         `json:"tools,omitempty"`          // Optional: tools available for the model to use
-	Thinking         *AnthropicThinking      `json:"thinking,omitempty"`       // Optional: thinking configuration for Claude 3.7+
+	Model       string                  `json:"model"`                    // Required: model name
+	Messages    []AnthropicMessageParam `json:"messages"`                 // Required: messages of the conversation
+	MaxTokens   int                     `json:"max_tokens"`               // Required: maximum number of tokens to generate
+	Temperature float64                 `json:"temperature,omitempty"`    // Optional: 0.0 to 1.0
+	TopP        float64                 `json:"top_p,omitempty"`          // Optional: 0.0 to 1.0
+	TopK        int                     `json:"top_k,omitempty"`          // Optional: top-k sampling
+	Stream      bool                    `json:"stream,omitempty"`         // Optional: if true, returns streaming response
+	System      interface{}             `json:"system,omitempty"`         // Optional: system prompt (string or array of content blocks)
+	StopSeq     []string                `json:"stop_sequences,omitempty"` // Optional: stop sequences
+	Tools       []AnthropicTool         `json:"tools,omitempty"`          // Optional: tools available for the model to use
+	Thinking    *AnthropicThinking      `json:"thinking,omitempty"`       // Optional: thinking configuration for Claude 3.7+
 }
 
 // AnthropicThinking represents thinking configuration for Claude 3.7+ models.
 type AnthropicThinking struct {
-	Type         string `json:"type"`           // Required: "enabled" or "disabled"
-	BudgetTokens int    `json:"budget_tokens"`  // Required when enabled: max tokens for thinking
+	Type         string `json:"type"`          // Required: "enabled" or "disabled"
+	BudgetTokens int    `json:"budget_tokens"` // Required when enabled: max tokens for thinking
 }
 
 // AnthropicMessageParam represents a message in the request
@@ -62,13 +62,13 @@ type AnthropicMessagesResponse struct {
 
 // AnthropicResponseContent represents a content block in the response
 type AnthropicResponseContent struct {
-	Type      string                 `json:"type"`                 // Required: "text", "thinking" or "tool_use"
-	Text      string                 `json:"text,omitempty"`       // For text type
-	Thinking  string                 `json:"thinking,omitempty"`   // For thinking type
-	Signature string                 `json:"signature,omitempty"`  // For thinking type
-	ID        string                 `json:"id,omitempty"`         // For tool_use type
-	Name      string                 `json:"name,omitempty"`       // For tool_use type
-	Input     map[string]interface{} `json:"input,omitempty"`      // For tool_use type
+	Type      string                 `json:"type"`                // Required: "text", "thinking" or "tool_use"
+	Text      string                 `json:"text,omitempty"`      // For text type
+	Thinking  string                 `json:"thinking,omitempty"`  // For thinking type
+	Signature string                 `json:"signature,omitempty"` // For thinking type
+	ID        string                 `json:"id,omitempty"`        // For tool_use type
+	Name      string                 `json:"name,omitempty"`      // For tool_use type
+	Input     map[string]interface{} `json:"input,omitempty"`     // For tool_use type
 }
 
 // AnthropicUsageInfo represents token usage information

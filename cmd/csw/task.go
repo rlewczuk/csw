@@ -112,7 +112,7 @@ func resolveTaskDirPath(cmd *cobra.Command, workDir string) (string, error) {
 			ConfigPath:    configPath,
 		})
 		if defaultsErr != nil {
-			return "", fmt.Errorf("resolveTaskDirPath() [task.go]: failed to resolve CLI defaults: %w", defaultsErr)
+			return "", fmt.Errorf("resolveTaskDirPath() [task.go]: failed to resolve CLI parameters: %w", defaultsErr)
 		}
 		resolvedTaskDir = strings.TrimSpace(defaults.TaskDir)
 	}

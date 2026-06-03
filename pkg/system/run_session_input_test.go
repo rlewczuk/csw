@@ -31,8 +31,8 @@ func (d *cliSessionInputThreadDouble) PermissionResponse(queryID string, respons
 
 var _ core.SessionThreadInput = (*cliSessionInputThreadDouble)(nil)
 
-func newRunExecutionForTest(defaults conf.RunDefaultsConfig) *RunExecution {
-	return &RunExecution{Config: &conf.GlobalConfig{Defaults: defaults}}
+func newRunExecutionForTest(defaults conf.RunParameters) *RunExecution {
+	return &RunExecution{Config: &conf.GlobalConfig{Parameters: defaults}}
 }
 
 func TestBuildRunStdinSessionInput(t *testing.T) {
@@ -54,34 +54,34 @@ func TestBuildRunStdinSessionInput(t *testing.T) {
 		},
 		{
 			name:        "interactive short mode uses text session input",
-			params:      newRunExecutionForTest(conf.RunDefaultsConfig{Interactive: true, OutputFormat: "short"}),
+			params:      newRunExecutionForTest(conf.RunParameters{Interactive: true, OutputFormat: "short"}),
 			input:       reader,
 			expectedNil: false,
 			expected:    &io.TextSessionInput{},
 		},
 		{
 			name:        "nil input returns nil",
-			params:      newRunExecutionForTest(conf.RunDefaultsConfig{Interactive: false, OutputFormat: "short"}),
+			params:      newRunExecutionForTest(conf.RunParameters{Interactive: false, OutputFormat: "short"}),
 			input:       nil,
 			expectedNil: true,
 		},
 		{
 			name:        "jsonl mode uses jsonl session input",
-			params:      newRunExecutionForTest(conf.RunDefaultsConfig{Interactive: false, OutputFormat: "jsonl"}),
+			params:      newRunExecutionForTest(conf.RunParameters{Interactive: false, OutputFormat: "jsonl"}),
 			input:       strings.NewReader("{}\n"),
 			expectedNil: false,
 			expected:    &io.JsonlSessionInput{},
 		},
 		{
 			name:        "short mode attaches text session input",
-			params:      newRunExecutionForTest(conf.RunDefaultsConfig{Interactive: false, OutputFormat: "short"}),
+			params:      newRunExecutionForTest(conf.RunParameters{Interactive: false, OutputFormat: "short"}),
 			input:       strings.NewReader("hello\n"),
 			expectedNil: false,
 			expected:    &io.TextSessionInput{},
 		},
 		{
 			name:        "full mode attaches text session input",
-			params:      newRunExecutionForTest(conf.RunDefaultsConfig{Interactive: false, OutputFormat: "full"}),
+			params:      newRunExecutionForTest(conf.RunParameters{Interactive: false, OutputFormat: "full"}),
 			input:       strings.NewReader("hello\n"),
 			expectedNil: false,
 			expected:    &io.TextSessionInput{},
@@ -115,17 +115,17 @@ func TestBuildCLISessionOutput(t *testing.T) {
 		},
 		{
 			name:     "jsonl format uses jsonl output",
-			params:   newRunExecutionForTest(conf.RunDefaultsConfig{OutputFormat: "jsonl"}),
+			params:   newRunExecutionForTest(conf.RunParameters{OutputFormat: "jsonl"}),
 			expected: &io.JsonlSessionOutput{},
 		},
 		{
 			name:     "short format uses text output",
-			params:   newRunExecutionForTest(conf.RunDefaultsConfig{OutputFormat: "short"}),
+			params:   newRunExecutionForTest(conf.RunParameters{OutputFormat: "short"}),
 			expected: &io.TextSessionOutput{},
 		},
 		{
 			name:     "full format uses text output",
-			params:   newRunExecutionForTest(conf.RunDefaultsConfig{OutputFormat: "full"}),
+			params:   newRunExecutionForTest(conf.RunParameters{OutputFormat: "full"}),
 			expected: &io.TextSessionOutput{},
 		},
 	}
@@ -141,7 +141,7 @@ func TestBuildCLISessionOutput(t *testing.T) {
 
 func TestBuildCLISessionOutput_UsesWorktreeBranchAsLabel(t *testing.T) {
 	buffer := &bytes.Buffer{}
-	output := buildRunSessionOutput(newRunExecutionForTest(conf.RunDefaultsConfig{OutputFormat: "short", Worktree: "feature/fix-branch-label"}), buffer)
+	output := buildRunSessionOutput(newRunExecutionForTest(conf.RunParameters{OutputFormat: "short", Worktree: "feature/fix-branch-label"}), buffer)
 
 	output.AddUserMessage("Run full build")
 

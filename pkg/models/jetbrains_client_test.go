@@ -219,7 +219,7 @@ func TestJetBrainsAuthHelpers(t *testing.T) {
 			config: &conf.ModelProviderConfig{
 				RefreshToken: "refresh-token",
 			},
-			expectedBearer: "refresh-token",
+			expectedBearer:  "refresh-token",
 			preHeader:       "preset",
 			expectedHeader:  "preset",
 			expectSameValue: true,

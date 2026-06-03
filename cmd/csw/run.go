@@ -73,97 +73,97 @@ func RunCommand() *cobra.Command {
 			if globalConfig == nil {
 				globalConfig = &conf.GlobalConfig{}
 			}
-			defaults := &globalConfig.Defaults
+			parameters := &globalConfig.Parameters
 			if cmd.Flags().Changed("model") {
-				defaults.Model = cliModel
-				defaults.ModelOverridden = true
+				parameters.Model = cliModel
+				parameters.ModelOverridden = true
 			}
-			if cmd.Flags().Changed("role") || defaults.Role == "" {
-				defaults.Role = cliRole
-				defaults.RoleOverridden = cmd.Flags().Changed("role")
+			if cmd.Flags().Changed("role") || parameters.Role == "" {
+				parameters.Role = cliRole
+				parameters.RoleOverridden = cmd.Flags().Changed("role")
 			}
 			if cmd.Flags().Changed("workdir") {
-				defaults.Workdir = cliWorkDir
+				parameters.Workdir = cliWorkDir
 			}
 			if cmd.Flags().Changed("worktree") {
-				defaults.Worktree = cliWorktree
+				parameters.Worktree = cliWorktree
 			}
 			if cmd.Flags().Changed("merge") {
-				defaults.Merge = cliMerge
+				parameters.Merge = cliMerge
 			}
 			if cmd.Flags().Changed("no-commit") {
-				defaults.NoCommit = cliNoCommit
+				parameters.NoCommit = cliNoCommit
 			}
-			if defaults.Container == nil {
-				defaults.Container = &conf.ContainerConfig{}
+			if parameters.Container == nil {
+				parameters.Container = &conf.ContainerConfig{}
 			}
 			if cmd.Flags().Changed("container-enabled") {
-				defaults.ContainerEnabled = cliContainerOn
+				parameters.ContainerEnabled = cliContainerOn
 			}
 			if cmd.Flags().Changed("container-disabled") {
-				defaults.ContainerDisabled = cliContainerOff
+				parameters.ContainerDisabled = cliContainerOff
 			}
 			if cmd.Flags().Changed("container-image") {
-				defaults.Container.Image = cliContainerImage
+				parameters.Container.Image = cliContainerImage
 			}
 			if cmd.Flags().Changed("container-mount") {
-				defaults.Container.Mounts = append([]string(nil), cliContainerMount...)
+				parameters.Container.Mounts = append([]string(nil), cliContainerMount...)
 			}
 			if cmd.Flags().Changed("container-env") {
-				defaults.Container.Env = append([]string(nil), cliContainerEnv...)
+				parameters.Container.Env = append([]string(nil), cliContainerEnv...)
 			}
 			if cmd.Flags().Changed("allow-all-permissions") {
-				defaults.AllowAllPermissions = cliAllowAllPerms
+				parameters.AllowAllPermissions = cliAllowAllPerms
 			}
 			if cmd.Flags().Changed("log-llm-requests") {
-				defaults.LogLLMRequests = cliLogLLMRequests
+				parameters.LogLLMRequests = cliLogLLMRequests
 			}
 			if cmd.Flags().Changed("log-llm-requests-raw") {
-				defaults.LogLLMRequestsRaw = cliLogLLMRequestsRaw
+				parameters.LogLLMRequestsRaw = cliLogLLMRequestsRaw
 			}
 			if cmd.Flags().Changed("lsp-server") {
-				defaults.LSPServer = cliLSPServer
+				parameters.LSPServer = cliLSPServer
 			}
 			if cmd.Flags().Changed("thinking") {
-				defaults.Thinking = cliThinking
+				parameters.Thinking = cliThinking
 			}
 			if cmd.Flags().Changed("git-user") {
-				defaults.GitUserName = cliGitUser
+				parameters.GitUserName = cliGitUser
 			}
 			if cmd.Flags().Changed("git-email") {
-				defaults.GitUserEmail = cliGitEmail
+				parameters.GitUserEmail = cliGitEmail
 			}
 			if cmd.Flags().Changed("max-threads") {
-				defaults.MaxThreads = cliMaxThreads
+				parameters.MaxThreads = cliMaxThreads
 			}
 			if cmd.Flags().Changed("vfs-allow") {
-				defaults.VFSAllow = append([]string(nil), cliVFSAllow...)
+				parameters.VFSAllow = append([]string(nil), cliVFSAllow...)
 			}
 			if cmd.Flags().Changed("run-bash-max") {
-				defaults.RunBashMax = &runBashMaxOutput
+				parameters.RunBashMax = &runBashMaxOutput
 			}
 			if cmd.Flags().Changed("vfs-read-limit") {
-				defaults.VfsReadLimit = &vfsReadLimit
+				parameters.VfsReadLimit = &vfsReadLimit
 			}
 			if cmd.Flags().Changed("shadow-dir") {
-				defaults.ShadowDir = shadowDir
+				parameters.ShadowDir = shadowDir
 			}
-			defaults.NoMerge = cliNoMerge
-			defaults.BashRunTimeout = cliBashRunTimeout
-			defaults.CommitMessageTemplate = cliCommitMessage
-			defaults.ConfigPath = cliConfigPath
-			defaults.ProjectConfig = cliProjectConfig
-			defaults.Interactive = cliInteractive
-			defaults.SaveSessionTo = cliSaveSessionTo
-			defaults.SaveSession = cliSaveSession
-			defaults.NoRefresh = cliNoRefresh
-			defaults.OutputFormat = cliOutputFormat
-			defaults.ContextEntries = append([]string(nil), cliContext...)
-			defaults.TaskIdentifier = strings.TrimSpace(cliTaskIdentifier)
-			defaults.TaskNext = cliTaskNext
-			defaults.TaskLast = cliTaskLast
-			defaults.TaskReset = cliTaskReset
-			defaults.PositionalArgs = append([]string(nil), args...)
+			parameters.NoMerge = cliNoMerge
+			parameters.BashRunTimeout = cliBashRunTimeout
+			parameters.CommitMessageTemplate = cliCommitMessage
+			parameters.ConfigPath = cliConfigPath
+			parameters.ProjectConfig = cliProjectConfig
+			parameters.Interactive = cliInteractive
+			parameters.SaveSessionTo = cliSaveSessionTo
+			parameters.SaveSession = cliSaveSession
+			parameters.NoRefresh = cliNoRefresh
+			parameters.OutputFormat = cliOutputFormat
+			parameters.ContextEntries = append([]string(nil), cliContext...)
+			parameters.TaskIdentifier = strings.TrimSpace(cliTaskIdentifier)
+			parameters.TaskNext = cliTaskNext
+			parameters.TaskLast = cliTaskLast
+			parameters.TaskReset = cliTaskReset
+			parameters.PositionalArgs = append([]string(nil), args...)
 			return system.RunCommand(&system.RunExecution{Config: globalConfig, Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr})
 		},
 	}

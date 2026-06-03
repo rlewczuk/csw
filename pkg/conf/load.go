@@ -14,7 +14,7 @@ import (
 
 const (
 	defaultsConfigPathMarker = "@DEFAULTS"
-	embeddedDefaultsRoot    = "files"
+	embeddedDefaultsRoot     = "files"
 )
 
 //go:embed files/**
@@ -93,10 +93,10 @@ func CswConfigLoad(path string) (*CswConfig, error) {
 	}
 
 	return &CswConfig{
-		GlobalConfig:          mergedGlobalConfig,
-		AgentRoleConfigs:      mergedAgentRoleConfigs,
+		GlobalConfig:         mergedGlobalConfig,
+		AgentRoleConfigs:     mergedAgentRoleConfigs,
 		ModelProviderConfigs: mergedModelProviderConfigs,
-		AgentConfigFiles:      mergedAgentConfigFiles,
+		AgentConfigFiles:     mergedAgentConfigFiles,
 		ModelAliases:         mergedModelAliases,
 	}, nil
 }
