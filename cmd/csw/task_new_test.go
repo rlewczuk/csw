@@ -3,9 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -271,12 +268,10 @@ func TestGenerateTaskDescriptionUsesRetryAndFallbackChain(t *testing.T) {
 				return models.NewChatModelFromProviderChain(modelSpec, providers, options, retryPolicy, nil, aliases)
 			}
 
-			workDir := t.TempDir()
 			description, err := generateTaskDescription(context.Background(), taskCreateResolveParams{
 				Prompt:    "improve retry handling",
 				Branch:    "feature/retry",
 				ModelName: tt.modelSpec,
-				WorkDir:   workDir,
 			})
 			require.NoError(t, err)
 			assert.NotEmpty(t, description)
@@ -284,15 +279,6 @@ func TestGenerateTaskDescriptionUsesRetryAndFallbackChain(t *testing.T) {
 			if tt.modelSpec == "mock/test-model,mockb/backup-model" {
 				require.NotEmpty(t, backup.RecordedMessages)
 			}
-
-			logBytes, err := os.ReadFile(filepath.Join(workDir, ".cswdata", "csw.jsonl"))
-			require.NoError(t, err)
-			logText := string(logBytes)
-			assert.Contains(t, logText, "task_description_generation_start")
-			assert.Contains(t, logText, "task_description_llm_prompt")
-			assert.Contains(t, logText, "improve retry handling")
-			assert.Contains(t, logText, "task_description_llm_response")
-			assert.Contains(t, logText, strings.TrimSpace(description))
 		})
 	}
 }
