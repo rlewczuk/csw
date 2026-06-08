@@ -66,6 +66,20 @@ func RunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			configRoot, err := system.ResolveWorkDir(cliWorkDir)
+			if err != nil {
+				return err
+			}
+			if strings.TrimSpace(shadowDir) != "" {
+				configRoot, err = system.ResolveWorkDir(shadowDir)
+				if err != nil {
+					return err
+				}
+			}
+			configPath, err = system.ResolveConfigPathForProjectRoot(configPath, configRoot)
+			if err != nil {
+				return err
+			}
 			cswConfig, err := conf.CswConfigLoad(configPath)
 			if err != nil {
 				return err

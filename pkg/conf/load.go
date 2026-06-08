@@ -207,6 +207,17 @@ func loadGlobalConfigFromSource(source configLoadSource) (*GlobalConfig, error) 
 	if err := json.Unmarshal(data, &globalConfig); err != nil {
 		return nil, fmt.Errorf("loadGlobalConfigFromSource() [load.go]: failed to parse %q: %w", filepath.Join(source.Path, globalConfigPath), err)
 	}
+	var legacyGlobalConfig struct {
+		Defaults *RunParameters `json:"defaults,omitempty"`
+	}
+	if err := json.Unmarshal(data, &legacyGlobalConfig); err != nil {
+		return nil, fmt.Errorf("loadGlobalConfigFromSource() [load.go]: failed to parse legacy defaults in %q: %w", filepath.Join(source.Path, globalConfigPath), err)
+	}
+	if legacyGlobalConfig.Defaults != nil {
+		parameters := *legacyGlobalConfig.Defaults
+		parameters.MergeFrom(globalConfig.Parameters)
+		globalConfig.Parameters = parameters
+	}
 
 	return &globalConfig, nil
 }

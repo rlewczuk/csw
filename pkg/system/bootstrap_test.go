@@ -273,6 +273,34 @@ func TestResolveRunDefaultsUsesShadowDirForProjectConfig(t *testing.T) {
 	assert.Equal(t, "shadow/provider-model", defaults.Model)
 }
 
+func TestMergeRunExecutionConfigUsesShadowDirForProjectConfig(t *testing.T) {
+	workDir := t.TempDir()
+	shadowDir := t.TempDir()
+
+	require.NoError(t, os.MkdirAll(filepath.Join(shadowDir, ".csw", "config"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(shadowDir, ".csw", "config", "global.json"), []byte(`{
+		"defaults": {
+			"model": "shadow/provider-model",
+			"default-role": "developer"
+		}
+	}`), 0o644))
+
+	parameters := conf.RunParameters{
+		Workdir:   workDir,
+		ShadowDir: shadowDir,
+		Role:      "developer",
+	}
+	configStore := &conf.CswConfig{GlobalConfig: &conf.GlobalConfig{Parameters: parameters}}
+
+	err := mergeRunExecutionConfig(configStore, &parameters)
+
+	require.NoError(t, err)
+	require.NotNil(t, configStore.GlobalConfig)
+	assert.Equal(t, "shadow/provider-model", configStore.GlobalConfig.Parameters.Model)
+	assert.Equal(t, shadowDir, configStore.GlobalConfig.Parameters.ShadowDir)
+	assert.Equal(t, "developer", configStore.GlobalConfig.Parameters.Role)
+}
+
 func TestResolveRunDefaultsReturnsConfiguredWorkdir(t *testing.T) {
 	workDir := t.TempDir()
 	shadowDir := t.TempDir()

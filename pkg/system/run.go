@@ -179,7 +179,22 @@ func mergeRunExecutionConfig(configStore *conf.CswConfig, parameters *conf.RunPa
 	if err != nil {
 		return fmt.Errorf("mergeRunExecutionConfig() [run.go]: failed to build config path: %w", err)
 	}
-	loadedConfig, err := conf.CswConfigLoad(configPath)
+	configRoot, err := ResolveWorkDir(parameters.Workdir)
+	if err != nil {
+		return fmt.Errorf("mergeRunExecutionConfig() [run.go]: failed to resolve work directory: %w", err)
+	}
+	if strings.TrimSpace(parameters.ShadowDir) != "" {
+		resolvedShadowDir, shadowErr := ResolveWorkDir(parameters.ShadowDir)
+		if shadowErr != nil {
+			return fmt.Errorf("mergeRunExecutionConfig() [run.go]: failed to resolve shadow directory: %w", shadowErr)
+		}
+		configRoot = resolvedShadowDir
+	}
+	resolvedConfigPath, err := ResolveConfigPathForProjectRoot(configPath, configRoot)
+	if err != nil {
+		return fmt.Errorf("mergeRunExecutionConfig() [run.go]: failed to resolve config path for project root: %w", err)
+	}
+	loadedConfig, err := conf.CswConfigLoad(resolvedConfigPath)
 	if err != nil {
 		return fmt.Errorf("mergeRunExecutionConfig() [run.go]: failed to load config: %w", err)
 	}

@@ -48,6 +48,26 @@ func TestCswConfigLoad(t *testing.T) {
 		require.Empty(t, cfg.ModelAliases)
 	})
 
+	t.Run("loads legacy defaults as run parameters", func(t *testing.T) {
+		t.Parallel()
+		configDir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(configDir, "global.json"), []byte(`{
+			"defaults": {
+				"default-role": "developer",
+				"model": "openai/gpt-5.5",
+				"max-threads": 4
+			}
+		}`), 0o644))
+
+		cfg, err := CswConfigLoad(configDir)
+
+		require.NoError(t, err)
+		require.NotNil(t, cfg.GlobalConfig)
+		require.Equal(t, "developer", cfg.GlobalConfig.Parameters.DefaultRole)
+		require.Equal(t, "openai/gpt-5.5", cfg.GlobalConfig.Parameters.Model)
+		require.Equal(t, 4, cfg.GlobalConfig.Parameters.MaxThreads)
+	})
+
 	t.Run("loads and overrides model providers by source order", func(t *testing.T) {
 		t.Parallel()
 		baseDir := t.TempDir()
