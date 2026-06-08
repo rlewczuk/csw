@@ -210,6 +210,7 @@ func mergeRunExecutionConfig(configStore *conf.CswConfig, parameters *conf.RunPa
 		loadedConfig.GlobalConfig.Parameters.PositionalArgs = append([]string(nil), parameters.PositionalArgs...)
 		loadedConfig.GlobalConfig.Parameters.ModelOverridden = parameters.ModelOverridden
 		loadedConfig.GlobalConfig.Parameters.RoleOverridden = parameters.RoleOverridden
+		loadedConfig.GlobalConfig.Parameters.ShadowDir = parameters.ShadowDir
 	}
 	if loadedConfig.ModelProviderConfigs != nil {
 		configStore.ModelProviderConfigs = loadedConfig.ModelProviderConfigs

@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunCommandDoesNotExposeTaskFlag(t *testing.T) {
@@ -92,4 +93,57 @@ func TestResolveShadowDir(t *testing.T) {
 			assert.Equal(t, tc.expected, resolved)
 		})
 	}
+}
+
+func TestResolveShadowDirUsesEnvForRunSubcommandWithRootPersistentFlag(t *testing.T) {
+	originalShadowDir := shadowDir
+	t.Cleanup(func() {
+		shadowDir = originalShadowDir
+	})
+
+	shadowDir = ""
+	t.Setenv(shadowDirEnvVar, "env-shadow")
+
+	rootCmd := &cobra.Command{Use: "csw"}
+	rootCmd.PersistentFlags().StringVar(&shadowDir, "shadow-dir", "", "")
+	runCmd := &cobra.Command{Use: "run"}
+	rootCmd.AddCommand(runCmd)
+
+	resolved := resolveShadowDir(runCmd)
+
+	assert.Equal(t, "env-shadow", resolved)
+}
+
+func TestRunCommandExposesInheritedShadowDirFlag(t *testing.T) {
+	originalShadowDir := shadowDir
+	t.Cleanup(func() {
+		shadowDir = originalShadowDir
+	})
+
+	shadowDir = ""
+	rootCmd := &cobra.Command{Use: "csw"}
+	rootCmd.PersistentFlags().StringVar(&shadowDir, "shadow-dir", "", "")
+	runCmd := RunCommand()
+	rootCmd.AddCommand(runCmd)
+
+	flag := runCmd.Flag("shadow-dir")
+
+	require.NotNil(t, flag)
+}
+
+func TestShouldApplyRunShadowDirUsesEnvResolvedValue(t *testing.T) {
+	originalShadowDir := shadowDir
+	t.Cleanup(func() {
+		shadowDir = originalShadowDir
+	})
+
+	rootCmd := &cobra.Command{Use: "csw"}
+	rootCmd.PersistentFlags().StringVar(&shadowDir, "shadow-dir", "", "")
+	runCmd := RunCommand()
+	rootCmd.AddCommand(runCmd)
+	shadowDir = "env-shadow"
+
+	apply := shouldApplyRunShadowDir(runCmd)
+
+	assert.True(t, apply)
 }

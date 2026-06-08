@@ -82,6 +82,21 @@ Run command
 		assert.Equal(t, "golang:latest", resolved.CommandRunParameters.Container.Image)
 		assert.True(t, resolved.CommandRunParameters.Container.Enabled)
 	})
+
+	t.Run("loads command from shadow directory", func(t *testing.T) {
+		workDir := t.TempDir()
+		shadowDir := t.TempDir()
+		commandPath := filepath.Join(shadowDir, ".agents", "commands", "shadow-command.md")
+		require.NoError(t, os.MkdirAll(filepath.Dir(commandPath), 0o755))
+		require.NoError(t, os.WriteFile(commandPath, []byte("Shadow command template"), 0o644))
+
+		resolved, err := resolveRunCommandInvocation(&commands.Invocation{Name: "shadow-command"}, workDir, shadowDir, false)
+		require.NoError(t, err)
+
+		assert.Equal(t, "shadow-command", resolved.CommandName)
+		assert.Equal(t, "Shadow command template", resolved.CommandTemplate)
+		assert.Equal(t, commandPath, resolved.CommandPath)
+	})
 }
 
 func TestBuildRunAgentStartupInfoMessages(t *testing.T) {

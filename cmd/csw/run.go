@@ -147,7 +147,7 @@ func RunCommand() *cobra.Command {
 			if cmd.Flags().Changed("vfs-read-limit") {
 				parameters.VfsReadLimit = &vfsReadLimit
 			}
-			if cmd.Flags().Changed("shadow-dir") {
+			if shouldApplyRunShadowDir(cmd) {
 				parameters.ShadowDir = shadowDir
 			}
 			parameters.NoMerge = cliNoMerge
@@ -208,4 +208,13 @@ func RunCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&cliTaskReset, "reset", false, "Reset task branch before run in task context")
 
 	return cmd
+}
+
+// shouldApplyRunShadowDir reports whether resolved shadow-dir should override config.
+func shouldApplyRunShadowDir(cmd *cobra.Command) bool {
+	if cmd == nil {
+		return strings.TrimSpace(shadowDir) != ""
+	}
+	shadowFlag := cmd.Flag("shadow-dir")
+	return (shadowFlag != nil && shadowFlag.Changed) || strings.TrimSpace(shadowDir) != ""
 }
