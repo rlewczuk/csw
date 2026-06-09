@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Replace an inclusive range of lines in a file. Use this instead of exact string replacement when editing existing files. The file must be read first. Provide the line range from the last vfsRead output and the replacement text. The tool verifies the file version before editing.",
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "Path to the file."
+    },
+    "start_line": {
+      "type": "integer",
+      "description": "1-based first line to replace."
+    },
+    "end_line": {
+      "type": "integer",
+      "description": "1-based last line to replace, inclusive."
+    },
+    "replacement": {
+      "type": "string",
+      "description": "Exact replacement text for the selected line range."
+    },
+    "expected_sha256": {
+      "type": "string",
+      "description": "Optional SHA-256 of the file content observed by the model before editing."
+    }
+  },
+  "required": ["path", "start_line", "end_line", "replacement"],
+  "additionalProperties": false
+}

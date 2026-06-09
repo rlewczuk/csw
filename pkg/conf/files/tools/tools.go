@@ -21,6 +21,7 @@ var Names = []string{
 	"vfsMove",
 	"vfsPatch",
 	"vfsRead",
+	"vfsReplaceLines",
 	"vfsWrite",
 	"webFetch",
 }
