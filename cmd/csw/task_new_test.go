@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"iter"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/rlewczuk/csw/pkg/models"
 	"github.com/rlewczuk/csw/pkg/shared"
 	"github.com/rlewczuk/csw/pkg/system"
+	"github.com/rlewczuk/csw/pkg/tool"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -281,4 +283,89 @@ func TestGenerateTaskDescriptionUsesRetryAndFallbackChain(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGenerateTaskDescriptionUsesResolvedModelFromBuildSystem(t *testing.T) {
+	originalBuilder := buildTaskDescriptionSystemFunc
+	originalModelBuilder := newGenerationChatModelFromSpecFunc
+	t.Cleanup(func() {
+		buildTaskDescriptionSystemFunc = originalBuilder
+		newGenerationChatModelFromSpecFunc = originalModelBuilder
+	})
+
+	primary := models.NewMockProvider([]models.ModelInfo{{Name: "test-model"}})
+	primary.SetChatResponse("test-model", &models.MockChatResponse{Response: models.NewTextMessage(models.ChatRoleAssistant, "generated description")})
+	configStore := &conf.CswConfig{
+		GlobalConfig: &conf.GlobalConfig{Parameters: conf.RunParameters{Model: "mock/test-model"}},
+		AgentConfigFiles: map[string]map[string]string{
+			"commit": {
+				"system.md":  "system prompt",
+				"prompt.md":  "{{ range .Messages }}{{ . }}{{ end }}",
+				"message.md": "{{ .Message }}",
+			},
+		},
+	}
+
+	buildTaskDescriptionSystemFunc = func(config *conf.CswConfig) (*system.SweSystem, error) {
+		_ = config
+		return &system.SweSystem{
+			ModelProviders: map[string]models.ModelProvider{"mock": primary},
+			ModelAliases:   map[string][]string{},
+			Config:         configStore,
+		}, nil
+	}
+
+	newGenerationChatModelFromSpecFunc = func(
+		modelSpec string,
+		providers map[string]models.ModelProvider,
+		options *models.ChatOptions,
+		config *conf.CswConfig,
+		primaryProvider models.ModelProvider,
+		aliases map[string][]string,
+		retryPolicyOverride *models.RetryPolicy,
+		retryLogFn func(string, shared.MessageType),
+	) (models.ChatModel, error) {
+		_ = options
+		_ = config
+		_ = primaryProvider
+		_ = aliases
+		_ = retryPolicyOverride
+		_ = retryLogFn
+
+		if modelSpec != "mock/test-model" {
+			return failingTaskDescriptionChatModel{}, nil
+		}
+
+		return providers["mock"].ChatModel("test-model", nil), nil
+	}
+
+	description, err := generateTaskDescription(context.Background(), taskCreateResolveParams{
+		Prompt:    "improve task description generation",
+		Branch:    "feature/task-description",
+		ModelName: "mock/default",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "generated description", description)
+}
+
+type failingTaskDescriptionChatModel struct{}
+
+func (failingTaskDescriptionChatModel) Chat(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) (*models.ChatMessage, error) {
+	_ = ctx
+	_ = messages
+	_ = options
+	_ = tools
+	return nil, fmt.Errorf("test should use resolved model from built system")
+}
+
+func (failingTaskDescriptionChatModel) ChatStream(ctx context.Context, messages []*models.ChatMessage, options *models.ChatOptions, tools []tool.ToolInfo) iter.Seq[*models.ChatMessage] {
+	_ = ctx
+	_ = messages
+	_ = options
+	_ = tools
+	return func(yield func(*models.ChatMessage) bool) {}
+}
+
+func (failingTaskDescriptionChatModel) Compactor() models.ChatCompator {
+	return nil
 }

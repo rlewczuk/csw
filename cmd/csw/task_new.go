@@ -346,9 +346,25 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 		defer runtimeConfig.Cleanup()
 	}
 
-	modelRefs, err := models.ExpandProviderModelChain(strings.TrimSpace(parameters.Model), sweSystem.ModelAliases)
+	resolvedModelSpec := strings.TrimSpace(parameters.Model)
+	if sweSystem.Config != nil && sweSystem.Config.GlobalConfig != nil {
+		builtModelSpec := strings.TrimSpace(sweSystem.Config.GlobalConfig.Parameters.Model)
+		if builtModelSpec != "" {
+			resolvedModelSpec = builtModelSpec
+		}
+	}
+	if resolvedModelSpec == "" {
+		return "", fmt.Errorf("generateTaskDescription() [task.go]: resolved model name is empty")
+	}
+
+	modelRefs, err := models.ExpandProviderModelChain(resolvedModelSpec, sweSystem.ModelAliases)
 	if err != nil || len(modelRefs) == 0 {
 		return "", fmt.Errorf("generateTaskDescription() [task.go]: failed to parse resolved model name: %w", err)
+	}
+	for _, ref := range modelRefs {
+		if _, found := sweSystem.ModelProviders[strings.TrimSpace(ref.Provider)]; !found {
+			return "", fmt.Errorf("generateTaskDescription() [task.go]: provider not found: %s", strings.TrimSpace(ref.Provider))
+		}
 	}
 
 	providerName := strings.TrimSpace(modelRefs[0].Provider)
@@ -358,7 +374,7 @@ func generateTaskDescription(ctx context.Context, params taskCreateResolveParams
 	}
 
 	chatModel, err := newGenerationChatModelFromSpecFunc(
-		strings.TrimSpace(parameters.Model),
+		resolvedModelSpec,
 		sweSystem.ModelProviders,
 		nil,
 		sweSystem.Config,
