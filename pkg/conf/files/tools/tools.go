@@ -17,6 +17,7 @@ var Names = []string{
 	"vfsEdit",
 	"vfsFind",
 	"vfsGrep",
+	"vfsInsertAfterLine",
 	"vfsList",
 	"vfsMove",
 	"vfsPatch",

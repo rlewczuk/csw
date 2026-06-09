@@ -160,6 +160,12 @@ func RegisterVFSTools(registry *ToolRegistry, vfsImpl apis.VFS, lspClient lsp.LS
 	}
 	registry.Register("vfsReplaceLines", replaceLinesTool)
 
+	insertAfterLineTool := NewVFSInsertAfterLineTool(vfsImpl, lspClient)
+	if logger != nil {
+		insertAfterLineTool.SetLogger(logger)
+	}
+	registry.Register("vfsInsertAfterLine", insertAfterLineTool)
+
 	patchTool := NewVFSPatchTool(vfsImpl, lspClient)
 	if logger != nil {
 		patchTool.SetLogger(logger)

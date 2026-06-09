@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Insert text into an existing file immediately after a specific line number. Prefer this tool for adding imports, statements, functions, methods, configuration entries, or documentation to an existing file. First read the relevant file section with vfsRead and use the line numbers from that read result. Use line_number=0 to insert at the beginning of the file before the current first line. Do not use this tool to replace existing lines; use vfsReplaceLines for replacements. Do not use this tool for creating new files; use the file creation/write tool instead. The inserted text is added exactly as provided, so include the correct indentation and trailing newline when needed. The tool verifies the file version when expected_sha256 is provided and rejects stale edits if the file has changed since it was read.",
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "Path to the existing file to edit. Use the same path convention as vfsRead for this file."
+    },
+    "line_number": {
+      "type": "integer",
+      "description": "1-based line number after which to insert text. Use 0 to insert at the beginning of the file, before line 1. Must refer to a line from the latest vfsRead result unless inserting at the beginning."
+    },
+    "content": {
+      "type": "string",
+      "description": "Text to insert exactly as written. Include indentation exactly as it should appear in the file. Include a trailing newline if the inserted text should end before the next existing line."
+    },
+    "expected_sha256": {
+      "type": "string",
+      "description": "Optional SHA-256 hash of the file content from the latest vfsRead result. When provided, the edit is rejected if the file has changed since it was read."
+    }
+  },
+  "required": [
+    "path",
+    "line_number",
+    "content"
+  ],
+  "additionalProperties": false
+}
