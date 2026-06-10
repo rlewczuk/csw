@@ -1,27 +1,27 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Executes a bash command in the project directory and returns the output.",
+  "description": "Executes a bash command from the project root by default and returns output. Use for terminal/program execution, not routine file search/read/write/edit operations.",
   "type": "object",
   "properties": {
     "command": {
       "type": "string",
-      "description": "The bash command to execute."
+      "description": "The bash command to execute. Prefer dedicated agent tools for finding, searching, reading, editing, or writing files."
     },
     "workdir": {
       "type": "string",
-      "description": "Working directory to run the command in. If not specified, project root is used. If relative, it is relative to project root. If absolute, it is used as is but command will require permission from user."
+      "description": "Optional working directory for the process. Omit unless the command must run from a specific directory. Use this instead of 'cd <dir> && <command>'. Do not use when the command already uses absolute paths for commands and files. Relative paths are resolved from the project root; absolute paths may require user permission."
     },
     "timeout": {
       "type": "integer",
-      "description": "Timeout in seconds. If not specified, default timeout is used."
+      "description": "Timeout in seconds. If omitted, the default timeout is 120 seconds."
     },
     "background": {
       "type": "integer",
-      "description": "Background wait time in seconds. If set to N\u003e0, wait up to N seconds then return with current output, PID, and whether process is still running. If set to 0, return immediately with PID and running status."
+      "description": "Optional background wait time in seconds. Use 0 to return immediately with PID and status. Use N > 0 to wait up to N seconds, then return collected output, PID, and running status."
     },
     "max_output": {
       "type": "integer",
-      "description": "Maximum output size in bytes before saving output to a temporary file in .cswdata/worktmp/. If not specified, default is 2048 bytes. Use 0 for no safeguard."
+      "description": "Maximum returned output size in bytes before saving full output to .cswdata/worktmp/. Default is 2048 bytes. Use 0 only when unlimited output is necessary."
     }
   },
   "required": ["command"],
