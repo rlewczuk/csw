@@ -52,8 +52,7 @@
       },
       "minimax": {
         "vfsInsertAfterLine": true,
-        "vfsReplaceLines": true,
-        "vfsEdit": false
+        "vfsReplaceLines": true
       }
     }
   },

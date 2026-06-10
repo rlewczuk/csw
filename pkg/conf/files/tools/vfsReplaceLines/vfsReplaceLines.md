@@ -6,3 +6,5 @@ Usage:
 - `replacement` is the exact text that should replace the selected line range.
 - `expected_sha256` is optional. When provided, it must match the SHA-256 of the current file content or the edit is rejected.
 - The selected range must exist in the current file.
+
+Important: this tool is useful when you want to replace a chunk of code with a new one. If you just need to add lines after a specific point, use `vfsInsertAfterLine` instead. If you need to make a small change to an existing line, use `vfsEdit` tool.
